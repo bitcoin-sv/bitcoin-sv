@@ -7,6 +7,7 @@
 #include "chainparams.h"
 #include "config.h"
 #include "httpserver.h"
+#include "core_io.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "rpc/blockchain.h"
@@ -426,7 +427,7 @@ static bool rest_tx(Config &config, HTTPRequest *req,
 
         case RF_JSON: {
             UniValue objTx(UniValue::VOBJ);
-            TxToJSON(config, *tx, hashBlock, objTx);
+            TxToUniv(*tx, hashBlock, objTx);
             std::string strJSON = objTx.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
             req->WriteReply(HTTP_OK, strJSON);
@@ -643,7 +644,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
                 // include the script in a json output
                 UniValue o(UniValue::VOBJ);
-                ScriptPubKeyToJSON(config, coin.out.scriptPubKey, o, true);
+                ScriptPubKeyToUniv(coin.out.scriptPubKey, o, true);
                 utxo.push_back(Pair("scriptPubKey", o));
                 utxos.push_back(utxo);
             }
