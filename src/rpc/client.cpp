@@ -82,7 +82,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"listunspent", 0, "minconf"},
     {"listunspent", 1, "maxconf"},
     {"listunspent", 2, "addresses"},
-    {"getblock", 1, "verbose"},
+    {"getblock", 1, "verbosity"},
     {"getblockheader", 1, "verbose"},
     {"getchaintxstats", 0, "nblocks"},
     {"gettransaction", 1, "include_watchonly"},
@@ -221,9 +221,9 @@ UniValue RPCConvertNamedValues(const std::string &strMethod,
     return params;
 }
 
-const char *http_errorstring(int code) 
+const char *http_errorstring(int code)
 {
-    switch (code) 
+    switch (code)
     {
 #if LIBEVENT_VERSION_NUMBER >= 0x02010300
         case EVREQ_HTTP_TIMEOUT:
@@ -251,11 +251,11 @@ static void http_error_cb(enum evhttp_request_error err, void *ctx) {
 }
 #endif
 
-void http_request_done(struct evhttp_request *req, void *ctx) 
+void http_request_done(struct evhttp_request *req, void *ctx)
 {
     HTTPReply *reply = static_cast<HTTPReply *>(ctx);
 
-    if (req == nullptr) 
+    if (req == nullptr)
     {
         /**
          * If req is nullptr, it means an error occurred while connecting: the
@@ -268,7 +268,7 @@ void http_request_done(struct evhttp_request *req, void *ctx)
     reply->status = evhttp_request_get_response_code(req);
 
     struct evbuffer *buf = evhttp_request_get_input_buffer(req);
-    if (buf) 
+    if (buf)
     {
         size_t size = evbuffer_get_length(buf);
         const char *data = (const char *)evbuffer_pullup(buf, size);
@@ -277,7 +277,7 @@ void http_request_done(struct evhttp_request *req, void *ctx)
     }
 }
 
-UniValue CallRPC(const std::string &strMethod, const UniValue &params) 
+UniValue CallRPC(const std::string &strMethod, const UniValue &params)
 {
     std::string host;
     // In preference order, we choose the following for the port:
@@ -308,11 +308,11 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
 
     // Get credentials
     std::string strRPCUserColonPass;
-    if (gArgs.GetArg("-rpcpassword", "") == "") 
+    if (gArgs.GetArg("-rpcpassword", "") == "")
     {
         // Try fall back to cookie-based authentication if no password is
         // provided
-        if (!GetAuthCookie(&strRPCUserColonPass)) 
+        if (!GetAuthCookie(&strRPCUserColonPass))
         {
             throw std::runtime_error(strprintf(
                 _("Could not locate RPC credentials. No authentication cookie "
@@ -320,8 +320,8 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
                   "-rpcpassword and -stdinrpcpass.  Configuration file: (%s)"),
                 GetConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME)).string().c_str()));
         }
-    } 
-    else 
+    }
+    else
     {
         strRPCUserColonPass = gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", "");
     }
@@ -341,15 +341,15 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
     // check if we should use a special wallet endpoint
     std::string endpoint = "/";
     std::string walletName = gArgs.GetArg("-rpcwallet", "");
-    if (!walletName.empty()) 
+    if (!walletName.empty())
     {
         char *encodedURI = evhttp_uriencode(walletName.c_str(), walletName.size(), false);
-        if (encodedURI) 
+        if (encodedURI)
         {
             endpoint = "/wallet/" + std::string(encodedURI);
             free(encodedURI);
-        } 
-        else 
+        }
+        else
         {
             throw CConnectionFailed("uri-encode failed");
         }
@@ -358,43 +358,43 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
 
     // ownership moved to evcon in above call
     req.release();
-    if (r != 0) 
+    if (r != 0)
     {
         throw CConnectionFailed("send http request failed");
     }
 
     event_base_dispatch(base.get());
 
-    if (response.status == 0) 
+    if (response.status == 0)
     {
         throw CConnectionFailed(strprintf(
             "couldn't connect to server: %s (code %d)\n(make sure server is "
             "running and you are connecting to the correct RPC port)",
             http_errorstring(response.error), response.error));
     }
-    else if (response.status == HTTP_UNAUTHORIZED) 
+    else if (response.status == HTTP_UNAUTHORIZED)
     {
         throw std::runtime_error("incorrect rpcuser or rpcpassword (authorization failed)");
-    } 
+    }
     else if (response.status >= 400 && response.status != HTTP_BAD_REQUEST &&
                response.status != HTTP_NOT_FOUND &&
-               response.status != HTTP_INTERNAL_SERVER_ERROR) 
+               response.status != HTTP_INTERNAL_SERVER_ERROR)
     {
         throw std::runtime_error(strprintf("server returned HTTP error %d", response.status));
-    } 
-    else if (response.body.empty()) 
+    }
+    else if (response.body.empty())
     {
         throw std::runtime_error("no response from server");
     }
 
     // Parse reply
     UniValue valReply(UniValue::VSTR);
-    if (!valReply.read(response.body)) 
+    if (!valReply.read(response.body))
     {
         throw std::runtime_error("couldn't parse reply from server");
     }
     const UniValue &reply = valReply.get_obj();
-    if (reply.empty()) 
+    if (reply.empty())
     {
         throw std::runtime_error("expected reply to have result, error and id properties");
     }
@@ -406,7 +406,7 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
 // This function returns either one of EXIT_ codes when it's expected to stop
 // the process or CONTINUE_EXECUTION when it's expected to continue further.
 //
-int AppInitRPC(int argc, char *argv[], const std::string& usage_format, std::function<std::string(void)> help_message) 
+int AppInitRPC(int argc, char *argv[], const std::string& usage_format, std::function<std::string(void)> help_message)
 {
     try
     {
@@ -417,13 +417,13 @@ int AppInitRPC(int argc, char *argv[], const std::string& usage_format, std::fun
        fprintf(stderr, "Error parsing program options: %s\n", e.what());
        return EXIT_FAILURE;
     }
-    if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") || gArgs.IsArgSet("-help") || gArgs.IsArgSet("-version")) 
-    { 
+    if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") || gArgs.IsArgSet("-help") || gArgs.IsArgSet("-version"))
+    {
         std::string usage = strprintf(_("%s RPC client version"), _(PACKAGE_NAME)) + " " + FormatFullVersion() + "\n";
-        
+
         if (!gArgs.IsArgSet("-version"))
             usage += usage_format + "\n" + help_message();
- 
+
         fprintf(stdout, "%s", usage.c_str());
         if (argc < 2)
         {
@@ -432,32 +432,32 @@ int AppInitRPC(int argc, char *argv[], const std::string& usage_format, std::fun
         }
         return EXIT_SUCCESS;
     }
-    if (!fs::is_directory(GetDataDir(false))) 
+    if (!fs::is_directory(GetDataDir(false)))
     {
         fprintf(stderr, "Error: Specified data directory \"%s\" does not exist.\n", gArgs.GetArg("-datadir", "").c_str());
         return EXIT_FAILURE;
     }
-    try 
+    try
     {
         gArgs.ReadConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME));
-    } 
-    catch (const std::exception &e) 
+    }
+    catch (const std::exception &e)
     {
         fprintf(stderr, "Error reading configuration file: %s\n", e.what());
         return EXIT_FAILURE;
     }
     // Check for -testnet or -regtest parameter (BaseParams() calls are only
     // valid after this clause)
-    try 
+    try
     {
         SelectBaseParams(ChainNameFromCommandLine());
-    } 
-    catch (const std::exception &e) 
+    }
+    catch (const std::exception &e)
     {
         fprintf(stderr, "Error: %s\n", e.what());
         return EXIT_FAILURE;
     }
-    if (gArgs.GetBoolArg("-rpcssl", false)) 
+    if (gArgs.GetBoolArg("-rpcssl", false))
     {
         fprintf(stderr, "Error: SSL mode for RPC (-rpcssl) is no longer supported.\n");
         return EXIT_FAILURE;
