@@ -9,6 +9,7 @@
 #include <limits>
 #include <map>
 #include <string>
+#include <chrono>
 
 #include <boost/preprocessor/cat.hpp>
 #include <boost/preprocessor/stringize.hpp>
@@ -37,11 +38,15 @@ BENCHMARK(CODE_TO_TIME);
 
 namespace benchmark {
 
+using clock = std::chrono::high_resolution_clock;
+using time_point = clock::time_point;
+using duration = clock::duration;
 class State {
     std::string name;
-    double maxElapsed;
-    double beginTime;
-    double lastTime, minTime, maxTime;
+    duration maxElapsed;
+    time_point beginTime;
+    time_point lastTime;
+    duration minTime, maxTime;
     uint64_t count;
     uint64_t countMask;
     uint64_t beginCycles;
@@ -50,10 +55,10 @@ class State {
     uint64_t maxCycles;
 
 public:
-    State(std::string _name, double _maxElapsed)
+    State(std::string _name, duration  _maxElapsed)
         : name(_name), maxElapsed(_maxElapsed), count(0) {
-        minTime = std::numeric_limits<double>::max();
-        maxTime = std::numeric_limits<double>::min();
+        minTime = duration::max();
+        maxTime = duration::zero();
         minCycles = std::numeric_limits<uint64_t>::max();
         maxCycles = std::numeric_limits<uint64_t>::min();
         countMask = 1;
@@ -70,7 +75,7 @@ class BenchRunner {
 public:
     BenchRunner(std::string name, BenchFunction func);
 
-    static void RunAll(double elapsedTimeForOne = 1.0);
+    static void RunAll(duration elapsedTimeForOne = std::chrono::seconds(1));
 };
 } // namespace benchmark
 
