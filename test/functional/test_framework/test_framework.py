@@ -108,7 +108,7 @@ class BitcoinTestFramework():
 
         PortSeed.n = self.options.port_seed
 
-        os.environ['PATH'] = self.options.srcdir + ":" + os.environ['PATH']
+        os.environ['PATH'] = self.options.srcdir + os.pathsep + os.environ['PATH']
 
         check_json_precision()
 
@@ -156,17 +156,18 @@ class BitcoinTestFramework():
                 "Note: bitcoinds were not stopped and may still be running")
 
         if not self.options.nocleanup and not self.options.noshutdown and success != TestStatus.FAILED:
-            self.log.info("Cleaning up")
-            shutil.rmtree(self.options.tmpdir)
+            self.log.info("Cleaning up {} on exit".format(self.options.tmpdir))
+            cleanup_tree_on_exit = True
         else:
             self.log.warning("Not cleaning up dir %s" % self.options.tmpdir)
+            cleanup_tree_on_exit = False
             if os.getenv("PYTHON_DEBUG", ""):
                 # Dump the end of the debug logs, to aid in debugging rare
                 # travis failures.
                 import glob
-                filenames = [self.options.tmpdir + "/test_framework.log"]
-                filenames += glob.glob(self.options.tmpdir +
-                                       "/node*/regtest/bitcoind.log")
+                filenames = [os.path.join(self.options.tmpdir, "test_framework.log")]
+                filenames += glob.glob(os.path.join(self.options.tmpdir,
+                                       "node*", "regtest", "bitcoind.log"))
                 MAX_LINES_TO_PRINT = 1000
                 for fn in filenames:
                     try:
@@ -176,18 +177,22 @@ class BitcoinTestFramework():
                     except OSError:
                         print("Opening file %s failed." % fn)
                         traceback.print_exc()
+            
 
         if success == TestStatus.PASSED:
             self.log.info("Tests successful")
-            sys.exit(TEST_EXIT_PASSED)
+            exit_code = TEST_EXIT_PASSED
         elif success == TestStatus.SKIPPED:
             self.log.info("Test skipped")
-            sys.exit(TEST_EXIT_SKIPPED)
+            exit_code = TEST_EXIT_SKIPPED
         else:
-            self.log.error(
-                "Test failed. Test logging available at %s/test_framework.log", self.options.tmpdir)
-            logging.shutdown()
-            sys.exit(TEST_EXIT_FAILED)
+            self.log.error("Test failed. Test logging available at %s/test_framework.log", self.options.tmpdir)
+            self.log.error("Hint: Call {} '{}' to consolidate all logs".format(os.path.normpath(os.path.dirname(os.path.realpath(__file__)) + "/../combine_logs.py"), self.options.tmpdir))
+            exit_code = TEST_EXIT_FAILED
+        logging.shutdown()
+        if cleanup_tree_on_exit:
+            shutil.rmtree(self.options.tmpdir)
+        sys.exit(exit_code)
 
     # Methods to override in subclass test scripts.
     def set_test_params(self):
