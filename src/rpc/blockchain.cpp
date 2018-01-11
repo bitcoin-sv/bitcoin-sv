@@ -1155,7 +1155,7 @@ UniValue verifychain(const Config &config, const JSONRPCRequest &request) {
 }
 
 /** Implementation of IsSuperMajority with better feedback */
-static UniValue SoftForkMajorityDesc(int version, CBlockIndex *pindex,
+static UniValue SoftForkMajorityDesc(int version, const CBlockIndex *pindex,
                                      const Consensus::Params &consensusParams) {
     UniValue rv(UniValue::VOBJ);
     bool activated = false;
@@ -1175,7 +1175,7 @@ static UniValue SoftForkMajorityDesc(int version, CBlockIndex *pindex,
 }
 
 static UniValue SoftForkDesc(const std::string &name, int version,
-                             CBlockIndex *pindex,
+                            const CBlockIndex *pindex,
                              const Consensus::Params &consensusParams) {
     UniValue rv(UniValue::VOBJ);
     rv.push_back(Pair("id", name));
