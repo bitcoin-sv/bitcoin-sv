@@ -66,14 +66,22 @@ double GetDifficulty(const CBlockIndex *blockindex) {
     return GetDifficultyFromBits(blockindex->nBits);
 }
 
-UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
+static int ComputeNextBlockAndDepth(const CBlockIndex* tip, const CBlockIndex* blockindex, const CBlockIndex*& next)
+{
+    next = tip->GetAncestor(blockindex->nHeight + 1);
+    if (next && next->pprev == blockindex) {
+        return tip->nHeight - blockindex->nHeight + 1;
+    }
+    next = nullptr;
+    return blockindex == tip ? 1 : -1;
+}
+
+UniValue blockheaderToJSON(const CBlockIndex* tip, const CBlockIndex* blockindex)
+{
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
-    int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
-    }
+    const CBlockIndex* pnext;
+    int confirmations = ComputeNextBlockAndDepth(tip, blockindex, pnext);
     result.push_back(Pair("confirmations", confirmations));
     result.push_back(Pair("height", blockindex->nHeight));
     result.push_back(Pair("version", blockindex->nVersion));
@@ -92,7 +100,6 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
         result.push_back(Pair("previousblockhash",
                               blockindex->pprev->GetBlockHash().GetHex()));
     }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
     if (pnext) {
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     }
@@ -100,14 +107,11 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
 }
 
 UniValue blockToJSON(const Config &config, const CBlock &block,
-                     const CBlockIndex *blockindex, bool txDetails) {
+                     const CBlockIndex *tip, const CBlockIndex*blockindex, bool txDetails) {
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
-    int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
-    }
+    const CBlockIndex* pnext;
+    int confirmations = ComputeNextBlockAndDepth(tip, blockindex, pnext);
     result.push_back(Pair("confirmations", confirmations));
     result.push_back(Pair(
         "size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
@@ -138,7 +142,6 @@ UniValue blockToJSON(const Config &config, const CBlock &block,
         result.push_back(Pair("previousblockhash",
                               blockindex->pprev->GetBlockHash().GetHex()));
     }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
     if (pnext) {
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     }
@@ -753,7 +756,7 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
         return strHex;
     }
 
-    return blockheaderToJSON(pblockindex);
+    return blockheaderToJSON(chainActive.Tip(), pblockindex);
 }
 
 UniValue getblock(const Config &config, const JSONRPCRequest &request) {
@@ -847,7 +850,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         return strHex;
     }
 
-    return blockToJSON(config, block, pblockindex);
+    return blockToJSON(config, block, chainActive.Tip(), pblockindex);
 }
 
 struct CCoinsStats {
