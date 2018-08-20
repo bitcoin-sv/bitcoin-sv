@@ -140,6 +140,55 @@ static valtype NegativeValtype(const valtype &v) {
     return r;
 }
 
+// convert the binary string into a vector of bytes
+// Expects str to contain 8*n bits.
+// see self_bitpattern_test for examples
+static valtype to_bitpattern(const char *str) {
+    size_t len = strlen(str); 
+ 
+    valtype val((len - 1) / 8 + 1, 0); 
+ 
+    const char *pin = &str[len - 1]; 
+    for (size_t i = 0; i < len; i++) {
+        int byte_idx = (len - 1 - i) / 8;
+        int bit_idx = i % 8; 
+ 
+        int8_t mask = 1 << bit_idx; 
+ 
+        if (*pin == '0') {
+            val[byte_idx] &= ~mask; 
+        } else {
+            val[byte_idx] |= mask; 
+        } 
+        pin--; 
+    } 
+    return val; 
+}
+
+// test the bitpattern function
+BOOST_AUTO_TEST_CASE(self_bitpattern_test)
+{
+    BOOST_CHECK(valtype({0x01}) == to_bitpattern("00000001"));
+    BOOST_CHECK(valtype({0x80}) == to_bitpattern("10000000"));
+    BOOST_CHECK(valtype({0x84}) == to_bitpattern("10000100"));
+    BOOST_CHECK(valtype({0xFF}) == to_bitpattern("11111111"));
+    BOOST_CHECK(valtype({0x00}) == to_bitpattern("00000000"));
+
+    BOOST_CHECK(valtype({0x00, 0x00}) == to_bitpattern("0000000000000000"));
+    BOOST_CHECK(valtype({0xFF, 0xFF}) == to_bitpattern("1111111111111111"));
+    BOOST_CHECK(valtype({0x01, 0x01}) == to_bitpattern("0000000100000001"));
+    BOOST_CHECK(valtype({0x80, 0x80}) == to_bitpattern("1000000010000000"));
+    BOOST_CHECK(valtype({0xFF, 0x00}) == to_bitpattern("1111111100000000"));
+    BOOST_CHECK(valtype({0xAA, 0x55}) == to_bitpattern("1010101001010101"));
+
+    BOOST_CHECK(valtype({0x00, 0x00, 0x00}) == to_bitpattern("000000000000000000000000"));
+    BOOST_CHECK(valtype({0xFF, 0xFF, 0xFF}) == to_bitpattern("111111111111111111111111"));
+    BOOST_CHECK(valtype({0xFF, 0x00, 0xAA}) == to_bitpattern("111111110000000010101010"));
+    BOOST_CHECK(valtype({0xAA, 0x55, 0x00}) == to_bitpattern("101010100101010100000000"));
+
+    BOOST_CHECK(valtype({0x9F, 0x11, 0xF5, 0x55}) == to_bitpattern("10011111000100011111010101010101"));
+}
+
 BOOST_AUTO_TEST_CASE(negative_valtype_test) {
     // Test zero values
     BOOST_CHECK(NegativeValtype({}) == valtype{});
@@ -459,6 +508,137 @@ BOOST_AUTO_TEST_CASE(invert_test)
     CheckUnaryOpMagnetic({0xFF}, OP_INVERT, {0x00});
     CheckUnaryOpMagnetic({0xFF, 0xA0, 0xCE, 0xA0, 0x96, 0x12}, OP_INVERT, {0x00, 0x5F, 0x31, 0x5F, 0x69, 0xED});
 } 
+
+static void CheckShiftOp(const valtype &x, const valtype &n, opcodetype op, const valtype &expected) {
+    CheckBinaryOpMagnetic(x, n, op, expected);
+}
+
+BOOST_AUTO_TEST_CASE(lshift_test)
+{ 
+    CheckShiftOp({}, {},     OP_LSHIFT, {}); 
+    CheckShiftOp({}, {0x01}, OP_LSHIFT, {}); 
+    CheckShiftOp({}, {0x02}, OP_LSHIFT, {}); 
+    CheckShiftOp({}, {0x07}, OP_LSHIFT, {}); 
+    CheckShiftOp({}, {0x08}, OP_LSHIFT, {}); 
+    CheckShiftOp({}, {0x09}, OP_LSHIFT, {}); 
+    CheckShiftOp({}, {0x0F}, OP_LSHIFT, {}); 
+    CheckShiftOp({}, {0x10}, OP_LSHIFT, {}); 
+    CheckShiftOp({}, {0x11}, OP_LSHIFT, {}); 
+ 
+    CheckShiftOp({0xFF}, {},     OP_LSHIFT, to_bitpattern("11111111")); 
+    CheckShiftOp({0xFF}, {0x01}, OP_LSHIFT, to_bitpattern("11111110")); 
+    CheckShiftOp({0xFF}, {0x02}, OP_LSHIFT, to_bitpattern("11111100")); 
+    CheckShiftOp({0xFF}, {0x03}, OP_LSHIFT, to_bitpattern("11111000")); 
+    CheckShiftOp({0xFF}, {0x04}, OP_LSHIFT, to_bitpattern("11110000")); 
+    CheckShiftOp({0xFF}, {0x05}, OP_LSHIFT, to_bitpattern("11100000")); 
+    CheckShiftOp({0xFF}, {0x06}, OP_LSHIFT, to_bitpattern("11000000")); 
+    CheckShiftOp({0xFF}, {0x07}, OP_LSHIFT, to_bitpattern("10000000")); 
+    CheckShiftOp({0xFF}, {0x08}, OP_LSHIFT, to_bitpattern("00000000")); 
+ 
+    CheckShiftOp({0xFF}, {0x01}, OP_LSHIFT, {0xFE}); 
+    CheckShiftOp({0xFF}, {0x02}, OP_LSHIFT, {0xFC}); 
+    CheckShiftOp({0xFF}, {0x03}, OP_LSHIFT, {0xF8}); 
+    CheckShiftOp({0xFF}, {0x04}, OP_LSHIFT, {0xF0}); 
+    CheckShiftOp({0xFF}, {0x05}, OP_LSHIFT, {0xE0}); 
+    CheckShiftOp({0xFF}, {0x06}, OP_LSHIFT, {0xC0}); 
+    CheckShiftOp({0xFF}, {0x07}, OP_LSHIFT, {0x80});
+
+    // bitpattern, not a number so not reduced to zero bytes
+    CheckShiftOp({0xFF}, {0x08}, OP_LSHIFT, {0x00});
+
+    // shift single bit over byte boundary
+    CheckShiftOp({0x00, 0x80}, {0x01}, OP_LSHIFT, {0x01, 0x00});
+    CheckShiftOp({0x00, 0x80, 0x00}, {0x01}, OP_LSHIFT, {0x01, 0x00, 0x00});
+    CheckShiftOp({0x00, 0x00, 0x80}, {0x01}, OP_LSHIFT, {0x00, 0x01, 0x00});
+    CheckShiftOp({0x80, 0x00, 0x00}, {0x01}, OP_LSHIFT, {0x00, 0x00, 0x00});
+
+    // {0x9F, 0x11, 0xF5, 0x55} is a sequence of bytes that is equal to the bit pattern
+    // "1001 1111 0001 0001 1111 0101 0101 0101"
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {},     OP_LSHIFT, to_bitpattern("10011111000100011111010101010101"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x01}, OP_LSHIFT, to_bitpattern("00111110001000111110101010101010"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x02}, OP_LSHIFT, to_bitpattern("01111100010001111101010101010100"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x03}, OP_LSHIFT, to_bitpattern("11111000100011111010101010101000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x04}, OP_LSHIFT, to_bitpattern("11110001000111110101010101010000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x05}, OP_LSHIFT, to_bitpattern("11100010001111101010101010100000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x06}, OP_LSHIFT, to_bitpattern("11000100011111010101010101000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x07}, OP_LSHIFT, to_bitpattern("10001000111110101010101010000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x08}, OP_LSHIFT, to_bitpattern("00010001111101010101010100000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x09}, OP_LSHIFT, to_bitpattern("00100011111010101010101000000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0A}, OP_LSHIFT, to_bitpattern("01000111110101010101010000000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0B}, OP_LSHIFT, to_bitpattern("10001111101010101010100000000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0C}, OP_LSHIFT, to_bitpattern("00011111010101010101000000000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0D}, OP_LSHIFT, to_bitpattern("00111110101010101010000000000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0E}, OP_LSHIFT, to_bitpattern("01111101010101010100000000000000"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_LSHIFT, to_bitpattern("11111010101010101000000000000000"));
+
+    // second parameter, n < 0 - should produce error
+    CheckErrorForAllFlagsMagnetic({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_LSHIFT,
+                          SCRIPT_ERR_INVALID_NUMBER_RANGE); 
+} 
+ 
+BOOST_AUTO_TEST_CASE(rshift_test) 
+{ 
+    CheckShiftOp({}, {},     OP_RSHIFT, {}); 
+    CheckShiftOp({}, {0x01}, OP_RSHIFT, {}); 
+    CheckShiftOp({}, {0x02}, OP_RSHIFT, {}); 
+    CheckShiftOp({}, {0x07}, OP_RSHIFT, {}); 
+    CheckShiftOp({}, {0x08}, OP_RSHIFT, {}); 
+    CheckShiftOp({}, {0x09}, OP_RSHIFT, {}); 
+    CheckShiftOp({}, {0x0F}, OP_RSHIFT, {}); 
+    CheckShiftOp({}, {0x10}, OP_RSHIFT, {}); 
+    CheckShiftOp({}, {0x11}, OP_RSHIFT, {}); 
+ 
+    CheckShiftOp({0xFF}, {},     OP_RSHIFT, to_bitpattern("11111111")); 
+    CheckShiftOp({0xFF}, {0x01}, OP_RSHIFT, to_bitpattern("01111111")); 
+    CheckShiftOp({0xFF}, {0x02}, OP_RSHIFT, to_bitpattern("00111111")); 
+    CheckShiftOp({0xFF}, {0x03}, OP_RSHIFT, to_bitpattern("00011111")); 
+    CheckShiftOp({0xFF}, {0x04}, OP_RSHIFT, to_bitpattern("00001111")); 
+    CheckShiftOp({0xFF}, {0x05}, OP_RSHIFT, to_bitpattern("00000111")); 
+    CheckShiftOp({0xFF}, {0x06}, OP_RSHIFT, to_bitpattern("00000011")); 
+    CheckShiftOp({0xFF}, {0x07}, OP_RSHIFT, to_bitpattern("00000001")); 
+    CheckShiftOp({0xFF}, {0x08}, OP_RSHIFT, to_bitpattern("00000000")); 
+
+ 
+    CheckShiftOp({0xFF}, {0x01}, OP_RSHIFT, {0x7F}); 
+    CheckShiftOp({0xFF}, {0x02}, OP_RSHIFT, {0x3F}); 
+    CheckShiftOp({0xFF}, {0x03}, OP_RSHIFT, {0x1F}); 
+    CheckShiftOp({0xFF}, {0x04}, OP_RSHIFT, {0x0F});
+    CheckShiftOp({0xFF}, {0x05}, OP_RSHIFT, {0x07}); 
+    CheckShiftOp({0xFF}, {0x06}, OP_RSHIFT, {0x03}); 
+    CheckShiftOp({0xFF}, {0x07}, OP_RSHIFT, {0x01});
+
+    // bitpattern, not a number so not reduced to zero bytes
+    CheckShiftOp({0xFF}, {0x08}, OP_RSHIFT, {0x00});
+
+    // shift single bit over byte boundary
+    CheckShiftOp({0x01, 0x00}, {0x01}, OP_RSHIFT, {0x00, 0x80});
+    CheckShiftOp({0x01, 0x00, 0x00}, {0x01}, OP_RSHIFT, {0x00, 0x80, 0x00});
+    CheckShiftOp({0x00, 0x01, 0x00}, {0x01}, OP_RSHIFT, {0x00, 0x00, 0x80});
+    CheckShiftOp({0x00, 0x00, 0x01}, {0x01}, OP_RSHIFT, {0x00, 0x00, 0x00});
+
+    // {0x9F, 0x11, 0xF5, 0x55} is a sequence of bytes that is equal to the bit pattern
+    // "1001 1111 0001 0001 1111 0101 0101 0101"
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {},     OP_RSHIFT, to_bitpattern("10011111000100011111010101010101"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x01}, OP_RSHIFT, to_bitpattern("01001111100010001111101010101010"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x02}, OP_RSHIFT, to_bitpattern("00100111110001000111110101010101"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x03}, OP_RSHIFT, to_bitpattern("00010011111000100011111010101010"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x04}, OP_RSHIFT, to_bitpattern("00001001111100010001111101010101"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x05}, OP_RSHIFT, to_bitpattern("00000100111110001000111110101010"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x06}, OP_RSHIFT, to_bitpattern("00000010011111000100011111010101"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x07}, OP_RSHIFT, to_bitpattern("00000001001111100010001111101010"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x08}, OP_RSHIFT, to_bitpattern("00000000100111110001000111110101"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x09}, OP_RSHIFT, to_bitpattern("00000000010011111000100011111010"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0A}, OP_RSHIFT, to_bitpattern("00000000001001111100010001111101"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0B}, OP_RSHIFT, to_bitpattern("00000000000100111110001000111110"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0C}, OP_RSHIFT, to_bitpattern("00000000000010011111000100011111"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0D}, OP_RSHIFT, to_bitpattern("00000000000001001111100010001111"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0E}, OP_RSHIFT, to_bitpattern("00000000000000100111110001000111"));
+    CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_RSHIFT, to_bitpattern("00000000000000010011111000100011"));
+
+    // second parameter, n < 0 - should produce error
+    CheckErrorForAllFlagsMagnetic({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT,
+                          SCRIPT_ERR_INVALID_NUMBER_RANGE);
+}
 
 /**
  * String opcodes.
