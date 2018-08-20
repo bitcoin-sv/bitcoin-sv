@@ -122,6 +122,11 @@ static void CheckBinaryOp(const valtype &a, const valtype &b, opcodetype op,
     CheckTestResultForAllFlags({a, b}, CScript() << op, {expected});
 }
 
+static void CheckBinaryOpMagnetic(const valtype &a, const valtype &b, opcodetype op,
+                          const valtype &expected) {
+    CheckTestResultForAllFlagsMagnetic({a, b}, CScript() << op, {expected});
+}
+
 static valtype NegativeValtype(const valtype &v) {
     valtype r(v);
     if (r.size() > 0) {
@@ -686,6 +691,46 @@ BOOST_AUTO_TEST_CASE(type_conversion_test) {
 /**
  * Arithmetic Opcodes
  */
+static void CheckMul(const valtype &a, const valtype &b, const valtype &expected) 
+{ 
+    // Negative values for multiplication
+    CheckBinaryOpMagnetic(a, b, OP_MUL, expected);
+    CheckBinaryOpMagnetic(a, NegativeValtype(b), OP_MUL, NegativeValtype(expected));
+    CheckBinaryOpMagnetic(NegativeValtype(a), b, OP_MUL, NegativeValtype(expected));
+    CheckBinaryOpMagnetic(NegativeValtype(a), NegativeValtype(b), OP_MUL, expected);
+ 
+    // Commutativity 
+    CheckBinaryOpMagnetic(b, a, OP_MUL, expected);
+    CheckBinaryOpMagnetic(b, NegativeValtype(a), OP_MUL, NegativeValtype(expected));
+    CheckBinaryOpMagnetic(NegativeValtype(b), a, OP_MUL, NegativeValtype(expected));
+    CheckBinaryOpMagnetic(NegativeValtype(b), NegativeValtype(a), OP_MUL, expected);
+
+    // Multiplication identities 
+    CheckBinaryOpMagnetic(a, {0x01}, OP_MUL, a);
+    CheckBinaryOpMagnetic(a, {0x81}, OP_MUL, NegativeValtype(a));
+    CheckBinaryOpMagnetic(a, {}, OP_MUL, {});
+
+    CheckBinaryOpMagnetic({0x01}, b, OP_MUL, b);
+    CheckBinaryOpMagnetic({0x81}, b, OP_MUL, NegativeValtype(b));
+    CheckBinaryOpMagnetic({}, b, OP_MUL, {});
+}
+
+BOOST_AUTO_TEST_CASE(mul_test) 
+{
+    CheckMul({0x05}, {0x06}, {0x1E});
+    CheckMul({0x05}, {0x26}, {0xBE, 0x00});
+    CheckMul({0x45}, {0x26}, {0x3E, 0x0A});
+    CheckMul({0x02}, {0x56, 0x24}, {0xAC, 0x48});
+    CheckMul({0x05}, {0x26, 0x03, 0x32}, {0xBE, 0x0F, 0xFA, 0x00});
+    CheckMul({0x06}, {0x26, 0x03, 0x32, 0x04}, {0xE4, 0x12, 0x2C, 0x19});
+    CheckMul({0xA0, 0xA0}, {0xF5, 0xE4}, {0x20, 0xB9, 0xDD, 0x0C}); // -20A0*-64F5=0CDDB920
+    CheckMul({0x05, 0x26}, {0x26, 0x03, 0x32}, {0xBE, 0xB3, 0x71, 0x6D, 0x07});
+    CheckMul({0x06, 0x26}, {0x26, 0x03, 0x32, 0x04}, {0xE4, 0xB6, 0xA3, 0x85, 0x9F, 0x00});
+    CheckMul({0x05, 0x26, 0x09}, {0x26, 0x03, 0x32}, {0xBE, 0xB3, 0xC7, 0x89, 0xC9, 0x01});
+    CheckMul({0x06, 0x26, 0x09}, {0x26, 0x03, 0x32, 0x04}, {0xE4, 0xB6, 0xF9, 0xA1, 0x61, 0x26});
+    CheckMul({0x06, 0x26, 0x09, 0x34}, {0x26, 0x03, 0x32, 0x04}, {0xE4, 0xB6, 0xF9, 0x59, 0x05, 0x4F, 0xDA, 0x00});
+}
+
 static void CheckDivMod(const valtype &a, const valtype &b,
                         const valtype &divExpected,
                         const valtype &modExpected) {
