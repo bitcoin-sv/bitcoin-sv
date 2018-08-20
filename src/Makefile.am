@@ -1,4 +1,5 @@
 # Copyright (c) 2013-2016 The Bitcoin Core developers
+# Copyright (c) 2018 The Bitcoin SV developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -313,6 +314,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/sighashtype.h \
   script/interpreter.cpp \
   script/interpreter.h \
+  script/script_flags.h \
   script/script.cpp \
   script/script.h \
   script/script_error.cpp \
