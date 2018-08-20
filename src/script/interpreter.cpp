@@ -283,7 +283,6 @@ static bool CheckMinimalPush(const valtype &data, opcodetype opcode) {
 
 static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
     switch (opcode) {
-        case OP_INVERT:
         case OP_2MUL:
         case OP_2DIV:
         case OP_LSHIFT:
@@ -291,10 +290,10 @@ static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
             // Disabled opcodes.
             return true;
 
+        case OP_INVERT:
         case OP_MUL:
             // Opcodes that have been reenabled.
-            if ((flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0) 
-            {
+            if ((flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0) {
                 return true;
             }
             break;
@@ -842,6 +841,19 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                         // And pop vch2.
                         popstack(stack);
+                    } break;
+
+                    case OP_INVERT: {
+                        // (x -- out)
+                        if (stack.size() < 1) {
+                            return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        valtype &vch1 = stacktop(-1);
+                        // To avoid allocating, we modify vch1 in place
+                        for(size_t i=0; i<vch1.size(); i++)
+                        {
+                            vch1[i] = ~vch1[i];
+                        }
                     } break;
 
                     case OP_EQUAL:

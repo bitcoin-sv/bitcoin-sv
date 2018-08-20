@@ -127,6 +127,10 @@ static void CheckBinaryOpMagnetic(const valtype &a, const valtype &b, opcodetype
     CheckTestResultForAllFlagsMagnetic({a, b}, CScript() << op, {expected});
 }
 
+static void CheckUnaryOpMagnetic(const valtype &a, opcodetype op, const valtype &expected) {
+    CheckTestResultForAllFlagsMagnetic({a}, CScript() << op, {expected});
+}
+
 static valtype NegativeValtype(const valtype &v) {
     valtype r(v);
     if (r.size() > 0) {
@@ -447,6 +451,14 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
     CheckAllBitwiseOpErrors({{}, a}, SCRIPT_ERR_INVALID_OPERAND_SIZE);
     CheckAllBitwiseOpErrors({b, {}}, SCRIPT_ERR_INVALID_OPERAND_SIZE);
 }
+
+BOOST_AUTO_TEST_CASE(invert_test)
+{ 
+    CheckUnaryOpMagnetic({},     OP_INVERT, {});
+    CheckUnaryOpMagnetic({0x00}, OP_INVERT, {0xFF});
+    CheckUnaryOpMagnetic({0xFF}, OP_INVERT, {0x00});
+    CheckUnaryOpMagnetic({0xFF, 0xA0, 0xCE, 0xA0, 0x96, 0x12}, OP_INVERT, {0x00, 0x5F, 0x31, 0x5F, 0x69, 0xED});
+} 
 
 /**
  * String opcodes.
