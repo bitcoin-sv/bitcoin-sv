@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "interpreter.h"
+#include "script_flags.h"
 
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
@@ -402,6 +403,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     }
     int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+    bool isMagnetic = (flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) != 0;
 
     try {
         while (pc < pend) {
@@ -418,7 +420,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             }
 
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if (opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT) {
+            if (!isMagnetic && opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
 
@@ -1262,7 +1264,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
                         nOpCount += nKeysCount;
-                        if (nOpCount > MAX_OPS_PER_SCRIPT) {
+                        if (!isMagnetic && nOpCount > MAX_OPS_PER_SCRIPT) {
                             return set_error(serror, SCRIPT_ERR_OP_COUNT);
                         }
                         int ikey = ++i;

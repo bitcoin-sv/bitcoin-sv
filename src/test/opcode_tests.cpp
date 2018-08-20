@@ -7,6 +7,8 @@
 
 #include "policy/policy.h"
 #include "script/interpreter.h"
+#include "script/sign.h"
+#include "keystore.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -1056,5 +1058,114 @@ BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests) {
     CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x4e, 0x67, 0xab, 0x21}, {},
                 {0xbb, 0xf0, 0x5d, 0x03});
 }
+
+static size_t NonPushOpCodeCount(const CScript& script)
+{ 
+    CScript::const_iterator pc = script.begin(); 
+    CScript::const_iterator pend = script.end(); 
+    size_t cnt = 0; 
+    opcodetype opcode; 
+    valtype value; 
+    while (pc < pend) 
+    { 
+        script.GetOp(pc, opcode, value); 
+        if (opcode > OP_16) 
+             ++cnt; 
+    } 
+    return cnt; 
+} 
+ 
+static void CheckTestForOpCodeLimit(const stacktype &original_stack, 
+                                       const CScript &script, 
+                                       const stacktype &expected, 
+                                       const BaseSignatureChecker& sigchecker) 
+{ 
+    std::array<uint32_t, 3> release_dependent_flagset{ 
+        {0, SCRIPT_ENABLE_MAGNETIC_OPCODES}}; 
+
+    for (uint32_t std_flags : flagset) 
+    { 
+        for(uint32_t rdep_flags : release_dependent_flagset) 
+        { 
+            uint32_t flags = std_flags | rdep_flags; 
+
+            ScriptError err = SCRIPT_ERR_OK; 
+            stacktype stack{original_stack}; 
+            bool r = EvalScript(stack, script, flags, sigchecker, &err); 
+
+            if(   (rdep_flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0  
+               && NonPushOpCodeCount(script) > MAX_OPS_PER_SCRIPT) 
+            { 
+                BOOST_CHECK(!r); 
+            }
+            else 
+            { 
+                BOOST_CHECK(r); 
+            } 
+	} 
+    } 
+} 
+
+static void add_30(CScript& script) 
+{   
+    script << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD                                  
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
+           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD; 
+} 
+ 
+BOOST_AUTO_TEST_CASE(opcode_nolimit_tests)  
+{ 
+    DummySignatureCreator sigfactory(nullptr); 
+    const BaseSignatureChecker& sigchecker = sigfactory.Checker(); 
+
+    // test with one opcode
+    CheckTestForOpCodeLimit({}, CScript() << OP_1 << OP_1 << OP_ADD, {valtype{OP_1}}, sigchecker);
+
+    {
+        CScript script; 
+        script << OP_1;
+
+        // test with 6*30=180 opcodes, which is under MAX_OPS_PER_SCRIPT
+        add_30(script);add_30(script);add_30(script); 
+        add_30(script);add_30(script);add_30(script); 
+        CheckTestForOpCodeLimit({}, script, {valtype{181}}, sigchecker); 
+
+        // test with 6*30+3*30=270 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
+        add_30(script);add_30(script);add_30(script); 
+        CheckTestForOpCodeLimit({}, script, {valtype{0x0F, 0x01}}, sigchecker); 
+    } 
+
+    // Check OP_CHECKMULTISIG/OP_CHECKMULTISIGVERIFY as this  
+    // explicitly checks MAX_OPS_PER_SCRIPT.  
+    { 
+        CScript script; 
+        script << OP_1; 
+        add_30(script);add_30(script);add_30(script); 
+        add_30(script);add_30(script);add_30(script); 
+ 
+        // Create multi-sig signatures + public keys.  
+        std::vector<uint8_t> signature;  // dummy signature 
+        sigfactory.CreateSig(signature, CKeyID(), CScript()); 
+        std::vector<uint8_t> publickey(33, '\0'); // dummy pubkey 
+        publickey[0] = '\x02'; 
+        script << OP_0 << signature << signature << OP_2 
+               << publickey << publickey << publickey << OP_3 
+               << OP_CHECKMULTISIG;
+
+        // test with 6*30=180 opcodes, which is under MAX_OPS_PER_SCRIPT
+        CheckTestForOpCodeLimit({}, script, {valtype{0x0F, 0x01}}, sigchecker);
+ 
+        add_30(script);add_30(script);add_30(script);
+        // test with 6*30+3*30=270 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
+        CheckTestForOpCodeLimit({}, script, {valtype{0x0F, 0x01}}, sigchecker);
+    } 
+} 
 
 BOOST_AUTO_TEST_SUITE_END()
