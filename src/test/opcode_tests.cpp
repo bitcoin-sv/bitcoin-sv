@@ -1,4 +1,5 @@
 // Copyright (c) 2018 The Bitcoin developers
+// Copyright (c) 2018 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -17,26 +18,25 @@ typedef std::vector<valtype> stacktype;
 std::array<uint32_t, 3> flagset{
     {0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
 
-BOOST_FIXTURE_TEST_SUITE(monolith_opcodes_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
 
 /**
  * General utility functions to check for script passing/failing.
  */
 static void CheckTestResultForAllFlags(const stacktype &original_stack,
                                        const CScript &script,
-                                       const stacktype &expected) {
+                                       const stacktype &expected,
+                                       uint32_t upgradeFlag) {
     BaseSignatureChecker sigchecker;
 
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
-        bool r =
-            EvalScript(stack, script, flags | SCRIPT_ENABLE_MONOLITH_OPCODES,
-                       sigchecker, &err);
+        bool r = EvalScript(stack, script, flags | upgradeFlag, sigchecker, &err);
         BOOST_CHECK(r);
         BOOST_CHECK(stack == expected);
 
-        // Make sure that if we do not pass the monolith flag, opcodes are still
+        // Make sure that if we do not pass the upgrade flag, opcodes are still
         // disabled.
         stack = original_stack;
         r = EvalScript(stack, script, flags, sigchecker, &err);
@@ -45,17 +45,29 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
     }
 }
 
+// monolith upgrade
+static void CheckTestResultForAllFlags(const stacktype &original_stack,
+                                       const CScript &script,
+                                       const stacktype &expected) {
+    CheckTestResultForAllFlags(original_stack, script, expected, SCRIPT_ENABLE_MONOLITH_OPCODES);
+}
+
+static void CheckTestResultForAllFlagsMagnetic(const stacktype &original_stack,
+                                               const CScript &script,
+                                               const stacktype &expected) {
+    CheckTestResultForAllFlags(original_stack, script, expected, SCRIPT_ENABLE_MAGNETIC_OPCODES);
+}
+
 static void CheckError(uint32_t flags, const stacktype &original_stack,
-                       const CScript &script, ScriptError expected_error) {
+                       const CScript &script, ScriptError expected_error, uint32_t upgradeFlag) {
     BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags | SCRIPT_ENABLE_MONOLITH_OPCODES,
-                        sigchecker, &err);
+    bool r = EvalScript(stack, script, flags | upgradeFlag, sigchecker, &err);
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected_error);
 
-    // Make sure that if we do not pass the monolith flag, opcodes are still
+    // Make sure that if we do not pass the opcodes flags, opcodes are still
     // disabled.
     stack = original_stack;
     r = EvalScript(stack, script, flags, sigchecker, &err);
@@ -63,12 +75,34 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
 }
 
-static void CheckErrorForAllFlags(const stacktype &original_stack,
-                                  const CScript &script,
-                                  ScriptError expected_error) {
+// monolith upgrade
+static void CheckError(uint32_t flags, const stacktype &original_stack,
+                       const CScript &script, ScriptError expected_error) {
+    CheckError(flags, original_stack, script, expected_error, SCRIPT_ENABLE_MONOLITH_OPCODES);
+}
+
+static void CheckErrorMagnetic(uint32_t flags, const stacktype &original_stack,
+                       const CScript &script, ScriptError expected_error) {
+    CheckError(flags, original_stack, script, expected_error, SCRIPT_ENABLE_MAGNETIC_OPCODES);
+}
+
+static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript &script,
+                                  ScriptError expected_error, uint32_t upgradeFlag) {
     for (uint32_t flags : flagset) {
-        CheckError(flags, original_stack, script, expected_error);
+        CheckError(flags, original_stack, script, expected_error, upgradeFlag);
     }
+}
+
+// monolith upgrade
+static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript &script,
+                                  ScriptError expected_error) {
+    CheckErrorForAllFlags(original_stack, script, expected_error, SCRIPT_ENABLE_MONOLITH_OPCODES);
+}
+
+// magnetic upgrade
+static void CheckErrorForAllFlagsMagnetic(const stacktype &original_stack, const CScript &script,
+                                  ScriptError expected_error) {
+    CheckErrorForAllFlags(original_stack, script, expected_error, SCRIPT_ENABLE_MAGNETIC_OPCODES);
 }
 
 static void CheckOpError(const stacktype &original_stack, opcodetype op,
