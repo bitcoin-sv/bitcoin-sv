@@ -11,6 +11,7 @@
 #include "init.h"
 #include "net.h"
 #include "netbase.h"
+#include "policy/policy.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
 #include "timedata.h"
@@ -57,7 +58,7 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
             "  \"timeoffset\": xxxxx,        (numeric) the time offset\n"
             "  \"connections\": xxxxx,       (numeric) the number of "
             "connections\n"
-            "  \"proxy\": \"host:port\",     (string, optional) the proxy used "
+            "  \"proxy\": \"host:port\",       (string, optional) the proxy used "
             "by the server\n"
             "  \"difficulty\": xxxxxx,       (numeric) the current difficulty\n"
             "  \"testnet\": true|false,      (boolean) if the server is using "
@@ -77,7 +78,11 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
                             "relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
-            "  \"errors\": \"...\"           (string) any error messages\n"
+            "  \"errors\": \"...\",            (string) any error messages\n"
+            "  \"maxblocksize\": xxxxx,      (numeric) The absolute maximum block "
+            "size we will accept from any source\n"
+            "  \"maxminedblocksize\": xxxxx  (numeric) The maximum block size "
+            "we will mine\n"
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getinfo", "") + HelpExampleRpc("getinfo", ""));
@@ -129,6 +134,8 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
     obj.push_back(Pair("relayfee",
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
+    obj.push_back(Pair("maxblocksize", config.GetMaxBlockSize()));
+    obj.push_back(Pair("maxminedblocksize", gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE)));
     return obj;
 }
 

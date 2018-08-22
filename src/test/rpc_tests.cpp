@@ -8,6 +8,8 @@
 #include "base58.h"
 #include "config.h"
 #include "netbase.h"
+#include "policy/policy.h"
+#include "util.h"
 
 #include "test/test_bitcoin.h"
 
@@ -36,6 +38,17 @@ UniValue CallRPC(std::string args) {
 }
 
 BOOST_FIXTURE_TEST_SUITE(rpc_tests, TestingSetup)
+
+BOOST_AUTO_TEST_CASE(rpc_getinfo)
+{
+    // Test block size fields from getinfo
+    UniValue r {};
+    BOOST_CHECK_NO_THROW(
+        r = CallRPC("getinfo");
+    );
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int(), DEFAULT_MAX_BLOCK_SIZE);
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxminedblocksize").get_int(), DEFAULT_MAX_GENERATED_BLOCK_SIZE);
+}
 
 BOOST_AUTO_TEST_CASE(rpc_rawparams) {
     // Test raw transaction API argument handling
