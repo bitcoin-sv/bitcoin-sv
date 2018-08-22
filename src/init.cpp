@@ -792,6 +792,12 @@ std::string HelpMessage(HelpMessageMode mode) {
     AppendParamsHelpMessages(strUsage, showDebug);
 
     strUsage += HelpMessageGroup(_("Node relay options:"));
+    strUsage +=
+        HelpMessageOpt("-excessiveblocksize=<n>",
+                       strprintf(_("Set the maximum block size in bytes we will accept "
+                                   "from any source. This is the effective block size "
+                                   "hard limit (default: %d)"),
+                                 DEFAULT_MAX_BLOCK_SIZE));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
@@ -799,11 +805,6 @@ std::string HelpMessage(HelpMessageMode mode) {
                 "Relay and mine \"non-standard\" transactions (%sdefault: %u)",
                 "testnet/regtest only; ",
                 defaultChainParams->RequireStandard()));
-        strUsage +=
-            HelpMessageOpt("-excessiveblocksize=<n>",
-                           strprintf(_("Do not accept blocks larger than this "
-                                       "limit, in bytes (default: %d)"),
-                                     DEFAULT_MAX_BLOCK_SIZE));
         strUsage += HelpMessageOpt(
             "-dustrelayfee=<amt>",
             strprintf("Fee rate (in %s/kB) used to defined dust, the value of "
@@ -829,7 +830,9 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
-        strprintf(_("Set maximum block size in bytes (default: %d)"),
+        strprintf(_("Set maximum block size in bytes we will mine (default: %d). "
+                    "Must be less than or equal the hard maximum block size limit "
+                    "as set by -excessiveblocksize"),
                   DEFAULT_MAX_GENERATED_BLOCK_SIZE));
     strUsage += HelpMessageOpt(
         "-blockprioritypercentage=<n>",
