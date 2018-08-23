@@ -41,13 +41,13 @@ class ABC_CmdLine_Test (BitcoinTestFramework):
         self.log.info("Testing -excessiveblocksize")
 
         self.log.info("  Set to twice the default, i.e. %d bytes" %
-                      (2 * LEGACY_MAX_BLOCK_SIZE))
+                      (2 * DEFAULT_MAX_BLOCK_SIZE))
         self.stop_node(0)
         self.start_node(0, ["-excessiveblocksize=%d" %
-                            (2 * LEGACY_MAX_BLOCK_SIZE)])
-        self.check_excessive(2 * LEGACY_MAX_BLOCK_SIZE)
+                            (2 * DEFAULT_MAX_BLOCK_SIZE)])
+        self.check_excessive(2 * DEFAULT_MAX_BLOCK_SIZE)
         # Check for EB correctness in the subver string
-        self.check_subversion("/Bitcoin SV:.*\(EB2\.0; .*\)/")
+        self.check_subversion("/Bitcoin SV:.*\(EB64\.0; .*\)/")
 
         self.log.info("  Attempt to set below legacy limit of 1MB - try %d bytes" %
                       LEGACY_MAX_BLOCK_SIZE)

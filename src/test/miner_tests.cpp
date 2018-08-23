@@ -776,12 +776,14 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction) {
                       DEFAULT_MAX_BLOCK_SIZE - 1000);
 
     // If the parameter is not specified, we use
-    // DEFAULT_MAX_GENERATED_BLOCK_SIZE
+    // max(1K, min(DEFAULT_MAX_BLOCK_SIZE - 1K, DEFAULT_MAX_GENERATED_BLOCK_SIZE))
     {
+        const auto expected { std::max(ONE_KILOBYTE,
+                                std::min(DEFAULT_MAX_BLOCK_SIZE - ONE_KILOBYTE,
+                                    DEFAULT_MAX_GENERATED_BLOCK_SIZE)) };
         gArgs.ClearArg("-blockmaxsize");
         BlockAssembler ba(config);
-        BOOST_CHECK_EQUAL(ba.GetMaxGeneratedBlockSize(),
-                          DEFAULT_MAX_GENERATED_BLOCK_SIZE);
+        BOOST_CHECK_EQUAL(ba.GetMaxGeneratedBlockSize(), expected);
     }
 }
 

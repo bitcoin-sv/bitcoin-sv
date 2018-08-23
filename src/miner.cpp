@@ -84,8 +84,8 @@ static uint64_t ComputeMaxGeneratedBlockSize(const Config &config,
 
     // Limit size to between 1K and MaxBlockSize-1K for sanity:
     nMaxGeneratedBlockSize =
-        std::max(uint64_t(1000), std::min(config.GetMaxBlockSize() - 1000,
-                                          nMaxGeneratedBlockSize));
+        std::max(uint64_t(ONE_KILOBYTE),
+            std::min(config.GetMaxBlockSize() - ONE_KILOBYTE, nMaxGeneratedBlockSize));
 
     // If May 15, 2018 HF is not activated yet, we also want to limit the max
     // generated block size to 8MB - 1000

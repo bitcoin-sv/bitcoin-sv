@@ -8,8 +8,10 @@
 
 #include <cstdint>
 
+/** 1KB */
+static const uint64_t ONE_KILOBYTE = 1000;
 /** 1MB */
-static const uint64_t ONE_MEGABYTE = 1000000;
+static const uint64_t ONE_MEGABYTE = ONE_KILOBYTE * 1000;
 /** The maximum allowed size for a transaction, in bytes */
 static const uint64_t MAX_TX_SIZE = ONE_MEGABYTE;
 /** The maximum allowed size for a block, before the UAHF */

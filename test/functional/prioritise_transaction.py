@@ -24,7 +24,8 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
         self.txouts = gen_return_txouts()
         self.relayfee = self.nodes[0].getnetworkinfo()['relayfee']
 
-        utxo_count = 90
+        # Create enough UTXOs to fill the 3 blocks we need for this test
+        utxo_count = 1440
         utxos = create_confirmed_utxos(
             self.relayfee, self.nodes[0], utxo_count)
         # our transactions are smaller than 100kb

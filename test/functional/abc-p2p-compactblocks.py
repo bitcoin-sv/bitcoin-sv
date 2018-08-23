@@ -75,7 +75,8 @@ class FullBlockTest(ComparisonTestFramework):
         self.block_heights = {}
         self.tip = None
         self.blocks = {}
-        self.excessive_block_size = 16 * ONE_MEGABYTE
+        # excessive_block_size needs to be > generated block size
+        self.excessive_block_size = 64 * ONE_MEGABYTE
         self.extra_args = [['-norelaypriority',
                             '-whitelist=127.0.0.1',
                             '-limitancestorcount=999999',
