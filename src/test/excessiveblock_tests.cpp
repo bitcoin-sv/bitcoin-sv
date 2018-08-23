@@ -4,6 +4,7 @@
 
 #include "consensus/consensus.h"
 #include "rpc/server.h"
+#include "validation.h"
 #include "test/test_bitcoin.h"
 
 #include <boost/algorithm/string.hpp>
@@ -43,20 +44,17 @@ BOOST_AUTO_TEST_CASE(excessiveblock_rpc) {
     BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
                                  std::to_string(ONE_MEGABYTE + 10)));
 
+    BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
+                         std::to_string(MAX_BLOCKFILE_SIZE - 1)));
+    BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
+                         std::to_string(MAX_BLOCKFILE_SIZE)));
+    BOOST_CHECK_THROW(CallRPC(std::string("setexcessiveblock ") +
+                      std::to_string(MAX_BLOCKFILE_SIZE + 1)),
+                      std::runtime_error);
+
     // Default can be higher than 1MB in future - test it too
     BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
                                  std::to_string(DEFAULT_MAX_BLOCK_SIZE)));
-    BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
-                                 std::to_string(DEFAULT_MAX_BLOCK_SIZE * 8)));
-
-    BOOST_CHECK_NO_THROW(
-        CallRPC(std::string("setexcessiveblock ") +
-                std::to_string(std::numeric_limits<uint64_t>::max())));
-
-    BOOST_CHECK_THROW(
-        CallRPC(std::string("setexcessiveblock ") +
-                std::to_string(std::numeric_limits<uint64_t>::max() + 1)),
-        std::runtime_error);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

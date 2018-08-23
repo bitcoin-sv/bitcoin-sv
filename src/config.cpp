@@ -6,6 +6,7 @@
 #include "chainparams.h"
 #include "consensus/consensus.h"
 #include "globals.h"
+#include "validation.h"
 
 GlobalConfig::GlobalConfig() : useCashAddr(false) {}
 
@@ -13,6 +14,11 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxBlockSize) {
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
     if (maxBlockSize <= LEGACY_MAX_BLOCK_SIZE) {
+        return false;
+    }
+
+    // Max block size can't be larger than the max block file size
+    if (maxBlockSize > MAX_BLOCKFILE_SIZE) {
         return false;
     }
 

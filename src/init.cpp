@@ -1496,8 +1496,11 @@ bool AppInitParameterInteraction(Config &config) {
     const uint64_t nProposedExcessiveBlockSize =
         gArgs.GetArg("-excessiveblocksize", DEFAULT_MAX_BLOCK_SIZE);
     if (!config.SetMaxBlockSize(nProposedExcessiveBlockSize)) {
-        return InitError(
-            _("Excessive block size must be > 1,000,000 bytes (1MB)"));
+        return InitError(strprintf(_(
+            "Excessive block size must be > %d and less than the "
+            "max block file size (%d)"),
+            LEGACY_MAX_BLOCK_SIZE, MAX_BLOCKFILE_SIZE
+        ));
     }
 
     // Check blockmaxsize does not exceed maximum accepted block size.
