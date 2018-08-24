@@ -47,7 +47,7 @@ class ABC_CmdLine_Test (BitcoinTestFramework):
                             (2 * LEGACY_MAX_BLOCK_SIZE)])
         self.check_excessive(2 * LEGACY_MAX_BLOCK_SIZE)
         # Check for EB correctness in the subver string
-        self.check_subversion("/Bitcoin ABC:.*\(EB2\.0; .*\)/")
+        self.check_subversion("/Bitcoin SV:.*\(EB2\.0; .*\)/")
 
         self.log.info("  Attempt to set below legacy limit of 1MB - try %d bytes" %
                       LEGACY_MAX_BLOCK_SIZE)
