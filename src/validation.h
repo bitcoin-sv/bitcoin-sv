@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2017 The Bitcoin developers
+// Copyright (c) 2018 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -447,6 +448,9 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /** Check if May 15, 2018 HF has activated. */
 bool IsMonolithEnabled(const Config &config, const CBlockIndex *pindexPrev);
+
+/** Check if November 15, 2018 HF has activated. */
+bool IsMagneticEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /**
  * (try to) add transaction to memory pool

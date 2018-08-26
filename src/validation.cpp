@@ -627,6 +627,21 @@ bool IsMonolithEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsMonolithEnabled(config, pindexPrev->GetMedianTimePast());
 }
 
+static bool IsMagneticEnabled(const Config &config, int64_t nMedianTimePast) {
+    return nMedianTimePast >=
+           gArgs.GetArg(
+                   "-magneticactivationtime",
+                   config.GetChainParams().GetConsensus().magneticAnomalyActivationTime);
+}
+
+bool IsMagneticEnabled(const Config &config, const CBlockIndex *pindexPrev) {
+    if (pindexPrev == nullptr) {
+        return false;
+    }
+
+    return IsMagneticEnabled(config, pindexPrev->GetMedianTimePast());
+}
+
 static bool IsReplayProtectionEnabled(const Config &config,
                                       int64_t nMedianTimePast) {
     return nMedianTimePast >= gArgs.GetArg("-replayprotectionactivationtime",
@@ -1001,6 +1016,10 @@ static bool AcceptToMemoryPoolWorker(
         uint32_t extraFlags = SCRIPT_VERIFY_NONE;
         if (IsMonolithEnabled(config, chainActive.Tip())) {
             extraFlags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
+        }
+
+        if (IsMagneticEnabled(config, chainActive.Tip())) {
+            extraFlags |= SCRIPT_ENABLE_MAGNETIC_OPCODES;
         }
 
         if (IsReplayProtectionEnabledForCurrentBlock(config)) {
@@ -1604,21 +1623,24 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
                 (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
             const bool doesNotHaveMonolith =
                 (flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0;
-            if (hasNonMandatoryFlags || doesNotHaveMonolith) {
+            const bool doesNotHaveMagnetic =
+                (flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0;
+            if (hasNonMandatoryFlags || doesNotHaveMonolith || doesNotHaveMagnetic) {
                 // Check whether the failure was caused by a non-mandatory
                 // script verification check, such as non-standard DER encodings
                 // or non-null dummy arguments; if so, don't trigger DoS
                 // protection to avoid splitting the network between upgraded
                 // and non-upgraded nodes.
                 //
-                // We also check activating the monolith opcodes as it is a
-                // strictly additive change and we would not like to ban some of
+                // We also check activating the monolith or magnetic opcodes as they
+                // are strictly additive changes and we would not like to ban some of
                 // our peer that are ahead of us and are considering the fork
                 // as activated.
                 CScriptCheck check2(
                     scriptPubKey, amount, tx, i,
                     (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) |
-                        SCRIPT_ENABLE_MONOLITH_OPCODES,
+                        SCRIPT_ENABLE_MONOLITH_OPCODES |
+                        SCRIPT_ENABLE_MAGNETIC_OPCODES,
                     sigCacheStore, txdata);
                 if (check2()) {
                     return state.Invalid(
@@ -1989,6 +2011,11 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     // The monolith HF enable a set of opcodes.
     if (IsMonolithEnabled(config, pChainTip)) {
         flags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
+    }
+
+    // The magnetic HF enable a set of opcodes.
+    if (IsMagneticEnabled(config, pChainTip)) {
+        flags |= SCRIPT_ENABLE_MAGNETIC_OPCODES;
     }
 
     // We make sure this node will have replay protection during the next hard
@@ -2643,12 +2670,14 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     // no easy way to do this so we'll just discard the whole mempool and then
     // add the transaction of the block we just disconnected back.
     //
-    // Samewise, if this block enabled the monolith opcodes, then we need to
-    // clear the mempool of any transaction using them.
+    // Samewise, if this block enabled the monolith or magnetic opcodes, then we
+    // need to clear the mempool of any transaction using them.
     if ((IsReplayProtectionEnabled(config, pindexDelete) &&
          !IsReplayProtectionEnabled(config, pindexDelete->pprev)) ||
         (IsMonolithEnabled(config, pindexDelete) &&
-         !IsMonolithEnabled(config, pindexDelete->pprev))) {
+         !IsMonolithEnabled(config, pindexDelete->pprev)) ||
+        (IsMagneticEnabled(config, pindexDelete) &&
+         !IsMagneticEnabled(config, pindexDelete->pprev))) {
         mempool.clear();
         // While not strictly necessary, clearing the disconnect pool is also
         // beneficial so we don't try to reuse its content at the end of the
