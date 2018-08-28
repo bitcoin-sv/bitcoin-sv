@@ -44,12 +44,15 @@ BOOST_AUTO_TEST_CASE(excessiveblock_rpc) {
     BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
                                  std::to_string(ONE_MEGABYTE + 10)));
 
+    // The absolute largest block size we are allowed to configure is the max block file size
+    // minus the block header size, minus 1
+    unsigned int ABSOLUTE_MAX_BLOCK_SIZE { MAX_BLOCKFILE_SIZE - BLOCKFILE_BLOCK_HEADER_SIZE - 1 };
     BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
-                         std::to_string(MAX_BLOCKFILE_SIZE - 1)));
+                         std::to_string(ABSOLUTE_MAX_BLOCK_SIZE - 1)));
     BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
-                         std::to_string(MAX_BLOCKFILE_SIZE)));
+                         std::to_string(ABSOLUTE_MAX_BLOCK_SIZE)));
     BOOST_CHECK_THROW(CallRPC(std::string("setexcessiveblock ") +
-                      std::to_string(MAX_BLOCKFILE_SIZE + 1)),
+                      std::to_string(ABSOLUTE_MAX_BLOCK_SIZE + 1)),
                       std::runtime_error);
 
     // Default can be higher than 1MB in future - test it too

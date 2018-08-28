@@ -17,8 +17,10 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxBlockSize) {
         return false;
     }
 
-    // Max block size can't be larger than the max block file size
-    if (maxBlockSize > MAX_BLOCKFILE_SIZE) {
+    // Max block size (plus block header) can't exceed the max block file size.
+    // NOTE: I actually think this should be > instead of >=, but we need to investigate
+    // the check in validation.cpp FindBlockPos() that this is protecting first.
+    if ((maxBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE) >= MAX_BLOCKFILE_SIZE) {
         return false;
     }
 

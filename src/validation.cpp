@@ -3980,7 +3980,7 @@ static bool AcceptBlock(const Config &config,
         if (dbp != nullptr) {
             blockPos = *dbp;
         }
-        if (!FindBlockPos(state, blockPos, nBlockSize + 8, nHeight,
+        if (!FindBlockPos(state, blockPos, nBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE, nHeight,
                           block.GetBlockTime(), dbp != nullptr)) {
             return error("AcceptBlock(): FindBlockPos failed");
         }

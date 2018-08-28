@@ -1499,7 +1499,7 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(strprintf(_(
             "Excessive block size must be > %d and less than the "
             "max block file size (%d)"),
-            LEGACY_MAX_BLOCK_SIZE, MAX_BLOCKFILE_SIZE
+            LEGACY_MAX_BLOCK_SIZE, MAX_BLOCKFILE_SIZE - BLOCKFILE_BLOCK_HEADER_SIZE
         ));
     }
 
