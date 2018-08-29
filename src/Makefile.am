@@ -114,7 +114,6 @@ BITCOIN_CORE_H = \
   cuckoocache.h \
   dstencode.h \
   fs.h \
-  globals.h \
   httprpc.h \
   httpserver.h \
   indirectmap.h \
@@ -206,7 +205,6 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   config.cpp \
-  globals.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
@@ -340,7 +338,6 @@ libbitcoin_common_a_SOURCES = \
   coins.cpp \
   compressor.cpp \
   dstencode.cpp \
-  globals.cpp \
   core_read.cpp \
   core_write.cpp \
   key.cpp \

@@ -137,7 +137,6 @@ add_library(common
 	coins.cpp
 	compressor.cpp
 	dstencode.cpp
-	globals.cpp
 	core_read.cpp
 	core_write.cpp
 	key.cpp
@@ -179,7 +178,6 @@ add_library(server
 	chain.cpp
 	checkpoints.cpp
 	config.cpp
-	globals.cpp
 	httprpc.cpp
 	httpserver.cpp
 	init.cpp
