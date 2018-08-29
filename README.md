@@ -1,6 +1,9 @@
 [Bitcoin SV](https://www.bitcoinsv.io)
 ===========
 
+This is an Alpha release, the purpose of which is to provide a preview of the code in response to requests from 
+miners and pool operators. This is not intended to be a release candidate.
+
 What is Bitcoin Cash?
 ---------------------
 
