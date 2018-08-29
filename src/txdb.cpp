@@ -276,7 +276,7 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
 
 bool CBlockTreeDB::LoadBlockIndexGuts(
     std::function<CBlockIndex *(const uint256 &)> insertBlockIndex) {
-    const Config &config = GetConfig();
+    const Config &config = GlobalConfig::GetConfig();
 
     std::unique_ptr<CDBIterator> pcursor(NewIterator());
 

@@ -6,6 +6,8 @@
 #define BITCOIN_CONFIG_H
 
 #include "amount.h"
+#include "consensus/consensus.h"
+#include "policy/policy.h"
 
 #include <boost/noncopyable.hpp>
 
@@ -35,7 +37,7 @@ public:
 
 class GlobalConfig final : public Config {
 public:
-    GlobalConfig();
+    GlobalConfig() = default;
     bool SetMaxBlockSize(uint64_t maxBlockSize) override;
     uint64_t GetMaxBlockSize() const override;
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override;
@@ -50,10 +52,14 @@ public:
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
 
+    static GlobalConfig& GetConfig();
+
 private:
-    bool useCashAddr;
-    Amount excessUTXOCharge;
-    CFeeRate feePerKB;
+    bool useCashAddr { false };
+    Amount excessUTXOCharge {};
+    CFeeRate feePerKB {};
+    uint64_t maxBlockSize { DEFAULT_MAX_BLOCK_SIZE };
+    uint64_t blockPriorityPercentage { DEFAULT_BLOCK_PRIORITY_PERCENTAGE };
 };
 
 // Dummy for subclassing in unittests
@@ -83,8 +89,5 @@ public:
 private:
     std::unique_ptr<CChainParams> chainParams;
 };
-
-// Temporary woraround.
-const Config &GetConfig();
 
 #endif

@@ -27,7 +27,7 @@ static bool ToMemPool(CMutableTransaction &tx) {
     LOCK(cs_main);
 
     CValidationState state;
-    return AcceptToMemoryPool(GetConfig(), mempool, state,
+    return AcceptToMemoryPool(GlobalConfig::GetConfig(), mempool, state,
                               MakeTransactionRef(tx), false, nullptr, true,
                               Amount(0));
 }

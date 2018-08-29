@@ -157,7 +157,7 @@ bool CZMQPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex) {
     LogPrint(BCLog::ZMQ, "zmq: Publish rawblock %s\n",
              pindex->GetBlockHash().GetHex());
 
-    const Config &config = GetConfig();
+    const Config &config = GlobalConfig::GetConfig();
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION | RPCSerializationFlags());
     {
         LOCK(cs_main);

@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
 
     BOOST_CHECK(fp != nullptr);
 
-    const Config &config = GetConfig();
+    const Config &config = GlobalConfig::GetConfig();
     const CChainParams &chainparams = config.GetChainParams();
 
     // serialization format is:

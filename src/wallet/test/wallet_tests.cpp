@@ -509,7 +509,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
         request.params.setArray();
         request.params.push_back(keys);
 
-        UniValue response = importmulti(GetConfig(), request);
+        UniValue response = importmulti(GlobalConfig::GetConfig(), request);
         BOOST_CHECK_EQUAL(
             response.write(),
             strprintf("[{\"success\":false,\"error\":{\"code\":-1,\"message\":"
@@ -572,7 +572,7 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup) {
         request.params.setArray();
         request.params.push_back((pathTemp / "wallet.backup").string());
         vpwallets.insert(vpwallets.begin(), &wallet);
-        ::dumpwallet(GetConfig(), request);
+        ::dumpwallet(GlobalConfig::GetConfig(), request);
     }
 
     // Call importwallet RPC and verify all blocks with timestamps >= BLOCK_TIME
@@ -584,7 +584,7 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup) {
         request.params.setArray();
         request.params.push_back((pathTemp / "wallet.backup").string());
         vpwallets[0] = &wallet;
-        ::importwallet(GetConfig(), request);
+        ::importwallet(GlobalConfig::GetConfig(), request);
 
         BOOST_CHECK_EQUAL(wallet.mapWallet.size(), 3);
         BOOST_CHECK_EQUAL(coinbaseTxns.size(), 103);

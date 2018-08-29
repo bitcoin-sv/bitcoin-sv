@@ -44,7 +44,7 @@ static NodeId id = 0;
 BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(DoS_banning) {
-    const Config &config = GetConfig();
+    const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
     connman->ClearBanned();
@@ -81,7 +81,7 @@ BOOST_AUTO_TEST_CASE(DoS_banning) {
 }
 
 BOOST_AUTO_TEST_CASE(DoS_banscore) {
-    const Config &config = GetConfig();
+    const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
     connman->ClearBanned();
@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE(DoS_banscore) {
 }
 
 BOOST_AUTO_TEST_CASE(DoS_bantime) {
-    const Config &config = GetConfig();
+    const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
     connman->ClearBanned();

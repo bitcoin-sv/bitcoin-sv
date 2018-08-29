@@ -5,54 +5,51 @@
 #include "config.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"
-#include "globals.h"
 #include "validation.h"
 
-GlobalConfig::GlobalConfig() : useCashAddr(false) {}
-
-bool GlobalConfig::SetMaxBlockSize(uint64_t maxBlockSize) {
+bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize) {
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
-    if (maxBlockSize <= LEGACY_MAX_BLOCK_SIZE) {
+    if (maxSize <= LEGACY_MAX_BLOCK_SIZE) {
         return false;
     }
 
     // Max block size (plus block header) can't exceed the max block file size.
     // NOTE: I actually think this should be > instead of >=, but we need to investigate
     // the check in validation.cpp FindBlockPos() that this is protecting first.
-    if ((maxBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE) >= MAX_BLOCKFILE_SIZE) {
+    if ((maxSize + BLOCKFILE_BLOCK_HEADER_SIZE) >= MAX_BLOCKFILE_SIZE) {
         return false;
     }
 
-    nMaxBlockSize = maxBlockSize;
+    maxBlockSize = maxSize;
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
-    return nMaxBlockSize;
+    return maxBlockSize;
 }
 
-bool GlobalConfig::SetBlockPriorityPercentage(int64_t blockPriorityPercentage) {
+bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage) {
     // blockPriorityPercentage has to belong to [0..100]
-    if ((blockPriorityPercentage < 0) || (blockPriorityPercentage > 100)) {
+    if ((percentage < 0) || (percentage > 100)) {
         return false;
     }
-    nBlockPriorityPercentage = blockPriorityPercentage;
+    blockPriorityPercentage = percentage;
     return true;
 }
 
 uint8_t GlobalConfig::GetBlockPriorityPercentage() const {
-    return nBlockPriorityPercentage;
+    return blockPriorityPercentage;
 }
 
 const CChainParams &GlobalConfig::GetChainParams() const {
     return Params();
 }
 
-static GlobalConfig gConfig;
-
-const Config &GetConfig() {
-    return gConfig;
+GlobalConfig& GlobalConfig::GetConfig()
+{
+    static GlobalConfig config {};
+    return config;
 }
 
 void GlobalConfig::SetCashAddrEncoding(bool c) {

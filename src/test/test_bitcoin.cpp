@@ -72,7 +72,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
 
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
-    const Config &config = GetConfig();
+    const Config &config = GlobalConfig::GetConfig();
     RegisterAllRPCCommands(tableRPC);
     ClearDatadirCache();
     pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
@@ -134,7 +134,7 @@ TestChain100Setup::TestChain100Setup()
 //
 CBlock TestChain100Setup::CreateAndProcessBlock(
     const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey) {
-    const Config &config = GetConfig();
+    const Config &config = GlobalConfig::GetConfig();
     std::unique_ptr<CBlockTemplate> pblocktemplate =
         BlockAssembler(config).CreateNewBlock(scriptPubKey);
     CBlock &block = pblocktemplate->block;
@@ -154,7 +154,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
 
     std::shared_ptr<const CBlock> shared_pblock =
         std::make_shared<const CBlock>(block);
-    ProcessNewBlock(GetConfig(), shared_pblock, true, nullptr);
+    ProcessNewBlock(GlobalConfig::GetConfig(), shared_pblock, true, nullptr);
 
     CBlock result = block;
     return result;

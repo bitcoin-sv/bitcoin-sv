@@ -706,34 +706,31 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     fCheckpointsEnabled = true;
 }
 
-void CheckBlockMaxSize(const CChainParams &chainparams, uint64_t size,
-                       uint64_t expected) {
-    GlobalConfig config;
-
+void CheckBlockMaxSize(uint64_t size, uint64_t expected)
+{
     gArgs.ForceSetArg("-blockmaxsize", std::to_string(size));
-
-    BlockAssembler ba(config);
+    BlockAssembler ba(GlobalConfig::GetConfig());
     BOOST_CHECK_EQUAL(ba.GetMaxGeneratedBlockSize(), expected);
 }
 
-BOOST_AUTO_TEST_CASE(BlockAssembler_construction) {
-    GlobalConfig config;
-    const CChainParams &chainparams = Params();
+BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
+{
+    Config& config = GlobalConfig::GetConfig();
 
     // We are working on a fake chain and need to protect ourselves.
     LOCK(cs_main);
 
     // Test around historical 1MB (plus one byte because that's mandatory)
     config.SetMaxBlockSize(ONE_MEGABYTE + 1);
-    CheckBlockMaxSize(chainparams, 0, 1000);
-    CheckBlockMaxSize(chainparams, 1000, 1000);
-    CheckBlockMaxSize(chainparams, 1001, 1001);
-    CheckBlockMaxSize(chainparams, 12345, 12345);
+    CheckBlockMaxSize(0, 1000);
+    CheckBlockMaxSize(1000, 1000);
+    CheckBlockMaxSize(1001, 1001);
+    CheckBlockMaxSize(12345, 12345);
 
-    CheckBlockMaxSize(chainparams, ONE_MEGABYTE - 1001, ONE_MEGABYTE - 1001);
-    CheckBlockMaxSize(chainparams, ONE_MEGABYTE - 1000, ONE_MEGABYTE - 1000);
-    CheckBlockMaxSize(chainparams, ONE_MEGABYTE - 999, ONE_MEGABYTE - 999);
-    CheckBlockMaxSize(chainparams, ONE_MEGABYTE, ONE_MEGABYTE - 999);
+    CheckBlockMaxSize(ONE_MEGABYTE - 1001, ONE_MEGABYTE - 1001);
+    CheckBlockMaxSize(ONE_MEGABYTE - 1000, ONE_MEGABYTE - 1000);
+    CheckBlockMaxSize(ONE_MEGABYTE - 999, ONE_MEGABYTE - 999);
+    CheckBlockMaxSize(ONE_MEGABYTE, ONE_MEGABYTE - 999);
 
     // The maximum block size to be generated before the May 15, 2018 HF
     static const auto EIGHT_MEGABYTES = 8 * ONE_MEGABYTE;
@@ -741,17 +738,16 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction) {
 
     // Test around historical 8MB cap.
     config.SetMaxBlockSize(EIGHT_MEGABYTES + 1);
-    CheckBlockMaxSize(chainparams, EIGHT_MEGABYTES - 1001,
-                      EIGHT_MEGABYTES - 1001);
-    CheckBlockMaxSize(chainparams, EIGHT_MEGABYTES - 1000, LEGACY_CAP);
-    CheckBlockMaxSize(chainparams, EIGHT_MEGABYTES - 999, LEGACY_CAP);
-    CheckBlockMaxSize(chainparams, EIGHT_MEGABYTES, EIGHT_MEGABYTES - 1000);
+    CheckBlockMaxSize(EIGHT_MEGABYTES - 1001, EIGHT_MEGABYTES - 1001);
+    CheckBlockMaxSize(EIGHT_MEGABYTES - 1000, LEGACY_CAP);
+    CheckBlockMaxSize(EIGHT_MEGABYTES - 999, LEGACY_CAP);
+    CheckBlockMaxSize(EIGHT_MEGABYTES, EIGHT_MEGABYTES - 1000);
 
     // Test around default cap
     config.SetMaxBlockSize(DEFAULT_MAX_BLOCK_SIZE);
 
     // We are stuck at the legacy cap before activation.
-    CheckBlockMaxSize(chainparams, DEFAULT_MAX_BLOCK_SIZE, LEGACY_CAP);
+    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE, LEGACY_CAP);
 
     // Activate May 15, 2018 HF the dirty way
     const int64_t monolithTime =
@@ -766,14 +762,10 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction) {
     BOOST_CHECK(IsMonolithEnabled(config, chainActive.Tip()));
 
     // Now we can use the default max block size.
-    CheckBlockMaxSize(chainparams, DEFAULT_MAX_BLOCK_SIZE - 1001,
-                      DEFAULT_MAX_BLOCK_SIZE - 1001);
-    CheckBlockMaxSize(chainparams, DEFAULT_MAX_BLOCK_SIZE - 1000,
-                      DEFAULT_MAX_BLOCK_SIZE - 1000);
-    CheckBlockMaxSize(chainparams, DEFAULT_MAX_BLOCK_SIZE - 999,
-                      DEFAULT_MAX_BLOCK_SIZE - 1000);
-    CheckBlockMaxSize(chainparams, DEFAULT_MAX_BLOCK_SIZE,
-                      DEFAULT_MAX_BLOCK_SIZE - 1000);
+    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1001, DEFAULT_MAX_BLOCK_SIZE - 1001);
+    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1000, DEFAULT_MAX_BLOCK_SIZE - 1000);
+    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 999, DEFAULT_MAX_BLOCK_SIZE - 1000);
+    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE - 1000);
 
     // If the parameter is not specified, we use
     // max(1K, min(DEFAULT_MAX_BLOCK_SIZE - 1K, DEFAULT_MAX_GENERATED_BLOCK_SIZE))
