@@ -2,7 +2,8 @@
 ===========
 
 This is an Alpha release, the purpose of which is to provide a preview of the code in response to requests from 
-miners and pool operators. This is not intended to be a release candidate.
+miners and pool operators. This is not intended to be a release candidate. Work is still in progress targeting a 
+beta release for 1st week of September in line with the initial Bitcoin SV announcement.
 
 What is Bitcoin Cash?
 ---------------------
