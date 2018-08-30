@@ -1,6 +1,8 @@
 Gitian building
 ================
 
+This document will be updated for Bitcoin SV in due course.
+
 *Setup instructions for a Gitian build of Bitcoin ABC using an Ubuntu VM or physical system.*
 
 Gitian is the deterministic build process that is used to build the Bitcoin

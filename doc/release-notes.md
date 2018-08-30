@@ -1,11 +1,9 @@
-Bitcoin ABC version 0.17.2 is now available from:
+Bitcoin SV version <next> is now available from:
 
-  <https://download.bitcoinabc.org/0.17.2/>
+  <https://url/>
 
 This release includes the following features and fixes:
- - Remove deprecated `estimatepriority` RPC.
- - Remove deprecated `estimatesmartpriority` RPC.
- - Remove support for `-sendfreetransactions`.
- - Remove unstable `estimatesmartfee` RPC.
- - Update berkley DB to 5.3 minimum. Developers should update their build environment accordingly.
- - Remove `-incrementalrelayfee` option
+ - November 2018 upgrade activation
+ - Re-enabled opcodes OP_MUL, OP_INVERT, OP_LSHIFT, & OP_RSHIFT
+ - Removed the limit on the number of opcodes per script
+ - Set the default maximum size of mined block = 32MB

@@ -1,6 +1,6 @@
 UNIX BUILD NOTES
 ====================
-Some notes on how to build Bitcoin ABC in Unix.
+Some notes on how to build Bitcoin SV in Unix.
 
 (for OpenBSD specific instructions, see [build-openbsd.md](build-openbsd.md))
 
@@ -55,7 +55,7 @@ Memory Requirements
 --------------------
 
 C++ compilers are memory-hungry. It is recommended to have at least 1.5 GB of
-memory available when compiling Bitcoin ABC. On systems with less, gcc can be
+memory available when compiling Bitcoin SV. On systems with less, gcc can be
 tuned to conserve memory with additional CXXFLAGS:
 
 
@@ -84,7 +84,7 @@ BerkeleyDB 5.3 or later is required for the wallet. This can be installed with:
         sudo apt-get install libdb-dev
         sudo apt-get install libdb++-dev
 
-See the section "Disable-wallet mode" to build Bitcoin ABC without wallet.
+See the section "Disable-wallet mode" to build Bitcoin SV without wallet.
 
 Optional (see --with-miniupnpc and --enable-upnp-default):
 
@@ -227,8 +227,8 @@ Setup and Build Example: Arch Linux
 This example lists the steps necessary to setup and build a command line only, non-wallet distribution of the latest changes on Arch Linux:
 
     pacman -S git base-devel boost libevent python
-    git clone https://github.com/Bitcoin-ABC/bitcoin-abc
-    cd bitcoin-abc/
+    git clone https://github.com/bitcoin-sv/bitcoin-sv
+    cd bitcoin-sv/
     ./autogen.sh
     ./configure --disable-wallet --without-gui --without-miniupnpc
     make check

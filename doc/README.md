@@ -1,11 +1,15 @@
-Bitcoin ABC
+Bitcoin SV
 =====================
 
 Setup
 ---------------------
-Bitcoin ABC is a fork of Bitcoin Core, which is the original Bitcoin client and builds the backbone of the network. It downloads and stores the entire history of Bitcoin transactions (which is currently several GBs); depending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to a day or more.
+Bitcoin SV is a fork of Bitcoin ABC, which is the original Bitcoin Cash client and 
+builds the backbone of the network. It downloads and stores the entire history of 
+Bitcoin transactions (which is currently several GBs); depending on the speed of 
+your computer and network connection, the synchronization process can take anywhere 
+from a few hours to a day or more.
 
-To download Bitcoin ABC, visit [bitcoinabc.org](https://download.bitcoinabc.org/).
+To download Bitcoin SV, visit [bitcoinsv.io](https://bitcoinsv.io/).
 
 Running
 ---------------------
@@ -24,13 +28,13 @@ Unpack the files into a directory, and then run bitcoin-qt.exe.
 
 ### OS X
 
-Drag bitcoin-abc to your applications folder, and then run bitcoin-abc.
+Drag bitcoin-sv to your applications folder, and then run bitcoin-sv.
 
 ### Need Help?
 
 * See the documentation at the [Bitcoin Wiki](https://en.bitcoin.it/wiki/Main_Page)
 for help and more information.
-* Ask for help on the [Bitcoin ABC Subreddit](https://www.reddit.com/r/BitcoinABC/).
+* Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/BitcoinSV/).
 
 Building
 ---------------------
@@ -44,7 +48,7 @@ The following are developer notes on how to build Bitcoin on your native platfor
 
 Development
 ---------------------
-The Bitcoin ABC repo's [root README](/README.md) contains relevant information on the development process and automated testing.
+The Bitcoin SV repo's [root README](/README.md) contains relevant information on the development process and automated testing.
 
 - [Developer Notes](developer-notes.md)
 - [Release Notes](release-notes.md)

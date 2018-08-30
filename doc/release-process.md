@@ -1,6 +1,7 @@
 Bitcoin ABC Release Process
 ===========================
 
+This document will be updated soon for Bitcoin SV.
 
 ## Before Release
 

@@ -32,8 +32,8 @@
  *
  * \section intro_sec Introduction
  *
- * This is the developer documentation of Bitcoin ABC
- * (https://www.bitcoinabc.org/). Bitcoin ABC is a client for the digital
+ * This is the developer documentation of Bitcoin SV
+ * (https://bitcoinsv.io/). Bitcoin SV is a client for the digital
  * currency called Bitcoin Cash (https://www.bitcoincash.org/), which enables
  * instant payments to anyone, anywhere in the world. Bitcoin Cash uses
  * peer-to-peer technology to operate with no central authority: managing

@@ -1,6 +1,9 @@
 Developer Notes
 ===============
 
+These notes will be updated for Bitcoin SV when the Bitcoin SV team begin
+accepting code contributions.
+
 Various coding styles have been used during the history of the codebase,
 and the result is not very consistent. However, we're now trying to converge to
 a single style, so please use it in new code. Old code will be converted
@@ -498,9 +501,6 @@ Git and GitHub tips
 
 - Github is not typically the source of truth for pull requests.  See CONTRIBUTING.md for instructions
   on setting up your repo correctly.
-
-- Similarly, your git remote origin should be set to: `ssh://vcs@reviews.bitcoinabc.org:2221/source/bitcoin-abc.git`
-  instead of github.com.  See CONTRIBUTING.md for details.
 
 - For resolving merge/rebase conflicts, it can be useful to enable diff3 style using
   `git config merge.conflictstyle diff3`. Instead of

@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: Bitcoin ABC
-Upstream-Contact: helpdesk@bitcoinabc.org
-Source: https://github.com/Bitcoin-ABC/bitcoin-abc
+Upstream-Name: Bitcoin SV
+Upstream-Contact: contact@bitcoinsv.io
+Source: https://github.com/bitcoin-sv/bitcoin-sv
 
 Files: *
 Copyright: 2009-2017, Bitcoin Core Developers, 2017 Bitcoin Developers

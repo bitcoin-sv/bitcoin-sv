@@ -1,4 +1,4 @@
-Bitcoin ABC
+Bitcoin SV
 =====================
 
 Intro
@@ -13,7 +13,7 @@ Setup
 -----
 Unpack the files into a directory and run bitcoin-qt.exe.
 
-Bitcoin ABC is based on Bitcoin Core, which is the original Bitcoin client and
+Bitcoin SV is based on Bitcoin ABC, which is the original Bitcoin Cash client and
 builds the backbone of the network. It downloads and stores the entire history
 of Bitcoin transactions; depending on the speed of your computer and network
 connection, the synchronization process can take anywhere from a few hours to

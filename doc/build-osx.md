@@ -29,15 +29,15 @@ In case you want to build the disk image with `make deploy` (.dmg / optional), y
 
     brew install librsvg
 
-Build Bitcoin ABC
+Build Bitcoin SV
 -----------------
 
-1. Clone the Bitcoin ABC source code and cd into `bitcoin-abc`
+1. Clone the Bitcoin SV source code and cd into `bitcoin-sv`
 
-        git clone github.com/Bitcoin-ABC/bitcoin-abc
-        cd bitcoin-abc
+        git clone github.com/bitcoin-sv/bitcoin-sv
+        cd bitcoin-sv
 
-2.  Build bitcoin-abc:
+2.  Build bitcoin-sv:
 
     Configure and build the headless bitcoin binaries as well as the GUI (if Qt is found).
 
@@ -58,7 +58,7 @@ Build Bitcoin ABC
 Running
 -------
 
-Bitcoin ABC is now available at `./src/bitcoind`
+Bitcoin SV is now available at `./src/bitcoind`
 
 Before running, it's recommended you create an RPC configuration file.
 
