@@ -1493,14 +1493,16 @@ bool AppInitParameterInteraction(Config &config) {
         nScriptCheckThreads = MAX_SCRIPTCHECK_THREADS;
 
     // Configure excessive block size.
-    const uint64_t nProposedExcessiveBlockSize =
-        gArgs.GetArg("-excessiveblocksize", DEFAULT_MAX_BLOCK_SIZE);
-    if (!config.SetMaxBlockSize(nProposedExcessiveBlockSize)) {
-        return InitError(strprintf(_(
-            "Excessive block size must be > %d and less than the "
-            "max block file size (%d)"),
-            LEGACY_MAX_BLOCK_SIZE, MAX_BLOCKFILE_SIZE - BLOCKFILE_BLOCK_HEADER_SIZE
-        ));
+    if(gArgs.IsArgSet("-excessiveblocksize")) {
+        const uint64_t nProposedExcessiveBlockSize =
+            gArgs.GetArg("-excessiveblocksize", DEFAULT_MAX_BLOCK_SIZE);
+        if (!config.SetMaxBlockSize(nProposedExcessiveBlockSize)) {
+            return InitError(strprintf(_(
+                "Excessive block size must be > %d and less than the "
+                "max block file size (%d)"),
+                LEGACY_MAX_BLOCK_SIZE, MAX_BLOCKFILE_SIZE - BLOCKFILE_BLOCK_HEADER_SIZE
+            ));
+        }
     }
 
     // Check blockmaxsize does not exceed maximum accepted block size.

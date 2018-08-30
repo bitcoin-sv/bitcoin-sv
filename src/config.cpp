@@ -22,11 +22,22 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize) {
     }
 
     maxBlockSize = maxSize;
+    maxBlockSizeOverridden = true;
+
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
     return maxBlockSize;
+}
+
+bool GlobalConfig::MaxBlockSizeOverridden() const {
+    return maxBlockSizeOverridden;
+}
+
+// Allow unit tests to control whether the max block size has been overridden
+void GlobalConfig::SetMaxBlockSizeOverridden(bool overridden) {
+    maxBlockSizeOverridden = overridden;
 }
 
 bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage) {
