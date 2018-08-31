@@ -94,6 +94,13 @@ static uint64_t ComputeMaxGeneratedBlockSize(const Config &config,
             std::min(8 * ONE_MEGABYTE - 1000, nMaxGeneratedBlockSize);
     }
 
+    // If Nov 15, 2018 HF is not activated yet (and the user hasn't overridden the max size),
+    // we also want to limit the max generated block size to 32MB - 1K
+    if (!IsMagneticEnabled(config, pindexPrev) && !config.MaxBlockSizeOverridden()) {
+        nMaxGeneratedBlockSize =
+            std::min(LEGACY_DEFAULT_MAX_BLOCK_SIZE - ONE_KILOBYTE, nMaxGeneratedBlockSize);
+    }
+
     return nMaxGeneratedBlockSize;
 }
 
