@@ -533,7 +533,7 @@ def save_results_as_junit(test_results, file_name, time):
     See http://llg.cubic.org/docs/junit/ for specification of format
     """
     e_test_suite = ET.Element("testsuite",
-                              {"name": "bitcoin_abc_tests",
+                              {"name": "bitcoin_sv_tests",
                                "tests": str(len(test_results)),
                                #"errors":
                                "failures": str(len([t for t in test_results if t.status == "Failed"])),

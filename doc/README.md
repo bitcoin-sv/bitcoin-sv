@@ -60,7 +60,6 @@ The Bitcoin SV repo's [root README](/README.md) contains relevant information on
 - [Unauthenticated REST Interface](REST-interface.md)
 - [Shared Libraries](shared-libraries.md)
 - [BIPS](bips.md)
-- [Dnsseed Policy](dnsseed-policy.md)
 - [Benchmarking](benchmarking.md)
 
 ### Miscellaneous

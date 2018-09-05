@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-abc-0.17-linux"
+name: "bitcoin-sv-0.17-linux"
 enable_cache: true
 suites:
 - "xenial"
@@ -35,7 +35,7 @@ packages:
 - "libc6-dev:i386"
 - "libstdc++6:i386"
 remotes:
-- "url": "https://github.com/Bitcoin-ABC/bitcoin-abc.git"
+- "url": "https://github.com/bitcoin-sv/bitcoin-sv.git"
   "dir": "bitcoin"
 files: []
 script: |

@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-abc-0.17-win"
+name: "bitcoin-sv-0.17-win"
 enable_cache: true
 suites:
 - "xenial"
@@ -31,7 +31,7 @@ alternatives:
 - "package" : "x86_64-w64-mingw32-g++"
   "path" : "/usr/bin/x86_64-w64-mingw32-g++-posix"
 remotes:
-- "url": "https://github.com/Bitcoin-ABC/bitcoin-abc.git"
+- "url": "https://github.com/bitcoin-sv/bitcoin-sv.git"
   "dir": "bitcoin"
 files: []
 script: |
