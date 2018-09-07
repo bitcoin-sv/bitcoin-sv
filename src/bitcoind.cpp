@@ -85,7 +85,7 @@ bool AppInit(int argc, char *argv[]) {
     // Process help and version before taking care about datadir
     if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") ||
         gArgs.IsArgSet("-help") || gArgs.IsArgSet("-version")) {
-        std::string strUsage = strprintf(_("%s Daemon"), _(PACKAGE_NAME)) +
+        std::string strUsage = strprintf(_("%s"), _(PACKAGE_NAME)) +
                                " " + _("version") + " " + FormatFullVersion() +
                                "\n";
 
