@@ -1,9 +1,8 @@
 [Bitcoin SV](https://www.bitcoinsv.io)
 ===========
 
-This is an Alpha release, the purpose of which is to provide a preview of the code in response to requests from 
-miners and pool operators. This is not intended to be a release candidate. Work is still in progress targeting a 
-beta release for 1st week of September in line with the initial Bitcoin SV announcement.
+This is a Beta release, the purpose of which is to provide a preview of the code in response to requests from 
+miners and pool operators. This release will undergo extensive testing before the final release in October.
 
 What is Bitcoin Cash?
 ---------------------
@@ -20,8 +19,10 @@ transaction history up until the split.
 What is Bitcoin SV?
 --------------------
 
-Bitcoin SV is the name of open-source software which enables the use of
-Bitcoin Cash. It is a fork of the [Bitcoin ABC](https://bitcoinabc.org)
+Bitcoin Satoshi Vision (SV) is the name of open-source software which enables the use of
+Bitcoin Cash. 
+
+The source code was originally based on the [Bitcoin ABC](https://bitcoinabc.org)
 software project.
 
 License
@@ -35,7 +36,7 @@ Security
 --------
 The Bitcoin SV team are currently organizing a Responsible Disclosure Policy.
 We expect to have this ready soon. In the meantime, if you have important 
-information to share, please contact Daniel Connolly (danielc@ncrypt.com)
+information to share, please contact Daniel Connolly (d.connolly@nchain.com)
 or Steve Shadders (s.shadders@nchain.com).
 
 Development Process

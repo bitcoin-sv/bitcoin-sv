@@ -1,6 +1,6 @@
-Bitcoin SV version <next> is now available from:
+Bitcoin SV beta version is now available from:
 
-  <https://url/>
+  <https://bitcoinsv.io/>
 
 This release includes the following features and fixes:
  - November 2018 upgrade activation

@@ -3,7 +3,7 @@ Bitcoin SV
 
 Setup
 ---------------------
-Bitcoin SV is a fork of Bitcoin ABC, which is the original Bitcoin Cash client and 
+Bitcoin SV is an implementation of a node for the Bitcoin Cash network and 
 builds the backbone of the network. It downloads and stores the entire history of 
 Bitcoin transactions (which is currently several GBs); depending on the speed of 
 your computer and network connection, the synchronization process can take anywhere 
