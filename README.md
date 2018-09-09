@@ -1,4 +1,4 @@
-[Bitcoin SV](https://www.bitcoinsv.io)
+Bitcoin SV
 ===========
 
 This is a Beta release, the purpose of which is to provide a preview of the code in response to requests from 
