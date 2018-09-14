@@ -42,7 +42,6 @@ enum LogFlags : uint32_t {
     MEMPOOLREJ = (1 << 16),
     LIBEVENT = (1 << 17),
     COINDB = (1 << 18),
-    QT = (1 << 19),
     LEVELDB = (1 << 20),
     ALL = ~uint32_t(0),
 };

@@ -2591,8 +2591,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
             std::string strWarning =
                 _("Warning: Unknown block versions being mined! It's possible "
                   "unknown rules are in effect");
-            // notify GetWarnings(), called by Qt and the JSON-RPC code to warn
-            // the user:
+            // notify GetWarnings(), called by the JSON-RPC code to warn the user:
             SetMiscWarning(strWarning);
             if (!fWarned) {
                 AlertNotify(strWarning);

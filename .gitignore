@@ -8,8 +8,6 @@ src/bitcoin-seeder
 src/bitcoin-tx
 src/test/test_bitcoin
 src/test/test_bitcoin_fuzzy
-src/qt/test/test_bitcoin-qt
-
 # autoreconf
 Makefile.in
 aclocal.m4
@@ -35,16 +33,7 @@ src/config/bitcoin-config.h
 src/config/bitcoin-config.h.in
 src/config/stamp-h1
 share/setup.nsi
-share/qt/Info.plist
-
 src/univalue/gen
-
-src/qt/*.moc
-src/qt/moc_*.cpp
-src/qt/forms/ui_*.h
-
-src/qt/test/moc*.cpp
-
 .deps
 .dirstamp
 .libs
@@ -72,15 +61,10 @@ src/qt/test/moc*.cpp
 *.lo
 *.la
 
-# Compilation and Qt preprocessor part
-*.qm
 Makefile
-bitcoin-qt
-Bitcoin-Qt.app
 
 # Unit-tests
 Makefile.test
-bitcoin-qt_test
 junit_results.xml
 
 # Resources cpp

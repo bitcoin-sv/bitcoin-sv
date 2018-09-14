@@ -78,7 +78,7 @@ std::string HelpMessageCli() {
     strUsage += HelpMessageOpt(
         "-rpcwallet=<walletname>",
         _("Send RPC for non-default wallet on RPC server (argument is wallet "
-          "filename in bitcoind directory, required if bitcoind/-Qt runs with "
+          "filename in bitcoind directory, required if bitcoind runs with "
           "multiple wallets)"));
 
     return strUsage;

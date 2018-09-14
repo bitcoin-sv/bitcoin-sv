@@ -78,7 +78,6 @@ bool AppInit(int argc, char *argv[]) {
     //
     // Parameters
     //
-    // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's
     // main()
     gArgs.ParseParameters(argc, argv);
 
@@ -138,8 +137,7 @@ bool AppInit(int argc, char *argv[]) {
                             "instead.\n");
             exit(EXIT_FAILURE);
         }
-        // -server defaults to true for bitcoind but not for the GUI so do this
-        // here
+        // -server defaults to true for bitcoind
         gArgs.SoftSetBoolArg("-server", true);
         // Set this early so that parameter interactions go to console
         InitLogging();

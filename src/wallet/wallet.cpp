@@ -1721,25 +1721,12 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
         pindex = chainActive.Next(pindex);
     }
 
-    // Show rescan progress in GUI as dialog or on splashscreen, if -rescan on
-    // startup.
-    ShowProgress(_("Rescanning..."), 0);
     double dProgressStart =
         GuessVerificationProgress(chainParams.TxData(), pindex);
     double dProgressTip =
         GuessVerificationProgress(chainParams.TxData(), chainActive.Tip());
     while (pindex) {
-        if (pindex->nHeight % 100 == 0 && dProgressTip - dProgressStart > 0.0) {
-            ShowProgress(
-                _("Rescanning..."),
-                std::max(1,
-                         std::min(99, (int)((GuessVerificationProgress(
-                                                 chainParams.TxData(), pindex) -
-                                             dProgressStart) /
-                                            (dProgressTip - dProgressStart) *
-                                            100))));
-        }
-
+        
         CBlock block;
         if (ReadBlockFromDisk(block, pindex, GlobalConfig::GetConfig())) {
             for (size_t posInBlock = 0; posInBlock < block.vtx.size();
@@ -1762,9 +1749,6 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
                       GuessVerificationProgress(chainParams.TxData(), pindex));
         }
     }
-
-    // Hide progress dialog in GUI.
-    ShowProgress(_("Rescanning..."), 100);
 
     return ret;
 }

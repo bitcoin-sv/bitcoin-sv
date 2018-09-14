@@ -107,7 +107,7 @@ static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 // Thread management and startup/shutdown:
 //
 // The network-processing threads are all part of a thread group created by
-// AppInit() or the Qt main() function.
+// AppInit() function.
 //
 // A clean exit happens when StartShutdown() or the SIGTERM signal handler sets
 // fRequestShutdown, which triggers the DetectShutdownThread(), which interrupts
@@ -119,9 +119,6 @@ static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 // Note that if running -daemon the parent process returns from AppInit2 before
 // adding any threads to the threadGroup, so .join_all() returns immediately and
 // the parent exits from main().
-//
-// Shutdown for Qt is very similar, only it uses a QTimer to detect
-// fRequestShutdown getting set, and then does the normal Qt shutdown thing.
 //
 
 std::atomic<bool> fRequestShutdown(false);
@@ -137,7 +134,7 @@ bool ShutdownRequested() {
 /**
  * This is a minimally invasive approach to shutdown on LevelDB read errors from
  * the chainstate, while keeping user interface out of the common library, which
- * is shared between bitcoind, and bitcoin-qt and non-server tools.
+ * is shared between bitcoind and non-server tools.
  */
 class CCoinsViewErrorCatcher final : public CCoinsViewBacked {
 public:
@@ -2180,8 +2177,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         }
     }
 
-    // As LoadBlockIndex can take several minutes, it's possible the user
-    // requested to kill the GUI during the last operation. If so, exit.
+    // As LoadBlockIndex can take several minutes.
     // As the program has not fully started yet, Shutdown() is possibly
     // overkill.
     if (fRequestShutdown) {

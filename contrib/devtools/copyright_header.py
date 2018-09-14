@@ -27,7 +27,6 @@ EXCLUDE = [
     'src/secp256k1/src/java/org_bitcoin_Secp256k1Context.h',
     # auto generated:
     'src/univalue/lib/univalue_escapes.h',
-    'src/qt/bitcoinstrings.cpp',
     'src/chainparamsseeds.h',
     # other external copyrights:
     'src/tinyformat.h',

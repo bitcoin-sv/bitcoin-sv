@@ -55,8 +55,7 @@ master branch.
 
 The packages specified in the `BuildRequires` are specified according to the
 package naming convention currently used in CentOS 7 and EPEL for CentOS 7. You
-may need to change some of the package names for other distributions. This is
-most likely to be the case with the Qt packages.
+may need to change some of the package names for other distributions.
 
 ## BerkeleyDB
 
@@ -69,16 +68,6 @@ the distribution may make in the future will not result in a problem for users.
 The problem that can exist, clients built against different versions of
 BerkeleyDB may not be able read each other's `wallet.dat` file which can make it
 difficult for a user to recover from backup in the event of a system failure.
-
-## Graphical User Interface and Qt Version
-
-The RPM spec file will by default build the GUI client linked against the Qt5
-libraries. If you wish instead to link against the Qt4 libraries you need to
-pass the switch `-D '_use_qt4 1'` at build time to the `rpmbuild` or `mock`
-command used to build the packages.
-
-If you would prefer not to build the GUI at all, you can pass the switch
-`-D '_no_gui 1'` to the `rpmbuild` or `mock` build command.
 
 ## Desktop and KDE Files
 

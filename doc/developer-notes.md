@@ -180,9 +180,6 @@ error and debugging messages are written there.
 The -debug=... command-line option controls debugging; running with just -debug or -debug=1 will turn
 on all categories (and give you a very large debug.log file).
 
-The Qt code routes qDebug() output to debug.log under category "qt": run with -debug=qt
-to see it.
-
 **running and debugging tests**
 
 Unit tests are run via `make check`
@@ -455,15 +452,6 @@ Source code organization
   fully specified types such as `std::string`.
 
   - *Rationale*: Avoids symbol conflicts
-
-GUI
------
-
-- Do not display or manipulate dialogs in model code (classes `*Model`)
-
-  - *Rationale*: Model classes pass through events and data from the core, they
-    should not interact with the user. That's where View classes come in. The converse also
-    holds: try to not directly access core data structures from Views.
 
 Subtrees
 ----------
