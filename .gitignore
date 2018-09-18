@@ -81,6 +81,7 @@ Bitcoin-Qt.app
 # Unit-tests
 Makefile.test
 bitcoin-qt_test
+junit_results.xml
 
 # Resources cpp
 qrc_*.cpp
