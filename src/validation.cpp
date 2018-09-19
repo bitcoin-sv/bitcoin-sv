@@ -3605,7 +3605,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
         // the coinbase, the loos is arranged such as this only runs after at
         // least one increment.
         tx = block.vtx[i].get();
-        if (!CheckRegularTransaction(*tx, state, false)) {
+        if (!CheckRegularTransaction(*tx, state, true)) {
             return state.Invalid(
                 false, state.GetRejectCode(), state.GetRejectReason(),
                 strprintf("Transaction check failed (txid %s) %s",
