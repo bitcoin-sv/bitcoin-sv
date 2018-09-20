@@ -528,12 +528,9 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
 
 /** Transaction validation functions */
 
-/** Context-independent validity checks for coinbase and non-coinbase
- * transactions */
-bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state,
-                             bool fCheckDuplicateInputs = true);
-bool CheckCoinbase(const CTransaction &tx, CValidationState &state,
-                   bool fCheckDuplicateInputs = true);
+/** Context-independent validity checks for coinbase and non-coinbase transactions */
+bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state);
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state);
 
 namespace Consensus {
 
