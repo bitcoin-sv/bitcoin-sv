@@ -844,6 +844,12 @@ static UniValue submitblock(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
+    return SubmitBlock(config, blockptr);
+}
+
+UniValue SubmitBlock(const Config& config, const std::shared_ptr<CBlock>& blockptr)
+{
+    CBlock &block = *blockptr;
     if (block.vtx.empty() || !block.vtx[0]->IsCoinBase()) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                            "Block does not start with a coinbase");

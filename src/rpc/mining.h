@@ -12,10 +12,12 @@
 #include <memory>
 
 class Config;
+class CBlock;
 
 /** Generate blocks (mine) */
-UniValue generateBlocks(const Config &config,
+UniValue generateBlocks(const Config& config,
                         std::shared_ptr<CReserveScript> coinbaseScript,
                         int nGenerate, uint64_t nMaxTries, bool keepScript);
 
+UniValue SubmitBlock(const Config& config, const std::shared_ptr<CBlock>& block);
 #endif

@@ -229,6 +229,7 @@ libbitcoin_server_a_SOURCES = \
   rpc/abc.cpp \
   rpc/blockchain.cpp \
   rpc/mining.cpp \
+  rpc/mining2.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
   rpc/rawtransaction.cpp \
