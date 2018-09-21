@@ -21,11 +21,15 @@ static const int64_t ORPHAN_TX_EXPIRE_INTERVAL = 5 * 60;
 /** Default number of orphan+recently-replaced txn to keep around for block
  * reconstruction */
 static const unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
+/** Max broadcast delay duration in micro seconds */
+static const int64_t MAX_INV_BROADCAST_DELAY = 50 * 1000000;
 
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals &nodeSignals);
 /** Unregister a network node */
 void UnregisterNodeSignals(CNodeSignals &nodeSignals);
+/** Set inventory broadcasting delay time in seconds*/
+bool SetInvBroadcastDelay(const int64_t& nDelay);
 
 class PeerLogicValidation : public CValidationInterface {
 private:
