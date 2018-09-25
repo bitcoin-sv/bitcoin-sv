@@ -814,15 +814,6 @@ std::string HelpMessage(HelpMessageMode mode) {
                        strprintf(_("Equivalent bytes per sigop in transactions "
                                    "for relay and mining (default: %u)"),
                                  DEFAULT_BYTES_PER_SIGOP));
-    strUsage += HelpMessageOpt(
-        "-datacarrier",
-        strprintf(_("Relay and mine data carrier transactions (default: %d)"),
-                  DEFAULT_ACCEPT_DATACARRIER));
-    strUsage += HelpMessageOpt(
-        "-datacarriersize",
-        strprintf(_("Maximum size of data in data carrier transactions we "
-                    "relay and mine (default: %u)"),
-                  MAX_OP_RETURN_RELAY));
 
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
@@ -1610,8 +1601,6 @@ bool AppInitParameterInteraction(Config &config) {
 
     fIsBareMultisigStd =
         gArgs.GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
-    fAcceptDatacarrier =
-        gArgs.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER);
 
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(gArgs.GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
