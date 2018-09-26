@@ -728,6 +728,8 @@ private:
     mutable CCriticalSection cs_addrLocal;
 
 public:
+    enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
+
     NodeId GetId() const { return id; }
 
     uint64_t GetLocalNonce() const { return nLocalHostNonce; }
@@ -739,7 +741,7 @@ public:
         return nRefCount;
     }
 
-    bool ReceiveMsgBytes(const Config &config, const char *pch, uint32_t nBytes,
+    RECV_STATUS ReceiveMsgBytes(const Config &config, const char *pch, uint32_t nBytes,
                          bool &complete);
 
     void SetRecvVersion(int nVersionIn) { nRecvVersion = nVersionIn; }

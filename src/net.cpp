@@ -704,7 +704,7 @@ static bool IsOversizedMessage(const Config &config, const CNetMessage &msg) {
     return msg.hdr.IsOversized(config);
 }
 
-bool CNode::ReceiveMsgBytes(const Config &config, const char *pch,
+CNode::RECV_STATUS CNode::ReceiveMsgBytes(const Config &config, const char *pch,
                             uint32_t nBytes, bool &complete) {
     complete = false;
     int64_t nTimeMicros = GetTimeMicros();
@@ -729,14 +729,14 @@ bool CNode::ReceiveMsgBytes(const Config &config, const char *pch,
         }
 
         if (handled < 0) {
-            return false;
+            return RECV_FAIL;
         }
 
         if (IsOversizedMessage(config, msg)) {
             LogPrint(BCLog::NET,
                      "Oversized message from peer=%i, disconnecting\n",
                      GetId());
-            return false;
+            return RECV_BAD_LENGTH;
         }
 
         pch += handled;
@@ -759,7 +759,7 @@ bool CNode::ReceiveMsgBytes(const Config &config, const char *pch,
         }
     }
 
-    return true;
+    return RECV_OK;
 }
 
 void CNode::SetSendVersion(int nVersionIn) {
@@ -1415,9 +1415,12 @@ void CConnman::ThreadSocketHandler() {
                 }
                 if (nBytes > 0) {
                     bool notify = false;
-                    if (!pnode->ReceiveMsgBytes(*config, pchBuf, nBytes,
-                                                notify)) {
+                    const CNode::RECV_STATUS status = pnode->ReceiveMsgBytes(*config, pchBuf, nBytes, notify); 
+                    if (status != CNode::RECV_OK) {
                         pnode->CloseSocketDisconnect();
+                        if (status == CNode::RECV_BAD_LENGTH) {
+                            Ban(pnode->addr, BanReasonNodeMisbehaving); // Ban the peer if try to send messages with bad length
+                        }   
                     }
                     RecordBytesRecv(nBytes);
                     if (notify) {

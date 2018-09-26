@@ -250,12 +250,18 @@ class FullBlockTest(ComparisonTestFramework):
         block(17, spend=out[16], block_size=self.excessive_block_size)
         yield accepted()
 
-        # Reject oversized blocks with bad-blk-length error
+        # Oversized blocks will cause us to be disconnected
+        assert(not self.test.test_nodes[0].closed)
         block(18, spend=out[17], block_size=self.excessive_block_size + 1)
-        yield rejected(RejectResult(16, b'bad-blk-length'))
+        self.test.connections[0].send_message(msg_block((self.tip)))
+        self.test.wait_for_disconnections()
+        assert(self.test.test_nodes[0].closed)
 
-        # Rewind bad block.
+        # Rewind bad block and remake connection to node
         tip(17)
+        self.test.clear_all_connections()
+        self.test.add_all_connections(self.nodes)
+        NetworkThread().start()
 
         # Accept many sigops
         lots_of_checksigs = CScript(

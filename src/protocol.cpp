@@ -169,8 +169,8 @@ bool CMessageHeader::IsOversized(const Config &config) const {
         return true;
     }
 
-    // Scale the maximum accepted size with the block size.
-    if (nMessageSize > 2 * config.GetMaxBlockSize()) {
+    // maximum accepted size with the block size.
+    if (nMessageSize > config.GetMaxBlockSize()) {
         return true;
     }
 
