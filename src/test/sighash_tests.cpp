@@ -161,34 +161,31 @@ BOOST_AUTO_TEST_CASE(sighash_test) {
             BOOST_CHECK(shreg == shref);
         }
 
-        // Make sure replay protection works as expected.
+        // Make sure replay protection doesn't change the hash type
         uint256 shrep = SignatureHash(scriptCode, CTransaction(txTo), nIn,
                                       sigHashType, Amount(0), nullptr,
                                       SCRIPT_ENABLE_SIGHASH_FORKID |
                                           SCRIPT_ENABLE_REPLAY_PROTECTION);
-        uint32_t newForValue = 0xff0000 | ((nHashType >> 8) ^ 0xdead);
+        uint32_t newForValue = sigHashType.getForkValue();
         uint256 manualshrep =
             SignatureHash(scriptCode, CTransaction(txTo), nIn,
                           sigHashType.withForkValue(newForValue), Amount(0));
         BOOST_CHECK(shrep == manualshrep);
 
-        // Replay protection works even if the hash is of the form 0xffxxxx
-        uint256 shrepff = SignatureHash(
-            scriptCode, CTransaction(txTo), nIn,
-            sigHashType.withForkValue(newForValue), Amount(0), nullptr,
+        // Replay protection has no effect even if the hash is of the form 0xffxxxx
+        uint256 shrepff = SignatureHash(scriptCode, CTransaction(txTo), nIn,
+            sigHashType.withForkValue(0xff0000), Amount(0), nullptr,
             SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION);
-        uint256 manualshrepff = SignatureHash(
-            scriptCode, CTransaction(txTo), nIn,
-            sigHashType.withForkValue(newForValue ^ 0xdead), Amount(0));
+        uint256 manualshrepff = SignatureHash(scriptCode, CTransaction(txTo), nIn,
+            sigHashType.withForkValue(0xff0000), Amount(0));
         BOOST_CHECK(shrepff == manualshrepff);
 
-        uint256 shrepabcdef = SignatureHash(
-            scriptCode, CTransaction(txTo), nIn,
+        uint256 shrepabcdef = SignatureHash(scriptCode, CTransaction(txTo), nIn,
             sigHashType.withForkValue(0xabcdef), Amount(0), nullptr,
             SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION);
         uint256 manualshrepabcdef =
             SignatureHash(scriptCode, CTransaction(txTo), nIn,
-                          sigHashType.withForkValue(0xff1342), Amount(0));
+                          sigHashType.withForkValue(0xabcdef), Amount(0));
         BOOST_CHECK(shrepabcdef == manualshrepabcdef);
 
 #if defined(PRINT_SIGHASH_JSON)
@@ -263,18 +260,17 @@ BOOST_AUTO_TEST_CASE(sighash_from_data) {
             continue;
         }
 
-        uint256 shreg =
-            SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0));
+        uint256 shreg = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0));
         BOOST_CHECK_MESSAGE(shreg.GetHex() == sigHashRegHex, strTest);
 
-        uint256 shold = SignatureHash(scriptCode, *tx, nIn, sigHashType,
-                                      Amount(0), nullptr, 0);
+        uint256 shold = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0), nullptr, 0);
         BOOST_CHECK_MESSAGE(shold.GetHex() == sigHashOldHex, strTest);
 
-        uint256 shrep = SignatureHash(
-            scriptCode, *tx, nIn, sigHashType, Amount(0), nullptr,
+        uint256 justforkid = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0), nullptr,
+            SCRIPT_ENABLE_SIGHASH_FORKID);
+        uint256 shrep = SignatureHash(scriptCode, *tx, nIn, sigHashType, Amount(0), nullptr,
             SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_ENABLE_REPLAY_PROTECTION);
-        BOOST_CHECK_MESSAGE(shrep.GetHex() == sigHashRepHex, strTest);
+        BOOST_CHECK_MESSAGE(shrep.GetHex() == justforkid.GetHex(), strTest);
     }
 }
 

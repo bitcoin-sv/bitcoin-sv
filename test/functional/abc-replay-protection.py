@@ -229,52 +229,57 @@ class ReplayProtectionTest(ComparisonTestFramework):
         txns = create_fund_and_spend_tx(out[2])
         send_transaction_to_mempool(txns[0])
         tx_id = send_transaction_to_mempool(txns[1])
+        assert(tx_id in set(node.getrawmempool()))
 
         # Activate the replay protection
         block(5556)
         yield accepted()
 
-        # Non replay protected transactions are not valid anymore,
-        # so they should be removed from the mempool.
+        # At activation the entire mempool is cleared, so the txn we inserted
+        # earlier will have gone.
         assert(tx_id not in set(node.getrawmempool()))
 
-        # Good old transactions are now invalid.
-        send_transaction_to_mempool(txns[0])
-        assert_raises_rpc_error(-26, RPC_INVALID_SIGNATURE_ERROR,
-                                node.sendrawtransaction, ToHex(txns[1]))
+        # Good old transactions are still valid
+        tx_id = send_transaction_to_mempool(txns[0])
+        assert(tx_id in set(node.getrawmempool()))
 
-        # They also cannot be mined
+        # They also can still be mined
         block(4)
         update_block(4, txns)
+        yield accepted()
+
+        # The replay protected transaction is still invalid
+        send_transaction_to_mempool(replay_txns[0])
+        assert_raises_rpc_error(-26, RPC_INVALID_SIGNATURE_ERROR,
+                                node.sendrawtransaction, ToHex(replay_txns[1]))
+
+        # They also still can't be mined
+        b5 = block(5)
+        update_block(5, replay_txns)
         yield rejected(RejectResult(16, b'blk-bad-inputs'))
 
         # Rewind bad block
         tip(5556)
 
-        # The replay protected transaction is now valid
-        send_transaction_to_mempool(replay_txns[0])
-        replay_tx_id = send_transaction_to_mempool(replay_txns[1])
-
-        # They also can also be mined
-        b5 = block(5)
-        update_block(5, replay_txns)
-        yield accepted()
+        # These next few tests look a bit pointless to me since over the activation
+        # we completely wipe the mempool, but hey-ho I guess they're only
+        # temporary.
 
         # Ok, now we check if a reorg work properly accross the activation.
         postforkblockid = node.getbestblockhash()
         node.invalidateblock(postforkblockid)
-        assert(replay_tx_id in set(node.getrawmempool()))
+        assert(tx_id in set(node.getrawmempool()))
 
         # Deactivating replay protection.
         forkblockid = node.getbestblockhash()
         node.invalidateblock(forkblockid)
-        assert(replay_tx_id not in set(node.getrawmempool()))
+        assert(tx_id not in set(node.getrawmempool()))
 
         # Check that we also do it properly on deeper reorg.
         node.reconsiderblock(forkblockid)
         node.reconsiderblock(postforkblockid)
         node.invalidateblock(forkblockid)
-        assert(replay_tx_id not in set(node.getrawmempool()))
+        assert(tx_id not in set(node.getrawmempool()))
 
 
 if __name__ == '__main__':
