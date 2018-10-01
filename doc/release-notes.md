@@ -4,7 +4,7 @@ This release includes the following features and fixes:
  - November 2018 upgrade activation. When the upgrade activates, the 
  following upgrades take effect:
     - The opcodes OP_MUL, OP_INVERT, OP_LSHIFT, & OP_RSHIFT are re-enabled
-    - The limit on the number of opcodes per script is removed
+    - The limit on the number of opcodes per script is increased to 500
     - The default maximum size of accepted blocks = 128MB
  - Disabled the automatic replay protection feature
 

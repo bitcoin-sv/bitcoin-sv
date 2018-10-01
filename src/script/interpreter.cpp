@@ -368,6 +368,19 @@ static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
     return false;
 }
 
+inline bool IsValidMaxOpsPerScript(bool isMagnetic, int nOpCount) {
+    if (isMagnetic) {
+        if (nOpCount > MAGNETIC_MAX_OPS_PER_SCRIPT) {
+            return false;
+        }
+    } else {
+        if (nOpCount > MAX_OPS_PER_SCRIPT) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                 uint32_t flags, const BaseSignatureChecker &checker,
                 ScriptError *serror) {
@@ -405,8 +418,12 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
             }
 
+            //
+            // Check opcode limits.
+            //
+            // Push values are not taken into consideration.
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if (!isMagnetic && opcode > OP_16 && ++nOpCount > MAX_OPS_PER_SCRIPT) {
+            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(isMagnetic, ++nOpCount)) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
 
@@ -1250,7 +1267,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
                         nOpCount += nKeysCount;
-                        if (!isMagnetic && nOpCount > MAX_OPS_PER_SCRIPT) {
+                        if (!IsValidMaxOpsPerScript(isMagnetic, nOpCount)) {
                             return set_error(serror, SCRIPT_ERR_OP_COUNT);
                         }
                         int ikey = ++i;
