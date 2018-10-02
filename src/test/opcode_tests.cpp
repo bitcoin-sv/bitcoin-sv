@@ -1058,9 +1058,10 @@ static size_t NonPushOpCodeCount(const CScript& script)
     { 
         script.GetOp(pc, opcode, value); 
         if (opcode > OP_16) 
-             ++cnt; 
-    } 
-    return cnt; 
+             ++cnt;
+    }
+    // Include multisig opcode count as well.
+    return cnt + script.GetSigOpCount(true);
 } 
  
 static void CheckTestForOpCodeLimit(const CScript &script,
@@ -1076,10 +1077,9 @@ static void CheckTestForOpCodeLimit(const CScript &script,
         for(uint32_t rdep_flags : release_dependent_flagset) {
             uint32_t flags = std_flags | rdep_flags; 
             ScriptError err = SCRIPT_ERR_OK; 
-            stacktype stack{original_stack}; 
-            bool r = EvalScript(stack, script, flags, sigchecker, &err);
-
+            stacktype stack{original_stack};
             bool isMagnetic = (rdep_flags & SCRIPT_ENABLE_MAGNETIC_OPCODES);
+            bool r = EvalScript(stack, script, flags, sigchecker, &err);
             size_t nonPushOpcodeCount = NonPushOpCodeCount(script);
             if( (isMagnetic && nonPushOpcodeCount > MAGNETIC_MAX_OPS_PER_SCRIPT) ||
                 (!isMagnetic && nonPushOpcodeCount > MAX_OPS_PER_SCRIPT) ) {
@@ -1093,42 +1093,30 @@ static void CheckTestForOpCodeLimit(const CScript &script,
     } 
 } 
 
-static void add_30(CScript& script) 
-{   
-    script << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD                                  
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD 
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD; 
-} 
- 
-static void add_100(CScript& script)
+static CScript add_op1_ntimes(size_t nTimes)
 {
-    script << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD
-           << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD << OP_1 << OP_ADD;
+    CScript script;
+    // Initial value
+    script << OP_1;
+    for (size_t i=0; i<nTimes; ++i) {
+        script << OP_1 << OP_ADD;
+    }
+    return script;
+}
+
+static CScript dummy_multisig_with_pubkey()
+{
+    DummySignatureCreator sigfactory(nullptr);
+    CScript script;
+    // Create multi-sig signatures + public keys.
+    std::vector<uint8_t> signature;  // dummy signature
+    sigfactory.CreateSig(signature, CKeyID(), CScript());
+    CKey key;
+    key.MakeNewKey(true);
+    script << OP_0 << signature << signature << OP_2
+           << ToByteVector(key.GetPubKey()) << ToByteVector(key.GetPubKey()) << ToByteVector(key.GetPubKey()) << OP_3
+           << OP_CHECKMULTISIG;
+    return script;
 }
 
 BOOST_AUTO_TEST_CASE(opcode_legacy_limit_tests)
@@ -1136,110 +1124,59 @@ BOOST_AUTO_TEST_CASE(opcode_legacy_limit_tests)
     DummySignatureCreator sigfactory(nullptr); 
     const BaseSignatureChecker& sigchecker = sigfactory.Checker(); 
 
+    /**
+     * Check based on OP_ADD opcode.
+     */
     // test with one opcode
-    CheckTestForOpCodeLimit(CScript() << OP_1 << OP_1 << OP_ADD, 1, sigchecker);
+    CheckTestForOpCodeLimit(add_op1_ntimes(1), 1, sigchecker);
+    // test with MAX_OPS_PER_SCRIPT-1 opcodes, which is under MAX_OPS_PER_SCRIPT legacy limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-1), MAX_OPS_PER_SCRIPT-1, sigchecker);
+    // test with MAX_OPS_PER_SCRIPT opcodes, which is equal MAX_OPS_PER_SCRIPT legacy limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT), MAX_OPS_PER_SCRIPT, sigchecker);
+    // test with MAX_OPS_PER_SCRIPT+1 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT+1), MAX_OPS_PER_SCRIPT+1, sigchecker);
 
-    {
-        CScript script; 
-        script << OP_1;
-
-        // test with 1*100=100 opcodes, which is under MAX_OPS_PER_SCRIPT legacy limit
-        add_100(script);
-        CheckTestForOpCodeLimit(script, 100, sigchecker);
-
-        // test with 100+1*100+1=201 opcodes, which is equal MAX_OPS_PER_SCRIPT legacy limit
-        add_100(script);
-        script << OP_1 << OP_ADD;
-        CheckTestForOpCodeLimit(script, 201, sigchecker);
-
-        // test with 201+1=202 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
-        script << OP_1 << OP_ADD;
-        CheckTestForOpCodeLimit(script, 202, sigchecker);
-    } 
-
-    // Check OP_CHECKMULTISIG/OP_CHECKMULTISIGVERIFY as this  
-    // explicitly checks MAX_OPS_PER_SCRIPT.  
-    // EvalScript increases opcode count by a number of pubkeys found in the script.
-    { 
-        CScript script; 
-        script << OP_1; 
-        add_30(script);add_30(script);add_30(script);
-        add_30(script);add_30(script);add_30(script);
- 
-        // Create multi-sig signatures + public keys.  
-        std::vector<uint8_t> signature;  // dummy signature 
-        sigfactory.CreateSig(signature, CKeyID(), CScript()); 
-        CKey key;
-        key.MakeNewKey(true);
-        script << OP_0 << signature << signature << OP_2 
-               << ToByteVector(key.GetPubKey()) << ToByteVector(key.GetPubKey()) << ToByteVector(key.GetPubKey()) << OP_3
-               << OP_CHECKMULTISIG;
-
-        // test with 6*30+1+3(pubkey)=181+3(pubkey) opcodes, which is under MAX_OPS_PER_SCRIPT legacy limit
-        CheckTestForOpCodeLimit(script, 181, sigchecker);
-
-        // test with 181+1*30+3(pubkey)=211+3(pubkey) opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
-        add_30(script);
-        CheckTestForOpCodeLimit(script, 211, sigchecker);
-    } 
-} 
+    /**
+     * Check OP_CHECKMULTISIG/OP_CHECKMULTISIGVERIFY as this
+     * explicitly checks MAX_OPS_PER_SCRIPT.
+     */
+    // Create multi-sig signatures + public keys.
+    CScript dummy_multisig (dummy_multisig_with_pubkey());
+    // test with MAX_OPS_PER_SCRIPT-5+4 opcodes, which is under MAX_OPS_PER_SCRIPT legacy limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-5) + dummy_multisig, MAX_OPS_PER_SCRIPT-1, sigchecker);
+    // test with MAX_OPS_PER_SCRIPT-4+4 opcodes, which is equal MAX_OPS_PER_SCRIPT legacy limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-4) + dummy_multisig, MAX_OPS_PER_SCRIPT, sigchecker);
+    // test with MAX_OPS_PER_SCRIPT-3+4 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-3) + dummy_multisig, MAX_OPS_PER_SCRIPT+1, sigchecker);
+}
 
 BOOST_AUTO_TEST_CASE(opcode_magnetic_limit_tests)
 {
     DummySignatureCreator sigfactory(nullptr);
     const BaseSignatureChecker& sigchecker = sigfactory.Checker();
 
-    {
-        CScript script;
-        script << OP_1;
+    /**
+     * Check based on OP_ADD opcode.
+     */
+    // test with MAGNETIC_MAX_OPS_PER_SCRIPT-1 opcodes, which is under MAGNETIC_MAX_OPS_PER_SCRIPT
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT-1), MAGNETIC_MAX_OPS_PER_SCRIPT-1, sigchecker);
+    // test with MAGNETIC_MAX_OPS_PER_SCRIPT opcodes
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT), MAGNETIC_MAX_OPS_PER_SCRIPT, sigchecker);
+    // test with MAGNETIC_MAX_OPS_PER_SCRIPT+1 opcodes, which is over MAGNETIC_MAX_OPS_PER_SCRIPT
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT+1), MAGNETIC_MAX_OPS_PER_SCRIPT+1, sigchecker);
 
-        // test with 4*100=400 opcodes, which is under MAGNETIC_MAX_OPS_PER_SCRIPT
-        add_100(script); add_100(script); add_100(script); add_100(script);
-        CheckTestForOpCodeLimit(script, 400, sigchecker);
-
-        // test with 400+100=500 opcodes, which is equal MAGNETIC_MAX_OPS_PER_SCRIPT
-        add_100(script);
-        CheckTestForOpCodeLimit(script, 500, sigchecker);
-
-        // test with 500+1=501 opcodes, which is over MAGNETIC_MAX_OPS_PER_SCRIPT
-        script << OP_1 << OP_ADD;
-        CheckTestForOpCodeLimit(script, 501, sigchecker);
-    }
-
-    // Check OP_CHECKMULTISIG/OP_CHECKMULTISIGVERIFY as this
-    // explicitly checks MAGNETIC_MAX_OPS_PER_SCRIPT.
-    // EvalScript increases opcode count by a number of pubkeys found in the script.
-    {
-        CScript script;
-        script << OP_1;
-        // test with 4*100+3*30+1+3(pubkey)=491+3(pubkey) opcodes, which is under MAGNETIC_MAX_OPS_PER_SCRIPT
-        add_100(script); add_100(script); add_100(script); add_100(script);
-        add_30(script); add_30(script); add_30(script);
-
-        // Create multi-sig signatures + public keys.
-        std::vector<uint8_t> signature;  // dummy signature
-        sigfactory.CreateSig(signature, CKeyID(), CScript());
-        CKey key;
-        key.MakeNewKey(true);
-        script << OP_0 << signature << signature << OP_2
-               << ToByteVector(key.GetPubKey()) << ToByteVector(key.GetPubKey()) << ToByteVector(key.GetPubKey()) << OP_3
-               << OP_CHECKMULTISIG;
-
-        CheckTestForOpCodeLimit(script, 491, sigchecker);
-
-        // test with 497+3(pubkey) opcodes, which is equal MAGNETIC_MAX_OPS_PER_SCRIPT
-        script << OP_1 << OP_ADD;
-        script << OP_1 << OP_ADD;
-        script << OP_1 << OP_ADD;
-        script << OP_1 << OP_ADD;
-        script << OP_1 << OP_ADD;
-        script << OP_1 << OP_ADD;
-        CheckTestForOpCodeLimit(script, 497, sigchecker);
-
-        // test with 497+30+3(pubkey)=527+3(pubkey) opcodes, which is over MAGNETIC_MAX_OPS_PER_SCRIPT
-        add_30(script);
-        CheckTestForOpCodeLimit(script, 527, sigchecker);
-    }
+    /**
+     * Check OP_CHECKMULTISIG/OP_CHECKMULTISIGVERIFY as this
+     * explicitly checks MAX_OPS_PER_SCRIPT.
+     */
+    // Create multi-sig signatures + public keys.
+    CScript dummy_multisig (dummy_multisig_with_pubkey());
+    // test with MAGNETIC_MAX_OPS_PER_SCRIPT-5+4 opcodes, which is under MAGNETIC_MAX_OPS_PER_SCRIPT limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT-5) + dummy_multisig, MAGNETIC_MAX_OPS_PER_SCRIPT-1, sigchecker);
+    // test with MAGNETIC_MAX_OPS_PER_SCRIPT-4+4 opcodes, which is equal MAGNETIC_MAX_OPS_PER_SCRIPT limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT-4) + dummy_multisig, MAGNETIC_MAX_OPS_PER_SCRIPT, sigchecker);
+    // test with MAGNETIC_MAX_OPS_PER_SCRIPT-3+4 opcodes, which is over MAGNETIC_MAX_OPS_PER_SCRIPT limit
+    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT-3) + dummy_multisig, MAGNETIC_MAX_OPS_PER_SCRIPT+1, sigchecker);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
