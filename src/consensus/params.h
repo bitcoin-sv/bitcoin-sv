@@ -52,8 +52,6 @@ struct Params {
     int uahfHeight;
     /** Block height at which the new DAA becomes active */
     int daaHeight;
-    /** Unix time used for MTP activation of May 15 2018, hardfork */
-    int monolithActivationTime;
     /** Unix time used for MTP activation of Nov 15 2018, hardfork */
     int magneticAnomalyActivationTime;
     /**

@@ -606,21 +606,6 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
-static bool IsMonolithEnabled(const Config &config, int64_t nMedianTimePast) {
-    return nMedianTimePast >=
-           gArgs.GetArg(
-               "-monolithactivationtime",
-               config.GetChainParams().GetConsensus().monolithActivationTime);
-}
-
-bool IsMonolithEnabled(const Config &config, const CBlockIndex *pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
-    }
-
-    return IsMonolithEnabled(config, pindexPrev->GetMedianTimePast());
-}
-
 static bool IsMagneticEnabled(const Config &config, int64_t nMedianTimePast) {
     return nMedianTimePast >=
            gArgs.GetArg(
@@ -1008,9 +993,6 @@ static bool AcceptToMemoryPoolWorker(
 
         // Set extraFlags as a set of flags that needs to be activated.
         uint32_t extraFlags = SCRIPT_VERIFY_NONE;
-        if (IsMonolithEnabled(config, chainActive.Tip())) {
-            extraFlags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
-        }
 
         if (IsMagneticEnabled(config, chainActive.Tip())) {
             extraFlags |= SCRIPT_ENABLE_MAGNETIC_OPCODES;
@@ -1615,25 +1597,22 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
         } else if (!check()) {
             const bool hasNonMandatoryFlags =
                 (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-            const bool doesNotHaveMonolith =
-                (flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0;
             const bool doesNotHaveMagnetic =
                 (flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0;
-            if (hasNonMandatoryFlags || doesNotHaveMonolith || doesNotHaveMagnetic) {
+            if (hasNonMandatoryFlags || doesNotHaveMagnetic) {
                 // Check whether the failure was caused by a non-mandatory
                 // script verification check, such as non-standard DER encodings
                 // or non-null dummy arguments; if so, don't trigger DoS
                 // protection to avoid splitting the network between upgraded
                 // and non-upgraded nodes.
                 //
-                // We also check activating the monolith or magnetic opcodes as they
+                // We also check activating the magnetic opcodes as they
                 // are strictly additive changes and we would not like to ban some of
                 // our peer that are ahead of us and are considering the fork
                 // as activated.
                 CScriptCheck check2(
                     scriptPubKey, amount, tx, i,
                     (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) |
-                        SCRIPT_ENABLE_MONOLITH_OPCODES |
                         SCRIPT_ENABLE_MAGNETIC_OPCODES,
                     sigCacheStore, txdata);
                 if (check2()) {
@@ -2000,11 +1979,6 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     if (IsDAAEnabled(config, pChainTip)) {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
-    }
-
-    // The monolith HF enable a set of opcodes.
-    if (IsMonolithEnabled(config, pChainTip)) {
-        flags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
     }
 
     // The magnetic HF enable a set of opcodes.
@@ -2663,12 +2637,10 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     // no easy way to do this so we'll just discard the whole mempool and then
     // add the transaction of the block we just disconnected back.
     //
-    // Samewise, if this block enabled the monolith or magnetic opcodes, then we
+    // Samewise, if this block enabled the magnetic opcodes, then we
     // need to clear the mempool of any transaction using them.
     if ((IsReplayProtectionEnabled(config, pindexDelete) &&
          !IsReplayProtectionEnabled(config, pindexDelete->pprev)) ||
-        (IsMonolithEnabled(config, pindexDelete) &&
-         !IsMonolithEnabled(config, pindexDelete->pprev)) ||
         (IsMagneticEnabled(config, pindexDelete) &&
          !IsMagneticEnabled(config, pindexDelete->pprev))) {
         mempool.clear();
@@ -3752,17 +3724,6 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     if (VersionBitsState(pindexPrev, consensusParams, Consensus::DEPLOYMENT_CSV,
                          versionbitscache) == THRESHOLD_ACTIVE) {
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
-    }
-
-    if (!IsMonolithEnabled(config, pindexPrev)) {
-        // When the May 15, 2018 HF is not enabled, block cannot be bigger
-        // than 8MB .
-        const uint64_t currentBlockSize =
-            ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-        if (currentBlockSize > 8 * ONE_MEGABYTE) {
-            return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
-                             false, "size limits failed");
-        }
     }
 
     // When the Nov 15, 2018 HF is not enabled (and the user hasn't overridden the max size),

@@ -445,9 +445,6 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 /** Check if DAA HF has activated. */
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
-/** Check if May 15, 2018 HF has activated. */
-bool IsMonolithEnabled(const Config &config, const CBlockIndex *pindexPrev);
-
 /** Check if November 15, 2018 HF has activated. */
 bool IsMagneticEnabled(const Config &config, const CBlockIndex *pindexPrev);
 

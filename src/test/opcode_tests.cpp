@@ -28,7 +28,7 @@ BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
 static void CheckTestResultForAllFlags(const stacktype &original_stack,
                                        const CScript &script,
                                        const stacktype &expected,
-                                       uint32_t upgradeFlag) {
+                                       uint32_t upgradeFlag = 0) {
     BaseSignatureChecker sigchecker;
 
     for (uint32_t flags : flagset) {
@@ -40,20 +40,17 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
 
         // Make sure that if we do not pass the upgrade flag, opcodes are still
         // disabled.
-        stack = original_stack;
-        r = EvalScript(stack, script, flags, sigchecker, &err);
-        BOOST_CHECK(!r);
-        BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
+        if(upgradeFlag)
+        {
+            stack = original_stack;
+            r = EvalScript(stack, script, flags, sigchecker, &err);
+            BOOST_CHECK(!r);
+            BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
+        }
     }
 }
 
-// monolith upgrade
-static void CheckTestResultForAllFlags(const stacktype &original_stack,
-                                       const CScript &script,
-                                       const stacktype &expected) {
-    CheckTestResultForAllFlags(original_stack, script, expected, SCRIPT_ENABLE_MONOLITH_OPCODES);
-}
-
+// magnetic upgrade
 static void CheckTestResultForAllFlagsMagnetic(const stacktype &original_stack,
                                                const CScript &script,
                                                const stacktype &expected) {
@@ -61,7 +58,7 @@ static void CheckTestResultForAllFlagsMagnetic(const stacktype &original_stack,
 }
 
 static void CheckError(uint32_t flags, const stacktype &original_stack,
-                       const CScript &script, ScriptError expected_error, uint32_t upgradeFlag) {
+                       const CScript &script, ScriptError expected_error, uint32_t upgradeFlag = 0) {
     BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
@@ -71,34 +68,20 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
 
     // Make sure that if we do not pass the opcodes flags, opcodes are still
     // disabled.
-    stack = original_stack;
-    r = EvalScript(stack, script, flags, sigchecker, &err);
-    BOOST_CHECK(!r);
-    BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
-}
-
-// monolith upgrade
-static void CheckError(uint32_t flags, const stacktype &original_stack,
-                       const CScript &script, ScriptError expected_error) {
-    CheckError(flags, original_stack, script, expected_error, SCRIPT_ENABLE_MONOLITH_OPCODES);
-}
-
-static void CheckErrorMagnetic(uint32_t flags, const stacktype &original_stack,
-                       const CScript &script, ScriptError expected_error) {
-    CheckError(flags, original_stack, script, expected_error, SCRIPT_ENABLE_MAGNETIC_OPCODES);
-}
-
-static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript &script,
-                                  ScriptError expected_error, uint32_t upgradeFlag) {
-    for (uint32_t flags : flagset) {
-        CheckError(flags, original_stack, script, expected_error, upgradeFlag);
+    if(upgradeFlag)
+    {
+        stack = original_stack;
+        r = EvalScript(stack, script, flags, sigchecker, &err);
+        BOOST_CHECK(!r);
+        BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
     }
 }
 
-// monolith upgrade
 static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript &script,
-                                  ScriptError expected_error) {
-    CheckErrorForAllFlags(original_stack, script, expected_error, SCRIPT_ENABLE_MONOLITH_OPCODES);
+                                  ScriptError expected_error, uint32_t upgradeFlag = 0) {
+    for (uint32_t flags : flagset) {
+        CheckError(flags, original_stack, script, expected_error, upgradeFlag);
+    }
 }
 
 // magnetic upgrade

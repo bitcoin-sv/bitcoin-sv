@@ -96,10 +96,6 @@ enum {
     //
     SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
 
-    // Enable new opcodes.
-    //
-    SCRIPT_ENABLE_MONOLITH_OPCODES = (1U << 18),
-
     // Are the Magnetic upgrade opcodes enabled?
     //
     SCRIPT_ENABLE_MAGNETIC_OPCODES = (1U << 19),
