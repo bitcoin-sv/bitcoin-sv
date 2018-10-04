@@ -1,9 +1,6 @@
 Bitcoin SV
 ===========
 
-This is a Beta release, the purpose of which is to provide a preview of the code in response to requests from 
-miners and pool operators. This release will undergo extensive testing and security audit before the final release in October.
-
 What is Bitcoin Cash?
 ---------------------
 
@@ -36,8 +33,8 @@ Security
 --------
 The Bitcoin SV team are currently organizing a Responsible Disclosure Policy.
 We expect to have this ready soon. In the meantime, if you have important 
-information to share, please contact Daniel Connolly (d.connolly@nchain.com)
-or Steve Shadders (s.shadders@nchain.com).
+information to share, please e-mail the security team at security@bitcoinsv.io 
+(PGP fingerprint: `F969 76FD &A20 AB62`).
 
 Development Process
 -------------------
