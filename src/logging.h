@@ -13,6 +13,8 @@
 #include <mutex>
 #include <string>
 
+#include "tinyformat.h"
+
 static const bool DEFAULT_LOGTIMEMICROS = false;
 static const bool DEFAULT_LOGIPS = false;
 static const bool DEFAULT_LOGTIMESTAMPS = true;
