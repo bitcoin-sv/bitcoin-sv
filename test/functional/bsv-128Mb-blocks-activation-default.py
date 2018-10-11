@@ -298,6 +298,7 @@ class BSV128MbActivation(ComparisonTestFramework):
         self.test.clear_all_connections()
         self.test.add_all_connections(self.nodes)
         NetworkThread().start()
+        self.test.wait_for_verack()
 
         # Check we can still mine a good size block
         block(5557, spend=out[18], block_size=self.excessive_block_size)

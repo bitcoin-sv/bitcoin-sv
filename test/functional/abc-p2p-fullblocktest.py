@@ -262,6 +262,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.test.clear_all_connections()
         self.test.add_all_connections(self.nodes)
         NetworkThread().start()
+        self.test.wait_for_verack()
 
         # Accept many sigops
         lots_of_checksigs = CScript(
