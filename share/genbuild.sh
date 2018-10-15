@@ -33,8 +33,6 @@ if [ -e "$(which git 2>/dev/null)" -a "$(git rev-parse --is-inside-work-tree 2>/
     SUFFIX=$(git rev-parse --short HEAD)
     git diff-index --quiet HEAD -- || SUFFIX="$SUFFIX-dirty"
 fi
-SUFFIX="beta-$SUFFIX"
-
 
 if [ -n "$DESC" ]; then
     NEWINFO="#define BUILD_DESC \"$DESC\""
