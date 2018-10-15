@@ -34,7 +34,7 @@ Security
 The Bitcoin SV team are currently organizing a Responsible Disclosure Policy.
 We expect to have this ready soon. In the meantime, if you have important 
 information to share, please e-mail the security team at security@bitcoinsv.io 
-(PGP fingerprint: `F969 76FD &A20 AB62`).
+(PGP fingerprint: `F969 76FD 7A20 AB62`).
 
 Development Process
 -------------------
