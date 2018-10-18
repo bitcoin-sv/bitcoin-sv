@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-sv-0.17-linux"
+name: "bitcoin-sv-0.1-linux"
 enable_cache: true
 suites:
 - "xenial"
