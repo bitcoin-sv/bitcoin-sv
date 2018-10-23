@@ -1169,7 +1169,7 @@ static UniValue sendrawtransaction(const Config &config,
     }
 
     CInv inv(MSG_TX, txid);
-    g_connman->ForEachNode([&inv](CNode *pnode) { pnode->PushInventory(inv); });
+    g_connman->ForEachNode([&inv](const CNodePtr& pnode) { pnode->PushInventory(inv); });
     return txid.GetHex();
 }
 

@@ -246,7 +246,7 @@ CNodeState *State(NodeId pnode) {
     return &it->second;
 }
 
-void UpdatePreferredDownload(CNode *node, CNodeState *state) {
+void UpdatePreferredDownload(const CNodePtr& node, CNodeState *state) {
     nPreferredDownload -= state->fPreferredDownload;
 
     // Whether this node should be marked as a preferred download node.
@@ -256,7 +256,7 @@ void UpdatePreferredDownload(CNode *node, CNodeState *state) {
     nPreferredDownload += state->fPreferredDownload;
 }
 
-void PushNodeVersion(const Config &config, CNode *pnode, CConnman &connman,
+void PushNodeVersion(const Config &config, const CNodePtr& pnode, CConnman &connman,
                      int64_t nTime) {
     ServiceFlags nLocalNodeServices = pnode->GetLocalServices();
     uint64_t nonce = pnode->GetLocalNonce();
@@ -289,7 +289,7 @@ void PushNodeVersion(const Config &config, CNode *pnode, CConnman &connman,
     }
 }
 
-void InitializeNode(const Config &config, CNode *pnode, CConnman &connman) {
+void InitializeNode(const Config &config, const CNodePtr& pnode, CConnman &connman) {
     CAddress addr = pnode->addr;
     std::string addrName = pnode->GetAddrName();
     NodeId nodeid = pnode->GetId();
@@ -496,7 +496,7 @@ void MaybeSetPeerAsAnnouncingHeaderAndIDs(NodeId nodeid, CConnman &connman) {
             return;
         }
     }
-    connman.ForNode(nodeid, [&connman](CNode *pfrom) {
+    connman.ForNode(nodeid, [&connman](const CNodePtr& pfrom) {
         bool fAnnounceUsingCMPCTBLOCK = false;
         uint64_t nCMPCTBLOCKVersion = 1;
         if (lNodesAnnouncingHeaderAndIDs.size() >= 3) {
@@ -504,7 +504,7 @@ void MaybeSetPeerAsAnnouncingHeaderAndIDs(NodeId nodeid, CConnman &connman) {
             // blocks using compact encodings.
             connman.ForNode(lNodesAnnouncingHeaderAndIDs.front(),
                             [&connman, fAnnounceUsingCMPCTBLOCK,
-                             nCMPCTBLOCKVersion](CNode *pnodeStop) {
+                             nCMPCTBLOCKVersion](const CNodePtr& pnodeStop) {
                                 connman.PushMessage(
                                     pnodeStop,
                                     CNetMsgMaker(pnodeStop->GetSendVersion())
@@ -857,8 +857,8 @@ void Misbehaving(NodeId pnode, int howmuch, const std::string &reason) {
     }
 }
 
-// overloaded variant of above to operate on CNode*s
-static void Misbehaving(CNode *node, int howmuch, const std::string &reason) {
+// overloaded variant of above to operate on CNodePtrs
+static void Misbehaving(const CNodePtr& node, int howmuch, const std::string &reason) {
     Misbehaving(node->GetId(), howmuch, reason);
 }
 
@@ -941,7 +941,7 @@ void PeerLogicValidation::NewPoWValidBlock(
     }
 
     connman->ForEachNode([this, &pcmpctblock, pindex, &msgMaker,
-                          &hashBlock](CNode *pnode) {
+                          &hashBlock](const CNodePtr& pnode) {
         // TODO: Avoid the repeated-serialization here
         if (pnode->nVersion < INVALID_CB_NO_BAN_VERSION || pnode->fDisconnect) {
             return;
@@ -985,7 +985,7 @@ void PeerLogicValidation::UpdatedBlockTip(const CBlockIndex *pindexNew,
         }
         // Relay inventory, but don't relay old inventory during initial block
         // download.
-        connman->ForEachNode([nNewHeight, &vHashes](CNode *pnode) {
+        connman->ForEachNode([nNewHeight, &vHashes](const CNodePtr& pnode) {
             if (nNewHeight > (pnode->nStartingHeight != -1
                                   ? pnode->nStartingHeight - 2000
                                   : 0)) {
@@ -1081,7 +1081,7 @@ static bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
 
 static void RelayTransaction(const CTransaction &tx, CConnman &connman) {
     CInv inv(MSG_TX, tx.GetId());
-    connman.ForEachNode([&inv](CNode *pnode) { pnode->PushInventory(inv); });
+    connman.ForEachNode([&inv](const CNodePtr& pnode) { pnode->PushInventory(inv); });
 }
 
 static void RelayAddress(const CAddress &addr, bool fReachable,
@@ -1099,11 +1099,11 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
             .Write((GetTime() + hashAddr) / (24 * 60 * 60));
     FastRandomContext insecure_rand;
 
-    std::array<std::pair<uint64_t, CNode *>, 2> best{
+    std::array<std::pair<uint64_t, CNodePtr>, 2> best{
         {{0, nullptr}, {0, nullptr}}};
     assert(nRelayNodes <= best.size());
 
-    auto sortfunc = [&best, &hasher, nRelayNodes](CNode *pnode) {
+    auto sortfunc = [&best, &hasher, nRelayNodes](const CNodePtr& pnode) {
         if (pnode->nVersion >= CADDR_TIME_VERSION) {
             uint64_t hashKey = CSipHasher(hasher).Write(pnode->id).Finalize();
             for (unsigned int i = 0; i < nRelayNodes; i++) {
@@ -1126,7 +1126,7 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     connman.ForEachNodeThen(std::move(sortfunc), std::move(pushfunc));
 }
 
-static void ProcessGetData(const Config &config, CNode *pfrom,
+static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                            const Consensus::Params &consensusParams,
                            CConnman &connman,
                            const std::atomic<bool> &interruptMsgProc) {
@@ -1362,7 +1362,7 @@ static void ProcessGetData(const Config &config, CNode *pfrom,
 
 inline static void SendBlockTransactions(const CBlock &block,
                                          const BlockTransactionsRequest &req,
-                                         CNode *pfrom, CConnman &connman) {
+                                         const CNodePtr& pfrom, CConnman &connman) {
     BlockTransactions resp(req);
     for (size_t i = 0; i < req.indices.size(); i++) {
         if (req.indices[i] >= block.vtx.size()) {
@@ -1382,7 +1382,7 @@ inline static void SendBlockTransactions(const CBlock &block,
                         msgMaker.Make(nSendFlags, NetMsgType::BLOCKTXN, resp));
 }
 
-static bool ProcessMessage(const Config &config, CNode *pfrom,
+static bool ProcessMessage(const Config &config, const CNodePtr& pfrom,
                            const std::string &strCommand, CDataStream &vRecv,
                            int64_t nTimeReceived,
                            const CChainParams &chainparams, CConnman &connman,
@@ -3011,7 +3011,7 @@ static bool ProcessMessage(const Config &config, CNode *pfrom,
     return true;
 }
 
-static bool SendRejectsAndCheckIfBanned(CNode *pnode, CConnman &connman) {
+static bool SendRejectsAndCheckIfBanned(const CNodePtr& pnode, CConnman &connman) {
     AssertLockHeld(cs_main);
     CNodeState &state = *State(pnode->GetId());
 
@@ -3047,7 +3047,7 @@ static bool SendRejectsAndCheckIfBanned(CNode *pnode, CConnman &connman) {
     return false;
 }
 
-bool ProcessMessages(const Config &config, CNode *pfrom, CConnman &connman,
+bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &connman,
                      const std::atomic<bool> &interruptMsgProc) {
     const CChainParams &chainparams = config.GetChainParams();
     //
@@ -3203,7 +3203,7 @@ public:
     }
 };
 
-bool SendMessages(const Config &config, CNode *pto, CConnman &connman,
+bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
                   const std::atomic<bool> &interruptMsgProc) {
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();

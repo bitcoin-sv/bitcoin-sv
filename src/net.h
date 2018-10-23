@@ -42,6 +42,8 @@ class Config;
 class CNode;
 class CScheduler;
 
+using CNodePtr = std::shared_ptr<CNode>;
+
 namespace boost {
 class thread_group;
 } // namespace boost
@@ -163,9 +165,9 @@ public:
                                bool fAddnode = false);
     bool CheckIncomingNonce(uint64_t nonce);
 
-    bool ForNode(NodeId id, std::function<bool(CNode *pnode)> func);
+    bool ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func);
 
-    void PushMessage(CNode *pnode, CSerializedNetMsg &&msg);
+    void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg);
 
     template <typename Callable> void ForEachNode(Callable &&func) {
         LOCK(cs_vNodes);
@@ -303,21 +305,21 @@ private:
 
     uint64_t CalculateKeyedNetGroup(const CAddress &ad) const;
 
-    CNode *FindNode(const CNetAddr &ip);
-    CNode *FindNode(const CSubNet &subNet);
-    CNode *FindNode(const std::string &addrName);
-    CNode *FindNode(const CService &addr);
+    CNodePtr FindNode(const CNetAddr &ip);
+    CNodePtr FindNode(const CSubNet &subNet);
+    CNodePtr FindNode(const std::string &addrName);
+    CNodePtr FindNode(const CService &addr);
 
     bool AttemptToEvictConnection();
-    CNode *ConnectNode(CAddress addrConnect, const char *pszDest,
-                       bool fCountFailure);
+    CNodePtr ConnectNode(CAddress addrConnect, const char *pszDest,
+                         bool fCountFailure);
     bool IsWhitelistedRange(const CNetAddr &addr);
 
-    void DeleteNode(CNode *pnode);
+    void DeleteNode(const CNodePtr& pnode);
 
     NodeId GetNewNodeId();
 
-    size_t SocketSendData(CNode *pnode) const;
+    size_t SocketSendData(const CNodePtr& pnode) const;
     //! check is the banlist has unwritten changes
     bool BannedSetIsDirty();
     //! set the "dirty" flag for the banlist
@@ -333,7 +335,7 @@ private:
     void RecordBytesSent(uint64_t bytes);
 
     // Whether the node should be passed out in ForEach* callbacks
-    static bool NodeFullyConnected(const CNode *pnode);
+    static bool NodeFullyConnected(const CNodePtr& pnode);
 
     const Config *config;
 
@@ -368,8 +370,8 @@ private:
     CCriticalSection cs_vOneShots;
     std::vector<std::string> vAddedNodes;
     CCriticalSection cs_vAddedNodes;
-    std::vector<CNode *> vNodes;
-    std::list<CNode *> vNodesDisconnected;
+    std::vector<CNodePtr> vNodes;
+    std::list<CNodePtr> vNodesDisconnected;
     mutable CCriticalSection cs_vNodes;
     std::atomic<NodeId> nLastNodeId;
 
@@ -429,15 +431,15 @@ struct CombinerAll {
 
 // Signals for message handling
 struct CNodeSignals {
-    boost::signals2::signal<bool(const Config &, CNode *, CConnman &,
+    boost::signals2::signal<bool(const Config &, const CNodePtr& , CConnman &,
                                  std::atomic<bool> &),
                             CombinerAll>
         ProcessMessages;
-    boost::signals2::signal<bool(const Config &, CNode *, CConnman &,
+    boost::signals2::signal<bool(const Config &, const CNodePtr& , CConnman &,
                                  std::atomic<bool> &),
                             CombinerAll>
         SendMessages;
-    boost::signals2::signal<void(const Config &, CNode *, CConnman &)>
+    boost::signals2::signal<void(const Config &, const CNodePtr& , CConnman &)>
         InitializeNode;
     boost::signals2::signal<void(NodeId, bool &)> FinalizeNode;
 };
@@ -459,8 +461,8 @@ enum {
     LOCAL_MAX
 };
 
-bool IsPeerAddrLocalGood(CNode *pnode);
-void AdvertiseLocal(CNode *pnode);
+bool IsPeerAddrLocalGood(const CNodePtr& pnode);
+void AdvertiseLocal(const CNodePtr& pnode);
 void SetLimited(enum Network net, bool fLimited = true);
 bool IsLimited(enum Network net);
 bool IsLimited(const CNetAddr &addr);
@@ -753,11 +755,7 @@ public:
     //! May not be called more than once
     void SetAddrLocal(const CService &addrLocalIn);
 
-    CNode *AddRef() {
-        nRefCount++;
-        return this;
-    }
-
+    void AddRef() { nRefCount++; }
     void Release() { nRefCount--; }
 
     void AddAddressKnown(const CAddress &_addr) {

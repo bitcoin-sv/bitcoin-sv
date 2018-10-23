@@ -1800,7 +1800,7 @@ bool CWalletTx::RelayWalletTransaction(CConnman *connman) {
         if (connman) {
             CInv inv(MSG_TX, GetId());
             connman->ForEachNode(
-                [&inv](CNode *pnode) { pnode->PushInventory(inv); });
+                [&inv](const CNodePtr& pnode) { pnode->PushInventory(inv); });
             return true;
         }
     }
