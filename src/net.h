@@ -22,6 +22,7 @@
 #include "streams.h"
 #include "sync.h"
 #include "threadinterrupt.h"
+#include "txn_propagator.h"
 #include "uint256.h"
 
 #include <atomic>
@@ -168,6 +169,9 @@ public:
     bool ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func);
 
     void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg);
+
+    /** Enqueue a new transaction for later sending to our peers */
+    void EnqueueTransaction(const CInv& inv);
 
     template <typename Callable> void ForEachNode(Callable &&func) {
         LOCK(cs_vNodes);
@@ -399,6 +403,9 @@ private:
     std::condition_variable condMsgProc;
     std::mutex mutexMsgProc;
     std::atomic<bool> flagInterruptMsgProc;
+
+    /** Transaction tracker/propagator */
+    CTxnPropagator mTxnPropagator {};
 
     CThreadInterrupt interruptNet;
 

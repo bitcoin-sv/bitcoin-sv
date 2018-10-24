@@ -2963,6 +2963,12 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
     }
 }
 
+/** Enqueue a new transaction for later sending to our peers */
+void CConnman::EnqueueTransaction(const CInv& inv)
+{
+    mTxnPropagator.newTransaction(inv);
+}
+
 bool CConnman::ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func) {
     CNodePtr found {nullptr};
     LOCK(cs_vNodes);
