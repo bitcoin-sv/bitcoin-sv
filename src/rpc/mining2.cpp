@@ -1,4 +1,4 @@
-// Copyright (c) 2015 G. Andrew Stone
+/// Copyright (c) 2015 G. Andrew Stone
 // Copyright (c) 2018 nChain/Bitcoin Cash developers.
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -28,6 +28,8 @@
 #include <iomanip>
 #include <limits>
 #include <queue>
+
+using namespace std;
 
 namespace
 {
@@ -88,7 +90,7 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
         throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    if (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0) 
+    if ((g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0) && !gArgs.IsArgSet("-standalone")) 
     {
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Bitcoin is not connected!");
     }
@@ -107,6 +109,8 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
     if (pindexPrev != chainActive.Tip() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
+        //cout << "Creating a new candidate block\n";
+
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = nullptr;
 
@@ -115,13 +119,9 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
         CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
-        // BU implementation generates coinbase script here.
-        //boost::shared_ptr<CReserveScript> coinbaseScript;
-        //GetMainSignals().ScriptForMining(coinbaseScript);
-        CScript scriptDummy = CScript() << OP_TRUE;
-
-        // Create new block
-        pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptDummy);
+        // Miner supplies the coinbase outputs. 
+        CScript scriptPubKey = CScript() << OP_1;
+        pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey); 
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -130,7 +130,6 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
     }
 
     CBlock *pblock = &pblocktemplate->block;
-    const Consensus::Params &consensusParams = config.GetChainParams().GetConsensus();
 
     // Update nTime
     UpdateTime(pblock, config, pindexPrev);
@@ -185,6 +184,17 @@ uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &
     return merkle_root;
 }
 
+// PLEASE LEAVE FOR FUTURE TROUBLE SHOOTING
+void Debug_dump(const CTransaction& tx)
+{
+    string hex =EncodeHexTx(tx); 
+    cout << "Creating mining candidate json, coinbase is " << hex << "\n";
+    CMutableTransaction tx2;
+    bool ok = DecodeHexTx(tx2, hex);
+    if(!ok)
+	    cout << "Unable to deserialise tx\n";
+}
+
 // Create Mining-Candidate JSON to send to miner
 UniValue MkMiningCandidateJson(CMiningCandidate &candid)
 {
@@ -204,11 +214,13 @@ UniValue MkMiningCandidateJson(CMiningCandidate &candid)
     {
         const CTransaction *tran = block.vtx[0].get();
         ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
+        //Debug_dump(*tran);
     }
 
     ret.push_back(Pair("version", block.nVersion));
     ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
     ret.push_back(Pair("time", block.GetBlockTime()));
+    ret.push_back(Pair("height", block.GetHeight()));
 
     // merkleProof:
     {
