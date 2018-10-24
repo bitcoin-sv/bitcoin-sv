@@ -392,7 +392,6 @@ CNodePtr CConnman::ConnectNode(CAddress addrConnect, const char *pszDest,
             CalculateKeyedNetGroup(addrConnect), nonce, pszDest ? pszDest : "", false)
         };
         pnode->nServicesExpected = ServiceFlags(addrConnect.nServices & nRelevantServices);
-        pnode->AddRef();
 
         return pnode;
     } else if (!proxyConnectionFailed) {
@@ -1200,7 +1199,6 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
 
     CNodePtr pnode { std::make_shared<CNode>(id, nLocalServices, GetBestHeight(), hSocket, addr,
         CalculateKeyedNetGroup(addr), nonce, "", true) };
-    pnode->AddRef();
     pnode->fWhitelisted = whitelisted;
 
     GetNodeSignals().InitializeNode(*config, pnode, *this);
@@ -1241,7 +1239,6 @@ void CConnman::ThreadSocketHandler() {
                 node->CloseSocketDisconnect();
 
                 // Hold in disconnected pool until all refs are released
-                node->Release();
                 vNodesDisconnected.push_back(node);
             }
         }
@@ -1389,9 +1386,6 @@ void CConnman::ThreadSocketHandler() {
         {
             LOCK(cs_vNodes);
             vNodesCopy = vNodes;
-            for (const CNodePtr& pnode : vNodesCopy) {
-                pnode->AddRef();
-            }
         }
         for (const CNodePtr& pnode : vNodesCopy) {
             if (interruptNet) {
@@ -1519,12 +1513,6 @@ void CConnman::ThreadSocketHandler() {
                     LogPrintf("version handshake timeout from %d\n", pnode->id);
                     pnode->fDisconnect = true;
                 }
-            }
-        }
-        {
-            LOCK(cs_vNodes);
-            for (const CNodePtr& pnode : vNodesCopy) {
-                pnode->Release();
             }
         }
     }
@@ -2111,9 +2099,6 @@ void CConnman::ThreadMessageHandler() {
         {
             LOCK(cs_vNodes);
             vNodesCopy = vNodes;
-            for (const CNodePtr& pnode : vNodesCopy) {
-                pnode->AddRef();
-            }
         }
 
         bool fMoreWork = false;
@@ -2139,13 +2124,6 @@ void CConnman::ThreadMessageHandler() {
             }
             if (flagInterruptMsgProc) {
                 return;
-            }
-        }
-
-        {
-            LOCK(cs_vNodes);
-            for (const CNodePtr& pnode : vNodesCopy) {
-                pnode->Release();
             }
         }
 
@@ -2848,7 +2826,6 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn,
     fFeeler = false;
     fSuccessfullyConnected = false;
     fDisconnect = false;
-    nRefCount = 0;
     nSendSize = 0;
     nSendOffset = 0;
     hashContinue = uint256();

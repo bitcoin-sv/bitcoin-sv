@@ -639,7 +639,6 @@ public:
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter *pfilter;
-    std::atomic<int> nRefCount;
     const NodeId id;
 
     const uint64_t nKeyedNetGroup;
@@ -738,11 +737,6 @@ public:
 
     int GetMyStartingHeight() const { return nMyStartingHeight; }
 
-    int GetRefCount() {
-        assert(nRefCount >= 0);
-        return nRefCount;
-    }
-
     RECV_STATUS ReceiveMsgBytes(const Config &config, const char *pch, uint32_t nBytes,
                          bool &complete);
 
@@ -754,9 +748,6 @@ public:
     CService GetAddrLocal() const;
     //! May not be called more than once
     void SetAddrLocal(const CService &addrLocalIn);
-
-    void AddRef() { nRefCount++; }
-    void Release() { nRefCount--; }
 
     void AddAddressKnown(const CAddress &_addr) {
         addrKnown.insert(_addr.GetKey());
