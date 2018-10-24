@@ -933,22 +933,22 @@ static void CheckDivMod(const valtype &a, const valtype &b,
 
         if (flags & SCRIPT_VERIFY_MINIMALDATA) {
             CheckError(flags, {a, {0x00}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_SCRIPTNUM_MINENCODE);
             CheckError(flags, {a, {0x80}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_SCRIPTNUM_MINENCODE);
             CheckError(flags, {a, {0x00, 0x00}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_SCRIPTNUM_MINENCODE);
             CheckError(flags, {a, {0x00, 0x80}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_SCRIPTNUM_MINENCODE);
 
             CheckError(flags, {b, {0x00}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_SCRIPTNUM_MINENCODE);
             CheckError(flags, {b, {0x80}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_SCRIPTNUM_MINENCODE);
             CheckError(flags, {b, {0x00, 0x00}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_SCRIPTNUM_MINENCODE);
             CheckError(flags, {b, {0x00, 0x80}}, CScript() << OP_DIV,
-                       SCRIPT_ERR_UNKNOWN_ERROR);
+                       SCRIPT_ERR_SCRIPTNUM_MINENCODE);
         } else {
             CheckError(flags, {a, {0x00}}, CScript() << OP_DIV,
                        SCRIPT_ERR_DIV_BY_ZERO);
@@ -1003,11 +1003,11 @@ BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests) {
     // CheckOps not valid numbers
     CheckDivModError(
         {{0x01, 0x02, 0x03, 0x04, 0x05}, {0x01, 0x02, 0x03, 0x04, 0x05}},
-        SCRIPT_ERR_UNKNOWN_ERROR);
+        SCRIPT_ERR_SCRIPTNUM_OVERFLOW);
     CheckDivModError({{0x01, 0x02, 0x03, 0x04, 0x05}, {0x01}},
-                     SCRIPT_ERR_UNKNOWN_ERROR);
+                     SCRIPT_ERR_SCRIPTNUM_OVERFLOW);
     CheckDivModError({{0x01, 0x05}, {0x01, 0x02, 0x03, 0x04, 0x05}},
-                     SCRIPT_ERR_UNKNOWN_ERROR);
+                     SCRIPT_ERR_SCRIPTNUM_OVERFLOW);
 
     // 0x185377af / 0x85f41b01 = -4
     // 0x185377af % 0x85f41b01 = 0x00830bab

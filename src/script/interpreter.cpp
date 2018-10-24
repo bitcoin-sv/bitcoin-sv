@@ -1504,6 +1504,10 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
             }
         }
+    } catch (scriptnum_overflow_error& err) {
+        return set_error(serror, SCRIPT_ERR_SCRIPTNUM_OVERFLOW);
+    } catch (scriptnum_minencode_error& err) {
+        return set_error(serror, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
     } catch (...) {
         return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     }
