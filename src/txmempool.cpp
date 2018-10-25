@@ -829,9 +829,24 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const {
     assert(innerUsage == cachedInnerUsage);
 }
 
+/**
+* Compare 2 transactions to determine their relative priority.
+*/
 bool CTxMemPool::CompareDepthAndScore(const uint256 &hasha,
-                                      const uint256 &hashb) {
+                                      const uint256 &hashb)
+{
     LOCK(cs);
+    return CompareDepthAndScoreUnlocked(hasha, hashb);
+}
+
+/**
+* Compare 2 transactions to determine their relative priority.
+* Does it wothout taking the mutex; it is up to the caller to
+* ensure this is thread safe.
+*/
+bool CTxMemPool::CompareDepthAndScoreUnlocked(const uint256 &hasha,
+                                              const uint256 &hashb)
+{
     indexed_transaction_set::const_iterator i = mapTx.find(hasha);
     if (i == mapTx.end()) {
         return false;

@@ -20,6 +20,7 @@
 #include "netbase.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
+#include "txn_propagator.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
 
@@ -700,6 +701,76 @@ static bool IsOversizedMessage(const Config &config, const CNetMessage &msg) {
     }
 
     return msg.hdr.IsOversized(config);
+}
+
+/**
+* Add some new transactions to our pending inventory list.
+* Assumes the caller has taken care of locking access to the mempool,
+* and so can be called in parallel.
+*/
+void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
+{
+    // Get our minimum fee
+    Amount filterrate {0};
+    {   
+        LOCK(cs_feeFilter);
+        filterrate = minFeeFilter;
+    }
+
+    LOCK(cs_filter);
+    LOCK(cs_mInvList);
+
+    if(!fRelayTxes)
+    {
+        // Peer has requested we not relay txns
+        if(!mInvList.empty())
+        {
+            // Clear any txns we have queued for this peer
+            mInvList = InvList{ CompareInv{&mempool} };
+        }
+    }
+    else
+    {
+        for(const CTxnSendingDetails& txn : txns)
+        {
+            // Don't bother if below peer's fee rate
+            if(filterrate != Amount{0} && txn.getInfo().feeRate.GetFeePerK() < filterrate)
+                continue;
+
+            // Check and update bloom filters
+            if(filterInventoryKnown.contains(txn.getInv().hash))
+                continue;
+            if(pfilter && !pfilter->IsRelevantAndUpdate(*(txn.getTxnRef())))
+                continue;
+
+            mInvList.emplace(txn);
+            filterInventoryKnown.insert(txn.getInv().hash);
+        }
+    }
+}
+
+/** Fetch the next N items from our inventory */
+std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
+{
+    std::vector<CTxnSendingDetails> results {};
+
+    // Try and lock the mempool (for txn ordering) and our inventory list,
+    // if we fail to take either then don't hold up the caller by waiting.
+    TRY_LOCK(mempool.cs, mempoolLocked);
+    TRY_LOCK(cs_mInvList, invLocked);
+    if(!mempoolLocked || !invLocked)
+        return results;
+
+    for(size_t i = 0; i < n; ++i)
+    {
+        if(mInvList.empty())
+            break;
+
+        results.emplace_back(std::move(mInvList.top()));
+        mInvList.pop();
+    }
+
+    return results;
 }
 
 CNode::RECV_STATUS CNode::ReceiveMsgBytes(const Config &config, const char *pch,
@@ -2341,6 +2412,8 @@ CConnman::CConnman(const Config &configIn, uint64_t nSeed0In, uint64_t nSeed1In)
     nBestHeight = 0;
     clientInterface = nullptr;
     flagInterruptMsgProc = false;
+
+    mTxnPropagator = std::make_shared<CTxnPropagator>();
 }
 
 NodeId CConnman::GetNewNodeId() {
@@ -2536,6 +2609,8 @@ void CConnman::Stop() {
         DumpData();
         fAddressesInitialized = false;
     }
+
+   mTxnPropagator->shutdown();
 
     // Close sockets
     for (const CNodePtr& pnode : vNodes) {
@@ -2964,9 +3039,9 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
 }
 
 /** Enqueue a new transaction for later sending to our peers */
-void CConnman::EnqueueTransaction(const CInv& inv)
+void CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
 {
-    mTxnPropagator.newTransaction(inv);
+    mTxnPropagator->newTransaction(txn);
 }
 
 bool CConnman::ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func) {

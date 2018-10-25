@@ -1794,9 +1794,9 @@ bool CWalletTx::RelayWalletTransaction(CConnman *connman) {
     if (InMempool() || AcceptToMemoryPool(maxTxFee, state)) {
         LogPrintf("Relaying wtx %s\n", GetId().ToString());
         if (connman) {
-            CInv inv(MSG_TX, GetId());
-            connman->ForEachNode(
-                [&inv](const CNodePtr& pnode) { pnode->PushInventory(inv); });
+            CInv inv { MSG_TX, GetId() };
+            TxMempoolInfo txinfo { mempool.info(GetId()) };
+            connman->EnqueueTransaction( {inv, txinfo} );
             return true;
         }
     }
