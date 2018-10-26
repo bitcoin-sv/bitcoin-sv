@@ -15,7 +15,12 @@ set(CLIENT_VERSION_MINOR 1)
 set(CLIENT_VERSION_REVISION 0)
 set(CLIENT_VERSION_BUILD 0)
 
-option(CLIENT_VERSION_IS_RELEASE "Build a release version" OFF)
+if(ENABLE_PROD_BUILD)
+    set(CLIENT_VERSION_IS_RELEASE "true")
+else()
+    set(CLIENT_VERSION_IS_RELEASE "false")
+endif()
+
 
 # Copyright
 set(COPYRIGHT_YEAR 2018)

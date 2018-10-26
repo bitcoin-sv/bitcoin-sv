@@ -18,7 +18,12 @@ const std::string CLIENT_NAME("Bitcoin SV");
 /**
  * Client version number
  */
-#define CLIENT_VERSION_SUFFIX ""
+#ifdef IS_PRODUCTION_BUILD
+    #define CLIENT_VERSION_SUFFIX ""
+#else
+    #define CLIENT_VERSION_SUFFIX "-dev"
+#endif
+
 
 /**
  * The following part of the code determines the CLIENT_BUILD variable.

@@ -4,7 +4,6 @@ define(_CLIENT_VERSION_MAJOR, 0)
 define(_CLIENT_VERSION_MINOR, 1)
 define(_CLIENT_VERSION_REVISION, 0)
 define(_CLIENT_VERSION_BUILD, 0)
-define(_CLIENT_VERSION_IS_RELEASE, true)
 define(_COPYRIGHT_YEAR, 2018)
 define(_COPYRIGHT_HOLDERS,[The %s developers])
 define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Bitcoin SV]])
@@ -90,6 +89,12 @@ AC_PATH_TOOL(OBJCOPY, objcopy)
 
 AC_ARG_VAR(PYTHONPATH, Augments the default search path for python module files)
 
+AC_ARG_ENABLE([prod-build],
+  [AS_HELP_STRING([--enable-prod-build],
+  [enable production build (disabled by default)])],
+  [enable_prod_build=$enableval],
+  [enable_prod_build=no])
+
 # Enable wallet
 AC_ARG_ENABLE([wallet],
   [AS_HELP_STRING([--disable-wallet],
@@ -159,6 +164,19 @@ AC_ARG_ENABLE([asm],
   [Enable assembly routines (default is yes)])],
   [use_asm=$enableval],
   [use_asm=yes])
+
+dnl setup for production/development build
+AC_MSG_CHECKING([whether production or development build])
+if test x$enable_prod_build != xno; then
+  AC_MSG_RESULT(prod)
+  AC_DEFINE([IS_PRODUCTION_BUILD],[],[Build production])
+  AC_DEFINE(CLIENT_VERSION_IS_RELEASE, true, [Version is release])
+  AC_SUBST(CLIENT_VERSION_IS_RELEASE, true)
+else
+  AC_MSG_RESULT(dev)
+  AC_DEFINE(CLIENT_VERSION_IS_RELEASE, false, [Version is development])
+  AC_SUBST(CLIENT_VERSION_IS_RELEASE, false)
+fi
 
 if test "x$use_asm" = xyes; then
   AC_DEFINE(USE_ASM, 1, [Define this symbol to build in assembly routines])
@@ -1158,7 +1176,6 @@ AC_DEFINE(CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MAJOR, [Major version])
 AC_DEFINE(CLIENT_VERSION_MINOR, _CLIENT_VERSION_MINOR, [Minor version])
 AC_DEFINE(CLIENT_VERSION_REVISION, _CLIENT_VERSION_REVISION, [Build revision])
 AC_DEFINE(CLIENT_VERSION_BUILD, _CLIENT_VERSION_BUILD, [Version Build])
-AC_DEFINE(CLIENT_VERSION_IS_RELEASE, _CLIENT_VERSION_IS_RELEASE, [Version is release])
 AC_DEFINE(COPYRIGHT_YEAR, _COPYRIGHT_YEAR, [Copyright year])
 AC_DEFINE(COPYRIGHT_HOLDERS, "_COPYRIGHT_HOLDERS", [Copyright holder(s) before %s replacement])
 AC_DEFINE(COPYRIGHT_HOLDERS_SUBSTITUTION, "_COPYRIGHT_HOLDERS_SUBSTITUTION", [Replacement for %s in copyright holders string])
@@ -1168,7 +1185,6 @@ AC_SUBST(CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MAJOR)
 AC_SUBST(CLIENT_VERSION_MINOR, _CLIENT_VERSION_MINOR)
 AC_SUBST(CLIENT_VERSION_REVISION, _CLIENT_VERSION_REVISION)
 AC_SUBST(CLIENT_VERSION_BUILD, _CLIENT_VERSION_BUILD)
-AC_SUBST(CLIENT_VERSION_IS_RELEASE, _CLIENT_VERSION_IS_RELEASE)
 AC_SUBST(COPYRIGHT_YEAR, _COPYRIGHT_YEAR)
 AC_SUBST(COPYRIGHT_HOLDERS, "_COPYRIGHT_HOLDERS")
 AC_SUBST(COPYRIGHT_HOLDERS_SUBSTITUTION, "_COPYRIGHT_HOLDERS_SUBSTITUTION")
@@ -1258,6 +1274,7 @@ esac
 
 echo
 echo "Options used to compile and link:"
+echo "  prod build    = $enable_prod_build"
 echo "  with wallet   = $enable_wallet"
 echo "  with zmq      = $use_zmq"
 echo "  with test     = $use_tests"
