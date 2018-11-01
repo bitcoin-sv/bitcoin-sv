@@ -518,6 +518,11 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "perspective of time may be influenced by peers forward or "
                     "backward by this amount. (default: %u seconds)"),
                   DEFAULT_MAX_TIME_ADJUSTMENT));
+    strUsage += HelpMessageOpt(
+        "-broadcastdelay=<n>",
+        strprintf(
+            _("Set inventory broadcast delay duration in microsecond(min: %d, max: %d)"),
+            0,MAX_INV_BROADCAST_DELAY));
     strUsage +=
         HelpMessageOpt("-onion=<ip:port>",
                        strprintf(_("Use separate SOCKS5 proxy to reach peers "
@@ -1820,6 +1825,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     CConnman &connman = *g_connman;
 
     peerLogic.reset(new PeerLogicValidation(&connman));
+    if (gArgs.IsArgSet("-broadcastdelay")) {
+        const int64_t nDelay = gArgs.GetArg("-broadcastdelay", -1);
+        if(!SetInvBroadcastDelay(nDelay)){
+            return InitError(strprintf(_("Error setting broadcastdelay=%d"), nDelay));
+        }
+    }
     RegisterValidationInterface(peerLogic.get());
     RegisterNodeSignals(GetNodeSignals());
 
