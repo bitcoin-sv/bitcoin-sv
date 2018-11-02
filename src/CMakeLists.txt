@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+option(ENABLE_PROD_BUILD "Enable production build" OFF)
 option(BUILD_BITCOIN_WALLET "Activate the wallet functionality" ON)
 option(BUILD_BITCOIN_ZMQ "Activate the ZeroMQ functionalities" ON)
 option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
@@ -80,6 +81,9 @@ add_library(util
 	utiltime.cpp
 )
 
+if(ENABLE_PROD_BUILD)
+    target_compile_definitions(util PUBLIC IS_PRODUCTION_BUILD)
+endif()
 target_compile_definitions(util PUBLIC HAVE_CONFIG_H)
 target_include_directories(util
 	PUBLIC
