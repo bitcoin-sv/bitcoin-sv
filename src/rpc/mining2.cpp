@@ -24,6 +24,7 @@
 #include "validationinterface.h"
 #include "validation.h"
 #include "version.h"
+#include "versionbits.h"
 #include "utilstrencodings.h"
 #include <iomanip>
 #include <limits>
@@ -119,9 +120,25 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
         CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
-        // Miner supplies the coinbase outputs. 
-        CScript scriptPubKey = CScript() << OP_1;
-        pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey); 
+        uint256 hash;
+        GetMainSignals().Inventory(hash);
+
+        std::shared_ptr<CReserveScript> coinbaseScript;
+        GetMainSignals().ScriptForMining(coinbaseScript);
+ 
+        // If the keypool is exhausted, no script is returned at all.  Catch this.
+        if (!coinbaseScript)
+            throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+ 
+        // throw an error if no script was provided
+        if (coinbaseScript->reserveScript.empty())
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
+
+        // Miner supplies the coinbase outputs. <-- NOT ANY MORE. They can override if they like.
+        //CScript scriptPubKey = CScript() << OP_1;
+        //pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
+
+        pblocktemplate = BlockAssembler(config).CreateNewBlock(coinbaseScript->reserveScript); 
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -195,6 +212,74 @@ void Debug_dump(const CTransaction& tx)
 	    cout << "Unable to deserialise tx\n";
 }
 
+// Sets the version bits in a block
+static int32_t MkBlockTemplateVersionBits(int32_t version,
+     std::set<std::string> setClientRules,
+     CBlockIndex *pindexPrev,
+     UniValue *paRules,
+     UniValue *pvbavailable) // Keep in line with BU as much as possible.
+{   
+     const Consensus::Params &consensusParams = Params().GetConsensus();
+     
+     for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j)
+     {
+         Consensus::DeploymentPos pos = Consensus::DeploymentPos(j);
+         ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
+         switch (state)
+         {
+         case THRESHOLD_DEFINED:
+         case THRESHOLD_FAILED:
+             // Not exposed to GBT at all
+             break;
+         case THRESHOLD_LOCKED_IN:
+             // Ensure bit is set in block version
+             version |= VersionBitsMask(consensusParams, pos);
+             // FALLTHROUGH
+         // to get vbavailable set...
+         case THRESHOLD_STARTED:
+             {
+                 const struct BIP9DeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
+                 if (pvbavailable != nullptr)
+                 {   
+                     pvbavailable->push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
+                 }
+                 if (setClientRules.find(vbinfo.name) == setClientRules.end())
+                 {
+                     if (!vbinfo.gbt_force)
+                     {
+                         // If the client doesn't support this, don't indicate it in the [default] version
+                         version &= ~VersionBitsMask(consensusParams, pos);
+                     }
+                     //if (vbinfo.myVote == true) // let the client vote for this feature  
+                     //    version |= VersionBitsMask(consensusParams, pos);
+                 }
+                 break;
+             }
+         case THRESHOLD_ACTIVE:
+             {
+                 // Add to rules only
+                 const struct BIP9DeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
+                 if (paRules != nullptr)
+                 {   
+                     paRules->push_back(gbt_vb_name(pos));
+                 }
+                 if (setClientRules.find(vbinfo.name) == setClientRules.end())
+                 {
+                     // Not supported by the client; make sure it's safe to proceed
+                     if (!vbinfo.gbt_force)
+                     {
+                         // If we do anything other than throw an exception here, be sure version/force isn't sent to old clients
+                         throw JSONRPCError(RPC_INVALID_PARAMETER,
+                             strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
+                     }
+                 }
+                 break;
+             }
+        }
+    }
+    return version;
+}
+
 // Create Mining-Candidate JSON to send to miner
 UniValue MkMiningCandidateJson(CMiningCandidate &candid)
 {
@@ -216,6 +301,11 @@ UniValue MkMiningCandidateJson(CMiningCandidate &candid)
         ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
         //Debug_dump(*tran);
     }
+
+    std::set<std::string> setClientRules;
+    CBlockIndex *const pindexPrev = chainActive.Tip();
+
+    block.nVersion = MkBlockTemplateVersionBits(block.nVersion, setClientRules, pindexPrev, nullptr, nullptr);
 
     ret.push_back(Pair("version", block.nVersion));
     ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
