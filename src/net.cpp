@@ -724,6 +724,9 @@ CNode::RECV_STATUS CNode::ReceiveMsgBytes(const Config &config, const char *pch,
         int handled;
         if (!msg.in_data) {
             handled = msg.readHeader(config, pch, nBytes);
+            if (handled < 0) {
+                return RECV_BAD_LENGTH;//Notify bad message as soon as seen in the header
+            }
         } else {
             handled = msg.readData(pch, nBytes);
         }
@@ -807,6 +810,7 @@ int CNetMessage::readHeader(const Config &config, const char *pch,
         hdrbuf >> hdr;
     } catch (const std::exception &) {
         return -1;
+        LogPrint(BCLog::NET, "Bad header format\n");
     }
 
     // Reject oversized messages

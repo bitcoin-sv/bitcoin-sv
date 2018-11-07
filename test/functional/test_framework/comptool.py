@@ -205,8 +205,8 @@ class TestManager():
             return all(node.closed for node in self.test_nodes)
         wait_until(disconnected, timeout=10, lock=mininode_lock)
 
-    def wait_for_verack(self):
-        return all(node.wait_for_verack() for node in self.test_nodes)
+    def wait_for_verack(self, timeout=60):
+        return all(node.wait_for_verack(timeout) for node in self.test_nodes)
 
     def wait_for_pings(self, counter):
         def received_pongs():
