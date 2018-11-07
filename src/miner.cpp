@@ -184,7 +184,10 @@ BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
     coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
-    coinbaseTx.vin[0].scriptSig = CScript() << nHeight;
+    // BIP34 only requires that the block height is available as a CScriptNum, but generally
+    // miner software which reads the coinbase tx will not support SCriptNum.
+    // Adding the extra 00 byte makes it look like a int32.
+    coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0; 
     pblock->vtx[0] = MakeTransactionRef(coinbaseTx);
     pblocktemplate->vTxFees[0] = -1 * nFees;
 

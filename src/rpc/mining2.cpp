@@ -1,5 +1,5 @@
 /// Copyright (c) 2015 G. Andrew Stone
-// Copyright (c) 2018 nChain/Bitcoin Cash developers.
+// Copyright (c) 2018 The Bitcoin SV developers.
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -38,7 +38,9 @@ namespace
 /** Mining-Candidate begin */
 const int NEW_CANDIDATE_INTERVAL = 30; // seconds
 
-class CMiningCandidate
+// This class originates in the BU codebase. 
+// It is retained as a point of commonality between BU and SV codebases.
+class CMiningCandidate  
 {
 public:
     CBlock block;
@@ -120,9 +122,6 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
         CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
-        uint256 hash;
-        GetMainSignals().Inventory(hash);
-
         std::shared_ptr<CReserveScript> coinbaseScript;
         GetMainSignals().ScriptForMining(coinbaseScript);
  
@@ -140,7 +139,7 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
 
         pblocktemplate = BlockAssembler(config).CreateNewBlock(coinbaseScript->reserveScript); 
         if (!pblocktemplate) 
-            throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
 
         // Need to update only after we know CreateNewBlock succeeded
         pindexPrev = pindexPrevNew;
