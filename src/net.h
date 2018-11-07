@@ -530,6 +530,7 @@ public:
     double dMinPing;
     std::string addrLocal;
     CAddress addr;
+    size_t nInvQueueSize;
 };
 
 class CNetMessage {

@@ -692,6 +692,12 @@ void CNode::copyStats(CNodeStats &stats) {
     CService addrLocalUnlocked = GetAddrLocal();
     stats.addrLocal =
         addrLocalUnlocked.IsValid() ? addrLocalUnlocked.ToString() : "";
+
+    {
+        // Fetch size of inventory queue
+        LOCK(cs_mInvList);
+        stats.nInvQueueSize = mInvList.size();
+    }
 }
 
 static bool IsOversizedMessage(const Config &config, const CNetMessage &msg) {

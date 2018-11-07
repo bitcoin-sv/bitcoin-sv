@@ -110,6 +110,7 @@ static UniValue getpeerinfo(const Config &config,
             "due to addnode and is using an addnode slot\n"
             "    \"startingheight\": n,       (numeric) The starting height "
             "(block) of the peer\n"
+            "    \"txninvsize\": n,           (numeric) The number of queued transaction inventory msgs we have for this peer\n "
             "    \"banscore\": n,             (numeric) The ban score\n"
             "    \"synced_headers\": n,       (numeric) The last header we "
             "have in common with this peer\n"
@@ -185,6 +186,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("inbound", stats.fInbound));
         obj.push_back(Pair("addnode", stats.fAddnode));
         obj.push_back(Pair("startingheight", stats.nStartingHeight));
+        obj.push_back(Pair("txninvsize", stats.nInvQueueSize));
         if (fStateStats) {
             obj.push_back(Pair("banscore", statestats.nMisbehavior));
             obj.push_back(Pair("synced_headers", statestats.nSyncHeight));
