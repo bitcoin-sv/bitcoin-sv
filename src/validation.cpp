@@ -1538,7 +1538,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 }
 } // namespace Consensus
 
-bool CheckInputs(const CTransaction &tx, CValidationState &state,
+bool CheckInputs(CTransaction &tx, CValidationState &state,
                  const CCoinsViewCache &inputs, bool fScriptChecks,
                  const uint32_t flags, bool sigCacheStore,
                  bool scriptCacheStore,
@@ -1575,6 +1575,9 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
     if (IsKeyInScriptCache(hashCacheEntry, !scriptCacheStore)) {
         return true;
     }
+
+    // We maintain a lists of inputs that were marked for miner redirection.
+    std::vector<size_t> idxMinerRedirect;
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
         const COutPoint &prevout = tx.vin[i].prevout;
@@ -1623,6 +1626,14 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
                 }
             }
 
+            // Miner redirection opcodes is not a failure in a block.
+            // We mark it, to clear the outputs later, as we cannot change the
+            // transaction here
+            if (check.GetScriptError() == SCRIPT_ERR_MINER_REDIRECT) {
+                idxMinerRedirect.push(i);
+                continue;
+            }
+
             // Failures of other flags indicate a transaction that is invalid in
             // new blocks, e.g. a invalid P2SH. We DoS ban such nodes as they
             // are not following the protocol. That said during an upgrade
@@ -1633,6 +1644,17 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
                 100, false, REJECT_INVALID,
                 strprintf("mandatory-script-verify-flag-failed (%s)",
                           ScriptErrorString(check.GetScriptError())));
+        }
+    }
+
+    // For inputs with miner redirection we clear the output value. Note that
+    // we only clear it for the output with the index of the input where the
+    // redirect was found.
+    // We can't really clear all outputs as this would make
+    // SIGHASH_ANYONECANSPEND|SIGHASH_SINGLE unusable.
+    for(size_t i : idxMinerRedirect) {
+        if i < tx.vout.len() {
+            tx.vout[i].value = 0;
         }
     }
 
@@ -2174,7 +2196,7 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
 
     for (size_t i = 0; i < block.vtx.size(); i++) {
-        const CTransaction &tx = *(block.vtx[i]);
+        CTransaction &tx = *(block.vtx[i]);
 
         nInputs += tx.vin.size();
 
@@ -2216,9 +2238,6 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
         }
 
         if (!tx.IsCoinBase()) {
-            Amount fee = view.GetValueIn(tx) - tx.GetValueOut();
-            nFees += fee;
-
             // Don't cache results if we're actually connecting blocks (still
             // consult the cache, though).
             bool fCacheResults = fJustCheck;
@@ -2232,6 +2251,10 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
             }
 
             control.Add(vChecks);
+
+            Amount fee = view.GetValueIn(tx) - tx.GetValueOut();
+            nFees += fee;
+
         }
 
         CTxUndo undoDummy;

@@ -351,6 +351,8 @@ static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
             // Disabled opcodes.
             return true;
 
+        case OP_MINER_REDIRECT1:
+        case OP_MINER_REDIRECT2:
         case OP_INVERT:
         case OP_MUL:
         case OP_LSHIFT:
@@ -403,6 +405,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
     bool isMagnetic = (flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) != 0;
+
+    bool fIncludesMinerRedirect = false;
 
     try {
         while (pc < pend) {
@@ -1494,6 +1498,29 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
                     } break;
 
+
+                    case OP_MINER_REDIRECT1:
+                    case OP_MINER_REDIRECT2:
+                    {
+                        if (stack.size() < 3) {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+                        popstack(stack);
+                        popstack(stack);
+                        popstack(stack);
+
+                        // OP_MINER_REDIRECT1 should leave TRUE on the stack
+                        if (opcode == OP_MINER_REDIRECT1) {
+                            stack.push_back(vchTrue);
+                        }
+
+                        // We can't throw an error directly as other errors have priority
+                        // Just mark it
+                        fIncludesMinerRedirect = true;
+
+                    } break;
+
                     default:
                         return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
                 }
@@ -1510,6 +1537,10 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
     if (!vfExec.empty()) {
         return set_error(serror, SCRIPT_ERR_UNBALANCED_CONDITIONAL);
+    }
+
+    if (fIncludesMinerRedirect) {
+        return set_error(serror, SCRIPT_ERR_MINER_REDIRECT);
     }
 
     return set_success(serror);

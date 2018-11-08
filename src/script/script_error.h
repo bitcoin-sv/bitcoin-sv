@@ -70,6 +70,12 @@ typedef enum ScriptError_t {
     SCRIPT_ERR_ILLEGAL_FORKID,
     SCRIPT_ERR_MUST_USE_FORKID,
 
+    /* script contains an OP_MINER_REDIRECTn
+     *
+     * This is an error for incoming transactions, but in blocks this error
+     * will be caught and clear the corresponding output value */
+    SCRIPT_ERR_MINER_REDIRECT,
+
     SCRIPT_ERR_ERROR_COUNT
 } ScriptError;
 
