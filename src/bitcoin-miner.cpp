@@ -36,12 +36,6 @@ using namespace std;
 
 typedef unsigned int extra_nonce_type;
 
-// BU add lockstack stuff here for bitcoin-miner, because I need to carefully
-// order it in globals.cpp for bitcoind and bitcoin-qt
-boost::mutex dd_mutex;
-//std::map<std::pair<void *, void *>, LockStack> lockorders;
-//boost::thread_specific_ptr<LockStack> lockstack;
-
 // Internal miner
 //
 // ScanHash scans nonces looking for a hash with at least some zero bits.

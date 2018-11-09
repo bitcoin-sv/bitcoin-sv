@@ -133,10 +133,6 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
         if (coinbaseScript->reserveScript.empty())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
 
-        // Miner supplies the coinbase outputs. <-- NOT ANY MORE. They can override if they like.
-        //CScript scriptPubKey = CScript() << OP_1;
-        //pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
-
         pblocktemplate = BlockAssembler(config).CreateNewBlock(coinbaseScript->reserveScript); 
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
@@ -175,8 +171,7 @@ std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
         leaves.push_back(pblock->vtx[i].get()->GetHash());
     }
 
-    ret = ComputeMerkleBranch(leaves, 0);
-    return ret;
+    return ComputeMerkleBranch(leaves, 0);
 }
 
 void CalculateNextMerkleRoot(uint256 &merkle_root, const uint256 &merkle_branch)
@@ -198,17 +193,6 @@ uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &
         CalculateNextMerkleRoot(merkle_root, merkleProof[i]);
     }
     return merkle_root;
-}
-
-// PLEASE LEAVE FOR FUTURE TROUBLE SHOOTING
-void Debug_dump(const CTransaction& tx)
-{
-    string hex =EncodeHexTx(tx); 
-    cout << "Creating mining candidate json, coinbase is " << hex << "\n";
-    CMutableTransaction tx2;
-    bool ok = DecodeHexTx(tx2, hex);
-    if(!ok)
-	    cout << "Unable to deserialise tx\n";
 }
 
 // Sets the version bits in a block
@@ -298,7 +282,6 @@ UniValue MkMiningCandidateJson(CMiningCandidate &candid)
     {
         const CTransaction *tran = block.vtx[0].get();
         ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
-        //Debug_dump(*tran);
     }
 
     std::set<std::string> setClientRules;
@@ -320,16 +303,6 @@ UniValue MkMiningCandidateJson(CMiningCandidate &candid)
             merkleProof.push_back(i.GetHex());
         }
         ret.push_back(Pair("merkleProof", merkleProof));
-
-        // merklePath parameter:
-        // If the coinbase is ever allowed to be anywhere in the hash tree via a hard fork, we will need to communicate
-        // how to calculate the merkleProof by supplying a bit for every level in the proof.
-        // This bit tells the calculator whether the next hash is on the left or right side of the tree.
-        // In other words, whether to do cat(A,B) or cat(B,A).  Specifically, if the bit is 0,the proof calcuation uses
-        // Hash256(concatentate(running hash, next hash in proof)), if the bit is 1, the proof calculates
-        // Hash256(concatentate(next hash in proof, running hash))
-
-        // ret.push_back(Pair("merklePath", 0));  // diliberately disabled.
     }
 
     return ret;
@@ -343,15 +316,14 @@ UniValue MkMiningCandidateJson(CMiningCandidate &candid)
 /// getblocktemplate has a number of control parameters that are not available in getminingcandidate.
 UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request) 
 {
-    CMiningCandidate candidate;
-    LOCK(cs_main);
-
     if (request.fHelp || request.params.size() > 0)
     {
         throw std::runtime_error("getminingcandidate"
                                 "\nReturns Mining-Candidate protocol data.\n"
                                 "\nArguments: None\n");
     }
+    CMiningCandidate candidate;
+    LOCK(cs_main);
     mkblocktemplate(config, request.params, &candidate.block);  // These mirror the functions in BU
     return MkMiningCandidateJson(candidate);
 }
