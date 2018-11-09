@@ -53,9 +53,9 @@ class MiningTest(BitcoinTestFramework):
         assert 'nBits' in tmpl
         assert 'time' in tmpl
 
-// TODO: This test needs to be expanded. Coverage is incomplete.
-// It should spin up a miner which uses getminingcandidate and returns a valid block via submitmining candidate.
-// The accepted block should then be propagated to the connected node.
+# TODO: This test needs to be expanded. Coverage is incomplete.
+# It should spin up a miner which uses getminingcandidate and returns a valid block via submitmining candidate.
+# The accepted block should then be propagated to the connected node.
 
 if __name__ == '__main__':
     MiningTest().main()
