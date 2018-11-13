@@ -54,10 +54,6 @@ class MagneticActivationTest(ComparisonTestFramework):
         return tx_signed
 
     def run_test(self):
-        self.test = TestManager(self, self.options.tmpdir)
-        self.test.add_all_connections(self.nodes)
-        # Start up network handling in another thread
-        NetworkThread().start()
         self.test.run()
 
     def get_tests(self):

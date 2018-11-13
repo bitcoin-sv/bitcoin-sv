@@ -75,10 +75,6 @@ class FullBlockTest(ComparisonTestFramework):
             "--runbarelyexpensive", dest="runbarelyexpensive", default=True)
 
     def run_test(self):
-        self.test = TestManager(self, self.options.tmpdir)
-        self.test.add_all_connections(self.nodes)
-        # Start up network handling in another thread
-        NetworkThread().start()
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):

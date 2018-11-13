@@ -30,14 +30,11 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-
-    def run_test(self):
-        test = TestManager(self, self.options.tmpdir)
-        test.add_all_connections(self.nodes)
         self.tip = None
         self.block_time = None
-        NetworkThread().start()  # Start up network handling in another thread
-        test.run()
+
+    def run_test(self):
+        self.test.run()
 
     def get_tests(self):
         if self.tip is None:

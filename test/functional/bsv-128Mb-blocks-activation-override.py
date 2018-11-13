@@ -57,10 +57,6 @@ class BSV128MbActivation(ComparisonTestFramework):
             "--runbarelyexpensive", dest="runbarelyexpensive", default=True)
 
     def run_test(self):
-        self.test = TestManager(self, self.options.tmpdir)
-        self.test.add_all_connections(self.nodes)
-        # Start up network handling in another thread
-        NetworkThread().start()
         self.nodes[0].setmocktime(MAGNETIC_START_TIME)
         self.test.run()
 

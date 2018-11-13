@@ -45,10 +45,6 @@ class ReplayProtectionTest(ComparisonTestFramework):
                             "-replayprotectionactivationtime=%d" % REPLAY_PROTECTION_START_TIME]]
 
     def run_test(self):
-        self.test = TestManager(self, self.options.tmpdir)
-        self.test.add_all_connections(self.nodes)
-        # Start up network handling in another thread
-        NetworkThread().start()
         self.nodes[0].setmocktime(REPLAY_PROTECTION_START_TIME)
         self.test.run()
 

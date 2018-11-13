@@ -15,6 +15,8 @@ import sys
 import tempfile
 import time
 import traceback
+from test_framework.comptool import TestManager
+from test_framework.mininode import NetworkThread
 
 from .authproxy import JSONRPCException
 from . import coverage
@@ -499,6 +501,14 @@ class ComparisonTestFramework(BitcoinTestFramework):
                        binary=[self.options.testbinary] +
                        [self.options.refbinary] * (self.num_nodes - 1))
         self.start_nodes()
+        self.init_network()
+
+    def init_network(self):
+        # Start creating test manager which help to manage test cases
+        self.test = TestManager(self, self.options.tmpdir)
+        self.test.add_all_connections(self.nodes)
+        # Start up network handling in another thread
+        NetworkThread().start()
 
 
 class SkipTest(Exception):
