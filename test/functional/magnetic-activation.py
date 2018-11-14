@@ -112,7 +112,7 @@ class MagneticActivationTest(ComparisonTestFramework):
 
         # create a new block at the tip of the chain with the given time
         # but don't add it to the chain yet
-        def next_block(block_time):
+        def next_block_by_time(block_time):
             # get block height
             blockchaininfo = node.getblockchaininfo()
             height = int(blockchaininfo['blocks'])
@@ -128,7 +128,7 @@ class MagneticActivationTest(ComparisonTestFramework):
             return block
 
         for i in range(6):
-            b = next_block(MAGNETIC_START_TIME + i - 1)
+            b = next_block_by_time(MAGNETIC_START_TIME + i - 1)
             yield accepted(b)
 
         # Check again just before the activation time
@@ -143,12 +143,12 @@ class MagneticActivationTest(ComparisonTestFramework):
             block.solve()
 
         # the last block before activation
-        b = next_block(MAGNETIC_START_TIME + 6)
+        b = next_block_by_time(MAGNETIC_START_TIME + 6)
         add_tx(b, tx0)
         yield rejected(b, RejectResult(16, b'blk-bad-inputs'))
 
         self.log.info("After this block, the new opcodes are activated")
-        fork_block = next_block(MAGNETIC_START_TIME + 6)
+        fork_block = next_block_by_time(MAGNETIC_START_TIME + 6)
         yield accepted(fork_block)
 
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
@@ -158,7 +158,7 @@ class MagneticActivationTest(ComparisonTestFramework):
         assert(tx0id in set(node.getrawmempool()))
 
         # Transactions can also be included in blocks.
-        magneticblock = next_block(MAGNETIC_START_TIME + 7)
+        magneticblock = next_block_by_time(MAGNETIC_START_TIME + 7)
         add_tx(magneticblock, tx0)
         yield accepted(magneticblock)
 
