@@ -51,6 +51,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.extra_args = [['-norelaypriority']]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
+        self.init_network()
 
     def add_options(self, parser):
         super().add_options(parser)
@@ -58,7 +59,6 @@ class FullBlockTest(ComparisonTestFramework):
             "--runbarelyexpensive", dest="runbarelyexpensive", default=True)
 
     def run_test(self):
-        self.init_network()
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):

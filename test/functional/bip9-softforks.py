@@ -35,7 +35,7 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         self.extra_args = [['-whitelist=127.0.0.1']]
         self.setup_clean_chain = True
 
-    def setup_network(self):
+    def reset_network(self):
         extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
         if hasattr(self, "extra_args"):
             extra_args = self.extra_args
@@ -45,7 +45,6 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         self.start_nodes()
 
     def run_test(self):
-        self.init_network()
         self.test.run()
 
     def create_transaction(self, node, coinbase, to_address, amount):
@@ -220,7 +219,7 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         self.nodes = []
         shutil.rmtree(self.options.tmpdir + "/node0")
         self.setup_chain()
-        self.setup_network()
+        self.reset_network()
         self.test.add_all_connections(self.nodes)
         NetworkThread().start()
         self.test.test_nodes[0].wait_for_verack()

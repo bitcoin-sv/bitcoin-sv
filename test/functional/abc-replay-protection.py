@@ -25,22 +25,11 @@ INVALID_SIGNATURE_ERROR = b'mandatory-script-verify-flag-failed (Signature must 
 RPC_INVALID_SIGNATURE_ERROR = "16: " + \
     INVALID_SIGNATURE_ERROR.decode("utf-8")
 
-
-class PreviousSpendableOutput(object):
-
-    def __init__(self, tx=CTransaction(), n=-1):
-        self.tx = tx
-        self.n = n  # the output we're spending
-
-
 class ReplayProtectionTest(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.block_heights = {}
-        self.tip = None
-        self.blocks = {}
         self.extra_args = [['-whitelist=127.0.0.1',
                             "-replayprotectionactivationtime=%d" % REPLAY_PROTECTION_START_TIME]]
 
@@ -48,93 +37,30 @@ class ReplayProtectionTest(ComparisonTestFramework):
         self.nodes[0].setmocktime(REPLAY_PROTECTION_START_TIME)
         self.test.run()
 
-    def next_block(self, number):
-        if self.tip == None:
-            base_block_hash = self.genesis_hash
-            block_time = int(time.time()) + 1
-        else:
-            base_block_hash = self.tip.sha256
-            block_time = self.tip.nTime + 1
-        # First create the coinbase
-        height = self.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height)
-        coinbase.rehash()
-        block = create_block(base_block_hash, coinbase, block_time)
-
-        # Do PoW, which is cheap on regnet
-        block.solve()
-        self.tip = block
-        self.block_heights[block.sha256] = height
-        assert number not in self.blocks
-        self.blocks[number] = block
-        return block
-
     def get_tests(self):
-        self.genesis_hash = int(self.nodes[0].getbestblockhash(), 16)
-        self.block_heights[self.genesis_hash] = 0
-        spendable_outputs = []
-
-        # save the current tip so it can be spent by a later block
-        def save_spendable_output():
-            spendable_outputs.append(self.tip)
-
-        # get an output that we previously marked as spendable
-        def get_spendable_output():
-            return PreviousSpendableOutput(spendable_outputs.pop(0).vtx[0], 0)
-
-        # returns a test case that asserts that the current tip was accepted
-        def accepted():
-            return TestInstance([[self.tip, True]])
-
-        # returns a test case that asserts that the current tip was rejected
-        def rejected(reject=None):
-            if reject is None:
-                return TestInstance([[self.tip, False]])
-            else:
-                return TestInstance([[self.tip, reject]])
-
-        # move the tip back to a previous block
-        def tip(number):
-            self.tip = self.blocks[number]
-
-        # adds transactions to the block and updates state
-        def update_block(block_number, new_transactions):
-            [tx.rehash() for tx in new_transactions]
-            block = self.blocks[block_number]
-            block.vtx.extend(new_transactions)
-            old_sha256 = block.sha256
-            block.hashMerkleRoot = block.calc_merkle_root()
-            block.solve()
-            # Update the internal state just like in next_block
-            self.tip = block
-            if block.sha256 != old_sha256:
-                self.block_heights[
-                    block.sha256] = self.block_heights[old_sha256]
-                del self.block_heights[old_sha256]
-            self.blocks[block_number] = block
-            return block
+        self.chain.set_genesis_hash( int(self.nodes[0].getbestblockhash(), 16) )
 
         # shorthand for functions
-        block = self.next_block
+        block = self.chain.next_block
         node = self.nodes[0]
 
         # Create a new block
         block(0)
-        save_spendable_output()
-        yield accepted()
+        self.chain.save_spendable_output()
+        yield self.accepted()
 
         # Now we need that block to mature so we can spend the coinbase.
         test = TestInstance(sync_every_block=False)
         for i in range(99):
             block(5000 + i)
-            test.blocks_and_transactions.append([self.tip, True])
-            save_spendable_output()
+            test.blocks_and_transactions.append([self.chain.tip, True])
+            self.chain.save_spendable_output()
         yield test
 
         # collect spendable outputs now to avoid cluttering the code later on
         out = []
         for i in range(100):
-            out.append(get_spendable_output())
+            out.append(self.chain.get_spendable_output())
 
         # Generate a key pair to test P2SH sigops count
         private_key = CECKey()
@@ -177,8 +103,8 @@ class ReplayProtectionTest(ComparisonTestFramework):
 
         # And txns get mined in a block properly.
         block(1)
-        update_block(1, txns)
-        yield accepted()
+        self.chain.update_block(1, txns)
+        yield self.accepted()
 
         # Replay protected transactions are rejected.
         replay_txns = create_fund_and_spend_tx(out[1], 0xffdead)
@@ -188,21 +114,21 @@ class ReplayProtectionTest(ComparisonTestFramework):
 
         # And block containing them are rejected as well.
         block(2)
-        update_block(2, replay_txns)
-        yield rejected(RejectResult(16, b'blk-bad-inputs'))
+        self.chain.update_block(2, replay_txns)
+        yield self.rejected(RejectResult(16, b'blk-bad-inputs'))
 
         # Rewind bad block
-        tip(1)
+        self.chain.set_tip(1)
 
         # Create a block that would activate the replay protection.
         bfork = block(5555)
         bfork.nTime = REPLAY_PROTECTION_START_TIME - 1
-        update_block(5555, [])
-        yield accepted()
+        self.chain.update_block(5555, [])
+        yield self.accepted()
 
         for i in range(5):
             block(5100 + i)
-            test.blocks_and_transactions.append([self.tip, True])
+            test.blocks_and_transactions.append([self.chain.tip, True])
         yield test
 
         # Check we are just before the activation time
@@ -214,11 +140,11 @@ class ReplayProtectionTest(ComparisonTestFramework):
                                 node.sendrawtransaction, ToHex(replay_txns[1]))
 
         block(3)
-        update_block(3, replay_txns)
-        yield rejected(RejectResult(16, b'blk-bad-inputs'))
+        self.chain.update_block(3, replay_txns)
+        yield self.rejected(RejectResult(16, b'blk-bad-inputs'))
 
         # Rewind bad block
-        tip(5104)
+        self.chain.set_tip(5104)
 
         # Send some non replay protected txns in the mempool to check
         # they get cleaned at activation.
@@ -229,7 +155,7 @@ class ReplayProtectionTest(ComparisonTestFramework):
 
         # Activate the replay protection
         block(5556)
-        yield accepted()
+        yield self.accepted()
 
         # At activation the entire mempool is cleared, so the txn we inserted
         # earlier will have gone.
@@ -241,8 +167,8 @@ class ReplayProtectionTest(ComparisonTestFramework):
 
         # They also can still be mined
         block(4)
-        update_block(4, txns)
-        yield accepted()
+        self.chain.update_block(4, txns)
+        yield self.accepted()
 
         # The replay protected transaction is still invalid
         send_transaction_to_mempool(replay_txns[0])
@@ -251,11 +177,11 @@ class ReplayProtectionTest(ComparisonTestFramework):
 
         # They also still can't be mined
         b5 = block(5)
-        update_block(5, replay_txns)
-        yield rejected(RejectResult(16, b'blk-bad-inputs'))
+        self.chain.update_block(5, replay_txns)
+        yield self.rejected(RejectResult(16, b'blk-bad-inputs'))
 
         # Rewind bad block
-        tip(5556)
+        self.chain.set_tip(5556)
 
         # These next few tests look a bit pointless to me since over the activation
         # we completely wipe the mempool, but hey-ho I guess they're only

@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 import traceback
-from test_framework.comptool import TestManager
+from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import NetworkThread
 
 from .authproxy import JSONRPCException
@@ -36,6 +36,7 @@ from .util import (
     sync_mempools,
 )
 
+from test_framework.blocktools import *
 
 class TestStatus(Enum):
     PASSED = 1
@@ -481,6 +482,11 @@ class ComparisonTestFramework(BitcoinTestFramework):
     - 2 binaries: 1 test binary, 1 ref binary
     - n>2 binaries: 1 test binary, n-1 ref binaries"""
 
+    def __init__(self):
+        super(ComparisonTestFramework,self).__init__()
+        self.chain = ChainManager()
+        self._network_thread = None
+
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -508,7 +514,22 @@ class ComparisonTestFramework(BitcoinTestFramework):
         self.test = TestManager(self, self.options.tmpdir)
         self.test.add_all_connections(self.nodes)
         # Start up network handling in another thread
-        NetworkThread().start()
+        if self._network_thread is None:
+            self._network_thread = NetworkThread()
+            self._network_thread.start()
+        else:
+            raise RuntimeError("ComparisonTestFramework.init_network() network thread has been started")
+
+    # returns a test case that asserts that the current tip was accepted
+    def accepted(self):
+        return TestInstance([[self.chain.tip, True]])
+
+    # returns a test case that asserts that the current tip was rejected
+    def rejected(self, reject=None):
+        if reject is None:
+            return TestInstance([[self.chain.tip, False]])
+        else:
+            return TestInstance([[self.chain.tip, reject]])
 
 
 class SkipTest(Exception):
