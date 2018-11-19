@@ -3376,12 +3376,12 @@ bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
                 BlockMap::iterator mi = mapBlockIndex.find(hash);
                 assert(mi != mapBlockIndex.end());
                 const CBlockIndex *pindex = mi->second;
-                if (chainActive[pindex->nHeight] != pindex) {
+                if ( pindex != nullptr && chainActive[pindex->nHeight] != pindex) {
                     // Bail out if we reorged away from this block
                     fRevertToInv = true;
                     break;
                 }
-                if (pBestIndex != nullptr && pindex->pprev != pBestIndex) {
+                if (pindex != nullptr && pBestIndex != nullptr && pindex->pprev != pBestIndex) {
                     // This means that the list of blocks to announce don't
                     // connect to each other. This shouldn't really be possible
                     // to hit during regular operation (because reorgs should
@@ -3430,7 +3430,7 @@ bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
                 bool fGotBlockFromCache = false;
                 {
                     LOCK(cs_most_recent_block);
-                    if (most_recent_block_hash == pBestIndex->GetBlockHash()) {
+                    if (pBestIndex != nullptr && most_recent_block_hash == pBestIndex->GetBlockHash()) {
                         CBlockHeaderAndShortTxIDs cmpctblock(
                             *most_recent_block);
                         connman.PushMessage(
