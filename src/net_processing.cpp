@@ -687,10 +687,10 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals) {
 }
 
 static int64_t Fixed_delay_microsecs=-1;// microsecond
-bool SetInvBroadcastDelay(const int64_t& nDelay) {
-    if ( nDelay < 0 || nDelay > MAX_INV_BROADCAST_DELAY)
+bool SetInvBroadcastDelay(const int64_t& nDelayMillisecs) {
+    if ( nDelayMillisecs < 0 || nDelayMillisecs > MAX_INV_BROADCAST_DELAY)
         return false;
-    Fixed_delay_microsecs=nDelay;
+    Fixed_delay_microsecs=1000*nDelayMillisecs;
     return true;
 }
 

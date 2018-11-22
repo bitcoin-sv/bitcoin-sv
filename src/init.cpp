@@ -521,7 +521,7 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-broadcastdelay=<n>",
         strprintf(
-            _("Set inventory broadcast delay duration in microsecond(min: %d, max: %d)"),
+            _("Set inventory broadcast delay duration in millisecond(min: %d, max: %d)"),
             0,MAX_INV_BROADCAST_DELAY));
     strUsage +=
         HelpMessageOpt("-onion=<ip:port>",
@@ -1826,9 +1826,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
     peerLogic.reset(new PeerLogicValidation(&connman));
     if (gArgs.IsArgSet("-broadcastdelay")) {
-        const int64_t nDelay = gArgs.GetArg("-broadcastdelay", -1);
-        if(!SetInvBroadcastDelay(nDelay)){
-            return InitError(strprintf(_("Error setting broadcastdelay=%d"), nDelay));
+        const int64_t nDelayMillisecs = gArgs.GetArg("-broadcastdelay", -1);
+        if(!SetInvBroadcastDelay(nDelayMillisecs)){
+            return InitError(strprintf(_("Error setting broadcastdelay=%d"), nDelayMillisecs));
         }
     }
     RegisterValidationInterface(peerLogic.get());

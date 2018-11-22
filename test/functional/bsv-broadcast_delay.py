@@ -15,7 +15,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self._nbSecondDelay = 10
-        self._fixedDelayArgs = [['-broadcastdelay={}'.format(1000000*self._nbSecondDelay)], ['-broadcastdelay={}'.format(1000000*self._nbSecondDelay)]]
+        self._fixedDelayArgs = [['-broadcastdelay={}'.format(1000*self._nbSecondDelay)], ['-broadcastdelay={}'.format(1000*self._nbSecondDelay)]]
         self.nbTransTest = 3 ## Increase the number of transactions to test will increase the test quality
 
     def setup_network(self):
