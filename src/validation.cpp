@@ -17,6 +17,7 @@
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
+#include "net.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "pow.h"
@@ -2822,6 +2823,10 @@ static bool ConnectTip(const Config &config, CValidationState &state,
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // Remove conflicting transactions from the mempool.;
     mempool.removeForBlock(blockConnecting.vtx, pindexNew->nHeight);
+    if(g_connman)
+    {
+        g_connman->DequeueTransactions(blockConnecting.vtx);
+    }
     disconnectpool.removeForBlock(blockConnecting.vtx);
     // Update chainActive & related variables.
     UpdateTip(config, pindexNew);
@@ -3052,6 +3057,7 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
 
     CBlockIndex *pindexMostWork = nullptr;
     CBlockIndex *pindexNewTip = nullptr;
+
     do {
         boost::this_thread::interruption_point();
         if (ShutdownRequested()) {

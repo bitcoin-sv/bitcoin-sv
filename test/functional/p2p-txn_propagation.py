@@ -16,7 +16,7 @@ class P2PTxnPropagation(BitcoinTestFramework):
         self.num_nodes = 8
         self.num_txns = 200
         self.setup_clean_chain = True
-        self.extra_args = [['-broadcastdelay=5000000']] * self.num_nodes
+        self.extra_args = [['-broadcastdelay=5000']] * self.num_nodes
 
     def setup_network(self):
         self.setup_nodes()
@@ -94,7 +94,6 @@ class P2PTxnPropagation(BitcoinTestFramework):
         # Verify all txns make it to all peers
         wait_until(self.check_final_mempool)
         sync_mempools(self.nodes)
-
 
     def run_test(self):
         # Make some coins to spend

@@ -732,7 +732,7 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
         if(!mInvList.empty())
         {
             // Clear any txns we have queued for this peer
-            mInvList = InvList{ CompareInv{&mempool} };
+            mInvList = InvList{ CompareTxnSendingDetails{&mempool} };
         }
     }
     else
@@ -753,6 +753,18 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
             filterInventoryKnown.insert(txn.getInv().hash);
         }
     }
+}
+
+/**
+* Remove some transactions from our pending inventory list.
+* Assumes the caller has taken care of locking access to the mempool,
+* and so can be called in parallel.
+*/
+void CNode::RemoveTxnsFromInventory(const std::vector<CTxnSendingDetails>& txns)
+{
+    // Remove them
+    LOCK(cs_mInvList);
+    mInvList.erase(txns);
 }
 
 /** Fetch the next N items from our inventory */
@@ -3048,6 +3060,12 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
 void CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
 {
     mTxnPropagator->newTransaction(txn);
+}
+
+/** Remove some transactions from our peers list of new transactions */
+void CConnman::DequeueTransactions(const std::vector<CTransactionRef>& txns)
+{
+    mTxnPropagator->removeTransactions(txns);
 }
 
 bool CConnman::ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func) {

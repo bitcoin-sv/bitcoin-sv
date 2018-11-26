@@ -33,7 +33,7 @@ class CModPriQueue : public std::priority_queue<T, Container, Compare>
     void erase(const Container& eles)
     {
         // Need everything sorted to make use of set_difference
-        std::sort_heap(Base::c.begin(), Base::c.end(), Base::comp);
+        std::sort(Base::c.begin(), Base::c.end(), Base::comp);
 
         // Remove items in eles from our underlying heap
         Container newContents {};

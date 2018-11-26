@@ -7,6 +7,7 @@
 #include "txn_sending_details.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -33,8 +34,18 @@ class CTxnPropagator final
     /** Handle a new transaction */
     void newTransaction(const CTxnSendingDetails& txn);
 
+    /** Remove some old transactions */
+    void removeTransactions(const std::vector<CTransactionRef>& txns);
+
     /** Shutdown and clean up */
     void shutdown();
+
+    /** Get/set the frequency we run */
+    std::chrono::milliseconds getRunFrequency() const;
+    void setRunFrequency(const std::chrono::milliseconds& freq);
+
+    /** Get the number of queued new transactions awaiting processing */
+    size_t getNewTxnQueueLength() const;
 
   private:
 
@@ -47,7 +58,7 @@ class CTxnPropagator final
 
     /** List of new transactions that need processing */
     std::vector<CTxnSendingDetails> mNewTxns {};
-    std::mutex mNewTxnsMtx {};
+    mutable std::mutex mNewTxnsMtx {};
 
     /** Our main thread */
     std::thread mNewTxnsThread {};
@@ -55,6 +66,10 @@ class CTxnPropagator final
 
     /** Flag to indicate we are running */
     std::atomic<bool> mRunning {true};
+
+    /** Frequency we run (defaults to 1 second) */
+    static constexpr unsigned DEFAULT_RUN_FREQUENCY_MILLIS {1000};
+    std::chrono::milliseconds mRunFrequency {DEFAULT_RUN_FREQUENCY_MILLIS};
 
 };
 

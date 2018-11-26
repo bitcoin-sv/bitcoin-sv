@@ -16,6 +16,7 @@
 #include "fs.h"
 #include "hash.h"
 #include "limitedmap.h"
+#include "mod_pri_queue.h"
 #include "netaddress.h"
 #include "protocol.h"
 #include "random.h"
@@ -32,7 +33,6 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
-#include <queue>
 #include <thread>
 
 #ifndef WIN32
@@ -176,6 +176,11 @@ public:
 
     /** Enqueue a new transaction for later sending to our peers */
     void EnqueueTransaction(const CTxnSendingDetails& txn);
+    /** Remove some transactions from our peers list of new transactions */
+    void DequeueTransactions(const std::vector<CTransactionRef>& txns);
+
+    /** Get a handle to our transaction propagator */
+    const std::shared_ptr<CTxnPropagator>& getTransactionPropagator() const { return mTxnPropagator; }
 
     template <typename Callable> void ForEachNode(Callable &&func) {
         LOCK(cs_vNodes);
@@ -740,24 +745,9 @@ private:
     CService addrLocal;
     mutable CCriticalSection cs_addrLocal;
 
-
-    /** Comparator for transaction priority */
-    struct CompareInv
-    {   
-        CTxMemPool* mMempool {nullptr};
-        CompareInv(CTxMemPool* mp) : mMempool{mp} {}
-
-        bool operator()(const CTxnSendingDetails& a, const CTxnSendingDetails& b)
-        {   
-            /* As std::make_heap produces a max-heap, we want the entries with the
-            * fewest ancestors/highest fee to sort later. */
-            return mMempool->CompareDepthAndScoreUnlocked(b.getInv().hash, a.getInv().hash);
-        }
-    };
-
     /** List of priority sorted inventory msgs for transactions to send */
-    using InvList = std::priority_queue<CTxnSendingDetails, std::vector<CTxnSendingDetails>, CompareInv>;
-    InvList mInvList { CompareInv{&mempool} };
+    using InvList = CModPriQueue<CTxnSendingDetails, std::vector<CTxnSendingDetails>, CompareTxnSendingDetails>;
+    InvList mInvList { CompareTxnSendingDetails{&mempool} };
     CCriticalSection cs_mInvList {};
 
 
@@ -766,6 +756,8 @@ public:
 
     /** Add some new transactions to our pending inventory list */
     void AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns);
+    /** Remove some transactions from our pending inventroy list */
+    void RemoveTxnsFromInventory(const std::vector<CTxnSendingDetails>& txns);
     /** Fetch the next N items from our inventory */
     std::vector<CTxnSendingDetails> FetchNInventory(size_t n);
 
