@@ -1721,10 +1721,6 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
         pindex = chainActive.Next(pindex);
     }
 
-    double dProgressStart =
-        GuessVerificationProgress(chainParams.TxData(), pindex);
-    double dProgressTip =
-        GuessVerificationProgress(chainParams.TxData(), chainActive.Tip());
     while (pindex) {
         
         CBlock block;
