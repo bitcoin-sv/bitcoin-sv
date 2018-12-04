@@ -34,8 +34,8 @@
  *
  * This is the developer documentation of Bitcoin SV
  * (https://bitcoinsv.io/). Bitcoin SV is a client for the digital
- * currency called Bitcoin Cash (https://www.bitcoincash.org/), which enables
- * instant payments to anyone, anywhere in the world. Bitcoin Cash uses
+ * currency called Bitcoin SV, which enables
+ * instant payments to anyone, anywhere in the world. Bitcoin SV uses
  * peer-to-peer technology to operate with no central authority: managing
  * transactions and issuing money are carried out collectively by the network.
  *

@@ -3,11 +3,10 @@ Bitcoin SV
 
 Setup
 ---------------------
-Bitcoin SV is an implementation of a node for the Bitcoin Cash network and 
-builds the backbone of the network. It downloads and stores the entire history of 
-Bitcoin transactions (which is currently several GBs); depending on the speed of 
-your computer and network connection, the synchronization process can take anywhere 
-from a few hours to a day or more.
+Bitcoin SV is an implementation of a node for the Bitcoin SV network and is one of the pieces of software that provide 
+the backbone of the network. It downloads and stores the entire history of Bitcoin SV transactions (which is currently 
+several GBs); depending on the speed of your computer and network connection, the synchronization process can take 
+anywhere from a few hours to a day or more.
 
 To download Bitcoin SV, visit [bitcoinsv.io](https://bitcoinsv.io/).
 
@@ -22,20 +21,21 @@ To run Bitcoin SV, unpack the files into a directory and run:
 ### Need Help?
 
 * Log an issue on [GitHub] (https://github.com/bitcoin-sv/bitcoin-sv/issues)
-* Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/BitcoinSV/) or
-[BTC Subreddit](https://www.reddit.com/r/btc/).
+* Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/bitcoinSV/) or
+[Bictoin Cash SV Subreddit](https://www.reddit.com/r/bitcoincashSV/).
 
 Building
 ---------------------
-The following are developer notes on how to build Bitcoin. They are not complete guides, 
-but include notes on the necessary libraries, compile flags, etc.
+The following are developer notes on how to build Bitcoin. They are not complete guides, but include notes on the 
+necessary libraries, compile flags, etc.
 
 - [Unix Build Notes](build-unix.md)
 - [Gitian Building Guide](gitian-building.md)
 
 Development
 ---------------------
-The Bitcoin SV repo's [root README](/README.md) contains relevant information on the development process and automated testing.
+The Bitcoin SV repo's [root README](/README.md) contains relevant information on the development process and automated 
+testing.
 
 - [Developer Notes](developer-notes.md)
 - [Release Notes](release-notes.md)
@@ -54,7 +54,6 @@ The Bitcoin SV repo's [root README](/README.md) contains relevant information on
 
 License
 ---------------------
-Distribution is done under the [MIT software license](/COPYING).
-This product includes software developed by the OpenSSL Project for use in the [OpenSSL Toolkit](https://www.openssl.org/), 
-cryptographic software written by Eric Young ([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), 
-and UPnP software written by Thomas Bernard.
+Distribution is done under the [MIT software license](/COPYING). This product includes software developed by the OpenSSL 
+Project for use in the [OpenSSL Toolkit](https://www.openssl.org/), cryptographic software written by Eric Young 
+([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), and UPnP software written by Thomas Bernard.
