@@ -180,6 +180,9 @@ static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
 static const unsigned int DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS = 500;
 static const unsigned int DEFAULT_INVALID_CHECKSUM_FREQUENCY = 100;
 
+static const unsigned int DEFAULT_MIN_TIME_INTERVAL_HEADER_MS = 500;
+static const unsigned int DEFAULT_INVALID_HEADER_FREQUENCY = 2000;
+
 /** Default for -persistmempool */
 static const bool DEFAULT_PERSIST_MEMPOOL = true;
 /** Default for using fee filter */
