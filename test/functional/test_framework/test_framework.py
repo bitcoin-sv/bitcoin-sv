@@ -509,16 +509,21 @@ class ComparisonTestFramework(BitcoinTestFramework):
         self.start_nodes()
         self.init_network()
 
+    def restart_network(self, timeout=None):
+        self.test.clear_all_connections()
+        # If we had a network thread from eariler, make sure it's finished before reconnecting
+        if self._network_thread is not None:
+            self._network_thread.join(timeout)
+        # Reconnect
+        self.test.add_all_connections(self.nodes)
+        self._network_thread = NetworkThread()
+        self._network_thread.start()
+
     def init_network(self):
         # Start creating test manager which help to manage test cases
         self.test = TestManager(self, self.options.tmpdir)
-        self.test.add_all_connections(self.nodes)
-        # Start up network handling in another thread
-        if self._network_thread is None:
-            self._network_thread = NetworkThread()
-            self._network_thread.start()
-        else:
-            raise RuntimeError("ComparisonTestFramework.init_network() network thread has been started")
+        # (Re)start network
+        self.restart_network()
 
     # returns a test case that asserts that the current tip was accepted
     def accepted(self):

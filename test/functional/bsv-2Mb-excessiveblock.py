@@ -77,9 +77,7 @@ class BSV128MBlocks(ComparisonTestFramework):
         logger.info("Banned node : {}".format(self.nodes[0].listbanned()))
 
         # Test to reconnect after being banned
-        self.test.clear_all_connections()
-        self.test.add_all_connections(self.nodes)
-        NetworkThread().start()
+        self.restart_network()
         has_been_banned=False
         try:
             self.test.wait_for_verack(5)

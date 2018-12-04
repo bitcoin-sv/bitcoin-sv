@@ -87,9 +87,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         # Rewind bad block and remake connection to node
         self.chain.set_tip(17)
-        self.test.clear_all_connections()
-        self.test.add_all_connections(self.nodes)
-        NetworkThread().start()
+        self.restart_network()
         self.test.wait_for_verack()
 
         # Accept many sigops

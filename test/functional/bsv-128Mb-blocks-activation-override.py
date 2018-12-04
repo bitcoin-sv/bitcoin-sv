@@ -106,9 +106,7 @@ class BSV128MbActivation(ComparisonTestFramework):
 
         # Rewind bad block and remake connection to node
         self.chain.set_tip(5104)
-        self.test.clear_all_connections()
-        self.test.add_all_connections(self.nodes)
-        NetworkThread().start()
+        self.restart_network()
         self.test.wait_for_verack()
 
         # Activate the Nov 15, 2018 HF
@@ -132,9 +130,7 @@ class BSV128MbActivation(ComparisonTestFramework):
 
         # Rewind bad block and remake connection to node
         self.chain.set_tip(17)
-        self.test.clear_all_connections()
-        self.test.add_all_connections(self.nodes)
-        NetworkThread().start()
+        self.restart_network()
         self.test.wait_for_verack()
 
         # Check we can still mine a good size block
