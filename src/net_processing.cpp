@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chrono>
 #include "net_processing.h"
 
 #include "addrman.h"
@@ -210,6 +211,15 @@ struct CNodeState {
      */
     bool fSupportsDesiredCmpctVersion;
 
+    /*
+    * Capture the number and frequency of Invalid checksum
+    */
+
+    int nNumberOfInvalidChecksums;
+    double dInvalidChecksumFrequency;
+    std::chrono::system_clock::time_point nTimeOfLastInvalidChecksumHeader;
+
+
     CNodeState(CAddress addrIn, std::string addrNameIn)
         : address(addrIn), name(addrNameIn) {
         fCurrentlyConnected = false;
@@ -230,6 +240,8 @@ struct CNodeState {
         fPreferHeaderAndIDs = false;
         fProvidesHeaderAndIDs = false;
         fSupportsDesiredCmpctVersion = false;
+        nNumberOfInvalidChecksums=0;
+//        nTimeOfLastInvalidChecksumHeader=0;
     }
 };
 
@@ -3127,14 +3139,35 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     // Checksum
     CDataStream &vRecv = msg.vRecv;
     const uint256 &hash = msg.GetMessageHash();
-    if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) !=
-        0) {
+    if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) !=0) {
         LogPrintf(
             "%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
             SanitizeString(strCommand), nMessageSize,
             HexStr(hash.begin(), hash.begin() + CMessageHeader::CHECKSUM_SIZE),
             HexStr(hdr.pchChecksum,
                    hdr.pchChecksum + CMessageHeader::CHECKSUM_SIZE));
+        CNodeState * state = State(pfrom->GetId()); 
+        if ( state != nullptr){
+            ++ state->nNumberOfInvalidChecksums;
+            auto curTime = std::chrono::system_clock::now();
+            auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastInvalidChecksumHeader - curTime).count();
+            unsigned int interval = gArgs.GetArg("-invalidCSInterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+            std::chrono::milliseconds checksumInterval(interval); 
+            if (duration < std::chrono::milliseconds(checksumInterval).count()){
+                ++ state->dInvalidChecksumFrequency;
+            }
+            else { 
+                // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
+                state->dInvalidChecksumFrequency = 0 ; 
+            }
+            unsigned int checkSumFreq = gArgs.GetArg ("-invalidCSFreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+            if (state->dInvalidChecksumFrequency > checkSumFreq){
+                // MisbehavingNode if the count goes above some chosen value 
+                // 100 conseqitive invalid checksums received with less than 500ms between them
+                Misbehaving(pfrom, 1, "Invalid Checksum activity");
+            }
+            state->nTimeOfLastInvalidChecksumHeader = curTime;
+        }
         return fMoreWork;
     }
 
@@ -3165,6 +3198,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             // Allow exceptions from over-long size
             LogPrintf("%s(%s, %u bytes): Exception '%s' caught\n", __func__,
                       SanitizeString(strCommand), nMessageSize, e.what());
+            Misbehaving(pfrom, 1, "Over-long size message protection");
         } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
             // Allow exceptions from non-canonical encoding
             LogPrintf("%s(%s, %u bytes): Exception '%s' caught\n", __func__,
