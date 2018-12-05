@@ -94,7 +94,11 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
     // Update lists of pending transactions for each node
     {
         LOCK(mempool.cs);
-        g_connman->ForEachNode([&txnDetails](const CNodePtr& node) { node->RemoveTxnsFromInventory(txnDetails); });
+        auto results { g_connman->ParallelForEachNode([&txnDetails](const CNodePtr& node) { node->RemoveTxnsFromInventory(txnDetails); }) };
+
+        // Wait for all nodes to finish processing so we can safely release the mempool lock
+        for(auto& result : results)
+            result.wait();
     }
 }
 
@@ -152,7 +156,11 @@ void CTxnPropagator::processNewTransactions()
     {
         // Take the mempool lock so we can do all the difficult txn sorting and node updating in parallel.
         LOCK(mempool.cs);
-        g_connman->ForEachNode([this](const CNodePtr& node) { node->AddTxnsToInventory(mNewTxns); });
+        auto results { g_connman->ParallelForEachNode([this](const CNodePtr& node) { node->AddTxnsToInventory(mNewTxns); }) };
+
+        // Wait for all nodes to finish processing so we can safely release the mempool lock
+        for(auto& result : results)
+            result.wait();
     }
 
     // Clear new transactions list

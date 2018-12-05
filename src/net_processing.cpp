@@ -1127,8 +1127,7 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
             .Write((GetTime() + hashAddr) / (24 * 60 * 60));
     FastRandomContext insecure_rand;
 
-    std::array<std::pair<uint64_t, CNodePtr>, 2> best{
-        {{0, nullptr}, {0, nullptr}}};
+    std::array<std::pair<uint64_t, CNodePtr>, 2> best {{{0, nullptr}, {0, nullptr}}};
     assert(nRelayNodes <= best.size());
 
     auto sortfunc = [&best, &hasher, nRelayNodes](const CNodePtr& pnode) {
@@ -1144,14 +1143,11 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
             }
         }
     };
+    connman.ForEachNode(sortfunc);
 
-    auto pushfunc = [&addr, &best, nRelayNodes, &insecure_rand] {
-        for (unsigned int i = 0; i < nRelayNodes && best[i].first != 0; i++) {
-            best[i].second->PushAddress(addr, insecure_rand);
-        }
-    };
-
-    connman.ForEachNodeThen(std::move(sortfunc), std::move(pushfunc));
+    for (unsigned int i = 0; i < nRelayNodes && best[i].first != 0; i++) {
+        best[i].second->PushAddress(addr, insecure_rand);
+    }
 }
 
 static void ProcessGetData(const Config &config, const CNodePtr& pfrom,

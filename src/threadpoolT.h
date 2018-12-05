@@ -40,7 +40,7 @@ CThreadPool<QueueAdaptor>::~CThreadPool()
 template<typename QueueAdaptor>
 void CThreadPool<QueueAdaptor>::worker(size_t n)
 {
-    LogPrintf("%s ThreadPool thread %d starting", mOwnerStr.c_str(), n);
+    LogPrintf("%s ThreadPool thread %d starting\n", mOwnerStr.c_str(), n);
 
     while(mRunning)
     {
@@ -64,7 +64,7 @@ void CThreadPool<QueueAdaptor>::worker(size_t n)
         task();
     }
 
-    LogPrintf("%s ThreadPool thread %d stopping", mOwnerStr.c_str(), n);
+    LogPrintf("%s ThreadPool thread %d stopping\n", mOwnerStr.c_str(), n);
 }
 
 // Submit a task to the pool.

@@ -22,6 +22,7 @@
 #include "random.h"
 #include "streams.h"
 #include "sync.h"
+#include "task_helpers.h"
 #include "threadinterrupt.h"
 #include "txmempool.h"
 #include "txn_sending_details.h"
@@ -182,36 +183,31 @@ public:
     /** Get a handle to our transaction propagator */
     const std::shared_ptr<CTxnPropagator>& getTransactionPropagator() const { return mTxnPropagator; }
 
-    template <typename Callable> void ForEachNode(Callable &&func) {
+    /** Call the specified function for each node */
+    template <typename Callable> void ForEachNode(Callable&& func) const {
         LOCK(cs_vNodes);
-        for (auto &&node : vNodes) {
-            if (NodeFullyConnected(node)) func(node);
+        for(const CNodePtr& node : vNodes) {
+            if(NodeFullyConnected(node))
+                func(node);
         }
     };
 
-    template <typename Callable> void ForEachNode(Callable &&func) const {
-        LOCK(cs_vNodes);
-        for (auto &&node : vNodes) {
-            if (NodeFullyConnected(node)) func(node);
-        }
-    };
+    /** Call the specified function for each node in parallel */
+    template <typename Callable>
+    auto ParallelForEachNode(Callable&& func)
+        -> std::vector<std::future<typename std::result_of<Callable(const CNodePtr&)>::type>>
+    {
+        using resultType = typename std::result_of<Callable(const CNodePtr&)>::type;
+        std::vector<std::future<resultType>> results {};
+        results.reserve(vNodes.size());
 
-    template <typename Callable, typename CallableAfter>
-    void ForEachNodeThen(Callable &&pre, CallableAfter &&post) {
         LOCK(cs_vNodes);
-        for (auto &&node : vNodes) {
-            if (NodeFullyConnected(node)) pre(node);
+        for(const CNodePtr& node : vNodes) {
+            if(NodeFullyConnected(node))
+                results.emplace_back(make_task(mThreadPool, func, node));
         }
-        post();
-    };
 
-    template <typename Callable, typename CallableAfter>
-    void ForEachNodeThen(Callable &&pre, CallableAfter &&post) const {
-        LOCK(cs_vNodes);
-        for (auto &&node : vNodes) {
-            if (NodeFullyConnected(node)) pre(node);
-        }
-        post();
+        return results;
     };
 
     // Addrman functions
@@ -415,6 +411,8 @@ private:
 
     /** Transaction tracker/propagator */
     std::shared_ptr<CTxnPropagator> mTxnPropagator {};
+
+    CThreadPool<CQueueAdaptor> mThreadPool { "ConnmanPool" };
 
     CThreadInterrupt interruptNet;
 
@@ -674,7 +672,6 @@ public:
     std::vector<CAddress> vAddrToSend;
     CRollingBloomFilter addrKnown;
     bool fGetAddr;
-    std::set<uint256> setKnown;
     int64_t nNextAddrSend;
     int64_t nNextLocalAddrSend;
 
