@@ -194,6 +194,7 @@ struct CNodeState {
     //! Whether this peer wants invs or headers (when possible) for block
     //! announcements.
     bool fPreferHeaders;
+    bool fPreferHeadersSet;
     //! Whether this peer wants invs or cmpctblocks (when possible) for block
     //! announcements.
     bool fPreferHeaderAndIDs;
@@ -239,6 +240,7 @@ struct CNodeState {
         nBlocksInFlightValidHeaders = 0;
         fPreferredDownload = false;
         fPreferHeaders = false;
+        fPreferHeadersSet=false;
         fPreferHeaderAndIDs = false;
         fProvidesHeaderAndIDs = false;
         fSupportsDesiredCmpctVersion = false;
@@ -1745,26 +1747,17 @@ static bool ProcessMessage(const Config &config, const CNodePtr& pfrom,
     else if (strCommand == NetMsgType::SENDHEADERS) {
         LOCK(cs_main);
         CNodeState * state = State(pfrom->GetId());
-        state->fPreferHeaders = true;
-        auto curTime = std::chrono::system_clock::now();
-        auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastHeaderMessage - curTime).count();
-        unsigned int interval = gArgs.GetArg("-invalidHeaderInterval", DEFAULT_MIN_TIME_INTERVAL_HEADER_MS );
-        std::chrono::milliseconds HeaderInterval(interval); 
-        if (duration < std::chrono::milliseconds(HeaderInterval).count()){
-            ++ state->dInvalidHeaderFrequency;
-        }
-        else { 
-            state->dInvalidHeaderFrequency = 0 ; 
-        }
-        unsigned int headerFreq = gArgs.GetArg ("-invalidHEADERFreq", DEFAULT_INVALID_HEADER_FREQUENCY );
-        if (state->dInvalidHeaderFrequency > headerFreq){
-            // MisbehavingNode if the count goes above some chosen value 
-            // 1100 conseqitive invalid checksums received with less than 500ms between them
-            // (this is approximately 2200 messages per second at which point TCP/IP will start to throttle
+        if ( state->fPreferHeadersSet && state->fPreferHeaders){
+            //This message should only be received once. If its already set it might 
+            // indicate a misbehaving node. Increase the banscore
             Misbehaving(pfrom, 1, "Invalid Header activity");
             LogPrintf("Peer %d showing  increaed activity in message header transmission\n",pfrom->id);
         }
-        state->nTimeOfLastHeaderMessage = curTime;
+        else
+        {
+            state->fPreferHeadersSet=true;
+            state->fPreferHeaders = true;
+        }
     }
 
     else if (strCommand == NetMsgType::SENDCMPCT) {
@@ -3527,7 +3520,7 @@ bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
                 auto curTime = std::chrono::system_clock::now();
                 auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state.nTimeOfLastHeaderMessage - curTime).count();
                 unsigned int interval = gArgs.GetArg("-invalidHeaderInterval", DEFAULT_MIN_TIME_INTERVAL_HEADER_MS );
-                std::chrono::millisecond headerInterval(interval); 
+                std::chrono::milliseconds headerInterval(interval); 
                 if (duration < std::chrono::milliseconds(headerInterval).count()){
                     ++ state.dInvalidHeaderFrequency;
                 }
