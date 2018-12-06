@@ -626,16 +626,6 @@ public:
         }
     }
 
-    bool Seek(uint64_t nPos) {
-        long nLongPos = nPos;
-        if (nPos != (uint64_t)nLongPos) return false;
-        if (fseek(src, nLongPos, SEEK_SET)) return false;
-        nLongPos = ftell(src);
-        nSrcPos = nLongPos;
-        nReadPos = nLongPos;
-        return true;
-    }
-
     // Prevent reading beyond a certain position. No argument removes the limit.
     bool SetLimit(uint64_t nPos = (uint64_t)(-1)) {
         if (nPos < nReadPos) return false;
