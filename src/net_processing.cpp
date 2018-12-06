@@ -3167,7 +3167,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
         if ( state != nullptr){
             auto curTime = std::chrono::system_clock::now();
             auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastInvalidChecksumHeader - curTime).count();
-            unsigned int interval = gArgs.GetArg("-invalidCSInterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+            unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
             std::chrono::milliseconds checksumInterval(interval); 
             if (duration < std::chrono::milliseconds(checksumInterval).count()){
                 ++ state->dInvalidChecksumFrequency;
@@ -3176,7 +3176,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                 // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
                 state->dInvalidChecksumFrequency = 0 ; 
             }
-            unsigned int checkSumFreq = gArgs.GetArg ("-invalidCSFreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+            unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
             if (state->dInvalidChecksumFrequency > checkSumFreq){
                 // MisbehavingNode if the count goes above some chosen value 
                 // 100 conseqitive invalid checksums received with less than 500ms between them
@@ -3519,7 +3519,7 @@ bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
 
                 auto curTime = std::chrono::system_clock::now();
                 auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state.nTimeOfLastHeaderMessage - curTime).count();
-                unsigned int interval = gArgs.GetArg("-invalidHeaderInterval", DEFAULT_MIN_TIME_INTERVAL_HEADER_MS );
+                unsigned int interval = gArgs.GetArg("-invalidheaderinterval", DEFAULT_MIN_TIME_INTERVAL_HEADER_MS );
                 std::chrono::milliseconds headerInterval(interval); 
                 if (duration < std::chrono::milliseconds(headerInterval).count()){
                     ++ state.dInvalidHeaderFrequency;
@@ -3527,7 +3527,7 @@ bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
                 else { 
                     state.dInvalidHeaderFrequency = 0 ; 
                 }
-                unsigned int headerFreq = gArgs.GetArg ("-invalidHEADERFreq", DEFAULT_INVALID_HEADER_FREQUENCY );
+                unsigned int headerFreq = gArgs.GetArg ("-invalidheaderfreq", DEFAULT_INVALID_HEADER_FREQUENCY );
                 if (state.dInvalidHeaderFrequency > headerFreq){
                     // MisbehavingNode if the count goes above some chosen value 
                     // 1100 conseqitive invalid checksums received with less than 500ms between them
