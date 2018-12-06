@@ -627,8 +627,8 @@ void Unserialize_impl(Stream &is, prevector<N, T> &v, const uint8_t &) {
     while (i < nSize) {
         size_t blk = std::min(nSize - i, size_t(1 + 4999999 / sizeof(T)));
         v.resize(i + blk);
-        is.read((char *)&v[i], blk * sizeof(T));        
-        i += blk;       
+        is.read((char *)&v[i], blk * sizeof(T));
+        i += blk;
     }
 }
 
@@ -640,16 +640,9 @@ void Unserialize_impl(Stream &is, prevector<N, T> &v, const V &) {
     size_t nMid = 0;
     while (nMid < nSize) {
         nMid = std::min(nSize, size_t(1 + 4999999 / sizeof(T)));
-#if 0 
-        nMid += 5000000 / sizeof(T);
-        if (nMid > nSize) {
-            nMid = nSize;
-        }
-#endif
         v.resize(nMid);
         for (; i < nMid; i++) {
-            T serializedVal; 
-            Unserialize(is, v[i]);            
+            Unserialize(is, v[i]);
         }
     }
 }
