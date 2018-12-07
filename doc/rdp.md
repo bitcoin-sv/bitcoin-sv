@@ -91,7 +91,7 @@ network will be considered economically unviable.
 
 | Severity	| Critical	| High	| Medium	| Low |
 | --------  | --------- | ----- | --------- | --- |
-| Description | Catastrophic impact on the network as a whole; network availability compromised; risk of introducing chain splits; loss of funds | Impacts individual nodes; individual node crashes; potential for a loss of funds | Not easily exploitable; medium impact; no loss of funds | Not easily exploitable; low impact |
+| Description | Catastrophic impact on the network as a whole; network availability compromised; risk of introducing chain splits; loss of funds | Impacts individual nodes; individual BIG node crashes; potential for a loss of funds | Not easily exploitable; medium impact; no loss of funds | Not easily exploitable; low impact |
 | Reward*	| $100,000 USD | $50,000 USD | $10,000 USD | $1,000 USD |
  
 
