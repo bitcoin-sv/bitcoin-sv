@@ -1747,16 +1747,18 @@ static bool ProcessMessage(const Config &config, const CNodePtr& pfrom,
     else if (strCommand == NetMsgType::SENDHEADERS) {
         LOCK(cs_main);
         CNodeState * state = State(pfrom->GetId());
-        if ( state->fPreferHeadersSet && state->fPreferHeaders){
-            //This message should only be received once. If its already set it might 
-            // indicate a misbehaving node. Increase the banscore
-            Misbehaving(pfrom, 1, "Invalid Header activity");
-            LogPrintf("Peer %d showing  increaed activity in message header transmission\n",pfrom->id);
-        }
-        else
-        {
-            state->fPreferHeadersSet=true;
-            state->fPreferHeaders = true;
+        if ( state != nullptr){
+            if ( state->fPreferHeadersSet && state->fPreferHeaders){
+                //This message should only be received once. If its already set it might 
+                // indicate a misbehaving node. Increase the banscore
+                Misbehaving(pfrom, 1, "Invalid Header activity");
+                LogPrintf("Peer %d showing  increaed activity in message header transmission\n",pfrom->id);
+            }
+            else
+            {
+                state->fPreferHeadersSet=true;
+                state->fPreferHeaders = true;
+            }
         }
     }
 
