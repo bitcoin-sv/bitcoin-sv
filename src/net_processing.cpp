@@ -3165,27 +3165,30 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             HexStr(hash.begin(), hash.begin() + CMessageHeader::CHECKSUM_SIZE),
             HexStr(hdr.pchChecksum,
                    hdr.pchChecksum + CMessageHeader::CHECKSUM_SIZE));
-        CNodeState * state = State(pfrom->GetId()); 
-        if ( state != nullptr){
-            auto curTime = std::chrono::system_clock::now();
-            auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastInvalidChecksumHeader - curTime).count();
-            unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
-            std::chrono::milliseconds checksumInterval(interval); 
-            if (duration < std::chrono::milliseconds(checksumInterval).count()){
-                ++ state->dInvalidChecksumFrequency;
+        {
+            LOCK(cs_main);
+            CNodeState * state = State(pfrom->GetId()); 
+            if ( state != nullptr){
+                auto curTime = std::chrono::system_clock::now();
+                auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastInvalidChecksumHeader - curTime).count();
+                unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
+                std::chrono::milliseconds checksumInterval(interval); 
+                if (duration < std::chrono::milliseconds(checksumInterval).count()){
+                    ++ state->dInvalidChecksumFrequency;
+                }
+                else { 
+                    // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
+                    state->dInvalidChecksumFrequency = 0 ; 
+                }
+                unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
+                if (state->dInvalidChecksumFrequency > checkSumFreq){
+                    // MisbehavingNode if the count goes above some chosen value 
+                    // 100 conseqitive invalid checksums received with less than 500ms between them
+                    Misbehaving(pfrom, 1, "Invalid Checksum activity");
+                    LogPrintf("Peer %d showing increased invalid checksum activity\n",pfrom->id);
+                }
+                state->nTimeOfLastInvalidChecksumHeader = curTime;
             }
-            else { 
-                // reset the frequency as this invalid checksum is outside the MIN_INTERVAL
-                state->dInvalidChecksumFrequency = 0 ; 
-            }
-            unsigned int checkSumFreq = gArgs.GetArg ("-invalidcsfreq", DEFAULT_INVALID_CHECKSUM_FREQUENCY);
-            if (state->dInvalidChecksumFrequency > checkSumFreq){
-                // MisbehavingNode if the count goes above some chosen value 
-                // 100 conseqitive invalid checksums received with less than 500ms between them
-                Misbehaving(pfrom, 1, "Invalid Checksum activity");
-                LogPrintf("Peer %d showing increased invalid checksum activity\n",pfrom->id);
-            }
-            state->nTimeOfLastInvalidChecksumHeader = curTime;
         }
         return fMoreWork;
     }
