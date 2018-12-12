@@ -422,7 +422,9 @@ MarkBlockAsInFlight(const Config &config, NodeId nodeid, const uint256 &hash,
         itInFlight = mapBlocksInFlight.find(hash);
     if (itInFlight != mapBlocksInFlight.end() &&
         itInFlight->second.first == nodeid) {
-        *pit = &itInFlight->second.second;
+        if (pit){
+            *pit = &itInFlight->second.second;
+        }
         return false;
     }
 
