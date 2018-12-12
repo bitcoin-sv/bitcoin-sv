@@ -212,9 +212,10 @@ std::string ArgsManager::GetArg(const std::string &strArg,
 
 int64_t ArgsManager::GetArg(const std::string &strArg, int64_t nDefault) {
     LOCK(cs_args);
-    if (mapArgs.count(strArg)) return atoi64(mapArgs[strArg]);
+	if (mapArgs.count(strArg)) return (stol(mapArgs[strArg]));
     return nDefault;
 }
+
 
 bool ArgsManager::GetBoolArg(const std::string &strArg, bool fDefault) {
     LOCK(cs_args);
