@@ -3518,10 +3518,9 @@ bool CheckBlock(const Config &config, const CBlock &block,
     // Size limits.
     auto nMaxBlockSize = config.GetMaxBlockSize();
 
-    // Bail early if there is no way this block is of reasonable size.
-    if ((block.vtx.size() * MIN_TRANSACTION_SIZE) > nMaxBlockSize) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length", false,
-                         "size limits failed");
+    // Bail early if there is no way this block is of reasonable size.  
+    if ( MIN_TRANSACTION_SIZE > 0 && block.vtx.size () > (nMaxBlockSize/MIN_TRANSACTION_SIZE)){
+        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length", false,"size limits failed");
     }
 
     auto currentBlockSize =
