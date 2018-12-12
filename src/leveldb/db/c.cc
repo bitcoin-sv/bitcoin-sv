@@ -145,7 +145,8 @@ static bool SaveError(char** errptr, const Status& s) {
 
 static char* CopyString(const std::string& str) {
   char* result = reinterpret_cast<char*>(malloc(sizeof(char) * str.size()));
-  memcpy(result, str.data(), sizeof(char) * str.size());
+  if (result != nullptr)
+      memcpy(result, str.data(), sizeof(char) * str.size());
   return result;
 }
 
