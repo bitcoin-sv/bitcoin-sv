@@ -212,7 +212,12 @@ std::string ArgsManager::GetArg(const std::string &strArg,
 
 int64_t ArgsManager::GetArg(const std::string &strArg, int64_t nDefault) {
     LOCK(cs_args);
-	if (mapArgs.count(strArg)) return (stol(mapArgs[strArg]));
+	if (mapArgs.count(strArg)) 
+    {
+        const std::string& argValue (mapArgs[strArg]);
+        if ( argValue.find_first_not_of ( "\t\r\n\f ") != std::string::npos)        
+            return (stol(mapArgs[strArg]));
+    }
     return nDefault;
 }
 
