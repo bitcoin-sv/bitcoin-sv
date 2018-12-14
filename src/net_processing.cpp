@@ -194,7 +194,6 @@ struct CNodeState {
     //! Whether this peer wants invs or headers (when possible) for block
     //! announcements.
     bool fPreferHeaders;
-    bool fPreferHeadersSet;
     //! Whether this peer wants invs or cmpctblocks (when possible) for block
     //! announcements.
     bool fPreferHeaderAndIDs;
@@ -240,7 +239,6 @@ struct CNodeState {
         nBlocksInFlightValidHeaders = 0;
         fPreferredDownload = false;
         fPreferHeaders = false;
-        fPreferHeadersSet=false;
         fPreferHeaderAndIDs = false;
         fProvidesHeaderAndIDs = false;
         fSupportsDesiredCmpctVersion = false;
@@ -1750,7 +1748,7 @@ static bool ProcessMessage(const Config &config, const CNodePtr& pfrom,
         LOCK(cs_main);
         CNodeState * state = State(pfrom->GetId());
         if ( state != nullptr){
-            if ( state->fPreferHeadersSet && state->fPreferHeaders){
+            if (state->fPreferHeaders){
                 //This message should only be received once. If its already set it might 
                 // indicate a misbehaving node. Increase the banscore
                 Misbehaving(pfrom, 1, "Invalid Header activity");
@@ -1758,7 +1756,6 @@ static bool ProcessMessage(const Config &config, const CNodePtr& pfrom,
             }
             else
             {
-                state->fPreferHeadersSet=true;
                 state->fPreferHeaders = true;
             }
         }
