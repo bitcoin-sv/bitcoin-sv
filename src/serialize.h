@@ -698,7 +698,7 @@ void Unserialize_impl(Stream &is, std::vector<T, A> &v, const V &) {
     size_t i = 0;
     size_t nMid = 0;
     while (nMid < nSize) {
-        nMid = std::min(nSize, size_t(1 + 4999999 / sizeof(T)));
+        nMid += std::min(nSize, size_t(1 + 4999999 / sizeof(T)));
         v.resize(nMid);
         for (; i < nMid; i++) {
             Unserialize(is, v[i]);
