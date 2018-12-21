@@ -220,7 +220,7 @@ int64_t ArgsManager::GetArg(const std::string &strArg, int64_t nDefault) {
         {
             try
             {   
-                returnValue = stol(argValue);
+                returnValue = stoll(argValue);
             }
             catch (std::exception& e)
             {   
