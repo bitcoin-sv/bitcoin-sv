@@ -158,6 +158,8 @@ BITCOIN_CORE_H = \
   support/events.h \
   support/lockedpool.h \
   sync.h \
+  task.h \
+  task_helpers.h \
   threadpool.h \
   threadpoolT.h \
   threadsafety.h \
