@@ -1,0 +1,27 @@
+image: nchain/buildtools:build-sv-xenial
+
+pipelines:
+  branches:
+    master:
+      - step:
+          script:
+            - ./autogen.sh
+            - ./configure
+            - make -j4
+            - make -j4 check
+    develop:
+      - step:
+          script:
+            - ./autogen.sh
+            - ./configure
+            - make -j4
+            - make -j4 check
+
+  pull-requests:
+    '**':
+      - step:
+          script:
+            - ./autogen.sh
+            - ./configure
+            - make -j4
+            - make -j4 check
