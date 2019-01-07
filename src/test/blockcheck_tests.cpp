@@ -89,6 +89,13 @@ BOOST_AUTO_TEST_CASE(blockfail) {
     // Check that at this point, we still accept the block.
     RunCheckOnBlock(config, block);
 
+    // And that serialisation works for large blocks
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << block;
+    CBlock unserblock;
+    ss >> unserblock;
+    BOOST_CHECK(block.vtx.size() == unserblock.vtx.size());
+
     // But reject it with one more transaction as it goes over the maximum
     // allowed block size.
     tx.vin[0].prevout = COutPoint(InsecureRand256(), 0);
