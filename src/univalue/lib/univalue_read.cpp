@@ -8,6 +8,12 @@
 #include "univalue.h"
 #include "univalue_utffilter.h"
 
+#ifdef APPLY_JSON_MAX_NESTING
+#ifndef JSON_DECODE_NESTING_MAX
+#define JSON_DECODE_NESTING_MAX 2048
+#endif //ifndef JSON_DECODE_NESTING_MAX
+#endif //APPLY_JSON_MAX_NESTING
+
 static bool json_isdigit(int ch)
 {
     return ((ch >= '0') && (ch <= '9'));
@@ -260,6 +266,10 @@ bool UniValue::read(const char *raw, size_t size)
     enum jtokentype tok = JTOK_NONE;
     enum jtokentype last_tok = JTOK_NONE;
     const char* end = raw + size;
+#ifdef APPLY_JSON_MAX_NESTING
+    int ObjArrCounter (0);
+#endif
+
     do {
         last_tok = tok;
 
@@ -308,6 +318,12 @@ bool UniValue::read(const char *raw, size_t size)
         case JTOK_OBJ_OPEN:
         case JTOK_ARR_OPEN: {
             VType utyp = (tok == JTOK_OBJ_OPEN ? VOBJ : VARR);
+#ifdef APPLY_JSON_MAX_NESTING
+            if ( ObjArrCounter > JSON_DECODE_NESTING_MAX ){
+                 fprintf (stderr, "JSON NESTING DEPTH exceed %d > %d\n",ObjArrCounter,JSON_DECODE_NESTING_MAX);
+                break;
+            }
+#endif
             if (!stack.size()) {
                 if (utyp == VOBJ)
                     setObject();
@@ -327,6 +343,10 @@ bool UniValue::read(const char *raw, size_t size)
                 setExpect(OBJ_NAME);
             else
                 setExpect(ARR_VALUE);
+
+#ifdef APPLY_JSON_MAX_NESTING
+            ++ ObjArrCounter ;
+#endif
             break;
             }
 

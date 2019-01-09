@@ -209,6 +209,13 @@ AC_ARG_ENABLE([debug],
     [enable_debug=$enableval],
     [enable_debug=no])
 
+# Disable JSON parse checking
+AC_ARG_ENABLE([jsonparsecheck],
+       [AS_HELP_STRING([--disable-jsonparsecheck],
+                    [disable JSON PARSE Depth checking (default is enabled)])],
+    [enable_jsonparsecheck=$enableval],
+    [enable_jsonparsecheck=yes])
+
 # Enable ASAN
 AC_ARG_ENABLE([asan],
     [AS_HELP_STRING([--enable-asan],
@@ -305,6 +312,16 @@ if test "x$enable_debug" = xyes; then
     if test "x$GXX" = xyes; then
         CXXFLAGS="$CXXFLAGS -g3 -O0"
     fi
+fi
+
+if test "x$enable_jsonparsecheck" = xyes; then
+       CPPFLAGS="$CPPFLAGS -DAPPLY_JSON_MAX_NESTING"
+       if test "x$GCC" = xyes; then
+               CFLAGS="$CFLAGS -DAPPLY_JSON_MAX_NESTING"
+       fi
+       if test "x$GXX = xyes"; then
+               CXXFLAGS="$CXXFLAGS -DAPPLY_JSON_MAX_NESTING"
+       fi
 fi
 
 ERROR_CXXFLAGS=
@@ -1282,6 +1299,7 @@ echo "  with bench    = $use_bench"
 echo "  with upnp     = $use_upnp"
 echo "  use asm       = $use_asm"
 echo "  debug enabled = $enable_debug"
+echo "	disable JSON Parse Depth Check = $x$enable_jsonparsecheck"
 echo "  werror        = $enable_werror"
 echo
 echo "  sanitizers    "
