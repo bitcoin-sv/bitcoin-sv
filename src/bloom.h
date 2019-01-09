@@ -50,12 +50,7 @@ private:
     unsigned int nTweak;
     uint8_t nFlags;
 
-    unsigned int Hash(unsigned int nHashNum,
-                      const std::vector<uint8_t> &vDataToHash) const;
-
-    // Private constructor for CRollingBloomFilter, no restrictions on size
-    CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak);
-    friend class CRollingBloomFilter;
+    unsigned int Hash(unsigned int nHashNum, const std::vector<uint8_t> &vDataToHash) const;
 
 public:
     /**
@@ -69,10 +64,8 @@ public:
      * always be a random value (and is largely only exposed for unit testing)
      * nFlags should be one of the BLOOM_UPDATE_* enums (not _MASK)
      */
-    CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak,
-                 uint8_t nFlagsIn);
-    CBloomFilter()
-        : isFull(true), isEmpty(false), nHashFuncs(0), nTweak(0), nFlags(0) {}
+    CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak,uint8_t nFlagsIn);
+    CBloomFilter() : isFull(true), isEmpty(false), nHashFuncs(0), nTweak(0), nFlags(0) { return;}
 
     ADD_SERIALIZE_METHODS;
 

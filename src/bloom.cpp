@@ -10,6 +10,7 @@
 #include "script/script.h"
 #include "script/standard.h"
 #include "streams.h"
+#include "util.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -30,23 +31,23 @@
  * See https://en.wikipedia.org/wiki/Bloom_filter for an explanation of these
  * formulas.
  */
-CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate,
-                           unsigned int nTweakIn, uint8_t nFlagsIn)
-    : vData(std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)),
-                     MAX_BLOOM_FILTER_SIZE * 8) /
-            8),
-      isFull(false), isEmpty(true),
-      nHashFuncs(std::min((unsigned int)(vData.size() * 8 / nElements * LN2),
-                          MAX_HASH_FUNCS)),
-      nTweak(nTweakIn), nFlags(nFlagsIn) {}
-
-// Private constructor used by CRollingBloomFilter
-CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate,
-                           unsigned int nTweakIn)
-    : vData((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)) / 8),
-      isFull(false), isEmpty(true),
-      nHashFuncs((unsigned int)(vData.size() * 8 / nElements * LN2)),
-      nTweak(nTweakIn), nFlags(BLOOM_UPDATE_NONE) {}
+CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweakIn, uint8_t nFlagsIn)
+    : vData(MAX_BLOOM_FILTER_SIZE)
+    , isFull(false)
+    , isEmpty(true)
+    , nHashFuncs(MAX_HASH_FUNCS)
+    , nTweak(nTweakIn)
+    , nFlags(nFlagsIn) 
+{
+    if (nFPRate <= 0 ){
+        LogPrintf("Warning: Invalid Para,eter nFPRate passed to CBloomFilter %d! Defaulting to %d\n", nFPRate,MAX_BLOOM_FILTER_SIZE);
+    }
+    else{
+        vData.resize (std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
+        nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),MAX_HASH_FUNCS);
+    }
+    return ;
+}
 
 inline unsigned int
 CBloomFilter::Hash(unsigned int nHashNum,
@@ -211,12 +212,24 @@ void CBloomFilter::UpdateEmptyFull() {
     isEmpty = empty;
 }
 
-CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements,
-                                         double fpRate) {
-    double logFpRate = log(fpRate);
-    /* The optimal number of hash functions is log(fpRate) / log(0.5), but
-     * restrict it to the range 1-50. */
-    nHashFuncs = std::max(1, std::min((int)round(logFpRate / log(0.5)), 50));
+CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements, double fpRate) 
+    : data ()
+    , nHashFuncs(MAX_HASH_FUNCS)
+{
+    // The magic number below (0.000001) was chosen because all instances of CRollingBloomFilter construction
+    // in the code base this is the value. 
+    double logFpRate = log (0.000001);
+    if (fpRate <= 0){
+        // default the number of hash functions to MAX_HASH_FUNCS in the event of a negative number for fpRate
+        nHashFuncs = MAX_HASH_FUNCS ; 
+    }
+    else{
+        logFpRate = log(fpRate);
+        /* The optimal number of hash functions is log(fpRate) / log(0.5), but
+         * restrict it to the range 1-50. */
+        nHashFuncs = std::max(1, std::min((int)round(logFpRate / log(0.5)), 50));
+    }
+    
     /* In this rolling bloom filter, we'll store between 2 and 3 generations of
      * nElements / 2 entries. */
     nEntriesPerGeneration = (nElements + 1) / 2;
@@ -234,9 +247,7 @@ CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements,
      * =>          nFilterBits = -nHashFuncs * nMaxElements / log(1.0 -
      * exp(logFpRate / nHashFuncs))
      */
-    uint32_t nFilterBits =
-        (uint32_t)ceil(-1.0 * nHashFuncs * nMaxElements /
-                       log(1.0 - exp(logFpRate / nHashFuncs)));
+    uint32_t nFilterBits = (uint32_t)ceil(-1.0 * nHashFuncs * nMaxElements / log(1.0 - exp(logFpRate / nHashFuncs)));
     data.clear();
     /* For each data element we need to store 2 bits. If both bits are 0, the
      * bit is treated as unset. If the bits are (01), (10), or (11), the bit is
