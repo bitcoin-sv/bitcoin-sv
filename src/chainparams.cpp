@@ -344,9 +344,9 @@ public:
         // Bitprim
         vSeeds.push_back(
             CDNSSeedData("bitprim.org", "testnet-seed.bitprim.org", true));
-        // Amaury SÉCHET
+        // Bitcoincloud.net
         vSeeds.push_back(
-            CDNSSeedData("deadalnix.me", "testnet-seed.deadalnix.me", true));
+            CDNSSeedData("bitcoincloud.net", "testnet-seed.bitcoincloud.net", true));
         // criptolayer.net
         vSeeds.push_back(CDNSSeedData("criptolayer.net",
                                       "testnet-seeder.criptolayer.net", true));
