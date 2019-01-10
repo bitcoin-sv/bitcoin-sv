@@ -668,6 +668,14 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
     }
 }
 
+/**
+* Utility method to calculate the maximum number of items in an inventory message.
+*/
+inline unsigned int GetInventoryBroadcastMax(const Config& config)
+{
+    return INVENTORY_BROADCAST_MAX_PER_MB * (config.GetMaxBlockSize() / ONE_MEGABYTE);
+}
+
 } // namespace
 
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
@@ -3555,11 +3563,11 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
     pto->vBlockHashesToAnnounce.clear();
 }
 
-void SendTxnInventory(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& msgMaker,
+void SendTxnInventory(const Config &config, const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& msgMaker,
     std::vector<CInv>& vInv)
 {
     // Get as many TX inventory msgs to send as we can for this peer
-    std::vector<CTxnSendingDetails> vInvTx { pto->FetchNInventory(INVENTORY_BROADCAST_MAX) };
+    std::vector<CTxnSendingDetails> vInvTx { pto->FetchNInventory(GetInventoryBroadcastMax(config)) };
 
     int64_t nNow = GetTimeMicros();
 
@@ -3587,7 +3595,7 @@ void SendTxnInventory(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker
     }
 }
  
-void SendInventory(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& msgMaker)
+void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& msgMaker)
 {
     //
     // Message: inventory
@@ -3596,8 +3604,7 @@ void SendInventory(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& m
     std::vector<CInv> vInv;
 
     LOCK(pto->cs_inventory);
-    vInv.reserve(std::max<size_t>(pto->vInventoryBlockToSend.size(),
-                                  INVENTORY_BROADCAST_MAX));
+    vInv.reserve(std::max<size_t>(pto->vInventoryBlockToSend.size(), GetInventoryBroadcastMax(config)));
 
     // Add blocks
     for (const uint256 &hash : pto->vInventoryBlockToSend) {
@@ -3662,8 +3669,7 @@ void SendInventory(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& m
             pto->filterInventoryKnown.insert(txid);
             vInv.push_back(inv);
             if (vInv.size() == MAX_INV_SZ) {
-                connman.PushMessage(pto,
-                                    msgMaker.Make(NetMsgType::INV, vInv));
+                connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
                 vInv.clear();
             }
         }
@@ -3672,7 +3678,7 @@ void SendInventory(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& m
 
     // Determine transactions to relay
     if (fSendTrickle) {
-        SendTxnInventory(pto, connman, msgMaker, vInv);
+        SendTxnInventory(config, pto, connman, msgMaker, vInv);
     }
 
     if (!vInv.empty()) {
@@ -3889,7 +3895,7 @@ bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
     SendBlockHeaders(config, pto, connman, msgMaker, state);
 
     // Message: inventory
-    SendInventory(pto, connman, msgMaker);
+    SendInventory(config, pto, connman, msgMaker);
 
     // Detect stalling peers
     if(DetectStalling(config, pto, state))
