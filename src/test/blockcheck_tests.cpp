@@ -101,6 +101,8 @@ BOOST_AUTO_TEST_CASE(blockfail) {
     tx.vin[0].prevout = COutPoint(InsecureRand256(), 0);
     block.vtx.push_back(MakeTransactionRef(tx));
     RunCheckOnBlock(config, block, "bad-blk-length");
+
+	
 }
 
 BOOST_AUTO_TEST_SUITE_END()
