@@ -40,15 +40,14 @@ CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int 
     , nFlags(nFlagsIn) 
 {
     if (nFPRate <= 0 ){
-        LogPrintf("Warning: Invalid Para,eter nFPRate passed to CBloomFilter %d! Defaulting to %d\n", nFPRate,MAX_BLOOM_FILTER_SIZE);
+        LogPrintf("Error: Invalid Parameter nFPRate passed to CBloomFilter %d!", nFPRate);
+        throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" );
     }
-    else{
-        vData.resize (std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
-        nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),MAX_HASH_FUNCS);
-    }
+    vData.resize (std::min((unsigned int)(-1 / LN2SQUARED * nElements * log(nFPRate)), MAX_BLOOM_FILTER_SIZE * 8) / 8);
+    nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),MAX_HASH_FUNCS);
     return ;
 }
-
+              
 inline unsigned int
 CBloomFilter::Hash(unsigned int nHashNum,
                    const std::vector<uint8_t> &vDataToHash) const {
@@ -213,23 +212,14 @@ void CBloomFilter::UpdateEmptyFull() {
 }
 
 CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements, double fpRate) 
-    : data ()
-    , nHashFuncs(MAX_HASH_FUNCS)
 {
-    // The magic number below (0.000001) was chosen because all instances of CRollingBloomFilter construction
-    // in the code base this is the value. 
-    double logFpRate = log (0.000001);
-    if (fpRate <= 0){
-        // default the number of hash functions to MAX_HASH_FUNCS in the event of a negative number for fpRate
-        nHashFuncs = MAX_HASH_FUNCS ; 
+    if (fpRate <= 0){        
+        throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" ); 
     }
-    else{
-        logFpRate = log(fpRate);
-        /* The optimal number of hash functions is log(fpRate) / log(0.5), but
-         * restrict it to the range 1-50. */
-        nHashFuncs = std::max(1, std::min((int)round(logFpRate / log(0.5)), 50));
-    }
-    
+    double logFpRate = log(fpRate);
+     /* The optimal number of hash functions is log(fpRate) / log(0.5), but
+      * restrict it to the range 1-50. */
+     nHashFuncs = std::max(1, std::min((int)round(logFpRate / log(0.5)), 50));
     /* In this rolling bloom filter, we'll store between 2 and 3 generations of
      * nElements / 2 entries. */
     nEntriesPerGeneration = (nElements + 1) / 2;
