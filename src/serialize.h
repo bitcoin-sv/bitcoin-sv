@@ -359,15 +359,18 @@ template <typename Stream, typename I> void WriteVarInt(Stream &os, I n) {
 }
 
 template <typename Stream, typename I> I ReadVarInt(Stream &is) {
-    I n = 0;
-    while (true) {
+    uint64_t n = 0;
+    for (unsigned int i = 0; i < std::numeric_limits<unsigned long int>::digits;++i){
         uint8_t chData = ser_readdata8(is);
         n = (n << 7) | (chData & 0x7F);
         if ((chData & 0x80) == 0) {
-                return n;     
+                return n;
         }
         n++;
     }
+    // If we make it to hear its a deserialisation error
+    // throw an exception
+    throw std::runtime_error ("Deserialisation Error ReadVarInt");
 }
 
 #define FLATDATA(obj)                                                          \
@@ -501,6 +504,8 @@ template <typename Stream, unsigned int N, typename T, typename V>
 void Unserialize_impl(Stream &is, prevector<N, T> &v, const V &);
 template <typename Stream, unsigned int N, typename T>
 inline void Unserialize(Stream &is, prevector<N, T> &v);
+
+
 
 /**
  * vector
@@ -649,6 +654,7 @@ void Unserialize_impl(Stream &is, prevector<N, T> &v, const V &) {
         }
     }
 }
+
 
 template <typename Stream, unsigned int N, typename T>
 inline void Unserialize(Stream &is, prevector<N, T> &v) {
