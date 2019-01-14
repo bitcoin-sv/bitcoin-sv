@@ -204,6 +204,39 @@ BOOST_AUTO_TEST_CASE(varints) {
         ss >> VARINT(j);
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
+    
+    {
+        ss.clear ();
+        ss << VARINT(std::numeric_limits<unsigned long int>::max()) ; 
+        uint64_t j ; 
+        ss >> VARINT(j); 
+        BOOST_CHECK_EQUAL ( j, std::numeric_limits<unsigned long int>::max() );
+    }
+
+    {
+        ss.clear ();
+        ss << VARINT(std::numeric_limits<unsigned long long int>::max()) ; 
+        unsigned long long int j ; 
+        ss >> VARINT(j); 
+        BOOST_CHECK_EQUAL ( j, std::numeric_limits<unsigned long int>::max() );
+    }
+
+    {
+        ss.clear ();
+        ss << VARINT( std::numeric_limits<long int>::max()) ; 
+        long int j ;
+        ss >> VARINT(j);
+        BOOST_CHECK_EQUAL (j, std::numeric_limits<long int>::max());
+    }
+
+    {
+        ss.clear ();
+        ss << VARINT(std::numeric_limits<long long int>::max());
+        long long int j;
+        ss >> VARINT(j);
+        BOOST_CHECK_EQUAL(j, std::numeric_limits<long long int>::max());
+    }
+    
 }
 
 BOOST_AUTO_TEST_CASE(varints_bitpatterns) {
