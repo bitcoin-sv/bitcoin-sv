@@ -60,6 +60,18 @@ Build requirements:
 
     sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils
 
+GCC version:
+
+A sufficiently recent version of GCC that supports C++17 is required for
+building, which in practise means at least version 7.X or above. On recent
+testing versions of Debian & Ubuntu 18.04+ a suitable version should either
+be installed by default or available in the standard package repositories.
+But if you are running an older release you may have to install a newer
+version of GCC from another repository.
+
+For instructions on how to install a more recent version of GCC into an
+older Ubuntu LTS see here: https://gist.github.com/application2000/73fd6f4bf1be6600a2cf9f56315a2d91 
+
 Options when installing required Boost library files:
 
 1. On at least Ubuntu 14.04+ and Debian 7+ there are generic names for the
@@ -87,8 +99,8 @@ ZMQ dependencies (provides ZMQ API 4.x):
 
     sudo apt-get install libzmq3-dev
 
-Dependency Build Instructions: Fedora
--------------------------------------
+Dependency Build Instructions: Fedora/Centos
+--------------------------------------------
 Build requirements:
 
     sudo dnf install gcc-c++ libtool make autoconf automake openssl-devel libevent-devel boost-devel libdb-devel libdb-cxx-devel
@@ -96,6 +108,17 @@ Build requirements:
 Optional:
 
     sudo dnf install miniupnpc-devel
+
+GCC version:
+
+A sufficiently recent version of GCC that supports C++17 is required for
+building, which in practise means at least version 7.X or above. On
+Centos 7 this means you will have to install a newer version of GCC from
+the auxilliary devtoolset suite. For exmaple:
+
+    sudo yum install centos-release-scl
+    sudo yum install devtoolset-7-gcc*
+    scl enable devtoolset-7 bash
 
 Notes
 -----
