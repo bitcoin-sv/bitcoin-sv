@@ -3143,6 +3143,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     if (strCommand == NetMsgType::REJECT) {
         ProcessRejectMessage(vRecv);
+        return true;
     }
 
     else if (strCommand == NetMsgType::VERSION) {
