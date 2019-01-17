@@ -872,6 +872,7 @@ void Misbehaving(NodeId pnode, int howmuch, const std::string &reason) {
         return;
     }
 
+    LOCK(cs_main);
     CNodeState *state = State(pnode);
     if (state == nullptr) {
         return;
@@ -1408,7 +1409,6 @@ inline static void SendBlockTransactions(const CBlock &block,
     BlockTransactions resp(req);
     for (size_t i = 0; i < req.indices.size(); i++) {
         if (req.indices[i] >= block.vtx.size()) {
-            LOCK(cs_main);
             Misbehaving(pfrom, 100, "out-of-bound-tx-index");
             LogPrintf(
                 "Peer %d sent us a getblocktxn with out-of-bounds tx indices",
@@ -1417,7 +1417,7 @@ inline static void SendBlockTransactions(const CBlock &block,
         }
         resp.txn[i] = block.vtx[req.indices[i]];
     }
-    LOCK(cs_main);
+
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
     int nSendFlags = 0;
     connman.PushMessage(pfrom,
@@ -1473,7 +1473,6 @@ static bool ProcessVersionMessage(const Config& config, const CNodePtr& pfrom, c
             CNetMsgMaker(INIT_PROTO_VERSION)
                 .Make(NetMsgType::REJECT, strCommand, REJECT_DUPLICATE,
                       std::string("Duplicate version message")));
-        LOCK(cs_main);
         Misbehaving(pfrom, 1, "multiple-version");
         return false;
     }
@@ -1706,7 +1705,6 @@ static OptBool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>
         return true;
     }
     if (vAddr.size() > 1000) {
-        LOCK(cs_main);
         Misbehaving(pfrom, 20, "oversized-addr");
         return error("message addr size() = %u", vAddr.size());
     }
@@ -1801,7 +1799,6 @@ static OptBool ProcessInvMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
     std::vector<CInv> vInv;
     vRecv >> vInv;
     if(vInv.size() > MAX_INV_SZ) {
-        LOCK(cs_main);
         Misbehaving(pfrom, 20, "oversized-inv");
         return error("message inv size() = %u", vInv.size());
     }
@@ -1882,7 +1879,6 @@ static OptBool ProcessGetDataMessage(const Config& config, const CNodePtr& pfrom
     std::vector<CInv> vInv;
     vRecv >> vInv;
     if(vInv.size() > MAX_INV_SZ) {
-        LOCK(cs_main);
         Misbehaving(pfrom, 20, "too-many-inv");
         return error("message getdata size() = %u", vInv.size());
     }
@@ -2329,7 +2325,6 @@ static OptBool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom
     // deserializing 2000 full blocks.
     unsigned int nCount = ReadCompactSize(vRecv);
     if(nCount > MAX_HEADERS_RESULTS) {
-        LOCK(cs_main);
         Misbehaving(pfrom, 20, "too-many-headers");
         return error("headers message size = %u", nCount);
     }
@@ -2406,7 +2401,6 @@ static OptBool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom
         int nDoS;
         if(state.IsInvalid(nDoS)) {
             if(nDoS > 0) {
-                LOCK(cs_main);
                 Misbehaving(pfrom, nDoS, state.GetRejectReason());
             }
             return error("invalid header received");
@@ -2633,7 +2627,6 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
         int nDoS;
         if(state.IsInvalid(nDoS)) {
             if (nDoS > 0) {
-                LOCK(cs_main);
                 Misbehaving(pfrom, nDoS, state.GetRejectReason());
             }
             LogPrintf("Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
@@ -3047,7 +3040,6 @@ static void ProcessFilterLoadMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 
     if(!filter.IsWithinSizeConstraints()) {
         // There is no excuse for sending a too-large filter
-        LOCK(cs_main);
         Misbehaving(pfrom, 100, "oversized-bloom-filter");
     }
     else {
@@ -3085,7 +3077,6 @@ static void ProcessFilterAddMessage(const CNodePtr& pfrom, CDataStream& vRecv)
     }
 
     if(bad) {
-        LOCK(cs_main);
         // The structure of this code doesn't really allow for a good error
         // code. We'll go generic.
         Misbehaving(pfrom, 100, "invalid-filteradd");
@@ -3142,7 +3133,6 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     if (!(pfrom->GetLocalServices() & NODE_BLOOM) &&
         (strCommand == NetMsgType::FILTERLOAD || strCommand == NetMsgType::FILTERADD)) {
         if (pfrom->nVersion >= NO_BLOOM_VERSION) {
-            LOCK(cs_main);
             Misbehaving(pfrom, 100, "no-bloom-version");
             return false;
         } else {
@@ -3161,7 +3151,6 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     else if (pfrom->nVersion == 0) {
         // Must have a version message before anything else
-        LOCK(cs_main);
         Misbehaving(pfrom, 1, "missing-version");
         return false;
     }
@@ -3175,7 +3164,6 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     else if (!pfrom->fSuccessfullyConnected) {
         // Must have a verack message before anything else
-        LOCK(cs_main);
         Misbehaving(pfrom, 1, "missing-verack");
         return false;
     }
