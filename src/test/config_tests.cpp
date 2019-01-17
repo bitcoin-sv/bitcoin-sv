@@ -43,6 +43,16 @@ BOOST_AUTO_TEST_CASE(max_block_size) {
     BOOST_CHECK_EQUAL(config.GetMaxBlockSize(), ONE_MEGABYTE + 1);
 }
 
+BOOST_AUTO_TEST_CASE(hex_to_array) {
+    const std::string hexstr = "0a0b0C0D";//Lower and Upper char should both work
+    CMessageHeader::MessageMagic array;
+    BOOST_CHECK(HexToArray(hexstr, array)); 
+    BOOST_CHECK_EQUAL(array[0],10);
+    BOOST_CHECK_EQUAL(array[1],11);
+    BOOST_CHECK_EQUAL(array[2],12);
+    BOOST_CHECK_EQUAL(array[3],13);
+}
+
 BOOST_AUTO_TEST_CASE(chain_params) {
     GlobalConfig config;
 

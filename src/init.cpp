@@ -890,6 +890,11 @@ std::string HelpMessage(HelpMessageMode mode) {
           "1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This "
           "option can be specified multiple times"));
     strUsage += HelpMessageOpt(
+        "-magicbytes=<hexcode>",
+        _("Allow users to split the test net by changing the magicbytes. "
+          "This option only work on a network different than mainnet. "
+          "default : 0f0f0f0f"));
+    strUsage += HelpMessageOpt(
         "-rpcthreads=<n>",
         strprintf(
             _("Set the number of threads to service RPC calls (default: %d)"),
