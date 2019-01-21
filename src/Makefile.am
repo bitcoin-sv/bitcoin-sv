@@ -122,6 +122,7 @@ BITCOIN_CORE_H = \
   keystore.h \
   dbwrapper.h \
   limitedmap.h \
+  locked_ref.h \
   logging.h \
   memusage.h \
   merkleblock.h \
