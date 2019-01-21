@@ -1,4 +1,5 @@
 # Copyright (c) 2018 The Bitcoin developers
+# Copyright (c) 2019 The Bitcoin SV developers
 
 project(bitcoin-test)
 
@@ -89,6 +90,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	policyestimator_tests.cpp
 	pow_tests.cpp
 	prevector_tests.cpp
+	protocol_tests.cpp
 	raii_event_tests.cpp
 	random_tests.cpp
 	reverselock_tests.cpp
