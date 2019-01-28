@@ -21,30 +21,32 @@ class UniValue {
 public:
     enum VType { VNULL, VOBJ, VARR, VSTR, VNUM, VBOOL, };
 
-    UniValue() { typ = VNULL; }
-    UniValue(UniValue::VType initialType, const std::string& initialStr = "") {
+    UniValue() : m_JSONParseDepth (2048) { typ = VNULL; }
+    UniValue(UniValue::VType initialType, const std::string& initialStr = "")
+        : m_JSONParseDepth(2048)
+    {
         typ = initialType;
         val = initialStr;
     }
-    UniValue(uint64_t val_) {
+    UniValue(uint64_t val_) : m_JSONParseDepth (2048) {
         setInt(val_);
     }
-    UniValue(int64_t val_) {
+    UniValue(int64_t val_) : m_JSONParseDepth (2048) {
         setInt(val_);
     }
-    UniValue(bool val_) {
+    UniValue(bool val_) : m_JSONParseDepth (2048) {
         setBool(val_);
     }
-    UniValue(int val_) {
+    UniValue(int val_) : m_JSONParseDepth (2048) {
         setInt(val_);
     }
-    UniValue(double val_) {
+    UniValue(double val_) : m_JSONParseDepth (2048) {
         setFloat(val_);
     }
-    UniValue(const std::string& val_) {
+    UniValue(const std::string& val_) : m_JSONParseDepth (2048) {
         setStr(val_);
     }
-    UniValue(const char *val_) {
+    UniValue(const char *val_) : m_JSONParseDepth (2048) {
         std::string s(val_);
         setStr(s);
     }
@@ -149,6 +151,9 @@ public:
         return read(rawStr.data(), rawStr.size());
     }
 
+    const int& JSonParseDepth () const { return m_JSONParseDepth ; }
+    int& JSonParseDepth () { return m_JSONParseDepth ; }
+
 private:
     UniValue::VType typ;
     std::string val;                       // numbers are stored as C++ strings
@@ -158,6 +163,8 @@ private:
     bool findKey(const std::string& key, size_t& retIdx) const;
     void writeArray(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
     void writeObject(unsigned int prettyIndent, unsigned int indentLevel, std::string& s) const;
+
+    int m_JSONParseDepth ;
 
 public:
     // Strict type-specific getters, these throw std::runtime_error if the
