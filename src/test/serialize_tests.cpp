@@ -204,26 +204,26 @@ BOOST_AUTO_TEST_CASE(varints) {
         ss >> VARINT(j);
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
-    
+
     {
         ss.clear ();
-        ss << VARINT(std::numeric_limits<unsigned long int>::max()) ; 
-        uint64_t j ; 
-        ss >> VARINT(j); 
+        ss << VARINT(std::numeric_limits<unsigned long int>::max()) ;
+        uint64_t j ;
+        ss >> VARINT(j);
         BOOST_CHECK_EQUAL ( j, std::numeric_limits<unsigned long int>::max() );
     }
 
     {
         ss.clear ();
-        ss << VARINT(std::numeric_limits<unsigned long long int>::max()) ; 
-        unsigned long long int j ; 
-        ss >> VARINT(j); 
+        ss << VARINT(std::numeric_limits<unsigned long long int>::max()) ;
+        unsigned long long int j ;
+        ss >> VARINT(j);
         BOOST_CHECK_EQUAL ( j, std::numeric_limits<unsigned long int>::max() );
     }
 
     {
         ss.clear ();
-        ss << VARINT( std::numeric_limits<long int>::max()) ; 
+        ss << VARINT( std::numeric_limits<long int>::max()) ;
         long int j ;
         ss >> VARINT(j);
         BOOST_CHECK_EQUAL (j, std::numeric_limits<long int>::max());
@@ -236,7 +236,7 @@ BOOST_AUTO_TEST_CASE(varints) {
         ss >> VARINT(j);
         BOOST_CHECK_EQUAL(j, std::numeric_limits<long long int>::max());
     }
-    
+
 }
 
 BOOST_AUTO_TEST_CASE(varints_bitpatterns) {
@@ -291,9 +291,20 @@ BOOST_AUTO_TEST_CASE(varints_bitpatterns) {
     ss.clear();
 }
 
-static bool isTooLargeException(const std::ios_base::failure &ex) {
+static bool isTooLargeReadException(const std::ios_base::failure &ex) {
     std::ios_base::failure expectedException(
         "ReadCompactSize(): size too large");
+
+    // The string returned by what() can be different for different platforms.
+    // Instead of directly comparing the ex.what() with an expected string,
+    // create an instance of exception to see if ex.what() matches  the expected
+    // explanatory string returned by the exception instance.
+    return strcmp(expectedException.what(), ex.what()) == 0;
+}
+
+static bool isTooLargeWriteException(const std::ios_base::failure &ex) {
+    std::ios_base::failure expectedException(
+        "WriteCompactSize(): size too large");
 
     // The string returned by what() can be different for different platforms.
     // Instead of directly comparing the ex.what() with an expected string,
@@ -321,17 +332,17 @@ BOOST_AUTO_TEST_CASE(compactsize) {
     WriteCompactSize(ss, MAX_SIZE);
     BOOST_CHECK_EQUAL(ReadCompactSize(ss), MAX_SIZE);
 
-    WriteCompactSize(ss, MAX_SIZE + 1);
-    BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure,
-                          isTooLargeException);
+    //WriteCompactSize(ss, MAX_SIZE + 1);
+    //BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure, isTooLargeException);
+    BOOST_CHECK_EXCEPTION(WriteCompactSize(ss, MAX_SIZE + 1), std::ios_base::failure, isTooLargeWriteException);
 
-    WriteCompactSize(ss, std::numeric_limits<int64_t>::max());
-    BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure,
-                          isTooLargeException);
+    //WriteCompactSize(ss, std::numeric_limits<int64_t>::max());
+    //BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure,isTooLargeException);
+    BOOST_CHECK_EXCEPTION(WriteCompactSize(ss, std::numeric_limits<int64_t>::max()), std::ios_base::failure, isTooLargeWriteException);
 
-    WriteCompactSize(ss, std::numeric_limits<uint64_t>::max());
-    BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure,
-                          isTooLargeException);
+    //WriteCompactSize(ss, std::numeric_limits<uint64_t>::max());
+    //BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure,isTooLargeException);
+    BOOST_CHECK_EXCEPTION(WriteCompactSize(ss, std::numeric_limits<uint64_t>::max()), std::ios_base::failure,isTooLargeWriteException);
 }
 
 static bool isCanonicalException(const std::ios_base::failure &ex) {

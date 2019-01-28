@@ -37,9 +37,9 @@ CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int 
     , isEmpty(true)
     , nHashFuncs(MAX_HASH_FUNCS)
     , nTweak(nTweakIn)
-    , nFlags(nFlagsIn) 
+    , nFlags(nFlagsIn)
 {
-    if (nFPRate <= 0 ){
+    if (nFPRate <= 0 || nFPRate > 1.18){
         LogPrintf("Error: Invalid Parameter nFPRate passed to CBloomFilter %d!", nFPRate);
         throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" );
     }
@@ -47,7 +47,7 @@ CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int 
     nHashFuncs = std::min((unsigned int)(vData.size() * 8 / nElements * LN2),MAX_HASH_FUNCS);
     return ;
 }
-              
+
 inline unsigned int
 CBloomFilter::Hash(unsigned int nHashNum,
                    const std::vector<uint8_t> &vDataToHash) const {
@@ -211,10 +211,10 @@ void CBloomFilter::UpdateEmptyFull() {
     isEmpty = empty;
 }
 
-CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements, double fpRate) 
+CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements, double fpRate)
 {
-    if (fpRate <= 0){        
-        throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" ); 
+    if (fpRate <= 0 || fpRate > 1.18){
+        throw std::runtime_error ( "Error: Invalid Parameter nFPRate passed to constructor" );
     }
     double logFpRate = log(fpRate);
      /* The optimal number of hash functions is log(fpRate) / log(0.5), but

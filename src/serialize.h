@@ -264,6 +264,9 @@ inline uint32_t GetSizeOfCompactSize(uint64_t nSize) {
 inline void WriteCompactSize(CSizeComputer &os, uint64_t nSize);
 
 template <typename Stream> void WriteCompactSize(Stream &os, uint64_t nSize) {
+    if (nSize > MAX_SIZE) {
+          throw std::ios_base::failure("WriteCompactSize(): size too large");
+    }
     if (nSize < 253) {
         ser_writedata8(os, nSize);
     } else if (nSize <= std::numeric_limits<uint16_t>::max()) {
@@ -342,7 +345,8 @@ template <typename I> inline unsigned int GetSizeOfVarInt(I n) {
 
 template <typename I> inline void WriteVarInt(CSizeComputer &os, I n);
 
-template <typename Stream, typename I> void WriteVarInt(Stream &os, I n) {
+template <typename Stream, typename I, class = typename std::enable_if<std::is_arithmetic<uint64_t>::value>::type>
+void WriteVarInt(Stream &os, I n) {
     uint8_t tmp[(sizeof(n) * 8 + 6) / 7];
     int len = 0;
     while (true) {
@@ -358,13 +362,19 @@ template <typename Stream, typename I> void WriteVarInt(Stream &os, I n) {
     } while (len--);
 }
 
-template <typename Stream, typename I> I ReadVarInt(Stream &is) {
-    uint64_t n = 0;
-    for (unsigned int i = 0; i < std::numeric_limits<unsigned long int>::digits;++i){
+template <typename Stream, typename I,class = typename std::enable_if<std::is_arithmetic<uint64_t>::value>::type>
+I ReadVarInt(Stream &is) {
+    I n = 0;
+    unsigned int maxSize = (sizeof(n) * 8 + 6) / 7;
+    for (unsigned int i = 0; i<maxSize; ++i){
         uint8_t chData = ser_readdata8(is);
         n = (n << 7) | (chData & 0x7F);
         if ((chData & 0x80) == 0) {
+          if (n >= std::numeric_limits<I>::lowest () && n <= std::numeric_limits<I>::max()){
                 return n;
+          }else{
+                throw std::runtime_error ("Deserialisation Error ReadVarInt");
+          }
         }
         n++;
     }
