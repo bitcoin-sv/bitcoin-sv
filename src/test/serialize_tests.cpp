@@ -218,7 +218,7 @@ BOOST_AUTO_TEST_CASE(varints) {
         ss << VARINT(std::numeric_limits<unsigned long long int>::max()) ;
         unsigned long long int j ;
         ss >> VARINT(j);
-        BOOST_CHECK_EQUAL ( j, std::numeric_limits<unsigned long int>::max() );
+        BOOST_CHECK_EQUAL ( j, std::numeric_limits<unsigned long long int>::max() );
     }
 
     {

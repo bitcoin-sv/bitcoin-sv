@@ -17,11 +17,13 @@
 #include <sstream>        // .get_int64()
 #include <utility>        // std::pair
 
+constexpr int DEFAULT_JSON_DEPTH (2048);
+
 class UniValue {
 public:
     enum VType { VNULL, VOBJ, VARR, VSTR, VNUM, VBOOL, };
 
-    UniValue() : m_JSONParseDepth (2048) { typ = VNULL; }
+    UniValue() : m_JSONParseDepth (DEFAULT_JSON_DEPTH) { typ = VNULL; }
     UniValue(UniValue::VType initialType, const std::string& initialStr = "")
         : m_JSONParseDepth(2048)
     {
