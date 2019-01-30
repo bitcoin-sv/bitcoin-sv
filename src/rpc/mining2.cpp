@@ -318,10 +318,27 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() > 0)
     {
-        throw std::runtime_error("getminingcandidate"
-                                "\nReturns Mining-Candidate protocol data.\n"
-                                "\nArguments: None\n");
+        throw std::runtime_error(
+                    "getminingcandidate\n"
+                    "\nReturns Mining-Candidate protocol data.\n"
+                    "\nArguments: None\n"
+                    "\nResult: (json string)\n"
+                    "    {\n                         \n"
+                    "        \"id\": n,              (integer) candidate identifier for submitminingsolution\n"
+                    "        \"prevhash\": \"xxxx\", (hex string) Hash of the previous block\n"
+                    "        \"coinbase\": \"xxxx\", (hex string encoded binary transaction) Coinbase transaction\n"
+                    "        \"version\": n,         (integer) Block version\n"
+                    "        \"nBits\": \"xxxx\",    (hex string) Difficulty\n"
+                    "        \"time\": n,            (integer) Block time\n"
+                    "        \"height\": n,          (integer) Current Block Height\n"
+                    "        \"merkleProof\": [      (list of hex strings) Merkle branch for the block\n"
+                    "                          xxxx,\n"
+                    "                          yyyy,\n"
+                    "                         ]\n"
+                    "    }\n"
+        );
     }
+
     CMiningCandidate candidate;
     LOCK(cs_main);
     mkblocktemplate(config, request.params, &candidate.block);  // These mirror the functions in BU
@@ -337,15 +354,21 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     if (request.fHelp || request.params.size() != 1)
     {
         throw std::runtime_error(
-            "submitminingsolution \"Mining-Candidate data\" ( \"jsonparametersobject\" )\n"
-            "\nAttempts to submit a new block to the network.\n"
-            "\nArguments\n"
-            "1. \"submitminingsolutiondata\"    (string, required) the mining solution (JSON encoded) data to submit\n"
-            "\nResult:\n"
-            "\nNothing on success, error string if block was rejected.\n"
-            "Identical to \"submitblock\".\n"
-            "\nExamples:\n" +
-            HelpExampleRpc("submitminingsolution", "\"mydata\""));
+                "submitminingsolution \"<json string>\" \n"
+                "\nAttempts to submit a new block to the network.\n"
+                "\nJson Object should comprise of the following and must be escaped\n"
+                "    {\n"
+                "        \"id\": n,           (integer) ID from getminingcandidate RPC\n"
+                "        \"nonce\": n,        (integer) Miner generated nonce\n"
+                "        \"coinbase\": \"\",  (hex string, optional) Modified Coinbase transaction\n"
+                "        \"time\": n,         (integer, optional) Block time\n"
+                "        \"version\": n       (integer, optional) Block version\n"
+                "    }\n"
+                "\nResult:\n"
+                "\nNothing on success, error string if block was rejected.\n"
+                "Identical to \"submitblock\".\n"
+                "\nExamples:\n" +
+                HelpExampleRpc("submitminingsolution", "\"<json string>\""));
     }
 
     rcvd = request.params[0].get_obj();
