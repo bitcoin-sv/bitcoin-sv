@@ -13,17 +13,19 @@
 const std::string CBaseChainParams::MAIN = "main";
 const std::string CBaseChainParams::TESTNET = "test";
 const std::string CBaseChainParams::REGTEST = "regtest";
+const std::string CBaseChainParams::STN = "stn";
 
 void AppendParamsHelpMessages(std::string &strUsage, bool debugHelp) {
     strUsage += HelpMessageGroup(_("Chain selection options:"));
     strUsage += HelpMessageOpt("-testnet", _("Use the test chain"));
-    if (debugHelp) {
-        strUsage += HelpMessageOpt(
-            "-regtest", "Enter regression test mode, which uses a special "
-                        "chain in which blocks can be solved instantly. "
-                        "This is intended for regression testing tools and app "
-                        "development.");
-    }
+    strUsage += HelpMessageOpt(
+        "-regtest", "Enter regression test mode, which uses a special "
+                    "chain in which blocks can be solved instantly. "
+                    "This is intended for regression testing tools and app "
+                    "development.");
+    strUsage += HelpMessageOpt(
+            "-stn", "Use the Scaling Test Network"
+            );
 }
 
 /**
@@ -32,6 +34,17 @@ void AppendParamsHelpMessages(std::string &strUsage, bool debugHelp) {
 class CBaseMainParams : public CBaseChainParams {
 public:
     CBaseMainParams() { nRPCPort = 8332; }
+};
+
+/**
+ * Scaling test network
+ */
+class CBaseStnParams : public CBaseChainParams {
+public:
+    CBaseStnParams() {
+        nRPCPort = 9332;
+        strDataDir = "stn";
+    }
 };
 
 /**
@@ -69,6 +82,8 @@ CreateBaseChainParams(const std::string &chain) {
         return std::unique_ptr<CBaseChainParams>(new CBaseMainParams());
     else if (chain == CBaseChainParams::TESTNET)
         return std::unique_ptr<CBaseChainParams>(new CBaseTestNetParams());
+    else if (chain == CBaseChainParams::STN)
+        return std::unique_ptr<CBaseChainParams>(new CBaseStnParams());
     else if (chain == CBaseChainParams::REGTEST)
         return std::unique_ptr<CBaseChainParams>(new CBaseRegTestParams());
     else
@@ -83,11 +98,13 @@ void SelectBaseParams(const std::string &chain) {
 std::string ChainNameFromCommandLine() {
     bool fRegTest = gArgs.GetBoolArg("-regtest", false);
     bool fTestNet = gArgs.GetBoolArg("-testnet", false);
+    bool fStn = gArgs.GetBoolArg("-stn", false);
 
-    if (fTestNet && fRegTest)
+    if ((fTestNet && fRegTest) || (fTestNet && fStn) || (fRegTest && fStn))
         throw std::runtime_error(
-            "Invalid combination of -regtest and -testnet.");
+            "Invalid combination of -regtest, -stn, and -testnet.");
     if (fRegTest) return CBaseChainParams::REGTEST;
     if (fTestNet) return CBaseChainParams::TESTNET;
+    if (fStn) return CBaseChainParams::STN;
     return CBaseChainParams::MAIN;
 }

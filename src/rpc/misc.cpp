@@ -121,6 +121,9 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
     obj.push_back(Pair("testnet",
                        config.GetChainParams().NetworkIDString() ==
                            CBaseChainParams::TESTNET));
+    obj.push_back(Pair("stn",
+                       config.GetChainParams().NetworkIDString() ==
+                       CBaseChainParams::STN));
 #ifdef ENABLE_WALLET
     if (pwallet) {
         obj.push_back(Pair("keypoololdest", pwallet->GetOldestKeyPoolTime()));
