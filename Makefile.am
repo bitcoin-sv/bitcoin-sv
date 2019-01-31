@@ -77,6 +77,7 @@ $(BITCOIN_SEEDER_BIN): FORCE
 if USE_LCOV
 
 baseline.info:
+	$(MAKE) -C src/
 	$(LCOV) -c -i -d $(abs_builddir)/src -o $@
 
 baseline_filtered.info: baseline.info
@@ -101,7 +102,7 @@ test_bitcoin_filtered.info: test_bitcoin.info
 	$(LCOV) -r $< "/usr/include/*" -o $@
 
 functional_test.info: test_bitcoin_filtered.info
-	-@TIMEOUT=15 python test/functional/test_runner.py $(EXTENDED_FUNCTIONAL_TESTS)
+	-@TIMEOUT=15 test/functional/test_runner.py $(EXTENDED_FUNCTIONAL_TESTS)
 	$(LCOV) -c -d $(abs_builddir)/src --t functional-tests -o $@
 	$(LCOV) -z -d $(abs_builddir)/src
 	$(LCOV) -z -d $(abs_builddir)/src/leveldb

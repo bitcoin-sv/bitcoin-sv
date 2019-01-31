@@ -534,7 +534,7 @@ if test x$use_pkgconfig = xyes; then
 fi
 
 if test x$use_extended_functional_tests != xno; then
-  AC_SUBST(EXTENDED_FUNCTIONAL_TESTS, --extended)
+  AC_SUBST(EXTENDED_FUNCTIONAL_TESTS, --extended --jobs=1)
 fi
 
 if test x$use_lcov = xyes; then
