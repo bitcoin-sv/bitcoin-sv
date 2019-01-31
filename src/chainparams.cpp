@@ -324,6 +324,7 @@ public:
         checkpointData = {.mapCheckpoints = {
                 {0, uint256S("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943")},
                 {1, uint256S("000000008908135d180edfe727f4e5dfaea25ed8d72337358d8362df7609b974")},
+                {2301, uint256S("00000000ff0ccf61bb239deb3998bd1a9c71d14c212c3fd58b32aae5ab6eaefb")},
         }};
     }
 };
