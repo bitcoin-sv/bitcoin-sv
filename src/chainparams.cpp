@@ -301,7 +301,7 @@ public:
         netMagic[2] = 0xc4;
         netMagic[3] = 0xf9;
         nDefaultPort = 9333;
-        nPruneAfterHeight = 100000;
+        nPruneAfterHeight = 1000;
 
         vFixedSeeds.clear();
         vSeeds.clear();
