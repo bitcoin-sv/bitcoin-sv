@@ -36,7 +36,7 @@ void BCLog::Logger::OpenDebugLog() {
     std::lock_guard<std::mutex> scoped_lock(mutexDebugLog);
 
     assert(fileout == nullptr);
-    fs::path pathDebug = GetDataDir() / "debug.log";
+    fs::path pathDebug = GetDataDir() / "bitcoind.log";
     fileout = fsbridge::fopen(pathDebug, "a");
     if (fileout) {
         // Unbuffered.
