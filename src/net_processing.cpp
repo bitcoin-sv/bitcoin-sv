@@ -1825,10 +1825,10 @@ static bool ProcessMessage(const Config &config, const CNodePtr& pfrom,
             }
 
             bool fAlreadyHave = AlreadyHave(inv);
-            LogPrint(BCLog::NET, "got inv: %s  %s peer=%d\n", inv.ToString(),
-                     fAlreadyHave ? "have" : "new", pfrom->id);
 
             if (inv.type == MSG_BLOCK) {
+                LogPrint(BCLog::NET, "got block inv: %s %s peer=%d\n", inv.hash.ToString(),
+                     fAlreadyHave ? "have" : "new", pfrom->id);
                 UpdateBlockAvailability(pfrom->GetId(), inv.hash);
                 if (!fAlreadyHave && !fImporting && !fReindex &&
                     !mapBlocksInFlight.count(inv.hash)) {
@@ -1849,6 +1849,8 @@ static bool ProcessMessage(const Config &config, const CNodePtr& pfrom,
                              pfrom->id);
                 }
             } else {
+                LogPrint(BCLog::TXNSRC | BCLog::NET, "got txn inv: %s %s txnsrc peer=%d\n",
+                    inv.hash.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
                 pfrom->AddInventoryKnown(inv);
                 if (fBlocksOnly) {
                     LogPrint(BCLog::NET, "transaction (%s) inv sent in "
@@ -2097,6 +2099,8 @@ static bool ProcessMessage(const Config &config, const CNodePtr& pfrom,
 
         CInv inv(MSG_TX, tx.GetId());
         pfrom->AddInventoryKnown(inv);
+
+        LogPrint(BCLog::TXNSRC, "got txn: %s txnsrc peer=%d\n", inv.hash.ToString(), pfrom->id);
 
         LOCK(cs_main);
 
