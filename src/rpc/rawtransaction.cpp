@@ -1172,6 +1172,9 @@ static UniValue sendrawtransaction(const Config &config,
     TxMempoolInfo txinfo { mempool.info(txid) };
     g_connman->EnqueueTransaction( {inv, txinfo} );
 
+    LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
+        inv.hash.ToString(), request.authUser.c_str());
+
     return txid.GetHex();
 }
 

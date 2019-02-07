@@ -55,7 +55,7 @@ def read_logs(tmp_dir):
 
     files = [("test", "%s/test_framework.log" % tmp_dir)]
     for i in itertools.count():
-        logfile = "{}/node{}/regtest/debug.log".format(tmp_dir, i)
+        logfile = "{}/node{}/regtest/bitcoind.log".format(tmp_dir, i)
         if not os.path.isfile(logfile):
             break
         files.append(("node%d" % i, logfile))
