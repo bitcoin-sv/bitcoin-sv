@@ -36,7 +36,7 @@ void BCLog::Logger::OpenDebugLog() {
     std::lock_guard<std::mutex> scoped_lock(mutexDebugLog);
 
     assert(fileout == nullptr);
-    fs::path pathDebug = GetDataDir() / "debug.log";
+    fs::path pathDebug = GetDataDir() / "bitcoind.log";
     fileout = fsbridge::fopen(pathDebug, "a");
     if (fileout) {
         // Unbuffered.
@@ -76,6 +76,8 @@ const CLogCategoryDesc LogCategories[] = {
     {BCLog::LIBEVENT, "libevent"},
     {BCLog::COINDB, "coindb"},
     {BCLog::LEVELDB, "leveldb"},
+    {BCLog::TXNPROP, "txnprop"},
+    {BCLog::TXNSRC, "txnsrc"},
     {BCLog::ALL, "1"},
     {BCLog::ALL, "all"},
 };
@@ -205,7 +207,7 @@ void BCLog::Logger::DisableCategory(LogFlags category) {
     logCategories &= ~category;
 }
 
-bool BCLog::Logger::WillLogCategory(LogFlags category) const {
+bool BCLog::Logger::WillLogCategory(typename std::underlying_type<LogFlags>::type category) const {
     return (logCategories.load(std::memory_order_relaxed) & category) != 0;
 }
 

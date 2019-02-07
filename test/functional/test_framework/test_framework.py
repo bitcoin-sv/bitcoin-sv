@@ -166,7 +166,7 @@ class BitcoinTestFramework():
                 import glob
                 filenames = [self.options.tmpdir + "/test_framework.log"]
                 filenames += glob.glob(self.options.tmpdir +
-                                       "/node*/regtest/debug.log")
+                                       "/node*/regtest/bitcoind.log")
                 MAX_LINES_TO_PRINT = 1000
                 for fn in filenames:
                     try:
@@ -375,7 +375,7 @@ class BitcoinTestFramework():
         ll = int(self.options.loglevel) if self.options.loglevel.isdigit(
         ) else self.options.loglevel.upper()
         ch.setLevel(ll)
-        # Format logs the same as bitcoind's debug.log with microprecision (so log files can be concatenated and sorted)
+        # Format logs the same as bitcoind's bitcoind.log with microprecision (so log files can be concatenated and sorted)
         formatter = logging.Formatter(
             fmt='%(asctime)s.%(msecs)03d000 %(name)s (%(levelname)s): %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         formatter.converter = time.gmtime
@@ -452,7 +452,7 @@ class BitcoinTestFramework():
             self.nodes = []
             self.disable_mocktime()
             for i in range(MAX_NODES):
-                os.remove(log_filename(self.options.cachedir, i, "debug.log"))
+                os.remove(log_filename(self.options.cachedir, i, "bitcoind.log"))
                 os.remove(log_filename(self.options.cachedir, i, "db.log"))
                 os.remove(log_filename(self.options.cachedir, i, "peers.dat"))
                 os.remove(log_filename(
