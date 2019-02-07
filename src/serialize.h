@@ -345,7 +345,7 @@ template <typename I> inline unsigned int GetSizeOfVarInt(I n) {
 
 template <typename I> inline void WriteVarInt(CSizeComputer &os, I n);
 
-template <typename Stream, typename I, class = typename std::enable_if<std::is_arithmetic<uint64_t>::value>::type>
+template <typename Stream, typename I, class = typename std::enable_if<std::is_integral<I>::value>::type>
 void WriteVarInt(Stream &os, I n) {
     uint8_t tmp[(sizeof(n) * 8 + 6) / 7];
     int len = 0;
@@ -362,19 +362,21 @@ void WriteVarInt(Stream &os, I n) {
     } while (len--);
 }
 
-template <typename Stream, typename I,class = typename std::enable_if<std::is_arithmetic<uint64_t>::value>::type>
+template <typename Stream, typename I,class = typename std::enable_if<std::is_integral<I>::value>::type>
 I ReadVarInt(Stream &is) {
-    I n = 0;
+    uintmax_t n {0};
+    static uintmax_t overflow { std::numeric_limits<I>::max() >> 7 };
+
     unsigned int maxSize = (sizeof(n) * 8 + 6) / 7;
     for (unsigned int i = 0; i<maxSize; ++i){
+        if (n > overflow){
+            throw std::runtime_error ("Deserialisation Error ReadVarInt");
+        }
+
         uint8_t chData = ser_readdata8(is);
         n = (n << 7) | (chData & 0x7F);
         if ((chData & 0x80) == 0) {
-          if (n >= std::numeric_limits<I>::lowest () && n <= std::numeric_limits<I>::max()){
-                return n;
-          }else{
-                throw std::runtime_error ("Deserialisation Error ReadVarInt");
-          }
+            return n ;
         }
         n++;
     }

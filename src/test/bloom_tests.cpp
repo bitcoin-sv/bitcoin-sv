@@ -77,7 +77,7 @@ BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize) {
         "Bloom filter should be empty!");
 
     BOOST_CHECK_EXCEPTION(CBloomFilter filter(3, 0.0, 0, BLOOM_UPDATE_ALL), std::runtime_error,inValidConstructorParameterException);
-    BOOST_CHECK_EXCEPTION(CBloomFilter filter(3, 1.81, 0, BLOOM_UPDATE_ALL), std::runtime_error,inValidConstructorParameterException);
+    BOOST_CHECK_EXCEPTION(CBloomFilter filter(3, 1.181, 0, BLOOM_UPDATE_ALL), std::runtime_error,inValidConstructorParameterException);
 }
 
 BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize_with_tweak) {
