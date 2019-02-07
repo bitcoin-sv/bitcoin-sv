@@ -205,7 +205,7 @@ void BCLog::Logger::DisableCategory(LogFlags category) {
     logCategories &= ~category;
 }
 
-bool BCLog::Logger::WillLogCategory(LogFlags category) const {
+bool BCLog::Logger::WillLogCategory(typename std::underlying_type<LogFlags>::type category) const {
     return (logCategories.load(std::memory_order_relaxed) & category) != 0;
 }
 

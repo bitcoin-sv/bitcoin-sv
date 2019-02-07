@@ -65,7 +65,7 @@ private:
      * Log categories bitfield. Leveldb/libevent need special handling if their
      * flags are changed at runtime.
      */
-    std::atomic<uint32_t> logCategories{0};
+    std::atomic<typename std::underlying_type<LogFlags>::type> logCategories{0};
 
     std::string LogTimestampStr(const std::string &str);
 
@@ -90,7 +90,7 @@ public:
     void DisableCategory(LogFlags category);
 
     /** Return true if log accepts specified category */
-    bool WillLogCategory(LogFlags category) const;
+    bool WillLogCategory(typename std::underlying_type<LogFlags>::type category) const;
 
     /** Default for whether ShrinkDebugFile should be run */
     bool DefaultShrinkDebugFile() const;
@@ -100,9 +100,9 @@ public:
 
 BCLog::Logger &GetLogger();
 
-/** Return true if log accepts specified category */
-static inline bool LogAcceptCategory(BCLog::LogFlags category) {
-    return GetLogger().WillLogCategory(category);
+/** Return true if log accepts one of the specified categories */
+static inline bool LogAcceptCategory(typename std::underlying_type<BCLog::LogFlags>::type categories) {
+    return GetLogger().WillLogCategory(categories);
 }
 
 /** Returns a string with the supported log categories */
