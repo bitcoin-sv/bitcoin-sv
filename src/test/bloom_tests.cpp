@@ -1141,7 +1141,7 @@ BOOST_AUTO_TEST_CASE(rolling_bloom) {
     }
 
     BOOST_CHECK_EXCEPTION(CRollingBloomFilter filter(3, 0.0), std::runtime_error,inValidConstructorParameterException);
-    BOOST_CHECK_EXCEPTION(CRollingBloomFilter filter(3, 1.81), std::runtime_error,inValidConstructorParameterException);
+    BOOST_CHECK_EXCEPTION(CRollingBloomFilter filter(3, 1.181), std::runtime_error,inValidConstructorParameterException);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
