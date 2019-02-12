@@ -10,6 +10,8 @@
 * added the Scaling Test Network
   * activate with `stn=1` in bitcoin.conf
   * getinfo returns new field, `stn=true|false`
+* renamed `debug.log` to `bitcoind.log`
+* added capability to log source of transactions  
 * various other fixes
 
 ## Scaling Test Network Reset
