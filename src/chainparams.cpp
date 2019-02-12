@@ -174,8 +174,8 @@ public:
         vSeeds.push_back(CDNSSeedData("bitcoinsv.io", "seed.bitcoinsv.io", true));
         // cascharia.com
         vSeeds.push_back(CDNSSeedData("cascharia.com", "seed.cascharia.com", true));
-        // satoshivision.network
-        vSeeds.push_back(CDNSSeedData("satoshivision.network", "seed.satoshisvision.network", true));
+        // satoshisvision.network
+        vSeeds.push_back(CDNSSeedData("satoshisvision.network", "seed.satoshisvision.network", true));
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<uint8_t>(1, 0);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<uint8_t>(1, 5);
