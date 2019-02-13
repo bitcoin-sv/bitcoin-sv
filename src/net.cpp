@@ -896,8 +896,8 @@ int CNetMessage::readHeader(const Config &config, const char *pch,
     try {
         hdrbuf >> hdr;
     } catch (const std::exception &) {
-        return -1;
         LogPrint(BCLog::NET, "Bad header format\n");
+        return -1;
     }
 
     // Reject oversized messages
