@@ -1,4 +1,4 @@
-image: nchain/buildtools:build-sv-xenial
+image: nchain/buildtools:build-sv-bionic
 
 pipelines:
   branches:
@@ -16,7 +16,13 @@ pipelines:
             - ./configure
             - make -j4
             - make -j4 check
-
+    feature/SV-238-C++17:
+    - step:
+        script:
+        - ./autogen.sh
+        - ./configure
+        - make -j4
+        - make -j4 check
   pull-requests:
     '**':
       - step:
