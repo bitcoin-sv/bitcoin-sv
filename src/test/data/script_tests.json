@@ -1,4 +1,7 @@
 [
+["Copyright (c) 2018-2019 The Bitcoin SV developers"],
+["Presumably there is an earlier copyright from the Bitcoin Core developers and/or the Bitcoin ABC developers but it was not listed"],
+
 ["Format is: [[wit..., amount]?, scriptSig, scriptPubKey, flags, expected_scripterror, ... comments]"],
 ["It is evaluated as if there was a crediting coinbase transaction with two 0"],
 ["pushes as scriptSig, and one output of 0 satoshi and given scriptPubKey,"],
@@ -915,17 +918,17 @@
 
 ["NOP","SIZE 1","P2SH,STRICTENC","INVALID_STACK_OPERATION"],
 
-["'abc' 0","IF INVERT ELSE 1 ENDIF","P2SH,STRICTENC","DISABLED_OPCODE","INVERT disabled"],
+["'abc' 0","IF INVERT ELSE 1 ENDIF","P2SH,STRICTENC","OK","INVERT enabled"],
 ["'abc' 0","IF INVERT ELSE 1 ENDIF","P2SH,STRICTENC,MAGNETIC_OPCODES","OK","INVERT enabled"],
 ["2 0 IF 2MUL ELSE 1 ENDIF","NOP","P2SH,STRICTENC","DISABLED_OPCODE","2MUL disabled"],
 ["2 0 IF 2MUL ELSE 1 ENDIF","NOP","P2SH,STRICTENC,MAGNETIC_OPCODES","DISABLED_OPCODE","2MUL disabled"],
 ["2 0 IF 2DIV ELSE 1 ENDIF","NOP","P2SH,STRICTENC","DISABLED_OPCODE","2DIV disabled"],
 ["2 0 IF 2DIV ELSE 1 ENDIF","NOP","P2SH,STRICTENC,MAGNETIC_OPCODES","DISABLED_OPCODE","2DIV disabled"],
-["2 2 0 IF MUL ELSE 1 ENDIF","NOP","P2SH,STRICTENC","DISABLED_OPCODE","MUL disabled"],
+["2 2 0 IF MUL ELSE 1 ENDIF","NOP","P2SH,STRICTENC","OK","MUL enabled"],
 ["2 2 0 IF MUL ELSE 1 ENDIF","NOP","P2SH,STRICTENC,MAGNETIC_OPCODES","OK","MUL enabled"],
-["2 2 0 IF LSHIFT ELSE 1 ENDIF","NOP","P2SH,STRICTENC","DISABLED_OPCODE","LSHIFT disabled"],
+["2 2 0 IF LSHIFT ELSE 1 ENDIF","NOP","P2SH,STRICTENC","OK","LSHIFT enabled"],
 ["2 2 0 IF LSHIFT ELSE 1 ENDIF","NOP","P2SH,STRICTENC,MAGNETIC_OPCODES","OK","LSHIFT enabled"],
-["2 2 0 IF RSHIFT ELSE 1 ENDIF","NOP","P2SH,STRICTENC","DISABLED_OPCODE","RSHIFT disabled"],
+["2 2 0 IF RSHIFT ELSE 1 ENDIF","NOP","P2SH,STRICTENC","OK","RSHIFT enabled"],
 ["2 2 0 IF RSHIFT ELSE 1 ENDIF","NOP","P2SH,STRICTENC,MAGNETIC_OPCODES","OK","RSHIFT enabled"],
 
 ["Bitwise opcodes"],
@@ -1123,17 +1126,17 @@
 ["'abcdef' NOT","0 EQUAL","P2SH,STRICTENC","SCRIPTNUM_OVERFLOW","NOT is an arithmetic operand"],
 
 ["Magnetic upgrade - check opcodes disabled"],
-["2 DUP MUL","4 EQUAL","P2SH,STRICTENC","DISABLED_OPCODE","disabled"],
+["2 DUP MUL","4 EQUAL","P2SH,STRICTENC","OK","enabled"],
 ["2 DUP MUL","4 EQUAL","P2SH,STRICTENC,MAGNETIC_OPCODES","OK","enabled"],
 ["2 2MUL","4 EQUAL","P2SH,STRICTENC","DISABLED_OPCODE","disabled"],
 ["2 2MUL","4 EQUAL","P2SH,STRICTENC,MAGNETIC_OPCODES","DISABLED_OPCODE","disabled"],
 ["2 2DIV","1 EQUAL","P2SH,STRICTENC","DISABLED_OPCODE","disabled"],
 ["2 2DIV","1 EQUAL","P2SH,STRICTENC,MAGNETIC_OPCODES","DISABLED_OPCODE","disabled"],
-["2 2 LSHIFT","8 EQUAL","P2SH,STRICTENC","DISABLED_OPCODE","disabled"],
+["2 2 LSHIFT","8 EQUAL","P2SH,STRICTENC","OK","enabled"],
 ["2 2 LSHIFT","8 EQUAL","P2SH,STRICTENC,MAGNETIC_OPCODES","OK","enabled"],
-["2 1 RSHIFT","1 EQUAL","P2SH,STRICTENC","DISABLED_OPCODE","disabled"],
+["2 1 RSHIFT","1 EQUAL","P2SH,STRICTENC","OK","enabled"],
 ["2 1 RSHIFT","1 EQUAL","P2SH,STRICTENC,MAGNETIC_OPCODES","OK","enabled"],
-["0x0100 INVERT","0x01FF EQUAL","P2SH,STRICTENC","DISABLED_OPCODE","disabled"],
+["0x0100 INVERT","0x01FF EQUAL","P2SH,STRICTENC","OK","enabled"],
 ["0x0100 INVERT","0x01FF EQUAL","P2SH,STRICTENC,MAGNETIC_OPCODES","OK","enabled"],
 
 ["1","NOP1 CHECKLOCKTIMEVERIFY CHECKSEQUENCEVERIFY NOP4 NOP5 NOP6 NOP7 NOP8 NOP9 NOP10 2 EQUAL","P2SH,STRICTENC","EVAL_FALSE"],

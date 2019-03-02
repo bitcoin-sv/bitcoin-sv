@@ -1,5 +1,5 @@
 // Copyright (c) 2018 The Bitcoin developers
-// Copyright (c) 2018 The Bitcoin SV developers
+// Copyright (c) 2018-2019 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,18 +19,15 @@ typedef std::vector<valtype> stacktype;
 
 constexpr uint32_t SCRIPT_DISABLE_MAGNETIC_OPCODES = 0;
 
-std::array<uint32_t, 3> flagset{
-    {0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
+std::array<uint32_t, 3> flagset{{0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
 
 BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
 
 /**
  * General utility functions to check for script passing/failing.
  */
-static void CheckTestResultForAllFlags(const stacktype &original_stack,
-                                       const CScript &script,
-                                       const stacktype &expected,
-                                       uint32_t upgradeFlag = 0) {
+static void CheckTestResultForAllFlags(const stacktype &original_stack, const CScript &script, const stacktype &expected,
+        uint32_t upgradeFlag = 0) {
     BaseSignatureChecker sigchecker;
 
     for (uint32_t flags : flagset) {
@@ -40,22 +37,18 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack,
         BOOST_CHECK(r);
         BOOST_CHECK(stack == expected);
 
-        // Make sure that if we do not pass the upgrade flag, opcodes are still
-        // disabled.
-        if(upgradeFlag)
-        {
+        // Make sure that if we do not pass the upgrade flag, we get the same result
+        if (upgradeFlag) {
             stack = original_stack;
             r = EvalScript(stack, script, flags, sigchecker, &err);
-            BOOST_CHECK(!r);
-            BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
+            BOOST_CHECK(r);
+            BOOST_CHECK(stack == expected);
         }
     }
 }
 
 // magnetic upgrade
-static void CheckTestResultForAllFlagsMagnetic(const stacktype &original_stack,
-                                               const CScript &script,
-                                               const stacktype &expected) {
+static void CheckTestResultForAllFlagsMagnetic(const stacktype &original_stack, const CScript &script, const stacktype &expected) {
     CheckTestResultForAllFlags(original_stack, script, expected, SCRIPT_ENABLE_MAGNETIC_OPCODES);
 }
 
@@ -68,49 +61,42 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     BOOST_CHECK(!r);
     BOOST_CHECK_EQUAL(err, expected_error);
 
-    // Make sure that if we do not pass the opcodes flags, opcodes are still
-    // disabled.
+    // Make sure that if we do not pass the opcodes flags, we get the same result
     if(upgradeFlag)
     {
         stack = original_stack;
         r = EvalScript(stack, script, flags, sigchecker, &err);
         BOOST_CHECK(!r);
-        BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
+        BOOST_CHECK_EQUAL(err, expected_error);
     }
 }
 
-static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript &script,
-                                  ScriptError expected_error, uint32_t upgradeFlag = 0) {
+static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript &script, ScriptError expected_error, uint32_t upgradeFlag = 0) {
     for (uint32_t flags : flagset) {
         CheckError(flags, original_stack, script, expected_error, upgradeFlag);
     }
 }
 
 // magnetic upgrade
-static void CheckErrorForAllFlagsMagnetic(const stacktype &original_stack, const CScript &script,
-                                  ScriptError expected_error) {
+static void CheckErrorForAllFlagsMagnetic(const stacktype &original_stack, const CScript &script, ScriptError expected_error) {
     CheckErrorForAllFlags(original_stack, script, expected_error, SCRIPT_ENABLE_MAGNETIC_OPCODES);
 }
 
-static void CheckOpError(const stacktype &original_stack, opcodetype op,
-                         ScriptError expected_error) {
+static void CheckOpError(const stacktype &original_stack, opcodetype op, ScriptError expected_error) {
     CheckErrorForAllFlags(original_stack, CScript() << op, expected_error);
 }
 
-static void CheckAllBitwiseOpErrors(const stacktype &stack,
-                                    ScriptError expected_error) {
+static void CheckAllBitwiseOpErrors(const stacktype &stack, ScriptError expected_error) {
     CheckOpError(stack, OP_AND, expected_error);
     CheckOpError(stack, OP_OR, expected_error);
     CheckOpError(stack, OP_XOR, expected_error);
 }
 
-static void CheckBinaryOp(const valtype &a, const valtype &b, opcodetype op,
-                          const valtype &expected) {
+static void CheckBinaryOp(const valtype &a, const valtype &b, opcodetype op, const valtype &expected) {
     CheckTestResultForAllFlags({a, b}, CScript() << op, {expected});
 }
 
-static void CheckBinaryOpMagnetic(const valtype &a, const valtype &b, opcodetype op,
-                          const valtype &expected) {
+static void CheckBinaryOpMagnetic(const valtype &a, const valtype &b, opcodetype op, const valtype &expected) {
     CheckTestResultForAllFlagsMagnetic({a, b}, CScript() << op, {expected});
 }
 

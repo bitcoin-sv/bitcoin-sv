@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2018 The Bitcoin developers
-# Copyright (c) 2018 The Bitcoin SV developers
+# Copyright (c) 2018-2019 The Bitcoin SV developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """
@@ -18,8 +18,7 @@ MAGNETIC_START_TIME = 2000000000
 
 # Error due to invalid opcodes
 DISABLED_OPCODE_ERROR = b'non-mandatory-script-verify-flag (Attempted to use a disabled opcode)'
-RPC_DISABLED_OPCODE_ERROR = "64: " + \
-    DISABLED_OPCODE_ERROR.decode("utf-8")
+RPC_DISABLED_OPCODE_ERROR = "64: " + DISABLED_OPCODE_ERROR.decode("utf-8")
 
 
 class PreviousSpendableOutput():
@@ -92,8 +91,8 @@ class MagneticActivationTest(ComparisonTestFramework):
 
         tx0 = spending_tx()
         tx0_hex = ToHex(tx0)
-        assert_raises_rpc_error(-26, RPC_DISABLED_OPCODE_ERROR,
-                                node.sendrawtransaction, tx0_hex)
+        # opcodes no longer disabled
+        tmpid = node.sendrawtransaction(tx0_hex)
 
         # Push MTP forward just before activation.
         self.log.info("Pushing MTP just before the activation and check again")
@@ -132,10 +131,9 @@ class MagneticActivationTest(ComparisonTestFramework):
             yield accepted(b)
 
         # Check again just before the activation time
-        assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
-                     MAGNETIC_START_TIME - 1)
-        assert_raises_rpc_error(-26, RPC_DISABLED_OPCODE_ERROR,
-                                node.sendrawtransaction, tx0_hex)
+        assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'], MAGNETIC_START_TIME - 1)
+        # opcode no longer disabled
+        tmpid = node.sendrawtransaction(tx0_hex)
 
         def add_tx(block, tx):
             block.vtx.append(tx)
@@ -145,14 +143,14 @@ class MagneticActivationTest(ComparisonTestFramework):
         # the last block before activation
         b = next_block_by_time(MAGNETIC_START_TIME + 6)
         add_tx(b, tx0)
-        yield rejected(b, RejectResult(16, b'blk-bad-inputs'))
+        yield accepted(b)       # block no longer rejected because opcodes not disabled
+        node.invalidateblock(format(b.sha256, 'x'))     # we need to go back one block for the rest of the tests
 
         self.log.info("After this block, the new opcodes are activated")
         fork_block = next_block_by_time(MAGNETIC_START_TIME + 6)
         yield accepted(fork_block)
 
-        assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
-                     MAGNETIC_START_TIME)
+        assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'], MAGNETIC_START_TIME)
 
         tx0id = node.sendrawtransaction(tx0_hex)
         assert(tx0id in set(node.getrawmempool()))

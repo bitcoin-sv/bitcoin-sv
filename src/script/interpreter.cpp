@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2018 The Bitcoin SV developers
+// Copyright (c) 2018-2019 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -350,16 +350,6 @@ static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
         case OP_2DIV:
             // Disabled opcodes.
             return true;
-
-        case OP_INVERT:
-        case OP_MUL:
-        case OP_LSHIFT:
-        case OP_RSHIFT:
-            // Opcodes that have been reenabled.
-            if ((flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0) {
-                return true;
-            }
-            break;
 
         default:
             break;
