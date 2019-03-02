@@ -1064,14 +1064,11 @@ static void CheckTestForOpCodeLimit(const CScript &script,
             uint32_t flags = std_flags | rdep_flags; 
             ScriptError err = SCRIPT_ERR_OK; 
             stacktype stack{original_stack};
-            bool isMagnetic = (rdep_flags & SCRIPT_ENABLE_MAGNETIC_OPCODES);
             bool r = EvalScript(stack, script, flags, sigchecker, &err);
             size_t nonPushOpcodeCount = NonPushOpCodeCount(script);
-            if( (isMagnetic && nonPushOpcodeCount > MAGNETIC_MAX_OPS_PER_SCRIPT) ||
-                (!isMagnetic && nonPushOpcodeCount > MAX_OPS_PER_SCRIPT) ) {
+            if (nonPushOpcodeCount > MAX_OPS_PER_SCRIPT) {
                 BOOST_CHECK(!r);
-            }
-            else {
+            } else {
                 BOOST_CHECK(r); 
             }
             BOOST_CHECK(nonPushOpcodeCount == expNonPushOpcodeCount);
@@ -1105,7 +1102,7 @@ static CScript dummy_multisig_with_pubkey()
     return script;
 }
 
-BOOST_AUTO_TEST_CASE(opcode_legacy_limit_tests)
+BOOST_AUTO_TEST_CASE(opcode_limit_tests)
 { 
     DummySignatureCreator sigfactory(nullptr); 
     const BaseSignatureChecker& sigchecker = sigfactory.Checker(); 
@@ -1134,35 +1131,6 @@ BOOST_AUTO_TEST_CASE(opcode_legacy_limit_tests)
     CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-4) + dummy_multisig, MAX_OPS_PER_SCRIPT, sigchecker);
     // test with MAX_OPS_PER_SCRIPT-3+4 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
     CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-3) + dummy_multisig, MAX_OPS_PER_SCRIPT+1, sigchecker);
-}
-
-BOOST_AUTO_TEST_CASE(opcode_magnetic_limit_tests)
-{
-    DummySignatureCreator sigfactory(nullptr);
-    const BaseSignatureChecker& sigchecker = sigfactory.Checker();
-
-    /**
-     * Check based on OP_ADD opcode.
-     */
-    // test with MAGNETIC_MAX_OPS_PER_SCRIPT-1 opcodes, which is under MAGNETIC_MAX_OPS_PER_SCRIPT
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT-1), MAGNETIC_MAX_OPS_PER_SCRIPT-1, sigchecker);
-    // test with MAGNETIC_MAX_OPS_PER_SCRIPT opcodes
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT), MAGNETIC_MAX_OPS_PER_SCRIPT, sigchecker);
-    // test with MAGNETIC_MAX_OPS_PER_SCRIPT+1 opcodes, which is over MAGNETIC_MAX_OPS_PER_SCRIPT
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT+1), MAGNETIC_MAX_OPS_PER_SCRIPT+1, sigchecker);
-
-    /**
-     * Check OP_CHECKMULTISIG/OP_CHECKMULTISIGVERIFY as this
-     * explicitly checks MAX_OPS_PER_SCRIPT.
-     */
-    // Create multi-sig signatures + public keys.
-    CScript dummy_multisig (dummy_multisig_with_pubkey());
-    // test with MAGNETIC_MAX_OPS_PER_SCRIPT-5+4 opcodes, which is under MAGNETIC_MAX_OPS_PER_SCRIPT limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT-5) + dummy_multisig, MAGNETIC_MAX_OPS_PER_SCRIPT-1, sigchecker);
-    // test with MAGNETIC_MAX_OPS_PER_SCRIPT-4+4 opcodes, which is equal MAGNETIC_MAX_OPS_PER_SCRIPT limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT-4) + dummy_multisig, MAGNETIC_MAX_OPS_PER_SCRIPT, sigchecker);
-    // test with MAGNETIC_MAX_OPS_PER_SCRIPT-3+4 opcodes, which is over MAGNETIC_MAX_OPS_PER_SCRIPT limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAGNETIC_MAX_OPS_PER_SCRIPT-3) + dummy_multisig, MAGNETIC_MAX_OPS_PER_SCRIPT+1, sigchecker);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

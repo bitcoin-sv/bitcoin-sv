@@ -358,17 +358,8 @@ static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
     return false;
 }
 
-inline bool IsValidMaxOpsPerScript(bool isMagnetic, int nOpCount) {
-    if (isMagnetic) {
-        if (nOpCount > MAGNETIC_MAX_OPS_PER_SCRIPT) {
-            return false;
-        }
-    } else {
-        if (nOpCount > MAX_OPS_PER_SCRIPT) {
-            return false;
-        }
-    }
-    return true;
+inline bool IsValidMaxOpsPerScript(int nOpCount) {
+    return (nOpCount <= MAX_OPS_PER_SCRIPT);
 }
 
 bool EvalScript(std::vector<valtype> &stack, const CScript &script,
@@ -392,7 +383,6 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     }
     int nOpCount = 0;
     bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-    bool isMagnetic = (flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) != 0;
 
     try {
         while (pc < pend) {
@@ -413,7 +403,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             //
             // Push values are not taken into consideration.
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(isMagnetic, ++nOpCount)) {
+            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount)) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
 
@@ -1257,7 +1247,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
                         nOpCount += nKeysCount;
-                        if (!IsValidMaxOpsPerScript(isMagnetic, nOpCount)) {
+                        if (!IsValidMaxOpsPerScript(nOpCount)) {
                             return set_error(serror, SCRIPT_ERR_OP_COUNT);
                         }
                         int ikey = ++i;
