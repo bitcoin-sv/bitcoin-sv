@@ -3731,17 +3731,6 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
     }
 
-    // When the Nov 15, 2018 HF is not enabled (and the user hasn't overridden the max size),
-    // block cannot be bigger than 32MB.
-    if (!IsMagneticEnabled(config, pindexPrev) && !config.MaxBlockSizeOverridden()) {
-        const uint64_t currentBlockSize =
-            ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-        if (currentBlockSize > LEGACY_DEFAULT_MAX_BLOCK_SIZE) {
-            return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
-                             false, "size limits failed");
-        }
-    }
-
     const int64_t nMedianTimePast =
         pindexPrev == nullptr ? 0 : pindexPrev->GetMedianTimePast();
 

@@ -78,21 +78,11 @@ static uint64_t ComputeMaxGeneratedBlockSize(const Config &config,
     // If both are given, restrict both.
     uint64_t nMaxGeneratedBlockSize = DEFAULT_MAX_GENERATED_BLOCK_SIZE;
     if (gArgs.IsArgSet("-blockmaxsize")) {
-        nMaxGeneratedBlockSize =
-            gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
+        nMaxGeneratedBlockSize = gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
     }
 
     // Limit size to between 1K and MaxBlockSize-1K for sanity:
-    nMaxGeneratedBlockSize =
-        std::max(uint64_t(ONE_KILOBYTE),
-            std::min(config.GetMaxBlockSize() - ONE_KILOBYTE, nMaxGeneratedBlockSize));
-
-    // If Nov 15, 2018 HF is not activated yet (and the user hasn't overridden the max size),
-    // we also want to limit the max generated block size to 32MB - 1K
-    if (!IsMagneticEnabled(config, pindexPrev) && !config.MaxBlockSizeOverridden()) {
-        nMaxGeneratedBlockSize =
-            std::min(LEGACY_DEFAULT_MAX_BLOCK_SIZE - ONE_KILOBYTE, nMaxGeneratedBlockSize);
-    }
+    nMaxGeneratedBlockSize = std::max(uint64_t(ONE_KILOBYTE), std::min(config.GetMaxBlockSize() - ONE_KILOBYTE, nMaxGeneratedBlockSize));
 
     return nMaxGeneratedBlockSize;
 }

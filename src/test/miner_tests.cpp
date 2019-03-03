@@ -733,37 +733,9 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
     CheckBlockMaxSize(ONE_MEGABYTE - 999, ONE_MEGABYTE - 999);
     CheckBlockMaxSize(ONE_MEGABYTE, ONE_MEGABYTE - 999);
 
-    // Now cap is 32MB
-    // Note: These lagacy cap tests can be removed once we remove the
-    // Magnetic activation code as they will no longer be relevant.
-    const auto THIRTY_TWO_MEGABYTES = 32 * ONE_MEGABYTE;
-    const auto LEGACY_CAP = THIRTY_TWO_MEGABYTES - 1000;
-
-    // Test around historical 32MB cap.
-    config.SetMaxBlockSize(THIRTY_TWO_MEGABYTES + 1);
-    config.SetMaxBlockSizeOverridden(false);
-    CheckBlockMaxSize(THIRTY_TWO_MEGABYTES - 1001, THIRTY_TWO_MEGABYTES - 1001);
-    CheckBlockMaxSize(THIRTY_TWO_MEGABYTES - 1000, LEGACY_CAP);
-    CheckBlockMaxSize(THIRTY_TWO_MEGABYTES - 999, LEGACY_CAP);
-    CheckBlockMaxSize(THIRTY_TWO_MEGABYTES, THIRTY_TWO_MEGABYTES - 1000);
-
     // Test around default cap
     config.SetMaxBlockSize(DEFAULT_MAX_BLOCK_SIZE);
     config.SetMaxBlockSizeOverridden(false);
-
-    // We are stuck at the legacy cap before activation.
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE, LEGACY_CAP);
-
-    // Activate Nov 15, 2018 HF the dirty way
-    const int64_t magneticTime =
-        config.GetChainParams().GetConsensus().magneticAnomalyActivationTime;
-    auto pindex = chainActive.Tip();
-    for (size_t i = 0; pindex && i < 5; i++) {
-        BOOST_CHECK(!IsMagneticEnabled(config, chainActive.Tip()));
-        pindex->nTime = magneticTime;
-        pindex = pindex->pprev;
-    }
-    BOOST_CHECK(IsMagneticEnabled(config, chainActive.Tip()));
 
     // Now we can use the default max block size.
     CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1001, DEFAULT_MAX_BLOCK_SIZE - 1001);
