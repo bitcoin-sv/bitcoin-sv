@@ -17,8 +17,6 @@
 typedef std::vector<uint8_t> valtype;
 typedef std::vector<valtype> stacktype;
 
-constexpr uint32_t SCRIPT_DISABLE_MAGNETIC_OPCODES = 0;
-
 std::array<uint32_t, 3> flagset{{0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
 
 BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
@@ -47,11 +45,6 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
     }
 }
 
-// magnetic upgrade
-static void CheckTestResultForAllFlagsMagnetic(const stacktype &original_stack, const CScript &script, const stacktype &expected) {
-    CheckTestResultForAllFlags(original_stack, script, expected, SCRIPT_ENABLE_MAGNETIC_OPCODES);
-}
-
 static void CheckError(uint32_t flags, const stacktype &original_stack,
                        const CScript &script, ScriptError expected_error, uint32_t upgradeFlag = 0) {
     BaseSignatureChecker sigchecker;
@@ -77,11 +70,6 @@ static void CheckErrorForAllFlags(const stacktype &original_stack, const CScript
     }
 }
 
-// magnetic upgrade
-static void CheckErrorForAllFlagsMagnetic(const stacktype &original_stack, const CScript &script, ScriptError expected_error) {
-    CheckErrorForAllFlags(original_stack, script, expected_error, SCRIPT_ENABLE_MAGNETIC_OPCODES);
-}
-
 static void CheckOpError(const stacktype &original_stack, opcodetype op, ScriptError expected_error) {
     CheckErrorForAllFlags(original_stack, CScript() << op, expected_error);
 }
@@ -96,12 +84,8 @@ static void CheckBinaryOp(const valtype &a, const valtype &b, opcodetype op, con
     CheckTestResultForAllFlags({a, b}, CScript() << op, {expected});
 }
 
-static void CheckBinaryOpMagnetic(const valtype &a, const valtype &b, opcodetype op, const valtype &expected) {
-    CheckTestResultForAllFlagsMagnetic({a, b}, CScript() << op, {expected});
-}
-
-static void CheckUnaryOpMagnetic(const valtype &a, opcodetype op, const valtype &expected) {
-    CheckTestResultForAllFlagsMagnetic({a}, CScript() << op, {expected});
+static void CheckUnaryOp(const valtype &a, opcodetype op, const valtype &expected) {
+    CheckTestResultForAllFlags({a}, CScript() << op, {expected});
 }
 
 static valtype NegativeValtype(const valtype &v) {
@@ -476,14 +460,14 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
 
 BOOST_AUTO_TEST_CASE(invert_test)
 { 
-    CheckUnaryOpMagnetic({},     OP_INVERT, {});
-    CheckUnaryOpMagnetic({0x00}, OP_INVERT, {0xFF});
-    CheckUnaryOpMagnetic({0xFF}, OP_INVERT, {0x00});
-    CheckUnaryOpMagnetic({0xFF, 0xA0, 0xCE, 0xA0, 0x96, 0x12}, OP_INVERT, {0x00, 0x5F, 0x31, 0x5F, 0x69, 0xED});
+    CheckUnaryOp({},     OP_INVERT, {});
+    CheckUnaryOp({0x00}, OP_INVERT, {0xFF});
+    CheckUnaryOp({0xFF}, OP_INVERT, {0x00});
+    CheckUnaryOp({0xFF, 0xA0, 0xCE, 0xA0, 0x96, 0x12}, OP_INVERT, {0x00, 0x5F, 0x31, 0x5F, 0x69, 0xED});
 } 
 
 static void CheckShiftOp(const valtype &x, const valtype &n, opcodetype op, const valtype &expected) {
-    CheckBinaryOpMagnetic(x, n, op, expected);
+    CheckBinaryOp(x, n, op, expected);
 }
 
 BOOST_AUTO_TEST_CASE(lshift_test)
@@ -545,8 +529,7 @@ BOOST_AUTO_TEST_CASE(lshift_test)
     CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_LSHIFT, to_bitpattern("11111010101010101000000000000000"));
 
     // second parameter, n < 0 - should produce error
-    CheckErrorForAllFlagsMagnetic({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_LSHIFT,
-                          SCRIPT_ERR_INVALID_NUMBER_RANGE); 
+    CheckErrorForAllFlags({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_LSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
 } 
  
 BOOST_AUTO_TEST_CASE(rshift_test) 
@@ -609,8 +592,7 @@ BOOST_AUTO_TEST_CASE(rshift_test)
     CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_RSHIFT, to_bitpattern("00000000000000010011111000100011"));
 
     // second parameter, n < 0 - should produce error
-    CheckErrorForAllFlagsMagnetic({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT,
-                          SCRIPT_ERR_INVALID_NUMBER_RANGE);
+    CheckErrorForAllFlags({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
 }
 
 /**
@@ -859,25 +841,25 @@ BOOST_AUTO_TEST_CASE(type_conversion_test) {
 static void CheckMul(const valtype &a, const valtype &b, const valtype &expected) 
 { 
     // Negative values for multiplication
-    CheckBinaryOpMagnetic(a, b, OP_MUL, expected);
-    CheckBinaryOpMagnetic(a, NegativeValtype(b), OP_MUL, NegativeValtype(expected));
-    CheckBinaryOpMagnetic(NegativeValtype(a), b, OP_MUL, NegativeValtype(expected));
-    CheckBinaryOpMagnetic(NegativeValtype(a), NegativeValtype(b), OP_MUL, expected);
+    CheckBinaryOp(a, b, OP_MUL, expected);
+    CheckBinaryOp(a, NegativeValtype(b), OP_MUL, NegativeValtype(expected));
+    CheckBinaryOp(NegativeValtype(a), b, OP_MUL, NegativeValtype(expected));
+    CheckBinaryOp(NegativeValtype(a), NegativeValtype(b), OP_MUL, expected);
  
     // Commutativity 
-    CheckBinaryOpMagnetic(b, a, OP_MUL, expected);
-    CheckBinaryOpMagnetic(b, NegativeValtype(a), OP_MUL, NegativeValtype(expected));
-    CheckBinaryOpMagnetic(NegativeValtype(b), a, OP_MUL, NegativeValtype(expected));
-    CheckBinaryOpMagnetic(NegativeValtype(b), NegativeValtype(a), OP_MUL, expected);
+    CheckBinaryOp(b, a, OP_MUL, expected);
+    CheckBinaryOp(b, NegativeValtype(a), OP_MUL, NegativeValtype(expected));
+    CheckBinaryOp(NegativeValtype(b), a, OP_MUL, NegativeValtype(expected));
+    CheckBinaryOp(NegativeValtype(b), NegativeValtype(a), OP_MUL, expected);
 
     // Multiplication identities 
-    CheckBinaryOpMagnetic(a, {0x01}, OP_MUL, a);
-    CheckBinaryOpMagnetic(a, {0x81}, OP_MUL, NegativeValtype(a));
-    CheckBinaryOpMagnetic(a, {}, OP_MUL, {});
+    CheckBinaryOp(a, {0x01}, OP_MUL, a);
+    CheckBinaryOp(a, {0x81}, OP_MUL, NegativeValtype(a));
+    CheckBinaryOp(a, {}, OP_MUL, {});
 
-    CheckBinaryOpMagnetic({0x01}, b, OP_MUL, b);
-    CheckBinaryOpMagnetic({0x81}, b, OP_MUL, NegativeValtype(b));
-    CheckBinaryOpMagnetic({}, b, OP_MUL, {});
+    CheckBinaryOp({0x01}, b, OP_MUL, b);
+    CheckBinaryOp({0x81}, b, OP_MUL, NegativeValtype(b));
+    CheckBinaryOp({}, b, OP_MUL, {});
 }
 
 BOOST_AUTO_TEST_CASE(mul_test) 
@@ -1055,25 +1037,18 @@ static void CheckTestForOpCodeLimit(const CScript &script,
                                     const BaseSignatureChecker& sigchecker,
                                     const stacktype &original_stack = {})
 { 
-    std::array<uint32_t, 2> release_dependent_flagset {
-        { SCRIPT_DISABLE_MAGNETIC_OPCODES, SCRIPT_ENABLE_MAGNETIC_OPCODES }
-    };
-
-    for (uint32_t std_flags : flagset) {
-        for(uint32_t rdep_flags : release_dependent_flagset) {
-            uint32_t flags = std_flags | rdep_flags; 
-            ScriptError err = SCRIPT_ERR_OK; 
-            stacktype stack{original_stack};
-            bool r = EvalScript(stack, script, flags, sigchecker, &err);
-            size_t nonPushOpcodeCount = NonPushOpCodeCount(script);
-            if (nonPushOpcodeCount > MAX_OPS_PER_SCRIPT) {
-                BOOST_CHECK(!r);
-            } else {
-                BOOST_CHECK(r); 
-            }
-            BOOST_CHECK(nonPushOpcodeCount == expNonPushOpcodeCount);
-	    }
-    } 
+    for (uint32_t flags : flagset) {
+        ScriptError err = SCRIPT_ERR_OK;
+        stacktype stack{original_stack};
+        bool r = EvalScript(stack, script, flags, sigchecker, &err);
+        size_t nonPushOpcodeCount = NonPushOpCodeCount(script);
+        if (nonPushOpcodeCount > MAX_OPS_PER_SCRIPT) {
+            BOOST_CHECK(!r);
+        } else {
+            BOOST_CHECK(r);
+        }
+        BOOST_CHECK(nonPushOpcodeCount == expNonPushOpcodeCount);
+    }
 } 
 
 static CScript add_op1_ntimes(size_t nTimes)

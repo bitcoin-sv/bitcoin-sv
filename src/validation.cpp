@@ -995,10 +995,6 @@ static bool AcceptToMemoryPoolWorker(
         // Set extraFlags as a set of flags that needs to be activated.
         uint32_t extraFlags = SCRIPT_VERIFY_NONE;
 
-        if (IsMagneticEnabled(config, chainActive.Tip())) {
-            extraFlags |= SCRIPT_ENABLE_MAGNETIC_OPCODES;
-        }
-
         if (IsReplayProtectionEnabledForCurrentBlock(config)) {
             extraFlags |= SCRIPT_ENABLE_REPLAY_PROTECTION;
         }
@@ -1598,29 +1594,19 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
         } else if (!check()) {
             const bool hasNonMandatoryFlags =
                 (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-            const bool doesNotHaveMagnetic =
-                (flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0;
-            if (hasNonMandatoryFlags || doesNotHaveMagnetic) {
+            if (hasNonMandatoryFlags) {
                 // Check whether the failure was caused by a non-mandatory
                 // script verification check, such as non-standard DER encodings
                 // or non-null dummy arguments; if so, don't trigger DoS
                 // protection to avoid splitting the network between upgraded
                 // and non-upgraded nodes.
-                //
-                // We also check activating the magnetic opcodes as they
-                // are strictly additive changes and we would not like to ban some of
-                // our peer that are ahead of us and are considering the fork
-                // as activated.
                 CScriptCheck check2(
                     scriptPubKey, amount, tx, i,
-                    (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) |
-                        SCRIPT_ENABLE_MAGNETIC_OPCODES,
+                    (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
                     sigCacheStore, txdata);
                 if (check2()) {
-                    return state.Invalid(
-                        false, REJECT_NONSTANDARD,
-                        strprintf("non-mandatory-script-verify-flag (%s)",
-                                  ScriptErrorString(check.GetScriptError())));
+                    return state.Invalid(false, REJECT_NONSTANDARD,
+                            strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
                 }
             }
 
@@ -1980,11 +1966,6 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     if (IsDAAEnabled(config, pChainTip)) {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
-    }
-
-    // The magnetic HF enable a set of opcodes.
-    if (IsMagneticEnabled(config, pChainTip)) {
-        flags |= SCRIPT_ENABLE_MAGNETIC_OPCODES;
     }
 
     // We make sure this node will have replay protection during the next hard
