@@ -15,7 +15,7 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
-#include "miner.h"
+#include "mining/miner.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "rpc/server.h"
@@ -442,7 +442,7 @@ const CRPCCommand commands[] =
 
 } // namespace
 
-void RegisterMining2RPCCommands(CRPCTable &t)
+void RegisterMiningFBBRPCCommands(CRPCTable &t)
 {
     for (auto& cmd : commands)
         t.appendCommand(cmd.name, &cmd);

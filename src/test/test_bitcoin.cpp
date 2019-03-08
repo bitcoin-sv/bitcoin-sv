@@ -12,7 +12,7 @@
 #include "fs.h"
 #include "key.h"
 #include "logging.h"
-#include "miner.h"
+#include "mining/miner.h"
 #include "net_processing.h"
 #include "pubkey.h"
 #include "random.h"

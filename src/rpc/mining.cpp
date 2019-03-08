@@ -14,7 +14,7 @@
 #include "core_io.h"
 #include "dstencode.h"
 #include "init.h"
-#include "miner.h"
+#include "mining/miner.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "pow.h"
