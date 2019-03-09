@@ -69,7 +69,7 @@ static const std::vector<std::string>
                           allNetMessageTypes + ARRAYLEN(allNetMessageTypes));
 
 CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn) {
-    memcpy(std::begin(pchMessageStart), std::begin(pchMessageStartIn),
+    memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
            MESSAGE_START_SIZE);
     memset(pchCommand, 0, sizeof(pchCommand));
     nMessageSize = -1;
@@ -79,7 +79,7 @@ CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn) {
 CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn,
                                const char *pszCommand,
                                unsigned int nMessageSizeIn) {
-    memcpy(std::begin(pchMessageStart), std::begin(pchMessageStartIn),
+    memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
            MESSAGE_START_SIZE);
     memset(pchCommand, 0, sizeof(pchCommand));
     strncpy(pchCommand, pszCommand, COMMAND_SIZE);
@@ -96,7 +96,7 @@ static bool
 CheckHeaderMagicAndCommand(const CMessageHeader &header,
                            const CMessageHeader::MessageMagic &magic) {
     // Check start string
-    if (memcmp(std::begin(header.pchMessageStart), std::begin(magic),
+    if (memcmp(header.pchMessageStart.data(), magic.data(),
                CMessageHeader::MESSAGE_START_SIZE) != 0) {
         return false;
     }
