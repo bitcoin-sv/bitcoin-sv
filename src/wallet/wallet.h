@@ -29,6 +29,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <random>
 
 typedef CWallet *CWalletRef;
 extern std::vector<CWalletRef> vpwallets;
@@ -594,6 +595,7 @@ class CWallet final : public CCryptoKeyStore, public CValidationInterface {
 private:
     static std::atomic<bool> fFlushScheduled;
 
+    mutable std::mt19937 randomNumbers;
     /**
      * Select a set of coins such that nValueRet >= nTargetValue and at least
      * all coins from coinControl are selected; Never select unconfirmed coins
@@ -710,14 +712,14 @@ public:
 
     // Create wallet with dummy database handle
     CWallet(const CChainParams &chainParams)
-        : dbw(new CWalletDBWrapper()), chainParams(chainParams) {
+        : dbw(new CWalletDBWrapper()), chainParams(chainParams), randomNumbers(std::random_device{}()) {
         SetNull();
     }
 
     // Create wallet with passed-in database handle
     CWallet(const CChainParams &chainParams,
             std::unique_ptr<CWalletDBWrapper> dbw_in)
-        : dbw(std::move(dbw_in)), chainParams(chainParams) {
+        : dbw(std::move(dbw_in)), chainParams(chainParams),  randomNumbers(std::random_device{}()) {
         SetNull();
     }
 
