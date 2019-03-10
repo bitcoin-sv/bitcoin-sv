@@ -3,7 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "miner.h"
+#include "legacy.h"
 
 #include "amount.h"
 #include "chain.h"
@@ -87,7 +87,7 @@ static uint64_t ComputeMaxGeneratedBlockSize(const Config &config,
     return nMaxGeneratedBlockSize;
 }
 
-BlockAssembler::BlockAssembler(const Config &_config) : config(&_config) {
+LegacyBlockAssembler::LegacyBlockAssembler(const Config &_config) : config(&_config) {
 
     if (gArgs.IsArgSet("-blockmintxfee")) {
         Amount n(0);
@@ -102,7 +102,7 @@ BlockAssembler::BlockAssembler(const Config &_config) : config(&_config) {
         ComputeMaxGeneratedBlockSize(*config, chainActive.Tip());
 }
 
-void BlockAssembler::resetBlock() {
+void LegacyBlockAssembler::resetBlock() {
     inBlock.clear();
 
     // Reserve space for coinbase tx.
@@ -126,7 +126,7 @@ getExcessiveBlockSizeSig(const Config &config) {
 }
 
 std::unique_ptr<CBlockTemplate>
-BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
+LegacyBlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
     int64_t nTimeStart = GetTimeMicros();
 
     resetBlock();
@@ -225,7 +225,7 @@ BlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
     return std::move(pblocktemplate);
 }
 
-bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter) {
+bool LegacyBlockAssembler::isStillDependent(CTxMemPool::txiter iter) {
     for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter)) {
         if (!inBlock.count(parent)) {
             return true;
@@ -234,7 +234,7 @@ bool BlockAssembler::isStillDependent(CTxMemPool::txiter iter) {
     return false;
 }
 
-void BlockAssembler::onlyUnconfirmed(CTxMemPool::setEntries &testSet) {
+void LegacyBlockAssembler::onlyUnconfirmed(CTxMemPool::setEntries &testSet) {
     for (CTxMemPool::setEntries::iterator iit = testSet.begin();
          iit != testSet.end();) {
         // Only test txs not already in the block.
@@ -246,7 +246,7 @@ void BlockAssembler::onlyUnconfirmed(CTxMemPool::setEntries &testSet) {
     }
 }
 
-bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOps) {
+bool LegacyBlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOps) {
     auto blockSizeWithPackage = nBlockSize + packageSize;
     if (blockSizeWithPackage >= nMaxGeneratedBlockSize) {
         return false;
@@ -263,7 +263,7 @@ bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOps) {
  * - Transaction finality (locktime)
  * - Serialized size (in case -blockmaxsize is in use)
  */
-bool BlockAssembler::TestPackageTransactions(
+bool LegacyBlockAssembler::TestPackageTransactions(
     const CTxMemPool::setEntries &package) {
     uint64_t nPotentialBlockSize = nBlockSize;
     for (const CTxMemPool::txiter it : package) {
@@ -285,7 +285,7 @@ bool BlockAssembler::TestPackageTransactions(
     return true;
 }
 
-bool BlockAssembler::TestForBlock(CTxMemPool::txiter it) {
+bool LegacyBlockAssembler::TestForBlock(CTxMemPool::txiter it) {
     auto blockSizeWithTx =
         nBlockSize +
         ::GetSerializeSize(it->GetTx(), SER_NETWORK, PROTOCOL_VERSION);
@@ -326,7 +326,7 @@ bool BlockAssembler::TestForBlock(CTxMemPool::txiter it) {
     return true;
 }
 
-void BlockAssembler::AddToBlock(CTxMemPool::txiter iter) {
+void LegacyBlockAssembler::AddToBlock(CTxMemPool::txiter iter) {
     pblock->vtx.emplace_back(iter->GetSharedTx());
     pblocktemplate->vTxFees.push_back(iter->GetFee());
     pblocktemplate->vTxSigOpsCount.push_back(iter->GetSigOpCount());
@@ -349,7 +349,7 @@ void BlockAssembler::AddToBlock(CTxMemPool::txiter iter) {
     }
 }
 
-int BlockAssembler::UpdatePackagesForAdded(
+int LegacyBlockAssembler::UpdatePackagesForAdded(
     const CTxMemPool::setEntries &alreadyAdded,
     indexed_modified_transaction_set &mapModifiedTx) {
     int nDescendantsUpdated = 0;
@@ -385,14 +385,14 @@ int BlockAssembler::UpdatePackagesForAdded(
 // It's currently guaranteed to fail again, but as a belt-and-suspenders check
 // we put it in failedTx and avoid re-evaluation, since the re-evaluation would
 // be using cached size/sigops/fee values that are not actually correct.
-bool BlockAssembler::SkipMapTxEntry(
+bool LegacyBlockAssembler::SkipMapTxEntry(
     CTxMemPool::txiter it, indexed_modified_transaction_set &mapModifiedTx,
     CTxMemPool::setEntries &failedTx) {
     assert(it != mempool.mapTx.end());
     return mapModifiedTx.count(it) || inBlock.count(it) || failedTx.count(it);
 }
 
-void BlockAssembler::SortForBlock(
+void LegacyBlockAssembler::SortForBlock(
     const CTxMemPool::setEntries &package, CTxMemPool::txiter entry,
     std::vector<CTxMemPool::txiter> &sortedEntries) {
     // Sort package by ancestor count. If a transaction A depends on transaction
@@ -411,7 +411,7 @@ void BlockAssembler::SortForBlock(
  * @param[out] nPackagesSelected    How many packages were selected
  * @param[out] nDescendantsUpdated  Number of descendant transactions updated
 */
-void BlockAssembler::addPackageTxs(int &nPackagesSelected,
+void LegacyBlockAssembler::addPackageTxs(int &nPackagesSelected,
                                    int &nDescendantsUpdated) {
 
     // selection algorithm orders the mempool based on feerate of a
@@ -556,7 +556,7 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected,
     }
 }
 
-void BlockAssembler::addPriorityTxs() {
+void LegacyBlockAssembler::addPriorityTxs() {
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay.
     if (config->GetBlockPriorityPercentage() == 0) {

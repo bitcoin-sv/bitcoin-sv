@@ -21,7 +21,7 @@
 #include "httprpc.h"
 #include "httpserver.h"
 #include "key.h"
-#include "mining/miner.h"
+#include "mining/legacy.h"
 #include "net.h"
 #include "net_processing.h"
 #include "netbase.h"

@@ -125,7 +125,9 @@ BITCOIN_CORE_H = \
   logging.h \
   memusage.h \
   merkleblock.h \
-  mining/miner.h \
+  mining/assembler.h \
+  mining/factory.h \
+  mining/legacy.h \
   mod_pri_queue.h \
   net.h \
   net_processing.h \
@@ -218,7 +220,8 @@ libbitcoin_server_a_SOURCES = \
   init.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
-  mining/miner.cpp \
+  mining/factory.cpp \
+  mining/legacy.cpp \
   net.cpp \
   net_processing.cpp \
   noui.cpp \

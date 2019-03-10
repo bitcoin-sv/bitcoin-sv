@@ -15,7 +15,7 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
-#include "mining/miner.h"
+#include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "rpc/server.h"
@@ -133,7 +133,7 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
         if (coinbaseScript->reserveScript.empty())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
 
-        pblocktemplate = BlockAssembler(config).CreateNewBlock(coinbaseScript->reserveScript); 
+        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript);
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
 

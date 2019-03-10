@@ -221,7 +221,8 @@ add_library(server
 	init.cpp
 	dbwrapper.cpp
 	merkleblock.cpp
-    mining/miner.cpp
+	mining/factory.cpp
+    mining/legacy.cpp
 	net.cpp
 	net_processing.cpp
 	noui.cpp

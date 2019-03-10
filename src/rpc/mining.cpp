@@ -14,7 +14,7 @@
 #include "core_io.h"
 #include "dstencode.h"
 #include "init.h"
-#include "mining/miner.h"
+#include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "pow.h"
@@ -130,7 +130,7 @@ UniValue generateBlocks(const Config &config,
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
-            BlockAssembler(config).CreateNewBlock(
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(
                 coinbaseScript->reserveScript));
 
         if (!pblocktemplate.get()) {
@@ -628,7 +628,7 @@ static UniValue getblocktemplate(const Config &config,
 
         // Create new block
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptDummy);
+        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptDummy);
         if (!pblocktemplate) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
         }

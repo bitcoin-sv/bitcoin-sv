@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "mining/miner.h"
+#include "mining/factory.h"
 
 #include "chainparams.h"
 #include "coins.h"
@@ -126,7 +126,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
                              .FromTx(tx));
 
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-        BlockAssembler(config).CreateNewBlock(scriptPubKey);
+        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
     BOOST_CHECK(pblocktemplate->block.vtx[1]->GetId() == parentTxId);
     BOOST_CHECK(pblocktemplate->block.vtx[2]->GetId() == highFeeTxId);
     BOOST_CHECK(pblocktemplate->block.vtx[3]->GetId() == mediumFeeTxId);
@@ -147,7 +147,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     tx.vout[0].nValue = Amount(5000000000LL - 1000 - 50000) - feeToUse;
     TxId lowFeeTxId = tx.GetId();
     mempool.addUnchecked(lowFeeTxId, entry.Fee(feeToUse).FromTx(tx));
-    pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
+    pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
     // Verify that the free tx and the low fee tx didn't get selected.
     for (const auto &txn : pblocktemplate->block.vtx) {
         BOOST_CHECK(txn->GetId() != freeTxId);
@@ -163,7 +163,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     lowFeeTxId = tx.GetId();
     mempool.addUnchecked(lowFeeTxId,
                          entry.Fee(feeToUse + Amount(2)).FromTx(tx));
-    pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
+    pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
     BOOST_CHECK(pblocktemplate->block.vtx[4]->GetId() == freeTxId);
     BOOST_CHECK(pblocktemplate->block.vtx[5]->GetId() == lowFeeTxId);
 
@@ -187,7 +187,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     TxId lowFeeTxId2 = tx.GetId();
     mempool.addUnchecked(lowFeeTxId2,
                          entry.Fee(feeToUse).SpendsCoinbase(false).FromTx(tx));
-    pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
+    pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
 
     // Verify that this tx isn't selected.
     for (const auto &txn : pblocktemplate->block.vtx) {
@@ -201,7 +201,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     // 10k satoshi fee.
     tx.vout[0].nValue = Amount(100000000 - 10000);
     mempool.addUnchecked(tx.GetId(), entry.Fee(Amount(10000)).FromTx(tx));
-    pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptPubKey);
+    pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
     BOOST_CHECK(pblocktemplate->block.vtx[8]->GetId() == lowFeeTxId2);
 }
 
@@ -217,7 +217,7 @@ void TestCoinbaseMessageEB(uint64_t eb, std::string cbmsg) {
                   << OP_CHECKSIG;
 
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-        BlockAssembler(config).CreateNewBlock(scriptPubKey);
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
 
     CBlock *pblock = &pblocktemplate->block;
 
@@ -264,7 +264,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     // Simple block creation, nothing special yet:
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
 
     // We can't make transactions until we have inputs. Therefore, load 100
     // blocks :)
@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     // Just to make sure we can still make simple blocks.
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
 
     const Amount BLOCKSUBSIDY = 50 * COIN;
     const Amount LOWFEE = CENT;
@@ -326,7 +326,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                                  .FromTx(tx));
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
                       std::runtime_error);
     mempool.clear();
 
@@ -348,7 +348,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     mempool.clear();
 
     // block size > limit
@@ -375,13 +375,13 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     mempool.clear();
 
     // Orphan in mempool, template creation fails.
     hash = tx.GetId();
     mempool.addUnchecked(hash, entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
                       std::runtime_error);
     mempool.clear();
 
@@ -404,7 +404,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         hash,
         entry.Fee(HIGHERFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     mempool.clear();
 
     // Coinbase in mempool, template creation fails.
@@ -417,7 +417,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
                       std::runtime_error);
     mempool.clear();
 
@@ -449,7 +449,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
                       std::runtime_error);
     mempool.clear();
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
@@ -472,7 +472,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK_THROW(BlockAssembler(config).CreateNewBlock(scriptPubKey),
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
                       std::runtime_error);
     mempool.clear();
 
@@ -490,7 +490,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         chainActive.SetTip(next);
     }
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     // Extend to a 210000-long block chain.
     while (chainActive.Tip()->nHeight < 210000) {
         CBlockIndex *prev = chainActive.Tip();
@@ -503,7 +503,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         chainActive.SetTip(next);
     }
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     // Delete the dummy blocks again.
     while (chainActive.Tip()->nHeight > nHeight) {
         CBlockIndex *del = chainActive.Tip();
@@ -676,7 +676,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), flags));
 
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
 
     // None of the of the absolute height/time locked tx should have made it
     // into the template because we still check IsFinalTx in CreateNewBlock, but
@@ -694,7 +694,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
     BOOST_CHECK(pblocktemplate =
-                    BlockAssembler(config).CreateNewBlock(scriptPubKey));
+                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), 5UL);
 
     chainActive.Tip()->nHeight--;
@@ -709,8 +709,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 void CheckBlockMaxSize(uint64_t size, uint64_t expected)
 {
     gArgs.ForceSetArg("-blockmaxsize", std::to_string(size));
-    BlockAssembler ba(GlobalConfig::GetConfig());
-    BOOST_CHECK_EQUAL(ba.GetMaxGeneratedBlockSize(), expected);
+    BlockAssemblerRef ba = CMiningFactory::GetAssembler(GlobalConfig::GetConfig());
+    BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
 }
 
 BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
@@ -750,8 +750,8 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
                                 std::min(DEFAULT_MAX_BLOCK_SIZE - ONE_KILOBYTE,
                                     DEFAULT_MAX_GENERATED_BLOCK_SIZE)) };
         gArgs.ClearArg("-blockmaxsize");
-        BlockAssembler ba(config);
-        BOOST_CHECK_EQUAL(ba.GetMaxGeneratedBlockSize(), expected);
+        BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);
+        BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
     }
 }
 

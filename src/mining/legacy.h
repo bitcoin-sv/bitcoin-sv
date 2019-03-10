@@ -6,6 +6,7 @@
 #ifndef BITCOIN_MINER_H
 #define BITCOIN_MINER_H
 
+#include "mining/assembler.h"
 #include "primitives/block.h"
 #include "txmempool.h"
 
@@ -23,12 +24,6 @@ class CScript;
 class CWallet;
 
 static const bool DEFAULT_PRINTPRIORITY = false;
-
-struct CBlockTemplate {
-    CBlock block;
-    std::vector<Amount> vTxFees;
-    std::vector<int64_t> vTxSigOpsCount;
-};
 
 // Container for tracking updates to ancestor feerate as we include (parent)
 // transactions in a block
@@ -126,7 +121,7 @@ struct update_for_parent_inclusion {
 };
 
 /** Generate a new block, without valid proof-of-work */
-class BlockAssembler {
+class LegacyBlockAssembler : public BlockAssembler {
 private:
     // The constructed block template
     std::unique_ptr<CBlockTemplate> pblocktemplate;
@@ -134,7 +129,6 @@ private:
     CBlock *pblock;
 
     // Configuration parameters for the block size
-    uint64_t nMaxGeneratedBlockSize;
     CFeeRate blockMinFeeRate;
 
     // Information on the current status of the block
@@ -155,12 +149,9 @@ private:
     bool blockFinished;
 
 public:
-    BlockAssembler(const Config &_config);
+    LegacyBlockAssembler(const Config &_config);
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    std::unique_ptr<CBlockTemplate>
-    CreateNewBlock(const CScript &scriptPubKeyIn);
-
-    uint64_t GetMaxGeneratedBlockSize() const { return nMaxGeneratedBlockSize; }
+    virtual std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript &scriptPubKeyIn);
 
 private:
     // utility functions
