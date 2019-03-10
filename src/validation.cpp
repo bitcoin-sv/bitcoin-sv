@@ -142,6 +142,20 @@ std::set<CBlockIndex *, CBlockIndexWorkComparator> setBlockIndexCandidates;
  */
 std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 
+class CBlockFileInfoStore
+{
+
+  CCriticalSection cs_LastBlockFile;
+  std::vector<CBlockFileInfo> vinfoBlockFile;
+  int nLastBlockFile = 0;
+public:
+  uint64_t CalculateCurrentUsage();
+    
+};
+
+std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = std::make_unique<CBlockFileInfoStore>();
+
+// TODO: remove the ones bellow
 CCriticalSection cs_LastBlockFile;
 std::vector<CBlockFileInfo> vinfoBlockFile;
 int nLastBlockFile = 0;
@@ -4094,7 +4108,8 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
 /**
  * Calculate the amount of disk space the block & undo files currently use.
  */
-static uint64_t CalculateCurrentUsage() {
+uint64_t CBlockFileInfoStore::CalculateCurrentUsage() {
+    // TODO: this method currently required cs_LastBlockFile to be held. Consider moving locking code insied this method  
     uint64_t retval = 0;
     for (const CBlockFileInfo &file : vinfoBlockFile) {
         retval += file.nSize + file.nUndoSize;
@@ -4218,7 +4233,7 @@ static void FindFilesToPrune(std::set<int> &setFilesToPrune,
 
     unsigned int nLastBlockWeCanPrune =
         chainActive.Tip()->nHeight - MIN_BLOCKS_TO_KEEP;
-    uint64_t nCurrentUsage = CalculateCurrentUsage();
+    uint64_t nCurrentUsage = pBlockFileInfoStore->CalculateCurrentUsage();
     // We don't check to prune until after we've allocated new space for files,
     // so we should leave a buffer under our target to account for another
     // allocation before the next pruning.
