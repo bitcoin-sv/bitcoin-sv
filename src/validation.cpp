@@ -142,6 +142,9 @@ std::set<CBlockIndex *, CBlockIndexWorkComparator> setBlockIndexCandidates;
  */
 std::multimap<CBlockIndex *, CBlockIndex *> mapBlocksUnlinked;
 
+
+
+/** Stores a collection of CBlockFileInfo-s */
 class CBlockFileInfoStore
 {
 
@@ -150,9 +153,14 @@ class CBlockFileInfoStore
   int nLastBlockFile = 0;
 public:
   uint64_t CalculateCurrentUsage();
-    
+  bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos,
+    unsigned int nAddSize, unsigned int nHeight,
+    uint64_t nTime, bool& fCheckForPruning, bool fKnown = false);
+
 };
 
+
+/** Access to info about block files */
 std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = std::make_unique<CBlockFileInfoStore>();
 
 // TODO: remove the ones bellow
@@ -3369,9 +3377,10 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState &state,
     return true;
 }
 
-static bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos,
+
+bool CBlockFileInfoStore::FindBlockPos(CValidationState &state, CDiskBlockPos &pos,
                          unsigned int nAddSize, unsigned int nHeight,
-                         uint64_t nTime, bool fKnown = false) {
+                         uint64_t nTime, bool& fCheckForPruning, bool fKnown) {
     LOCK(cs_LastBlockFile);
 
     unsigned int nFile = fKnown ? pos.nFile : nLastBlockFile;
@@ -3995,8 +4004,8 @@ static bool AcceptBlock(const Config &config,
         if (dbp != nullptr) {
             blockPos = *dbp;
         }
-        if (!FindBlockPos(state, blockPos, nBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE, nHeight,
-                          block.GetBlockTime(), dbp != nullptr)) {
+        if (!pBlockFileInfoStore->FindBlockPos(state, blockPos, nBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE, nHeight,
+                          block.GetBlockTime(), fCheckForPruning, dbp != nullptr)) {
             return error("AcceptBlock(): FindBlockPos failed");
         }
         if (dbp == nullptr) {
@@ -4879,8 +4888,8 @@ bool InitBlockIndex(const Config &config) {
                 ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
             CDiskBlockPos blockPos;
             CValidationState state;
-            if (!FindBlockPos(state, blockPos, nBlockSize + 8, 0,
-                              block.GetBlockTime())) {
+            if (!pBlockFileInfoStore->FindBlockPos(state, blockPos, nBlockSize + 8, 0,
+                              block.GetBlockTime(), fCheckForPruning)) {
                 return error("LoadBlockIndex(): FindBlockPos failed");
             }
             if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic())) {
