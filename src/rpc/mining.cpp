@@ -137,7 +137,8 @@ UniValue generateBlocks(const Config &config,
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         }
 
-        CBlock *pblock = &pblocktemplate->block;
+        CBlockRef blockRef = pblocktemplate->GetBlockRef();
+        CBlock *pblock = blockRef.get();
 
         {
             LOCK(cs_main);
@@ -638,7 +639,8 @@ static UniValue getblocktemplate(const Config &config,
     }
 
     // pointer for convenience
-    CBlock *pblock = &pblocktemplate->block;
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlock *pblock = blockRef.get();
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 

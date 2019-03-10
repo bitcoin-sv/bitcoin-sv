@@ -141,7 +141,8 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
         pindexPrev = pindexPrevNew;
     }
 
-    CBlock *pblock = &pblocktemplate->block;
+    CBlockRef blockref = pblocktemplate->GetBlockRef();
+    CBlock *pblock = blockref.get();
 
     // Update nTime
     UpdateTime(pblock, config, pindexPrev);

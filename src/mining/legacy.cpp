@@ -137,7 +137,8 @@ LegacyBlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
     }
 
     // Pointer for convenience.
-    pblock = &pblocktemplate->block;
+    CBlockRef blockref = pblocktemplate->GetBlockRef();
+    pblock = blockref.get();
 
     // Add dummy coinbase tx as first transaction.
     pblock->vtx.emplace_back();

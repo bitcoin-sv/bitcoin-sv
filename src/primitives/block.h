@@ -115,6 +115,8 @@ public:
     std::string ToString() const;
 };
 
+typedef std::shared_ptr<CBlock> CBlockRef;
+
 /**
  * Describes a place in the block chain to another node such that if the other
  * node doesn't have the same branch, it can find a recent common trunk.  The

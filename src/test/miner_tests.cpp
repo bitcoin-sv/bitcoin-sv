@@ -127,9 +127,9 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
 
     std::unique_ptr<CBlockTemplate> pblocktemplate =
         CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
-    BOOST_CHECK(pblocktemplate->block.vtx[1]->GetId() == parentTxId);
-    BOOST_CHECK(pblocktemplate->block.vtx[2]->GetId() == highFeeTxId);
-    BOOST_CHECK(pblocktemplate->block.vtx[3]->GetId() == mediumFeeTxId);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[1]->GetId() == parentTxId);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[2]->GetId() == highFeeTxId);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[3]->GetId() == mediumFeeTxId);
 
     // Test that a package below the block min tx fee doesn't get included
     tx.vin[0].prevout = COutPoint(highFeeTxId, 0);
@@ -149,7 +149,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     mempool.addUnchecked(lowFeeTxId, entry.Fee(feeToUse).FromTx(tx));
     pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
     // Verify that the free tx and the low fee tx didn't get selected.
-    for (const auto &txn : pblocktemplate->block.vtx) {
+    for (const auto &txn : pblocktemplate->GetBlockRef()->vtx) {
         BOOST_CHECK(txn->GetId() != freeTxId);
         BOOST_CHECK(txn->GetId() != lowFeeTxId);
     }
@@ -164,8 +164,8 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     mempool.addUnchecked(lowFeeTxId,
                          entry.Fee(feeToUse + Amount(2)).FromTx(tx));
     pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
-    BOOST_CHECK(pblocktemplate->block.vtx[4]->GetId() == freeTxId);
-    BOOST_CHECK(pblocktemplate->block.vtx[5]->GetId() == lowFeeTxId);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[4]->GetId() == freeTxId);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[5]->GetId() == lowFeeTxId);
 
     // Test that transaction selection properly updates ancestor fee
     // calculations as ancestor transactions get included in a block. Add a
@@ -190,7 +190,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
 
     // Verify that this tx isn't selected.
-    for (const auto &txn : pblocktemplate->block.vtx) {
+    for (const auto &txn : pblocktemplate->GetBlockRef()->vtx) {
         BOOST_CHECK(txn->GetId() != freeTxId2);
         BOOST_CHECK(txn->GetId() != lowFeeTxId2);
     }
@@ -202,7 +202,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     tx.vout[0].nValue = Amount(100000000 - 10000);
     mempool.addUnchecked(tx.GetId(), entry.Fee(Amount(10000)).FromTx(tx));
     pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
-    BOOST_CHECK(pblocktemplate->block.vtx[8]->GetId() == lowFeeTxId2);
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[8]->GetId() == lowFeeTxId2);
 }
 
 void TestCoinbaseMessageEB(uint64_t eb, std::string cbmsg) {
@@ -219,7 +219,8 @@ void TestCoinbaseMessageEB(uint64_t eb, std::string cbmsg) {
     std::unique_ptr<CBlockTemplate> pblocktemplate =
             CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
 
-    CBlock *pblock = &pblocktemplate->block;
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlock *pblock = blockRef.get();
 
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
@@ -272,7 +273,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     std::vector<CTransactionRef> txFirst;
     for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) {
         // pointer for convenience.
-        CBlock *pblock = &pblocktemplate->block;
+        CBlockRef blockRef = pblocktemplate->GetBlockRef();
+        CBlock *pblock = blockRef.get();
         pblock->nVersion = 1;
         pblock->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
         CMutableTransaction txCoinbase(*pblock->vtx[0]);
@@ -682,7 +684,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     // into the template because we still check IsFinalTx in CreateNewBlock, but
     // relative locked txs will if inconsistently added to mempool. For now
     // these will still generate a valid template until BIP68 soft fork.
-    BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), 3UL);
+    BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 3UL);
     // However if we advance height by 1 and time by 512, all of them should be
     // mined.
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
@@ -695,7 +697,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     BOOST_CHECK(pblocktemplate =
                         CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
-    BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), 5UL);
+    BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 5UL);
 
     chainActive.Tip()->nHeight--;
     SetMockTime(0);

@@ -137,7 +137,8 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const Config &config = GlobalConfig::GetConfig();
     std::unique_ptr<CBlockTemplate> pblocktemplate =
             CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
-    CBlock &block = pblocktemplate->block;
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlock &block = *blockRef;
 
     // Replace mempool-selected txns with just coinbase plus passed-in txns:
     block.vtx.resize(1);
