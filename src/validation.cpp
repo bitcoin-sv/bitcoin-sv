@@ -153,10 +153,13 @@ class CBlockFileInfoStore
   int nLastBlockFile = 0;
 public:
   uint64_t CalculateCurrentUsage();
+  
   bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos,
     unsigned int nAddSize, unsigned int nHeight,
     uint64_t nTime, bool& fCheckForPruning, bool fKnown = false);
 
+  void FindFilesToPrune(std::set<int> &setFilesToPrune,
+    uint64_t nPruneAfterHeight);
 };
 
 
@@ -2383,7 +2386,7 @@ static bool FlushStateToDisk(const CChainParams &chainparams,
                 if (nManualPruneHeight > 0) {
                     FindFilesToPruneManual(setFilesToPrune, nManualPruneHeight);
                 } else {
-                    FindFilesToPrune(setFilesToPrune,
+                    pBlockFileInfoStore->FindFilesToPrune(setFilesToPrune,
                                      chainparams.PruneAfterHeight());
                     fCheckForPruning = false;
                 }
@@ -4230,7 +4233,7 @@ void PruneBlockFilesManual(int nManualPruneHeight) {
  * @param[out]   setFilesToPrune   The set of file indices that can be unlinked
  * will be returned
  */
-static void FindFilesToPrune(std::set<int> &setFilesToPrune,
+void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
                              uint64_t nPruneAfterHeight) {
     LOCK2(cs_main, cs_LastBlockFile);
     if (chainActive.Tip() == nullptr || nPruneTarget == 0) {
