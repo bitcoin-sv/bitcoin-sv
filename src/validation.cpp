@@ -160,6 +160,9 @@ public:
 
   void FindFilesToPrune(std::set<int> &setFilesToPrune,
     uint64_t nPruneAfterHeight);
+
+  void FindFilesToPruneManual(std::set<int> &setFilesToPrune,
+    int nManualPruneHeight);
 };
 
 
@@ -228,10 +231,6 @@ enum FlushStateMode {
 static bool FlushStateToDisk(const CChainParams &chainParams,
                              CValidationState &state, FlushStateMode mode,
                              int nManualPruneHeight = 0);
-static void FindFilesToPruneManual(std::set<int> &setFilesToPrune,
-                                   int nManualPruneHeight);
-static void FindFilesToPrune(std::set<int> &setFilesToPrune,
-                             uint64_t nPruneAfterHeight);
 static FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly = false);
 static uint32_t GetBlockScriptFlags(const Config &config,
                                     const CBlockIndex *pChainTip);
@@ -2384,7 +2383,7 @@ static bool FlushStateToDisk(const CChainParams &chainparams,
             if (fPruneMode && (fCheckForPruning || nManualPruneHeight > 0) &&
                 !fReindex) {
                 if (nManualPruneHeight > 0) {
-                    FindFilesToPruneManual(setFilesToPrune, nManualPruneHeight);
+                    pBlockFileInfoStore->FindFilesToPruneManual(setFilesToPrune, nManualPruneHeight);
                 } else {
                     pBlockFileInfoStore->FindFilesToPrune(setFilesToPrune,
                                      chainparams.PruneAfterHeight());
@@ -4177,7 +4176,7 @@ void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune) {
  * Calculate the block/rev files to delete based on height specified by user
  * with RPC command pruneblockchain
  */
-static void FindFilesToPruneManual(std::set<int> &setFilesToPrune,
+void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
                                    int nManualPruneHeight) {
     assert(fPruneMode && nManualPruneHeight > 0);
 
