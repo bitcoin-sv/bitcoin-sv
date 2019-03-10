@@ -163,6 +163,10 @@ public:
 
   void FindFilesToPruneManual(std::set<int> &setFilesToPrune,
     int nManualPruneHeight);
+
+  bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
+    unsigned int nAddSize, bool& fCheckForPruning);
+
 };
 
 
@@ -1896,9 +1900,6 @@ static void FlushBlockFile(bool fFinalize = false) {
     }
 }
 
-static bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
-                        unsigned int nAddSize);
-
 static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
 void ThreadScriptCheck() {
@@ -2311,10 +2312,10 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
         !pindex->IsValid(BlockValidity::SCRIPTS)) {
         if (pindex->GetUndoPos().IsNull()) {
             CDiskBlockPos _pos;
-            if (!FindUndoPos(
+            if (!pBlockFileInfoStore->FindUndoPos(
                     state, pindex->nFile, _pos,
                     ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) +
-                        40)) {
+                        40, fCheckForPruning)) {
                 return error("ConnectBlock(): FindUndoPos failed");
             }
             if (!UndoWriteToDisk(blockundo, _pos, pindex->pprev->GetBlockHash(),
@@ -3449,8 +3450,8 @@ bool CBlockFileInfoStore::FindBlockPos(CValidationState &state, CDiskBlockPos &p
     return true;
 }
 
-static bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
-                        unsigned int nAddSize) {
+bool CBlockFileInfoStore::FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
+                        unsigned int nAddSize, bool& fCheckForPruning) {
     pos.nFile = nFile;
 
     LOCK(cs_LastBlockFile);
