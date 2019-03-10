@@ -167,6 +167,8 @@ public:
   bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
     unsigned int nAddSize, bool& fCheckForPruning);
 
+  void FlushBlockFile(bool fFinalize = false);
+
 };
 
 
@@ -1876,7 +1878,7 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
-static void FlushBlockFile(bool fFinalize = false) {
+void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
     LOCK(cs_LastBlockFile);
 
     CDiskBlockPos posOld(nLastBlockFile, 0);
@@ -2445,7 +2447,7 @@ static bool FlushStateToDisk(const CChainParams &chainparams,
                     return state.Error("out of disk space");
                 }
                 // First make sure all block and undo data is flushed to disk.
-                FlushBlockFile();
+                pBlockFileInfoStore->FlushBlockFile();
                 // Then update all block file information (which may refer to
                 // block and undo files).
                 {
@@ -3407,7 +3409,7 @@ bool CBlockFileInfoStore::FindBlockPos(CValidationState &state, CDiskBlockPos &p
             LogPrintf("Leaving block file %i: %s\n", nLastBlockFile,
                       vinfoBlockFile[nLastBlockFile].ToString());
         }
-        FlushBlockFile(!fKnown);
+        pBlockFileInfoStore->FlushBlockFile(!fKnown);
         nLastBlockFile = nFile;
     }
 
