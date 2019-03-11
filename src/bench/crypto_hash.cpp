@@ -59,7 +59,7 @@ static void SipHash_32b(benchmark::State &state) {
     uint256 x;
     while (state.KeepRunning()) {
         for (int i = 0; i < 1000000; i++) {
-            *((uint64_t *)x.begin()) = SipHashUint256(0, i, x);
+            *reinterpret_cast<uint64_t *>(x.begin()) = SipHashUint256(0, i, x);
         }
     }
 }
