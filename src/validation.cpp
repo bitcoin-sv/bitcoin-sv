@@ -180,6 +180,11 @@ public:
   // Uninitialize the object (without marking it as dirty)
   void Clear();
   CBlockFileInfo *GetBlockFileInfo(size_t n);
+
+  // Return number of block files
+  int GetnLastBlockFile() {  
+      return nLastBlockFile;
+  }
 };
 
 
@@ -2485,7 +2490,7 @@ static bool FlushStateToDisk(const CChainParams &chainparams,
                         vBlocks.push_back(*it);
                         setDirtyBlockIndex.erase(it++);
                     }
-                    if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile,
+                    if (!pblocktree->WriteBatchSync(vFiles, pBlockFileInfoStore->GetnLastBlockFile(),
                                                     vBlocks)) {
                         return AbortNode(
                             state, "Failed to write to block index database");
