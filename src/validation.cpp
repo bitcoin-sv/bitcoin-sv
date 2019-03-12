@@ -151,6 +151,9 @@ class CBlockFileInfoStore
   CCriticalSection cs_LastBlockFile;
   std::vector<CBlockFileInfo> vinfoBlockFile;
   int nLastBlockFile = 0;
+
+  /** Dirty block file entries. */
+  std::set<int> setDirtyFileInfo;
 public:
   uint64_t CalculateCurrentUsage();
   
@@ -217,8 +220,6 @@ arith_uint256 nLastPreciousChainwork = 0;
 /** Dirty block index entries. */
 std::set<CBlockIndex *> setDirtyBlockIndex;
 
-/** Dirty block file entries. */
-std::set<int> setDirtyFileInfo;
 } // namespace
 
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
@@ -4873,7 +4874,7 @@ void CBlockFileInfoStore::Clear()
 {
     vinfoBlockFile.clear();
     nLastBlockFile = 0;
-    // TODO: dirty set should be cleard as well
+    setDirtyFileInfo.clear();
 }
 // May NOT be used after any connections are up as much of the peer-processing
 // logic assumes a consistent block index state
@@ -4888,7 +4889,6 @@ void UnloadBlockIndex() {
     pBlockFileInfoStore->Clear();
     nBlockSequenceId = 1;
     setDirtyBlockIndex.clear();
-    setDirtyFileInfo.clear();
     versionbitscache.Clear();
     for (int b = 0; b < VERSIONBITS_NUM_BITS; b++) {
         warningcache[b].clear();
