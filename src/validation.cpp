@@ -177,8 +177,9 @@ public:
   // Clears specified fileINfo and mar it as dirty.
   void ClearFileInfo(int fileNumber);
   
-  // Uninitializes the object (without marking it as dirty)
+  // Uninitialize the object (without marking it as dirty)
   void Clear();
+  CBlockFileInfo *GetBlockFileInfo(size_t n);
 };
 
 
@@ -5415,8 +5416,13 @@ std::string CBlockFileInfo::ToString() const {
         DateTimeStrFormat("%Y-%m-%d", nTimeLast));
 }
 
+CBlockFileInfo *CBlockFileInfoStore::GetBlockFileInfo(size_t n)
+{
+ return &vinfoBlockFile.at(n);
+}
+
 CBlockFileInfo *GetBlockFileInfo(size_t n) {
-    return &vinfoBlockFile.at(n);
+    return pBlockFileInfoStore->GetBlockFileInfo(n);
 }
 
 ThresholdState VersionBitsTipState(const Consensus::Params &params,
