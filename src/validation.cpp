@@ -169,12 +169,16 @@ public:
 
   void FlushBlockFile(bool fFinalize = false);
 
-  void LoadBlockFileInfo(int nLastBlockFile, CBlockTreeDB& blockTreeDb);
+  void LoadBlockFileInfo(int nLastBlockFile, CBlockTreeDB& blockTreeDb);  
   
   // Returns all dirty files infos and clears the set that indicates which are dirty
   std::vector<std::pair<int, const CBlockFileInfo *>> GetAndClearDirtyFileInfo();
 
+  // Clears specified fileINfo and mar it as dirty.
   void ClearFileInfo(int fileNumber);
+  
+  // Uninitializes the object (without marking it as dirty)
+  void Clear();
 };
 
 
@@ -4859,6 +4863,12 @@ bool RewindBlockIndex(const Config &config) {
     return true;
 }
 
+void CBlockFileInfoStore::Clear()
+{
+    vinfoBlockFile.clear();
+    nLastBlockFile = 0;
+    // TODO: dirty set should be cleard as well
+}
 // May NOT be used after any connections are up as much of the peer-processing
 // logic assumes a consistent block index state
 void UnloadBlockIndex() {
@@ -4869,8 +4879,7 @@ void UnloadBlockIndex() {
     pindexBestHeader = nullptr;
     mempool.clear();
     mapBlocksUnlinked.clear();
-    vinfoBlockFile.clear();
-    nLastBlockFile = 0;
+    pBlockFileInfoStore->Clear();
     nBlockSequenceId = 1;
     setDirtyBlockIndex.clear();
     setDirtyFileInfo.clear();
