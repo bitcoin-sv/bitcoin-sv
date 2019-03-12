@@ -170,6 +170,9 @@ public:
   void FlushBlockFile(bool fFinalize = false);
 
   void LoadBlockFileInfo(int nLastBlockFile, CBlockTreeDB& blockTreeDb);
+  
+  // Returns all dirty files infos and clears the set that indicates which are dirty
+  std::vector<std::pair<int, const CBlockFileInfo *>> GetAndClearDirtyFileInfo();
 };
 
 
@@ -2363,6 +2366,19 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
     return true;
 }
 
+std::vector<std::pair<int, const CBlockFileInfo *>> CBlockFileInfoStore::GetAndClearDirtyFileInfo()
+{
+    std::vector<std::pair<int, const CBlockFileInfo *>> vFiles;
+    vFiles.reserve(setDirtyFileInfo.size());
+    for (std::set<int>::iterator it = setDirtyFileInfo.begin();
+      it != setDirtyFileInfo.end();) {
+      vFiles.push_back(
+        std::make_pair(*it, &vinfoBlockFile[*it]));
+      setDirtyFileInfo.erase(it++);
+    }
+    return vFiles;
+}
+
 /**
  * Update the on-disk chain state.
  * The caches and indexes are flushed depending on the mode we're called with if
@@ -2452,14 +2468,8 @@ static bool FlushStateToDisk(const CChainParams &chainparams,
                 // Then update all block file information (which may refer to
                 // block and undo files).
                 {
-                    std::vector<std::pair<int, const CBlockFileInfo *>> vFiles;
-                    vFiles.reserve(setDirtyFileInfo.size());
-                    for (std::set<int>::iterator it = setDirtyFileInfo.begin();
-                         it != setDirtyFileInfo.end();) {
-                        vFiles.push_back(
-                            std::make_pair(*it, &vinfoBlockFile[*it]));
-                        setDirtyFileInfo.erase(it++);
-                    }
+                    
+                    std::vector<std::pair<int, const CBlockFileInfo *>> vFiles = pBlockFileInfoStore->GetAndClearDirtyFileInfo();
                     std::vector<const CBlockIndex *> vBlocks;
                     vBlocks.reserve(setDirtyBlockIndex.size());
                     for (std::set<CBlockIndex *>::iterator it =
