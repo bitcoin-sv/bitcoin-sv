@@ -195,10 +195,6 @@ public:
 /** Access to info about block files */
 std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = std::make_unique<CBlockFileInfoStore>();
 
-// TODO: remove the ones bellow
-CCriticalSection cs_LastBlockFile;
-std::vector<CBlockFileInfo> vinfoBlockFile;
-int nLastBlockFile = 0;
 /**
  * Global flag to indicate we should check to see if there are block/undo files
  * that should be deleted. Set on startup or if we allocate more file space when
