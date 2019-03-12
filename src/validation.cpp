@@ -169,6 +169,7 @@ public:
 
   void FlushBlockFile(bool fFinalize = false);
 
+  void LoadBlockFileInfo(int nLastBlockFile, CBlockTreeDB& blockTreeDb);
 };
 
 
@@ -4365,6 +4366,27 @@ CBlockIndex *InsertBlockIndex(uint256 hash) {
     return pindexNew;
 }
 
+void CBlockFileInfoStore::LoadBlockFileInfo(int nLastBlockFile, CBlockTreeDB& blockTreeDb)
+{
+  this->nLastBlockFile = nLastBlockFile;
+  vinfoBlockFile.resize(nLastBlockFile + 1);
+  LogPrintf("%s: last block file = %i\n", __func__, nLastBlockFile);
+  for (int nFile = 0; nFile <= nLastBlockFile; nFile++) {
+      blockTreeDb.ReadBlockFileInfo(nFile, vinfoBlockFile[nFile]);
+  }
+  LogPrintf("%s: last block file info: %s\n", __func__,
+    vinfoBlockFile[nLastBlockFile].ToString());
+  for (int nFile = nLastBlockFile + 1; true; nFile++) {
+    CBlockFileInfo info;
+    if (blockTreeDb.ReadBlockFileInfo(nFile, info)) {
+      vinfoBlockFile.push_back(info);
+    }
+    else {
+      break;
+    }
+  }
+}
+
 static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     if (!pblocktree->LoadBlockIndexGuts(InsertBlockIndex)) {
         return false;
@@ -4422,22 +4444,9 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     }
 
     // Load block file info
-    pblocktree->ReadLastBlockFile(nLastBlockFile);
-    vinfoBlockFile.resize(nLastBlockFile + 1);
-    LogPrintf("%s: last block file = %i\n", __func__, nLastBlockFile);
-    for (int nFile = 0; nFile <= nLastBlockFile; nFile++) {
-        pblocktree->ReadBlockFileInfo(nFile, vinfoBlockFile[nFile]);
-    }
-    LogPrintf("%s: last block file info: %s\n", __func__,
-              vinfoBlockFile[nLastBlockFile].ToString());
-    for (int nFile = nLastBlockFile + 1; true; nFile++) {
-        CBlockFileInfo info;
-        if (pblocktree->ReadBlockFileInfo(nFile, info)) {
-            vinfoBlockFile.push_back(info);
-        } else {
-            break;
-        }
-    }
+    int nLastBlockFileLocal = 0;
+    pblocktree->ReadLastBlockFile(nLastBlockFileLocal);
+    pBlockFileInfoStore->LoadBlockFileInfo(nLastBlockFileLocal, *pblocktree);
 
     // Check presence of blk files
     LogPrintf("Checking all blk files are present...\n");
