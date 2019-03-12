@@ -185,6 +185,10 @@ public:
   int GetnLastBlockFile() {  
       return nLastBlockFile;
   }
+  CCriticalSection& GetLock()
+  {
+      return cs_LastBlockFile;
+  }
 };
 
 
@@ -2411,7 +2415,7 @@ static bool FlushStateToDisk(const CChainParams &chainparams,
     int64_t nNow = 0;
     try {
         {
-            LOCK(cs_LastBlockFile);
+            LOCK(pBlockFileInfoStore->GetLock());
             if (fPruneMode && (fCheckForPruning || nManualPruneHeight > 0) &&
                 !fReindex) {
                 if (nManualPruneHeight > 0) {
