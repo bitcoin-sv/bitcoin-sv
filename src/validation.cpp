@@ -173,6 +173,8 @@ public:
   
   // Returns all dirty files infos and clears the set that indicates which are dirty
   std::vector<std::pair<int, const CBlockFileInfo *>> GetAndClearDirtyFileInfo();
+
+  void ClearFileInfo(int fileNumber);
 };
 
 
@@ -4142,6 +4144,11 @@ uint64_t CBlockFileInfoStore::CalculateCurrentUsage() {
     return retval;
 }
 
+void CBlockFileInfoStore::ClearFileInfo(int fileNumber)
+{
+    vinfoBlockFile[fileNumber].SetNull();
+    setDirtyFileInfo.insert(fileNumber);
+}
 /**
  * Prune a block file (modify associated database entries)
  */
@@ -4173,8 +4180,7 @@ void PruneOneBlockFile(const int fileNumber) {
         }
     }
 
-    vinfoBlockFile[fileNumber].SetNull();
-    setDirtyFileInfo.insert(fileNumber);
+    pBlockFileInfoStore->ClearFileInfo(fileNumber);
 }
 
 void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune) {
