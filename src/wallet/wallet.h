@@ -712,14 +712,14 @@ public:
 
     // Create wallet with dummy database handle
     CWallet(const CChainParams &chainParams)
-        : dbw(new CWalletDBWrapper()), chainParams(chainParams), randomNumbers(std::random_device{}()) {
+        : randomNumbers(std::random_device{}()), dbw(new CWalletDBWrapper()), chainParams(chainParams) {
         SetNull();
     }
 
     // Create wallet with passed-in database handle
     CWallet(const CChainParams &chainParams,
             std::unique_ptr<CWalletDBWrapper> dbw_in)
-        : dbw(std::move(dbw_in)), chainParams(chainParams),  randomNumbers(std::random_device{}()) {
+        : randomNumbers(std::random_device{}()), dbw(std::move(dbw_in)), chainParams(chainParams) {
         SetNull();
     }
 
