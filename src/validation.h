@@ -749,9 +749,6 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 /** Transaction conflicts with a transaction already known */
 static const unsigned int REJECT_CONFLICT = 0x102;
 
-/** Get block file info entry for one block file */
-CBlockFileInfo *GetBlockFileInfo(size_t n);
-
 /** Dump the mempool to disk. */
 void DumpMempool();
 

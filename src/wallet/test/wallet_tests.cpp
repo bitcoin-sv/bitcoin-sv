@@ -11,6 +11,7 @@
 #include "validation.h"
 #include "wallet/rpcdump.h"
 #include "wallet/test/wallet_test_fixture.h"
+#include "blockfileinfostore.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -453,7 +454,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
 
     // Cap last block file size, and mine new block in a new block file.
     CBlockIndex *oldTip = chainActive.Tip();
-    GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize = MAX_BLOCKFILE_SIZE;
+    pBlockFileInfoStore->GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize = MAX_BLOCKFILE_SIZE;
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     CBlockIndex *newTip = chainActive.Tip();
 

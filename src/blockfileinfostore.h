@@ -44,11 +44,13 @@ public:
     // Returns all dirty files infos and clears the set that indicates which are dirty
     std::vector<std::pair<int, const CBlockFileInfo *>> GetAndClearDirtyFileInfo();
 
-    // Clears specified fileINfo and mar it as dirty.
+    // Clears specified fileInfo and mar it as dirty.
     void ClearFileInfo(int fileNumber);
 
     // Uninitialize the object (without marking it as dirty)
     void Clear();
+
+    /** Get block file info entry for one block file */
     CBlockFileInfo *GetBlockFileInfo(size_t n);
 
     // Return number of block files
