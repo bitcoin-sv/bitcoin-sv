@@ -208,6 +208,7 @@ libbitcoin_server_a_SOURCES = \
   addrdb.cpp \
   bloom.cpp \
   blockencodings.cpp \
+  blockfileinfostore.cpp \
   chain.cpp \
   checkpoints.cpp \
   config.cpp \
