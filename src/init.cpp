@@ -1049,29 +1049,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
 
         // -reindex
         if (fReindex) {
-            int nFile = 0;
-            while (true) {
-                CDiskBlockPos pos(nFile, 0);
-                if (!fs::exists(GetBlockPosFilename(pos, "blk"))) {
-                    // No block files left to reindex
-                    break;
-                }
-                FILE *file = OpenBlockFile(pos, true);
-                if (!file) {
-                    // This error is logged in OpenBlockFile
-                    break;
-                }
-                LogPrintf("Reindexing block file blk%05u.dat...\n",
-                          (unsigned int)nFile);
-                LoadExternalBlockFile(config, file, &pos);
-                nFile++;
-            }
-            pblocktree->WriteReindexing(false);
-            fReindex = false;
-            LogPrintf("Reindexing finished\n");
-            // To avoid ending up in a situation without genesis block, re-try
-            // initializing (no-op if reindexing worked):
-            InitBlockIndex(config);
+            ReindexAllBlockFiles(config, pblocktree, fReindex);
         }
 
         // hardcoded $DATADIR/bootstrap.dat

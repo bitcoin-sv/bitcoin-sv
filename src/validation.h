@@ -342,11 +342,6 @@ bool ProcessNewBlockHeaders(const Config &config,
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 
 /**
- * Open a block file (blk?????.dat).
- */
-FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-
-/**
  * Translation to a filesystem path.
  */
 fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
@@ -356,6 +351,9 @@ fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
  */
 bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                            CDiskBlockPos *dbp = nullptr);
+
+/** used for --reindex */
+void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& fReindex);
 
 /**
  * Initialize a new block tree database + block data on disk.
