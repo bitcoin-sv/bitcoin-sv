@@ -6,7 +6,10 @@ project(bitcoin-test)
 # Process json files.
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
-find_program(PYTHON python)
+# Python is required to build C++ tests (and to execute functional tests)
+find_package(PythonInterp 3 REQUIRED)
+
+
 function(gen_json_header NAME)
 	set(HEADERS "")
 	foreach(f ${ARGN})
@@ -15,7 +18,7 @@ function(gen_json_header NAME)
 		# Get the proper name for the test variable.
 		get_filename_component(TEST_NAME ${f} NAME_WE)
 		add_custom_command(OUTPUT ${h}
-			COMMAND ${PYTHON}
+			COMMAND ${PYTHON_EXECUTABLE}
 			ARGS
 				"${CMAKE_CURRENT_SOURCE_DIR}/data/generate_header.py"
 				"${TEST_NAME}"
