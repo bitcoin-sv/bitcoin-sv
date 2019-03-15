@@ -13,7 +13,12 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 option(ENABLE_PROD_BUILD "Enable production build" OFF)
 option(BUILD_BITCOIN_WALLET "Activate the wallet functionality" ON)
 option(BUILD_BITCOIN_ZMQ "Activate the ZeroMQ functionalities" ON)
-option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
+
+if (NOT MSVC)
+  #bitcoin seeder can not be build with MSVC
+	option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
+endif()
+
 option(BUILD_BITCOIN_CLI "Build bitcoin-cli" ON)
 option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
 option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
