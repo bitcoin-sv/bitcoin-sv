@@ -66,6 +66,12 @@ how many jobs to run, append `--jobs=n`
 The individual tests and the test_runner harness have many command-line
 options. Run `test_runner.py -h` to see them all.
 
+Multiple build configurations are supported on Windows. Use `--buildconfig` parameter to specify which one you want to test.
+
+```
+test/functional/test_runner.py --buildconfig RelWithDebInfo
+```
+
 #### Troubleshooting and debugging test failures
 
 ##### Resource contention

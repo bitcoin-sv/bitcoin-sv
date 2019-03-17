@@ -119,6 +119,9 @@ def main():
                         default=tempfile.gettempdir(), help="Root directory for datadirs")
     parser.add_argument('--junitouput', '-ju',
                         default=os.path.join(build_dir, 'junit_results.xml'), help="file that will store JUnit formated test results.")
+    parser.add_argument('--buildconfig', '-b',
+                        default="", help="Optional name of directory that contains binary and is located inside build directory. Used on Windows where "
+                        "the build directory can contain outputs for multiple configurations. Example: -b RelWithDebInfo.")
 
     args, unknown_args = parser.parse_known_args()
 
@@ -206,10 +209,10 @@ def main():
                                    "cache"), ignore_errors=True)
 
     run_tests(test_list, build_dir, tests_dir, args.junitouput,
-              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings)
+              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig)
 
 
-def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[], build_timings=None):
+def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig=""):
     # Warn if bitcoind is already running (unix only)
     try:
         pidofOutput = subprocess.check_output(["pidof", "bitcoind"])
@@ -228,9 +231,20 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
     # Set env vars
     if "BITCOIND" not in os.environ:
         os.environ["BITCOIND"] = os.path.join(
-            build_dir, 'src', 'bitcoind' + exeext)
+            build_dir, 'src', buildconfig, 'bitcoind' + exeext)
         os.environ["BITCOINCLI"] = os.path.join(
-            build_dir, 'src', 'bitcoin-cli' + exeext)
+            build_dir, 'src', buildconfig, 'bitcoin-cli' + exeext)
+
+    if not os.path.isfile(os.environ["BITCOIND"]):
+        print("%sERROR!%s Can not find bitcoind executable here: %s. " % (
+            BOLD[1], BOLD[0], os.environ["BITCOIND"]))
+        sys.exit(0)
+
+    if not os.path.isfile(os.environ["BITCOINCLI"]):
+        print("%sERROR!%s Can not find bitcoin-cli executable here: %s. " % (
+            BOLD[1], BOLD[0], os.environ["BITCOINCLI"]))
+        sys.exit(0)
+
 
     flags = [os.path.join("--srcdir={}".format(build_dir), "src")] + args
     flags.append("--cachedir=%s" % cache_dir)
