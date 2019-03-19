@@ -2618,13 +2618,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     // remove transactions that are replay protected from the mempool. There is
     // no easy way to do this so we'll just discard the whole mempool and then
     // add the transaction of the block we just disconnected back.
-    //
-    // Samewise, if this block enabled the magnetic opcodes, then we
-    // need to clear the mempool of any transaction using them.
-    if ((IsReplayProtectionEnabled(config, pindexDelete) &&
-         !IsReplayProtectionEnabled(config, pindexDelete->pprev)) ||
-        (IsMagneticEnabled(config, pindexDelete) &&
-         !IsMagneticEnabled(config, pindexDelete->pprev))) {
+    if (IsReplayProtectionEnabled(config, pindexDelete) &&
+         !IsReplayProtectionEnabled(config, pindexDelete->pprev)) {
         mempool.clear();
         // While not strictly necessary, clearing the disconnect pool is also
         // beneficial so we don't try to reuse its content at the end of the
