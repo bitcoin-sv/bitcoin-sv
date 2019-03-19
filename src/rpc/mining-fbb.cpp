@@ -1,5 +1,5 @@
-/// Copyright (c) 2015 G. Andrew Stone
-// Copyright (c) 2018 The Bitcoin SV developers.
+// Copyright (c) 2015 G. Andrew Stone
+// Copyright (c) 2018-2019 The Bitcoin SV developers.
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,6 +15,7 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
+#include "mining/candidates.h"
 #include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
@@ -38,53 +39,15 @@ namespace
 /** Mining-Candidate begin */
 const int NEW_CANDIDATE_INTERVAL = 30; // seconds
 
-// This class originates in the BU codebase. 
-// It is retained as a point of commonality between BU and SV codebases.
-class CMiningCandidate  
-{
-public:
-    CBlock block;
-};
-std::map<int64_t, CMiningCandidate> MiningCandidates;
-
 inline int GetBlockchainHeight()
 {
     return chainActive.Height();
 }
 
-// Oustanding candidates are removed 30 sec after a new block has been found
-void RmOldMiningCandidates()
-{
-    LOCK(cs_main);
-    static unsigned int prevheight = 0;
-    unsigned int height = GetBlockchainHeight();
-
-    if (height <= prevheight)
-        return;
-
-    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
-    if (tdiff >= 0)
-    {
-        // Clean out mining candidates that are the same height as a discovered block.
-        for (auto it = MiningCandidates.cbegin(); it != MiningCandidates.cend();)
-        {
-            if (it->second.block.GetHeight() <= prevheight)
-            {
-                it = MiningCandidates.erase(it);
-            }
-            else
-            {
-                ++it;
-            }
-        }
-        prevheight = height;
-    }
-}
-
 /// mkblocktemplate is a modified/cut down version of the code from the RPC method getblocktemplate. 
 /// It is currently only called from getminingcandidate, but getblocktemplate could be
 /// modified to call a generic version of mkblocktemplate.
-UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *pblockOut)
+UniValue mkblocktemplate(const Config& config, const UniValue &params, CMiningCandidateRef candidate)
 {
     LOCK(cs_main);
 
@@ -148,20 +111,13 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CBlock *p
     UpdateTime(pblock, config, pindexPrev);
     pblock->nNonce = 0;
 
-    if (pblockOut != nullptr)
-        *pblockOut = *pblock;
+    candidate->SetBlock(blockref);
 
     return NullUniValue;
 }
 
-void AddMiningCandidate(CMiningCandidate &candid, int64_t id)
-{
-    // Save candidate so can be looked up:
-    LOCK(cs_main);
-    MiningCandidates[id] = candid;
-}
 
-std::vector<uint256> GetMerkleProofBranches(CBlock *pblock)
+std::vector<uint256> GetMerkleProofBranches(CBlockRef pblock)
 {
     std::vector<uint256> ret;
     std::vector<uint256> leaves;
@@ -265,39 +221,35 @@ static int32_t MkBlockTemplateVersionBits(int32_t version,
 }
 
 // Create Mining-Candidate JSON to send to miner
-UniValue MkMiningCandidateJson(CMiningCandidate &candid)
+UniValue MkMiningCandidateJson(CMiningCandidateRef &candidate)
 {
-    static int64_t id = 0;
     UniValue ret(UniValue::VOBJ);
-    CBlock &block = candid.block;
+    CBlockRef block = candidate->GetBlock();
 
-    RmOldMiningCandidates();
+    CMiningFactory::GetCandidateManager().RemoveOldCandidates();
 
-    // Save candidate so can be looked up:
-    id++;
-    AddMiningCandidate(candid, id);
-    ret.push_back(Pair("id", id));
+    ret.push_back(Pair("id", candidate->GetId()));
 
-    ret.push_back(Pair("prevhash", block.hashPrevBlock.GetHex()));
+    ret.push_back(Pair("prevhash", block->hashPrevBlock.GetHex()));
 
     {
-        const CTransaction *tran = block.vtx[0].get();
+        const CTransaction *tran = block->vtx[0].get();
         ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
     }
 
     std::set<std::string> setClientRules;
     CBlockIndex *const pindexPrev = chainActive.Tip();
 
-    block.nVersion = MkBlockTemplateVersionBits(block.nVersion, setClientRules, pindexPrev, nullptr, nullptr);
+    block->nVersion = MkBlockTemplateVersionBits(block->nVersion, setClientRules, pindexPrev, nullptr, nullptr);
 
-    ret.push_back(Pair("version", block.nVersion));
-    ret.push_back(Pair("nBits", strprintf("%08x", block.nBits)));
-    ret.push_back(Pair("time", block.GetBlockTime()));
-    ret.push_back(Pair("height", block.GetHeight()));
+    ret.push_back(Pair("version", block->nVersion));
+    ret.push_back(Pair("nBits", strprintf("%08x", block->nBits)));
+    ret.push_back(Pair("time", block->GetBlockTime()));
+    ret.push_back(Pair("height", block->GetHeight()));
 
     // merkleProof:
     {
-        std::vector<uint256> brancharr = GetMerkleProofBranches(&block);
+        std::vector<uint256> brancharr = GetMerkleProofBranches(block);
         UniValue merkleProof(UniValue::VARR);
         for (const auto &i : brancharr)
         {
@@ -340,9 +292,9 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
         );
     }
 
-    CMiningCandidate candidate;
     LOCK(cs_main);
-    mkblocktemplate(config, request.params, &candidate.block);  // These mirror the functions in BU
+    CMiningCandidateRef candidate = CMiningFactory::GetCandidateManager().Create(chainActive.Tip()->GetBlockHash());
+    mkblocktemplate(config, request.params, candidate);
     return MkMiningCandidateJson(candidate);
 }
 
@@ -350,7 +302,6 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
 UniValue submitminingsolution(const Config& config, const JSONRPCRequest& request) 
 {
     UniValue rcvd;
-    std::shared_ptr<CBlock> block = std::make_shared<CBlock>();
 
     if (request.fHelp || request.params.size() != 1)
     {
@@ -377,15 +328,13 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     int64_t id = rcvd["id"].get_int64();
 
     LOCK(cs_main);
-    if (MiningCandidates.count(id) == 1)
-    {
-        *block = MiningCandidates[id].block;
-        MiningCandidates.erase(id);
-    }
-    else
+    std::optional<CMiningCandidateRef> result = CMiningFactory::GetCandidateManager().Get(id);
+    if (!result)
     {
         return UniValue("Block candidate ID not found");
     }
+
+    CBlockRef block = (*result)->GetBlock();
 
     UniValue nonce = rcvd["nonce"];
     if (nonce.isNull())
@@ -421,13 +370,13 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
 
     // Merkle root
     {
-        std::vector<uint256> merkleProof = GetMerkleProofBranches(block.get());
+        std::vector<uint256> merkleProof = GetMerkleProofBranches(block);
         uint256 t = block->vtx[0]->GetHash();
         block->hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
     }
 
     UniValue submitted = SubmitBlock(config, block); // returns string on failure
-    RmOldMiningCandidates();
+    CMiningFactory::GetCandidateManager().RemoveOldCandidates();
     return submitted;
 }
 

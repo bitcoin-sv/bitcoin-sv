@@ -4,3 +4,5 @@
 
 
 #include "factory.h"
+
+CMiningCandidateManager CMiningFactory::manager;
