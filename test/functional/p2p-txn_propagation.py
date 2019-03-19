@@ -86,7 +86,8 @@ class P2PTxnPropagation(BitcoinTestFramework):
         peerinfo = self.nodes[0].getpeerinfo()
         for peer in peerinfo:
             txninvsize = peer['txninvsize']
-            assert(txninvsize > 0 and txninvsize <= self.num_txns)
+            if(txninvsize > 0):
+                assert(txninvsize <= self.num_txns)
 
         # Verify the txn propagation queue drains out
         wait_until(self.check_queue_drains)

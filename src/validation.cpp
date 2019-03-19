@@ -3072,8 +3072,9 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
             // Destructed before cs_main is unlocked.
             ConnectTrace connectTrace(mempool);
 
-            CBlockIndex *pindexOldTip = chainActive.Tip();
-            if (pindexMostWork == nullptr) {
+            if (pindexMostWork == nullptr || pindexNewTip != chainActive.Tip()) {
+                // If we've not yet calculated the best chain, or someone else has updated the current tip
+                // from under us, work out the best new tip to aim for.
                 pindexMostWork = FindMostWorkChain();
             }
 
@@ -3085,6 +3086,7 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
 
             bool fInvalidFound = false;
             std::shared_ptr<const CBlock> nullBlockPtr;
+            CBlockIndex *pindexOldTip = chainActive.Tip();
             if (!ActivateBestChainStep(
                     config, state, pindexMostWork,
                     pblock &&
