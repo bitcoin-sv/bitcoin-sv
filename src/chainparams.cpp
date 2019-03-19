@@ -557,6 +557,27 @@ const CChainParams &Params() {
     return *globalChainParams;
 }
 
+void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode)
+{
+    if(!HexToArray(hexcode, chainParam.netMagic))
+        throw std::runtime_error(strprintf("%s: Bad hex code %s.", __func__, hexcode)); 
+}
+
+
+bool HexToArray(const std::string& hexstring, CMessageHeader::MessageMagic& array){
+    if(!IsHexNumber(hexstring))
+        return false;
+
+    const std::vector<uint8_t> hexVect = ParseHex(hexstring);
+
+    if(hexVect.size()!= array.size())
+        return false;
+
+    std::copy(hexVect.begin(),hexVect.end(),array.begin());
+
+    return true;
+}
+
 std::unique_ptr<CChainParams> CreateChainParams(const std::string &chain) {
     if (chain == CBaseChainParams::MAIN) {
         return std::unique_ptr<CChainParams>(new CMainParams());
@@ -581,6 +602,14 @@ std::unique_ptr<CChainParams> CreateChainParams(const std::string &chain) {
 void SelectParams(const std::string &network) {
     SelectBaseParams(network);
     globalChainParams = CreateChainParams(network);
+
+    // If not mainnet, allow to set the parameter magicbytes (for testing propose)
+    const bool isMagicBytesSet = gArgs.IsArgSet("-magicbytes");
+    if(network != CBaseChainParams::MAIN && isMagicBytesSet){
+        const std::string magicbytesStr = gArgs.GetArg("-magicbytes", "0f0f0f0f");
+        LogPrintf("Manually set magicbytes [%s].\n",magicbytesStr);
+        ResetNetMagic(*globalChainParams,magicbytesStr);
+    }
 }
 
 void UpdateBIP9Parameters(Consensus::DeploymentPos d, int64_t nStartTime,

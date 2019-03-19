@@ -91,6 +91,7 @@ public:
                               int64_t nTimeout);
 
 protected:
+    friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
     CChainParams() {}
 
     Consensus::Params consensus;
@@ -111,6 +112,11 @@ protected:
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
 };
+
+/**
+ * Convert hex string into CMessageHeader::MessageMagic
+ */
+bool HexToArray(const std::string& hexstring, CMessageHeader::MessageMagic& array);
 
 /**
  * Creates and returns a std::unique_ptr<CChainParams> of the chosen chain.
