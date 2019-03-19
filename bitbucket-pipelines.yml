@@ -16,13 +16,6 @@ pipelines:
             - ./configure
             - make -j4
             - make -j4 check
-    feature/SV-238-C++17:
-    - step:
-        script:
-        - ./autogen.sh
-        - ./configure
-        - make -j4
-        - make -j4 check
   pull-requests:
     '**':
       - step:
