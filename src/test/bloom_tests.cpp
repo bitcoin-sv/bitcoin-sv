@@ -21,6 +21,17 @@
 #include <boost/test/unit_test.hpp>
 #include <boost/tuple/tuple.hpp>
 
+static bool inValidConstructorParameterException(const std::runtime_error &ex) {
+    std::runtime_error expectedException(
+        "Error: Invalid Parameter nFPRate passed to constructor");
+
+    // The string returned by what() can be different for different platforms.
+    // Instead of directly comparing the ex.what() with an expected string,
+    // create an instance of exception to see if ex.what() matches  the expected
+    // explanatory string returned by the exception instance.
+    return strcmp(expectedException.what(), ex.what()) == 0;
+}
+
 BOOST_FIXTURE_TEST_SUITE(bloom_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize) {
@@ -64,6 +75,9 @@ BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize) {
     BOOST_CHECK_MESSAGE(
         !filter.contains(ParseHex("99108ad8ed9bb6274d3980bab5a85c048f0950c8")),
         "Bloom filter should be empty!");
+
+    BOOST_CHECK_EXCEPTION(CBloomFilter filter(3, 0.0, 0, BLOOM_UPDATE_ALL), std::runtime_error,inValidConstructorParameterException);
+    BOOST_CHECK_EXCEPTION(CBloomFilter filter(3, 1.181, 0, BLOOM_UPDATE_ALL), std::runtime_error,inValidConstructorParameterException);
 }
 
 BOOST_AUTO_TEST_CASE(bloom_create_insert_serialize_with_tweak) {
@@ -1125,6 +1139,9 @@ BOOST_AUTO_TEST_CASE(rolling_bloom) {
     for (int i = 0; i < DATASIZE; i++) {
         BOOST_CHECK(rb2.contains(data[i]));
     }
+
+    BOOST_CHECK_EXCEPTION(CRollingBloomFilter filter(3, 0.0), std::runtime_error,inValidConstructorParameterException);
+    BOOST_CHECK_EXCEPTION(CRollingBloomFilter filter(3, 1.181), std::runtime_error,inValidConstructorParameterException);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

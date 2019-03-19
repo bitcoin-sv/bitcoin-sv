@@ -8,6 +8,7 @@
 #include "univalue.h"
 #include "univalue_utffilter.h"
 
+
 static bool json_isdigit(int ch)
 {
     return ((ch >= '0') && (ch <= '9'));
@@ -260,6 +261,10 @@ bool UniValue::read(const char *raw, size_t size)
     enum jtokentype tok = JTOK_NONE;
     enum jtokentype last_tok = JTOK_NONE;
     const char* end = raw + size;
+
+    int ObjArrCounter (0);
+
+
     do {
         last_tok = tok;
 
@@ -308,6 +313,12 @@ bool UniValue::read(const char *raw, size_t size)
         case JTOK_OBJ_OPEN:
         case JTOK_ARR_OPEN: {
             VType utyp = (tok == JTOK_OBJ_OPEN ? VOBJ : VARR);
+
+            if ( ObjArrCounter > m_JSONParseDepth ){
+                 fprintf (stderr, "JSON NESTING DEPTH exceed %d > %d\n",ObjArrCounter,m_JSONParseDepth);
+                 return false;
+            }
+
             if (!stack.size()) {
                 if (utyp == VOBJ)
                     setObject();
@@ -327,6 +338,10 @@ bool UniValue::read(const char *raw, size_t size)
                 setExpect(OBJ_NAME);
             else
                 setExpect(ARR_VALUE);
+
+
+            ++ ObjArrCounter ;
+
             break;
             }
 
@@ -446,4 +461,3 @@ bool UniValue::read(const char *raw, size_t size)
 
     return true;
 }
-

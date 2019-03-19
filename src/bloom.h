@@ -50,12 +50,7 @@ private:
     unsigned int nTweak;
     uint8_t nFlags;
 
-    unsigned int Hash(unsigned int nHashNum,
-                      const std::vector<uint8_t> &vDataToHash) const;
-
-    // Private constructor for CRollingBloomFilter, no restrictions on size
-    CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak);
-    friend class CRollingBloomFilter;
+    unsigned int Hash(unsigned int nHashNum, const std::vector<uint8_t> &vDataToHash) const;
 
 public:
     /**
@@ -69,10 +64,16 @@ public:
      * always be a random value (and is largely only exposed for unit testing)
      * nFlags should be one of the BLOOM_UPDATE_* enums (not _MASK)
      */
-    CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak,
-                 uint8_t nFlagsIn);
-    CBloomFilter()
-        : isFull(true), isEmpty(false), nHashFuncs(0), nTweak(0), nFlags(0) {}
+     /**
+      * if the  nFPRate  parameter is greater than , e/ln(10) ≈ 1.18   then the result of the
+      * computation of  -1 / LN2SQUARED * nElements * log(nFPRate)  will  be  a  negative number.
+      * If the  nFPRate  parameter is 0, the result will be  infinite.
+      * In either  case, the cast to an  unsigned int  will produce an undeﬁned behavior. In the constructor
+      * for CBloomFilter & CRollingBloomFilter there is a check on the range between 0 & the magine number of
+      * 1.18
+     **/
+    CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweak,uint8_t nFlagsIn);
+    CBloomFilter() : isFull(true), isEmpty(false), nHashFuncs(0), nTweak(0), nFlags(0) { return;}
 
     ADD_SERIALIZE_METHODS;
 

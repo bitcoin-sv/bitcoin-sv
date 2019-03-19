@@ -11,6 +11,25 @@
 #include <limits>
 
 #include <boost/test/unit_test.hpp>
+namespace
+{
+    // Helper method that checks serialisation/deserialisation works for the
+    // largest value of the given unsigned and signed types.
+    template<typename Unsigned, typename Signed>
+    void TestLimitMax(CDataStream& ss)
+    {
+        ss.clear();
+        ss << VARINT(std::numeric_limits<Unsigned>::max());
+        Unsigned j;
+        ss >> VARINT(j);
+        BOOST_CHECK_EQUAL(j, std::numeric_limits<Unsigned>::max());
+        ss.clear();
+        ss << VARINT(std::numeric_limits<Signed>::max());
+        Signed k;
+        ss >> VARINT(k);
+        BOOST_CHECK_EQUAL(k, std::numeric_limits<Signed>::max());
+    }
+}
 
 BOOST_FIXTURE_TEST_SUITE(serialize_tests, BasicTestingSetup)
 
@@ -204,6 +223,29 @@ BOOST_AUTO_TEST_CASE(varints) {
         ss >> VARINT(j);
         BOOST_CHECK_MESSAGE(i == j, "decoded:" << j << " expected:" << i);
     }
+
+        // Serialise/deserialise largest fixed size types
+        TestLimitMax<uint8_t, int8_t>(ss);
+        TestLimitMax<uint16_t, int16_t>(ss);
+        TestLimitMax<uint32_t, int32_t>(ss);
+        TestLimitMax<uint64_t, int64_t>(ss);
+        TestLimitMax<uintmax_t, intmax_t>(ss);
+
+    {
+        // Deserialising a larger value than can fit into any integral type
+        ss.clear();
+        ss.insert(ss.end(), 64, 0x80);
+        uint32_t j;
+        BOOST_CHECK_THROW({ss >> VARINT(j);}, std::runtime_error);
+    }
+
+    {
+        // Deserialising a larger value than can fit into the given type
+        ss.clear();
+        ss.insert(ss.end(), 4, 0xFF);
+        uint16_t j;
+        BOOST_CHECK_THROW({ss >> VARINT(j);}, std::runtime_error);
+    }
 }
 
 BOOST_AUTO_TEST_CASE(varints_bitpatterns) {
@@ -258,9 +300,20 @@ BOOST_AUTO_TEST_CASE(varints_bitpatterns) {
     ss.clear();
 }
 
-static bool isTooLargeException(const std::ios_base::failure &ex) {
+static bool isTooLargeReadException(const std::ios_base::failure &ex) {
     std::ios_base::failure expectedException(
         "ReadCompactSize(): size too large");
+
+    // The string returned by what() can be different for different platforms.
+    // Instead of directly comparing the ex.what() with an expected string,
+    // create an instance of exception to see if ex.what() matches  the expected
+    // explanatory string returned by the exception instance.
+    return strcmp(expectedException.what(), ex.what()) == 0;
+}
+
+static bool isTooLargeWriteException(const std::ios_base::failure &ex) {
+    std::ios_base::failure expectedException(
+        "WriteCompactSize(): size too large");
 
     // The string returned by what() can be different for different platforms.
     // Instead of directly comparing the ex.what() with an expected string,
@@ -288,17 +341,10 @@ BOOST_AUTO_TEST_CASE(compactsize) {
     WriteCompactSize(ss, MAX_SIZE);
     BOOST_CHECK_EQUAL(ReadCompactSize(ss), MAX_SIZE);
 
-    WriteCompactSize(ss, MAX_SIZE + 1);
-    BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure,
-                          isTooLargeException);
+    BOOST_CHECK_EXCEPTION(WriteCompactSize(ss, MAX_SIZE + 1), std::ios_base::failure, isTooLargeWriteException);
 
-    WriteCompactSize(ss, std::numeric_limits<int64_t>::max());
-    BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure,
-                          isTooLargeException);
-
-    WriteCompactSize(ss, std::numeric_limits<uint64_t>::max());
-    BOOST_CHECK_EXCEPTION(ReadCompactSize(ss), std::ios_base::failure,
-                          isTooLargeException);
+    BOOST_CHECK_EXCEPTION(WriteCompactSize(ss, std::numeric_limits<int64_t>::max()), std::ios_base::failure, isTooLargeWriteException);
+    BOOST_CHECK_EXCEPTION(WriteCompactSize(ss, std::numeric_limits<uint64_t>::max()), std::ios_base::failure,isTooLargeWriteException);
 }
 
 static bool isCanonicalException(const std::ios_base::failure &ex) {

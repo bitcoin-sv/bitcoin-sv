@@ -264,6 +264,9 @@ inline uint32_t GetSizeOfCompactSize(uint64_t nSize) {
 inline void WriteCompactSize(CSizeComputer &os, uint64_t nSize);
 
 template <typename Stream> void WriteCompactSize(Stream &os, uint64_t nSize) {
+    if (nSize > MAX_SIZE) {
+          throw std::ios_base::failure("WriteCompactSize(): size too large");
+    }
     if (nSize < 253) {
         ser_writedata8(os, nSize);
     } else if (nSize <= std::numeric_limits<uint16_t>::max()) {
@@ -342,7 +345,8 @@ template <typename I> inline unsigned int GetSizeOfVarInt(I n) {
 
 template <typename I> inline void WriteVarInt(CSizeComputer &os, I n);
 
-template <typename Stream, typename I> void WriteVarInt(Stream &os, I n) {
+template <typename Stream, typename I, class = typename std::enable_if<std::is_integral<I>::value>::type>
+void WriteVarInt(Stream &os, I n) {
     uint8_t tmp[(sizeof(n) * 8 + 6) / 7];
     int len = 0;
     while (true) {
@@ -358,16 +362,27 @@ template <typename Stream, typename I> void WriteVarInt(Stream &os, I n) {
     } while (len--);
 }
 
-template <typename Stream, typename I> I ReadVarInt(Stream &is) {
-    I n = 0;
-    while (true) {
+template <typename Stream, typename I,class = typename std::enable_if<std::is_integral<I>::value>::type>
+I ReadVarInt(Stream &is) {
+    uintmax_t n {0};
+    static uintmax_t overflow { std::numeric_limits<I>::max() >> 7 };
+
+    unsigned int maxSize = (sizeof(n) * 8 + 6) / 7;
+    for (unsigned int i = 0; i<maxSize; ++i){
+        if (n > overflow){
+            throw std::runtime_error ("Deserialisation Error ReadVarInt");
+        }
+
         uint8_t chData = ser_readdata8(is);
         n = (n << 7) | (chData & 0x7F);
         if ((chData & 0x80) == 0) {
-                return n;     
+            return n ;
         }
         n++;
     }
+    // If we make it to hear its a deserialisation error
+    // throw an exception
+    throw std::runtime_error ("Deserialisation Error ReadVarInt");
 }
 
 #define FLATDATA(obj)                                                          \
@@ -501,6 +516,8 @@ template <typename Stream, unsigned int N, typename T, typename V>
 void Unserialize_impl(Stream &is, prevector<N, T> &v, const V &);
 template <typename Stream, unsigned int N, typename T>
 inline void Unserialize(Stream &is, prevector<N, T> &v);
+
+
 
 /**
  * vector
@@ -649,6 +666,7 @@ void Unserialize_impl(Stream &is, prevector<N, T> &v, const V &) {
         }
     }
 }
+
 
 template <typename Stream, unsigned int N, typename T>
 inline void Unserialize(Stream &is, prevector<N, T> &v) {

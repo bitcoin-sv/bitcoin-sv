@@ -279,8 +279,11 @@ BOOST_AUTO_TEST_CASE(univalue_object) {
     BOOST_CHECK_EQUAL(obj.size(), 0);
 }
 
-static const char *json1 = "[1.10000000,{\"key1\":\"str\\u0000\",\"key2\":800,"
-                           "\"key3\":{\"name\":\"martian http://test.com\"}}]";
+static const char *json1 = "[1.10000000,{\"key1\":\"str\\u0000\",\"key2\":800,\"key3\":{\"name\":\"martian http://test.com\"}}]";
+
+static const char* json2 ="[1.10000000,{\"key1\":\"str\\u0000\",\"key2\":800, \
+		\"key3\":{\"name\":\"martian http://test.com\",\"key31\": \
+          			{\"key311\":{\"key3111\":{\"key31111\":{\"deepkey\":\"deepvalue\"}}}}}}]";
 
 BOOST_AUTO_TEST_CASE(univalue_readwrite) {
     UniValue v;
@@ -322,6 +325,22 @@ BOOST_AUTO_TEST_CASE(univalue_readwrite) {
     BOOST_CHECK(!v.read("[]{}"));
     BOOST_CHECK(!v.read("{}[]"));
     BOOST_CHECK(!v.read("{} 42"));
+
+    UniValue val;
+    std::string strJson2(json2);
+    BOOST_CHECK(val.read(strJson2));
+
+    BOOST_CHECK(val.isArray());
+    BOOST_CHECK_EQUAL(val.size(), 2);
+
+    {
+        // set the max JSON object nesting to two levels
+        UniValue val;
+        val.JSonParseDepth () = 2 ;
+        std::string strJson2(json2);
+        //BOOST_CHECK(val.read(strJson2));
+        BOOST_CHECK_MESSAGE (val.read(strJson2) == false,"JSON NESTING DEPTH exceed 3 > 2");
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
