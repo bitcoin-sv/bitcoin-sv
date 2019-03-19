@@ -104,3 +104,11 @@ test\functional\test_runner.py --buildconfig RelWithDebInfo
     VCPKG (git reset to an older version and rebuild libraries) or add new
     library version to bitcoind CMAKE scripts located in cmake\\modules. See
     <https://github.com/Microsoft/vcpkg/issues/1681> for details.
+
+### Editing Python files on Windows
+Editing a Python file on Windows will clear its executable flag, making it unsuable
+on Linux. To restore the flag use:
+
+```
+git update-index --chmod=+x path/to/file
+```
