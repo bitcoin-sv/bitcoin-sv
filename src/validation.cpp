@@ -607,27 +607,9 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
-static bool IsMagneticEnabled(const Config &config, int64_t nMedianTimePast) {
-    return nMedianTimePast >=
-           gArgs.GetArg(
-                   "-magneticactivationtime",
-                   config.GetChainParams().GetConsensus().magneticAnomalyActivationTime);
-}
-
-bool IsMagneticEnabled(const Config &config, const CBlockIndex *pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
-    }
-
-    return IsMagneticEnabled(config, pindexPrev->GetMedianTimePast());
-}
-
 static bool IsReplayProtectionEnabled(const Config &config,
                                       int64_t nMedianTimePast) {
-    return nMedianTimePast >= gArgs.GetArg("-replayprotectionactivationtime",
-                                           config.GetChainParams()
-                                               .GetConsensus()
-                                               .magneticAnomalyActivationTime);
+    return nMedianTimePast >= gArgs.GetArg("-replayprotectionactivationtime", 2000000000);
 }
 
 static bool IsReplayProtectionEnabled(const Config &config,
