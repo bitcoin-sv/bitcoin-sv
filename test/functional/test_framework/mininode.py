@@ -236,12 +236,14 @@ def ToHex(obj):
 # Objects that map to bitcoind objects, which can be serialized/deserialized
 
 
-class CAddress():
-    def __init__(self):
+# Because the nVersion field has not been passed before the VERSION message the protocol uses an old format for the CAddress (missing nTime)
+# This class handles that old format
+class CAddressInVersion(object):
+    def __init__(self, ip="0.0.0.0", port=0):
         self.nServices = 1
-        self.pchReserved = b"\x00" * 10 + b"\xff" * 2
-        self.ip = "0.0.0.0"
-        self.port = 0
+        self.pchReserved = b"\x00" * 10 + b"\xff" * 2  # ip is 16 bytes on wire to handle v6
+        self.ip = ip
+        self.port = port
 
     def deserialize(self, f):
         self.nServices = struct.unpack("<Q", f.read(8))[0]
@@ -258,9 +260,35 @@ class CAddress():
         return r
 
     def __repr__(self):
-        return "CAddress(nServices=%i ip=%s port=%i)" % (self.nServices,
-                                                         self.ip, self.port)
+        return "CAddressInVersion(nServices=%i ip=%s port=%i)" % (self.nServices, self.ip, self.port)
 
+# Handle new-style CAddress objects (with nTime)
+class CAddress():
+    def __init__(self, ip="0.0.0.0", port=0):
+        self.nServices = 1
+        self.nTime = int(time.time())
+        self.pchReserved = b"\x00" * 10 + b"\xff" * 2  # ip is 16 bytes on wire to handle v6
+        self.ip = ip
+        self.port = port
+
+    def deserialize(self, f):
+        self.nTime = struct.unpack("<L", f.read(4))[0]
+        self.nServices = struct.unpack("<Q", f.read(8))[0]
+        self.pchReserved = f.read(12)
+        self.ip = socket.inet_ntoa(f.read(4))
+        self.port = struct.unpack(">H", f.read(2))[0]
+
+    def serialize(self):
+        r = b""
+        r += struct.pack("<L", self.nTime)
+        r += struct.pack("<Q", self.nServices)
+        r += self.pchReserved
+        r += socket.inet_aton(self.ip)
+        r += struct.pack(">H", self.port)
+        return r
+
+    def __repr__(self):
+        return "CAddress(nServices=%i ip=%s port=%i time=%d)" % (self.nServices, self.ip, self.port, self.nTime)
 
 class CInv():
     typemap = {
@@ -829,8 +857,8 @@ class msg_version():
         self.nVersion = MY_VERSION
         self.nServices = 1
         self.nTime = int(time.time())
-        self.addrTo = CAddress()
-        self.addrFrom = CAddress()
+        self.addrTo = CAddressInVersion()
+        self.addrFrom = CAddressInVersion()
         self.nNonce = random.getrandbits(64)
         self.strSubVer = MY_SUBVERSION
         self.nStartingHeight = -1
@@ -842,11 +870,11 @@ class msg_version():
             self.nVersion = 300
         self.nServices = struct.unpack("<Q", f.read(8))[0]
         self.nTime = struct.unpack("<q", f.read(8))[0]
-        self.addrTo = CAddress()
+        self.addrTo = CAddressInVersion()
         self.addrTo.deserialize(f)
 
         if self.nVersion >= 106:
-            self.addrFrom = CAddress()
+            self.addrFrom = CAddressInVersion()
             self.addrFrom.deserialize(f)
             self.nNonce = struct.unpack("<Q", f.read(8))[0]
             self.strSubVer = deser_string(f)
