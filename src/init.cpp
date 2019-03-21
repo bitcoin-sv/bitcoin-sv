@@ -459,6 +459,10 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
         _("Add a node to connect to and attempt to keep the connection open"));
+    if (showDebug) {
+        strUsage += HelpMessageOpt("-allowunsolicitedaddr",
+            _("Allow inbound peers to send us unsolicted addr messages"));
+    }
     strUsage += HelpMessageOpt(
         "-banscore=<n>",
         strprintf(

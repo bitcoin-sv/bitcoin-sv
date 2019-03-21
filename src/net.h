@@ -531,6 +531,7 @@ public:
     double dPingTime;
     double dPingWait;
     double dMinPing;
+    // What this peer sees as my address
     std::string addrLocal;
     CAddress addr;
     size_t nInvQueueSize;
@@ -622,6 +623,7 @@ public:
     std::atomic<int64_t> nLastRecv;
     const int64_t nTimeConnected;
     std::atomic<int64_t> nTimeOffset;
+    // The address of the remote peer
     const CAddress addr;
     std::atomic<int> nVersion;
     // strSubVer is whatever byte array we read from the wire. However, this
@@ -671,7 +673,8 @@ public:
     // flood relay
     std::vector<CAddress> vAddrToSend;
     CRollingBloomFilter addrKnown;
-    bool fGetAddr;
+    // Has an ADDR been requested?
+    std::atomic<bool> fGetAddr;
     int64_t nNextAddrSend;
     int64_t nNextLocalAddrSend;
 
