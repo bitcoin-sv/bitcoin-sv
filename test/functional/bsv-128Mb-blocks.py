@@ -21,18 +21,23 @@ class BSV128MBlocks(ComparisonTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
-        self.excessive_block_size = 128 * ONE_MEGABYTE
-        self.extra_args = [['-whitelist=127.0.0.1',
-                            "-excessiveblocksize=%d" % self.excessive_block_size]]
 
     def add_options(self, parser):
         super().add_options(parser)
+        parser.add_option("--excessiveblocksize", dest="excessive_block_size", default=128*ONE_MEGABYTE, type='int')
 
     def run_test(self):
-        self.nodes[0].setexcessiveblock(self.excessive_block_size)
+        self.extra_args = [['-whitelist=127.0.0.1',
+                    "-excessiveblocksize=%d" % self.options.excessive_block_size]]
+        self.nodes[0].setexcessiveblock(self.options.excessive_block_size)
         self.test.run()
 
     def get_tests(self):
+        self.log.info("Testing with -excessiveblocksize set to {} MB ({} bytes)"
+            .format(
+                (self.options.excessive_block_size/ONE_MEGABYTE),
+                self.options.excessive_block_size))
+
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
 
@@ -58,12 +63,12 @@ class BSV128MBlocks(ComparisonTestFramework):
             out.append(self.chain.get_spendable_output())
 
         # block of maximal size
-        block(1, spend=out[0], block_size=self.excessive_block_size)
+        block(1, spend=out[0], block_size=self.options.excessive_block_size)
         yield self.accepted()
 
         # Oversized blocks will cause us to be disconnected
         assert(not self.test.test_nodes[0].closed)
-        block(2, spend=out[1], block_size=self.excessive_block_size + 1)
+        block(2, spend=out[1], block_size=self.options.excessive_block_size + 1)
         self.test.connections[0].send_message(msg_block((self.chain.tip)))
         self.test.wait_for_disconnections()
         assert(self.test.test_nodes[0].closed)
@@ -74,7 +79,7 @@ class BSV128MBlocks(ComparisonTestFramework):
         self.test.wait_for_verack()
 
         # Check we can still mine a good size block
-        block(3, spend=out[1], block_size=self.excessive_block_size)
+        block(3, spend=out[1], block_size=self.options.excessive_block_size)
         yield self.accepted()
 
 if __name__ == '__main__':
