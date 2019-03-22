@@ -55,12 +55,6 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     BOOST_CHECK_EQUAL(sizemaxplus.IsValidWithoutConfig(config.GetChainParams().NetMagic()), false);
     BOOST_CHECK_EQUAL(sizemaxplus.IsValid(config), false);
     BOOST_CHECK_EQUAL(sizemaxplus.IsOversized(config), true);
-
-    // test with max inv size message
-    CMessageHeader invmax(config.GetChainParams().NetMagic(), NetMsgType::INV, (3+MAX_INV_SZ*(4+32)));
-    BOOST_CHECK_EQUAL(invmax.IsValidWithoutConfig(config.GetChainParams().NetMagic()), true);
-    BOOST_CHECK_EQUAL(invmax.IsValid(config), true);
-    BOOST_CHECK_EQUAL(invmax.IsOversized(config), false);
 }
 
 BOOST_AUTO_TEST_CASE(protocol_estimate_inv_elements)

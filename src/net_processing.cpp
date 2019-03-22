@@ -1908,11 +1908,6 @@ static OptBool ProcessInvMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
-    if(vInv.size() > MAX_INV_SZ) {
-        Misbehaving(pfrom, 20, "oversized-inv");
-        return error("message inv size() = %u", vInv.size());
-    }
-
     bool fBlocksOnly = !fRelayTxes;
 
     // Allow whitelisted peers to send data other than blocks in blocks only
@@ -1988,10 +1983,6 @@ static OptBool ProcessGetDataMessage(const Config& config, const CNodePtr& pfrom
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
-    if(vInv.size() > MAX_INV_SZ) {
-        Misbehaving(pfrom, 20, "too-many-inv");
-        return error("message getdata size() = %u", vInv.size());
-    }
 
     LogPrint(BCLog::NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
 
@@ -3991,8 +3982,9 @@ void SendTxnInventory(const Config &config, const CNodePtr& pto, CConnman &connm
     for(const CTxnSendingDetails& txn : vInvTx)
     {
         vInv.emplace_back(txn.getInv());
-        if(vInv.size() == MAX_INV_SZ)
-        {
+        // if next element will cause too large message, then we send it now, as message size is still under limit
+        // vInv size is actually limited before -- with INVENTORY_BROADCAST_MAX_PER_MB
+        if (vInv.size() == pto->maxInvElements) {
             connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
             vInv.clear();
         }
@@ -4026,7 +4018,9 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
     // Add blocks
     for (const uint256 &hash : pto->vInventoryBlockToSend) {
         vInv.push_back(CInv(MSG_BLOCK, hash));
-        if (vInv.size() == MAX_INV_SZ) {
+        // if next element will cause too large message, then we send it now, as message size is still under limit
+        // vInv size is actually limited before -- with INVENTORY_BROADCAST_MAX_PER_MB
+        if (vInv.size() == pto->maxInvElements) {
             connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
             vInv.clear();
         }
@@ -4076,7 +4070,8 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
             }
             pto->filterInventoryKnown.insert(txid);
             vInv.push_back(inv);
-            if (vInv.size() == MAX_INV_SZ) {
+            // if next element will cause too large message, then we send it now, as message size is still under limit
+            if (vInv.size() == pto->maxInvElements) {
                 connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
                 vInv.clear();
             }
