@@ -402,7 +402,7 @@ class TestManager():
                     else:
                         invqueue.append(CInv(1, tx.sha256))
                 # Ensure we're not overflowing the inv queue
-                if len(invqueue) == MAX_INV_SZ:
+                if len(invqueue) == c.maxInvElements:
                     [c.send_message(msg_inv(invqueue))
                      for c in self.connections]
                     invqueue = []

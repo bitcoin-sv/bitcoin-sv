@@ -4,6 +4,7 @@
 # Copyright (c) 2010-2016 The Bitcoin Core developers
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
+
 """Bitcoin P2P network half-a-node.
 
 This python code was modified from ArtForz' public domain  half-a-node, as
@@ -318,6 +319,28 @@ class CInv():
     def __repr__(self):
         return "CInv(type=%s hash=%064x)" \
             % (self.typemap[self.type], self.hash)
+
+    def estimateMaxInvElements(max_payload_length=MAX_PROTOCOL_RECV_PAYLOAD_LENGTH):
+        return int((max_payload_length - 8) / (4 + 32))
+
+class CProtoconf():
+    def __init__(self, number_of_fields=1, max_recv_payload_length=0):
+        self.number_of_fields = number_of_fields
+        self.max_recv_payload_length = max_recv_payload_length
+        
+    def deserialize(self, f):
+        self.number_of_fields = deser_compact_size(f)
+        self.max_recv_payload_length = struct.unpack("<i", f.read(4))[0]
+
+    def serialize(self):
+        r = b""
+        r += ser_compact_size(self.number_of_fields)
+        r += struct.pack("<i", self.max_recv_payload_length) 
+        return r
+
+    def __repr__(self):
+        return "CProtoconf(number_of_fields=%064x max_recv_payload_length=%064x)" \
+            % (self.number_of_fields, self.max_recv_payload_length)
 
 
 class CBlockLocator():
@@ -933,6 +956,25 @@ class msg_verack():
     def __repr__(self):
         return "msg_verack()"
 
+class msg_protoconf():
+    command = b"protoconf"
+
+    def __init__(self, protoconf=None):
+        if protoconf is None:
+            self.protoconf = CProtoconf(1,0)
+        else:
+            self.protoconf = protoconf
+
+    def deserialize(self, f):
+        self.inv = self.protoconf.deserialize(f)
+
+    def serialize(self):
+        r = b""
+        r += self.protoconf.serialize()
+        return r
+
+    def __repr__(self):
+        return "msg_protoconf(protoconf=%s)" % (repr(self.protoconf))
 
 class msg_addr():
     command = b"addr"
@@ -1354,6 +1396,7 @@ class NodeConnCB():
         # Track number of messages of each type received and the most recent
         # message of each type
         self.message_count = defaultdict(int)
+        self.msg_timestamp = {}
         self.last_message = {}
 
         # A count of the number of ping messages we've sent to the node
@@ -1386,6 +1429,7 @@ class NodeConnCB():
                 command = message.command.decode('ascii')
                 self.message_count[command] += 1
                 self.last_message[command] = message
+                self.msg_timestamp[command] = time.time()
                 getattr(self, 'on_' + command)(conn, message)
             except:
                 print("ERROR delivering %s (%s)" % (repr(message),
@@ -1462,13 +1506,19 @@ class NodeConnCB():
         conn.ver_recv = conn.ver_send
         self.verack_received = True
 
+    def on_protoconf(self, conn, message): pass
+
     def on_version(self, conn, message):
         if message.nVersion >= 209:
             conn.send_message(msg_verack())
+            self.send_protoconf(conn)
         conn.ver_send = min(MY_VERSION, message.nVersion)
         if message.nVersion < 209:
             conn.ver_recv = conn.ver_send
         conn.nServices = message.nServices
+
+    def send_protoconf(self, conn):
+        conn.send_message(msg_protoconf(CProtoconf(1, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH)))
 
     # Connection helper methods
 
@@ -1513,6 +1563,10 @@ class NodeConnCB():
         def test_function(): return self.message_count["reject"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
+    def wait_for_protoconf(self, timeout=60):
+        def test_function(): return self.message_count["protoconf"]
+        wait_until(test_function, timeout=timeout, lock=mininode_lock)
+
     # Message sending helper functions
 
     def send_message(self, message):
@@ -1543,6 +1597,7 @@ class NodeConnCB():
 class NodeConn(asyncore.dispatcher):
     messagemap = {
         b"version": msg_version,
+        b"protoconf": msg_protoconf,
         b"verack": msg_verack,
         b"addr": msg_addr,
         b"alert": msg_alert,
@@ -1587,6 +1642,7 @@ class NodeConn(asyncore.dispatcher):
         self.cb = callback
         self.disconnect = False
         self.nServices = 0
+        self.maxInvElements = CInv.estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
 
         if send_version:
             # stuff version msg into sendbuf
