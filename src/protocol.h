@@ -394,6 +394,19 @@ public:
         return k == MSG_BLOCK || k == MSG_FILTERED_BLOCK ||
                k == MSG_CMPCT_BLOCK;
     }
+
+    /* Estimate the maximum number of INV elements that will fit in given payload.
+     * The result is pessimistic, because we assume that 8 bytes are required to encode number
+     * of elements, which is only true for very large numbers.
+     * @param maxPayloadLength : maximal size of INV message *payload* (without header) that a peer can receive (in bytes)
+     * @ return : number of elements in INV message that corresponds to maxPayloadLength 
+
+    **/
+    static constexpr uint32_t estimateMaxInvElements(unsigned int maxPayloadLength) {
+
+        return (maxPayloadLength - 8 /* number of elements */) / (4 /* type */ + 32 /* hash size */);
+    } 
+
 };
 
 #endif // BITCOIN_PROTOCOL_H

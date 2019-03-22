@@ -63,6 +63,42 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     BOOST_CHECK_EQUAL(invmax.IsOversized(config), false);
 }
 
+BOOST_AUTO_TEST_CASE(protocol_estimate_inv_elements)
+{
+    OurConfig config;
+    const CNetMsgMaker msgMaker(INIT_PROTO_VERSION);
+    std::vector<CInv> vInv;
+    uint32_t maxRecvPayloadLength = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
+
+    auto cnetMsg = CNetMessage(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION);
+    for (uint32_t i = 0; i < maxRecvPayloadLength - 1; i++) {
+        vInv.emplace_back(1, uint256());
+    }
+
+    // Send maxInvElements - 1.
+    auto serializedInvMsg = msgMaker.Make(NetMsgType::INV, vInv);
+    size_t nPayloadLength = serializedInvMsg.data.size();
+    CMessageHeader hdrLess(config.GetChainParams().NetMagic(), serializedInvMsg.command.c_str(),
+        nPayloadLength);
+    BOOST_CHECK_EQUAL(hdrLess.IsOversized(config), false);
+
+    // Send maxInvElements.
+    vInv.emplace_back(1, uint256());
+    serializedInvMsg = msgMaker.Make(NetMsgType::INV, vInv);
+    nPayloadLength = serializedInvMsg.data.size();
+    CMessageHeader hdrEqual(config.GetChainParams().NetMagic(), serializedInvMsg.command.c_str(),
+        nPayloadLength);
+    BOOST_CHECK_EQUAL(hdrEqual.IsOversized(config), false);
+
+    // Send maxInvElements + 1.
+    vInv.emplace_back(1, uint256());
+    serializedInvMsg = msgMaker.Make(NetMsgType::INV, vInv);
+    nPayloadLength = serializedInvMsg.data.size();
+    CMessageHeader hdrMore(config.GetChainParams().NetMagic(), serializedInvMsg.command.c_str(),
+        nPayloadLength);
+    BOOST_CHECK_EQUAL(hdrMore.IsOversized(config), true);
+}
+
 BOOST_AUTO_TEST_CASE(protocol_msghdr_magic)
 {
     CMessageHeader::MessageMagic wrongMessageMagic = {
