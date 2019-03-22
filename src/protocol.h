@@ -28,6 +28,20 @@ class Config;
 static const unsigned int MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
 
 /**
+ * By default, size of messages to other peers are limited by this default value.
+ * This limit is raised if a Protoconf message is received from a peer.
+ * Default value is required for compatibility with older versions that do not support Protoconf message.
+**/
+static const unsigned int LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH = 1 * 1024 * 1024;
+
+/**
+ * Maximum size of message that can be send to peer.
+ * If a peer sends Protoconf message with maxRecvPayloadLength larger than MAX_PROTOCOL_SEND_PAYLOAD_LENGTH,
+ * this peer's maxRecvPayloadLength is set to this value.
+**/
+static const unsigned int MAX_PROTOCOL_SEND_PAYLOAD_LENGTH = 2 * MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+
+/**
  * Message header.
  * (4) message start.
  * (12) command.
@@ -252,6 +266,11 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
+/**
+ * Contains a CProtoconf.
+ * Sent right after VERACK message, regardless of remote peer's protocol version
+ */
+extern const char *PROTOCONF;
 
 /**
  * Indicate if the message is used to transmit the content of a block.
@@ -407,6 +426,30 @@ public:
         return (maxPayloadLength - 8 /* number of elements */) / (4 /* type */ + 32 /* hash size */);
     } 
 
+};
+
+/** protoconf message data **/
+class CProtoconf {
+
+public:
+    uint64_t numberOfFields;
+    uint32_t maxRecvPayloadLength;
+public:
+    CProtoconf() : numberOfFields(1), maxRecvPayloadLength(0) {}
+    /** numberOfFields is set to 1, increment if new properties are added **/
+    CProtoconf(unsigned int maxRecvPayloadLengthIn) : numberOfFields(1), maxRecvPayloadLength(maxRecvPayloadLengthIn) {}
+
+    ADD_SERIALIZE_METHODS;
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream &s, Operation ser_action) {
+        READWRITECOMPACTSIZE(numberOfFields);
+        if (numberOfFields > 0) {
+            READWRITE(maxRecvPayloadLength);
+        } else {
+            throw std::ios_base::failure("Invalid deserialization. Number of fields specified in protoconf is equal to 0.");
+        }
+        
+    }
 };
 
 #endif // BITCOIN_PROTOCOL_H

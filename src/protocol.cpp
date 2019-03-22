@@ -41,6 +41,7 @@ const char *SENDCMPCT = "sendcmpct";
 const char *CMPCTBLOCK = "cmpctblock";
 const char *GETBLOCKTXN = "getblocktxn";
 const char *BLOCKTXN = "blocktxn";
+const char *PROTOCONF = "protoconf";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
@@ -62,7 +63,7 @@ static const std::string allNetMessageTypes[] = {
     NetMsgType::NOTFOUND,    NetMsgType::FILTERLOAD, NetMsgType::FILTERADD,
     NetMsgType::FILTERCLEAR, NetMsgType::REJECT,     NetMsgType::SENDHEADERS,
     NetMsgType::FEEFILTER,   NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
-    NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN,
+    NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
 };
 static const std::vector<std::string>
     allNetMessageTypesVec(allNetMessageTypes,
@@ -162,6 +163,13 @@ bool CMessageHeader::IsValidWithoutConfig(const MessageMagic &magic) const {
 }
 
 bool CMessageHeader::IsOversized(const Config &config) const {
+
+    // If the message is PROTOCONF, it is limited to LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH.
+    if (nPayloadLength > LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH &&
+        GetCommand() == NetMsgType::PROTOCONF) {
+        return true;
+    }
+
     // If the message doesn't not contain a block content, check against
     // MAX_PROTOCOL_RECV_PAYLOAD_LENGTH.
     if (nPayloadLength > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH &&

@@ -758,6 +758,11 @@ public:
     Amount lastSentFeeFilter {0};
     int64_t nextSendTimeFeeFilter {0};
 
+    /** Maximum number of CInv elements this peers is willing to accept */
+    uint32_t maxInvElements {CInv::estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)};
+    /** protoconfReceived is false by default and set to true when protoconf is received from peer **/
+    bool protoconfReceived {false};
+
     CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn,
           SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn,
           uint64_t nLocalHostNonceIn, const std::string &addrNameIn = "",
