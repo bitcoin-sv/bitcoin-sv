@@ -79,7 +79,13 @@ std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};
 std::atomic_size_t CSendQueueBytes::nTotalSendQueuesBytes = 0;
 
-limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
+limitedmap<uint256, int64_t> mapAlreadyAskedFor(CInv::estimateMaxInvElements(MAX_PROTOCOL_SEND_PAYLOAD_LENGTH));
+
+/** The maximum number of entries in mapAskFor */
+static const size_t MAPASKFOR_MAX_SIZE = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
+/** The maximum number of entries in setAskFor (larger due to getdata latency)*/
+static const size_t SETASKFOR_MAX_SIZE = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * 2);
+
 
 // Signals for message handling
 static CNodeSignals g_signals;
@@ -2928,8 +2934,9 @@ CNode::~CNode() {
 }
 
 void CNode::AskFor(const CInv &inv) {
-    if (mapAskFor.size() > MAPASKFOR_MAX_SZ ||
-        setAskFor.size() > SETASKFOR_MAX_SZ) {
+    // if mapAskFor is too large, we will never ask for it (it becomes lost)
+    if (mapAskFor.size() > MAPASKFOR_MAX_SIZE ||
+        setAskFor.size() > SETASKFOR_MAX_SIZE) {
         return;
     }
 
