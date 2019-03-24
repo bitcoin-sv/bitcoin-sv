@@ -62,8 +62,6 @@ static const int PING_INTERVAL = 2 * 60;
 static const int TIMEOUT_INTERVAL = 20 * 60;
 /** Run the feeler connection loop once every 2 minutes or 120 seconds. **/
 static const int FEELER_INTERVAL = 120;
-/** The maximum number of entries in an 'inv' protocol message */
-static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
 /** Maximum length of strSubVer in `version` message */

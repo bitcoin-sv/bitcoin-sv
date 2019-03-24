@@ -4185,7 +4185,8 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
             LogPrint(BCLog::NET, "Requesting %s peer=%d\n", inv.ToString(),
                      pto->id);
             vGetData.push_back(inv);
-            if (vGetData.size() >= 1000) {
+            // if next element will cause too large message, then we send it now, as message size is still under limit
+            if (vGetData.size() == pto->maxInvElements) {
                 connman.PushMessage(
                     pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
                 vGetData.clear();
