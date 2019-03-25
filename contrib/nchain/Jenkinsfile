@@ -36,6 +36,11 @@ pipeline {
                 sh 'cd src/univalue && test/unitester'
             }
         }
+        stage('leveldb Tests') {
+            steps {
+                sh 'cd src/leveldb && make check'
+            }
+        }
         stage('Util Tests') {
             steps {
                 sh 'test/util/bitcoin-util-test.py --verbose > build/reports/util-test.log'
