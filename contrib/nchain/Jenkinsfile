@@ -48,7 +48,7 @@ pipeline {
         }
         stage('Functional Tests') {
             steps {
-                sh 'test/functional/test_runner.py --extended --jobs=1 --junitouput=build/reports/func-tests.xml'
+                sh 'test/functional/test_runner.py --extended --junitouput=build/reports/func-tests.xml'
             }
         }
         stage('Code Coverage') {
