@@ -1,3 +1,12 @@
+/*
+    simple pipeline to perform all Bitcoin SV tests
+
+    node requirements:
+    - 16GB RAM
+    - docker
+
+    Copyright 2019 The Bitcoin SV Developers
+*/
 pipeline {
     agent {
         docker {
