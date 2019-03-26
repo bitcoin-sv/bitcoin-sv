@@ -10,6 +10,26 @@
 /** Access to info about block files */
 std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = std::make_unique<CBlockFileInfoStore>();
 
+void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(
+    unsigned int nAddSize, unsigned int& nFile)
+{
+    // this while instead of if is here because first commit introduced it
+    // and vinfoBlockFile.size() can exceed nLastBlockFile at least in
+    // LoadBlockIndexDB function where block file info is being loaded
+    // and we can't be certain that it's the only case without more tests
+    // and extensive refactoring
+    while (vinfoBlockFile[nFile].nSize &&
+           // >= is here for legacy purposes - could possibly be changed to > as
+           // currently max file size is one byte less than preferred block file size
+           // but larger code analisys would be required
+           vinfoBlockFile[nFile].nSize + nAddSize >= MAX_BLOCKFILE_SIZE) {
+        nFile++;
+        if (vinfoBlockFile.size() <= nFile) {
+            vinfoBlockFile.resize(nFile + 1);
+        }
+    }
+}
+
 void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
     LOCK(cs_LastBlockFile);
 
@@ -59,12 +79,7 @@ bool CBlockFileInfoStore::FindBlockPos(CValidationState &state, CDiskBlockPos &p
     }
 
     if (!fKnown) {
-        while (vinfoBlockFile[nFile].nSize + nAddSize >= MAX_BLOCKFILE_SIZE) {
-            nFile++;
-            if (vinfoBlockFile.size() <= nFile) {
-                vinfoBlockFile.resize(nFile + 1);
-            }
-        }
+        FindNextFileWithEnoughEmptySpace(nAddSize, nFile);
         pos.nFile = nFile;
         pos.nPos = vinfoBlockFile[nFile].nSize;
     }
