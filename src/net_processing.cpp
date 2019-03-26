@@ -1149,8 +1149,10 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     std::array<std::pair<uint64_t, CNodePtr>, 2> best {{{0, nullptr}, {0, nullptr}}};
     assert(nRelayNodes <= best.size());
 
-    auto sortfunc = [&best, &hasher, nRelayNodes](const CNodePtr& pnode) {
-        if (pnode->nVersion >= CADDR_TIME_VERSION) {
+    bool allowUnsolictedAddr { gArgs.GetBoolArg("-allowunsolicitedaddr", false) };
+    auto sortfunc = [&best, &hasher, nRelayNodes, allowUnsolictedAddr](const CNodePtr& pnode) {
+        // FIXME: When we get rid of -allowunsolicitedaddr, change to just: pnode->fInbound && ...
+        if ((allowUnsolictedAddr || pnode->fInbound) && pnode->nVersion >= CADDR_TIME_VERSION) {
             uint64_t hashKey = CSipHasher(hasher).Write(pnode->id).Finalize();
             for (unsigned int i = 0; i < nRelayNodes; i++) {
                 if (hashKey > best[i].first) {
