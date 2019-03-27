@@ -507,6 +507,7 @@ static UniValue getnetworkinfo(const Config &config,
             "  \"txnpropagationqlen\": xxxxx,           (numeric) length of the transaction propagator queue\n"
             "  \"connections\": xxxxx,                  (numeric) the number "
             "of connections\n"
+            "  \"addresscount\": xxxxx,                 (numeric) number of known peer addresses\n"
             "  \"networkactive\": true|false,           (bool) whether p2p "
             "networking is enabled\n"
             "  \"networks\": [                          (array) information "
@@ -565,9 +566,8 @@ static UniValue getnetworkinfo(const Config &config,
         obj.push_back(Pair("txnpropagationfreq", g_connman->getTransactionPropagator()->getRunFrequency().count()));
         obj.push_back(Pair("txnpropagationqlen", static_cast<uint64_t>(g_connman->getTransactionPropagator()->getNewTxnQueueLength())));
         obj.push_back(Pair("networkactive", g_connman->GetNetworkActive()));
-        obj.push_back(
-            Pair("connections",
-                 (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
+        obj.push_back(Pair("connections", (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
+        obj.push_back(Pair("addresscount", static_cast<uint64_t>(g_connman->GetAddressCount())));
     }
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee",
