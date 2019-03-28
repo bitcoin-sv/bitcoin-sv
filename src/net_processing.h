@@ -23,6 +23,8 @@ static const int64_t ORPHAN_TX_EXPIRE_INTERVAL = 5 * 60;
 static const unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
 /** Max broadcast delay duration in milliseconds */
 static const int64_t MAX_INV_BROADCAST_DELAY = 50 * 1000;
+/** Default broadcast delay duration in milliseconds **/
+static const int64_t DEFAULT_INV_BROADCAST_DELAY = 150;
 
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals &nodeSignals);

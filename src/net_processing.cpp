@@ -722,7 +722,7 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals) {
     nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
 }
 
-static int64_t Fixed_delay_microsecs=-1;// microsecond
+static int64_t Fixed_delay_microsecs = DEFAULT_INV_BROADCAST_DELAY * 1000;
 bool SetInvBroadcastDelay(const int64_t& nDelayMillisecs) {
     if ( nDelayMillisecs < 0 || nDelayMillisecs > MAX_INV_BROADCAST_DELAY)
         return false;
@@ -3870,16 +3870,7 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
     bool fSendTrickle = pto->fWhitelisted;
     if (pto->nNextInvSend < nNow) {
         fSendTrickle = true;
-        // Use half the delay for outbound peers, as there is less privacy
-        // concern for them.
-        if(Fixed_delay_microsecs < 0) {
-            // If fixed delay is not set, use the randomized delay broadcasting
-            pto->nNextInvSend = PoissonNextSend(
-                nNow, INVENTORY_BROADCAST_INTERVAL >> !pto->fInbound);
-        }
-        else {
-            pto->nNextInvSend = nNow + Fixed_delay_microsecs;
-        }
+        pto->nNextInvSend = nNow + Fixed_delay_microsecs; 
     }
 
     // Time to send but the peer has requested we not relay transactions.
