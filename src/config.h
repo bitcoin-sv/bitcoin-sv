@@ -7,6 +7,7 @@
 
 #include "amount.h"
 #include "consensus/consensus.h"
+#include "validation.h"
 #include "policy/policy.h"
 
 #include <boost/noncopyable.hpp>
@@ -33,6 +34,9 @@ public:
 
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
+
+    virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
+    virtual uint64_t GetPreferredBlockFileSize() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -53,6 +57,9 @@ public:
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
 
+    void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override;
+    uint64_t GetPreferredBlockFileSize() const override;
+
     void SetMaxBlockSizeOverridden(bool overridden);    // For unit testing only
 
     static GlobalConfig& GetConfig();
@@ -64,6 +71,7 @@ private:
     uint64_t maxBlockSize { DEFAULT_MAX_BLOCK_SIZE };
     bool maxBlockSizeOverridden { false };
     uint64_t blockPriorityPercentage { DEFAULT_BLOCK_PRIORITY_PERCENTAGE };
+    uint64_t preferredBlockFileSize { DEFAULT_PREFERRED_BLOCKFILE_SIZE };
 };
 
 // Dummy for subclassing in unittests
@@ -90,6 +98,9 @@ public:
 
     void SetMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetMinFeePerKB() const override { return CFeeRate(Amount(0)); }
+
+    void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override {}
+    uint64_t GetPreferredBlockFileSize() const override { return 0; }
 
 private:
     std::unique_ptr<CChainParams> chainParams;

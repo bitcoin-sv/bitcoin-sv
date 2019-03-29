@@ -24,6 +24,14 @@ uint64_t GlobalConfig::GetMaxBlockSize() const {
     return maxBlockSize;
 }
 
+void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
+    preferredBlockFileSize = preferredSize;
+}
+
+uint64_t GlobalConfig::GetPreferredBlockFileSize() const {
+    return preferredBlockFileSize;
+}
+
 bool GlobalConfig::MaxBlockSizeOverridden() const {
     return maxBlockSizeOverridden;
 }

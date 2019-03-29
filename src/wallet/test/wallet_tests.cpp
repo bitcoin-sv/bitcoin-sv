@@ -454,7 +454,8 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
 
     // Cap last block file size, and mine new block in a new block file.
     CBlockIndex *oldTip = chainActive.Tip();
-    pBlockFileInfoStore->GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize = MAX_BLOCKFILE_SIZE;
+    pBlockFileInfoStore->GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize =
+        DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     CBlockIndex *newTip = chainActive.Tip();
 

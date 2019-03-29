@@ -1496,6 +1496,11 @@ bool AppInitParameterInteraction(Config &config) {
     else if (nScriptCheckThreads > MAX_SCRIPTCHECK_THREADS)
         nScriptCheckThreads = MAX_SCRIPTCHECK_THREADS;
 
+    // Configure preferred size of blockfile.
+    config.SetPreferredBlockFileSize(
+        gArgs.GetArg("-preferredblockfilesize",
+            DEFAULT_PREFERRED_BLOCKFILE_SIZE));
+
     // Configure excessive block size.
     if(gArgs.IsArgSet("-excessiveblocksize")) {
         const uint64_t nProposedExcessiveBlockSize =
