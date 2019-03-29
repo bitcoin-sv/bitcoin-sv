@@ -3018,17 +3018,12 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         CTxMemPoolEntry entry(wtxNew.tx, Amount(0), 0, 0, 0, Amount(0), false,
                               0, lp);
         CTxMemPool::setEntries setAncestors;
-        size_t nLimitAncestors =
-            gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize =
-            gArgs.GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) *
-            1000;
-        size_t nLimitDescendants =
-            gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
-        size_t nLimitDescendantSize =
-            gArgs.GetArg("-limitdescendantsize",
-                         DEFAULT_DESCENDANT_SIZE_LIMIT) *
-            1000;
+        size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
+        size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
+
+        size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
+        size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
+
         std::string errString;
         if (!mempool.CalculateMemPoolAncestors(
                 entry, setAncestors, nLimitAncestors, nLimitAncestorSize,

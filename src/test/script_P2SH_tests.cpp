@@ -12,6 +12,8 @@
 #include "script/sign.h"
 #include "test/test_bitcoin.h"
 #include "validation.h"
+#include "chainparams.h"
+#include "config.h"
 
 #include <vector>
 
@@ -48,6 +50,8 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
 BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(sign) {
+
+    DummyConfig config(CBaseChainParams::MAIN);
     LOCK(cs_main);
     // Pay-to-script-hash looks like this:
     // scriptSig:    <sig> <sig...> <serialized_script>
@@ -84,7 +88,7 @@ BOOST_AUTO_TEST_CASE(sign) {
         txFrom.vout[i + 4].scriptPubKey = standardScripts[i];
         txFrom.vout[i + 4].nValue = COIN;
     }
-    BOOST_CHECK(IsStandardTx(CTransaction(txFrom), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(txFrom), reason));
 
     CMutableTransaction txTo[8]; // Spending transactions
     for (int i = 0; i < 8; i++) {
@@ -155,6 +159,9 @@ BOOST_AUTO_TEST_CASE(norecurse) {
 }
 
 BOOST_AUTO_TEST_CASE(set) {
+
+    DummyConfig config(CBaseChainParams::MAIN);
+
     LOCK(cs_main);
     // Test the CScript::Set* methods
     CBasicKeyStore keystore;
@@ -189,7 +196,7 @@ BOOST_AUTO_TEST_CASE(set) {
         txFrom.vout[i].scriptPubKey = outer[i];
         txFrom.vout[i].nValue = CENT;
     }
-    BOOST_CHECK(IsStandardTx(CTransaction(txFrom), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(txFrom), reason));
 
     // Spending transactions
     CMutableTransaction txTo[4];
@@ -207,7 +214,7 @@ BOOST_AUTO_TEST_CASE(set) {
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(IsStandardTx(CTransaction(txTo[i]), reason),
+        BOOST_CHECK_MESSAGE(IsStandardTx(config, CTransaction(txTo[i]), reason),
                             strprintf("txTo[%d].IsStandard", i));
     }
 }

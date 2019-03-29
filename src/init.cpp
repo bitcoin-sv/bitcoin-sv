@@ -842,7 +842,7 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-datacarriersize",
         strprintf(_("Maximum size of data in data carrier transactions we "
                     "relay and mine (default: %u)"),
-                  MAX_OP_RETURN_RELAY));
+                  DEFAULT_DATA_CARRIER_SIZE));
 
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
@@ -1552,6 +1552,31 @@ bool AppInitParameterInteraction(Config &config) {
         const int64_t nProposedActivationTime =
             gArgs.GetArg("-blocksizeactivationtime", 0);
         config.SetBlockSizeActivationTime(nProposedActivationTime);
+    }
+
+    // Configure data carrier size.
+    if(gArgs.IsArgSet("-datacarriersize")) {
+        config.SetDataCarrierSize(gArgs.GetArg("-datacarriersize", DEFAULT_DATA_CARRIER_SIZE));
+    }
+
+    // Configure descendant limit count.
+    if(gArgs.IsArgSet("-limitdescendantcount")) {
+        config.SetLimitDescendantCount(gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
+    }
+
+    // Configure ancestor limit count.
+    if(gArgs.IsArgSet("-limitancestorcount")) {
+        config.SetLimitAncestorCount(gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT));
+    }
+
+    // Configure descendant limit size.
+    if(gArgs.IsArgSet("-limitdescendantsize")) {
+        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000);
+    }
+
+    // Configure ancestor limit size.
+    if(gArgs.IsArgSet("-limitancestorsize")) {
+        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000);
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &

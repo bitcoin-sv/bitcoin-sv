@@ -724,7 +724,7 @@ static bool AcceptToMemoryPoolWorker(
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     std::string reason;
-    if (fRequireStandard && !IsStandardTx(tx, reason)) {
+    if (fRequireStandard && !IsStandardTx(config, tx, reason)) {
         return state.DoS(0, false, REJECT_NONSTANDARD, reason);
     }
 
@@ -933,17 +933,12 @@ static bool AcceptToMemoryPoolWorker(
 
         // Calculate in-mempool ancestors, up to a limit.
         CTxMemPool::setEntries setAncestors;
-        size_t nLimitAncestors =
-            gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
-        size_t nLimitAncestorSize =
-            gArgs.GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) *
-            1000;
-        size_t nLimitDescendants =
-            gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
-        size_t nLimitDescendantSize =
-            gArgs.GetArg("-limitdescendantsize",
-                         DEFAULT_DESCENDANT_SIZE_LIMIT) *
-            1000;
+        size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
+        size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
+
+        size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
+        size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
+
         std::string errString;
         if (!pool.CalculateMemPoolAncestors(
                 entry, setAncestors, nLimitAncestors, nLimitAncestorSize,

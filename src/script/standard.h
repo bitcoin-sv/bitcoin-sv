@@ -27,7 +27,7 @@ public:
 };
 
 //!< bytes (+1 for OP_RETURN, +2 for the pushdata opcodes)
-static const unsigned int MAX_OP_RETURN_RELAY = 223;
+static const uint64_t DEFAULT_DATA_CARRIER_SIZE = 223;
 extern bool fAcceptDatacarrier;
 
 /**

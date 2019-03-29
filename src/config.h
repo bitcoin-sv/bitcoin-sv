@@ -10,6 +10,8 @@
 #include "consensus/consensus.h"
 #include "validation.h"
 #include "policy/policy.h"
+#include "script/standard.h"
+#include "validation.h"
 
 #include <boost/noncopyable.hpp>
 
@@ -52,6 +54,21 @@ public:
 
     virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual uint64_t GetPreferredBlockFileSize() const = 0;
+
+    virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
+    virtual uint64_t GetDataCarrierSize() const = 0;
+
+    virtual void SetLimitAncestorSize(uint64_t limitAncestorSize) = 0;
+    virtual uint64_t GetLimitAncestorSize() const = 0;
+
+    virtual void SetLimitDescendantSize(uint64_t limitDescendantSize) = 0;
+    virtual uint64_t GetLimitDescendantSize() const = 0;
+
+    virtual void SetLimitAncestorCount(uint64_t limitAncestorCount) = 0;
+    virtual uint64_t GetLimitAncestorCount() const = 0;
+
+    virtual void SetLimitDescendantCount(uint64_t limitDescendantCount) = 0;
+    virtual uint64_t GetLimitDescendantCount() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -89,7 +106,22 @@ public:
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override;
     uint64_t GetPreferredBlockFileSize() const override;
 
-    // Reset state of this object to match a newly constructed one. 
+    void SetDataCarrierSize(uint64_t dataCarrierSize) override;
+    uint64_t GetDataCarrierSize() const override;
+
+    void SetLimitAncestorSize(uint64_t limitAncestorSize) override;
+    uint64_t GetLimitAncestorSize() const override;
+
+    void SetLimitDescendantSize(uint64_t limitDescendantSize) override;
+    uint64_t GetLimitDescendantSize() const override;
+
+    void SetLimitAncestorCount(uint64_t limitAncestorCount) override;
+    uint64_t GetLimitAncestorCount() const override;
+
+    void SetLimitDescendantCount(uint64_t limitDescendantCount) override;
+    uint64_t GetLimitDescendantCount() const override;
+
+    // Reset state of this object to match a newly constructed one.
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
     static GlobalConfig& GetConfig();
@@ -114,6 +146,12 @@ private:
     uint64_t maxGeneratedBlockSizeBefore;
     uint64_t maxGeneratedBlockSizeAfter;
     bool maxGeneratedBlockSizeOverridden;
+
+    uint64_t dataCarrierSize;
+    uint64_t limitDescendantCount;
+    uint64_t limitAncestorCount;
+    uint64_t limitDescendantSize;
+    uint64_t limitAncestorSize;
 };
 
 // Dummy for subclassing in unittests
@@ -157,8 +195,24 @@ public:
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override {}
     uint64_t GetPreferredBlockFileSize() const override { return 0; }
 
+    uint64_t GetDataCarrierSize() const override { return dataCarrierSize; }
+    void SetDataCarrierSize(uint64_t dataCarrierSizeIn) override { dataCarrierSize = dataCarrierSizeIn; }
+
+    void SetLimitAncestorSize(uint64_t limitAncestorSize) override {}
+    uint64_t GetLimitAncestorSize() const override { return 0; }
+
+    void SetLimitDescendantSize(uint64_t limitDescendantSize) override {}
+    uint64_t GetLimitDescendantSize() const override { return 0; }
+
+    void SetLimitAncestorCount(uint64_t limitAncestorCount) override {}
+    uint64_t GetLimitAncestorCount() const override { return 0; }
+
+    void SetLimitDescendantCount(uint64_t limitDescendantCount) override {}
+    uint64_t GetLimitDescendantCount() const override { return 0; }
+
 private:
     std::unique_ptr<CChainParams> chainParams;
+    uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
 };
 
 #endif

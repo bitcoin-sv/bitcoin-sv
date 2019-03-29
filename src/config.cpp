@@ -28,6 +28,13 @@ void GlobalConfig::Reset()
     maxGeneratedBlockSizeBefore = 0;
     maxGeneratedBlockSizeAfter = 0;
     maxGeneratedBlockSizeOverridden =  false;
+
+    dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
+    limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
+    limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
+    limitDescendantSize = DEFAULT_DESCENDANT_SIZE_LIMIT;
+    limitAncestorSize = DEFAULT_ANCESTOR_SIZE_LIMIT;
+
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -91,7 +98,7 @@ uint64_t GlobalConfig::GetMaxBlockSize(int64_t nMedianTimePast) const {
     return maxSize;
 }
 
-bool GlobalConfig::MaxBlockSizeOverridden() const {    
+bool GlobalConfig::MaxBlockSizeOverridden() const {
     return maxBlockSizeOverridden;
 }
 
@@ -148,6 +155,46 @@ bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage) {
 
 uint8_t GlobalConfig::GetBlockPriorityPercentage() const {
     return blockPriorityPercentage;
+}
+
+void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {
+    dataCarrierSize = dataCarrierSizeIn;
+}
+
+uint64_t GlobalConfig::GetDataCarrierSize() const {
+    return dataCarrierSize;
+}
+
+void GlobalConfig::SetLimitAncestorSize(uint64_t limitAncestorSizeIn) {
+    limitAncestorSize = limitAncestorSizeIn;
+}
+
+uint64_t GlobalConfig::GetLimitAncestorSize() const {
+    return limitAncestorSize;
+}
+
+void GlobalConfig::SetLimitDescendantSize(uint64_t limitDescendantSizeIn) {
+    limitDescendantSize = limitDescendantSizeIn;
+}
+
+uint64_t GlobalConfig::GetLimitDescendantSize() const {
+    return limitDescendantSize;
+}
+
+void GlobalConfig::SetLimitAncestorCount(uint64_t limitAncestorCountIn) {
+    limitAncestorCount = limitAncestorCountIn;
+}
+
+uint64_t GlobalConfig::GetLimitAncestorCount() const {
+    return limitAncestorCount;
+}
+
+void GlobalConfig::SetLimitDescendantCount(uint64_t limitDescendantCountIn) {
+    limitDescendantCount = limitDescendantCountIn;
+}
+
+uint64_t GlobalConfig::GetLimitDescendantCount() const {
+    return limitDescendantCount;
 }
 
 const CChainParams &GlobalConfig::GetChainParams() const {
