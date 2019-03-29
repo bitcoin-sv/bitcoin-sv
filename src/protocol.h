@@ -22,10 +22,10 @@
 class Config;
 
 /**
- * Maximum length of incoming protocol messages (Currently 2MB).
+ * Maximum length of incoming protocol messages (Currently 2MiB).
  * NB: Messages propagating block content are not subject to this limit.
  */
-static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;
+static const unsigned int MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
 
 /**
  * Message header.
@@ -51,7 +51,7 @@ public:
 
     CMessageHeader(const MessageMagic &pchMessageStartIn);
     CMessageHeader(const MessageMagic &pchMessageStartIn,
-                   const char *pszCommand, unsigned int nMessageSizeIn);
+                   const char *pszCommand, unsigned int nPayloadLengthIn);
 
     std::string GetCommand() const;
     bool IsValid(const Config &config) const;
@@ -64,13 +64,13 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action) {
         READWRITE(FLATDATA(pchMessageStart));
         READWRITE(FLATDATA(pchCommand));
-        READWRITE(nMessageSize);
+        READWRITE(nPayloadLength);
         READWRITE(FLATDATA(pchChecksum));
     }
 
     MessageMagic pchMessageStart;
     char pchCommand[COMMAND_SIZE];
-    uint32_t nMessageSize;
+    uint32_t nPayloadLength;
     uint8_t pchChecksum[CHECKSUM_SIZE];
 };
 

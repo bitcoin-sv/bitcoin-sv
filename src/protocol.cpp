@@ -72,18 +72,18 @@ CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn) {
     memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
            MESSAGE_START_SIZE);
     memset(pchCommand, 0, sizeof(pchCommand));
-    nMessageSize = -1;
+    nPayloadLength = -1;
     memset(pchChecksum, 0, CHECKSUM_SIZE);
 }
 
 CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn,
                                const char *pszCommand,
-                               unsigned int nMessageSizeIn) {
+                               unsigned int nPayloadLengthIn) {
     memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
            MESSAGE_START_SIZE);
     memset(pchCommand, 0, sizeof(pchCommand));
     strncpy(pchCommand, pszCommand, COMMAND_SIZE);
-    nMessageSize = nMessageSizeIn;
+    nPayloadLength = nPayloadLengthIn;
     memset(pchChecksum, 0, CHECKSUM_SIZE);
 }
 
@@ -130,7 +130,7 @@ bool CMessageHeader::IsValid(const Config &config) const {
     // Message size
     if (IsOversized(config)) {
         LogPrintf("CMessageHeader::IsValid(): (%s, %u bytes) is oversized\n",
-                  GetCommand(), nMessageSize);
+                  GetCommand(), nPayloadLength);
         return false;
     }
 
@@ -150,11 +150,11 @@ bool CMessageHeader::IsValidWithoutConfig(const MessageMagic &magic) const {
         return false;
     }
 
-    // Message size
-    if (nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH) {
+    // Payload size
+    if (nPayloadLength > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH) {
         LogPrintf(
             "CMessageHeader::IsValidForSeeder(): (%s, %u bytes) is oversized\n",
-            GetCommand(), nMessageSize);
+            GetCommand(), nPayloadLength);
         return false;
     }
 
@@ -163,14 +163,14 @@ bool CMessageHeader::IsValidWithoutConfig(const MessageMagic &magic) const {
 
 bool CMessageHeader::IsOversized(const Config &config) const {
     // If the message doesn't not contain a block content, check against
-    // MAX_PROTOCOL_MESSAGE_LENGTH.
-    if (nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH &&
+    // MAX_PROTOCOL_RECV_PAYLOAD_LENGTH.
+    if (nPayloadLength > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH &&
         !NetMsgType::IsBlockLike(GetCommand())) {
         return true;
     }
 
     // maximum accepted size with the block size.
-    if (nMessageSize > config.GetMaxBlockSize()) {
+    if (nPayloadLength > config.GetMaxBlockSize()) {
         return true;
     }
 

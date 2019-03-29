@@ -3522,7 +3522,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     std::string strCommand = hdr.GetCommand();
 
     // Message size
-    unsigned int nMessageSize = hdr.nMessageSize;
+    unsigned int nPayloadLength = hdr.nPayloadLength;
 
     // Checksum
     CDataStream &vRecv = msg.vRecv;
@@ -3530,7 +3530,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) !=0) {
         LogPrint(BCLog::NET,
             "%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
-            SanitizeString(strCommand), nMessageSize,
+            SanitizeString(strCommand), nPayloadLength,
             HexStr(hash.begin(), hash.begin() + CMessageHeader::CHECKSUM_SIZE),
             HexStr(hdr.pchChecksum,
                    hdr.pchChecksum + CMessageHeader::CHECKSUM_SIZE));
@@ -3584,16 +3584,16 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             LogPrint(BCLog::NET,
                 "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
                 "message being shorter than its stated length\n",
-                __func__, SanitizeString(strCommand), nMessageSize, e.what());
+                __func__, SanitizeString(strCommand), nPayloadLength, e.what());
         } else if (strstr(e.what(), "size too large")) {
             // Allow exceptions from over-long size
             LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
-                      SanitizeString(strCommand), nMessageSize, e.what());
+                      SanitizeString(strCommand), nPayloadLength, e.what());
             Misbehaving(pfrom, 1, "Over-long size message protection");
         } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
             // Allow exceptions from non-canonical encoding
             LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
-                      SanitizeString(strCommand), nMessageSize, e.what());
+                      SanitizeString(strCommand), nPayloadLength, e.what());
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
         }
@@ -3605,7 +3605,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
 
     if (!fRet) {
         LogPrint(BCLog::NET, "%s(%s, %u bytes) FAILED peer=%d\n", __func__,
-                  SanitizeString(strCommand), nMessageSize, pfrom->id);
+                  SanitizeString(strCommand), nPayloadLength, pfrom->id);
     }
 
     LOCK(cs_main);

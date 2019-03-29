@@ -46,6 +46,7 @@ MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 MY_RELAY = 1
 
 MAX_INV_SZ = 50000
+MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024
 
 COIN = 100000000  # 1 btc in satoshis
 
@@ -1673,28 +1674,28 @@ class NodeConn(asyncore.dispatcher):
                     if len(self.recvbuf) < 4 + 12 + 4:
                         return None
                     command = self.recvbuf[4:4 + 12].split(b"\x00", 1)[0]
-                    msglen = struct.unpack(
+                    payloadlen = struct.unpack(
                         "<i", self.recvbuf[4 + 12:4 + 12 + 4])[0]
                     checksum = None
-                    if len(self.recvbuf) < 4 + 12 + 4 + msglen:
+                    if len(self.recvbuf) < 4 + 12 + 4 + payloadlen:
                         return None
-                    msg = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + msglen]
-                    self.recvbuf = self.recvbuf[4 + 12 + 4 + msglen:]
+                    msg = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + payloadlen]
+                    self.recvbuf = self.recvbuf[4 + 12 + 4 + payloadlen:]
                 else:
                     if len(self.recvbuf) < 4 + 12 + 4 + 4:
                         return None
                     command = self.recvbuf[4:4 + 12].split(b"\x00", 1)[0]
-                    msglen = struct.unpack(
+                    payloadlen = struct.unpack(
                         "<i", self.recvbuf[4 + 12:4 + 12 + 4])[0]
                     checksum = self.recvbuf[4 + 12 + 4:4 + 12 + 4 + 4]
-                    if len(self.recvbuf) < 4 + 12 + 4 + 4 + msglen:
+                    if len(self.recvbuf) < 4 + 12 + 4 + 4 + payloadlen:
                         return None
-                    msg = self.recvbuf[4 + 12 + 4 + 4:4 + 12 + 4 + 4 + msglen]
+                    msg = self.recvbuf[4 + 12 + 4 + 4:4 + 12 + 4 + 4 + payloadlen]
                     h = sha256(sha256(msg))
                     if checksum != h[:4]:
                         raise ValueError(
                             "got bad checksum " + repr(self.recvbuf))
-                    self.recvbuf = self.recvbuf[4 + 12 + 4 + 4 + msglen:]
+                    self.recvbuf = self.recvbuf[4 + 12 + 4 + 4 + payloadlen:]
                 if command not in self.messagemap:
                     logger.warning("Received unknown command from %s:%d: '%s' %s" % (
                         self.dstaddr, self.dstport, command, repr(msg)))

@@ -580,7 +580,7 @@ public:
             return false;
         }
 
-        return (hdr.nMessageSize == nDataPos);
+        return (hdr.nPayloadLength == nDataPos);
     }
 
     const uint256 &GetMessageHash() const;

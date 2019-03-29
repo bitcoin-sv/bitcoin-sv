@@ -45,13 +45,13 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     BOOST_CHECK_EQUAL(inv10.IsOversized(config), false);
 
     // test with max size message
-    CMessageHeader sizemax(config.GetChainParams().NetMagic(), NetMsgType::INV, MAX_PROTOCOL_MESSAGE_LENGTH);
+    CMessageHeader sizemax(config.GetChainParams().NetMagic(), NetMsgType::INV, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
     BOOST_CHECK_EQUAL(sizemax.IsValidWithoutConfig(config.GetChainParams().NetMagic()), true);
     BOOST_CHECK_EQUAL(sizemax.IsValid(config), true);
     BOOST_CHECK_EQUAL(sizemax.IsOversized(config), false);
 
     // test with (max size + 1) message
-    CMessageHeader sizemaxplus(config.GetChainParams().NetMagic(), NetMsgType::INV, MAX_PROTOCOL_MESSAGE_LENGTH+1);
+    CMessageHeader sizemaxplus(config.GetChainParams().NetMagic(), NetMsgType::INV, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH+1);
     BOOST_CHECK_EQUAL(sizemaxplus.IsValidWithoutConfig(config.GetChainParams().NetMagic()), false);
     BOOST_CHECK_EQUAL(sizemaxplus.IsValid(config), false);
     BOOST_CHECK_EQUAL(sizemaxplus.IsOversized(config), true);
