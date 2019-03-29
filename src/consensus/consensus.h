@@ -19,8 +19,6 @@ static const uint64_t MAX_TX_SIZE = ONE_MEGABYTE;
 static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
 /** Default setting for maximum allowed size for a block, in bytes */
 static const uint64_t DEFAULT_MAX_BLOCK_SIZE = 128 * ONE_MEGABYTE;
-/** Pre Nov 2018 default setting for maximum allowed size for a block, in bytes */
-static const uint64_t LEGACY_DEFAULT_MAX_BLOCK_SIZE = 32 * ONE_MEGABYTE;
 /**
  * The maximum allowed number of signature check operations per MB in a block
  * (network rule).

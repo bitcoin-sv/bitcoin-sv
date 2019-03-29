@@ -139,9 +139,6 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 504031;
 
-        // Nov 15, 2018 hard fork
-        consensus.magneticAnomalyActivationTime = 1542300000;
-
         /**
          * The message start string is designed to be unlikely to occur in
          * normal data. The characters are rarely used upper ASCII, not valid as
@@ -284,9 +281,6 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 2200;     // must be > 2016 - see assert in pow.cpp:268
 
-        // Nov 15, 2018 hard fork - modified to 2018-09-17 12:00
-        consensus.magneticAnomalyActivationTime = 1537358400;
-
         /**
          * The message start string is designed to be unlikely to occur in
          * normal data. The characters are rarely used upper ASCII, not valid as
@@ -386,9 +380,6 @@ public:
 
         // November 13, 2017 hard fork
         consensus.daaHeight = 1188697;
-
-        // Nov 15, 2018 hard fork
-        consensus.magneticAnomalyActivationTime = 1542300000;
 
         diskMagic[0] = 0x0b;
         diskMagic[1] = 0x11;
@@ -500,9 +491,6 @@ public:
 
         // November 13, 2017 hard fork is always on on regtest.
         consensus.daaHeight = 0;
-
-        // Nov 15, 2018 hard fork
-        consensus.magneticAnomalyActivationTime = 1542300000;
 
         diskMagic[0] = 0xfa;
         diskMagic[1] = 0xbf;

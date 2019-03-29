@@ -602,27 +602,9 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
-static bool IsMagneticEnabled(const Config &config, int64_t nMedianTimePast) {
-    return nMedianTimePast >=
-           gArgs.GetArg(
-                   "-magneticactivationtime",
-                   config.GetChainParams().GetConsensus().magneticAnomalyActivationTime);
-}
-
-bool IsMagneticEnabled(const Config &config, const CBlockIndex *pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
-    }
-
-    return IsMagneticEnabled(config, pindexPrev->GetMedianTimePast());
-}
-
 static bool IsReplayProtectionEnabled(const Config &config,
                                       int64_t nMedianTimePast) {
-    return nMedianTimePast >= gArgs.GetArg("-replayprotectionactivationtime",
-                                           config.GetChainParams()
-                                               .GetConsensus()
-                                               .magneticAnomalyActivationTime);
+    return nMedianTimePast >= gArgs.GetArg("-replayprotectionactivationtime", 2000000000);
 }
 
 static bool IsReplayProtectionEnabled(const Config &config,
@@ -989,10 +971,6 @@ static bool AcceptToMemoryPoolWorker(
 
         // Set extraFlags as a set of flags that needs to be activated.
         uint32_t extraFlags = SCRIPT_VERIFY_NONE;
-
-        if (IsMagneticEnabled(config, chainActive.Tip())) {
-            extraFlags |= SCRIPT_ENABLE_MAGNETIC_OPCODES;
-        }
 
         if (IsReplayProtectionEnabledForCurrentBlock(config)) {
             extraFlags |= SCRIPT_ENABLE_REPLAY_PROTECTION;
@@ -1593,29 +1571,19 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
         } else if (!check()) {
             const bool hasNonMandatoryFlags =
                 (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-            const bool doesNotHaveMagnetic =
-                (flags & SCRIPT_ENABLE_MAGNETIC_OPCODES) == 0;
-            if (hasNonMandatoryFlags || doesNotHaveMagnetic) {
+            if (hasNonMandatoryFlags) {
                 // Check whether the failure was caused by a non-mandatory
                 // script verification check, such as non-standard DER encodings
                 // or non-null dummy arguments; if so, don't trigger DoS
                 // protection to avoid splitting the network between upgraded
                 // and non-upgraded nodes.
-                //
-                // We also check activating the magnetic opcodes as they
-                // are strictly additive changes and we would not like to ban some of
-                // our peer that are ahead of us and are considering the fork
-                // as activated.
                 CScriptCheck check2(
                     scriptPubKey, amount, tx, i,
-                    (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS) |
-                        SCRIPT_ENABLE_MAGNETIC_OPCODES,
+                    (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
                     sigCacheStore, txdata);
                 if (check2()) {
-                    return state.Invalid(
-                        false, REJECT_NONSTANDARD,
-                        strprintf("non-mandatory-script-verify-flag (%s)",
-                                  ScriptErrorString(check.GetScriptError())));
+                    return state.Invalid(false, REJECT_NONSTANDARD,
+                            strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
                 }
             }
 
@@ -1948,11 +1916,6 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     if (IsDAAEnabled(config, pChainTip)) {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
-    }
-
-    // The magnetic HF enable a set of opcodes.
-    if (IsMagneticEnabled(config, pChainTip)) {
-        flags |= SCRIPT_ENABLE_MAGNETIC_OPCODES;
     }
 
     // We make sure this node will have replay protection during the next hard
@@ -2600,13 +2563,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     // remove transactions that are replay protected from the mempool. There is
     // no easy way to do this so we'll just discard the whole mempool and then
     // add the transaction of the block we just disconnected back.
-    //
-    // Samewise, if this block enabled the magnetic opcodes, then we
-    // need to clear the mempool of any transaction using them.
-    if ((IsReplayProtectionEnabled(config, pindexDelete) &&
-         !IsReplayProtectionEnabled(config, pindexDelete->pprev)) ||
-        (IsMagneticEnabled(config, pindexDelete) &&
-         !IsMagneticEnabled(config, pindexDelete->pprev))) {
+    if (IsReplayProtectionEnabled(config, pindexDelete) &&
+         !IsReplayProtectionEnabled(config, pindexDelete->pprev)) {
         mempool.clear();
         // While not strictly necessary, clearing the disconnect pool is also
         // beneficial so we don't try to reuse its content at the end of the
@@ -3589,17 +3547,6 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     if (VersionBitsState(pindexPrev, consensusParams, Consensus::DEPLOYMENT_CSV,
                          versionbitscache) == THRESHOLD_ACTIVE) {
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
-    }
-
-    // When the Nov 15, 2018 HF is not enabled (and the user hasn't overridden the max size),
-    // block cannot be bigger than 32MB.
-    if (!IsMagneticEnabled(config, pindexPrev) && !config.MaxBlockSizeOverridden()) {
-        const uint64_t currentBlockSize =
-            ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-        if (currentBlockSize > LEGACY_DEFAULT_MAX_BLOCK_SIZE) {
-            return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
-                             false, "size limits failed");
-        }
     }
 
     const int64_t nMedianTimePast =

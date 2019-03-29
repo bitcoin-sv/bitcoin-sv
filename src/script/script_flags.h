@@ -95,10 +95,6 @@ enum {
     // Do we accept activate replay protection using a different fork id.
     //
     SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
-
-    // Are the Magnetic upgrade opcodes enabled?
-    //
-    SCRIPT_ENABLE_MAGNETIC_OPCODES = (1U << 19),
 };
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

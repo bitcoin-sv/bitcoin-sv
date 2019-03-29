@@ -31,9 +31,6 @@ LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE
 DEFAULT_MAX_BLOCK_SIZE = eval(
     re.search(r'DEFAULT_MAX_BLOCK_SIZE = (.+);',
               _consensus_h_contents).group(1))
-LEGACY_DEFAULT_MAX_BLOCK_SIZE = eval(
-    re.search(r'LEGACY_DEFAULT_MAX_BLOCK_SIZE = (.+);',
-              _consensus_h_contents).group(1))
 
 # The following consensus parameters should not be automatically imported.
 # They *should* cause test failures if application code is changed in ways
