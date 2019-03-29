@@ -94,7 +94,7 @@ bool CBanDB::Read(banmap_t &banSet) {
         ssBanlist >> FLATDATA(pchMsgTmp);
 
         // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, std::begin(chainParams.DiskMagic()),
+        if (memcmp(pchMsgTmp, chainParams.DiskMagic().data(),
                    sizeof(pchMsgTmp))) {
             return error("%s: Invalid network magic number", __func__);
         }
@@ -190,7 +190,7 @@ bool CAddrDB::Read(CAddrMan &addr, CDataStream &ssPeers) {
         ssPeers >> FLATDATA(pchMsgTmp);
 
         // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, std::begin(chainParams.DiskMagic()),
+        if (memcmp(pchMsgTmp, chainParams.DiskMagic().data(),
                    sizeof(pchMsgTmp))) {
             return error("%s: Invalid network magic number", __func__);
         }

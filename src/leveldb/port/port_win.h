@@ -31,14 +31,22 @@
 #ifndef STORAGE_LEVELDB_PORT_PORT_WIN_H_
 #define STORAGE_LEVELDB_PORT_PORT_WIN_H_
 
-#ifdef _MSC_VER
-#define snprintf _snprintf
-#define close _close
-#define fread_unlocked _fread_nolock
-#endif
-
 #include <string>
 #include <stdint.h>
+
+#ifdef _MSC_VER
+#if !(_MSC_VER >= 1900)
+#define snprintf _snprintf
+#endif
+#define close _close
+#define fread_unlocked _fread_nolock
+#ifdef _WIN64
+using ssize_t = int64_t;
+#else
+using ssize_t = int32_t;
+#endif
+#endif
+
 #ifdef SNAPPY
 #include <snappy.h>
 #endif

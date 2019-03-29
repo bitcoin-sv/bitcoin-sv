@@ -68,8 +68,10 @@ class WalletDumpTest(BitcoinTestFramework):
         self.add_nodes(self.num_nodes, self.extra_args, timewait=60)
         self.start_nodes()
 
-    def run_test(self):
-        tmpdir = self.options.tmpdir
+    def run_test(self):        
+        unencrypted_dump = os.path.join(self.nodes[0].datadir, "wallet.unencrypted.dump")
+        encrypted_dump = os.path.join(self.nodes[0].datadir, "wallet.encrypted.dump")
+
 
         # generate 20 addresses to compare against the dump
         test_addr_count = 20
@@ -84,12 +86,12 @@ class WalletDumpTest(BitcoinTestFramework):
 
         # dump unencrypted wallet
         result = self.nodes[0].dumpwallet(
-            tmpdir + "/node0/wallet.unencrypted.dump")
+            unencrypted_dump)
         assert_equal(result['filename'], os.path.abspath(
-            tmpdir + "/node0/wallet.unencrypted.dump"))
+            unencrypted_dump))
 
         found_addr, found_addr_chg, found_addr_rsv, hd_master_addr_unenc = \
-            read_dump(tmpdir + "/node0/wallet.unencrypted.dump", addrs, None)
+            read_dump(unencrypted_dump, addrs, None)
         # all keys must be in the dump
         assert_equal(found_addr, test_addr_count)
         # 50 blocks where mined
@@ -103,10 +105,10 @@ class WalletDumpTest(BitcoinTestFramework):
         self.nodes[0].walletpassphrase('test', 10)
         # Should be a no-op:
         self.nodes[0].keypoolrefill()
-        self.nodes[0].dumpwallet(tmpdir + "/node0/wallet.encrypted.dump")
+        self.nodes[0].dumpwallet(encrypted_dump)
 
         found_addr, found_addr_chg, found_addr_rsv, hd_master_addr_enc = \
-            read_dump(tmpdir + "/node0/wallet.encrypted.dump",
+            read_dump(encrypted_dump,
                       addrs, hd_master_addr_unenc)
         assert_equal(found_addr, test_addr_count)
         # old reserve keys are marked as change now
@@ -115,7 +117,7 @@ class WalletDumpTest(BitcoinTestFramework):
 
         # Overwriting should fail
         assert_raises_rpc_error(-8, "already exists",
-                                self.nodes[0].dumpwallet, tmpdir + "/node0/wallet.unencrypted.dump")
+                                self.nodes[0].dumpwallet, unencrypted_dump)
 
 
 if __name__ == '__main__':

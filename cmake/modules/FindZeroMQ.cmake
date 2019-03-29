@@ -9,7 +9,13 @@ if(ZMQ_INCLUDE_DIR AND ZMQ_LIBRARY)
 endif()
 
 find_path(ZMQ_INCLUDE_DIR NAMES zmq.h)
-find_library(ZMQ_LIBRARY NAMES zmq libzmq)
+
+if (MSVC)
+  find_library(ZMQ_LIBRARY NAMES libzmq-mt-s-4_3_0 libzmq-mt-s-4_3_1 libzmq-mt-s-4_3_2)
+else()
+  find_library(ZMQ_LIBRARY NAMES zmq libzmq)
+endif()
+
 message(STATUS "ZeroMQ lib: " ${ZMQ_LIBRARY})
 
 include(FindPackageHandleStandardArgs)

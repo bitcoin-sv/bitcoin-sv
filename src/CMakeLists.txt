@@ -13,7 +13,12 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 option(ENABLE_PROD_BUILD "Enable production build" OFF)
 option(BUILD_BITCOIN_WALLET "Activate the wallet functionality" ON)
 option(BUILD_BITCOIN_ZMQ "Activate the ZeroMQ functionalities" ON)
-option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
+
+if (NOT MSVC)
+  #bitcoin seeder can not be build with MSVC
+	option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
+endif()
+
 option(BUILD_BITCOIN_CLI "Build bitcoin-cli" ON)
 option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
 option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
@@ -43,6 +48,33 @@ if(EXTRA_WARNINGS)
 	add_cxx_compiler_flag(-Wsuggest-override)
 else()
 	add_compiler_flag(-Wno-unused-parameter)
+endif()
+
+if(MSVC)
+	# Do not define min/max macros - we use std::min/max
+	add_compile_definitions(NOMINMAX)
+	# Perform parallel builds:
+	add_compile_options("/MP")
+
+	# Fix Cmake's default compiler options - see also https://gitlab.kitware.com/cmake/community/wikis/FAQ#dynamic-replace
+	# - remove default NDEBUG compile definition to solve #error "Bitcoin cannot be compiled without assertions"
+	# - use static runtime instead of dynamic runtime to match the external libraries  
+	foreach(flag_var
+		CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+		CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO
+		CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+		CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
+		
+	if(${flag_var} MATCHES "/MD")
+			string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")    
+		endif()
+
+		if(${flag_var} MATCHES "/DNDEBUG")
+			string(REGEX REPLACE "/DNDEBUG" "" ${flag_var} "${${flag_var}}")
+		endif()
+
+	endforeach()
+
 endif()
 
 # libtool style configure

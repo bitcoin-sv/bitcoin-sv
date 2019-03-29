@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2018 The Bitcoin developers
 
 import os
@@ -11,7 +11,7 @@ def main(test_name, input_file):
 
     print("namespace json_tests{")
     print("   static unsigned const char {}[] = {{".format(test_name))
-    print(", ".join(map(lambda x: "0x{:02x}".format(ord(x)), contents)))
+    print(", ".join(map(lambda x: "0x{:02x}".format(x), contents)))
     print(" };")
     print("};")
 

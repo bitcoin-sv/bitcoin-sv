@@ -65,19 +65,25 @@ else()
 	# on 32bits implementations for field and scalar.
 endif()
 
-# Detect if we are on a 32 or 64 bits plateform and chose
-# scalar and filed implementation accordingly
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-	# 64 bits implementationr require either __int128 or asm support.
-	if (HAVE___INT128 OR USE_ASM_X86_64)
-		set(USE_SCALAR_4X64 1)
-		set(USE_FIELD_5X52 1)
-	else()
-		message(SEND_ERROR "Compiler does not support __int128 or insline assembly")
-	endif()
-else()
-	set(USE_SCALAR_8X32 1)
+if (MSVC)
+	# MSVC compiler does not support inline assembly nor __int128. Use C implementation, but fail with error for other compilers
 	set(USE_FIELD_10X26 1)
+	set(USE_SCALAR_8X32 1)
+else()
+	# Detect if we are on a 32 or 64 bits plateform and chose
+	# scalar and filed implementation accordingly
+	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+		# 64 bits implementationr require either __int128 or asm support.
+		if (HAVE___INT128 OR USE_ASM_X86_64)
+			set(USE_SCALAR_4X64 1)
+			set(USE_FIELD_5X52 1)
+		else()
+			message(SEND_ERROR "Compiler does not support __int128 or insline assembly")
+		endif()
+	else()
+		set(USE_SCALAR_8X32 1)
+		set(USE_FIELD_10X26 1)
+	endif()
 endif()
 
 # Executable internal to secp256k1 need to have the HAVE_CONFIG_H define set.
@@ -88,12 +94,17 @@ function(link_secp256k1_internal NAME)
 endfunction(link_secp256k1_internal)
 
 # Phony target to build benchmarks
-add_custom_target(bench-secp256k1)
+if (NOT MSVC)
+	add_custom_target(bench-secp256k1)
+endif()
 
 function(add_secp256k1_bench NAME)
-	add_executable(${NAME} EXCLUDE_FROM_ALL ${ARGN})
-	link_secp256k1_internal(${NAME})
-	add_dependencies(bench-secp256k1 ${NAME})
+	# benchmark tests use non-portable time related functions. Only include them in non MSVC build:
+	if (NOT MSVC)
+		add_executable(${NAME} EXCLUDE_FROM_ALL ${ARGN})
+		link_secp256k1_internal(${NAME})
+		add_dependencies(bench-secp256k1 ${NAME})
+	endif()
 endfunction(add_secp256k1_bench)
 
 # Recovery module

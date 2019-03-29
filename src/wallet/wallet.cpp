@@ -2377,9 +2377,9 @@ bool CWallet::SelectCoinsMinConf(
     std::vector<std::pair<Amount, std::pair<const CWalletTx *, unsigned int>>>
         vValue;
     Amount nTotalLower(0);
-
-    random_shuffle(vCoins.begin(), vCoins.end(), GetRandInt);
-
+         
+    std::shuffle(vCoins.begin(), vCoins.end(), randomNumbers);    
+    
     for (const COutput &output : vCoins) {
         if (!output.fSpendable) {
             continue;

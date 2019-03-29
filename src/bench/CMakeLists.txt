@@ -1,5 +1,14 @@
 # Copyright (c) 2018 The Bitcoin SV developers
 
+find_package(PythonInterp 3 REQUIRED)
+
+add_custom_command(
+  OUTPUT data/block413567.raw.h
+  COMMAND ${CMAKE_COMMAND} -E make_directory data
+  COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/data/hexhdr.py ${CMAKE_CURRENT_SOURCE_DIR}/data/block413567.raw data/block413567.raw.h
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/data/block413567.raw
+  )
+
 add_executable(bench_bitcoin
         bench_bitcoin.cpp
         base58.cpp
@@ -12,7 +21,8 @@ add_executable(bench_bitcoin
         lockedpool.cpp
         mempool_eviction.cpp
         perf.cpp
-        rollingbloom.cpp)
+        rollingbloom.cpp
+        data/block413567.raw.h)
 
 target_link_libraries(bench_bitcoin
         server

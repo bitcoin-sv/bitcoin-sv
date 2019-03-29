@@ -36,3 +36,8 @@ include(BrewHelper)
 find_brew_prefix(OPENSSL_ROOT_DIR openssl)
 find_package(OpenSSL REQUIRED)
 target_link_libraries(crypto ${OPENSSL_CRYPTO_LIBRARY})
+
+if(MSVC)
+	# crypt32  is required for CertOpenStore and other certificate related functions
+	target_link_libraries(crypto crypt32)
+endif()

@@ -26,12 +26,26 @@ configure_file(config.ini.in config.ini @ONLY)
 # Setup symlinks for testing
 ### 
 macro(make_link src dest)
-  add_custom_command(
-    OUTPUT "${dest}"
-    COMMAND ${CMAKE_COMMAND} -E create_symlink "${src}" "${dest}"
-    COMMENT "make_link ${src} -> ${dest}"
-    MAIN_DEPENDENCY "${src}"
-  )
+  if (MSVC)  
+    # Although recent versions of Windows 10 enables creation of symbolic for non-admin users, this 
+    # required developer mode to be turned on. To play it safe, we just copy the files 
+    # instead of creating links. Be careful when editing those files in build directory. You might loose changes.
+    add_custom_command(
+      OUTPUT "${dest}"
+      COMMAND ${CMAKE_COMMAND} -E copy "${src}" "${dest}"
+      COMMENT "copy (fake link) ${src} -> ${dest}"
+      MAIN_DEPENDENCY "${src}"
+    )
+
+
+  else()
+    add_custom_command(
+      OUTPUT "${dest}"
+      COMMAND ${CMAKE_COMMAND} -E create_symlink "${src}" "${dest}"
+      COMMENT "make_link ${src} -> ${dest}"
+      MAIN_DEPENDENCY "${src}"
+    )
+  endif()
 endmacro()
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/functional/)
@@ -50,9 +64,14 @@ make_link(
 	${CMAKE_CURRENT_BINARY_DIR}/util/bitcoin-util-test.py
 )
 
+IF (MSVC)
+	# MSVC build requires configuration name to find buildbitcoind.exe
+	SET(extra_runner_prams --buildconfig  $<CONFIG>)
+endif()
+
 add_custom_target(check-functional
 	COMMAND
-		./functional/test_runner.py
+		./functional/test_runner.py  ${extra_runner_prams}
 	DEPENDS
 		../src/bitcoind
 		${CMAKE_CURRENT_BINARY_DIR}/functional/test_runner.py

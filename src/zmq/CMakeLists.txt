@@ -12,6 +12,12 @@ find_package(ZeroMQ REQUIRED)
 target_include_directories(zmq PRIVATE ${ZMQ_INCLUDE_DIR})
 target_link_libraries(zmq util ${ZMQ_LIBRARY})
 
+if (MSVC)
+  # Iphlpapi is required for if_nametoindex and other interface related helper functions
+  target_link_libraries(zmq Iphlpapi)
+endif()
+
+
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_compile_definitions(zmq PUBLIC ZMQ_STATIC)
 endif()

@@ -189,8 +189,7 @@ public:
         fRequireStandard = true;
         fMineBlocksOnDemand = false;
 
-        checkpointData = {
-            .mapCheckpoints = {
+        checkpointData = { {
                 {11111, uint256S("0000000069e244f73d78e8fd29ba2fd2ed618bd6fa2ee"
                                  "92559f542fdb26e7c1d")},
                 {33333, uint256S("000000002dd5588a74784eaa7ab0507a18ad16a236e7b"
@@ -225,7 +224,7 @@ public:
                                   "9d653b4c1a1beeb6ab9c")},
                 // Monolith activation.
                 {530359, uint256S("0000000000000000011ada8bd08f46074f44a8f15539"
-                                  "6f43e38acf9501c49103")},
+                                  "6f43e38acf9501c49103")}
             }};
 
         // Data as of block
@@ -315,10 +314,10 @@ public:
         fRequireStandard = false;
         fMineBlocksOnDemand = false;
 
-        checkpointData = {.mapCheckpoints = {
+        checkpointData = {  { 
                 {0, uint256S("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943")},
                 {1, uint256S("000000008908135d180edfe727f4e5dfaea25ed8d72337358d8362df7609b974")},
-                {2301, uint256S("00000000ff0ccf61bb239deb3998bd1a9c71d14c212c3fd58b32aae5ab6eaefb")},
+                {2301, uint256S("00000000ff0ccf61bb239deb3998bd1a9c71d14c212c3fd58b32aae5ab6eaefb")}
         }};
     }
 };
@@ -424,8 +423,7 @@ public:
         fRequireStandard = false;
         fMineBlocksOnDemand = false;
 
-        checkpointData = {
-            .mapCheckpoints = {
+        checkpointData = { {
                 {546, uint256S("000000002a936ca763904c3c35fce2f3556c559c0214345"
                                "d31b1bcebf76acb70")},
                 // UAHF fork block.
@@ -433,7 +431,7 @@ public:
                                    "c8889b5c1a80e7faef138")},
                 // Nov, 13. DAA activation block.
                 {1188697, uint256S("0000000000170ed0918077bde7b4d36cc4c91be69fa"
-                                   "09211f748240dabe047fb")},
+                                   "09211f748240dabe047fb")}
             }};
 
         // Data as of block
@@ -522,9 +520,9 @@ public:
         fRequireStandard = false;
         fMineBlocksOnDemand = true;
 
-        checkpointData = {.mapCheckpoints = {
+        checkpointData = { {
                               {0, uint256S("0f9188f13cb7b2c71f2a335e3a4fc328bf5"
-                                           "beb436012afca590b1a11466e2206")},
+                                           "beb436012afca590b1a11466e2206")}
                           }};
 
         chainTxData = ChainTxData{0, 0, 0};

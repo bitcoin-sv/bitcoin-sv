@@ -31,7 +31,7 @@ void UnregisterNodeSignals(CNodeSignals &nodeSignals);
 /** Set inventory broadcasting delay time in seconds*/
 bool SetInvBroadcastDelay(const int64_t& nDelayMillisecs);
 
-class PeerLogicValidation : public CValidationInterface {
+class PeerLogicValidation final : public CValidationInterface {
 private:
     CConnman *connman;
 
