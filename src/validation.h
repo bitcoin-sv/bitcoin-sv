@@ -88,7 +88,7 @@ static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The size of the header for each block in a block file */
-static const unsigned int BLOCKFILE_BLOCK_HEADER_SIZE = 8;  // 8 bytes
+static const unsigned int BLOCKFILE_BLOCK_HEADER_SIZE = 8;  // 8 bytes: - 4 bytes for disk magic + 4 bytes for size
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
 static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
@@ -342,11 +342,6 @@ bool ProcessNewBlockHeaders(const Config &config,
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 
 /**
- * Open a block file (blk?????.dat).
- */
-FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-
-/**
  * Translation to a filesystem path.
  */
 fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
@@ -356,6 +351,9 @@ fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
  */
 bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                            CDiskBlockPos *dbp = nullptr);
+
+/** used for --reindex */
+void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& fReindex);
 
 /**
  * Initialize a new block tree database + block data on disk.
@@ -750,9 +748,6 @@ static const unsigned int REJECT_HIGHFEE = 0x100;
 static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 /** Transaction conflicts with a transaction already known */
 static const unsigned int REJECT_CONFLICT = 0x102;
-
-/** Get block file info entry for one block file */
-CBlockFileInfo *GetBlockFileInfo(size_t n);
 
 /** Dump the mempool to disk. */
 void DumpMempool();

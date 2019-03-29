@@ -180,6 +180,7 @@ add_library(server
 	addrdb.cpp
 	bloom.cpp
 	blockencodings.cpp
+	blockfileinfostore.cpp
 	chain.cpp
 	checkpoints.cpp
 	config.cpp
