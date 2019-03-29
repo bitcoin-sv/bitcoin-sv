@@ -595,55 +595,55 @@ class CNode {
 
 public:
     // socket
-    std::atomic<ServiceFlags> nServices;
+    std::atomic<ServiceFlags> nServices {NODE_NONE};
     // Services expected from a peer, otherwise it will be disconnected
-    ServiceFlags nServicesExpected;
-    SOCKET hSocket;
+    ServiceFlags nServicesExpected {NODE_NONE};
+    SOCKET hSocket {0};
     // Total size of all vSendMsg entries.
-    size_t nSendSize;
+    size_t nSendSize {0};
     // Offset inside the first vSendMsg already sent.
-    size_t nSendOffset;
-    uint64_t nSendBytes;
-    std::deque<std::vector<uint8_t>> vSendMsg;
-    CCriticalSection cs_vSend;
-    CCriticalSection cs_hSocket;
-    CCriticalSection cs_vRecv;
+    size_t nSendOffset {0};
+    uint64_t nSendBytes {0};
+    std::deque<std::vector<uint8_t>> vSendMsg {};
+    CCriticalSection cs_vSend {};
+    CCriticalSection cs_hSocket {};
+    CCriticalSection cs_vRecv {};
 
-    CCriticalSection cs_vProcessMsg;
-    std::list<CNetMessage> vProcessMsg;
-    size_t nProcessQueueSize;
+    CCriticalSection cs_vProcessMsg {};
+    std::list<CNetMessage> vProcessMsg {};
+    size_t nProcessQueueSize {0};
 
-    CCriticalSection cs_sendProcessing;
+    CCriticalSection cs_sendProcessing {};
 
-    std::deque<CInv> vRecvGetData;
-    uint64_t nRecvBytes;
-    std::atomic<int> nRecvVersion;
+    std::deque<CInv> vRecvGetData {};
+    uint64_t nRecvBytes {0};
+    std::atomic<int> nRecvVersion {INIT_PROTO_VERSION};
 
-    std::atomic<int64_t> nLastSend;
-    std::atomic<int64_t> nLastRecv;
-    const int64_t nTimeConnected;
-    std::atomic<int64_t> nTimeOffset;
+    std::atomic<int64_t> nLastSend {0};
+    std::atomic<int64_t> nLastRecv {0};
+    const int64_t nTimeConnected {0};
+    std::atomic<int64_t> nTimeOffset {0};
     // The address of the remote peer
-    const CAddress addr;
-    std::atomic<int> nVersion;
+    const CAddress addr {};
+    std::atomic<int> nVersion {0};
     // strSubVer is whatever byte array we read from the wire. However, this
     // field is intended to be printed out, displayed to humans in various forms
     // and so on. So we sanitize it and store the sanitized version in
     // cleanSubVer. The original should be used when dealing with the network or
     // wire types and the cleaned string used when displayed or logged.
-    std::string strSubVer, cleanSubVer;
+    std::string strSubVer {}, cleanSubVer {};
     // Used for both cleanSubVer and strSubVer.
-    CCriticalSection cs_SubVer;
+    CCriticalSection cs_SubVer {};
     // This peer can bypass DoS banning.
-    bool fWhitelisted;
+    bool fWhitelisted {false};
     // If true this node is being used as a short lived feeler.
-    bool fFeeler;
-    bool fOneShot;
-    bool fAddnode;
-    bool fClient;
-    const bool fInbound;
-    std::atomic_bool fSuccessfullyConnected;
-    std::atomic_bool fDisconnect;
+    bool fFeeler {false};
+    bool fOneShot {false};
+    bool fAddnode {false};
+    bool fClient {false};
+    const bool fInbound {false};
+    std::atomic_bool fSuccessfullyConnected {false};
+    std::atomic_bool fDisconnect {false};
     // We use fRelayTxes for two purposes -
     // a) it allows us to not relay tx invs before receiving the peer's version
     // message.
@@ -651,75 +651,75 @@ public:
     // tx invs unless it loads a bloom filter.
 
     // protected by cs_filter
-    bool fRelayTxes;
-    bool fSentAddr;
-    CSemaphoreGrant grantOutbound;
-    CCriticalSection cs_filter;
-    CBloomFilter *pfilter;
-    const NodeId id;
+    bool fRelayTxes {false};
+    bool fSentAddr {false};
+    CSemaphoreGrant grantOutbound {};
+    CCriticalSection cs_filter {};
+    CBloomFilter *pfilter {nullptr};
+    const NodeId id {};
 
-    const uint64_t nKeyedNetGroup;
-    std::atomic_bool fPauseRecv;
-    std::atomic_bool fPauseSend;
+    const uint64_t nKeyedNetGroup {0};
+    std::atomic_bool fPauseRecv {false};
+    std::atomic_bool fPauseSend {false};
 
 protected:
-    mapMsgCmdSize mapSendBytesPerMsgCmd;
-    mapMsgCmdSize mapRecvBytesPerMsgCmd;
+    mapMsgCmdSize mapSendBytesPerMsgCmd {};
+    mapMsgCmdSize mapRecvBytesPerMsgCmd {};
 
 public:
-    uint256 hashContinue;
-    std::atomic<int> nStartingHeight;
+    uint256 hashContinue { uint256() };
+    std::atomic<int> nStartingHeight {-1};
 
     // flood relay
-    std::vector<CAddress> vAddrToSend;
-    CRollingBloomFilter addrKnown;
+    std::vector<CAddress> vAddrToSend {};
+    CRollingBloomFilter addrKnown { 5000, 0.001 };
     // Has an ADDR been requested?
-    std::atomic<bool> fGetAddr;
-    int64_t nNextAddrSend;
-    int64_t nNextLocalAddrSend;
+    std::atomic_bool fGetAddr {false};
+    int64_t nNextAddrSend {0};
+    int64_t nNextLocalAddrSend {0};
 
     // Inventory based relay.
-    CRollingBloomFilter filterInventoryKnown;
+    CRollingBloomFilter filterInventoryKnown { 50000, 0.000001 };
     // Set of transaction ids we still have to announce. They are sorted by the
     // mempool before relay, so the order is not important.
-    std::set<uint256> setInventoryTxToSend;
+    std::set<uint256> setInventoryTxToSend {};
     // List of block ids we still have announce. There is no final sorting
     // before sending, as they are always sent immediately and in the order
     // requested.
-    std::vector<uint256> vInventoryBlockToSend;
-    CCriticalSection cs_inventory;
-    std::set<uint256> setAskFor;
-    std::multimap<int64_t, CInv> mapAskFor;
-    int64_t nNextInvSend;
+    std::vector<uint256> vInventoryBlockToSend {};
+    CCriticalSection cs_inventory {};
+    std::set<uint256> setAskFor {};
+    std::multimap<int64_t, CInv> mapAskFor {};
+    int64_t nNextInvSend {0};
     // Used for headers announcements - unfiltered blocks to relay. Also
     // protected by cs_inventory.
-    std::vector<uint256> vBlockHashesToAnnounce;
+    std::vector<uint256> vBlockHashesToAnnounce {};
     // Used for BIP35 mempool sending, also protected by cs_inventory.
-    bool fSendMempool;
+    bool fSendMempool {false};
 
     // Last time a "MEMPOOL" request was serviced.
-    std::atomic<int64_t> timeLastMempoolReq;
+    std::atomic<int64_t> timeLastMempoolReq {0};
 
     // Block and TXN accept times
-    std::atomic<int64_t> nLastBlockTime;
-    std::atomic<int64_t> nLastTXTime;
+    std::atomic<int64_t> nLastBlockTime {0};
+    std::atomic<int64_t> nLastTXTime {0};
 
     // Ping time measurement:
     // The pong reply we're expecting, or 0 if no pong expected.
-    std::atomic<uint64_t> nPingNonceSent;
+    std::atomic<uint64_t> nPingNonceSent {0};
     // Time (in usec) the last ping was sent, or 0 if no ping was ever sent.
-    std::atomic<int64_t> nPingUsecStart;
+    std::atomic<int64_t> nPingUsecStart {0};
     // Last measured round-trip time.
-    std::atomic<int64_t> nPingUsecTime;
+    std::atomic<int64_t> nPingUsecTime {0};
     // Best measured round-trip time.
-    std::atomic<int64_t> nMinPingUsecTime;
+    std::atomic<int64_t> nMinPingUsecTime { std::numeric_limits<int64_t>::max() };
     // Whether a ping is requested.
-    std::atomic<bool> fPingQueued;
+    std::atomic_bool fPingQueued {false};
     // Minimum fee rate with which to filter inv's to this node
-    Amount minFeeFilter;
-    CCriticalSection cs_feeFilter;
-    Amount lastSentFeeFilter;
-    int64_t nextSendTimeFeeFilter;
+    Amount minFeeFilter {0};
+    CCriticalSection cs_feeFilter {};
+    Amount lastSentFeeFilter {0};
+    int64_t nextSendTimeFeeFilter {0};
 
     CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn,
           SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn,
@@ -731,19 +731,19 @@ private:
     CNode(const CNode &);
     void operator=(const CNode &);
 
-    const uint64_t nLocalHostNonce;
+    const uint64_t nLocalHostNonce {};
     // Services offered to this peer
-    const ServiceFlags nLocalServices;
-    const int nMyStartingHeight;
-    int nSendVersion;
+    const ServiceFlags nLocalServices {};
+    const int nMyStartingHeight {};
+    int nSendVersion {0};
     // Used only by SocketHandler thread.
-    std::list<CNetMessage> vRecvMsg;
+    std::list<CNetMessage> vRecvMsg {};
 
-    mutable CCriticalSection cs_addrName;
-    std::string addrName;
+    mutable CCriticalSection cs_addrName {};
+    std::string addrName {};
 
-    CService addrLocal;
-    mutable CCriticalSection cs_addrLocal;
+    CService addrLocal {};
+    mutable CCriticalSection cs_addrLocal {};
 
     /** List of priority sorted inventory msgs for transactions to send */
     using InvList = CModPriQueue<CTxnSendingDetails, std::vector<CTxnSendingDetails>, CompareTxnSendingDetails>;
