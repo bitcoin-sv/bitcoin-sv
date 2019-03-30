@@ -602,24 +602,6 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
-static bool IsReplayProtectionEnabled(const Config &config,
-                                      int64_t nMedianTimePast) {
-    return nMedianTimePast >= gArgs.GetArg("-replayprotectionactivationtime", 2000000000);
-}
-
-static bool IsReplayProtectionEnabled(const Config &config,
-                                      const CBlockIndex *pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
-    }
-
-    return IsReplayProtectionEnabled(config, pindexPrev->GetMedianTimePast());
-}
-
-static bool IsReplayProtectionEnabledForCurrentBlock(const Config &config) {
-    AssertLockHeld(cs_main);
-    return IsReplayProtectionEnabled(config, chainActive.Tip());
-}
 
 /**
  * Make mempool consistent after a reorg, by re-adding or recursively erasing
@@ -971,10 +953,6 @@ static bool AcceptToMemoryPoolWorker(
 
         // Set extraFlags as a set of flags that needs to be activated.
         uint32_t extraFlags = SCRIPT_VERIFY_NONE;
-
-        if (IsReplayProtectionEnabledForCurrentBlock(config)) {
-            extraFlags |= SCRIPT_ENABLE_REPLAY_PROTECTION;
-        }
 
         // Check inputs based on the set of flags we activate.
         uint32_t scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
@@ -1918,12 +1896,6 @@ static uint32_t GetBlockScriptFlags(const Config &config,
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    // We make sure this node will have replay protection during the next hard
-    // fork.
-    if (IsReplayProtectionEnabled(config, pChainTip)) {
-        flags |= SCRIPT_ENABLE_REPLAY_PROTECTION;
-    }
-
     return flags;
 }
 
@@ -2255,14 +2227,6 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
     LogPrint(BCLog::BENCH, "    - Callbacks: %.2fms [%.2fs]\n",
              0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
 
-    // If we just activated the replay protection with that block, it means
-    // transaction in the mempool are now invalid. As a result, we need to clear
-    // the mempool.
-    if (IsReplayProtectionEnabled(config, pindex) &&
-        !IsReplayProtectionEnabled(config, pindex->pprev)) {
-        mempool.clear();
-    }
-
     return true;
 }
 
@@ -2557,21 +2521,6 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     if (!FlushStateToDisk(config.GetChainParams(), state,
                           FLUSH_STATE_IF_NEEDED)) {
         return false;
-    }
-
-    // If this block was deactivating the replay protection, then we need to
-    // remove transactions that are replay protected from the mempool. There is
-    // no easy way to do this so we'll just discard the whole mempool and then
-    // add the transaction of the block we just disconnected back.
-    if (IsReplayProtectionEnabled(config, pindexDelete) &&
-         !IsReplayProtectionEnabled(config, pindexDelete->pprev)) {
-        mempool.clear();
-        // While not strictly necessary, clearing the disconnect pool is also
-        // beneficial so we don't try to reuse its content at the end of the
-        // reorg, which we know will fail.
-        if (disconnectpool) {
-            disconnectpool->clear();
-        }
     }
 
     if (disconnectpool) {

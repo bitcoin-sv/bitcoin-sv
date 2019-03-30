@@ -92,9 +92,6 @@ enum {
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
-    // Do we accept activate replay protection using a different fork id.
-    //
-    SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
 };
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H
