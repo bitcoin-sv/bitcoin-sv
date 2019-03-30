@@ -7,6 +7,16 @@
 #include "consensus/consensus.h"
 #include "validation.h"
 
+void GlobalConfig::SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) {
+    blockSizeActivationTime = params.blockSizeActivationTime;
+    maxBlockSizeBefore = params.maxBlockSizeBefore;
+    maxBlockSizeAfter = params.maxBlockSizeAfter;
+    maxBlockSizeOverridden = false;
+    maxGeneratedBlockSizeBefore = params.maxGeneratedBlockSizeBefore;
+    maxGeneratedBlockSizeAfter = params.maxGeneratedBlockSizeAfter;
+    maxGeneratedBlockSizeOverridden = false;
+}
+
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize) {
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
@@ -14,14 +24,14 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize) {
         return false;
     }
 
-    maxBlockSize = maxSize;
+    maxBlockSizeAfter = maxSize;
     maxBlockSizeOverridden = true;
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
-    return maxBlockSize;
+    return maxBlockSizeAfter;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {

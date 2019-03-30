@@ -17,9 +17,12 @@
 #include <string>
 
 class CChainParams;
+struct DefaultBlockSizeParams;
 
 class Config : public boost::noncopyable {
 public:
+    // used to specify default block size related parameters
+    virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) = 0;
     virtual bool SetMaxBlockSize(uint64_t maxBlockSize) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
     virtual bool MaxBlockSizeOverridden() const = 0;
@@ -42,6 +45,7 @@ public:
 class GlobalConfig final : public Config {
 public:
     GlobalConfig() = default;
+    void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override;
     bool SetMaxBlockSize(uint64_t maxBlockSize) override;
     uint64_t GetMaxBlockSize() const override;
     bool MaxBlockSizeOverridden() const override;
@@ -68,10 +72,18 @@ private:
     bool useCashAddr { false };
     Amount excessUTXOCharge {};
     CFeeRate feePerKB {};
-    uint64_t maxBlockSize { DEFAULT_MAX_BLOCK_SIZE };
-    bool maxBlockSizeOverridden { false };
     uint64_t blockPriorityPercentage { DEFAULT_BLOCK_PRIORITY_PERCENTAGE };
-    uint64_t preferredBlockFileSize { DEFAULT_PREFERRED_BLOCKFILE_SIZE };
+    uint64_t preferredBlockFileSize{ DEFAULT_PREFERRED_BLOCKFILE_SIZE };
+
+    // Block size limits 
+    // Init to hard limits and set later with chainparams data
+    int64_t blockSizeActivationTime { 0 };
+    uint64_t maxBlockSizeBefore { DEFAULT_MAX_BLOCK_SIZE };
+    uint64_t maxBlockSizeAfter { DEFAULT_MAX_BLOCK_SIZE };
+    bool maxBlockSizeOverridden { false };
+    uint64_t maxGeneratedBlockSizeBefore { DEFAULT_MAX_GENERATED_BLOCK_SIZE };
+    uint64_t maxGeneratedBlockSizeAfter { DEFAULT_MAX_GENERATED_BLOCK_SIZE };
+    bool maxGeneratedBlockSizeOverridden { false };        
 };
 
 // Dummy for subclassing in unittests
@@ -79,6 +91,7 @@ class DummyConfig : public Config {
 public:
     DummyConfig();
     DummyConfig(std::string net);
+    void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override {  }
     bool SetMaxBlockSize(uint64_t maxBlockSize) override { return false; }
     uint64_t GetMaxBlockSize() const override { return 0; }
     bool MaxBlockSizeOverridden() const override { return false; }

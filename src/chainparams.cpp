@@ -6,6 +6,8 @@
 #include "chainparams.h"
 #include "consensus/merkle.h"
 
+#include "policy/policy.h"
+
 #include "tinyformat.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -13,6 +15,7 @@
 #include <cassert>
 
 #include "chainparamsseeds.h"
+
 
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
                                  const CScript &genesisOutputScript,
@@ -238,6 +241,19 @@ public:
             248589038,
             // Estimated number of transactions per second after that timestamp.
             3.2};
+
+        defaultBlockSizeParams = DefaultBlockSizeParams{
+            // activation time 
+            MAIN_NEW_BLOCKSIZE_ACTIVATION_TIME,
+            // max block size before activation
+            MAIN_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
+            // max block size after activation
+            MAIN_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max generated block size before activation
+            MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
+            // max generated block size after activation
+            MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
+        };
     }
 };
 
@@ -319,6 +335,19 @@ public:
                 {1, uint256S("000000008908135d180edfe727f4e5dfaea25ed8d72337358d8362df7609b974")},
                 {2301, uint256S("00000000ff0ccf61bb239deb3998bd1a9c71d14c212c3fd58b32aae5ab6eaefb")}
         }};
+
+        defaultBlockSizeParams = DefaultBlockSizeParams{
+            // activation time 
+            STN_NEW_BLOCKSIZE_ACTIVATION_TIME,
+            // max block size before activation
+            STN_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
+            // max block size after activation
+            STN_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max generated block size before activation
+            STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
+            // max generated block size after activation
+            STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
+        };
     }
 };
 CStnParams stnParams;
@@ -438,6 +467,19 @@ public:
         // 000000000005b07ecf85563034d13efd81c1a29e47e22b20f4fc6919d5b09cd6
         // (height 1223263)
         chainTxData = ChainTxData{1522608381, 15052068, 0.15};
+
+        defaultBlockSizeParams = DefaultBlockSizeParams{
+            // activation time 
+            TESTNET_NEW_BLOCKSIZE_ACTIVATION_TIME,
+            // max block size before activation
+            TESTNET_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
+            // max block size after activation
+            TESTNET_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max generated block size before activation
+            TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
+            // max generated block size after activation
+            TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
+        };
     }
 };
 
@@ -533,6 +575,19 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
         cashaddrPrefix = "bchreg";
+
+        defaultBlockSizeParams = DefaultBlockSizeParams{
+            // activation time 
+            REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME,
+            // max block size before activation
+            REGTEST_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
+            // max block size after activation
+            REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max generated block size before activation
+            REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
+            // max generated block size after activation
+            REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
+        };
     }
 };
 

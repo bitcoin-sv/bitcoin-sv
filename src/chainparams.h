@@ -40,6 +40,17 @@ struct ChainTxData {
     double dTxRate;
 };
 
+// Contains defaults for block size related parameters. 
+// Defaults are used changed based on activation time
+
+struct DefaultBlockSizeParams {
+    int64_t blockSizeActivationTime;
+    uint64_t maxBlockSizeBefore;
+    uint64_t maxBlockSizeAfter;
+    uint64_t maxGeneratedBlockSizeBefore;
+    uint64_t maxGeneratedBlockSizeAfter;
+};
+
 /**
  * CChainParams defines various tweakable parameters of a given instance of the
  * Bitcoin system. There are three: the main network on which people trade goods
@@ -89,6 +100,7 @@ public:
     const ChainTxData &TxData() const { return chainTxData; }
     void UpdateBIP9Parameters(Consensus::DeploymentPos d, int64_t nStartTime,
                               int64_t nTimeout);
+    const DefaultBlockSizeParams &GetDefaultBlockSizeParams() const { return defaultBlockSizeParams; }
 
 protected:
     friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
@@ -111,6 +123,7 @@ protected:
     bool fMineBlocksOnDemand;
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
+    DefaultBlockSizeParams defaultBlockSizeParams;
 };
 
 /**

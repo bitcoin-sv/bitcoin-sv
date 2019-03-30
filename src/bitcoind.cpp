@@ -124,6 +124,9 @@ bool AppInit(int argc, char *argv[]) {
             return false;
         }
 
+        // Fill config with block size data
+        config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+
         // Command-line RPC
         bool fCommandLine = false;
         for (int i = 1; i < argc; i++)
