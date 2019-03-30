@@ -1233,9 +1233,8 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                                     *pindexBestHeader,
                                     consensusParams) < nOneMonth);
                         if (!send) {
-                            LogPrintf("%s: ignoring request from peer=%i for "
-                                      "old block that isn't in the main "
-                                      "chain\n",
+                            LogPrint(BCLog::NET, "%s: ignoring request from peer=%i for "
+                                      "old block that isn't in the main chain\n",
                                       __func__, pfrom->GetId());
                         }
                     }
@@ -1410,9 +1409,7 @@ inline static void SendBlockTransactions(const CBlock &block,
     for (size_t i = 0; i < req.indices.size(); i++) {
         if (req.indices[i] >= block.vtx.size()) {
             Misbehaving(pfrom, 100, "out-of-bound-tx-index");
-            LogPrintf(
-                "Peer %d sent us a getblocktxn with out-of-bounds tx indices",
-                pfrom->id);
+            LogPrintf("Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
             return;
         }
         resp.txn[i] = block.vtx[req.indices[i]];
@@ -1513,7 +1510,7 @@ static bool ProcessVersionMessage(const Config& config, const CNodePtr& pfrom, c
 
     if(nVersion < MIN_PEER_PROTO_VERSION) {
         // Disconnect from peers older than this proto version
-        LogPrintf("peer=%d using obsolete version %i; disconnecting\n",
+        LogPrint(BCLog::NET, "peer=%d using obsolete version %i; disconnecting\n",
                   pfrom->id, nVersion);
         connman.PushMessage(
             pfrom,
@@ -1618,7 +1615,7 @@ static bool ProcessVersionMessage(const Config& config, const CNodePtr& pfrom, c
         remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
     }
 
-    LogPrintf("receive version message: [%s] %s: version %d, blocks=%d, "
+    LogPrint(BCLog::NET, "receive version message: [%s] %s: version %d, blocks=%d, "
               "us=%s, peer=%d%s\n",
               pfrom->addr.ToString().c_str(), cleanSubVer, pfrom->nVersion,
               pfrom->nStartingHeight, addrMe.ToString(), pfrom->id,
@@ -1665,6 +1662,9 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         // Mark this node as currently connected, so we update its timestamp later.
         LOCK(cs_main);
         State(pfrom->GetId())->fCurrentlyConnected = true;
+        LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s\n",
+                  pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
+                  (fLogIPs ? strprintf(", peeraddr=%s", pfrom->addr.ToString()) : ""));
     }
 
     if(pfrom->nVersion >= SENDHEADERS_VERSION) {
@@ -1996,7 +1996,7 @@ static OptBool ProcessGetBlockTxnMessage(const Config& config, const CNodePtr& p
 
     BlockMap::iterator it = mapBlockIndex.find(req.blockhash);
     if(it == mapBlockIndex.end() || !it->second->nStatus.hasData()) {
-        LogPrintf("Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
+        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
         return true;
     }
 
@@ -2008,8 +2008,7 @@ static OptBool ProcessGetBlockTxnMessage(const Config& config, const CNodePtr& p
         // might maliciously send lots of getblocktxn requests to trigger
         // expensive disk reads, because it will require the peer to
         // actually receive all the data read from disk over the network.
-        LogPrint(BCLog::NET,
-                 "Peer %d sent us a getblocktxn for a block > %i deep",
+        LogPrint(BCLog::NET, "Peer %d sent us a getblocktxn for a block > %i deep",
                  pfrom->id, MAX_BLOCKTXN_DEPTH);
         CInv inv;
         inv.type = MSG_BLOCK;
@@ -2627,9 +2626,12 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
         int nDoS;
         if(state.IsInvalid(nDoS)) {
             if (nDoS > 0) {
+                LogPrintf("Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
                 Misbehaving(pfrom, nDoS, state.GetRejectReason());
             }
-            LogPrintf("Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
+            else {
+                LogPrint(BCLog::NET, "Peer %d sent us invalid header via cmpctblock\n", pfrom->id);
+            }
             return true;
         }
     }
@@ -2722,8 +2724,7 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
                     // Reset in-flight state in case of whitelist
                     MarkBlockAsReceived(pindex->GetBlockHash());
                     Misbehaving(pfrom, 100, "invalid-cmpctblk");
-                    LogPrintf("Peer %d sent us invalid compact block\n",
-                              pfrom->id);
+                    LogPrintf("Peer %d sent us invalid compact block\n", pfrom->id);
                     return true;
                 }
                 else if(status == READ_STATUS_FAILED) {
@@ -3395,7 +3396,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     if (memcmp(msg.hdr.pchMessageStart.data(),
                chainparams.NetMagic().data(),
                CMessageHeader::MESSAGE_START_SIZE) != 0) {
-        LogPrintf("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n",
+        LogPrint(BCLog::NET, "PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n",
                   SanitizeString(msg.hdr.GetCommand()), pfrom->id);
 
         // Make sure we ban where that come from for some time.
@@ -3408,7 +3409,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     // Read header
     CMessageHeader &hdr = msg.hdr;
     if (!hdr.IsValid(config)) {
-        LogPrintf("PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n",
+        LogPrint(BCLog::NET, "PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n",
                   SanitizeString(hdr.GetCommand()), pfrom->id);
         return fMoreWork;
     }
@@ -3421,7 +3422,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     CDataStream &vRecv = msg.vRecv;
     const uint256 &hash = msg.GetMessageHash();
     if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) !=0) {
-        LogPrintf(
+        LogPrint(BCLog::NET,
             "%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
             SanitizeString(strCommand), nMessageSize,
             HexStr(hash.begin(), hash.begin() + CMessageHeader::CHECKSUM_SIZE),
@@ -3447,7 +3448,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                     // MisbehavingNode if the count goes above some chosen value 
                     // 100 conseqitive invalid checksums received with less than 500ms between them
                     Misbehaving(pfrom, 1, "Invalid Checksum activity");
-                    LogPrintf("Peer %d showing increased invalid checksum activity\n",pfrom->id);
+                    LogPrint(BCLog::NET, "Peer %d showing increased invalid checksum activity\n",pfrom->id);
                 }
                 state->nTimeOfLastInvalidChecksumHeader = curTime;
             }
@@ -3474,18 +3475,18 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                                       std::string("error parsing message")));
         if (strstr(e.what(), "end of data")) {
             // Allow exceptions from under-length message on vRecv
-            LogPrintf(
+            LogPrint(BCLog::NET,
                 "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
                 "message being shorter than its stated length\n",
                 __func__, SanitizeString(strCommand), nMessageSize, e.what());
         } else if (strstr(e.what(), "size too large")) {
             // Allow exceptions from over-long size
-            LogPrintf("%s(%s, %u bytes): Exception '%s' caught\n", __func__,
+            LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
                       SanitizeString(strCommand), nMessageSize, e.what());
             Misbehaving(pfrom, 1, "Over-long size message protection");
         } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
             // Allow exceptions from non-canonical encoding
-            LogPrintf("%s(%s, %u bytes): Exception '%s' caught\n", __func__,
+            LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
                       SanitizeString(strCommand), nMessageSize, e.what());
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
@@ -3497,7 +3498,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     if (!fRet) {
-        LogPrintf("%s(%s, %u bytes) FAILED peer=%d\n", __func__,
+        LogPrint(BCLog::NET, "%s(%s, %u bytes) FAILED peer=%d\n", __func__,
                   SanitizeString(strCommand), nMessageSize, pfrom->id);
     }
 
@@ -3947,8 +3948,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, CNodeState& state
         // During normal steady state, the download window should be much larger
         // than the to-be-downloaded set of blocks, so disconnection should only
         // happen during initial block download.
-        LogPrintf("Peer=%d is stalling block download, disconnecting\n",
-                  pto->id);
+        LogPrintf("Peer=%d is stalling block download, disconnecting\n", pto->id);
         pto->fDisconnect = true;
         return true;
     }
