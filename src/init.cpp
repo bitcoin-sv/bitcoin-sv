@@ -42,6 +42,8 @@
 #include "utilmoneystr.h"
 #include "validation.h"
 #include "validationinterface.h"
+#include "vmtouch.h"
+
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
 #include "wallet/wallet.h"
@@ -959,6 +961,13 @@ std::string HelpMessage(HelpMessageMode mode) {
          strprintf("Set the limit on the number of message headers transmitted from the local node over a given time period (default: %d)",
            DEFAULT_INVALID_HEADER_FREQUENCY)) ;
 
+    strUsage += HelpMessageOpt(
+                "-preload=<n>",
+                _("If n is set to 1, blockchain state will be preloaded into memory. If n is 0, no preload will happen. "
+                  "Other values for n are not allowed. The default value is 0."
+                  " This option is not supported on Windows operating systems.")
+                );
+
     return strUsage;
 }
 
@@ -1795,6 +1804,70 @@ bool AppInitSanityChecks() {
     return LockDataDirectory(true);
 }
 
+void preloadChainStateThreadFunction()
+{
+#ifndef WIN32
+    auto path = boost::filesystem::canonical(GetDataDir() / "chainstate").string();
+    LogPrintf("Preload started\n");
+    try {
+        auto start = std::chrono::system_clock::now();
+        VMTouch vm;
+
+        vm.vmtouch_touch(path);
+
+        auto end = std::chrono::system_clock::now();
+
+        int64_t elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+        auto& warnings = vm.get_warnings();
+        if (!warnings.empty())
+        {
+            LogPrintf("Warnings occured during chainstate preload\n:");
+            for(auto& warning : warnings)
+            {
+                LogPrintf("Preload warning:  %s \n", warning.c_str());
+            }
+        }
+        LogPrintf("Preload finished in %" PRId64 " [ms]. Preloaded %" PRId64 " MB of data (%d %% were already present in memory)\n",
+            elapsed, vm.total_pages*vm.pagesize/ONE_MEGABYTE, (int) vm.getPagesInCorePercent());
+
+        // verify that pages were not evicted
+        VMTouch vm2;
+        int stillLoadedPercent = (int) vm2.vmtouch_check(path);
+
+        if (stillLoadedPercent < 90) {
+            LogPrintf("WARNING: Only %d %% of data still present in memory after preloading. Increae amount of free RAM to get the benefits of preloading\n", stillLoadedPercent);
+        }
+
+    }   catch(const std::runtime_error& ex) {
+        LogPrintf("Error while preloading chain state: %s\n", ex.what());
+    }
+
+#else
+    LogPrintf("Preload is not supported on this platform!");
+    return;
+#endif
+}
+
+void preloadChainState(boost::thread_group &threadGroup)
+{
+    int64_t preload;
+    preload = gArgs.GetArg("-preload", 0);
+    if (preload == 0)
+    {
+        LogPrintf("Chainstate will NOT be preloaded\n");
+        return;
+    }
+
+    if (preload == 1 )// preload with vmtouch
+    {
+        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "preload", preloadChainStateThreadFunction));
+    }
+    else
+    {
+        LogPrintf("Unknown value of -preload. No preloading will be done\n");
+    }
+}
+
 bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                  CScheduler &scheduler) {
     const CChainParams &chainparams = config.GetChainParams();
@@ -2333,6 +2406,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         uiInterface.NotifyBlockTip.disconnect(BlockNotifyGenesisWait);
     }
 
+    preloadChainState(threadGroup);
+
     // Step 11: start node
 
     //// debug print
@@ -2373,6 +2448,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // Step 12: finished
 
     SetRPCWarmupFinished();
+
     uiInterface.InitMessage(_("Done loading"));
 
 #ifdef ENABLE_WALLET
