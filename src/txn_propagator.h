@@ -68,7 +68,7 @@ class CTxnPropagator final
     std::atomic<bool> mRunning {true};
 
     /** Frequency we run (defaults to 1 second) */
-    static constexpr unsigned DEFAULT_RUN_FREQUENCY_MILLIS {1000};
+    static constexpr unsigned DEFAULT_RUN_FREQUENCY_MILLIS {250};
     std::chrono::milliseconds mRunFrequency {DEFAULT_RUN_FREQUENCY_MILLIS};
 
 };
