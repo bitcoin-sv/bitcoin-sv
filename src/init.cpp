@@ -1517,13 +1517,15 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
-    // Check blockmaxsize does not exceed maximum accepted block size.
-    const uint64_t nProposedMaxGeneratedBlockSize =
-        gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
-    if (nProposedMaxGeneratedBlockSize > config.GetMaxBlockSize()) {
-        auto msg = _("Max generated block size (blockmaxsize) cannot exceed "
-                     "the excessive block size (excessiveblocksize)");
-        return InitError(msg);
+    // Configure max generated block size.
+    if(gArgs.IsArgSet("-blockmaxsize")) {
+        const uint64_t nProposedMaxGeneratedBlockSize =
+            gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
+        if (!config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize)) {
+            auto msg = _("Max generated block size (blockmaxsize) cannot exceed "
+                "the excessive block size (excessiveblocksize)");
+            return InitError(msg);
+        }
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &

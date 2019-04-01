@@ -1,4 +1,5 @@
 // Copyright (c) 2017 Amaury SÉCHET
+// Copyright (c) 2019 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,9 +24,15 @@ class Config : public boost::noncopyable {
 public:
     // used to specify default block size related parameters
     virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) = 0;
+    
     virtual bool SetMaxBlockSize(uint64_t maxBlockSize) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
     virtual bool MaxBlockSizeOverridden() const = 0;
+    
+    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) = 0;
+    virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
+    virtual bool MaxGeneratedBlockSizeOverridden() const = 0;
+
     virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) = 0;
     virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
@@ -45,10 +52,17 @@ public:
 class GlobalConfig final : public Config {
 public:
     GlobalConfig() = default;
+
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override;
+
     bool SetMaxBlockSize(uint64_t maxBlockSize) override;
     uint64_t GetMaxBlockSize() const override;
     bool MaxBlockSizeOverridden() const override;
+
+    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) override;
+    uint64_t GetMaxGeneratedBlockSize() const override;
+    bool MaxGeneratedBlockSizeOverridden() const override;
+
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override;
     uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
@@ -91,10 +105,17 @@ class DummyConfig : public Config {
 public:
     DummyConfig();
     DummyConfig(std::string net);
+
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override {  }
+
     bool SetMaxBlockSize(uint64_t maxBlockSize) override { return false; }
     uint64_t GetMaxBlockSize() const override { return 0; }
     bool MaxBlockSizeOverridden() const override { return false; }
+
+    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) override { return false; };
+    uint64_t GetMaxGeneratedBlockSize() const override { return 0; };
+    bool MaxGeneratedBlockSizeOverridden() const override { return false; }
+
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override {
         return false;
     }

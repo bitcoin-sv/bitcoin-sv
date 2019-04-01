@@ -701,7 +701,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
 void CheckBlockMaxSize(uint64_t size, uint64_t expected)
 {
-    gArgs.ForceSetArg("-blockmaxsize", std::to_string(size));
+    GlobalConfig::GetConfig().SetMaxGeneratedBlockSize(size);
     BlockAssemblerRef ba = CMiningFactory::GetAssembler(GlobalConfig::GetConfig());
     BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
 }
@@ -709,6 +709,7 @@ void CheckBlockMaxSize(uint64_t size, uint64_t expected)
 BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
 {
     GlobalConfig& config = GlobalConfig::GetConfig();
+    uint64_t nDefaultMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
 
     // We are working on a fake chain and need to protect ourselves.
     LOCK(cs_main);
@@ -742,7 +743,9 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
         const auto expected { std::max(ONE_KILOBYTE,
                                 std::min(DEFAULT_MAX_BLOCK_SIZE - ONE_KILOBYTE,
                                     DEFAULT_MAX_GENERATED_BLOCK_SIZE)) };
-        gArgs.ClearArg("-blockmaxsize");
+
+        // Set generated max size to default
+        config.SetMaxGeneratedBlockSize(nDefaultMaxGeneratedBlockSize);
         BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);
         BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
     }

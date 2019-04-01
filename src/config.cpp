@@ -51,6 +51,26 @@ void GlobalConfig::SetMaxBlockSizeOverridden(bool overridden) {
     maxBlockSizeOverridden = overridden;
 }
 
+bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize) {
+    // Check generated max size does not exceed max accepted size
+    if (maxSize > maxBlockSizeAfter) {
+        return false;
+    }
+
+    maxGeneratedBlockSizeAfter = maxSize;
+    maxGeneratedBlockSizeOverridden = true;
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxGeneratedBlockSize() const {
+    return maxGeneratedBlockSizeAfter;
+};
+
+bool GlobalConfig::MaxGeneratedBlockSizeOverridden() const {
+    return maxGeneratedBlockSizeOverridden;
+};
+
 bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage) {
     // blockPriorityPercentage has to belong to [0..100]
     if ((percentage < 0) || (percentage > 100)) {
