@@ -742,6 +742,9 @@ std::string HelpMessage(HelpMessageMode mode) {
             "-mocktime=<n>",
             "Replace actual time with <n> seconds since epoch (default: 0)");
         strUsage += HelpMessageOpt(
+            "-blocksizeactivationtime=<n>",
+            "Change time that specifies when new defaults for excessiveblocksize and -blockmaxsize are used");
+        strUsage += HelpMessageOpt(
             "-limitfreerelay=<n>",
             strprintf("Continuously rate-limit free transactions to <n>*1000 "
                       "bytes per minute (default: %u)",
@@ -1526,6 +1529,13 @@ bool AppInitParameterInteraction(Config &config) {
                 "the excessive block size (excessiveblocksize)");
             return InitError(msg);
         }
+    }
+
+    // Configure block size related activation time
+    if(gArgs.IsArgSet("-blocksizeactivationtime")) {
+        const int64_t nProposedActivationTime =
+            gArgs.GetArg("-blocksizeactivationtime", 0);
+        config.SetBlockSizeActivationTime(nProposedActivationTime);
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &

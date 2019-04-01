@@ -3500,8 +3500,21 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
     }
 
+    // Check if block has the right size. Maximum accepted block size changes
+    // according to predetermined schedule unless user has overriden this by 
+    // specifying -excessiveblocksize command line parameter 
     const int64_t nMedianTimePast =
         pindexPrev == nullptr ? 0 : pindexPrev->GetMedianTimePast();
+
+    const uint64_t nMaxBlockSize = 
+        pindexPrev == nullptr ? config.GetMaxBlockSize() : config.GetMaxBlockSize(nMedianTimePast);
+
+    const uint64_t currentBlockSize =
+        ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    if (currentBlockSize > nMaxBlockSize) {
+        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
+                        false, "size limits failed");
+    }
 
     const int64_t nLockTimeCutoff = (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST)
                                         ? nMedianTimePast

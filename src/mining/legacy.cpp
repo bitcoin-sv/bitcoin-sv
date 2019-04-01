@@ -73,11 +73,20 @@ int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
 static uint64_t ComputeMaxGeneratedBlockSize(const Config &config,
                                              const CBlockIndex *pindexPrev) {
     // Block resource limits
-    // TODO: check block size activation date
-    uint64_t nMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
+    uint64_t nMaxGeneratedBlockSize;
+    uint64_t nMaxBlockSize;
+    if (pindexPrev == nullptr) {
+        nMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
+        nMaxBlockSize = config.GetMaxBlockSize();
+    }
+    else {
+        auto medianPastTime = pindexPrev->GetMedianTimePast();
+        nMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize(medianPastTime);
+        nMaxBlockSize = config.GetMaxBlockSize(medianPastTime);
+    }
 
     // Limit size to between 1K and MaxBlockSize-1K for sanity:
-    nMaxGeneratedBlockSize = std::max(uint64_t(ONE_KILOBYTE), std::min(config.GetMaxBlockSize() - ONE_KILOBYTE, nMaxGeneratedBlockSize));
+    nMaxGeneratedBlockSize = std::max(uint64_t(ONE_KILOBYTE), std::min(nMaxBlockSize - ONE_KILOBYTE, nMaxGeneratedBlockSize));
 
     return nMaxGeneratedBlockSize;
 }

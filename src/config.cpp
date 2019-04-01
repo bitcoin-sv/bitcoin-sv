@@ -7,6 +7,14 @@
 #include "consensus/consensus.h"
 #include "validation.h"
 
+void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
+    preferredBlockFileSize = preferredSize;
+}
+
+uint64_t GlobalConfig::GetPreferredBlockFileSize() const {
+    return preferredBlockFileSize;
+}
+
 void GlobalConfig::SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) {
     blockSizeActivationTime = params.blockSizeActivationTime;
     maxBlockSizeBefore = params.maxBlockSizeBefore;
@@ -34,12 +42,16 @@ uint64_t GlobalConfig::GetMaxBlockSize() const {
     return maxBlockSizeAfter;
 }
 
-void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
-    preferredBlockFileSize = preferredSize;
-}
+uint64_t GlobalConfig::GetMaxBlockSize(int64_t nMedianTimePast) const {
+    uint64_t maxSize;
+    if (!maxBlockSizeOverridden) {
+        maxSize = nMedianTimePast >= blockSizeActivationTime ? maxBlockSizeAfter : maxBlockSizeBefore;
+    }
+    else {
+        maxSize = maxBlockSizeAfter;
+    }
 
-uint64_t GlobalConfig::GetPreferredBlockFileSize() const {
-    return preferredBlockFileSize;
+    return maxSize;
 }
 
 bool GlobalConfig::MaxBlockSizeOverridden() const {
@@ -67,8 +79,27 @@ uint64_t GlobalConfig::GetMaxGeneratedBlockSize() const {
     return maxGeneratedBlockSizeAfter;
 };
 
+uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
+    uint64_t maxSize;
+    if (!maxGeneratedBlockSizeOverridden) {
+        maxSize = nMedianTimePast >= blockSizeActivationTime ? maxGeneratedBlockSizeAfter : maxGeneratedBlockSizeBefore;
+    }
+    else {
+        maxSize = maxGeneratedBlockSizeAfter;
+    }
+    return maxSize;
+}
 bool GlobalConfig::MaxGeneratedBlockSizeOverridden() const {
     return maxGeneratedBlockSizeOverridden;
+};
+
+bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime) {
+    blockSizeActivationTime = activationTime;
+    return true;
+};
+
+int64_t GlobalConfig::GetBlockSizeActivationTime() const {
+    return blockSizeActivationTime;
 };
 
 bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage) {
