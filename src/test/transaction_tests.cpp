@@ -611,6 +611,8 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
         SetupDummyInputs(keystore, coins);
 
     DummyConfig config(CBaseChainParams::MAIN);
+    uint64_t TEMP_DATA_CARRIER_SIZE = 223;
+    config.SetDataCarrierSize(TEMP_DATA_CARRIER_SIZE);
 
     CMutableTransaction t;
     t.vin.resize(1);
@@ -649,7 +651,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     t.vout[0].scriptPubKey = CScript() << OP_1;
     BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 
-    // DEFAULT_DATA_CARRIER_SIZE-byte TX_NULL_DATA (standard)
+    // TEMP_DATA_CARRIER_SIZE-byte TX_NULL_DATA (standard)
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("646578784062697477617463682e636f2092c558ed52c56d"
@@ -662,10 +664,10 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
                               "732ba6677520a893d75d9a966cb8f85dc301656b1635c631"
                               "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1"
                               "3afb2ab8");
-    BOOST_CHECK_EQUAL(DEFAULT_DATA_CARRIER_SIZE, t.vout[0].scriptPubKey.size());
+    BOOST_CHECK_EQUAL(TEMP_DATA_CARRIER_SIZE, t.vout[0].scriptPubKey.size());
     BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
-    // DEFAULT_DATA_CARRIER_SIZE+1-byte TX_NULL_DATA (non-standard)
+    // TEMP_DATA_CARRIER_SIZE+1-byte TX_NULL_DATA (non-standard)
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("646578784062697477617463682e636f2092c558ed52c56d"
@@ -678,7 +680,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
                               "732ba6677520a893d75d9a966cb8f85dc301656b1635c631"
                               "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1"
                               "3afb2ab800");
-    BOOST_CHECK_EQUAL(DEFAULT_DATA_CARRIER_SIZE + 1, t.vout[0].scriptPubKey.size());
+    BOOST_CHECK_EQUAL(TEMP_DATA_CARRIER_SIZE + 1, t.vout[0].scriptPubKey.size());
     BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 
     /**

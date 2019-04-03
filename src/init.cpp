@@ -17,6 +17,7 @@
 #include "compat/sanity.h"
 #include "config.h"
 #include "consensus/validation.h"
+#include "consensus/consensus.h"
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
@@ -1504,9 +1505,7 @@ bool AppInitParameterInteraction(Config &config) {
     // mempool limits
     int64_t nMempoolSizeMax =
         gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
-    int64_t nMempoolSizeMin =
-        gArgs.GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) *
-        1000 * 40;
+    int64_t nMempoolSizeMin = nMempoolSizeMax * 0.3;
     if (nMempoolSizeMax < 0 || nMempoolSizeMax < nMempoolSizeMin)
         return InitError(strprintf(_("-maxmempool must be at least %d MB"),
                                    std::ceil(nMempoolSizeMin / 1000000.0)));
@@ -1571,12 +1570,13 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure descendant limit size.
     if(gArgs.IsArgSet("-limitdescendantsize")) {
-        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000);
+        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", (MAX_TX_SIZE * config.GetLimitDescendantCount()) / 1000) * 1000);
+
     }
 
     // Configure ancestor limit size.
     if(gArgs.IsArgSet("-limitancestorsize")) {
-        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000);
+        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", (MAX_TX_SIZE * config.GetLimitAncestorCount()) / 1000) * 1000);
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &

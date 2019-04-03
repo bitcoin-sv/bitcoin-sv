@@ -1507,6 +1507,10 @@ class NodeConnCB():
         def test_function(): return self.message_count["verack"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
+    def wait_for_reject(self, timeout=60):
+        def test_function(): return self.message_count["reject"]
+        wait_until(test_function, timeout=timeout, lock=mininode_lock)
+
     # Message sending helper functions
 
     def send_message(self, message):
