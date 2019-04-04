@@ -264,8 +264,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     fCheckpointsEnabled = false;
 
     // Simple block creation, nothing special yet:
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
 
     // We can't make transactions until we have inputs. Therefore, load 100
     // blocks :)
@@ -298,8 +297,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     }
 
     // Just to make sure we can still make simple blocks.
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
 
     const Amount BLOCKSUBSIDY = 50 * COIN;
     const Amount LOWFEE = CENT;
@@ -349,8 +347,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                                  .FromTx(tx));
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     mempool.clear();
 
     // block size > limit
@@ -376,8 +373,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                                  .FromTx(tx));
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     mempool.clear();
 
     // Orphan in mempool, template creation fails.
@@ -405,8 +401,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(HIGHERFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     mempool.clear();
 
     // Coinbase in mempool, template creation fails.
@@ -491,8 +486,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         next->BuildSkip();
         chainActive.SetTip(next);
     }
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     // Extend to a 210000-long block chain.
     while (chainActive.Tip()->nHeight < 210000) {
         CBlockIndex *prev = chainActive.Tip();
@@ -504,8 +498,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         next->BuildSkip();
         chainActive.SetTip(next);
     }
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     // Delete the dummy blocks again.
     while (chainActive.Tip()->nHeight > nHeight) {
         CBlockIndex *del = chainActive.Tip();
@@ -677,8 +670,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     // Sequence locks fail.
     BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), flags));
 
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
 
     // None of the of the absolute height/time locked tx should have made it
     // into the template because we still check IsFinalTx in CreateNewBlock, but
@@ -695,8 +687,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     chainActive.Tip()->nHeight++;
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
-    BOOST_CHECK(pblocktemplate =
-                        CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
     BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 5UL);
 
     chainActive.Tip()->nHeight--;

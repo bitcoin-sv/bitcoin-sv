@@ -47,7 +47,7 @@ inline int GetBlockchainHeight()
 /// mkblocktemplate is a modified/cut down version of the code from the RPC method getblocktemplate. 
 /// It is currently only called from getminingcandidate, but getblocktemplate could be
 /// modified to call a generic version of mkblocktemplate.
-UniValue mkblocktemplate(const Config& config, const UniValue &params, CMiningCandidateRef candidate)
+UniValue mkblocktemplate(const Config& config, bool coinbaseRequired, CMiningCandidateRef candidate)
 {
     LOCK(cs_main);
 
@@ -75,8 +75,6 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CMiningCa
     if (pindexPrev != chainActive.Tip() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
-        //cout << "Creating a new candidate block\n";
-
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = nullptr;
 
@@ -85,18 +83,25 @@ UniValue mkblocktemplate(const Config& config, const UniValue &params, CMiningCa
         CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
-        std::shared_ptr<CReserveScript> coinbaseScript;
-        GetMainSignals().ScriptForMining(coinbaseScript);
+        // Dummy script; the real one is either created by the wallet below, or will be replaced by one
+        // from the miner when they submit the mining solution
+        CScript coinbaseScriptPubKey { CScript() << OP_TRUE };
+        if(coinbaseRequired)
+        {
+            std::shared_ptr<CReserveScript> coinbaseScript {nullptr};
+            GetMainSignals().ScriptForMining(coinbaseScript);
  
-        // If the keypool is exhausted, no script is returned at all.  Catch this.
-        if (!coinbaseScript)
-            throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+            // If the keypool is exhausted, no script is returned at all.  Catch this.
+            if (!coinbaseScript)
+                throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
  
-        // throw an error if no script was provided
-        if (coinbaseScript->reserveScript.empty())
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
+            // throw an error if no script was provided
+            if (coinbaseScript->reserveScript.empty())
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
+            coinbaseScriptPubKey = coinbaseScript->reserveScript;
+        }
+        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScriptPubKey);
 
-        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript);
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
 
@@ -221,7 +226,7 @@ static int32_t MkBlockTemplateVersionBits(int32_t version,
 }
 
 // Create Mining-Candidate JSON to send to miner
-UniValue MkMiningCandidateJson(CMiningCandidateRef &candidate)
+UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candidate)
 {
     UniValue ret(UniValue::VOBJ);
     CBlockRef block = candidate->GetBlock();
@@ -232,6 +237,7 @@ UniValue MkMiningCandidateJson(CMiningCandidateRef &candidate)
 
     ret.push_back(Pair("prevhash", block->hashPrevBlock.GetHex()));
 
+    if(coinbaseRequired)
     {
         const CTransaction *tran = block->vtx[0].get();
         ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
@@ -269,17 +275,18 @@ UniValue MkMiningCandidateJson(CMiningCandidateRef &candidate)
 /// getblocktemplate has a number of control parameters that are not available in getminingcandidate.
 UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request) 
 {
-    if (request.fHelp || request.params.size() > 0)
+    if (request.fHelp || request.params.size() > 1)
     {
         throw std::runtime_error(
-                    "getminingcandidate\n"
+                    "getminingcandidate coinbase (optional, default false)\n"
                     "\nReturns Mining-Candidate protocol data.\n"
-                    "\nArguments: None\n"
+                    "\nArguments:\n"
+                    "1. \"coinbase\"        (boolean, optional) True if a coinbase transaction is required in result"
                     "\nResult: (json string)\n"
                     "    {\n                         \n"
-                    "        \"id\": n,              (integer) candidate identifier for submitminingsolution\n"
+                    "        \"id\": n,              (integer) Candidate identifier for submitminingsolution\n"
                     "        \"prevhash\": \"xxxx\", (hex string) Hash of the previous block\n"
-                    "        \"coinbase\": \"xxxx\", (hex string encoded binary transaction) Coinbase transaction\n"
+                    "        \"coinbase\": \"xxxx\", (optional hex string encoded binary transaction) Coinbase transaction\n"
                     "        \"version\": n,         (integer) Block version\n"
                     "        \"nBits\": \"xxxx\",    (hex string) Difficulty\n"
                     "        \"time\": n,            (integer) Block time\n"
@@ -292,10 +299,16 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
         );
     }
 
+    bool coinbaseRequired {false};
+    if (request.params.size() == 1 && !request.params[0].isNull())
+    {
+        coinbaseRequired = request.params[0].get_bool();
+    }
+
     LOCK(cs_main);
     CMiningCandidateRef candidate = CMiningFactory::GetCandidateManager().Create(chainActive.Tip()->GetBlockHash());
-    mkblocktemplate(config, request.params, candidate);
-    return MkMiningCandidateJson(candidate);
+    mkblocktemplate(config, coinbaseRequired, candidate);
+    return MkMiningCandidateJson(coinbaseRequired, candidate);
 }
 
 /// RPC - Return a successfully mined block 
@@ -361,7 +374,9 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     {
         CMutableTransaction coinbase;
         if (DecodeHexTx(coinbase, cbhex.get_str()))
+        {
             block->vtx[0] = MakeTransactionRef(std::move(coinbase));
+        }
         else
         {
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "coinbase decode failed");
@@ -386,7 +401,7 @@ const CRPCCommand commands[] =
 {
   //  category              name                      actor (function)         okSafeMode
   //  --------------------- ------------------------  -----------------------  ----------
-    { "mining",             "getminingcandidate",     getminingcandidate,     true, {}  },
+    { "mining",             "getminingcandidate",     getminingcandidate,     true, {"coinbase"}  },
     { "mining",             "submitminingsolution",   submitminingsolution,   true, {}  },
 };
 

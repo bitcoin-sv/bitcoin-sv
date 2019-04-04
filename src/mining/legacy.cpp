@@ -126,7 +126,8 @@ getExcessiveBlockSizeSig(const Config &config) {
 }
 
 std::unique_ptr<CBlockTemplate>
-LegacyBlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
+LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
+{
     int64_t nTimeStart = GetTimeMicros();
 
     resetBlock();
@@ -178,7 +179,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
     nLastBlockTx = nBlockTx;
     nLastBlockSize = nBlockSize;
 
-    // Create coinbase transaction.
+    // Create coinbase transaction
     CMutableTransaction coinbaseTx;
     coinbaseTx.vin.resize(1);
     coinbaseTx.vin[0].prevout = COutPoint();
@@ -191,9 +192,9 @@ LegacyBlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0; 
     pblock->vtx[0] = MakeTransactionRef(coinbaseTx);
     pblocktemplate->vTxFees[0] = -1 * nFees;
+    pblocktemplate->vTxSigOpsCount[0] = GetSigOpCountWithoutP2SH(*pblock->vtx[0]);
 
-    uint64_t nSerializeSize =
-        GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
+    uint64_t nSerializeSize = GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
 
     LogPrintf("CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",
               nSerializeSize, nBlockTx, nFees, nBlockSigOps);
@@ -203,17 +204,13 @@ LegacyBlockAssembler::CreateNewBlock(const CScript &scriptPubKeyIn) {
     UpdateTime(pblock, *config, pindexPrev);
     pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, *config);
     pblock->nNonce = 0;
-    pblocktemplate->vTxSigOpsCount[0] =
-        GetSigOpCountWithoutP2SH(*pblock->vtx[0]);
 
     CValidationState state;
-    BlockValidationOptions validationOptions =
-        BlockValidationOptions(false, false);
-    if (!TestBlockValidity(*config, state, *pblock, pindexPrev,
-                           validationOptions)) {
+    BlockValidationOptions validationOptions = BlockValidationOptions(false, false);
+    if (!TestBlockValidity(*config, state, *pblock, pindexPrev, validationOptions))
+    {
         throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s",
-                                           __func__,
-                                           FormatStateMessage(state)));
+                                           __func__, FormatStateMessage(state)));
     }
     int64_t nTime2 = GetTimeMicros();
 

@@ -35,7 +35,7 @@ protected:
 
 public:
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    virtual std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript &scriptPubKeyIn) = 0;
+    virtual std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn) = 0;
 
     uint64_t GetMaxGeneratedBlockSize() const { return nMaxGeneratedBlockSize; }
 };

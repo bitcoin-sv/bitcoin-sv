@@ -130,8 +130,7 @@ UniValue generateBlocks(const Config &config,
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
-            CMiningFactory::GetAssembler(config)->CreateNewBlock(
-                coinbaseScript->reserveScript));
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript));
 
         if (!pblocktemplate.get()) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
