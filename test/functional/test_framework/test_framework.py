@@ -340,13 +340,13 @@ class BitcoinTestFramework():
         connect_nodes_bi(self.nodes, 1, 2)
         self.sync_all()
 
-    def sync_all(self, node_groups=None):
+    def sync_all(self, node_groups=None, timeout=60):
         if not node_groups:
             node_groups = [self.nodes]
 
         for group in node_groups:
-            sync_blocks(group)
-            sync_mempools(group)
+            sync_blocks(group, timeout=timeout)
+            sync_mempools(group, timeout=timeout)
 
     def enable_mocktime(self, mocktime):
         """Enable mocktime for the script.
