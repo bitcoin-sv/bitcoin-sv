@@ -132,7 +132,7 @@ Section -un.post UNSEC0001
     Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\@PACKAGE_NAME@ (testnet, @WINDOWS_BITS@-bit).lnk"
     Delete /REBOOTOK "$SMSTARTUP\Bitcoin.lnk"
     Delete /REBOOTOK $INSTDIR\uninstall.exe
-    Delete /REBOOTOK $INSTDIR\debug.log
+    Delete /REBOOTOK $INSTDIR\bitcoind.log
     Delete /REBOOTOK $INSTDIR\db.log
     DeleteRegValue HKCU "${REGKEY}" StartMenuGroup
     DeleteRegValue HKCU "${REGKEY}" Path
