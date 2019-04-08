@@ -237,11 +237,12 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
 
     ret.push_back(Pair("prevhash", block->hashPrevBlock.GetHex()));
 
+    const CTransaction* cbtran = block->vtx[0].get();
     if(coinbaseRequired)
     {
-        const CTransaction *tran = block->vtx[0].get();
-        ret.push_back(Pair("coinbase", EncodeHexTx(*tran)));
+        ret.push_back(Pair("coinbase", EncodeHexTx(*cbtran)));
     }
+    ret.push_back(Pair("coinbaseValue", cbtran->vout[0].nValue.GetSatoshis()));
 
     std::set<std::string> setClientRules;
     CBlockIndex *const pindexPrev = chainActive.Tip();
