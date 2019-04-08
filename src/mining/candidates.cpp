@@ -4,6 +4,10 @@
 
 #include "candidates.h"
 
+namespace
+{
+    constexpr unsigned int NEW_CANDIDATE_INTERVAL = 30; // seconds
+}
 
 /**
  * Create a new Mining Candidate. This is then ready for use by the BlockConstructor to construct a Candidate Block.
@@ -11,13 +15,35 @@
  *
  * @return a reference to the MiningCandidate.
  */
-CMiningCandidateRef CMiningCandidateManager::Create(uint256 hashPrevBlock) {
-    std::lock_guard<std::mutex> lock(mutex);
+CMiningCandidateRef CMiningCandidateManager::Create(uint256 hashPrevBlock)
+{
+    // Create UUID for next candidate
+    MiningCandidateId nextId { mIdGenerator() };
+
     auto candidate = std::make_shared<CMiningCandidate>(CMiningCandidate(nextId, hashPrevBlock));
+    std::lock_guard<std::mutex> lock(mutex);
     candidates[nextId] = candidate;
-    nextId++;
     return candidate;
 };
+
+/**
+ * Lookup and return a reference to the requested MiningCandidate.
+ *
+ * @return The requested MiningCandidate, or nullptr if not found.
+ */
+CMiningCandidateRef CMiningCandidateManager::Get(const MiningCandidateId& candidateId) const
+{
+    CMiningCandidateRef res {nullptr};
+
+    std::lock_guard<std::mutex> lock {mutex};
+    auto candidateIt { candidates.find(candidateId) };
+    if(candidateIt != candidates.end())
+    {
+        res = candidateIt->second;
+    }
+
+    return res;
+}
 
 /**
  * Remove old candidate blocks. This frees up space.

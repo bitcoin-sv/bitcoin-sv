@@ -34,17 +34,21 @@ BOOST_AUTO_TEST_CASE(add_remove_candidates) {
     }
     BOOST_CHECK_EQUAL(NUM_CANDIDATES, manager.Size());
 
+    // fetch the first & 53rd elements
+    BOOST_CHECK(manager.Get(first)!=nullptr);
+    BOOST_CHECK(manager.Get(fiftythird)!=nullptr);
+
     // remove the first element
     manager.Remove(first);
     BOOST_CHECK_EQUAL(NUM_CANDIDATES-1, manager.Size());
-    BOOST_CHECK(manager.Get(first)==std::nullopt);
+    BOOST_CHECK(manager.Get(first)==nullptr);
     // remove it again
     manager.Remove(first);
     BOOST_CHECK_EQUAL(NUM_CANDIDATES-1, manager.Size());
     // remove the 53rd element
     manager.Remove(fiftythird);
     BOOST_CHECK_EQUAL(NUM_CANDIDATES-2, manager.Size());
-    BOOST_CHECK(manager.Get(fiftythird)==std::nullopt);
+    BOOST_CHECK(manager.Get(fiftythird)==nullptr);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

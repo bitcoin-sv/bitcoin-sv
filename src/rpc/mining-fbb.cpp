@@ -30,6 +30,8 @@
 #include <iomanip>
 #include <limits>
 #include <queue>
+#include <boost/lexical_cast.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 using namespace std;
 
@@ -233,7 +235,9 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
 
     CMiningFactory::GetCandidateManager().RemoveOldCandidates();
 
-    ret.push_back(Pair("id", candidate->GetId()));
+    std::stringstream idstr {};
+    idstr << candidate->GetId();
+    ret.push_back(Pair("id", idstr.str()));
 
     ret.push_back(Pair("prevhash", block->hashPrevBlock.GetHex()));
 
@@ -285,7 +289,7 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
                     "1. \"coinbase\"        (boolean, optional) True if a coinbase transaction is required in result"
                     "\nResult: (json string)\n"
                     "    {\n                         \n"
-                    "        \"id\": n,              (integer) Candidate identifier for submitminingsolution\n"
+                    "        \"id\": n,              (string) Candidate identifier for submitminingsolution\n"
                     "        \"prevhash\": \"xxxx\", (hex string) Hash of the previous block\n"
                     "        \"coinbase\": \"xxxx\", (optional hex string encoded binary transaction) Coinbase transaction\n"
                     "        \"version\": n,         (integer) Block version\n"
@@ -324,7 +328,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
                 "\nAttempts to submit a new block to the network.\n"
                 "\nJson Object should comprise of the following and must be escaped\n"
                 "    {\n"
-                "        \"id\": n,           (integer) ID from getminingcandidate RPC\n"
+                "        \"id\": n,           (string) ID from getminingcandidate RPC\n"
                 "        \"nonce\": n,        (integer) Miner generated nonce\n"
                 "        \"coinbase\": \"\",  (hex string, optional) Modified Coinbase transaction\n"
                 "        \"time\": n,         (integer, optional) Block time\n"
@@ -339,16 +343,17 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
 
     rcvd = request.params[0].get_obj();
 
-    int64_t id = rcvd["id"].get_int64();
+    std::string idstr { rcvd["id"].get_str() };
+    MiningCandidateId id { boost::lexical_cast<MiningCandidateId>(idstr) };
 
     LOCK(cs_main);
-    std::optional<CMiningCandidateRef> result = CMiningFactory::GetCandidateManager().Get(id);
+    CMiningCandidateRef result { CMiningFactory::GetCandidateManager().Get(id) };
     if (!result)
     {
         return UniValue("Block candidate ID not found");
     }
 
-    CBlockRef block = (*result)->GetBlock();
+    CBlockRef block = result->GetBlock();
 
     UniValue nonce = rcvd["nonce"];
     if (nonce.isNull())

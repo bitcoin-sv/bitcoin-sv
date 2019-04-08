@@ -8,9 +8,12 @@
 #include "primitives/block.h"
 
 #include <mutex>
-#include <optional>
 
-typedef uint64_t MiningCandidateId;
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+
+// Allow candidate IDs to be unique
+using MiningCandidateId = boost::uuids::uuid;
 
 
 /**
@@ -32,16 +35,14 @@ public:
     MiningCandidateId GetId() const { return id; };
 
 private:
-    CMiningCandidate(MiningCandidateId _id, uint256 hashPrevBlock) : block{std::make_shared<CBlock>()}, id{_id} {
+    CMiningCandidate(MiningCandidateId _id, uint256 hashPrevBlock) : id{_id} {
         block->hashPrevBlock = hashPrevBlock;
     };
 
-    CBlockRef block;
-    MiningCandidateId id;
+    CBlockRef block { std::make_shared<CBlock>() };
+    MiningCandidateId id {};
 };
-
-
-typedef std::shared_ptr<CMiningCandidate> CMiningCandidateRef;
+using CMiningCandidateRef = std::shared_ptr<CMiningCandidate>;
 
 
 /**
@@ -49,8 +50,9 @@ typedef std::shared_ptr<CMiningCandidate> CMiningCandidateRef;
  */
 class CMiningCandidateManager {
 public:
-    std::optional<CMiningCandidateRef> Get(MiningCandidateId candidateId) const { return std::nullopt; };
     CMiningCandidateRef Create(uint256 hashPrevBlock);
+    CMiningCandidateRef Get(const MiningCandidateId& candidateId) const;
+
     void Remove(MiningCandidateId candidateId) {
         std::lock_guard<std::mutex> lock(mutex);
         candidates.erase(candidateId);
@@ -63,9 +65,12 @@ public:
     void RemoveOldCandidates();
 
 private:
-    mutable std::mutex mutex;   // we don't expect much concurrency, a simple exclusive mutex is sufficient
-    std::map<uint64_t, CMiningCandidateRef> candidates;
-    MiningCandidateId nextId {0};
+    mutable std::mutex mutex {};   // we don't expect much concurrency, a simple exclusive mutex is sufficient
+
+    using CandidateMap = std::map<MiningCandidateId, CMiningCandidateRef>;
+    CandidateMap candidates {};
+
+    boost::uuids::random_generator mIdGenerator {};
 };
 
 
