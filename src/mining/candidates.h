@@ -7,6 +7,7 @@
 
 #include "primitives/block.h"
 
+#include <atomic>
 #include <mutex>
 
 #include <boost/uuid/uuid.hpp>
@@ -28,19 +29,19 @@ using MiningCandidateId = boost::uuids::uuid;
 class CMiningCandidate {
     friend class CMiningCandidateManager;
 public:
-    CBlockRef GetBlock() const { return block; };
+    CBlockRef GetBlock() const { return mBlock; };
     void SetBlock(const CBlockRef &blockRef) {
-        block = blockRef;
+        mBlock = blockRef;
     };
-    MiningCandidateId GetId() const { return id; };
+    MiningCandidateId GetId() const { return mId; };
 
 private:
-    CMiningCandidate(MiningCandidateId _id, uint256 hashPrevBlock) : id{_id} {
-        block->hashPrevBlock = hashPrevBlock;
+    CMiningCandidate(MiningCandidateId _id, uint256 hashPrevBlock) : mId{_id} {
+        mBlock->hashPrevBlock = hashPrevBlock;
     };
 
-    CBlockRef block { std::make_shared<CBlock>() };
-    MiningCandidateId id {};
+    CBlockRef mBlock { std::make_shared<CBlock>() };
+    MiningCandidateId mId {};
 };
 using CMiningCandidateRef = std::shared_ptr<CMiningCandidate>;
 
@@ -54,21 +55,23 @@ public:
     CMiningCandidateRef Get(const MiningCandidateId& candidateId) const;
 
     void Remove(MiningCandidateId candidateId) {
-        std::lock_guard<std::mutex> lock(mutex);
-        candidates.erase(candidateId);
+        std::lock_guard<std::mutex> lock(mMutex);
+        mCandidates.erase(candidateId);
     };
     size_t Size() const {
-        std::lock_guard<std::mutex> lock(mutex);
-        return candidates.size();
+        std::lock_guard<std::mutex> lock(mMutex);
+        return mCandidates.size();
     };
 
     void RemoveOldCandidates();
 
 private:
-    mutable std::mutex mutex {};   // we don't expect much concurrency, a simple exclusive mutex is sufficient
+    mutable std::mutex mMutex {};   // we don't expect much concurrency, a simple exclusive mutex is sufficient
 
     using CandidateMap = std::map<MiningCandidateId, CMiningCandidateRef>;
-    CandidateMap candidates {};
+    CandidateMap mCandidates {};
+
+    std::atomic_uint mPrevHeight {0};
 
     boost::uuids::random_generator mIdGenerator {};
 };

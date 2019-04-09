@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "candidates.h"
+#include "utiltime.h"
+#include "validation.h"
 
 namespace
 {
@@ -21,8 +23,8 @@ CMiningCandidateRef CMiningCandidateManager::Create(uint256 hashPrevBlock)
     MiningCandidateId nextId { mIdGenerator() };
 
     auto candidate = std::make_shared<CMiningCandidate>(CMiningCandidate(nextId, hashPrevBlock));
-    std::lock_guard<std::mutex> lock(mutex);
-    candidates[nextId] = candidate;
+    std::lock_guard<std::mutex> lock {mMutex};
+    mCandidates[nextId] = candidate;
     return candidate;
 };
 
@@ -35,9 +37,9 @@ CMiningCandidateRef CMiningCandidateManager::Get(const MiningCandidateId& candid
 {
     CMiningCandidateRef res {nullptr};
 
-    std::lock_guard<std::mutex> lock {mutex};
-    auto candidateIt { candidates.find(candidateId) };
-    if(candidateIt != candidates.end())
+    std::lock_guard<std::mutex> lock {mMutex};
+    auto candidateIt { mCandidates.find(candidateId) };
+    if(candidateIt != mCandidates.end())
     {
         res = candidateIt->second;
     }
@@ -52,31 +54,38 @@ CMiningCandidateRef CMiningCandidateManager::Get(const MiningCandidateId& candid
  * 30 seconds ago. In theory, a sequence of new blocks found within 30 seconds of each other would prevent old
  * candidates from being removed but in practice this wont happen.
  */
-void CMiningCandidateManager::RemoveOldCandidates() {
-    std::lock_guard<std::mutex> lock(mutex);
-// old code:
-//    LOCK(cs_main);
-//    static unsigned int prevheight = 0;
-//    unsigned int height = GetBlockchainHeight();
-//
-//    if (height <= prevheight)
-//        return;
-//
-//    int64_t tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
-//    if (tdiff >= 0)
-//    {
-//        // Clean out mining candidates that are the same height as a discovered block.
-//        for (auto it = MiningCandidates.cbegin(); it != MiningCandidates.cend();)
-//        {
-//            if (it->second.block.GetHeight() <= prevheight)
-//            {
-//                it = MiningCandidates.erase(it);
-//            }
-//            else
-//            {
-//                ++it;
-//            }
-//        }
-//        prevheight = height;
-//    }
+void CMiningCandidateManager::RemoveOldCandidates()
+{
+    unsigned int height {0};
+    int64_t tdiff {0};
+
+    {
+        LOCK(cs_main);
+        if(chainActive.Height() < 0)
+            return;
+
+        height = static_cast<unsigned int>(chainActive.Height());
+        if(height <= mPrevHeight)
+            return;
+
+        tdiff = GetTime() - (chainActive.Tip()->nTime + NEW_CANDIDATE_INTERVAL);
+    }
+
+    if(tdiff >= 0)
+    {
+        // Clean out mining candidates that are older than the discovered block.
+        std::lock_guard<std::mutex> lock {mMutex};
+        for(auto it = mCandidates.cbegin(); it != mCandidates.cend();)
+        {
+            if(it->second->mBlock->GetHeight() <= mPrevHeight)
+            {
+                it = mCandidates.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+        mPrevHeight = height;
+    }
 }

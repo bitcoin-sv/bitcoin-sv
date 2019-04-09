@@ -38,14 +38,6 @@ using namespace std;
 namespace
 {
 
-/** Mining-Candidate begin */
-const int NEW_CANDIDATE_INTERVAL = 30; // seconds
-
-inline int GetBlockchainHeight()
-{
-    return chainActive.Height();
-}
-
 /// mkblocktemplate is a modified/cut down version of the code from the RPC method getblocktemplate. 
 /// It is currently only called from getminingcandidate, but getblocktemplate could be
 /// modified to call a generic version of mkblocktemplate.
@@ -259,15 +251,13 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     ret.push_back(Pair("height", block->GetHeight()));
 
     // merkleProof:
+    std::vector<uint256> brancharr = GetMerkleProofBranches(block);
+    UniValue merkleProof(UniValue::VARR);
+    for (const auto &i : brancharr)
     {
-        std::vector<uint256> brancharr = GetMerkleProofBranches(block);
-        UniValue merkleProof(UniValue::VARR);
-        for (const auto &i : brancharr)
-        {
-            merkleProof.push_back(i.GetHex());
-        }
-        ret.push_back(Pair("merkleProof", merkleProof));
+        merkleProof.push_back(i.GetHex());
     }
+    ret.push_back(Pair("merkleProof", merkleProof));
 
     return ret;
 }
@@ -346,11 +336,10 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     std::string idstr { rcvd["id"].get_str() };
     MiningCandidateId id { boost::lexical_cast<MiningCandidateId>(idstr) };
 
-    LOCK(cs_main);
     CMiningCandidateRef result { CMiningFactory::GetCandidateManager().Get(id) };
     if (!result)
     {
-        return UniValue("Block candidate ID not found");
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block candidate ID not found");
     }
 
     CBlockRef block = result->GetBlock();
@@ -396,8 +385,23 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         block->hashMerkleRoot = CalculateMerkleRoot(t, merkleProof);
     }
 
-    UniValue submitted = SubmitBlock(config, block); // returns string on failure
+    // Submit solution
+    UniValue submitted {};
+    {
+        LOCK(cs_main);
+        submitted = SubmitBlock(config, block); // returns string on failure
+    }
+    if(submitted.isNull())
+    {
+        // Return true on success
+        UniValue tru { UniValue::VBOOL };
+        tru.setBool(true);
+        submitted = tru;
+    }
+
+    // Clear out old candidates
     CMiningFactory::GetCandidateManager().RemoveOldCandidates();
+
     return submitted;
 }
 
