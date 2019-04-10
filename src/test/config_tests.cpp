@@ -1,4 +1,5 @@
 // Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2019 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -57,6 +58,86 @@ BOOST_AUTO_TEST_CASE(max_block_size) {
     BOOST_CHECK(config.SetMaxBlockSize(ONE_MEGABYTE + 1));
     BOOST_CHECK_EQUAL(config.GetMaxBlockSize(), ONE_MEGABYTE + 1);
 }
+
+BOOST_AUTO_TEST_CASE(max_block_size_related_defaults) {
+
+    GlobalConfig config;
+
+    // Make up some dummy parameters taking into account the following rules
+    // - Block size should be at least 1000 
+    // - generated block size can not be larger than received block size - 1000
+    DefaultBlockSizeParams defaultParams {
+        // activation time 
+        1000,
+        // max block size before activation
+        5000,
+        // max block size after activation
+        6000,
+        // max generated block size before activation
+        3000,
+        // max generated block size after activation
+        4000
+    };
+
+    config.SetDefaultBlockSizeParams(defaultParams);
+
+    // Providing defaults should not override anything
+    BOOST_CHECK(!config.MaxBlockSizeOverridden());
+    BOOST_CHECK(!config.MaxGeneratedBlockSizeOverridden());
+
+    BOOST_CHECK_EQUAL(config.GetBlockSizeActivationTime(), 1000);
+
+    // Functions that do not take time parameter should return future data
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(), defaultParams.maxBlockSizeAfter);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(), defaultParams.maxGeneratedBlockSizeAfter);
+
+
+    ///////////////////
+    /// Test with default values - they should change based on activation time
+    /////////////////
+        
+    // Functions that do take time parameter should return old values before activation time
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(999), defaultParams.maxBlockSizeBefore);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(999), defaultParams.maxGeneratedBlockSizeBefore);
+
+    // Functions that do take time parameter should return new values on activation time
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1000), defaultParams.maxBlockSizeAfter);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1000), defaultParams.maxGeneratedBlockSizeAfter);
+
+    // Functions that do take time parameter should return new value after activation date
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1001), defaultParams.maxBlockSizeAfter);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1001), defaultParams.maxGeneratedBlockSizeAfter);
+
+    // Override one of the values, the overriden value should be used regardless of time.
+    // Minimum allowed received block size is 1 MB, so we use 8 MB
+    uint64_t overridenMaxBlockSize { 8 * ONE_MEGABYTE };
+
+    BOOST_CHECK(config.SetMaxBlockSize(overridenMaxBlockSize));
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(999), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(999), defaultParams.maxGeneratedBlockSizeBefore);
+
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1000), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1000), defaultParams.maxGeneratedBlockSizeAfter);
+
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1001), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1001), defaultParams.maxGeneratedBlockSizeAfter);
+
+
+    // Override the generated block size, which must be smaller than received block size
+    uint64_t overridenMagGeneratedBlockSize = overridenMaxBlockSize - ONE_MEGABYTE;
+
+    BOOST_CHECK(config.SetMaxGeneratedBlockSize(overridenMagGeneratedBlockSize));
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(999), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(999), overridenMagGeneratedBlockSize);
+
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1000), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1000), overridenMagGeneratedBlockSize);
+
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1001), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1001), overridenMagGeneratedBlockSize);
+
+}
+
 
 BOOST_AUTO_TEST_CASE(hex_to_array) {
     const std::string hexstr = "0a0b0C0D";//Lower and Upper char should both work

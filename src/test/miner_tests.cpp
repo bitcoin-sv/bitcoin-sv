@@ -1,4 +1,5 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2019 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -751,6 +752,65 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
         BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);
         BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
     }
+}
+
+void CheckBlockMaxSizeForTime(Config& config, uint64_t medianPastTime, uint64_t expectedSize)
+{
+    std::vector<CBlockIndex> blocks(11);
+
+    // Construct chain  with desired median time. Set time of each block to 
+    // the same value to get desired median past time.
+    CBlockIndex* pprev{ nullptr };
+    int height = 0;
+    for (auto& block : blocks)
+    {
+        block.nTime = medianPastTime;
+        block.pprev = pprev;
+        block.nHeight = height;
+
+        pprev = &block;
+        height++;
+    }
+
+
+    // Make sure that we got correct median past time.
+    BOOST_REQUIRE_EQUAL(blocks.back().GetMedianTimePast(), medianPastTime);
+
+    // chainActive is used by BlockAssembler to get median past time, which is used to select default block size
+    chainActive.SetTip(&blocks.back());
+
+    BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);
+    BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expectedSize);
+
+
+    chainActive.SetTip(nullptr); // cleanup
+}
+
+BOOST_AUTO_TEST_CASE(BlockAssembler_construction_acttivate_new_blocksize)
+{
+    DefaultBlockSizeParams defaultParams{
+        // activation time 
+        1000,
+        // max block size before activation
+        5000,
+        // max block size after activation
+        6000,
+        // max generated block size before activation
+        3000,
+        // max generated block size after activation
+        4000
+    };
+
+    GlobalConfig config;
+    config.SetDefaultBlockSizeParams(defaultParams);
+
+    CheckBlockMaxSizeForTime(config, 999, 3000);
+    CheckBlockMaxSizeForTime(config, 1000, 4000);
+    CheckBlockMaxSizeForTime(config, 10001, 4000);
+
+    // When explicitly set, defaults values must not be used
+    config.SetMaxGeneratedBlockSize(3333);
+    CheckBlockMaxSizeForTime(config, 10001, 3333);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
