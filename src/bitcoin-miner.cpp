@@ -339,8 +339,9 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
     }
 
     uint32_t startNonce = header.nNonce = std::rand();
+    std::string candidateId = params["id"].get_str();
 
-    printf("Mining: id: %x parent: %s bits: %x difficulty: %.8e time: %d\n", (unsigned int)params["id"].get_int64(),
+    printf("Mining: id: %s parent: %s bits: %x difficulty: %.8e time: %d\n", candidateId.c_str(),
         header.hashPrevBlock.ToString().c_str(), header.nBits, GetDifficulty(header.nBits), header.nTime);
 
     int64_t start = GetTime();
@@ -367,7 +368,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
 
     tmpstr = HexStr(coinbaseBytes.begin(), coinbaseBytes.end());
     tmp.push_back(Pair("coinbase", tmpstr));
-    tmp.push_back(Pair("id", params["id"]));
+    tmp.push_back(Pair("id", candidateId));
     tmp.push_back(Pair("time", UniValue(uint64_t(header.nTime)))); // Optional. We have changed so must send.
     tmp.push_back(Pair("nonce", UniValue(uint64_t(header.nNonce))));
     tmp.push_back(Pair("version", UniValue(header.nVersion))); // Optional. We may have changed so sending.
@@ -402,7 +403,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
     }
     else
     {
-        if (result.isNull())
+        if (result.isTrue())
         {
             printf("Block Candidate accepted.\n");
             if (nblocks > 0)
@@ -410,7 +411,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
         }
         else
         {
-            fprintf(stderr, "Unknown \"submitminingsolution\" Error.\n");
+            fprintf(stderr, "Unknown \"submitminingsolution\" Response.\n");
         }
     }
 
@@ -457,6 +458,7 @@ int CpuMiner(void)
                     }
 
                     UniValue params(UniValue::VARR);                        
+                    params.push_back(UniValue(true));
                     reply = CallRPC("getminingcandidate", params);
 
                     // Parse reply
