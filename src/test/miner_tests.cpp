@@ -208,6 +208,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
 void TestCoinbaseMessageEB(uint64_t eb, std::string cbmsg) {
 
     GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     config.SetMaxBlockSize(eb);
 
     CScript scriptPubKey =
@@ -259,6 +260,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     entry.nHeight = 11;
 
     GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
     LOCK(cs_main);
     fCheckpointsEnabled = false;
@@ -710,14 +712,15 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
 {
     GlobalConfig& config = GlobalConfig::GetConfig();
     uint64_t nDefaultMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
+    uint64_t nDefaultMaxBlockSize = config.GetMaxBlockSize();
+
 
     // We are working on a fake chain and need to protect ourselves.
     LOCK(cs_main);
 
     // Test around historical 1MB (plus one byte because that's mandatory)
-    config.SetMaxBlockSize(ONE_MEGABYTE + 1);
-    config.SetMaxBlockSizeOverridden(false);
-    CheckBlockMaxSize(0, 1000);
+    BOOST_REQUIRE(config.SetMaxBlockSize(ONE_MEGABYTE + 1));
+    CheckBlockMaxSize(0, 1000); 
     CheckBlockMaxSize(1000, 1000);
     CheckBlockMaxSize(1001, 1001);
     CheckBlockMaxSize(12345, 12345);
@@ -728,22 +731,21 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
     CheckBlockMaxSize(ONE_MEGABYTE, ONE_MEGABYTE - 999);
 
     // Test around default cap
-    config.SetMaxBlockSize(DEFAULT_MAX_BLOCK_SIZE);
-    config.SetMaxBlockSizeOverridden(false);
+    BOOST_REQUIRE(config.SetMaxBlockSize(nDefaultMaxBlockSize));
 
     // Now we can use the default max block size.
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1001, DEFAULT_MAX_BLOCK_SIZE - 1001);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1000, DEFAULT_MAX_BLOCK_SIZE - 1000);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 999, DEFAULT_MAX_BLOCK_SIZE - 1000);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 1001, nDefaultMaxBlockSize - 1001);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 1000, nDefaultMaxBlockSize - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 999, nDefaultMaxBlockSize - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize, nDefaultMaxBlockSize - 1000);
 
     // If the parameter is not specified, we use
     // max(1K, min(DEFAULT_MAX_BLOCK_SIZE - 1K, DEFAULT_MAX_GENERATED_BLOCK_SIZE))
     {
         const auto expected { std::max(ONE_KILOBYTE,
-                                std::min(DEFAULT_MAX_BLOCK_SIZE - ONE_KILOBYTE,
-                                    DEFAULT_MAX_GENERATED_BLOCK_SIZE)) };
-
+                                std::min(nDefaultMaxBlockSize - ONE_KILOBYTE,
+                                    nDefaultMaxGeneratedBlockSize)) };
+        
         // Set generated max size to default
         config.SetMaxGeneratedBlockSize(nDefaultMaxGeneratedBlockSize);
         BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);

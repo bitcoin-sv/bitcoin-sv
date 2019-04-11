@@ -69,7 +69,9 @@ TestingSetup::TestingSetup(const std::string &chainName)
 
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
-    const Config &config = GlobalConfig::GetConfig();
+    GlobalConfig &config = GlobalConfig::GetConfig();
+    config.Reset(); // make sure that we start every test with a clean config
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     RegisterAllRPCCommands(tableRPC);
     ClearDatadirCache();
     pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",

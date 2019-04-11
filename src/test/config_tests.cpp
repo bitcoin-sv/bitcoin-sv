@@ -11,8 +11,23 @@
 
 BOOST_FIXTURE_TEST_SUITE(config_tests, BasicTestingSetup)
 
+static bool isSetDefaultBlockSizeParamsCalledException(const std::runtime_error &ex) {
+    static std::string expectedException("GlobalConfig::SetDefaultBlockSizeParams must be called before accessing block size related parameters");
+    return expectedException == ex.what();
+}
+
 BOOST_AUTO_TEST_CASE(max_block_size) {
     GlobalConfig config;
+
+    // SetDefaultBlockSizeParams must be called before using config block size parameters
+    // otherwise getters rise exceptions
+    BOOST_CHECK_EXCEPTION(config.GetMaxBlockSize(), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
+    BOOST_CHECK_EXCEPTION(config.GetMaxBlockSize(0), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
+    BOOST_CHECK_EXCEPTION(config.GetMaxGeneratedBlockSize(), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
+    BOOST_CHECK_EXCEPTION(config.GetMaxGeneratedBlockSize(0), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
+    BOOST_CHECK_EXCEPTION(config.GetBlockSizeActivationTime(), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
+
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
     // Too small.
     BOOST_CHECK(!config.SetMaxBlockSize(0));

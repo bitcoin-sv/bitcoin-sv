@@ -56,7 +56,7 @@ public:
 
 class GlobalConfig final : public Config {
 public:
-    GlobalConfig() = default;
+    GlobalConfig();
 
     // Set block size related default. This must be called after constructing GlobalConfig
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override;
@@ -89,29 +89,31 @@ public:
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override;
     uint64_t GetPreferredBlockFileSize() const override;
 
-    void SetMaxBlockSizeOverridden(bool overridden);    // For unit testing only
-
+    // Reset state of this object to match a newly constructed one. 
+    // Used in constructor and for unit testing to always start with a clean state
+    void Reset(); 
     static GlobalConfig& GetConfig();
 
 private:
-    bool useCashAddr { false };
-    Amount excessUTXOCharge {};
-    CFeeRate feePerKB {};
-    uint64_t blockPriorityPercentage { DEFAULT_BLOCK_PRIORITY_PERCENTAGE };
-    uint64_t preferredBlockFileSize{ DEFAULT_PREFERRED_BLOCKFILE_SIZE };
+    // All fileds are initialized in Reset()
+    bool useCashAddr;
+    Amount excessUTXOCharge;
+    CFeeRate feePerKB;
+    uint64_t blockPriorityPercentage;
+    uint64_t preferredBlockFileSize;
 
     // Block size limits 
     // SetDefaultBlockSizeParams must be called before reading any of those
-    bool  setDefaultBlockSizeParamsCalled{ false };
+    bool  setDefaultBlockSizeParamsCalled;
     void  CheckSetDefaultCalled() const;
 
-    int64_t blockSizeActivationTime { 0 };
-    uint64_t maxBlockSizeBefore { 0 };
-    uint64_t maxBlockSizeAfter { 0 };
-    bool maxBlockSizeOverridden { false };
-    uint64_t maxGeneratedBlockSizeBefore { 0 };
-    uint64_t maxGeneratedBlockSizeAfter { 0 };
-    bool maxGeneratedBlockSizeOverridden { false };
+    int64_t blockSizeActivationTime;
+    uint64_t maxBlockSizeBefore;
+    uint64_t maxBlockSizeAfter;
+    bool maxBlockSizeOverridden;
+    uint64_t maxGeneratedBlockSizeBefore;
+    uint64_t maxGeneratedBlockSizeAfter;
+    bool maxGeneratedBlockSizeOverridden;
 };
 
 // Dummy for subclassing in unittests

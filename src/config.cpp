@@ -7,6 +7,29 @@
 #include "consensus/consensus.h"
 #include "validation.h"
 
+GlobalConfig::GlobalConfig() {
+    Reset();
+}
+
+void GlobalConfig::Reset()
+{
+    useCashAddr = false;
+    excessUTXOCharge = Amount {};
+    feePerKB = CFeeRate {};
+    blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
+    preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
+    
+    setDefaultBlockSizeParamsCalled = false;
+
+    blockSizeActivationTime = 0;
+    maxBlockSizeBefore = 0;
+    maxBlockSizeAfter = 0;
+    maxBlockSizeOverridden = false;
+    maxGeneratedBlockSizeBefore = 0;
+    maxGeneratedBlockSizeAfter = 0;
+    maxGeneratedBlockSizeOverridden =  false;
+}
+
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
     preferredBlockFileSize = preferredSize;
 }
@@ -70,11 +93,6 @@ uint64_t GlobalConfig::GetMaxBlockSize(int64_t nMedianTimePast) const {
 
 bool GlobalConfig::MaxBlockSizeOverridden() const {    
     return maxBlockSizeOverridden;
-}
-
-// Allow unit tests to control whether the max block size has been overridden
-void GlobalConfig::SetMaxBlockSizeOverridden(bool overridden) {
-    maxBlockSizeOverridden = overridden;
 }
 
 bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize) {
