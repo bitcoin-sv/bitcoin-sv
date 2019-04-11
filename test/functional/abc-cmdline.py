@@ -12,7 +12,7 @@ Currently:
 import re
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
-from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE
+from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER, ONE_MEGABYTE
 
 MAX_GENERATED_BLOCK_SIZE_ERROR = (
     'Max generated block size (blockmaxsize) cannot exceed the excessive block size (excessiveblocksize)')
@@ -40,13 +40,15 @@ class ABC_CmdLine_Test (BitcoinTestFramework):
     def excessiveblocksize_test(self):
         self.log.info("Testing -excessiveblocksize")
 
-        # there are other internal constraints on the max size of the block - leveldb also has a limit of 128 MiB
-        self.log.info("  Set to larger than the default, i.e. %d bytes" % (DEFAULT_MAX_BLOCK_SIZE + 6000000))
+        self.log.info("  Set to larger than the default, i.e. %d bytes" % (REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER + 6000000))
         self.stop_node(0)
-        self.start_node(0, ["-excessiveblocksize=%d" % (DEFAULT_MAX_BLOCK_SIZE + 6000000)])
-        self.check_excessive(DEFAULT_MAX_BLOCK_SIZE + 6000000)
+        self.start_node(0, ["-excessiveblocksize=%d" % (REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER + 6000000)])
+        self.check_excessive(REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER + 6000000)
+
         # Check for EB correctness in the subver string
-        self.check_subversion("/Bitcoin SV:.*\(EB134\.0; .*\)/")
+        expectedUASize = str((REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER + 6000000) // (ONE_MEGABYTE // 10))
+        expectedUASize =  expectedUASize[:-1] + "\." + expectedUASize[-1] # insert \ to escape regexp .
+        self.check_subversion("/Bitcoin SV:.*\(EB" + expectedUASize + "; .*\)/")
 
         self.log.info("  Attempt to set below legacy limit of 1MB - try %d bytes" % LEGACY_MAX_BLOCK_SIZE)
         self.stop_node(0)

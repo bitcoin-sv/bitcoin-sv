@@ -12,6 +12,7 @@
 #include <boost/test/unit_test.hpp>
 #include <limits>
 #include <string>
+#include <config.h>
 
 extern UniValue CallRPC(std::string strMethod);
 
@@ -49,8 +50,9 @@ BOOST_AUTO_TEST_CASE(excessiveblock_rpc) {
                          std::to_string(DEFAULT_PREFERRED_BLOCKFILE_SIZE * 100)));
 
     // Default can be higher than 1MB in future - test it too
+    auto nDefaultMaxBlockSize = GlobalConfig::GetConfig().GetMaxBlockSize();
     BOOST_CHECK_NO_THROW(CallRPC(std::string("setexcessiveblock ") +
-                                 std::to_string(DEFAULT_MAX_BLOCK_SIZE)));
+                                 std::to_string(nDefaultMaxBlockSize)));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

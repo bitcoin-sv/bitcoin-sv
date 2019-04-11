@@ -712,6 +712,11 @@ void CheckBlockMaxSize(uint64_t size, uint64_t expected)
 BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
 {
     GlobalConfig& config = GlobalConfig::GetConfig();
+
+    // Make sure that default values are not overriden
+    BOOST_REQUIRE(!config.MaxGeneratedBlockSizeOverridden());
+    BOOST_REQUIRE(!config.MaxBlockSizeOverridden());
+
     uint64_t nDefaultMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
     uint64_t nDefaultMaxBlockSize = config.GetMaxBlockSize();
 

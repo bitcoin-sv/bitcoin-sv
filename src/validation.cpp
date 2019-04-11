@@ -2529,8 +2529,11 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         for (const auto &tx : boost::adaptors::reverse(block.vtx)) {
             disconnectpool->addTransaction(tx);
         }
-        while (disconnectpool->DynamicMemoryUsage() >
-               MAX_DISCONNECTED_TX_POOL_SIZE) {
+
+        //  The amount of tranasctions we are willing to store during reorg is calculated based
+        //  of default block size for the network (not our configuration that might be lower)
+        uint64_t maxDisconnectedTxPoolSize = MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR * config.GetChainParams().GetDefaultBlockSizeParams().maxBlockSizeAfter;
+        while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
             // Drop the earliest entry, and remove its children from the
             // mempool.
             auto it = disconnectpool->queuedTx.get<insertion_order>().begin();
