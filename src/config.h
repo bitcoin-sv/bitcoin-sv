@@ -58,6 +58,7 @@ class GlobalConfig final : public Config {
 public:
     GlobalConfig() = default;
 
+    // Set block size related default. This must be called after constructing GlobalConfig
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override;
 
     bool SetMaxBlockSize(uint64_t maxBlockSize) override;
@@ -100,14 +101,17 @@ private:
     uint64_t preferredBlockFileSize{ DEFAULT_PREFERRED_BLOCKFILE_SIZE };
 
     // Block size limits 
-    // Init to hard limits and set later with chainparams data
+    // SetDefaultBlockSizeParams must be called before reading any of those
+    bool  setDefaultBlockSizeParamsCalled{ false };
+    void  CheckSetDefaultCalled() const;
+
     int64_t blockSizeActivationTime { 0 };
-    uint64_t maxBlockSizeBefore { DEFAULT_MAX_BLOCK_SIZE };
-    uint64_t maxBlockSizeAfter { DEFAULT_MAX_BLOCK_SIZE };
+    uint64_t maxBlockSizeBefore { 0 };
+    uint64_t maxBlockSizeAfter { 0 };
     bool maxBlockSizeOverridden { false };
-    uint64_t maxGeneratedBlockSizeBefore { DEFAULT_MAX_GENERATED_BLOCK_SIZE };
-    uint64_t maxGeneratedBlockSizeAfter { DEFAULT_MAX_GENERATED_BLOCK_SIZE };
-    bool maxGeneratedBlockSizeOverridden { false };        
+    uint64_t maxGeneratedBlockSizeBefore { 0 };
+    uint64_t maxGeneratedBlockSizeAfter { 0 };
+    bool maxGeneratedBlockSizeOverridden { false };
 };
 
 // Dummy for subclassing in unittests

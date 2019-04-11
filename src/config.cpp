@@ -23,6 +23,18 @@ void GlobalConfig::SetDefaultBlockSizeParams(const DefaultBlockSizeParams &param
     maxGeneratedBlockSizeBefore = params.maxGeneratedBlockSizeBefore;
     maxGeneratedBlockSizeAfter = params.maxGeneratedBlockSizeAfter;
     maxGeneratedBlockSizeOverridden = false;
+    setDefaultBlockSizeParamsCalled = true;
+}
+
+void GlobalConfig::CheckSetDefaultCalled() const
+{
+    if (!setDefaultBlockSizeParamsCalled)
+    {
+        // If you hit this we created new instance of GlobalConfig without 
+        // setting defaults
+        throw std::runtime_error(
+            "GlobalConfig::SetDefaultBlockSizeParams must be called before accessing block size related parameters");
+    }
 }
 
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize) {
@@ -39,10 +51,12 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize) {
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
+    CheckSetDefaultCalled();
     return maxBlockSizeAfter;
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize(int64_t nMedianTimePast) const {
+    CheckSetDefaultCalled();
     uint64_t maxSize;
     if (!maxBlockSizeOverridden) {
         maxSize = nMedianTimePast >= blockSizeActivationTime ? maxBlockSizeAfter : maxBlockSizeBefore;
@@ -54,7 +68,7 @@ uint64_t GlobalConfig::GetMaxBlockSize(int64_t nMedianTimePast) const {
     return maxSize;
 }
 
-bool GlobalConfig::MaxBlockSizeOverridden() const {
+bool GlobalConfig::MaxBlockSizeOverridden() const {    
     return maxBlockSizeOverridden;
 }
 
@@ -76,10 +90,12 @@ bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize) {
 }
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize() const {
+    CheckSetDefaultCalled();
     return maxGeneratedBlockSizeAfter;
 };
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
+    CheckSetDefaultCalled();
     uint64_t maxSize;
     if (!maxGeneratedBlockSizeOverridden) {
         maxSize = nMedianTimePast >= blockSizeActivationTime ? maxGeneratedBlockSizeAfter : maxGeneratedBlockSizeBefore;
@@ -99,6 +115,7 @@ bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime) {
 };
 
 int64_t GlobalConfig::GetBlockSizeActivationTime() const {
+    CheckSetDefaultCalled();
     return blockSizeActivationTime;
 };
 
