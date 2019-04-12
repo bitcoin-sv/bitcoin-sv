@@ -70,7 +70,9 @@ TEST_PARAMS = {
     #    testName --param1 --param2
     #    testname --param3
     "txn_doublespend.py": [["--mineblock"]],
-    "txn_clone.py": [["--mineblock"]]
+    "txn_clone.py": [["--mineblock"]],
+    # Test with blocks larger than preferredBlockfileSize.
+    "bsv-128Mb-blocks.py": [["--excessiveblocksize=130000000"]]
 }
 
 # Used to limit the number of tests, when list of tests is not provided on command line
