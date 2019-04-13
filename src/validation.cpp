@@ -3735,7 +3735,8 @@ static bool AcceptBlock(const Config &config,
         if (dbp != nullptr) {
             blockPos = *dbp;
         }
-        if (!pBlockFileInfoStore->FindBlockPos(state, blockPos, nBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE, nHeight,
+        if (!pBlockFileInfoStore->FindBlockPos(config, state, blockPos,
+                          nBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE, nHeight,
                           block.GetBlockTime(), fCheckForPruning, dbp != nullptr)) {
             return error("AcceptBlock(): FindBlockPos failed");
         }
@@ -4480,12 +4481,14 @@ bool InitBlockIndex(const Config &config) {
             const CChainParams &chainparams = config.GetChainParams();
             CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
             // Start new block file
-            unsigned int nBlockSize =
-                ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
+            unsigned int nBlockSizeWithHeader =
+                ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION)
+                + BLOCKFILE_BLOCK_HEADER_SIZE;
             CDiskBlockPos blockPos;
             CValidationState state;
-            if (!pBlockFileInfoStore->FindBlockPos(state, blockPos, nBlockSize + 8, 0,
-                              block.GetBlockTime(), fCheckForPruning)) {
+            if (!pBlockFileInfoStore->FindBlockPos(config, state, blockPos,
+                               nBlockSizeWithHeader, 0, block.GetBlockTime(),
+                               fCheckForPruning)) {
                 return error("LoadBlockIndex(): FindBlockPos failed");
             }
             if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic())) {

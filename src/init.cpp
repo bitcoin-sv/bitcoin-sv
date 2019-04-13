@@ -1496,15 +1496,19 @@ bool AppInitParameterInteraction(Config &config) {
     else if (nScriptCheckThreads > MAX_SCRIPTCHECK_THREADS)
         nScriptCheckThreads = MAX_SCRIPTCHECK_THREADS;
 
+    // Configure preferred size of blockfile.
+    config.SetPreferredBlockFileSize(
+        gArgs.GetArg("-preferredblockfilesize",
+            DEFAULT_PREFERRED_BLOCKFILE_SIZE));
+
     // Configure excessive block size.
     if(gArgs.IsArgSet("-excessiveblocksize")) {
         const uint64_t nProposedExcessiveBlockSize =
             gArgs.GetArg("-excessiveblocksize", DEFAULT_MAX_BLOCK_SIZE);
         if (!config.SetMaxBlockSize(nProposedExcessiveBlockSize)) {
-            return InitError(strprintf(_(
-                "Excessive block size must be > %d and less than the "
-                "max block file size (%d)"),
-                LEGACY_MAX_BLOCK_SIZE, MAX_BLOCKFILE_SIZE - BLOCKFILE_BLOCK_HEADER_SIZE
+            return InitError(strprintf(
+                _("Excessive block size must be > %d"),
+                LEGACY_MAX_BLOCK_SIZE
             ));
         }
     }

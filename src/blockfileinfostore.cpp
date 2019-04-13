@@ -3,12 +3,33 @@
 // Copyright (c) 2019 The Bitcoin SV developers.
 
 #include "blockfileinfostore.h"
+#include "config.h"
 #include "util.h"
 #include "txdb.h"  // CBlockTreeDB
 #include "consensus/validation.h" // CValidationState
 
 /** Access to info about block files */
 std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore = std::make_unique<CBlockFileInfoStore>();
+
+void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,
+    unsigned int nAddSize, unsigned int& nFile)
+{
+    // this while instead of if is here because first commit introduced it
+    // and vinfoBlockFile.size() can exceed nLastBlockFile at least in
+    // LoadBlockIndexDB function where block file info is being loaded
+    // and we can't be certain that it's the only case without more tests
+    // and extensive refactoring
+    while (vinfoBlockFile[nFile].nSize &&
+           // >= is here for legacy purposes - could possibly be changed to > as
+           // currently max file size is one byte less than preferred block file size
+           // but larger code analisys would be required
+           vinfoBlockFile[nFile].nSize + nAddSize >= config.GetPreferredBlockFileSize()) {
+        nFile++;
+        if (vinfoBlockFile.size() <= nFile) {
+            vinfoBlockFile.resize(nFile + 1);
+        }
+    }
+}
 
 void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
     LOCK(cs_LastBlockFile);
@@ -48,8 +69,8 @@ std::vector<std::pair<int, const CBlockFileInfo *>> CBlockFileInfoStore::GetAndC
 }
 
 
-bool CBlockFileInfoStore::FindBlockPos(CValidationState &state, CDiskBlockPos &pos,
-    unsigned int nAddSize, unsigned int nHeight,
+bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &state,
+    CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight,
     uint64_t nTime, bool& fCheckForPruning, bool fKnown) {
     LOCK(cs_LastBlockFile);
 
@@ -59,12 +80,7 @@ bool CBlockFileInfoStore::FindBlockPos(CValidationState &state, CDiskBlockPos &p
     }
 
     if (!fKnown) {
-        while (vinfoBlockFile[nFile].nSize + nAddSize >= MAX_BLOCKFILE_SIZE) {
-            nFile++;
-            if (vinfoBlockFile.size() <= nFile) {
-                vinfoBlockFile.resize(nFile + 1);
-            }
-        }
+        FindNextFileWithEnoughEmptySpace(config, nAddSize, nFile);
         pos.nFile = nFile;
         pos.nPos = vinfoBlockFile[nFile].nSize;
     }

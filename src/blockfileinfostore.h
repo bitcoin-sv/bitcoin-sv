@@ -14,18 +14,20 @@
 /** Stores a collection of CBlockFileInfo-s in memory */
 class CBlockFileInfoStore
 {
-
     CCriticalSection cs_LastBlockFile;
     std::vector<CBlockFileInfo> vinfoBlockFile;
     int nLastBlockFile = 0;
 
     /** Dirty block file entries. */
     std::set<int> setDirtyFileInfo;
+
+    void FindNextFileWithEnoughEmptySpace(const Config &config,
+        unsigned int nAddSize, unsigned int& nFile);
 public:
     uint64_t CalculateCurrentUsage();
 
-    bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos,
-        unsigned int nAddSize, unsigned int nHeight,
+    bool FindBlockPos(const Config &config, CValidationState &state,
+        CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight,
         uint64_t nTime, bool& fCheckForPruning, bool fKnown = false);
 
     void FindFilesToPrune(std::set<int> &setFilesToPrune,
