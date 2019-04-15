@@ -22,6 +22,8 @@
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
+#include "vmtouch.h"
+
 #endif
 
 #include <univalue.h>
@@ -588,6 +590,21 @@ static UniValue RPCLockedMemoryInfo() {
     return obj;
 }
 
+static UniValue TouchedPagesInfo() {
+    UniValue obj(UniValue::VOBJ);
+    VMTouch vm;
+    double percents = 0.0;
+    try {
+        auto path = GetDataDir() / "chainstate";
+        std::string result = boost::filesystem::canonical(path).string();
+        percents = vm.vmtouch_check(result);
+    }   catch(const std::runtime_error& ex) {
+        LogPrintf("Error while preloading chain state: %s\n", ex.what());
+    }
+    obj.push_back(Pair("chainStateCached", percents));
+    return obj;
+}
+
 static UniValue getmemoryinfo(const Config &config,
                               const JSONRPCRequest &request) {
     /* Please, avoid using the word "pool" here in the RPC interface or help,
@@ -621,6 +638,7 @@ static UniValue getmemoryinfo(const Config &config,
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("locked", RPCLockedMemoryInfo()));
+    obj.push_back(Pair("preloading", TouchedPagesInfo()));
     return obj;
 }
 
