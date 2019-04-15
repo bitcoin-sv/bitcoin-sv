@@ -1171,10 +1171,31 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     }
 }
 
+static bool isMaxDownloadExceeded(const Config &config, CSerializedNetMsg &msg, bool isMostRecentBlock) {
+
+    uint64_t maxSendQueuesBytes = config.GetMaxSendQueuesBytes();
+    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.data.size() + CMessageHeader::HEADER_SIZE;
+    if (totalSize > maxSendQueuesBytes) {
+        if (!isMostRecentBlock) {
+            LogPrint(BCLog::NET, "Size of all msgs currently sending across "
+                "all the queues is too large: %s. Maximum size: %s. Request ignored, block will not be sent. \n", 
+                totalSize, maxSendQueuesBytes);
+            return true;
+        } else {
+            LogPrint(BCLog::NET, "Size of all msgs currently sending across "
+                "all the queues is too large: %s. Maximum size: %s. Sending last block anyway. \n",
+                totalSize, maxSendQueuesBytes);
+        }
+    }
+
+    return false;
+}
+
 static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                            const Consensus::Params &consensusParams,
                            CConnman &connman,
                            const std::atomic<bool> &interruptMsgProc) {
+
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
     std::vector<CInv> vNotFound;
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
@@ -1262,6 +1283,8 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     pfrom->fDisconnect = true;
                     send = false;
                 }
+
+                bool isMostRecentBlock = chainActive.Tip() == mi->second;
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
                 if (send && (mi->second->nStatus.hasData())) {
@@ -1272,8 +1295,11 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     }
 
                     if (inv.type == MSG_BLOCK) {
-                        connman.PushMessage(
-                            pfrom, msgMaker.Make(NetMsgType::BLOCK, block));
+                        CSerializedNetMsg blockMsg = msgMaker.Make(NetMsgType::BLOCK, block);
+                        if (isMaxDownloadExceeded(config, blockMsg, isMostRecentBlock)) {
+                            break;
+                        }
+                        connman.PushMessage(pfrom, std::move(blockMsg));
                     } else if (inv.type == MSG_FILTERED_BLOCK) {
                         bool sendMerkleBlock = false;
                         CMerkleBlock merkleBlock;
@@ -1286,10 +1312,11 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             }
                         }
                         if (sendMerkleBlock) {
-                            connman.PushMessage(
-                                pfrom,
-                                msgMaker.Make(NetMsgType::MERKLEBLOCK,
-                                              merkleBlock));
+                            CSerializedNetMsg merkleBlockMsg = msgMaker.Make(NetMsgType::MERKLEBLOCK, merkleBlock);
+                            if (isMaxDownloadExceeded(config, merkleBlockMsg, isMostRecentBlock)) {
+                                break;
+                            }
+                            connman.PushMessage(pfrom, std::move(merkleBlockMsg));
                             // CMerkleBlock just contains hashes, so also push
                             // any transactions in the block the client did not
                             // see. This avoids hurting performance by
@@ -1322,16 +1349,18 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             mi->second->nHeight >=
                                 chainActive.Height() - MAX_CMPCTBLOCK_DEPTH) {
                             CBlockHeaderAndShortTxIDs cmpctblock(block);
-                            connman.PushMessage(
-                                pfrom,
-                                msgMaker.Make(nSendFlags,
-                                              NetMsgType::CMPCTBLOCK,
-                                              cmpctblock));
+
+                            CSerializedNetMsg compactBlockMsg = msgMaker.Make(nSendFlags, NetMsgType::CMPCTBLOCK, cmpctblock);
+                            if (isMaxDownloadExceeded(config, compactBlockMsg, isMostRecentBlock)) {
+                                break;
+                            }
+                            connman.PushMessage(pfrom, std::move(compactBlockMsg));
                         } else {
-                            connman.PushMessage(pfrom,
-                                                msgMaker.Make(nSendFlags,
-                                                              NetMsgType::BLOCK,
-                                                              block));
+                            CSerializedNetMsg blockMsg = msgMaker.Make(NetMsgType::BLOCK, block);
+                            if (isMaxDownloadExceeded(config, blockMsg, isMostRecentBlock)) {
+                                break;
+                            }
+                            connman.PushMessage(pfrom, std::move(blockMsg));
                         }
                     }
 

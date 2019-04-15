@@ -69,6 +69,11 @@ public:
 
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual bool GetTestBlockCandidateValidity() const = 0;
+
+    virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
+    virtual uint64_t GetFactorMaxSendQueuesBytes() const = 0;
+    virtual uint64_t GetMaxSendQueuesBytes() const = 0; // calculated based on factorMaxSendQueuesBytes
+
 };
 
 class GlobalConfig final : public Config {
@@ -122,7 +127,11 @@ public:
     void SetTestBlockCandidateValidity(bool test) override;
     bool GetTestBlockCandidateValidity() const override;
 
-    // Reset state of this object to match a newly constructed one.
+    void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) override;
+    uint64_t GetFactorMaxSendQueuesBytes() const override;
+    uint64_t GetMaxSendQueuesBytes() const override;
+
+    // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
     static GlobalConfig& GetConfig();
@@ -133,6 +142,7 @@ private:
     CFeeRate feePerKB;
     uint64_t blockPriorityPercentage;
     uint64_t preferredBlockFileSize;
+    uint64_t factorMaxSendQueuesBytes;
 
     // Block size limits 
     // SetDefaultBlockSizeParams must be called before reading any of those
@@ -211,6 +221,10 @@ public:
 
     void SetTestBlockCandidateValidity(bool skip) override {}
     bool GetTestBlockCandidateValidity() const override { return false; }
+
+    void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) override {}
+    uint64_t GetFactorMaxSendQueuesBytes() const override { return 0;}
+    uint64_t GetMaxSendQueuesBytes() const override { return 0; }
 
 private:
     std::unique_ptr<CChainParams> chainParams;
