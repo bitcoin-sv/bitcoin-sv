@@ -1654,7 +1654,7 @@ bool AbortNode(const std::string &strMessage,
     LogPrintf("*** %s\n", strMessage);
     uiInterface.ThreadSafeMessageBox(
         userMessage.empty() ? _("Error: A fatal internal error occurred, see "
-                                "debug.log for details")
+                                "bitcoind.log for details")
                             : userMessage,
         "", CClientUIInterface::MSG_ERROR);
     StartShutdown();

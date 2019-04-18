@@ -50,7 +50,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
     InitSignatureCache();
     InitScriptExecutionCache();
 
-    // Don't want to write to debug.log file.
+    // Don't want to write to bitcoind.log file.
     GetLogger().fPrintToDebugLog = false;
 
     fCheckBlockIndex = true;
