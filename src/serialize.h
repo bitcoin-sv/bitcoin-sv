@@ -365,7 +365,13 @@ void WriteVarInt(Stream &os, I n) {
 template <typename Stream, typename I,class = typename std::enable_if<std::is_integral<I>::value>::type>
 I ReadVarInt(Stream &is) {
     uintmax_t n {0};
-    static uintmax_t overflow { std::numeric_limits<I>::max() >> 7 };
+    // VarInt encoding is only defined for unsigned integers. However there are places in source code
+    // where ReadVarInt is called with a signed integer type (such as when serializing CDiskBlockPos)
+    // Those places need to make sure that the actual values are always non-negative. 
+    // Static cast in the following line if required to make MSVC compiler happy.
+    // It is safe, because the value that is being casted is always positive and will always
+    // fit in the unsigned version of type. 
+    static uintmax_t overflow { static_cast<uintmax_t>(std::numeric_limits<I>::max() >> 7) };
 
     unsigned int maxSize = (sizeof(n) * 8 + 6) / 7;
     for (unsigned int i = 0; i<maxSize; ++i){
