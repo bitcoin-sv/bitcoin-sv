@@ -75,12 +75,50 @@ static UniValue setexcessiveblock(Config &config,
     return UniValue(ret.str());
 }
 
+static UniValue setblockmaxsize(Config &config,
+                                const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 1) {
+        throw std::runtime_error(
+            "setblockmaxsize blockSize\n"
+            "\nSets maximum size of produced block."
+            "\nResult\n"
+            "  blockSize (integer) block size in bytes\n"
+            "\nExamples:\n" +
+            HelpExampleCli("setblockmaxsize", "") +
+            HelpExampleRpc("setblockmaxsize", ""));
+    }
+
+    uint64_t mbs = 0;
+    if (request.params[0].isNum()) {
+        mbs = request.params[0].get_int64();
+    } else {
+        std::string temp = request.params[0].get_str();
+        if (temp[0] == '-') boost::throw_exception(boost::bad_lexical_cast());
+        mbs = boost::lexical_cast<uint64_t>(temp);
+    }
+
+    if (mbs > config.GetMaxBlockSize())
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER,
+            std::string(
+                "Invalid parameter, block size must be smaller or equal to excessive block size"));
+    // Set the new max block size.
+    if (!config.SetMaxGeneratedBlockSize(mbs)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Unexpected error");
+    }
+    
+    std::ostringstream ret;
+    ret << "Maximal generated block size set to " << mbs << " bytes.";
+    return UniValue(ret.str());
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
     //  ------------------- ------------------------  ----------------------  ----------
     { "network",            "getexcessiveblock",      getexcessiveblock,      true, {}},
     { "network",            "setexcessiveblock",      setexcessiveblock,      true, {"maxBlockSize"}},
+    { "network",            "setblockmaxsize",        setblockmaxsize,        true, {"maxBlockSize"}},
 };
 // clang-format on
 
