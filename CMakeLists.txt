@@ -5,6 +5,37 @@
 cmake_minimum_required(VERSION 3.5)
 project(BitcoinSV)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
+   CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+
+    # for more accurate stack trace
+    set(sanitizer_common_flags "-fno-omit-frame-pointer")
+
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # gdb requires file/line print flag to be set explicitly
+        set(sanitizer_common_flags "-ggdb ${sanitizer_common_flags}")
+    endif()
+
+    ###
+    # sanitizer: address
+    ###
+    # NOTE: with gcc in case you get error:
+    #   LeakSanitizer does not work under ptrace
+    # disable leak sanitizer part of asan to overcome this:
+    #   ASAN_OPTIONS=detect_leaks=0 <executable_name>
+    option(enable_asan "Use clang/gcc address sanitizer" OFF)
+    if(enable_asan)
+        if(CRYPTO_USE_ASM)
+            message(FATAL_ERROR "enable_asan can not be used with"
+                " CRYPTO_USE_ASM enabled!")
+        endif()
+        set(CMAKE_CXX_FLAGS
+            "${CMAKE_CXX_FLAGS} ${sanitizer_common_flags} -fsanitize=address")
+        set(CMAKE_LINKER_FLAGS
+            "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=address")
+    endif()
+endif()
+
 # Add path for custom modules.
 set(CMAKE_MODULE_PATH
 	${CMAKE_MODULE_PATH}
