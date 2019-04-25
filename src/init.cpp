@@ -1393,9 +1393,8 @@ bool AppInitParameterInteraction(Config &config) {
     // stop program execution and warn the user with a proper error message
     const int64_t blkprio = gArgs.GetArg("-blockprioritypercentage",
                                          DEFAULT_BLOCK_PRIORITY_PERCENTAGE);
-    if (!config.SetBlockPriorityPercentage(blkprio)) {
-        return InitError(_("Block priority percentage has to belong to the "
-                           "[0..100] interval."));
+    if (std::string err; !config.SetBlockPriorityPercentage(blkprio, &err)) {
+        return InitError(err);
     }
 
     // Make sure enough file descriptors are available
@@ -1552,11 +1551,8 @@ bool AppInitParameterInteraction(Config &config) {
     if(gArgs.IsArgSet("-excessiveblocksize")) {
         const uint64_t nProposedExcessiveBlockSize =
             gArgs.GetArg("-excessiveblocksize", 0 /*not used*/ );
-        if (!config.SetMaxBlockSize(nProposedExcessiveBlockSize)) {
-            return InitError(strprintf(
-                _("Excessive block size must be > %d"),
-                LEGACY_MAX_BLOCK_SIZE
-            ));
+        if (std::string err; !config.SetMaxBlockSize(nProposedExcessiveBlockSize, &err)) {
+            return InitError(err);
         }
     }
 
@@ -1569,8 +1565,8 @@ bool AppInitParameterInteraction(Config &config) {
     if(gArgs.IsArgSet("-blockmaxsize")) {
         const uint64_t nProposedMaxGeneratedBlockSize =
             gArgs.GetArg("-blockmaxsize", 0 /* not used*/);
-        if (!config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize)) {
-            return InitError(_("Unknown error"));
+        if (std::string err; !config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize, &err)) {
+            return InitError(err);
         }
     }
 
@@ -1578,7 +1574,9 @@ bool AppInitParameterInteraction(Config &config) {
     if(gArgs.IsArgSet("-blocksizeactivationtime")) {
         const int64_t nProposedActivationTime =
             gArgs.GetArg("-blocksizeactivationtime", 0);
-        config.SetBlockSizeActivationTime(nProposedActivationTime);
+        if (std::string err; !config.SetBlockSizeActivationTime(nProposedActivationTime)){
+            return InitError(err);
+        }
     }
 
     // Configure whether to run extra block candidate validity checks

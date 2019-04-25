@@ -56,17 +56,10 @@ static UniValue setexcessiveblock(Config &config,
         ebs = boost::lexical_cast<uint64_t>(temp);
     }
 
-    // Do not allow maxBlockSize to be set below historic 1MB limit
-    if (ebs <= LEGACY_MAX_BLOCK_SIZE)
-        throw JSONRPCError(
-            RPC_INVALID_PARAMETER,
-            std::string(
-                "Invalid parameter, excessiveblock must be larger than ") +
-                std::to_string(LEGACY_MAX_BLOCK_SIZE));
-
     // Set the new max block size.
-    if (!config.SetMaxBlockSize(ebs)) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Unexpected error");
+    std::string err("Unexpected error");
+    if ( !config.SetMaxBlockSize(ebs, &err)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, err);
     }
 
     // settingsToUserAgentString();
@@ -97,14 +90,10 @@ static UniValue setblockmaxsize(Config &config,
         mbs = boost::lexical_cast<uint64_t>(temp);
     }
 
-    if (mbs > config.GetMaxBlockSize())
-        throw JSONRPCError(
-            RPC_INVALID_PARAMETER,
-            std::string(
-                "Invalid parameter, block size must be smaller or equal to excessive block size"));
     // Set the new max block size.
-    if (!config.SetMaxGeneratedBlockSize(mbs)) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Unexpected error");
+    std::string err("Unexpected error");
+    if (!config.SetMaxGeneratedBlockSize(mbs, &err)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, err);
     }
     
     std::ostringstream ret;

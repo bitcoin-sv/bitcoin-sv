@@ -26,20 +26,20 @@ public:
     // used to specify default block size related parameters
     virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) = 0;
     
-    virtual bool SetMaxBlockSize(uint64_t maxBlockSize) = 0;
+    virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
     virtual uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const = 0;
     virtual bool MaxBlockSizeOverridden() const = 0;
     
-    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) = 0;
+    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
     virtual uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const = 0;
     virtual bool MaxGeneratedBlockSizeOverridden() const = 0;
 
-    virtual bool SetBlockSizeActivationTime(int64_t activationTime) = 0;
+    virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
 
-    virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) = 0;
+    virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) = 0;
     virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
 
@@ -83,20 +83,20 @@ public:
     // Set block size related default. This must be called after constructing GlobalConfig
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override;
 
-    bool SetMaxBlockSize(uint64_t maxBlockSize) override;
+    bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override;
     uint64_t GetMaxBlockSize() const override;
     uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override;
     bool MaxBlockSizeOverridden() const override;
 
-    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) override;
+    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override;
     uint64_t GetMaxGeneratedBlockSize() const override;
     uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override;
     bool MaxGeneratedBlockSizeOverridden() const override;
 
-    bool SetBlockSizeActivationTime(int64_t activationTime) override;
+    bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override;
     int64_t GetBlockSizeActivationTime() const override;
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override;
+    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override;
     uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
 
@@ -174,20 +174,30 @@ public:
 
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override {  }
 
-    bool SetMaxBlockSize(uint64_t maxBlockSize) override { return false; }
+    bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override {
+        if (err) *err = "This is dummy config"; 
+        return false; 
+    }
     uint64_t GetMaxBlockSize() const override { return 0; }
     uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override { return 0; }
     bool MaxBlockSizeOverridden() const override { return false; }
 
-    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) override { return false; };
+    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override {
+        if (err) *err = "This is dummy config";  
+        return false; 
+    }
     uint64_t GetMaxGeneratedBlockSize() const override { return 0; };
     uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override { return 0; }
     bool MaxGeneratedBlockSizeOverridden() const override { return false; }
 
-    bool SetBlockSizeActivationTime(int64_t activationTime) override { return false; }
+    bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override {
+        if (err) *err = "This is dummy config";  
+        return false; 
+    }
     int64_t GetBlockSizeActivationTime() const override { return 0; }
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override {
+    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override {
+        if (err) *err = "This is dummy config";
         return false;
     }
     uint8_t GetBlockPriorityPercentage() const override { return 0; }
