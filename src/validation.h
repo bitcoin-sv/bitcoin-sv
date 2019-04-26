@@ -282,14 +282,20 @@ private:
     bool checkPoW : 1;
     bool checkMerkleRoot : 1;
 
+    // If true; force block to be flagged as checked
+    bool markChecked : 1;
+
 public:
-    // Do full validation by default
-    BlockValidationOptions() : checkPoW(true), checkMerkleRoot(true) {}
-    BlockValidationOptions(bool checkPoWIn, bool checkMerkleRootIn)
-        : checkPoW(checkPoWIn), checkMerkleRoot(checkMerkleRootIn) {}
+    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}
+    {}
+
+    BlockValidationOptions(bool checkPoWIn, bool checkMerkleRootIn, bool markCheckedIn = false)
+        : checkPoW{checkPoWIn}, checkMerkleRoot{checkMerkleRootIn}, markChecked{markCheckedIn}
+    {}
 
     bool shouldValidatePoW() const { return checkPoW; }
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
+    bool shouldMarkChecked() const { return markChecked; }
 };
 
 /**

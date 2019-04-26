@@ -206,7 +206,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
     pblock->nNonce = 0;
 
     CValidationState state;
-    BlockValidationOptions validationOptions = BlockValidationOptions(false, false);
+    BlockValidationOptions validationOptions { false, false, true };
     if (!TestBlockValidity(*config, state, *pblock, pindexPrev, validationOptions))
     {
         throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s",

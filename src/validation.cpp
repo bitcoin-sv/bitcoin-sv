@@ -3350,8 +3350,9 @@ bool CheckBlock(const Config &config, const CBlock &block,
         }
     }
 
-    if (validationOptions.shouldValidatePoW() &&
-        validationOptions.shouldValidateMerkleRoot()) {
+    if ((validationOptions.shouldValidatePoW() && validationOptions.shouldValidateMerkleRoot()) ||
+         validationOptions.shouldMarkChecked())
+    {
         block.fChecked = true;
     }
 

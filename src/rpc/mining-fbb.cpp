@@ -388,6 +388,9 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     // Submit solution
     UniValue submitted {};
     {
+        // Ensure we run full checks on submitted block
+        block->fChecked = false;
+
         LOCK(cs_main);
         submitted = SubmitBlock(config, block); // returns string on failure
     }
