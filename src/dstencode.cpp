@@ -10,12 +10,12 @@
 std::string EncodeDestination(const CTxDestination &dest,
                               const Config &config) {
     const CChainParams &params = config.GetChainParams();
-    return EncodeLegacyAddr(dest, params);
+    return EncodeBase58Addr(dest, params);
 }
 
 CTxDestination DecodeDestination(const std::string &addr,
                                  const CChainParams &params) {
-    return DecodeLegacyAddr(addr, params);
+    return DecodeBase58Addr(addr, params);
 }
 
 bool IsValidDestinationString(const std::string &addr,

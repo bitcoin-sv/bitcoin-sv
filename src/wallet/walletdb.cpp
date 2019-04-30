@@ -33,7 +33,7 @@ bool CWalletDB::WriteName(const CTxDestination &address,
         return false;
     }
     return WriteIC(std::make_pair(std::string("name"),
-                                  EncodeLegacyAddr(address, Params())),
+                                  EncodeBase58Addr(address, Params())),
                    strName);
 }
 
@@ -45,7 +45,7 @@ bool CWalletDB::EraseName(const CTxDestination &address) {
         return false;
     }
     return EraseIC(std::make_pair(std::string("name"),
-                                  EncodeLegacyAddr(address, Params())));
+                                  EncodeBase58Addr(address, Params())));
 }
 
 bool CWalletDB::WritePurpose(const CTxDestination &address,
@@ -54,7 +54,7 @@ bool CWalletDB::WritePurpose(const CTxDestination &address,
         return false;
     }
     return WriteIC(std::make_pair(std::string("purpose"),
-                                  EncodeLegacyAddr(address, Params())),
+                                  EncodeBase58Addr(address, Params())),
                    strPurpose);
 }
 
@@ -63,7 +63,7 @@ bool CWalletDB::ErasePurpose(const CTxDestination &address) {
         return false;
     }
     return EraseIC(std::make_pair(std::string("purpose"),
-                                  EncodeLegacyAddr(address, Params())));
+                                  EncodeBase58Addr(address, Params())));
 }
 
 bool CWalletDB::WriteTx(const CWalletTx &wtx) {
@@ -857,7 +857,7 @@ bool CWalletDB::WriteDestData(const CTxDestination &address,
     return WriteIC(
         std::make_pair(
             std::string("destdata"),
-            std::make_pair(EncodeLegacyAddr(address, Params()), key)),
+            std::make_pair(EncodeBase58Addr(address, Params()), key)),
         value);
 }
 
@@ -868,7 +868,7 @@ bool CWalletDB::EraseDestData(const CTxDestination &address,
     }
     return EraseIC(std::make_pair(
         std::string("destdata"),
-        std::make_pair(EncodeLegacyAddr(address, Params()), key)));
+        std::make_pair(EncodeBase58Addr(address, Params()), key)));
 }
 
 bool CWalletDB::WriteHDChain(const CHDChain &chain) {
