@@ -457,10 +457,6 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-txindex", strprintf(_("Maintain a full transaction index, used by "
                                 "the getrawtransaction rpc call (default: %d)"),
                               DEFAULT_TXINDEX));
-    strUsage += HelpMessageOpt(
-        "-usecashaddr", _("Use Cash Address for destination encoding instead "
-                          "of base58 (activate by default on Jan, 14)"));
-
     strUsage += HelpMessageGroup(_("Connection options:"));
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
@@ -2349,11 +2345,6 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // Allowed to fail as this file IS missing on first startup.
     if (!est_filein.IsNull()) mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
-
-    // Encoded addresses using cashaddr instead of base58
-    // Activates by default on Jan, 14
-    config.SetCashAddrEncoding(
-        gArgs.GetBoolArg("-usecashaddr", GetAdjustedTime() > 1515900000));
 
 // Step 8: load wallet
 #ifdef ENABLE_WALLET

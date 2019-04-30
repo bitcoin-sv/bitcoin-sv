@@ -3,7 +3,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 #include "dstencode.h"
 #include "base58.h"
-#include "cashaddrenc.h"
 #include "chainparams.h"
 #include "config.h"
 #include "script/standard.h"
@@ -11,16 +10,11 @@
 std::string EncodeDestination(const CTxDestination &dest,
                               const Config &config) {
     const CChainParams &params = config.GetChainParams();
-    return config.UseCashAddrEncoding() ? EncodeCashAddr(dest, params)
-                                        : EncodeLegacyAddr(dest, params);
+    return EncodeLegacyAddr(dest, params);
 }
 
 CTxDestination DecodeDestination(const std::string &addr,
                                  const CChainParams &params) {
-    CTxDestination dst = DecodeCashAddr(addr, params);
-    if (IsValidDestination(dst)) {
-        return dst;
-    }
     return DecodeLegacyAddr(addr, params);
 }
 

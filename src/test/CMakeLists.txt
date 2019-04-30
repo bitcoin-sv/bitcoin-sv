@@ -62,8 +62,6 @@ add_test_to_suite(bitcoin test_bitcoin
 	blockstatus_tests.cpp
 	bloom_tests.cpp
 	bswap_tests.cpp
-	cashaddr_tests.cpp
-	cashaddrenc_tests.cpp
 	checkpoints_tests.cpp
 	coins_tests.cpp
 	compress_tests.cpp

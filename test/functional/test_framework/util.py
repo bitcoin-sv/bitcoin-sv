@@ -329,10 +329,8 @@ def initialize_datadir(dirname, n):
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
         f.write("listenonion=0\n")
-        f.write("usecashaddr=1\n")
         f.write("shrinkdebugfile=0\n")
     return datadir
-
 
 def get_datadir_path(dirname, n):
     return os.path.join(dirname, "node" + str(n))
