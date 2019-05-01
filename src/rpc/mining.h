@@ -8,7 +8,7 @@
 #include "script/script.h"
 
 #include <univalue.h>
-
+#include <functional>
 #include <memory>
 
 #include "consensus/params.h"
@@ -21,7 +21,9 @@ UniValue generateBlocks(const Config& config,
                         std::shared_ptr<CReserveScript> coinbaseScript,
                         int nGenerate, uint64_t nMaxTries, bool keepScript);
 
-UniValue SubmitBlock(const Config& config, const std::shared_ptr<CBlock>& block);
+UniValue processBlock(const Config& config,
+	const std::shared_ptr<CBlock>& block,
+	std::function<bool(const Config&, const std::shared_ptr<CBlock>&)> performBlockOperation);
 
 std::string gbt_vb_name(const Consensus::DeploymentPos pos);
 

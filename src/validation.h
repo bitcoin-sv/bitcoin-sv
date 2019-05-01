@@ -301,6 +301,20 @@ public:
 };
 
 /**
+ * Verify block without proof-of-work verification.
+ *
+ * If you want to *possibly* get feedback on whether pblock is valid, you must
+ * install a CValidationInterface (see validationinterface.h) - this will have
+ * its BlockChecked method called whenever *any* block completes validation.
+ *
+ * @param[in]   config  The global config.
+ * @param[in]   pblock  The block we want to verify.
+ * @return True if the block is valid.
+ */
+bool VerifyNewBlock(const Config &config,
+                     const std::shared_ptr<const CBlock> pblock);
+
+/**
  * Process an incoming block. This only returns after the best known valid
  * block is made active. Note that it does not, however, guarantee that the
  * specific block passed to it has been checked for validity!
