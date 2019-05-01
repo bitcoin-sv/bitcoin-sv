@@ -78,6 +78,7 @@ static int ComputeNextBlockAndDepth(const CBlockIndex* tip, const CBlockIndex* b
 
 UniValue blockheaderToJSON(const CBlockIndex* tip, const CBlockIndex* blockindex)
 {
+    // Serialize passed information without accessing chain state of the active chain!
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     const CBlockIndex* pnext;
@@ -108,6 +109,7 @@ UniValue blockheaderToJSON(const CBlockIndex* tip, const CBlockIndex* blockindex
 
 UniValue blockToJSON(const Config &config, const CBlock &block,
                      const CBlockIndex *tip, const CBlockIndex*blockindex, bool txDetails) {
+    // Serialize passed information without accessing chain state of the active chain!
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     const CBlockIndex* pnext;
@@ -812,8 +814,6 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
                                        "214adbda81d7e2a3dd146f6ed09\""));
     }
 
-    LOCK(cs_main);
-
     std::string strHash = request.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
@@ -821,25 +821,30 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     if (request.params.size() > 1) {
         fVerbose = request.params[1].get_bool();
     }
-
-    if (mapBlockIndex.count(hash) == 0) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-    }
-
     CBlock block;
-    CBlockIndex *pblockindex = mapBlockIndex[hash];
+    const CBlockIndex* pblockindex;
+    const CBlockIndex* tip;
+    {
+        LOCK(cs_main);
+        if (mapBlockIndex.count(hash) == 0) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+        }
 
-    if (fHavePruned && !pblockindex->nStatus.hasData() &&
-        pblockindex->nTx > 0) {
-        throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
-    }
+        pblockindex = mapBlockIndex[hash];
+        tip = chainActive.Tip();
 
-    if (!ReadBlockFromDisk(block, pblockindex, config)) {
-        // Block not found on disk. This could be because we have the block
-        // header in our index but don't have the block (for example if a
-        // non-whitelisted node sends us an unrequested long chain of valid
-        // blocks, we add the headers to our index, but don't accept the block).
-        throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
+        if (fHavePruned && !pblockindex->nStatus.hasData() &&
+            pblockindex->nTx > 0) {
+            throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
+        }
+
+        if (!ReadBlockFromDisk(block, pblockindex, config)) {
+            // Block not found on disk. This could be because we have the block
+            // header in our index but don't have the block (for example if a
+            // non-whitelisted node sends us an unrequested long chain of valid
+            // blocks, we add the headers to our index, but don't accept the block).
+            throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
+        }
     }
 
     if (!fVerbose) {
@@ -850,7 +855,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         return strHex;
     }
 
-    return blockToJSON(config, block, chainActive.Tip(), pblockindex);
+    return blockToJSON(config, block, tip, pblockindex);
 }
 
 struct CCoinsStats {
