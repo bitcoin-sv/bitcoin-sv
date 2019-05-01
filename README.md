@@ -11,8 +11,7 @@ Nakamoto’s white paper in 2008.  This Github repository provides open-source s
 License
 -------
 
-Bitcoin SV is released under the terms of the MIT license. See [COPYING](COPYING) for more information or see
-https://opensource.org/licenses/MIT.
+Bitcoin SV is released under the terms of the Open BSV license. See [LICENSE](LICENSE) for more information.
 
 Security
 --------

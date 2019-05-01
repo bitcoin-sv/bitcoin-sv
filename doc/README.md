@@ -54,6 +54,6 @@ testing.
 
 License
 ---------------------
-Distribution is done under the [MIT software license](/COPYING). This product includes software developed by the OpenSSL 
+Distribution is done under the [Open BSV License](/LICENSE). This product includes software developed by the OpenSSL 
 Project for use in the [OpenSSL Toolkit](https://www.openssl.org/), cryptographic software written by Eric Young 
 ([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), and UPnP software written by Thomas Bernard.

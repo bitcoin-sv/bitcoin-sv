@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019 The Bitcoin SV developers
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
@@ -950,9 +950,9 @@ std::string LicenseInfo() {
            "\n" + strprintf(_("The source code is available from %s."),
                             URL_SOURCE_CODE) +
            "\n" + "\n" + _("This is experimental software.") + "\n" +
-           strprintf(_("Distributed under the MIT software license, see the "
-                       "accompanying file %s or %s"),
-                     "COPYING", "<https://opensource.org/licenses/MIT>") +
+           strprintf(_("Distributed under the Open BSV software license, see the "
+                       "accompanying file %s"),
+                     "LICENSE") +
            "\n" + "\n" +
            strprintf(_("This product includes software developed by the "
                        "OpenSSL Project for use in the OpenSSL Toolkit %s and "
