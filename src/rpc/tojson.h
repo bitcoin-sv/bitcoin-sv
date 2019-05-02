@@ -8,6 +8,9 @@
 #include "uint256.h"
 
 #include <univalue.h>
+#include <sync.h>
+
+extern CCriticalSection cs_main;
 
 class CScript;
 
@@ -16,7 +19,7 @@ void ScriptPubKeyToJSON(const Config &config, const CScript &scriptPubKey,
 void TxToJSON(const Config &config, const CTransaction &tx,
               const uint256 hashBlock, UniValue &entry);
 UniValue blockToJSON(const Config &config, const CBlock &block, const CBlockIndex* tip,
-                     const CBlockIndex *blockindex, bool txDetails = false);
-UniValue blockheaderToJSON(const CBlockIndex* tip, const CBlockIndex *blockindex);
+                     const CBlockIndex *blockindex, bool txDetails = false) LOCKS_EXCLUDED(cs_main);
+UniValue blockheaderToJSON(const CBlockIndex* tip, const CBlockIndex *blockindex) LOCKS_EXCLUDED(cs_main);
 
 #endif // BITCOIN_RPCTOJSON_H
