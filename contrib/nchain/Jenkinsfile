@@ -32,14 +32,14 @@ pipeline {
         }
         stage('secp256k1 Tests') {
             steps {
-                sh 'cd src/secp256k1 && make'
+                sh 'cd src/secp256k1 && make -j$(nproc --all)'
                 sh 'src/secp256k1/exhaustive_tests'
                 sh 'src/secp256k1/tests'
             }
         }
         stage('univalue Tests') {
             steps {
-                sh 'cd src/univalue && make'
+                sh 'cd src/univalue && make -j$(nproc --all)'
                 sh 'cd src/univalue && test/object'
                 sh 'cd src/univalue && test/no_nul'
                 sh 'cd src/univalue && test/unitester'
@@ -65,7 +65,7 @@ pipeline {
                 sh './autogen.sh'
                 sh './configure --enable-lcov'
                 sh 'make clean'
-                sh 'make'
+                sh 'make -j$(nproc --all)'
                 sh 'make cov'
             }
         }
