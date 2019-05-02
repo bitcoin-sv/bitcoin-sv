@@ -81,7 +81,7 @@ public:
         READWRITE(vtx);
     }
 
-    uint64_t GetHeight() const // Returns the block's height as specified in its coinbase transaction
+    uint64_t GetHeightFromCoinbase() const // Returns the block's height as specified in its coinbase transaction
     {
         const CScript &sig = vtx[0]->vin[0].scriptSig;
         int numlen = sig[0];

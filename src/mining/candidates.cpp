@@ -77,7 +77,7 @@ void CMiningCandidateManager::RemoveOldCandidates()
         std::lock_guard<std::mutex> lock {mMutex};
         for(auto it = mCandidates.cbegin(); it != mCandidates.cend();)
         {
-            if(it->second->mBlock->GetHeight() <= mPrevHeight)
+            if(it->second->mBlock->GetHeightFromCoinbase() <= mPrevHeight)
             {
                 it = mCandidates.erase(it);
             }

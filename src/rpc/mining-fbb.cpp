@@ -248,7 +248,7 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     ret.push_back(Pair("version", block->nVersion));
     ret.push_back(Pair("nBits", strprintf("%08x", block->nBits)));
     ret.push_back(Pair("time", block->GetBlockTime()));
-    ret.push_back(Pair("height", block->GetHeight()));
+    ret.push_back(Pair("height", block->GetHeightFromCoinbase()));
 
     // merkleProof:
     std::vector<uint256> brancharr = GetMerkleProofBranches(block);
