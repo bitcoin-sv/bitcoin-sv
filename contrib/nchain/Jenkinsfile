@@ -65,7 +65,7 @@ pipeline {
                 sh './autogen.sh'
                 sh './configure --enable-lcov'
                 sh 'make clean'
-                sh 'make'
+                sh 'make -j$(nproc --all)'
                 sh 'make cov'
             }
         }
