@@ -399,6 +399,13 @@ def connect_nodes_bi(nodes, a, b):
     connect_nodes(nodes[a], b)
     connect_nodes(nodes[b], a)
 
+def connect_nodes_mesh(nodes, bi=False):
+    for i in range(len(nodes)):
+        for j in range(i + 1, len(nodes)):
+            if bi:
+                connect_nodes_bi(nodes, i, j)
+            else:
+                connect_nodes(nodes[i], j)
 
 def sync_blocks(rpc_connections, *, wait=1, timeout=60):
     """

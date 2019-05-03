@@ -1149,8 +1149,10 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     std::array<std::pair<uint64_t, CNodePtr>, 2> best {{{0, nullptr}, {0, nullptr}}};
     assert(nRelayNodes <= best.size());
 
-    auto sortfunc = [&best, &hasher, nRelayNodes](const CNodePtr& pnode) {
-        if (pnode->nVersion >= CADDR_TIME_VERSION) {
+    bool allowUnsolictedAddr { gArgs.GetBoolArg("-allowunsolicitedaddr", false) };
+    auto sortfunc = [&best, &hasher, nRelayNodes, allowUnsolictedAddr](const CNodePtr& pnode) {
+        // FIXME: When we get rid of -allowunsolicitedaddr, change to just: pnode->fInbound && ...
+        if ((allowUnsolictedAddr || pnode->fInbound) && pnode->nVersion >= CADDR_TIME_VERSION) {
             uint64_t hashKey = CSipHasher(hasher).Write(pnode->id).Finalize();
             for (unsigned int i = 0; i < nRelayNodes; i++) {
                 if (hashKey > best[i].first) {
@@ -1602,10 +1604,8 @@ static bool ProcessVersionMessage(const Config& config, const CNodePtr& pfrom, c
 
         // Get recent addresses
         if(pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || connman.GetAddressCount() < 1000) {
-            connman.PushMessage(
-                pfrom,
-                CNetMsgMaker(nSendVersion).Make(NetMsgType::GETADDR));
             pfrom->fGetAddr = true;
+            connman.PushMessage(pfrom, CNetMsgMaker(nSendVersion).Make(NetMsgType::GETADDR));
         }
         connman.MarkAddressGood(pfrom->addr);
     }
@@ -1709,11 +1709,62 @@ static OptBool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>
         return error("message addr size() = %u", vAddr.size());
     }
 
+    // The purpose of using exchange here is to atomically set to false and
+    // also get whether I asked for an addr.
+    bool requestedAddr { pfrom->fGetAddr.exchange(false) };
+
+    // FIXME: For now we make rejecting unsolicited addr messages configurable (on by default).
+    // Once we are happy this doesn't have any adverse effects on address propagation we can
+    // remove the config option and make it the only behaviour.
+    bool rejectUnsolictedAddr { !gArgs.GetBoolArg("-allowunsolicitedaddr", false) };
+    if(rejectUnsolictedAddr)
+    {
+        // To avoid malicious flooding of our address table, only allow unsolicited
+        // ADDR messages to insert the connecting IP. We need to allow this IP
+        // to be inserted, or there is no way for that node to tell the network
+        // about itself if its behind a NAT.
+
+        // Digression about how things work behind a NAT:
+        //      Node A periodically ADDRs node B with the address that B reported
+        //      to A as A's own address (in the VERSION message).
+        if (!requestedAddr && pfrom->fInbound)
+        {
+            bool reportedOwnAddr {false};
+            CAddress ownAddr {};
+            for (const CAddress& addr : vAddr)
+            {
+                // Server listen port will be different. We want to compare IPs and then use provided port
+                if (static_cast<CNetAddr>(addr) == static_cast<CNetAddr>(pfrom->addr))
+                {
+                    ownAddr = addr;
+                    reportedOwnAddr = true;
+                    break;
+                }
+            }
+            if (reportedOwnAddr)
+            {
+                // Get rid of every address the remote node tried to inject except itself.
+                vAddr.resize(1);
+                vAddr[0] = ownAddr;
+            }
+            else
+            {
+                // Today unsolicited ADDRs are not illegal, but we should consider
+                // misbehaving on this because a few unsolicited ADDRs are ok from
+                // a DOS perspective but lots are not.
+                LogPrint(BCLog::NET, "Peer %d sent unsolicited ADDR\n", pfrom->id);
+
+                // We don't want to process any other addresses, but giving them is not an error
+                return true;
+            }
+        }
+    }
+
     // Store the new addresses
     std::vector<CAddress> vAddrOk;
     int64_t nNow = GetAdjustedTime();
     int64_t nSince = nNow - 10 * 60;
-    for (CAddress &addr : vAddr) {
+    for (CAddress& addr : vAddr) {
         if (interruptMsgProc) {
             return true;
         }
@@ -1727,7 +1778,8 @@ static OptBool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>
         }
         pfrom->AddAddressKnown(addr);
         bool fReachable = IsReachable(addr);
-        if (addr.nTime > nSince && !pfrom->fGetAddr && vAddr.size() <= 10 && addr.IsRoutable()) {
+        // FIXME: When we remove -allowunsolicitedaddr, remove the whole (rejectUnsolictedAddr || !requestedAddr) check
+        if (addr.nTime > nSince && vAddr.size() <= 10 && addr.IsRoutable() && (rejectUnsolictedAddr || !requestedAddr)) {
             // Relay to a limited number of other nodes
             RelayAddress(addr, fReachable, connman);
         }
@@ -1737,9 +1789,6 @@ static OptBool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>
         }
     }
     connman.AddNewAddresses(vAddrOk, pfrom->addr, 2 * 60 * 60);
-    if (vAddr.size() < 1000) {
-        pfrom->fGetAddr = false;
-    }
     if (pfrom->fOneShot) {
         pfrom->fDisconnect = true;
     }
@@ -1759,7 +1808,7 @@ static void ProcessSendHeadersMessage(const CNodePtr& pfrom)
             // This message should only be received once. If its already set it might 
             // indicate a misbehaving node. Increase the banscore
             Misbehaving(pfrom, 1, "Invalid Header activity");
-            LogPrintf("Peer %d showing  increaed activity in message header transmission\n",pfrom->id);
+            LogPrintf("Peer %d showing increased activity in message header transmission\n",pfrom->id);
         }
         else {
             state->fPreferHeaders = true;
@@ -3572,10 +3621,10 @@ void SendAddrs(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& msgMa
                 }
             }
         }
-        pto->vAddrToSend.clear();
         if (!vAddr.empty()) {
             connman.PushMessage(pto, msgMaker.Make(NetMsgType::ADDR, vAddr));
         }
+        pto->vAddrToSend.clear();
 
         // we only send the big addr message once
         if (pto->vAddrToSend.capacity() > 40) {
@@ -3769,7 +3818,7 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
                 // 1100 conseqitive invalid checksums received with less than 500ms between them
                 // (this is approximately 2200 messages per second at which point TCP/IP will start to throttle
                 Misbehaving(pto, 1, "Invalid Header activity");
-                LogPrintf("Peer %d showing  increaed activity in message header transmission\n",pto->id);
+                LogPrintf("Peer %d showing increased activity in message header transmission\n",pto->id);
             }
             // record the time of sending the header. 
             state.nTimeOfLastHeaderMessage = curTime;
