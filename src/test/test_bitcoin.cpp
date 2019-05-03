@@ -12,7 +12,7 @@
 #include "fs.h"
 #include "key.h"
 #include "logging.h"
-#include "miner.h"
+#include "mining/factory.h"
 #include "net_processing.h"
 #include "pubkey.h"
 #include "random.h"
@@ -136,8 +136,9 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey) {
     const Config &config = GlobalConfig::GetConfig();
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-        BlockAssembler(config).CreateNewBlock(scriptPubKey);
-    CBlock &block = pblocktemplate->block;
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlock &block = *blockRef;
 
     // Replace mempool-selected txns with just coinbase plus passed-in txns:
     block.vtx.resize(1);

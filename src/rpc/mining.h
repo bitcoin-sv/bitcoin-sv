@@ -11,11 +11,18 @@
 
 #include <memory>
 
+#include "consensus/params.h"
+
 class Config;
+class CBlock;
 
 /** Generate blocks (mine) */
-UniValue generateBlocks(const Config &config,
+UniValue generateBlocks(const Config& config,
                         std::shared_ptr<CReserveScript> coinbaseScript,
                         int nGenerate, uint64_t nMaxTries, bool keepScript);
+
+UniValue SubmitBlock(const Config& config, const std::shared_ptr<CBlock>& block);
+
+std::string gbt_vb_name(const Consensus::DeploymentPos pos);
 
 #endif

@@ -236,18 +236,18 @@ class BitcoinTestFramework():
 
     # Public helper methods. These can be accessed by the subclass test scripts.
 
-    def add_nodes(self, num_nodes, extra_args=None, rpchost=None, timewait=None, binary=None):
+    def add_nodes(self, num_nodes, extra_args=None, rpchost=None, timewait=None, binaries=None):
         """Instantiate TestNode objects"""
 
         if extra_args is None:
             extra_args = [[]] * num_nodes
-        if binary is None:
-            binary = [None] * num_nodes
+        if binaries is None:
+            binaries = [None] * num_nodes
         assert_equal(len(extra_args), num_nodes)
-        assert_equal(len(binary), num_nodes)
+        assert_equal(len(binaries), num_nodes)
         for i in range(num_nodes):
             self.nodes.append(TestNode(i, self.options.tmpdir, extra_args[i], rpchost, timewait=timewait,
-                                       binary=binary[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+                                       binary=binaries[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
 
     def start_node(self, i, extra_args=None, stderr=None):
         """Start a bitcoind"""
@@ -340,13 +340,13 @@ class BitcoinTestFramework():
         connect_nodes_bi(self.nodes, 1, 2)
         self.sync_all()
 
-    def sync_all(self, node_groups=None):
+    def sync_all(self, node_groups=None, timeout=60):
         if not node_groups:
             node_groups = [self.nodes]
 
         for group in node_groups:
-            sync_blocks(group)
-            sync_mempools(group)
+            sync_blocks(group, timeout=timeout)
+            sync_mempools(group, timeout=timeout)
 
     def enable_mocktime(self, mocktime):
         """Enable mocktime for the script.
@@ -491,26 +491,29 @@ class ComparisonTestFramework(BitcoinTestFramework):
         super(ComparisonTestFramework,self).__init__()
         self.chain = ChainManager()
         self._network_thread = None
+        if not hasattr(self, "testbinary"):
+            self.testbinary = [os.getenv("BITCOIND", "bitcoind")]
+        if not hasattr(self, "refbinary"):
+            self.refbinary = [os.getenv("BITCOIND", "bitcoind")]
 
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
 
     def add_options(self, parser):
-        parser.add_option("--testbinary", dest="testbinary",
-                          default=os.getenv("BITCOIND", "bitcoind"),
-                          help="bitcoind binary to test")
-        parser.add_option("--refbinary", dest="refbinary",
-                          default=os.getenv("BITCOIND", "bitcoind"),
-                          help="bitcoind binary to use for reference nodes (if any)")
+        parser.add_option("--testbinary", dest="testbinary", help="bitcoind binary to test")
+        parser.add_option("--refbinary", dest="refbinary", help="bitcoind binary to use for reference nodes (if any)")
 
     def setup_network(self):
         extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
         if hasattr(self, "extra_args"):
             extra_args = self.extra_args
-        self.add_nodes(self.num_nodes, extra_args,
-                       binary=[self.options.testbinary] +
-                       [self.options.refbinary] * (self.num_nodes - 1))
+        if self.options.testbinary:
+            self.testbinary = [self.options.testbinary]
+        if self.options.refbinary:
+            self.refbinary = [self.options.refbinary]
+        binaries = [self.testbinary] + [self.refbinary] * (self.num_nodes - 1)
+        self.add_nodes(self.num_nodes, extra_args, binaries=binaries)
         self.start_nodes()
         self.init_network()
 

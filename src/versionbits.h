@@ -35,6 +35,8 @@ struct BIP9DeploymentInfo {
     const char *name;
     /** Whether GBT clients can safely ignore this rule in simplified usage */
     bool gbt_force;
+    /** What is this client's vote? */
+    bool myVote;
 };
 
 extern const struct BIP9DeploymentInfo VersionBitsDeploymentInfo[];

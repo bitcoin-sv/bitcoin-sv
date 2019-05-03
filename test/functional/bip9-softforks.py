@@ -40,7 +40,7 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         if hasattr(self, "extra_args"):
             extra_args = self.extra_args
         self.add_nodes(self.num_nodes, extra_args,
-                       binary=[self.options.testbinary] +
+                       binaries=[self.options.testbinary] +
                        [self.options.refbinary] * (self.num_nodes - 1))
         self.start_nodes()
 

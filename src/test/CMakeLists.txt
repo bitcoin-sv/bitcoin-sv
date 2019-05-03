@@ -80,6 +80,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	jsonutil.cpp
 	key_tests.cpp
 	limitedmap_tests.cpp
+	m_candidates_tests.cpp
 	main_tests.cpp
 	mempool_tests.cpp
 	merkle_tests.cpp

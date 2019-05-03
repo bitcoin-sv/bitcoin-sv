@@ -81,6 +81,20 @@ public:
         READWRITE(vtx);
     }
 
+    uint64_t GetHeightFromCoinbase() const // Returns the block's height as specified in its coinbase transaction
+    {
+        const CScript &sig = vtx[0]->vin[0].scriptSig;
+        int numlen = sig[0];
+        if (numlen == OP_0)
+            return 0;
+        if ((numlen >= OP_1) && (numlen <= OP_16))
+            return numlen - OP_1 + 1;
+        std::vector<unsigned char> heightScript(numlen);
+        copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
+        CScriptNum coinbaseHeight(heightScript, false, numlen);
+        return coinbaseHeight.getint();
+    }
+
     void SetNull() {
         CBlockHeader::SetNull();
         vtx.clear();
@@ -100,6 +114,8 @@ public:
 
     std::string ToString() const;
 };
+
+typedef std::shared_ptr<CBlock> CBlockRef;
 
 /**
  * Describes a place in the block chain to another node such that if the other

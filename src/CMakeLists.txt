@@ -221,7 +221,9 @@ add_library(server
 	init.cpp
 	dbwrapper.cpp
 	merkleblock.cpp
-	miner.cpp
+	mining/candidates.cpp
+	mining/factory.cpp
+    mining/legacy.cpp
 	net.cpp
 	net_processing.cpp
 	noui.cpp
@@ -232,6 +234,7 @@ add_library(server
 	rpc/abc.cpp
 	rpc/blockchain.cpp
 	rpc/mining.cpp
+	rpc/mining-fbb.cpp
 	rpc/misc.cpp
 	rpc/net.cpp
 	rpc/rawtransaction.cpp

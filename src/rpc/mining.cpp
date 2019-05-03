@@ -14,7 +14,7 @@
 #include "core_io.h"
 #include "dstencode.h"
 #include "init.h"
-#include "miner.h"
+#include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "pow.h"
@@ -130,14 +130,14 @@ UniValue generateBlocks(const Config &config,
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
-            BlockAssembler(config).CreateNewBlock(
-                coinbaseScript->reserveScript));
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript));
 
         if (!pblocktemplate.get()) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         }
 
-        CBlock *pblock = &pblocktemplate->block;
+        CBlockRef blockRef = pblocktemplate->GetBlockRef();
+        CBlock *pblock = blockRef.get();
 
         {
             LOCK(cs_main);
@@ -549,9 +549,10 @@ static UniValue getblocktemplate(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    if (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0) {
-        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED,
-                           "Bitcoin is not connected!");
+    // "-standalone" is an undocumented option.
+    if ((g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0) && !gArgs.IsArgSet("-standalone"))
+    {
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Bitcoin is not connected!");
     }
 
     if (IsInitialBlockDownload()) {
@@ -627,7 +628,7 @@ static UniValue getblocktemplate(const Config &config,
 
         // Create new block
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler(config).CreateNewBlock(scriptDummy);
+        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptDummy);
         if (!pblocktemplate) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
         }
@@ -637,7 +638,8 @@ static UniValue getblocktemplate(const Config &config,
     }
 
     // pointer for convenience
-    CBlock *pblock = &pblocktemplate->block;
+    CBlockRef blockRef = pblocktemplate->GetBlockRef();
+    CBlock *pblock = blockRef.get();
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
@@ -844,6 +846,12 @@ static UniValue submitblock(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
+    return SubmitBlock(config, blockptr);
+}
+
+UniValue SubmitBlock(const Config& config, const std::shared_ptr<CBlock>& blockptr)
+{
+    CBlock &block = *blockptr;
     if (block.vtx.empty() || !block.vtx[0]->IsCoinBase()) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                            "Block does not start with a coinbase");
