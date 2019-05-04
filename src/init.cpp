@@ -1864,7 +1864,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
     peerLogic.reset(new PeerLogicValidation(&connman));
     if (gArgs.IsArgSet("-broadcastdelay")) {
-        const int64_t nDelayMillisecs = gArgs.GetArg("-broadcastdelay", -1);
+        const int64_t nDelayMillisecs = gArgs.GetArg("-broadcastdelay", DEFAULT_INV_BROADCAST_DELAY);
         if(!SetInvBroadcastDelay(nDelayMillisecs)){
             return InitError(strprintf(_("Error setting broadcastdelay=%d"), nDelayMillisecs));
         }
