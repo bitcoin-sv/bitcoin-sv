@@ -1,4 +1,5 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2019 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -208,6 +209,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
 void TestCoinbaseMessageEB(uint64_t eb, std::string cbmsg) {
 
     GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     config.SetMaxBlockSize(eb);
 
     CScript scriptPubKey =
@@ -259,6 +261,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     entry.nHeight = 11;
 
     GlobalConfig config;
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
     LOCK(cs_main);
     fCheckpointsEnabled = false;
@@ -701,7 +704,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
 void CheckBlockMaxSize(uint64_t size, uint64_t expected)
 {
-    gArgs.ForceSetArg("-blockmaxsize", std::to_string(size));
+    GlobalConfig::GetConfig().SetMaxGeneratedBlockSize(size);
     BlockAssemblerRef ba = CMiningFactory::GetAssembler(GlobalConfig::GetConfig());
     BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
 }
@@ -710,13 +713,20 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
 {
     GlobalConfig& config = GlobalConfig::GetConfig();
 
+    // Make sure that default values are not overriden
+    BOOST_REQUIRE(!config.MaxGeneratedBlockSizeOverridden());
+    BOOST_REQUIRE(!config.MaxBlockSizeOverridden());
+
+    uint64_t nDefaultMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
+    uint64_t nDefaultMaxBlockSize = config.GetMaxBlockSize();
+
+
     // We are working on a fake chain and need to protect ourselves.
     LOCK(cs_main);
 
     // Test around historical 1MB (plus one byte because that's mandatory)
-    config.SetMaxBlockSize(ONE_MEGABYTE + 1);
-    config.SetMaxBlockSizeOverridden(false);
-    CheckBlockMaxSize(0, 1000);
+    BOOST_REQUIRE(config.SetMaxBlockSize(ONE_MEGABYTE + 1));
+    CheckBlockMaxSize(0, 1000); 
     CheckBlockMaxSize(1000, 1000);
     CheckBlockMaxSize(1001, 1001);
     CheckBlockMaxSize(12345, 12345);
@@ -727,25 +737,85 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
     CheckBlockMaxSize(ONE_MEGABYTE, ONE_MEGABYTE - 999);
 
     // Test around default cap
-    config.SetMaxBlockSize(DEFAULT_MAX_BLOCK_SIZE);
-    config.SetMaxBlockSizeOverridden(false);
+    BOOST_REQUIRE(config.SetMaxBlockSize(nDefaultMaxBlockSize));
 
     // Now we can use the default max block size.
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1001, DEFAULT_MAX_BLOCK_SIZE - 1001);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 1000, DEFAULT_MAX_BLOCK_SIZE - 1000);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE - 999, DEFAULT_MAX_BLOCK_SIZE - 1000);
-    CheckBlockMaxSize(DEFAULT_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 1001, nDefaultMaxBlockSize - 1001);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 1000, nDefaultMaxBlockSize - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize - 999, nDefaultMaxBlockSize - 1000);
+    CheckBlockMaxSize(nDefaultMaxBlockSize, nDefaultMaxBlockSize - 1000);
 
     // If the parameter is not specified, we use
     // max(1K, min(DEFAULT_MAX_BLOCK_SIZE - 1K, DEFAULT_MAX_GENERATED_BLOCK_SIZE))
     {
         const auto expected { std::max(ONE_KILOBYTE,
-                                std::min(DEFAULT_MAX_BLOCK_SIZE - ONE_KILOBYTE,
-                                    DEFAULT_MAX_GENERATED_BLOCK_SIZE)) };
-        gArgs.ClearArg("-blockmaxsize");
+                                std::min(nDefaultMaxBlockSize - ONE_KILOBYTE,
+                                    nDefaultMaxGeneratedBlockSize)) };
+        
+        // Set generated max size to default
+        config.SetMaxGeneratedBlockSize(nDefaultMaxGeneratedBlockSize);
         BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);
         BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expected);
     }
+}
+
+void CheckBlockMaxSizeForTime(Config& config, uint64_t medianPastTime, uint64_t expectedSize)
+{
+    std::vector<CBlockIndex> blocks(11);
+
+    // Construct chain  with desired median time. Set time of each block to 
+    // the same value to get desired median past time.
+    CBlockIndex* pprev{ nullptr };
+    int height = 0;
+    for (auto& block : blocks)
+    {
+        block.nTime = medianPastTime;
+        block.pprev = pprev;
+        block.nHeight = height;
+
+        pprev = &block;
+        height++;
+    }
+
+
+    // Make sure that we got correct median past time.
+    BOOST_REQUIRE_EQUAL(blocks.back().GetMedianTimePast(), medianPastTime);
+
+    // chainActive is used by BlockAssembler to get median past time, which is used to select default block size
+    chainActive.SetTip(&blocks.back());
+
+    BlockAssemblerRef ba = CMiningFactory::GetAssembler(config);
+    BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expectedSize);
+
+
+    chainActive.SetTip(nullptr); // cleanup
+}
+
+BOOST_AUTO_TEST_CASE(BlockAssembler_construction_acttivate_new_blocksize)
+{
+    DefaultBlockSizeParams defaultParams{
+        // activation time 
+        1000,
+        // max block size before activation
+        5000,
+        // max block size after activation
+        6000,
+        // max generated block size before activation
+        3000,
+        // max generated block size after activation
+        4000
+    };
+
+    GlobalConfig config;
+    config.SetDefaultBlockSizeParams(defaultParams);
+
+    CheckBlockMaxSizeForTime(config, 999, 3000);
+    CheckBlockMaxSizeForTime(config, 1000, 4000);
+    CheckBlockMaxSizeForTime(config, 10001, 4000);
+
+    // When explicitly set, defaults values must not be used
+    config.SetMaxGeneratedBlockSize(3333);
+    CheckBlockMaxSizeForTime(config, 10001, 3333);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -208,15 +208,15 @@ class TestManager():
     def wait_for_verack(self, timeout=60):
         return all(node.wait_for_verack(timeout) for node in self.test_nodes)
 
-    def wait_for_pings(self, counter):
+    def wait_for_pings(self, counter, timeout=60):
         def received_pongs():
             return all(node.received_ping_response(counter) for node in self.test_nodes)
-        wait_until(received_pongs, lock=mininode_lock)
+        wait_until(received_pongs, lock=mininode_lock, timeout=timeout)
 
     # sync_blocks: Wait for all connections to request the blockhash given
     # then send get_headers to find out the tip of each node, and synchronize
     # the response by using a ping (and waiting for pong with same nonce).
-    def sync_blocks(self, blockhash, num_blocks):
+    def sync_blocks(self, blockhash, num_blocks, timeout=60):
         def blocks_requested():
             return all(
                 blockhash in node.block_request_map and node.block_request_map[blockhash]
@@ -232,7 +232,7 @@ class TestManager():
 
         # Send ping and wait for response -- synchronization hack
         [c.cb.send_ping(self.ping_counter) for c in self.connections]
-        self.wait_for_pings(self.ping_counter)
+        self.wait_for_pings(self.ping_counter, timeout=timeout)
         self.ping_counter += 1
 
     # Analogous to sync_block (see above)
@@ -365,7 +365,7 @@ class TestManager():
                         # if we expect failure, just push the block and see what happens.
                         if outcome == True:
                             [c.cb.send_inv(block) for c in self.connections]
-                            self.sync_blocks(block.sha256, 1)
+                            self.sync_blocks(block.sha256, 1, timeout=300)
                         else:
                             [c.send_message(msg_block(block))
                              for c in self.connections]

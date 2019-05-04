@@ -61,7 +61,7 @@ NON_SCRIPTS = [
 
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
-    # When a test is listed here, the it  will be run without parameters
+    # When a test is listed here, then it will be run without parameters
     # as well as with additional parameters listed here.
     # This:
     #    example "testName" : [["--param1", "--param2"] , ["--param3"]]
@@ -72,7 +72,11 @@ TEST_PARAMS = {
     "txn_doublespend.py": [["--mineblock"]],
     "txn_clone.py": [["--mineblock"]],
     # Test with blocks larger than preferredBlockfileSize.
-    "bsv-128Mb-blocks.py": [["--excessiveblocksize=130000000"]]
+    "bsv-128Mb-blocks.py": [["--excessiveblocksize=130000000"]],
+
+    # Run  automatic block size validation size with default activation time as well as overriden time
+    "bsv-block-size-activation-generated-default.py": [["--blocksizeactivationtime=1563197777"]],
+    "bsv-block-size-activation-default.py": [["--blocksizeactivationtime=1563197777"]]
 }
 
 # Used to limit the number of tests, when list of tests is not provided on command line

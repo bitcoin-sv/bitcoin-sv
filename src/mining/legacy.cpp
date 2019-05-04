@@ -73,16 +73,20 @@ int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
 static uint64_t ComputeMaxGeneratedBlockSize(const Config &config,
                                              const CBlockIndex *pindexPrev) {
     // Block resource limits
-    // If -blockmaxsize is not given, limit to DEFAULT_MAX_GENERATED_BLOCK_SIZE
-    // If only one is given, only restrict the specified resource.
-    // If both are given, restrict both.
-    uint64_t nMaxGeneratedBlockSize = DEFAULT_MAX_GENERATED_BLOCK_SIZE;
-    if (gArgs.IsArgSet("-blockmaxsize")) {
-        nMaxGeneratedBlockSize = gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
+    uint64_t nMaxGeneratedBlockSize;
+    uint64_t nMaxBlockSize;
+    if (pindexPrev == nullptr) {
+        nMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
+        nMaxBlockSize = config.GetMaxBlockSize();
+    }
+    else {
+        auto medianPastTime = pindexPrev->GetMedianTimePast();
+        nMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize(medianPastTime);
+        nMaxBlockSize = config.GetMaxBlockSize(medianPastTime);
     }
 
     // Limit size to between 1K and MaxBlockSize-1K for sanity:
-    nMaxGeneratedBlockSize = std::max(uint64_t(ONE_KILOBYTE), std::min(config.GetMaxBlockSize() - ONE_KILOBYTE, nMaxGeneratedBlockSize));
+    nMaxGeneratedBlockSize = std::max(uint64_t(ONE_KILOBYTE), std::min(nMaxBlockSize - ONE_KILOBYTE, nMaxGeneratedBlockSize));
 
     return nMaxGeneratedBlockSize;
 }

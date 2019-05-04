@@ -2529,8 +2529,11 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         for (const auto &tx : boost::adaptors::reverse(block.vtx)) {
             disconnectpool->addTransaction(tx);
         }
-        while (disconnectpool->DynamicMemoryUsage() >
-               MAX_DISCONNECTED_TX_POOL_SIZE) {
+
+        //  The amount of tranasctions we are willing to store during reorg is calculated based
+        //  of default block size for the network (not our configuration that might be lower)
+        uint64_t maxDisconnectedTxPoolSize = MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR * config.GetChainParams().GetDefaultBlockSizeParams().maxBlockSizeAfter;
+        while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
             // Drop the earliest entry, and remove its children from the
             // mempool.
             auto it = disconnectpool->queuedTx.get<insertion_order>().begin();
@@ -3500,8 +3503,21 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
     }
 
+    // Check if block has the right size. Maximum accepted block size changes
+    // according to predetermined schedule unless user has overriden this by 
+    // specifying -excessiveblocksize command line parameter 
     const int64_t nMedianTimePast =
         pindexPrev == nullptr ? 0 : pindexPrev->GetMedianTimePast();
+
+    const uint64_t nMaxBlockSize = 
+        pindexPrev == nullptr ? config.GetMaxBlockSize() : config.GetMaxBlockSize(nMedianTimePast);
+
+    const uint64_t currentBlockSize =
+        ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    if (currentBlockSize > nMaxBlockSize) {
+        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
+                        false, "size limits failed");
+    }
 
     const int64_t nLockTimeCutoff = (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST)
                                         ? nMedianTimePast

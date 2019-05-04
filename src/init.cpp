@@ -742,6 +742,9 @@ std::string HelpMessage(HelpMessageMode mode) {
             "-mocktime=<n>",
             "Replace actual time with <n> seconds since epoch (default: 0)");
         strUsage += HelpMessageOpt(
+            "-blocksizeactivationtime=<n>",
+            "Change time that specifies when new defaults for excessiveblocksize and -blockmaxsize are used");
+        strUsage += HelpMessageOpt(
             "-limitfreerelay=<n>",
             strprintf("Continuously rate-limit free transactions to <n>*1000 "
                       "bytes per minute (default: %u)",
@@ -802,8 +805,16 @@ std::string HelpMessage(HelpMessageMode mode) {
         HelpMessageOpt("-excessiveblocksize=<n>",
                        strprintf(_("Set the maximum block size in bytes we will accept "
                                    "from any source. This is the effective block size "
-                                   "hard limit (default: %d)"),
-                                 DEFAULT_MAX_BLOCK_SIZE));
+                                   "hard limit  If not specified, the following defaults are used : "
+                                   "Mainnet: %d before %s and %d after, "
+                                   "Testnet: %d before %s and %d after."),
+                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeBefore,
+                                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", defaultChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
+                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfter,
+                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeBefore,
+                                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", testnetChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
+                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfter
+                                 ));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
@@ -836,10 +847,18 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
-        strprintf(_("Set maximum block size in bytes we will mine (default: %d). "
+        strprintf(_("Set maximum block size in bytes we will mine. "
                     "Must be less than or equal the hard maximum block size limit "
-                    "as set by -excessiveblocksize"),
-                  DEFAULT_MAX_GENERATED_BLOCK_SIZE));
+                    "as set by -excessiveblocksize. If not specified, the following defaults are used: "
+                    "Mainnet: %d before %s and %d after, "
+                    "Testnet: %d before %s and %d after."),
+                    defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore,
+                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", defaultChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
+                    defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter,
+                    testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore,
+                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", testnetChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
+                    testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter
+                    ));
     strUsage += HelpMessageOpt(
         "-blockprioritypercentage=<n>",
         strprintf(_("Set maximum percentage of a block reserved to "
@@ -1508,7 +1527,7 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure excessive block size.
     if(gArgs.IsArgSet("-excessiveblocksize")) {
         const uint64_t nProposedExcessiveBlockSize =
-            gArgs.GetArg("-excessiveblocksize", DEFAULT_MAX_BLOCK_SIZE);
+            gArgs.GetArg("-excessiveblocksize", 0 /*not used*/ );
         if (!config.SetMaxBlockSize(nProposedExcessiveBlockSize)) {
             return InitError(strprintf(
                 _("Excessive block size must be > %d"),
@@ -1517,13 +1536,22 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
-    // Check blockmaxsize does not exceed maximum accepted block size.
-    const uint64_t nProposedMaxGeneratedBlockSize =
-        gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE);
-    if (nProposedMaxGeneratedBlockSize > config.GetMaxBlockSize()) {
-        auto msg = _("Max generated block size (blockmaxsize) cannot exceed "
-                     "the excessive block size (excessiveblocksize)");
-        return InitError(msg);
+    // Configure max generated block size.
+    if(gArgs.IsArgSet("-blockmaxsize")) {
+        const uint64_t nProposedMaxGeneratedBlockSize =
+            gArgs.GetArg("-blockmaxsize", 0 /* not used*/);
+        if (!config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize)) {
+            auto msg = _("Max generated block size (blockmaxsize) cannot exceed "
+                "the excessive block size (excessiveblocksize)");
+            return InitError(msg);
+        }
+    }
+
+    // Configure block size related activation time
+    if(gArgs.IsArgSet("-blocksizeactivationtime")) {
+        const int64_t nProposedActivationTime =
+            gArgs.GetArg("-blocksizeactivationtime", 0);
+        config.SetBlockSizeActivationTime(nProposedActivationTime);
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &

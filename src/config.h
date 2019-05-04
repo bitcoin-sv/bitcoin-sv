@@ -1,4 +1,5 @@
 // Copyright (c) 2017 Amaury SÉCHET
+// Copyright (c) 2019 The Bitcoin SV developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -17,12 +18,26 @@
 #include <string>
 
 class CChainParams;
+struct DefaultBlockSizeParams;
 
 class Config : public boost::noncopyable {
 public:
+    // used to specify default block size related parameters
+    virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) = 0;
+    
     virtual bool SetMaxBlockSize(uint64_t maxBlockSize) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
+    virtual uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const = 0;
     virtual bool MaxBlockSizeOverridden() const = 0;
+    
+    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) = 0;
+    virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
+    virtual uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const = 0;
+    virtual bool MaxGeneratedBlockSizeOverridden() const = 0;
+
+    virtual bool SetBlockSizeActivationTime(int64_t activationTime) = 0;
+    virtual int64_t GetBlockSizeActivationTime() const = 0;
+
     virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) = 0;
     virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
@@ -41,10 +56,24 @@ public:
 
 class GlobalConfig final : public Config {
 public:
-    GlobalConfig() = default;
+    GlobalConfig();
+
+    // Set block size related default. This must be called after constructing GlobalConfig
+    void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override;
+
     bool SetMaxBlockSize(uint64_t maxBlockSize) override;
     uint64_t GetMaxBlockSize() const override;
+    uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override;
     bool MaxBlockSizeOverridden() const override;
+
+    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) override;
+    uint64_t GetMaxGeneratedBlockSize() const override;
+    uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override;
+    bool MaxGeneratedBlockSizeOverridden() const override;
+
+    bool SetBlockSizeActivationTime(int64_t activationTime) override;
+    int64_t GetBlockSizeActivationTime() const override;
+
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override;
     uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
@@ -60,18 +89,31 @@ public:
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override;
     uint64_t GetPreferredBlockFileSize() const override;
 
-    void SetMaxBlockSizeOverridden(bool overridden);    // For unit testing only
-
+    // Reset state of this object to match a newly constructed one. 
+    // Used in constructor and for unit testing to always start with a clean state
+    void Reset(); 
     static GlobalConfig& GetConfig();
 
 private:
-    bool useCashAddr { false };
-    Amount excessUTXOCharge {};
-    CFeeRate feePerKB {};
-    uint64_t maxBlockSize { DEFAULT_MAX_BLOCK_SIZE };
-    bool maxBlockSizeOverridden { false };
-    uint64_t blockPriorityPercentage { DEFAULT_BLOCK_PRIORITY_PERCENTAGE };
-    uint64_t preferredBlockFileSize { DEFAULT_PREFERRED_BLOCKFILE_SIZE };
+    // All fileds are initialized in Reset()
+    bool useCashAddr;
+    Amount excessUTXOCharge;
+    CFeeRate feePerKB;
+    uint64_t blockPriorityPercentage;
+    uint64_t preferredBlockFileSize;
+
+    // Block size limits 
+    // SetDefaultBlockSizeParams must be called before reading any of those
+    bool  setDefaultBlockSizeParamsCalled;
+    void  CheckSetDefaultCalled() const;
+
+    int64_t blockSizeActivationTime;
+    uint64_t maxBlockSizeBefore;
+    uint64_t maxBlockSizeAfter;
+    bool maxBlockSizeOverridden;
+    uint64_t maxGeneratedBlockSizeBefore;
+    uint64_t maxGeneratedBlockSizeAfter;
+    bool maxGeneratedBlockSizeOverridden;
 };
 
 // Dummy for subclassing in unittests
@@ -79,9 +121,22 @@ class DummyConfig : public Config {
 public:
     DummyConfig();
     DummyConfig(std::string net);
+
+    void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override {  }
+
     bool SetMaxBlockSize(uint64_t maxBlockSize) override { return false; }
     uint64_t GetMaxBlockSize() const override { return 0; }
+    uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override { return 0; }
     bool MaxBlockSizeOverridden() const override { return false; }
+
+    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) override { return false; };
+    uint64_t GetMaxGeneratedBlockSize() const override { return 0; };
+    uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override { return 0; }
+    bool MaxGeneratedBlockSizeOverridden() const override { return false; }
+
+    bool SetBlockSizeActivationTime(int64_t activationTime) override { return false; }
+    int64_t GetBlockSizeActivationTime() const override { return 0; }
+
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override {
         return false;
     }

@@ -59,6 +59,14 @@
   "name": "blockchain.py",
   "time": 10
  },
+{
+  "name": "bsv-block-size-activation-default.py",
+  "time": 500
+ },
+ {
+  "name": "bsv-block-size-activation-default.py --blocksizeactivationtime=1563197777",
+  "time": 500
+ },
  {
   "name": "dbcrash.py",
   "time": 1257

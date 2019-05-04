@@ -138,7 +138,7 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     obj.push_back(Pair("maxblocksize", config.GetMaxBlockSize()));
-    obj.push_back(Pair("maxminedblocksize", gArgs.GetArg("-blockmaxsize", DEFAULT_MAX_GENERATED_BLOCK_SIZE)));
+    obj.push_back(Pair("maxminedblocksize", config.GetMaxGeneratedBlockSize()));
     return obj;
 }
 

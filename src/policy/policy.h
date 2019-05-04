@@ -14,9 +14,45 @@
 
 class CCoinsViewCache;
 
-/** Default for -blockmaxsize, which controls the maximum size of block the
- * mining code will create **/
-static const uint64_t DEFAULT_MAX_GENERATED_BLOCK_SIZE = 32 * ONE_MEGABYTE;
+/** Defaults for -excessiveblocksize and -blockmaxsize. The changed when we reach blocksize activation time.
+ *
+ * DEFAULT_MAX_GENERATED_BLOCK_SIZE_* represents default for -blockmaxsize, 
+ * which controls the maximum size of block the mining code will create 
+ * 
+ * DEFAULT_MAX_BLOCK_SIZE_* represents default for -excessiveblocksize, which specifies the 
+ * maximum allowed size for a block, in bytes. This is actually a consenus rule - if a node sets
+ * this to a value lower than  -blockmaxsize of another node, it will start rejecting 
+ * big another node. 
+ * 
+ * Values bellow are also parsed by cdefs.py.
+ */
+
+static const uint64_t MAIN_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-07-24T14:00:00
+static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE_BEFORE = 128 * ONE_MEGABYTE;
+static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE_AFTER = 2 * ONE_GIGABYTE;
+static const uint64_t MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEGABYTE;
+static const uint64_t MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
+
+static const uint64_t REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-07-24T14:00:00 
+static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_BEFORE = 128 * ONE_MEGABYTE;
+static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER = 2 * ONE_GIGABYTE;
+static const uint64_t REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEGABYTE;
+static const uint64_t REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
+
+
+static const uint64_t TESTNET_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-07-24T14:00:00 
+static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE_BEFORE = 128 * ONE_MEGABYTE;
+static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE_AFTER = 2 * ONE_GIGABYTE;
+static const uint64_t TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEGABYTE;
+static const uint64_t TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
+
+static const uint64_t STN_NEW_BLOCKSIZE_ACTIVATION_TIME = 1558360800;   // 2019-05-20T14:00:00
+static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE_BEFORE = 128 * ONE_MEGABYTE;
+static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE_AFTER = 10 * ONE_GIGABYTE;
+static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEGABYTE;
+static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
+
+
 /** Default for -blockprioritypercentage, define the amount of block space
  * reserved to high priority transactions **/
 static const uint64_t DEFAULT_BLOCK_PRIORITY_PERCENTAGE = 5;
