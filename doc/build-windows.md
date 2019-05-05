@@ -31,7 +31,7 @@ After VCPKG is installed you can download and build dependencies by invoking the
 following command:
 
 ```
-vcpkg install --triplet x64-windows-static boost-filesystem boost-signals2 boost-test boost-program-options boost-interprocess boost-random boost-assign libevent openssl zeromq berkeleydb
+vcpkg install --triplet x64-windows-static boost-filesystem boost-signals2 boost-test boost-program-options boost-interprocess boost-random boost-assign boost-uuid libevent openssl zeromq berkeleydb
 ```
 
 
