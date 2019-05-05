@@ -118,6 +118,9 @@ Branches out of scope:
 
 * branches prefixed with: dev-*, exp-* or research-*
 * all other branches not specified as in scope
+
+The scope of this policy is limited to those Operating Systems & hardware platforms for which binaries are released
+by the Bitcoin SV Node implementation team. 
  
 
 Out-of-scope
