@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2019 The Bitcoin SV developers.
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "blockfileinfostore.h"
 #include "config.h"

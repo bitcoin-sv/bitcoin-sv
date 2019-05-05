@@ -1,4 +1,5 @@
-# Copyright (c) 2018 The Bitcoin SV developers
+# Copyright (c) 2018-2019 The Bitcoin SV developers
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 find_package(PythonInterp 3 REQUIRED)
 

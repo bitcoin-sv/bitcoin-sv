@@ -16,4 +16,4 @@ Unpack the files into a directory and run bitcoind.exe.
 
 * Log an issue on [GitHub] (https://github.com/bitcoin-sv/bitcoin-sv/issues)
 * Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/bitcoinSV/) or
-[Bictoin Cash SV Subreddit](https://www.reddit.com/r/bitcoincashSV/).
+[Bictoin SV Subreddit](https://www.reddit.com/r/bitcoincashSV/).

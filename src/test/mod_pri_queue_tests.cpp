@@ -1,6 +1,5 @@
-// Copyright (c) 2018 The Bitcoin SV developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2018-2019 The Bitcoin SV developers
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <boost/test/unit_test.hpp>
 #include <mod_pri_queue.h>

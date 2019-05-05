@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Copyright (c) 2015-2016 The Bitcoin Core developers
 # Copyright (c) 2017 The Bitcoin developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 The Bitcoin SV developers
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
