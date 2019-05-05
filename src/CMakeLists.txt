@@ -272,6 +272,10 @@ target_link_libraries(server
 
 if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_link_libraries(server ${EVENT_PTHREAD_LIBRARY})
+else()
+  # New mining API uses boost uuid library which requires bcrypt.lib on Windows
+  find_library(BCRYPT_LIBRARY NAMES bcrypt)
+  target_link_libraries(server ${BCRYPT_LIBRARY})
 endif()
 
 # Test suite.
