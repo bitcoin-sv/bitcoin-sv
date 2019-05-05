@@ -2959,6 +2959,14 @@ static OptBool ProcessGetAddrMessage(const CNodePtr& pfrom,
 static OptBool ProcessMempoolMessage(const CNodePtr& pfrom,
     CDataStream& vRecv, CConnman& connman)
 {
+
+    if (gArgs.GetBoolArg("-rejectmempoolrequest", DEFAULT_REJECTMEMPOOLREQUEST) && !pfrom->fWhitelisted) {
+        LogPrint(BCLog::NET, "mempool request from nonwhitelisted peer disabled, disconnect peer=%d\n",
+                 pfrom->GetId());
+        pfrom->fDisconnect = true;
+        return true;
+    }
+
     if(!(pfrom->GetLocalServices() & NODE_BLOOM) && !pfrom->fWhitelisted) {
         LogPrint(BCLog::NET, "mempool request with bloom filters disabled, disconnect peer=%d\n",
                  pfrom->GetId());

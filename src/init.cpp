@@ -442,6 +442,9 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage +=
         HelpMessageOpt("-reindex", _("Rebuild chain state and block index from "
                                      "the blk*.dat files on disk"));
+    strUsage +=
+        HelpMessageOpt("-rejectmempoolrequest", _("Reject every mempool request from "
+                                     "non-whitelisted peers."));
 #ifndef WIN32
     strUsage += HelpMessageOpt(
         "-sysperms",
