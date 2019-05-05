@@ -125,13 +125,13 @@ default:
 - when run directly, *all* logs are written to `test_framework.log` and INFO
   level and above are output to the console.
 - when run on Travis, no logs are output to the console. However, if a test
-  fails, the `test_framework.log` and bitcoind `debug.log`s will all be dumped
+  fails, the `test_framework.log` and bitcoind `bitcoind.log`s will all be dumped
   to the console to help troubleshooting.
 
 To change the level of logs output to the console, use the `-l` command line
 argument.
 
-`test_framework.log` and bitcoind `debug.log`s can be combined into a single
+`test_framework.log` and bitcoind `bitcoind.log`s can be combined into a single
 aggregate log by running the `combine_logs.py` script. The output can be plain
 text, colorized text or html. For example:
 

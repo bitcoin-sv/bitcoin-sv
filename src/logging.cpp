@@ -8,6 +8,8 @@
 #include "util.h"
 #include "utiltime.h"
 
+constexpr auto LOGFILE = "bitcoind.log";
+
 bool fLogIPs = DEFAULT_LOGIPS;
 
 /**
@@ -36,7 +38,7 @@ void BCLog::Logger::OpenDebugLog() {
     std::lock_guard<std::mutex> scoped_lock(mutexDebugLog);
 
     assert(fileout == nullptr);
-    fs::path pathDebug = GetDataDir() / "bitcoind.log";
+    fs::path pathDebug = GetDataDir() / LOGFILE;
     fileout = fsbridge::fopen(pathDebug, "a");
     if (fileout) {
         // Unbuffered.
@@ -161,7 +163,7 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
             // Reopen the log file, if requested.
             if (fReopenDebugLog) {
                 fReopenDebugLog = false;
-                fs::path pathDebug = GetDataDir() / "debug.log";
+                fs::path pathDebug = GetDataDir() / LOGFILE;
                 if (fsbridge::freopen(pathDebug, "a", fileout) != nullptr) {
                     // unbuffered.
                     setbuf(fileout, nullptr);
@@ -175,12 +177,12 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
 }
 
 void BCLog::Logger::ShrinkDebugFile() {
-    // Amount of debug.log to save at end when shrinking (must fit in memory)
+    // Amount of LOGFILE to save at end when shrinking (must fit in memory)
     constexpr size_t RECENT_DEBUG_HISTORY_SIZE = 10 * 1000000;
-    // Scroll debug.log if it's getting too big.
-    fs::path pathLog = GetDataDir() / "debug.log";
+    // Scroll LOGFILE if it's getting too big.
+    fs::path pathLog = GetDataDir() / LOGFILE;
     FILE *file = fsbridge::fopen(pathLog, "r");
-    // If debug.log file is more than 10% bigger the RECENT_DEBUG_HISTORY_SIZE
+    // If LOGFILE is more than 10% bigger the RECENT_DEBUG_HISTORY_SIZE
     // trim it down by saving only the last RECENT_DEBUG_HISTORY_SIZE bytes.
     if (file &&
         fs::file_size(pathLog) > 11 * (RECENT_DEBUG_HISTORY_SIZE / 10)) {

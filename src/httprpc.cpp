@@ -352,7 +352,7 @@ static bool InitRPCAuthentication() {
         if (!GenerateAuthCookie(&strRPCUserColonPass)) {
             // Same message as AbortNode.
             uiInterface.ThreadSafeMessageBox(
-                _("Error: A fatal internal error occurred, see debug.log for "
+                _("Error: A fatal internal error occurred, see bitcoind.log for "
                   "details"),
                 "", CClientUIInterface::MSG_ERROR);
             return false;

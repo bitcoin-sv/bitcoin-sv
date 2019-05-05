@@ -34,4 +34,4 @@ List the version number/commit ID, and if it is an official binary, self compile
 - Disk Type (HD/SDD):
 
 ### Any extra information that might be useful in the debugging process.
-This is normally the contents of a `debug.log` or `config.log` file. Raw text or a link to a pastebin type site are preferred.
+This is normally the contents of a `bitcoind.log` or `config.log` file. Raw text or a link to a pastebin type site are preferred.

@@ -791,7 +791,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                   CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)));
     strUsage += HelpMessageOpt(
         "-printtoconsole",
-        _("Send trace/debug info to console instead of debug.log file"));
+        _("Send trace/debug info to console instead of bitcoind.log file"));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-printpriority", strprintf("Log transaction priority and fee per "
@@ -799,7 +799,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                                         DEFAULT_PRINTPRIORITY));
     }
     strUsage += HelpMessageOpt("-shrinkdebugfile",
-                               _("Shrink debug.log file on client startup "
+                               _("Shrink bitcoind.log file on client startup "
                                  "(default: 1 when no -debug)"));
 
     AppendParamsHelpMessages(strUsage, showDebug);
@@ -1338,7 +1338,7 @@ bool AppInitBasicSetup() {
     sigaction(SIGTERM, &sa, nullptr);
     sigaction(SIGINT, &sa, nullptr);
 
-    // Reopen debug.log on SIGHUP
+    // Reopen bitcoind.log on SIGHUP
     struct sigaction sa_hup;
     sa_hup.sa_handler = HandleSIGHUP;
     sigemptyset(&sa_hup.sa_mask);
@@ -1817,8 +1817,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
     bool default_shrinkdebugfile = logger.DefaultShrinkDebugFile();
     if (gArgs.GetBoolArg("-shrinkdebugfile", default_shrinkdebugfile)) {
-        // Do this first since it both loads a bunch of debug.log into memory,
-        // and because this needs to happen before any other debug.log printing.
+        // Do this first since it both loads a bunch of bitcoind.log into memory,
+        // and because this needs to happen before any other bitcoind.log printing.
         logger.ShrinkDebugFile();
     }
 
