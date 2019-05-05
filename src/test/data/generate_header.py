@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2018 The Bitcoin developers
+# Copyright (c) 2019 The Bitcoin SV developers
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 import os
 import sys

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2019 The Bitcoin SV developers
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Combine logs from multiple bitcoin nodes as well as the test_framework log.
 
 This streams the combined log output to stdout. Use combine_logs.py > outputfile

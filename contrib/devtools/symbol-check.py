@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) 2014 Wladimir J. van der Laan
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 The Bitcoin SV developers
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 '''
 A script to check that the (Linux) executables produced by gitian only contain
 allowed gcc, glibc and libstdc++ version symbols.  This makes sure they are

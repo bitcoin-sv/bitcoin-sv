@@ -1,6 +1,5 @@
 // Copyright (c) 2019 The Bitcoin SV developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_BLOCKFILEINFOSTORE_H
 #define BITCOIN_BLOCKFILEINFOSTORE_H
