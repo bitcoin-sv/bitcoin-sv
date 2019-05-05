@@ -21,6 +21,8 @@
 #include "test/scriptflags.h"
 #include "utilstrencodings.h"
 #include "validation.h" // For CheckRegularTransaction
+#include "chainparams.h"
+#include "config.h"
 
 #include <map>
 #include <string>
@@ -608,6 +610,10 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     std::vector<CMutableTransaction> dummyTransactions =
         SetupDummyInputs(keystore, coins);
 
+    DummyConfig config(CBaseChainParams::MAIN);
+    uint64_t TEMP_DATA_CARRIER_SIZE = 223;
+    config.SetDataCarrierSize(TEMP_DATA_CARRIER_SIZE);
+
     CMutableTransaction t;
     t.vin.resize(1);
     t.vin[0].prevout = COutPoint(dummyTransactions[0].GetId(), 1);
@@ -619,33 +625,33 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     t.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
     std::string reason;
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
     // Check dust with default relay fee:
     Amount nDustThreshold = 3 * 182 * dustRelayFee.GetFeePerK() / 1000;
     BOOST_CHECK_EQUAL(nDustThreshold, Amount(546));
     // dust:
     t.vout[0].nValue = nDustThreshold - Amount(1);
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
     // not dust:
     t.vout[0].nValue = nDustThreshold;
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
     // Check dust with odd relay fee to verify rounding:
     // nDustThreshold = 182 * 1234 / 1000 * 3
     dustRelayFee = CFeeRate(Amount(1234));
     // dust:
     t.vout[0].nValue = Amount(672 - 1);
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
     // not dust:
     t.vout[0].nValue = Amount(672);
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
     dustRelayFee = CFeeRate(DUST_RELAY_TX_FEE);
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 
-    // MAX_OP_RETURN_RELAY-byte TX_NULL_DATA (standard)
+    // TEMP_DATA_CARRIER_SIZE-byte TX_NULL_DATA (standard)
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("646578784062697477617463682e636f2092c558ed52c56d"
@@ -658,10 +664,10 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
                               "732ba6677520a893d75d9a966cb8f85dc301656b1635c631"
                               "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1"
                               "3afb2ab8");
-    BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY, t.vout[0].scriptPubKey.size());
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK_EQUAL(TEMP_DATA_CARRIER_SIZE, t.vout[0].scriptPubKey.size());
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
-    // MAX_OP_RETURN_RELAY+1-byte TX_NULL_DATA (non-standard)
+    // TEMP_DATA_CARRIER_SIZE+1-byte TX_NULL_DATA (non-standard)
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("646578784062697477617463682e636f2092c558ed52c56d"
@@ -674,14 +680,14 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
                               "732ba6677520a893d75d9a966cb8f85dc301656b1635c631"
                               "f5d00d4adf73f2dd112ca75cf19754651909becfbe65aed1"
                               "3afb2ab800");
-    BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1, t.vout[0].scriptPubKey.size());
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK_EQUAL(TEMP_DATA_CARRIER_SIZE + 1, t.vout[0].scriptPubKey.size());
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 
     /**
      * Check when a custom value is used for -datacarriersize .
      */
     unsigned newMaxSize = 90;
-    gArgs.ForceSetArg("-datacarriersize", std::to_string(newMaxSize));
+    config.SetDataCarrierSize(newMaxSize);
 
     // Max user provided payload size is standard
     t.vout[0].scriptPubKey =
@@ -691,7 +697,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
                               "271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
                               "b649f6bc3f4cef3877696e64657878");
     BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), newMaxSize);
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
     // Max user provided payload size + 1 is non-standard
     t.vout[0].scriptPubKey =
@@ -701,37 +707,37 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
                               "271967f1a67130b7105cd6a828e03909a67962e0ea1f61de"
                               "b649f6bc3f4cef3877696e6465787800");
     BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), newMaxSize + 1);
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 
     // Clear custom confirguration.
-    gArgs.ClearArg("-datacarriersize");
+    config.SetDataCarrierSize(DEFAULT_DATA_CARRIER_SIZE);
 
     // Data payload can be encoded in any way...
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("");
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
     t.vout[0].scriptPubKey = CScript()
                              << OP_RETURN << ParseHex("00") << ParseHex("01");
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
     // OP_RESERVED *is* considered to be a PUSHDATA type opcode by IsPushOnly()!
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_RESERVED << -1 << 0
                                        << ParseHex("01") << 2 << 3 << 4 << 5
                                        << 6 << 7 << 8 << 9 << 10 << 11 << 12
                                        << 13 << 14 << 15 << 16;
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
     t.vout[0].scriptPubKey = CScript()
                              << OP_RETURN << 0 << ParseHex("01") << 2
                              << ParseHex("fffffffffffffffffffffffffffffffffffff"
                                          "fffffffffffffffffffffffffffffffffff");
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
     // ...so long as it only contains PUSHDATA's
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 
     // TX_NULL_DATA w/o PUSHDATA
     t.vout.resize(1);
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
     // Only one TX_NULL_DATA permitted in all cases
     t.vout.resize(2);
@@ -743,18 +749,18 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
         CScript() << OP_RETURN
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
                               "a67962e0ea1f61deb649f6bc3f4cef38");
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 
     t.vout[0].scriptPubKey =
         CScript() << OP_RETURN
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
                               "a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(CTransaction(t), reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

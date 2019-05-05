@@ -12,6 +12,7 @@
 
 #include <string>
 
+class Config;
 class CCoinsViewCache;
 
 /** Defaults for -excessiveblocksize and -blockmaxsize. The changed when we reach blocksize activation time.
@@ -38,7 +39,6 @@ static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_BEFORE = 128 * ONE_MEGABYTE
 static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER = 2 * ONE_GIGABYTE;
 static const uint64_t REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEGABYTE;
 static const uint64_t REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
-
 
 static const uint64_t TESTNET_NEW_BLOCKSIZE_ACTIVATION_TIME = 1563976800; // 2019-07-24T14:00:00 
 static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE_BEFORE = 128 * ONE_MEGABYTE;
@@ -103,14 +103,14 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS =
     LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
 
-bool IsStandard(const CScript &scriptPubKey, txnouttype &whichType);
+bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &whichType);
 
 /**
  * Check for standard transaction types
  * @return True if all outputs (scriptPubKeys) use only standard transaction
  * forms
  */
-bool IsStandardTx(const CTransaction &tx, std::string &reason);
+bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &reason);
 
 /**
  * Check for standard transaction types
