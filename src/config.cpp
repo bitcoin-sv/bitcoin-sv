@@ -119,11 +119,6 @@ bool GlobalConfig::MaxBlockSizeOverridden() const {
 }
 
 bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize) {
-    // Check generated max size does not exceed max accepted size
-    if (maxSize > maxBlockSizeAfter) {
-        return false;
-    }
-
     maxGeneratedBlockSizeAfter = maxSize;
     maxGeneratedBlockSizeOverridden = true;
 

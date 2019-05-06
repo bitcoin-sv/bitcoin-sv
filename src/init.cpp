@@ -870,8 +870,8 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
         strprintf(_("Set maximum block size in bytes we will mine. "
-                    "Must be less than or equal the hard maximum block size limit "
-                    "as set by -excessiveblocksize. If not specified, the following defaults are used: "
+                    "Size of the mined block will never exceed the maximum block size we will accept (-excessiveblocksize). "
+                    "If not specified, the following defaults are used: "
                     "Mainnet: %d before %s and %d after, "
                     "Testnet: %d before %s and %d after."),
                     defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore,
@@ -1570,9 +1570,7 @@ bool AppInitParameterInteraction(Config &config) {
         const uint64_t nProposedMaxGeneratedBlockSize =
             gArgs.GetArg("-blockmaxsize", 0 /* not used*/);
         if (!config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize)) {
-            auto msg = _("Max generated block size (blockmaxsize) cannot exceed "
-                "the excessive block size (excessiveblocksize)");
-            return InitError(msg);
+            return InitError(_("Unknown error"));
         }
     }
 
