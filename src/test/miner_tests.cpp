@@ -261,6 +261,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     GlobalConfig config;
     config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    config.SetTestBlockCandidateValidity(true);
 
     LOCK(cs_main);
     fCheckpointsEnabled = false;
@@ -320,7 +321,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         // Only first tx spends coinbase.
         bool spendsCoinbase = (i == 0) ? true : false;
         // If we don't set the # of sig ops in the CTxMemPoolEntry, template
-        // creation fails.
+        // creation fails when validating.
         mempool.addUnchecked(hash,
                              entry.Fee(LOWFEE)
                                  .Time(GetTime())
@@ -328,8 +329,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                                  .FromTx(tx));
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
-    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
@@ -381,8 +384,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     // Orphan in mempool, template creation fails.
     hash = tx.GetId();
     mempool.addUnchecked(hash, entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx));
-    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     // Child with higher priority than parent.
@@ -416,8 +421,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     // Invalid (pre-p2sh) txn in mempool, template creation fails.
@@ -448,8 +455,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Restore the MedianTimePast.
@@ -471,8 +480,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     mempool.addUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey),
-                      std::runtime_error);
+    config.SetTestBlockCandidateValidity(false);
+    BOOST_CHECK_NO_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey));
+    config.SetTestBlockCandidateValidity(true);
+    BOOST_CHECK_THROW(CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey), std::runtime_error);
     mempool.clear();
 
     // Subsidy changing.

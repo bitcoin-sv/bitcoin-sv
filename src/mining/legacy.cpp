@@ -209,20 +209,25 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
     pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, *config);
     pblock->nNonce = 0;
 
-    CValidationState state;
-    BlockValidationOptions validationOptions { false, false, true };
-    if (!TestBlockValidity(*config, state, *pblock, pindexPrev, validationOptions))
+    // If required, check block validity
+    int64_t nTimeValidationStart { GetTimeMicros() };
+    if(config->GetTestBlockCandidateValidity())
     {
-        throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s",
-                                           __func__, FormatStateMessage(state)));
+        CValidationState state;
+        BlockValidationOptions validationOptions { false, false, true };
+        if (!TestBlockValidity(*config, state, *pblock, pindexPrev, validationOptions))
+        {
+            throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s",
+                                               __func__, FormatStateMessage(state)));
+        }
     }
-    int64_t nTime2 = GetTimeMicros();
 
+    int64_t nTimeEnd = GetTimeMicros();
     LogPrint(
         BCLog::BENCH, "CreateNewBlock() packages: %.2fms (%d packages, %d "
                       "updated descendants), validity: %.2fms (total %.2fms)\n",
         0.001 * (nTime1 - nTimeStart), nPackagesSelected, nDescendantsUpdated,
-        0.001 * (nTime2 - nTime1), 0.001 * (nTime2 - nTimeStart));
+        0.001 * (nTimeEnd - nTimeValidationStart), 0.001 * (nTimeEnd - nTimeStart));
 
     return std::move(pblocktemplate);
 }
