@@ -631,6 +631,7 @@ public:
      */
     bool IsUnspendable() const {
         return (size() > 0 && *begin() == OP_RETURN) ||
+               (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
                (size() > MAX_SCRIPT_SIZE);
     }
 
