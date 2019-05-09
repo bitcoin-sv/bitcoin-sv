@@ -60,9 +60,6 @@ MAX_STANDARD_TX_SIGOPS = MAX_TX_SIGOPS_COUNT // 5
 # blocks (network rule)
 COINBASE_MATURITY = 100
 
-# Anti replay OP_RETURN commitment.
-ANTI_REPLAY_COMMITMENT = b"Bitcoin: A Peer-to-Peer Electronic Cash System"
-
 # The maximum allowed size for a transaction, in bytes
 MAX_TX_SIZE = ONE_MEGABYTE
 
