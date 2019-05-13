@@ -16,7 +16,7 @@ Bitcoin SV is only supported on the Unix platform at this time.
 
 To run Bitcoin SV, unpack the files into a directory and run:
 
-- `bin/bitcoind` (headless)
+- `bin/bitcoind`
 
 ### Need Help?
 
