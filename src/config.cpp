@@ -35,6 +35,7 @@ void GlobalConfig::Reset()
     limitDescendantSize = DEFAULT_DESCENDANT_SIZE_LIMIT;
     limitAncestorSize = DEFAULT_ANCESTOR_SIZE_LIMIT;
 
+    testBlockCandidateValidity = false;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -212,6 +213,14 @@ void GlobalConfig::SetCashAddrEncoding(bool c) {
 }
 bool GlobalConfig::UseCashAddrEncoding() const {
     return useCashAddr;
+}
+
+void GlobalConfig::SetTestBlockCandidateValidity(bool test) {
+    testBlockCandidateValidity = test;
+}
+
+bool GlobalConfig::GetTestBlockCandidateValidity() const {
+    return testBlockCandidateValidity;
 }
 
 DummyConfig::DummyConfig()

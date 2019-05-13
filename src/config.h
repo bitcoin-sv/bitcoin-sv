@@ -68,6 +68,9 @@ public:
 
     virtual void SetLimitDescendantCount(uint64_t limitDescendantCount) = 0;
     virtual uint64_t GetLimitDescendantCount() const = 0;
+
+    virtual void SetTestBlockCandidateValidity(bool test) = 0;
+    virtual bool GetTestBlockCandidateValidity() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -120,6 +123,9 @@ public:
     void SetLimitDescendantCount(uint64_t limitDescendantCount) override;
     uint64_t GetLimitDescendantCount() const override;
 
+    void SetTestBlockCandidateValidity(bool test) override;
+    bool GetTestBlockCandidateValidity() const override;
+
     // Reset state of this object to match a newly constructed one.
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -151,6 +157,8 @@ private:
     uint64_t limitAncestorCount;
     uint64_t limitDescendantSize;
     uint64_t limitAncestorSize;
+
+    bool testBlockCandidateValidity;
 };
 
 // Dummy for subclassing in unittests
@@ -208,6 +216,9 @@ public:
 
     void SetLimitDescendantCount(uint64_t limitDescendantCount) override {}
     uint64_t GetLimitDescendantCount() const override { return 0; }
+
+    void SetTestBlockCandidateValidity(bool skip) override {}
+    bool GetTestBlockCandidateValidity() const override { return false; }
 
 private:
     std::unique_ptr<CChainParams> chainParams;

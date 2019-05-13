@@ -877,6 +877,10 @@ std::string HelpMessage(HelpMessageMode mode) {
         strUsage +=
             HelpMessageOpt("-blockversion=<n>",
                            "Override block version to test forking scenarios");
+        strUsage +=
+            HelpMessageOpt("-blockcandidatevaliditytest",
+                           strprintf(_("Perform validity test on block candidates. Defaults: "
+                           "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
     }
 
     strUsage += HelpMessageGroup(_("RPC server options:"));
@@ -1556,6 +1560,10 @@ bool AppInitParameterInteraction(Config &config) {
         config.SetBlockSizeActivationTime(nProposedActivationTime);
     }
 
+    // Configure whether to run extra block candidate validity checks
+    config.SetTestBlockCandidateValidity(
+        gArgs.GetBoolArg("-blockcandidatevaliditytest", chainparams.TestBlockCandidateValidity()));
+
     // Configure data carrier size.
     if(gArgs.IsArgSet("-datacarriersize")) {
         config.SetDataCarrierSize(gArgs.GetArg("-datacarriersize", DEFAULT_DATA_CARRIER_SIZE));
@@ -1574,7 +1582,6 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure descendant limit size.
     if(gArgs.IsArgSet("-limitdescendantsize")) {
         config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", (MAX_TX_SIZE * config.GetLimitDescendantCount()) / 1000) * 1000);
-
     }
 
     // Configure ancestor limit size.

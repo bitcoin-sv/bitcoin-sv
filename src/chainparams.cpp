@@ -254,6 +254,8 @@ public:
             // max generated block size after activation
             MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
         };
+
+        fTestBlockCandidateValidity = false;
     }
 };
 
@@ -349,6 +351,8 @@ public:
             // max generated block size after activation
             STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
         };
+
+        fTestBlockCandidateValidity = false;
     }
 };
 CStnParams stnParams;
@@ -481,6 +485,8 @@ public:
             // max generated block size after activation
             TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
         };
+
+        fTestBlockCandidateValidity = false;
     }
 };
 
@@ -589,6 +595,8 @@ public:
             // max generated block size after activation
             REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER
         };
+
+        fTestBlockCandidateValidity = true;
     }
 };
 
