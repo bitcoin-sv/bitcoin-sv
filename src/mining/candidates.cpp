@@ -16,12 +16,12 @@ namespace
  *
  * @return a reference to the MiningCandidate.
  */
-CMiningCandidateRef CMiningCandidateManager::Create(uint256 hashPrevBlock)
+CMiningCandidateRef CMiningCandidateManager::Create(const CBlockRef& block)
 {
     // Create UUID for next candidate
     MiningCandidateId nextId { mIdGenerator() };
 
-    auto candidate = std::make_shared<CMiningCandidate>(CMiningCandidate(nextId, hashPrevBlock));
+    auto candidate = std::make_shared<CMiningCandidate>(CMiningCandidate(nextId, block));
     std::lock_guard<std::mutex> lock {mMutex};
     mCandidates[nextId] = candidate;
     return candidate;

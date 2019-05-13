@@ -29,17 +29,12 @@ class CMiningCandidate {
     friend class CMiningCandidateManager;
 public:
     CBlockRef GetBlock() const { return mBlock; };
-    void SetBlock(const CBlockRef &blockRef) {
-        mBlock = blockRef;
-    };
     MiningCandidateId GetId() const { return mId; };
 
 private:
-    CMiningCandidate(MiningCandidateId _id, uint256 hashPrevBlock) : mId{_id} {
-        mBlock->hashPrevBlock = hashPrevBlock;
-    };
+    CMiningCandidate(MiningCandidateId id, const CBlockRef& block) : mBlock{block}, mId{id} {}
 
-    CBlockRef mBlock { std::make_shared<CBlock>() };
+    CBlockRef mBlock { nullptr };
     MiningCandidateId mId {};
 };
 using CMiningCandidateRef = std::shared_ptr<CMiningCandidate>;
@@ -50,7 +45,7 @@ using CMiningCandidateRef = std::shared_ptr<CMiningCandidate>;
  */
 class CMiningCandidateManager {
 public:
-    CMiningCandidateRef Create(uint256 hashPrevBlock);
+    CMiningCandidateRef Create(const CBlockRef& block);
     CMiningCandidateRef Get(const MiningCandidateId& candidateId) const;
 
     void Remove(MiningCandidateId candidateId) {
