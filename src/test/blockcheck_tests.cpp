@@ -45,6 +45,7 @@ BOOST_AUTO_TEST_CASE(blockfail) {
     // Set max blocksize to default in case other tests left it dirty
     GlobalConfig config;
     config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    config.SetMaxBlockSize(128*ONE_MEGABYTE);
     auto nDefaultMaxBlockSize = config.GetMaxBlockSize();
 
     CBlock block;
