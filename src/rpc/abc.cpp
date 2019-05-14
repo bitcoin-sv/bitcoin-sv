@@ -1,5 +1,5 @@
 // Copyright (c) 2017 The Bitcoin developers
-// Copyright (c) 2019 The Bitcoin SV developers
+// Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "config.h"

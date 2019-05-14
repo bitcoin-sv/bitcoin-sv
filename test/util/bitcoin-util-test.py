@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2014 BitPay Inc.
 # Copyright 2016-2017 The Bitcoin Core developers
-# Copyright (c) 2019 The Bitcoin SV developers
+# Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Test framework for bitcoin utils.
 

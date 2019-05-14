@@ -17,7 +17,7 @@
   <string>APPL</string>
 
   <key>CFBundleGetInfoString</key>
-  <string>0.1.0, Copyright © 2009-2018 The Bitcoin SV developers</string>
+  <string>0.1.0, Copyright © 2009-2018 Bitcoin Association</string>
 
   <key>CFBundleShortVersionString</key>
   <string>0.1.0</string>
