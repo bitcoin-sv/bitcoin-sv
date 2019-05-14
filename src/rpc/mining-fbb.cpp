@@ -1,5 +1,5 @@
 // Copyright (c) 2015 G. Andrew Stone
-// Copyright (c) 2018-2019 The Bitcoin SV developers.
+// Copyright (c) 2018-2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "mining.h"

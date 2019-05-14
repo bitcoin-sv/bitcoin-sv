@@ -1,5 +1,5 @@
 // Copyright 2014 BitPay Inc.
-// Copyright (c) 2019 The Bitcoin SV developers
+// Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <string.h>
