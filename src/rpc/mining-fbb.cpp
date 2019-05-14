@@ -40,7 +40,7 @@ namespace
 /// mkblocktemplate is a modified/cut down version of the code from the RPC method getblocktemplate. 
 /// It is currently only called from getminingcandidate, but getblocktemplate could be
 /// modified to call a generic version of mkblocktemplate.
-UniValue mkblocktemplate(const Config& config, bool coinbaseRequired, CMiningCandidateRef candidate)
+CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
 {
     LOCK(cs_main);
 
@@ -109,9 +109,9 @@ UniValue mkblocktemplate(const Config& config, bool coinbaseRequired, CMiningCan
     UpdateTime(pblock, config, pindexPrev);
     pblock->nNonce = 0;
 
-    candidate->SetBlock(blockref);
-
-    return NullUniValue;
+    // Create candidate and return it
+    CMiningCandidateRef candidate  { CMiningFactory::GetCandidateManager().Create(blockref) };
+    return candidate;
 }
 
 
@@ -300,8 +300,7 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
     }
 
     LOCK(cs_main);
-    CMiningCandidateRef candidate = CMiningFactory::GetCandidateManager().Create(chainActive.Tip()->GetBlockHash());
-    mkblocktemplate(config, coinbaseRequired, candidate);
+    CMiningCandidateRef candidate { mkblocktemplate(config, coinbaseRequired) };
     return MkMiningCandidateJson(coinbaseRequired, candidate);
 }
 

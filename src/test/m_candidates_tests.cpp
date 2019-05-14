@@ -12,14 +12,14 @@ BOOST_AUTO_TEST_SUITE(mining_candidates)
 BOOST_AUTO_TEST_CASE(add_remove_candidates) {
     constexpr int NUM_CANDIDATES = 250;
     std::set<MiningCandidateId> idsSet;
-    uint256 randomHash = InsecureRand256();
+    CBlockRef block { std::make_shared<CBlock>() };
 
     CMiningCandidateManager manager;
     MiningCandidateId first;
     MiningCandidateId fiftythird;
     BOOST_CHECK_EQUAL(0, manager.Size());
     for(int i = 0; i < NUM_CANDIDATES; i++) {
-        CMiningCandidateRef ref = manager.Create(randomHash);
+        CMiningCandidateRef ref = manager.Create(block);
         BOOST_CHECK(ref != nullptr);
         if (ref != nullptr) {
             // every id should be unique
