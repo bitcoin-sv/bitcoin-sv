@@ -15,7 +15,7 @@ from test_framework.comptool import TestManager, TestInstance
 from test_framework.mininode import *
 from test_framework.util import *
 import math
-from time import sleep
+import time
 
 # Calculate the merkle root for a block
 def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
@@ -161,6 +161,7 @@ class MiningTest(BitcoinTestFramework):
         newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos)
         fill_mempool(self.relayfee, node, newutxos)
 
+
     def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution
         block = CBlock()
@@ -214,7 +215,7 @@ class MiningTest(BitcoinTestFramework):
 
         submitResult = self._create_and_submit_block(blockNode, candidate, get_coinbase)
 
-        #submitResult is bool True for success, string if failure
+        # submitResult is bool True for success, false if failure
         assert submitResult
 
 
@@ -240,6 +241,37 @@ class MiningTest(BitcoinTestFramework):
             candidate = candidate_new
 
 
+    def test_optional_validation(self):
+        # Start 2 nodes, 1 with validation enabled the other disabled
+        self.log.info("Restarting nodes for optional validation")
+        self.stop_nodes()
+        self.start_nodes([['-blockcandidatevaliditytest=1','-checkmempool=0'], ['-blockcandidatevaliditytest=0','-checkmempool=0']])
+        self.sync_all()
+        connect_nodes_bi(self.nodes, 0, 1)
+
+        self._send_transactions_to_node(self.nodes[0], 5000)
+        self.sync_all()
+        # Check both nodes have the same number of txns in their mempool
+        assert self.nodes[0].getmempoolinfo()['size'] == self.nodes[1].getmempoolinfo()['size']
+
+        # Time call to getminingcandidate with validation
+        start_time = time.time()
+        candidate = self.nodes[0].getminingcandidate(True)
+        end_time = time.time()
+        validation_time = end_time - start_time
+        self.log.info("Time to get candidate with validation: {}".format(validation_time))
+
+        # Time call to getminingcandidate without validation
+        start_time = time.time()
+        candidate = self.nodes[1].getminingcandidate(True)
+        end_time = time.time()
+        novalidation_time = end_time - start_time
+        self.log.info("Time to get candidate without validation: {}".format(novalidation_time))
+
+        # Without validation will be significantly quicker
+        assert novalidation_time < validation_time
+
+
     def run_test(self):
         txnNode = self.nodes[0]
         blockNode = self.nodes[1]
@@ -248,12 +280,12 @@ class MiningTest(BitcoinTestFramework):
         self.test_mine_block(txnNode, blockNode, False)
 
         self.test_api_errors(blockNode, txnNode)
-
         self.sync_all()
+
+        self.test_optional_validation()
 
         self.test_mine_from_old_mining_candidate(blockNode, True)
         self.test_mine_from_old_mining_candidate(blockNode, False)
-
 
 
 if __name__ == '__main__':
