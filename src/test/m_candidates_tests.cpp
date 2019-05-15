@@ -12,7 +12,12 @@ BOOST_AUTO_TEST_SUITE(mining_candidates)
 BOOST_AUTO_TEST_CASE(add_remove_candidates) {
     constexpr int NUM_CANDIDATES = 250;
     std::set<MiningCandidateId> idsSet;
+
+    // Make dummy coinbase and block
+    CMutableTransaction tx {};
     CBlockRef block { std::make_shared<CBlock>() };
+    block->vtx.resize(1);
+    block->vtx[0] = MakeTransactionRef(std::move(tx));
 
     CMiningCandidateManager manager;
     MiningCandidateId first;
