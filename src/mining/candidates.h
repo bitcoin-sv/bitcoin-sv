@@ -28,14 +28,28 @@ using MiningCandidateId = boost::uuids::uuid;
 class CMiningCandidate {
     friend class CMiningCandidateManager;
 public:
-    CBlockRef GetBlock() const { return mBlock; };
+    // Accessors
     MiningCandidateId GetId() const { return mId; };
+    CBlockRef GetBlock() const { return mBlock; };
+    uint32_t GetBlockTime() const { return mBlockTime; }
+    uint32_t GetBlockBits() const { return mBlockBits; }
+    int32_t GetBlockVersion() const { return mBlockVersion; }
+    CTransactionRef GetBlockCoinbase() const { return mBlockCoinbase; }
 
 private:
-    CMiningCandidate(MiningCandidateId id, const CBlockRef& block) : mBlock{block}, mId{id} {}
+    CMiningCandidate(MiningCandidateId id, const CBlockRef& block);
 
-    CBlockRef mBlock { nullptr };
+    // This candidate ID
     MiningCandidateId mId {};
+
+    // The block this candidate is based off
+    CBlockRef mBlock { nullptr };
+
+    // Fields from the block that are unique to this candidate
+    uint32_t mBlockTime {};
+    uint32_t mBlockBits {};
+    int32_t mBlockVersion {};
+    CTransactionRef mBlockCoinbase {};
 };
 using CMiningCandidateRef = std::shared_ptr<CMiningCandidate>;
 

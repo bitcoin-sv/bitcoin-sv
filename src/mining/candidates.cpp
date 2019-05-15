@@ -11,6 +11,25 @@ namespace
 }
 
 /**
+ * CMiningCandidate constructor.
+ */
+CMiningCandidate::CMiningCandidate(MiningCandidateId id, const CBlockRef& block)
+    : mId{id}, mBlock{block}
+{
+    if(!block || block->vtx.empty())
+    {
+        throw std::runtime_error("Null or empty block in MiningCandidate creation");
+    }
+
+    // Copy out fields from block that are unique to this candidate
+    mBlockTime = block->nTime;
+    mBlockBits = block->nBits;
+    mBlockVersion = block->nVersion;
+    mBlockCoinbase = block->vtx[0];
+}
+
+
+/**
  * Create a new Mining Candidate. This is then ready for use by the BlockConstructor to construct a Candidate Block.
  * The Mining Candidate is assigned a unique id and is added to the set of candidates.
  *
