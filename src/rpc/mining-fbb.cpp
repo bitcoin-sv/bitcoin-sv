@@ -340,7 +340,11 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block candidate ID not found");
     }
 
-    CBlockRef block = result->GetBlock();
+    // Make a copy of the block we're trying to submit so that we can safely update the fields
+    // sent to us without invalidating other candidates based off the same block.
+    CBlockRef baseBlock { result->GetBlock() };
+    CBlockRef block { std::make_shared<CBlock>(baseBlock->GetBlockHeader()) };
+    block->vtx = baseBlock->vtx;
 
     UniValue nonce = rcvd["nonce"];
     if (nonce.isNull())
@@ -352,13 +356,28 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     UniValue time = rcvd["time"];
     if (!time.isNull())
     {
+        // Use time from client
         block->nTime = (uint32_t)time.get_int64();
     }
+    else
+    {
+        // Use original time from mining candidate
+        block->nTime = result->GetBlockTime();
+    }
+
+    // Reset nBits to those from the original candidate
+    block->nBits = result->GetBlockBits();
 
     UniValue version = rcvd["version"];
     if (!version.isNull())
     {
+        // Use version from client
         block->nVersion = version.get_int(); // version signed 32 bit int
+    }
+    else
+    {
+        // Use original version from mining candidate
+        block->nVersion = result->GetBlockVersion();
     }
 
     // Coinbase
@@ -368,12 +387,18 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         CMutableTransaction coinbase;
         if (DecodeHexTx(coinbase, cbhex.get_str()))
         {
+            // Use coinbase from client
             block->vtx[0] = MakeTransactionRef(std::move(coinbase));
         }
         else
         {
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "coinbase decode failed");
         }
+    }
+    else
+    {
+        // Use original coinbase from mining candidate
+        block->vtx[0] = result->GetBlockCoinbase();
     }
 
     // Merkle root

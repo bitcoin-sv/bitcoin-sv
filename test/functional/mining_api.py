@@ -15,6 +15,7 @@ from test_framework.comptool import TestManager, TestInstance
 from test_framework.mininode import *
 from test_framework.util import *
 import math
+from time import sleep
 
 # Calculate the merkle root for a block
 def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
@@ -151,33 +152,16 @@ class MiningTest(BitcoinTestFramework):
         assert submitResult == 'high-hash'
 
 
-    def test_mine_block(self, txnNode, blockNode, get_coinbase):
-        self.log.info("Setting up for submission...")
-
+    def _send_transactions_to_node(self, node, num_trasactions):
         # Create UTXOs to build a bunch of transactions from
-        self.relayfee = txnNode.getnetworkinfo()['relayfee']
-        utxos = create_confirmed_utxos(self.relayfee, txnNode, 100)
+        self.relayfee = node.getnetworkinfo()['relayfee']
+        utxos = create_confirmed_utxos(self.relayfee, node, 100)
 
         # Create a lot of transactions from the UTXOs
-        num_reqd = 1000
-        newutxos = split_utxos(self.relayfee, txnNode, num_reqd, utxos)
-        fill_mempool(self.relayfee, txnNode, newutxos)
+        newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos)
+        fill_mempool(self.relayfee, node, newutxos)
 
-        # Check candidate has expected fields
-        candidate = blockNode.getminingcandidate(get_coinbase)
-        assert 'id' in candidate
-        assert 'prevhash' in candidate
-        if(get_coinbase):
-            assert 'coinbase' in candidate
-        else:
-            assert not 'coinbase' in candidate
-        assert 'coinbaseValue' in candidate
-        assert 'version' in candidate
-        assert 'nBits' in candidate
-        assert 'time' in candidate
-        assert 'height' in candidate
-        assert 'merkleProof' in candidate
-
+    def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution
         block = CBlock()
         block.nVersion = candidate["version"]
@@ -196,17 +180,64 @@ class MiningTest(BitcoinTestFramework):
         # Calculate merkle root & solve
         block.hashMerkleRoot = merkle_root_from_merkle_proof(coinbase_tx.sha256, candidate["merkleProof"])
         block.solve()
+        block.rehash()
+        self.log.info("block hash before submit: " + str(block.hash))
 
-        # Submit and verify it was accepted
-        if(get_coinbase):
+        if (get_coinbase):
             self.log.info("Checking submission with provided coinbase")
-            submitResult = blockNode.submitminingsolution({'id': candidate['id'], 'nonce': block.nNonce})
+            return node.submitminingsolution({'id': candidate['id'], 'nonce': block.nNonce})
         else:
             self.log.info("Checking submission with generated coinbase")
-            submitResult = blockNode.submitminingsolution({'id': candidate['id'],
-                                                           'nonce': block.nNonce,
-                                                           'coinbase': '{}'.format(ToHex(coinbase_tx))})
+            return node.submitminingsolution({'id': candidate['id'],
+                                              'nonce': block.nNonce,
+                                              'coinbase': '{}'.format(ToHex(coinbase_tx))})
+
+    def test_mine_block(self, txnNode, blockNode, get_coinbase):
+        self.log.info("Setting up for submission...")
+
+        self._send_transactions_to_node(txnNode, 1000)
+
+        # Check candidate has expected fields
+        candidate = blockNode.getminingcandidate(get_coinbase)
+        assert 'id' in candidate
+        assert 'prevhash' in candidate
+        if(get_coinbase):
+            assert 'coinbase' in candidate
+        else:
+            assert not 'coinbase' in candidate
+        assert 'coinbaseValue' in candidate
+        assert 'version' in candidate
+        assert 'nBits' in candidate
+        assert 'time' in candidate
+        assert 'height' in candidate
+        assert 'merkleProof' in candidate
+
+        submitResult = self._create_and_submit_block(blockNode, candidate, get_coinbase)
+
+        #submitResult is bool True for success, string if failure
         assert submitResult
+
+
+    def test_mine_from_old_mining_candidate(self, blockNode, get_coinbase):
+
+        candidate = blockNode.getminingcandidate(get_coinbase)
+
+        # Here we will check multiple block submitions because probability of accepting
+        # a block with the random nonce is very high
+        for i in range(1, 100):
+            # one more minute to future
+            blockNode.setmocktime(candidate["time"] + 60)
+
+            #we are getting new mining candidate to change nTime in the headder of the pblocktemplate
+            candidate_new = blockNode.getminingcandidate(get_coinbase)
+
+            assert (candidate["time"] < candidate_new["time"])
+
+            submitResult = self._create_and_submit_block(blockNode, candidate, get_coinbase)
+            if submitResult == "high-hash":
+                assert False, "Submited blocks is rejected because invalid pow, the time has changed."
+
+            candidate = candidate_new
 
 
     def run_test(self):
@@ -215,9 +246,15 @@ class MiningTest(BitcoinTestFramework):
 
         self.test_mine_block(txnNode, blockNode, True)
         self.test_mine_block(txnNode, blockNode, False)
+
         self.test_api_errors(blockNode, txnNode)
 
         self.sync_all()
+
+        self.test_mine_from_old_mining_candidate(blockNode, True)
+        self.test_mine_from_old_mining_candidate(blockNode, False)
+
+
 
 if __name__ == '__main__':
     MiningTest().main()
