@@ -3070,6 +3070,7 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
         pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
         pindexNew->BuildSkip();
     }
+    pindexNew->nTimeReceived = GetTime();
     pindexNew->nTimeMax =
         (pindexNew->pprev
              ? std::max(pindexNew->pprev->nTimeMax, pindexNew->nTime)
@@ -3595,6 +3596,29 @@ static bool AcceptBlock(const Config &config,
     // process an unrequested block if it's new and has enough work to
     // advance our tip, and isn't too many blocks ahead.
     bool fAlreadyHave = pindex->nStatus.hasData();
+
+    // Compare block header timestamps and received times of the block and the
+    // chaintip.  If they have the same chain height, use these diffs as a
+    // tie-breaker, attempting to pick the more honestly-mined block.
+    int64_t newBlockTimeDiff = std::llabs(pindex->GetReceivedTimeDiff());
+    int64_t chainTipTimeDiff =
+        chainActive.Tip() ? std::llabs(chainActive.Tip()->GetReceivedTimeDiff())
+                          : 0;
+
+    bool isSameHeightAndMoreHonestlyMined =
+        chainActive.Tip() &&
+        (pindex->nChainWork == chainActive.Tip()->nChainWork) &&
+        (newBlockTimeDiff < chainTipTimeDiff);
+    if (isSameHeightAndMoreHonestlyMined) {
+        LogPrintf("Chain tip timestamp-to-received-time difference: hash=%s, "
+                  "diff=%d\n",
+                  chainActive.Tip()->GetBlockHash().ToString(),
+                  chainTipTimeDiff);
+        LogPrintf("New block timestamp-to-received-time difference: hash=%s, "
+                  "diff=%d\n",
+                  pindex->GetBlockHash().ToString(), newBlockTimeDiff);
+    }
+
     bool fHasMoreWork =
         (chainActive.Tip() ? pindex->nChainWork > chainActive.Tip()->nChainWork
                            : true);
