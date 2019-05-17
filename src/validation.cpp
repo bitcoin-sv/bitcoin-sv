@@ -1816,6 +1816,11 @@ static uint32_t GetBlockScriptFlags(const Config &config,
         flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
     }
 
+    // Start enforcing CSV (BIP68, BIP112 and BIP113) rule.
+    if ((pChainTip->nHeight + 1) >= consensusparams.CSVHeight) {
+        flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
+    }
+
     // If the UAHF is enabled, we start accepting replay protected txns
     if (IsUAHFenabled(config, pChainTip)) {
         flags |= SCRIPT_VERIFY_STRICTENC;
@@ -1976,8 +1981,11 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
         }
     }
 
-
+    // Start enforcing BIP68 (sequence locks) using versionbits logic.
     int nLockTimeFlags = 0;
+    if (pindex->nHeight >= consensusParams.CSVHeight) {
+        nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
+    }
     const uint32_t flags = GetBlockScriptFlags(config, pindex->pprev);
 
     int64_t nTime2 = GetTimeMicros();
@@ -3401,7 +3409,11 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
+    // Start enforcing BIP113 (Median Time Past) using versionbits logic.
     int nLockTimeFlags = 0;
+    if (nHeight >= consensusParams.CSVHeight) {
+        nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
+    }
 
     // Check if block has the right size. Maximum accepted block size changes
     // according to predetermined schedule unless user has overriden this by 
