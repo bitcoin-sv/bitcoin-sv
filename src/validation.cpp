@@ -1835,12 +1835,6 @@ static uint32_t GetBlockScriptFlags(const Config &config,
         flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
     }
 
-    // Start enforcing BIP112 (CHECKSEQUENCEVERIFY) using versionbits logic.
-    if (VersionBitsState(pChainTip, consensusparams, Consensus::DEPLOYMENT_CSV,
-                         versionbitscache) == THRESHOLD_ACTIVE) {
-        flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
-    }
-
     // If the UAHF is enabled, we start accepting replay protected txns
     if (IsUAHFenabled(config, pChainTip)) {
         flags |= SCRIPT_VERIFY_STRICTENC;
@@ -2001,14 +1995,8 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
         }
     }
 
-    // Start enforcing BIP68 (sequence locks) using versionbits logic.
-    int nLockTimeFlags = 0;
-    if (VersionBitsState(pindex->pprev, consensusParams,
-                         Consensus::DEPLOYMENT_CSV,
-                         versionbitscache) == THRESHOLD_ACTIVE) {
-        nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
-    }
 
+    int nLockTimeFlags = 0;
     const uint32_t flags = GetBlockScriptFlags(config, pindex->pprev);
 
     int64_t nTime2 = GetTimeMicros();
@@ -3433,12 +3421,7 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
-    // Start enforcing BIP113 (Median Time Past) using versionbits logic.
     int nLockTimeFlags = 0;
-    if (VersionBitsState(pindexPrev, consensusParams, Consensus::DEPLOYMENT_CSV,
-                         versionbitscache) == THRESHOLD_ACTIVE) {
-        nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
-    }
 
     // Check if block has the right size. Maximum accepted block size changes
     // according to predetermined schedule unless user has overriden this by 
@@ -4959,19 +4942,6 @@ std::string CBlockFileInfo::ToString() const {
 
 CBlockFileInfo *GetBlockFileInfo(size_t n) {
     return pBlockFileInfoStore->GetBlockFileInfo(n);
-}
-
-ThresholdState VersionBitsTipState(const Consensus::Params &params,
-                                   Consensus::DeploymentPos pos) {
-    LOCK(cs_main);
-    return VersionBitsState(chainActive.Tip(), params, pos, versionbitscache);
-}
-
-int VersionBitsTipStateSinceHeight(const Consensus::Params &params,
-                                   Consensus::DeploymentPos pos) {
-    LOCK(cs_main);
-    return VersionBitsStateSinceHeight(chainActive.Tip(), params, pos,
-                                       versionbitscache);
 }
 
 static const uint64_t MEMPOOL_DUMP_VERSION = 1;
