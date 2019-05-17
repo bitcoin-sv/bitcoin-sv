@@ -23,6 +23,4 @@ UniValue generateBlocks(const Config& config,
 
 UniValue SubmitBlock(const Config& config, const std::shared_ptr<CBlock>& block);
 
-std::string gbt_vb_name(const Consensus::DeploymentPos pos);
-
 #endif

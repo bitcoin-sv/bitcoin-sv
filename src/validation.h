@@ -724,8 +724,6 @@ extern CBlockTreeDB *pblocktree;
  */
 int GetSpendHeight(const CCoinsViewCache &inputs);
 
-extern VersionBitsCache versionbitscache;
-
 /**
  * Reject codes greater or equal to this can be returned by AcceptToMemPool for
  * transactions, to signal internal conditions. They cannot and should not be

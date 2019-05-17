@@ -1792,9 +1792,6 @@ void ThreadScriptCheck() {
     scriptcheckqueue.Thread();
 }
 
-// Protected by cs_main
-VersionBitsCache versionbitscache;
-
 // Returns the script flags which should be checked for a given block
 static uint32_t GetBlockScriptFlags(const Config &config,
                                     const CBlockIndex *pChainTip) {
@@ -4362,7 +4359,6 @@ void UnloadBlockIndex() {
     pBlockFileInfoStore->Clear();
     nBlockSequenceId = 1;
     setDirtyBlockIndex.clear();
-    versionbitscache.Clear();
 
     for (BlockMap::value_type &entry : mapBlockIndex) {
         delete entry.second;

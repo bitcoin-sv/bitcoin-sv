@@ -97,8 +97,6 @@ public:
     const std::vector<SeedSpec6> &FixedSeeds() const { return vFixedSeeds; }
     const CCheckpointData &Checkpoints() const { return checkpointData; }
     const ChainTxData &TxData() const { return chainTxData; }
-    void UpdateBIP9Parameters(Consensus::DeploymentPos d, int64_t nStartTime,
-                              int64_t nTimeout);
     const DefaultBlockSizeParams &GetDefaultBlockSizeParams() const { return defaultBlockSizeParams; }
 
     bool TestBlockCandidateValidity() const { return fTestBlockCandidateValidity; }
