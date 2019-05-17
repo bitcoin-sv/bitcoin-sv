@@ -25,6 +25,7 @@
 #include "utilmoneystr.h"
 #include "validation.h"
 #include "validationinterface.h"
+#include "versionbits.h"
 
 #include <algorithm>
 #include <queue>
@@ -157,8 +158,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
     nHeight = pindexPrevNew->nHeight + 1;
 
     const CChainParams &chainparams = config->GetChainParams();
-    pblock->nVersion =
-        ComputeBlockVersion(pindexPrevNew, chainparams.GetConsensus());
+    pblock->nVersion = VERSIONBITS_TOP_BITS;
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
     if (chainparams.MineBlocksOnDemand()) {

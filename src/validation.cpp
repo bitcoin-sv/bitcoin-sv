@@ -1795,22 +1795,6 @@ void ThreadScriptCheck() {
 // Protected by cs_main
 VersionBitsCache versionbitscache;
 
-int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev,
-                            const Consensus::Params &params) {
-    LOCK(cs_main);
-    int32_t nVersion = VERSIONBITS_TOP_BITS;
-
-    for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++) {
-        ThresholdState state = VersionBitsState(
-            pindexPrev, params, (Consensus::DeploymentPos)i, versionbitscache);
-        if (state == THRESHOLD_LOCKED_IN || state == THRESHOLD_STARTED) {
-            nVersion |= VersionBitsMask(params, (Consensus::DeploymentPos)i);
-        }
-    }
-
-    return nVersion;
-}
-
 // Returns the script flags which should be checked for a given block
 static uint32_t GetBlockScriptFlags(const Config &config,
                                     const CBlockIndex *pChainTip) {
@@ -2360,8 +2344,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
         // Check the version of the last 100 blocks to see if we need to
         // upgrade:
         for (int i = 0; i < 100 && pindex != nullptr; i++) {
-            int32_t nExpectedVersion =
-                ComputeBlockVersion(pindex->pprev, consensusParams);
+            int32_t nExpectedVersion = VERSIONBITS_TOP_BITS;
             if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION &&
                 (pindex->nVersion & ~nExpectedVersion) != 0) {
                 ++nUpgraded;
