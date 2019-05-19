@@ -3598,8 +3598,8 @@ static bool AcceptBlock(const Config &config,
     bool fAlreadyHave = pindex->nStatus.hasData();
 
     // Compare block header timestamps and received times of the block and the
-    // chaintip.  If they have the same chain height, use these diffs as a
-    // tie-breaker, attempting to pick the more honestly-mined block.
+    // chaintip.  If they have the same chain height, just log the time
+    // difference for both.
     int64_t newBlockTimeDiff = std::llabs(pindex->GetReceivedTimeDiff());
     int64_t chainTipTimeDiff =
         chainActive.Tip() ? std::llabs(chainActive.Tip()->GetReceivedTimeDiff())
