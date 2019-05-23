@@ -155,10 +155,12 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
     }
 
+    const CBlockIndex* tip = nullptr;
     std::vector<const CBlockIndex *> headers;
     headers.reserve(count);
     {
         LOCK(cs_main);
+        tip = chainActive.Tip();
         BlockMap::const_iterator it = mapBlockIndex.find(hash);
         const CBlockIndex *pindex =
             (it != mapBlockIndex.end()) ? it->second : nullptr;
@@ -194,7 +196,7 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         case RF_JSON: {
             UniValue jsonHeaders(UniValue::VARR);
             for (const CBlockIndex *pindex : headers) {
-                jsonHeaders.push_back(blockheaderToJSON(pindex));
+                jsonHeaders.push_back(blockheaderToJSON(tip, pindex));
             }
             std::string strJSON = jsonHeaders.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
@@ -228,12 +230,13 @@ static bool rest_block(const Config &config, HTTPRequest *req,
 
     CBlock block;
     CBlockIndex *pblockindex = nullptr;
+    CBlockIndex* tip = nullptr;
     {
         LOCK(cs_main);
         if (mapBlockIndex.count(hash) == 0) {
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
         }
-
+        tip = chainActive.Tip();
         pblockindex = mapBlockIndex[hash];
         if (fHavePruned && !pblockindex->nStatus.hasData() &&
             pblockindex->nTx > 0) {
@@ -267,7 +270,7 @@ static bool rest_block(const Config &config, HTTPRequest *req,
 
         case RF_JSON: {
             UniValue objBlock =
-                blockToJSON(config, block, pblockindex, showTxDetails);
+                blockToJSON(config, block, tip,pblockindex, showTxDetails);
             std::string strJSON = objBlock.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
             req->WriteReply(HTTP_OK, strJSON);

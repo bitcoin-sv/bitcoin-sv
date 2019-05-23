@@ -66,14 +66,25 @@ double GetDifficulty(const CBlockIndex *blockindex) {
     return GetDifficultyFromBits(blockindex->nBits);
 }
 
-UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
+static int ComputeNextBlockAndDepth(const CBlockIndex* tip, const CBlockIndex* blockindex, const CBlockIndex*& next)
+{
+    next = tip->GetAncestor(blockindex->nHeight + 1);
+    if (next && next->pprev == blockindex) {
+        return tip->nHeight - blockindex->nHeight + 1;
+    }
+    next = nullptr;
+    return blockindex == tip ? 1 : -1;
+}
+
+UniValue blockheaderToJSON(const CBlockIndex* tip, const CBlockIndex* blockindex)
+{
+    // Serialize passed information without accessing chain state of the active chain!
+    AssertLockNotHeld(cs_main); // For performance reasons
+
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
-    int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
-    }
+    const CBlockIndex* pnext;
+    int confirmations = ComputeNextBlockAndDepth(tip, blockindex, pnext);
     result.push_back(Pair("confirmations", confirmations));
     result.push_back(Pair("height", blockindex->nHeight));
     result.push_back(Pair("version", blockindex->nVersion));
@@ -92,7 +103,6 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
         result.push_back(Pair("previousblockhash",
                               blockindex->pprev->GetBlockHash().GetHex()));
     }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
     if (pnext) {
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     }
@@ -100,14 +110,14 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
 }
 
 UniValue blockToJSON(const Config &config, const CBlock &block,
-                     const CBlockIndex *blockindex, bool txDetails) {
+                     const CBlockIndex *tip, const CBlockIndex*blockindex, bool txDetails) {
+    // Serialize passed information without accessing chain state of the active chain!
+    AssertLockNotHeld(cs_main); // For performance reasons
+
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
-    int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
-    }
+    const CBlockIndex* pnext;
+    int confirmations = ComputeNextBlockAndDepth(tip, blockindex, pnext);
     result.push_back(Pair("confirmations", confirmations));
     result.push_back(Pair(
         "size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
@@ -138,7 +148,6 @@ UniValue blockToJSON(const Config &config, const CBlock &block,
         result.push_back(Pair("previousblockhash",
                               blockindex->pprev->GetBlockHash().GetHex()));
     }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
     if (pnext) {
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     }
@@ -753,7 +762,7 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
         return strHex;
     }
 
-    return blockheaderToJSON(pblockindex);
+    return blockheaderToJSON(chainActive.Tip(), pblockindex);
 }
 
 UniValue getblock(const Config &config, const JSONRPCRequest &request) {
@@ -809,8 +818,6 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
                                        "214adbda81d7e2a3dd146f6ed09\""));
     }
 
-    LOCK(cs_main);
-
     std::string strHash = request.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
@@ -818,25 +825,30 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     if (request.params.size() > 1) {
         fVerbose = request.params[1].get_bool();
     }
-
-    if (mapBlockIndex.count(hash) == 0) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-    }
-
     CBlock block;
-    CBlockIndex *pblockindex = mapBlockIndex[hash];
+    const CBlockIndex* pblockindex;
+    const CBlockIndex* tip;
+    {
+        LOCK(cs_main);
+        if (mapBlockIndex.count(hash) == 0) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+        }
 
-    if (fHavePruned && !pblockindex->nStatus.hasData() &&
-        pblockindex->nTx > 0) {
-        throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
-    }
+        pblockindex = mapBlockIndex[hash];
+        tip = chainActive.Tip();
 
-    if (!ReadBlockFromDisk(block, pblockindex, config)) {
-        // Block not found on disk. This could be because we have the block
-        // header in our index but don't have the block (for example if a
-        // non-whitelisted node sends us an unrequested long chain of valid
-        // blocks, we add the headers to our index, but don't accept the block).
-        throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
+        if (fHavePruned && !pblockindex->nStatus.hasData() &&
+            pblockindex->nTx > 0) {
+            throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
+        }
+
+        if (!ReadBlockFromDisk(block, pblockindex, config)) {
+            // Block not found on disk. This could be because we have the block
+            // header in our index but don't have the block (for example if a
+            // non-whitelisted node sends us an unrequested long chain of valid
+            // blocks, we add the headers to our index, but don't accept the block).
+            throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
+        }
     }
 
     if (!fVerbose) {
@@ -847,7 +859,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         return strHex;
     }
 
-    return blockToJSON(config, block, pblockindex);
+    return blockToJSON(config, block, tip, pblockindex);
 }
 
 struct CCoinsStats {
@@ -1155,7 +1167,7 @@ UniValue verifychain(const Config &config, const JSONRPCRequest &request) {
 }
 
 /** Implementation of IsSuperMajority with better feedback */
-static UniValue SoftForkMajorityDesc(int version, CBlockIndex *pindex,
+static UniValue SoftForkMajorityDesc(int version, const CBlockIndex *pindex,
                                      const Consensus::Params &consensusParams) {
     UniValue rv(UniValue::VOBJ);
     bool activated = false;
@@ -1175,7 +1187,7 @@ static UniValue SoftForkMajorityDesc(int version, CBlockIndex *pindex,
 }
 
 static UniValue SoftForkDesc(const std::string &name, int version,
-                             CBlockIndex *pindex,
+                            const CBlockIndex *pindex,
                              const Consensus::Params &consensusParams) {
     UniValue rv(UniValue::VOBJ);
     rv.push_back(Pair("id", name));
