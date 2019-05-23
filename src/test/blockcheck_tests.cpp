@@ -104,7 +104,31 @@ BOOST_AUTO_TEST_CASE(blockfail) {
     block.vtx.push_back(MakeTransactionRef(tx));
     RunCheckOnBlock(config, block, "bad-blk-length");
 
-	
+	// Bounds checking within GetHeightFromCoinbase()
+    block.vtx.resize(1);
+    block.vtx[0] = MakeTransactionRef(tx);
 }
 
+BOOST_AUTO_TEST_CASE(block_bounds_check)
+{
+    SelectParams(CBaseChainParams::MAIN);
+
+    /* Bounds checking within GetHeightFromCoinbase() */
+
+    // Invalid coinbase script which mis-reports length
+    CMutableTransaction tx {};
+    tx.vin.resize(1);
+    tx.vin[0].scriptSig.resize(1);
+    tx.vin[0].scriptSig[0] = 0xff;
+    tx.vout.resize(1);
+    tx.vout[0].nValue = Amount(42);
+    auto coinbaseTx = CTransaction(tx);
+    CBlock block {};
+    block.vtx.resize(1);
+    block.vtx[0] = MakeTransactionRef(tx);
+
+    // GetHeightFromCoinbase() should throw
+    BOOST_CHECK_THROW(block.GetHeightFromCoinbase(), std::runtime_error);
+}
+ 
 BOOST_AUTO_TEST_SUITE_END()

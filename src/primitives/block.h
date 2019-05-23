@@ -84,7 +84,15 @@ public:
     uint64_t GetHeightFromCoinbase() const // Returns the block's height as specified in its coinbase transaction
     {
         const CScript &sig = vtx[0]->vin[0].scriptSig;
-        int numlen = sig[0];
+
+        // Get length of height number
+        if(sig.empty())
+            throw std::runtime_error("Empty coinbase scriptSig");
+        uint8_t numlen = sig[0];
+        if(sig.size() - 1 < numlen)
+            throw std::runtime_error("Badly formated hight in coinbase");
+
+        // Parse height as CScriptNum
         if (numlen == OP_0)
             return 0;
         if ((numlen >= OP_1) && (numlen <= OP_16))
