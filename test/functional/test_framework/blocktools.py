@@ -6,7 +6,7 @@
 
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN
-from .util import assert_equal, assert_raises_rpc_error
+from .util import assert_equal, assert_raises_rpc_error, hash256
 from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT)
 
 from collections import deque
@@ -28,6 +28,38 @@ def create_block(hashprev, coinbase, nTime=None):
     block.calc_sha256()
     return block
 
+def create_block_from_candidate(miningCandidate):
+    block = CBlock()
+    block.nVersion = miningCandidate["version"]
+    block.hashPrevBlock = int(miningCandidate["prevhash"], 16)
+    block.nTime = miningCandidate["time"]
+    block.nBits = int(miningCandidate["nBits"], 16)
+    block.nNonce = 0
+
+    coinbase_tx = create_coinbase(height=int(miningCandidate["height"]) + 1)
+    coinbase_tx.rehash()
+    block.vtx = [coinbase_tx]
+    block.hashMerkleRoot = merkle_root_from_merkle_proof(coinbase_tx.sha256, miningCandidate["merkleProof"])
+    
+    return block
+
+# Calculate the merkle root for a block
+def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
+    merkleRootBytes = ser_uint256(coinbase_hash)
+    for mp in merkle_proof:
+        mp = int(mp, 16)
+        mpBytes = ser_uint256(mp)
+        merkleRootBytes = hash256(merkleRootBytes + mpBytes)
+        merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
+    return uint256_from_str(merkleRootBytes)
+
+# Do incorrect POW for block
+def solve_bad(block):
+    block.rehash()
+    target = uint256_from_compact(block.nBits)
+    while block.sha256 < target:
+        block.nNonce += 1
+        block.rehash()
 
 def serialize_script_num(value):
     r = bytearray(0)
