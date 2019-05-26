@@ -1,0 +1,33 @@
+﻿{
+  "configurations": [
+    {
+      "name": "BitcoinSV",
+      "generator": "Unix Makefiles",
+      "remoteMachineName": "${defaultRemoteMachineName}",
+      "configurationType": "Debug",
+      //"configurationType": "Release",
+      "remoteCMakeListsRoot": "/home/kenshin/${name}/src",
+      "cmakeExecutable": "/usr/bin/cmake",
+      "buildRoot": "${env.USERPROFILE}\\CMakeBuilds\\${name}\\build",
+      "installRoot": "${env.USERPROFILE}\\CMakeBuilds\\${name}\\install",
+      "remoteBuildRoot": "/home/kenshin/${name}/build",
+      "remoteInstallRoot": "/home/kenshin/${name}/install",
+      "remoteCopySources": true,
+      "remoteCopySourcesOutputVerbosity": "Normal",
+      "remoteCopySourcesConcurrentCopies": "10",
+      "remoteCopySourcesMethod": "rsync",
+      "remoteCopySourcesExclusionList": [
+        ".vs",
+        ".git"
+      ],
+      "rsyncCommandArgs": "-t --delete --delete-excluded",
+      "remoteCopyBuildOutput": false,
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [
+        "linux_x64"
+      ]
+    }
+  ]
+}

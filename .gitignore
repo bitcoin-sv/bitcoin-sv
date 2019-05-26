@@ -101,3 +101,5 @@ contrib/devtools/split-debug.sh
 .vagrant
 
 /dist
+
+.vs
