@@ -331,7 +331,7 @@ endif()
 # bitcoin-miner
 add_executable(bitcoin-miner bitcoin-miner.cpp)
 target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
-target_link_libraries(bitcoin-miner common rpcclient ${EVENT_LIBRARY})
+target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoin-miner PRIVATE bitcoin-miner-res.rc)
 endif()
