@@ -123,7 +123,7 @@ std::vector<uint256> GetMerkleProofBranches(CBlockRef pblock)
 
     for (int i = 0; i < len; i++)
     {
-        leaves.push_back(pblock->vtx[i].get()->GetHash());
+        leaves.emplace_back(pblock->vtx[i]->GetHash());
     }
 
     return ComputeMerkleBranch(leaves, 0);
