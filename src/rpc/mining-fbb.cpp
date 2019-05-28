@@ -64,16 +64,15 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     // Update block
     static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
-    static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
+    static std::unique_ptr<CBlockTemplate> pblocktemplate { std::make_unique<CBlockTemplate>() };
     if (pindexPrev != chainActive.Tip() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = nullptr;
 
-        // Store the pindexBest used before CreateNewBlock, to avoid races
+        // Update other fields for tracking state of this candidate
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-        CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
         // Dummy script; the real one is either created by the wallet below, or will be replaced by one
@@ -93,13 +92,10 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
             coinbaseScriptPubKey = coinbaseScript->reserveScript;
         }
-        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScriptPubKey);
+        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScriptPubKey, pindexPrev);
 
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
-
-        // Need to update only after we know CreateNewBlock succeeded
-        pindexPrev = pindexPrevNew;
     }
 
     CBlockRef blockref = pblocktemplate->GetBlockRef();
