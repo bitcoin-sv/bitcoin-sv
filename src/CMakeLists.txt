@@ -252,6 +252,7 @@ add_library(server
 	validation.cpp
 	validationinterface.cpp
 	versionbits.cpp
+    vmtouch.cpp
 )
 
 # This require libevent

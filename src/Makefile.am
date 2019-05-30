@@ -182,6 +182,7 @@ BITCOIN_CORE_H = \
   validation.h \
   validationinterface.h \
   versionbits.h \
+  vmtouch.h \
   wallet/coincontrol.h \
   wallet/crypter.h \
   wallet/db.h \
@@ -250,6 +251,7 @@ libbitcoin_server_a_SOURCES = \
   validation.cpp \
   validationinterface.cpp \
   versionbits.cpp \
+  vmtouch.cpp \
   $(BITCOIN_CORE_H)
 
 if ENABLE_ZMQ

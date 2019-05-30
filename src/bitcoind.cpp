@@ -26,6 +26,7 @@
 
 #include <cstdio>
 
+
 /* Introduction text for doxygen: */
 
 /*! \mainpage Developer documentation
@@ -193,8 +194,11 @@ bool AppInit(int argc, char *argv[]) {
         // don't result in a hang due to some
         // thread-blocking-waiting-for-another-thread-during-startup case.
     } else {
+        LogPrintf("Preload wait for shutdown\n");
         WaitForShutdown(&threadGroup);
+        LogPrintf("Preload wait for shutdown done\n");
     }
+    LogPrintf("Checking Thread shutdown\n");
     Shutdown();
 
     return fRet;
