@@ -102,6 +102,8 @@ public:
                               int64_t nTimeout);
     const DefaultBlockSizeParams &GetDefaultBlockSizeParams() const { return defaultBlockSizeParams; }
 
+    bool TestBlockCandidateValidity() const { return fTestBlockCandidateValidity; }
+
 protected:
     friend void ResetNetMagic(CChainParams& chainParam, const std::string& hexcode);
     CChainParams() {}
@@ -121,6 +123,7 @@ protected:
     bool fDefaultConsistencyChecks;
     bool fRequireStandard;
     bool fMineBlocksOnDemand;
+    bool fTestBlockCandidateValidity;
     CCheckpointData checkpointData;
     ChainTxData chainTxData;
     DefaultBlockSizeParams defaultBlockSizeParams;
