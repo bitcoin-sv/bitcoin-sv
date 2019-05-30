@@ -617,7 +617,6 @@ public:
     unsigned int GetSigOpCount(const CScript &scriptSig) const;
 
     bool IsPayToScriptHash() const;
-    bool IsCommitment(const std::vector<uint8_t> &data) const;
     bool IsWitnessProgram(int &version, std::vector<uint8_t> &program) const;
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it
@@ -632,6 +631,7 @@ public:
      */
     bool IsUnspendable() const {
         return (size() > 0 && *begin() == OP_RETURN) ||
+               (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
                (size() > MAX_SCRIPT_SIZE);
     }
 

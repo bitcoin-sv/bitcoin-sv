@@ -75,13 +75,24 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
         return true;
     }
 
+    bool isOpReturn = false;
+    int offset = 0;
+    //check if starts with OP_RETURN or OP_FALSE, OP_RETURN
+    if (scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN){
+        isOpReturn = true;
+        offset = 1;
+    }
+    else if (scriptPubKey.size() > 1 && scriptPubKey[0] == OP_FALSE && scriptPubKey[1] == OP_RETURN) {
+        isOpReturn = true;
+        offset = 2;
+    }
+
     // Provably prunable, data-carrying output
     //
     // So long as script passes the IsUnspendable() test and all but the first
     // byte passes the IsPushOnly() test we don't care what exactly is in the
     // script.
-    if (scriptPubKey.size() >= 1 && scriptPubKey[0] == OP_RETURN &&
-        scriptPubKey.IsPushOnly(scriptPubKey.begin() + 1)) {
+    if (isOpReturn && scriptPubKey.IsPushOnly(scriptPubKey.begin() + offset)) {
         typeRet = TX_NULL_DATA;
         return true;
     }
