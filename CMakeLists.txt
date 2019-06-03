@@ -28,11 +28,27 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
         if(CRYPTO_USE_ASM)
             message(FATAL_ERROR "enable_asan can not be used with"
                 " CRYPTO_USE_ASM enabled!")
+        elseif(enable_tsan)
+            message(FATAL_ERROR "enable_asan can not be"
+                    " used with enable_tsan enabled!")
         endif()
         set(CMAKE_CXX_FLAGS
             "${CMAKE_CXX_FLAGS} ${sanitizer_common_flags} -fsanitize=address")
         set(CMAKE_LINKER_FLAGS
             "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=address")
+    endif()
+
+    ###
+    # sanitizer: thread
+    ###
+    # NOTE: on Linux this sanitizer is also checking recursive locking and
+    #       can produce a lot of false positives.
+    option(enable_tsan "Use clang thread sanitizer" OFF)
+    if(enable_tsan)
+        set(CMAKE_CXX_FLAGS
+            "${CMAKE_CXX_FLAGS} ${sanitizer_common_flags} -fsanitize=thread")
+        set(CMAKE_LINKER_FLAGS
+            "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=thread")
     endif()
 endif()
 
