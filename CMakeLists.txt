@@ -39,6 +39,23 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
     endif()
 
     ###
+    # sanitizer: undefined
+    ###
+    # NOTE: with gcc stack trace must be enabled with environmet variable:
+    #   UBSAN_OPTIONS="print_stacktrace=1" <executable_name>
+    option(enable_ubsan "Use clang/gcc undefined behaviour sanitizer" OFF)
+    if(enable_ubsan)
+        if(enable_tsan)
+            message(FATAL_ERROR "enable_ubsan can not be used"
+                    " with enable_tsan enabled!")
+        endif()
+        set(CMAKE_CXX_FLAGS
+            "${CMAKE_CXX_FLAGS} ${sanitizer_common_flags} -fsanitize=undefined")
+        set(CMAKE_LINKER_FLAGS
+            "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=undefined")
+    endif()
+
+    ###
     # sanitizer: thread
     ###
     # NOTE: on Linux this sanitizer is also checking recursive locking and
