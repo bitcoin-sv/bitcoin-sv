@@ -592,8 +592,9 @@ static UniValue RPCLockedMemoryInfo() {
 
 static UniValue TouchedPagesInfo() {
     UniValue obj(UniValue::VOBJ);
-    VMTouch vm;
     double percents = 0.0;
+#ifndef WIN32
+    VMTouch vm;
     try {
         auto path = GetDataDir() / "chainstate";
         std::string result = boost::filesystem::canonical(path).string();
@@ -601,6 +602,7 @@ static UniValue TouchedPagesInfo() {
     }   catch(const std::runtime_error& ex) {
         LogPrintf("Error while preloading chain state: %s\n", ex.what());
     }
+#endif
     obj.push_back(Pair("chainStateCached", percents));
     return obj;
 }
