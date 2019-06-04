@@ -67,6 +67,16 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
         set(CMAKE_LINKER_FLAGS
             "${CMAKE_LINKER_FLAGS} ${sanitizer_common_flags} -fsanitize=thread")
     endif()
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        ###
+        # static analyzer
+        ###
+        option(enable_static_analyzer "Use clang static analyzer" OFF)
+        if(enable_static_analyzer)
+            set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-checks=-*,clang-analyzer-*")
+        endif()
+    endif()
 endif()
 
 # Add path for custom modules.
