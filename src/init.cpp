@@ -201,7 +201,15 @@ void Shutdown() {
     MapPort(false);
     UnregisterValidationInterface(peerLogic.get());
     peerLogic.reset();
-    g_connman.reset();
+
+    if (g_connman) {
+        // call Stop first as CConnman members are using g_connman global
+        // variable and they must be shut down before the variable is reset to
+        // nullptr (which happens before the destructor is called making Stop
+        // call inside CConnman destructor too late)
+        g_connman->Stop();
+        g_connman.reset();
+    }
 
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
