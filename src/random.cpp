@@ -28,10 +28,10 @@
 #include <sys/syscall.h>
 #endif
 #if defined(HAVE_GETENTROPY) ||                                                \
-    (defined(HAVE_GETENTROPY_RAND) && defined(MAC_OSX))
+    (defined(HAVE_GETENTROPY_RAND) && defined(__APPLE__))
 #include <unistd.h>
 #endif
-#if defined(HAVE_GETENTROPY_RAND) && defined(MAC_OSX)
+#if defined(HAVE_GETENTROPY_RAND) && defined(__APPLE__)
 #include <sys/random.h>
 #endif
 #ifdef HAVE_SYSCTL_ARND
@@ -248,7 +248,7 @@ void GetOSRand(uint8_t *ent32) {
     if (getentropy(ent32, NUM_OS_RANDOM_BYTES) != 0) {
         RandFailure();
     }
-#elif defined(HAVE_GETENTROPY_RAND) && defined(MAC_OSX)
+#elif defined(HAVE_GETENTROPY_RAND) && defined(__APPLE__)
     // We need a fallback for OSX < 10.12
     if (&getentropy != NULL) {
         if (getentropy(ent32, NUM_OS_RANDOM_BYTES) != 0) {

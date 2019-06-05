@@ -47,7 +47,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "logging.h"
 
-#ifdef MAC_OSX
+#ifdef __APPLE__
     #include <libgen.h>
 #endif
 
@@ -319,7 +319,7 @@ void VMTouch::vmtouch_file(const std::string& strPath)
   #endif
     } else {
       //double last_chart_print_time=0.0, temp_time;
-      #ifdef MAC_OSX
+      #ifdef __APPLE__
           std::vector<char> mincore_array(pages_in_range);
       #else
           std::vector<unsigned char> mincore_array(pages_in_range);

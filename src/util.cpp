@@ -331,7 +331,7 @@ fs::path GetDefaultDataDir() {
         pathRet = fs::path("/");
     else
         pathRet = fs::path(pszHome);
-#ifdef MAC_OSX
+#ifdef __APPLE__
     // Mac
     return pathRet / "Library/Application Support/Bitcoin";
 #else
@@ -525,7 +525,7 @@ void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length) {
     nFileSize.u.HighPart = nEndPos >> 32;
     SetFilePointerEx(hFile, nFileSize, 0, FILE_BEGIN);
     SetEndOfFile(hFile);
-#elif defined(MAC_OSX)
+#elif defined(__APPLE__)
     // OSX specific version.
     fstore_t fst;
     fst.fst_flags = F_ALLOCATECONTIG;
@@ -585,7 +585,7 @@ void RenameThread(const char *name) {
 #elif (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
     pthread_set_name_np(pthread_self(), name);
 
-#elif defined(MAC_OSX)
+#elif defined(__APPLE__)
     pthread_setname_np(name);
 #else
     // Prevent warnings for unused parameters...
@@ -596,7 +596,7 @@ void RenameThread(const char *name) {
 void SetupEnvironment() {
 // On most POSIX systems (e.g. Linux, but not BSD) the environment's locale may
 // be invalid, in which case the "C" locale is used as fallback.
-#if !defined(WIN32) && !defined(MAC_OSX) && !defined(__FreeBSD__) &&           \
+#if !defined(WIN32) && !defined(__APPLE__) && !defined(__FreeBSD__) &&           \
     !defined(__OpenBSD__)
     try {
         // Raises a runtime error if current locale is invalid.
