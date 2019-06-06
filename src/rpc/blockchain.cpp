@@ -1260,6 +1260,7 @@ UniValue getblockchaininfo(const Config &config,
     softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip65", 4, tip, consensusParams));
+    // version 5 is introduced only for this RPC (we will never receive block with version 5)
     softforks.push_back(SoftForkDesc("csv", 5, tip, consensusParams));
     obj.push_back(Pair("softforks", softforks));
 

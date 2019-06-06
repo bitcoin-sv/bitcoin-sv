@@ -1816,7 +1816,7 @@ static uint32_t GetBlockScriptFlags(const Config &config,
         flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
     }
 
-    // Start enforcing CSV (BIP68, BIP112 and BIP113) rule.
+    // Start enforcing BIP112 (CSV).
     if ((pChainTip->nHeight + 1) >= consensusparams.CSVHeight) {
         flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
     }
@@ -1981,7 +1981,7 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
         }
     }
 
-    // Start enforcing BIP68 (sequence locks) using versionbits logic.
+    // Start enforcing BIP68 (sequence locks).
     int nLockTimeFlags = 0;
     if (pindex->nHeight >= consensusParams.CSVHeight) {
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
@@ -2372,6 +2372,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
             }
         }
     }
+
     LogPrintf("%s: new best=%s height=%d version=0x%08x log2_work=%.8g tx=%lu "
               "date='%s' progress=%f cache=%.1fMiB(%utxo)",
               __func__, chainActive.Tip()->GetBlockHash().ToString(),
@@ -2384,11 +2385,13 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
                                         chainActive.Tip()),
               pcoinsTip->DynamicMemoryUsage() * (1.0 / (1 << 20)),
               pcoinsTip->GetCacheSize());
+
     if (!warningMessages.empty()) {
         LogPrintf(" warning='%s'",
                   boost::algorithm::join(warningMessages, ", "));
     }
     LogPrintf("\n");
+
 }
 
 /**
@@ -3409,7 +3412,7 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
-    // Start enforcing BIP113 (Median Time Past) using versionbits logic.
+    // Start enforcing BIP113 (Median Time Past)
     int nLockTimeFlags = 0;
     if (nHeight >= consensusParams.CSVHeight) {
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
