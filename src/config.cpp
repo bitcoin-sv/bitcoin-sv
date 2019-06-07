@@ -13,7 +13,6 @@ GlobalConfig::GlobalConfig() {
 
 void GlobalConfig::Reset()
 {
-    useCashAddr = false;
     excessUTXOCharge = Amount {};
     feePerKB = CFeeRate {};
     blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
@@ -206,13 +205,6 @@ GlobalConfig& GlobalConfig::GetConfig()
 {
     static GlobalConfig config {};
     return config;
-}
-
-void GlobalConfig::SetCashAddrEncoding(bool c) {
-    useCashAddr = c;
-}
-bool GlobalConfig::UseCashAddrEncoding() const {
-    return useCashAddr;
 }
 
 void GlobalConfig::SetTestBlockCandidateValidity(bool test) {
