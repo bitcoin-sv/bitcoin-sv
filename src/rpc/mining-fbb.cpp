@@ -64,16 +64,15 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     // Update block
     static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
-    static std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
+    static std::unique_ptr<CBlockTemplate> pblocktemplate { std::make_unique<CBlockTemplate>() };
     if (pindexPrev != chainActive.Tip() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = nullptr;
 
-        // Store the pindexBest used before CreateNewBlock, to avoid races
+        // Update other fields for tracking state of this candidate
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-        CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
         // Dummy script; the real one is either created by the wallet below, or will be replaced by one
@@ -93,13 +92,10 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
             coinbaseScriptPubKey = coinbaseScript->reserveScript;
         }
-        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScriptPubKey);
+        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScriptPubKey, pindexPrev);
 
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
-
-        // Need to update only after we know CreateNewBlock succeeded
-        pindexPrev = pindexPrevNew;
     }
 
     CBlockRef blockref = pblocktemplate->GetBlockRef();
@@ -123,7 +119,7 @@ std::vector<uint256> GetMerkleProofBranches(CBlockRef pblock)
 
     for (int i = 0; i < len; i++)
     {
-        leaves.push_back(pblock->vtx[i].get()->GetHash());
+        leaves.emplace_back(pblock->vtx[i]->GetHash());
     }
 
     return ComputeMerkleBranch(leaves, 0);
@@ -150,74 +146,6 @@ uint256 CalculateMerkleRoot(uint256 &coinbase_hash, const std::vector<uint256> &
     return merkle_root;
 }
 
-// Sets the version bits in a block
-static int32_t MkBlockTemplateVersionBits(int32_t version,
-     std::set<std::string> setClientRules,
-     CBlockIndex *pindexPrev,
-     UniValue *paRules,
-     UniValue *pvbavailable) // Keep in line with BU as much as possible.
-{   
-     const Consensus::Params &consensusParams = Params().GetConsensus();
-     
-     for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++j)
-     {
-         Consensus::DeploymentPos pos = Consensus::DeploymentPos(j);
-         ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
-         switch (state)
-         {
-         case THRESHOLD_DEFINED:
-         case THRESHOLD_FAILED:
-             // Not exposed to GBT at all
-             break;
-         case THRESHOLD_LOCKED_IN:
-             // Ensure bit is set in block version
-             version |= VersionBitsMask(consensusParams, pos);
-             // FALLTHROUGH
-         // to get vbavailable set...
-         case THRESHOLD_STARTED:
-             {
-                 const struct BIP9DeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
-                 if (pvbavailable != nullptr)
-                 {   
-                     pvbavailable->push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
-                 }
-                 if (setClientRules.find(vbinfo.name) == setClientRules.end())
-                 {
-                     if (!vbinfo.gbt_force)
-                     {
-                         // If the client doesn't support this, don't indicate it in the [default] version
-                         version &= ~VersionBitsMask(consensusParams, pos);
-                     }
-                     //if (vbinfo.myVote == true) // let the client vote for this feature  
-                     //    version |= VersionBitsMask(consensusParams, pos);
-                 }
-                 break;
-             }
-         case THRESHOLD_ACTIVE:
-             {
-                 // Add to rules only
-                 const struct BIP9DeploymentInfo &vbinfo = VersionBitsDeploymentInfo[pos];
-                 if (paRules != nullptr)
-                 {   
-                     paRules->push_back(gbt_vb_name(pos));
-                 }
-                 if (setClientRules.find(vbinfo.name) == setClientRules.end())
-                 {
-                     // Not supported by the client; make sure it's safe to proceed
-                     if (!vbinfo.gbt_force)
-                     {
-                         // If we do anything other than throw an exception here, be sure version/force isn't sent to old clients
-                         throw JSONRPCError(RPC_INVALID_PARAMETER,
-                             strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
-                     }
-                 }
-                 break;
-             }
-        }
-    }
-    return version;
-}
-
 // Create Mining-Candidate JSON to send to miner
 UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candidate)
 {
@@ -238,11 +166,6 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
         ret.push_back(Pair("coinbase", EncodeHexTx(*cbtran)));
     }
     ret.push_back(Pair("coinbaseValue", cbtran->vout[0].nValue.GetSatoshis()));
-
-    std::set<std::string> setClientRules;
-    CBlockIndex *const pindexPrev = chainActive.Tip();
-
-    block->nVersion = MkBlockTemplateVersionBits(block->nVersion, setClientRules, pindexPrev, nullptr, nullptr);
 
     ret.push_back(Pair("version", block->nVersion));
     ret.push_back(Pair("nBits", strprintf("%08x", block->nBits)));

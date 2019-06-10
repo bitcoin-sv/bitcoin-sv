@@ -134,8 +134,9 @@ TestChain100Setup::TestChain100Setup()
 CBlock TestChain100Setup::CreateAndProcessBlock(
     const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey) {
     const Config &config = GlobalConfig::GetConfig();
+    CBlockIndex* pindexPrev {nullptr};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey);
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
     CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock &block = *blockRef;
 
@@ -146,7 +147,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     }
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
-    IncrementExtraNonce(config, &block, chainActive.Tip(), extraNonce);
+    IncrementExtraNonce(config, &block, pindexPrev, extraNonce);
 
     while (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
         ++block.nNonce;

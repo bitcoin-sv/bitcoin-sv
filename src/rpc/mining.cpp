@@ -128,9 +128,10 @@ UniValue generateBlocks(const Config &config,
 
     unsigned int nExtraNonce = 0;
     UniValue blockHashes(UniValue::VARR);
+    CBlockIndex* pindexPrev {nullptr};
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
-            CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript));
+            CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript, pindexPrev));
 
         if (!pblocktemplate.get()) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
@@ -138,11 +139,7 @@ UniValue generateBlocks(const Config &config,
 
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();
-
-        {
-            LOCK(cs_main);
-            IncrementExtraNonce(config, pblock, chainActive.Tip(), nExtraNonce);
-        }
+        IncrementExtraNonce(config, pblock, pindexPrev, nExtraNonce);
 
         while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
                !CheckProofOfWork(pblock->GetHash(), pblock->nBits, config)) {
@@ -621,20 +618,16 @@ static UniValue getblocktemplate(const Config &config,
         // failures from here on
         pindexPrev = nullptr;
 
-        // Store the pindexBest used before CreateNewBlock, to avoid races
+        // Update other fields for tracking state of this candidate
         nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-        CBlockIndex *pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
         // Create new block
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptDummy);
+        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptDummy, pindexPrev);
         if (!pblocktemplate) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
         }
-
-        // Need to update only after we know CreateNewBlock succeeded
-        pindexPrev = pindexPrevNew;
     }
 
     // pointer for convenience

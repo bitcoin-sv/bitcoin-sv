@@ -151,7 +151,7 @@ private:
 public:
     LegacyBlockAssembler(const Config &_config);
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn) override;
+    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev) override;
 
 private:
     // utility functions

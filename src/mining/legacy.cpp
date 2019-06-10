@@ -130,7 +130,7 @@ getExcessiveBlockSizeSig(const Config &config) {
 }
 
 std::unique_ptr<CBlockTemplate>
-LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
+LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev)
 {
     int64_t nTimeStart = GetTimeMicros();
 
@@ -153,12 +153,12 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
     pblocktemplate->vTxSigOpsCount.push_back(-1);
 
     LOCK2(cs_main, mempool.cs);
-    CBlockIndex *pindexPrev = chainActive.Tip();
-    nHeight = pindexPrev->nHeight + 1;
+    CBlockIndex* pindexPrevNew = chainActive.Tip();
+    nHeight = pindexPrevNew->nHeight + 1;
 
     const CChainParams &chainparams = config->GetChainParams();
     pblock->nVersion =
-        ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
+        ComputeBlockVersion(pindexPrevNew, chainparams.GetConsensus());
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
     if (chainparams.MineBlocksOnDemand()) {
@@ -166,11 +166,11 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
     }
 
     pblock->nTime = GetAdjustedTime();
-    nMaxGeneratedBlockSize = ComputeMaxGeneratedBlockSize(*config, pindexPrev);
+    nMaxGeneratedBlockSize = ComputeMaxGeneratedBlockSize(*config, pindexPrevNew);
 
     nLockTimeCutoff =
         (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
-            ? pindexPrev->GetMedianTimePast()
+            ? pindexPrevNew->GetMedianTimePast()
             : pblock->GetBlockTime();
 
     addPriorityTxs();
@@ -204,9 +204,9 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
               nSerializeSize, nBlockTx, nFees, nBlockSigOps);
 
     // Fill in header.
-    pblock->hashPrevBlock = pindexPrev->GetBlockHash();
-    UpdateTime(pblock, *config, pindexPrev);
-    pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, *config);
+    pblock->hashPrevBlock = pindexPrevNew->GetBlockHash();
+    UpdateTime(pblock, *config, pindexPrevNew);
+    pblock->nBits = GetNextWorkRequired(pindexPrevNew, pblock, *config);
     pblock->nNonce = 0;
 
     // If required, check block validity
@@ -215,7 +215,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
     {
         CValidationState state;
         BlockValidationOptions validationOptions { false, false, true };
-        if (!TestBlockValidity(*config, state, *pblock, pindexPrev, validationOptions))
+        if (!TestBlockValidity(*config, state, *pblock, pindexPrevNew, validationOptions))
         {
             throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s",
                                                __func__, FormatStateMessage(state)));
@@ -229,6 +229,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
         0.001 * (nTime1 - nTimeStart), nPackagesSelected, nDescendantsUpdated,
         0.001 * (nTimeEnd - nTimeValidationStart), 0.001 * (nTimeEnd - nTimeStart));
 
+    pindexPrev = pindexPrevNew;
     return std::move(pblocktemplate);
 }
 
