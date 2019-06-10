@@ -723,6 +723,10 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
         filterrate = minFeeFilter;
     }
 
+    // reason for larger cs_inventory lock scope than needed is that if we need
+    // to lock both cs_inventory and cs_filter we need to consistently lock
+    // inventory before cs_filter to prevent deadlocks
+    LOCK(cs_inventory);
     LOCK(cs_filter);
     LOCK(cs_mInvList);
 
