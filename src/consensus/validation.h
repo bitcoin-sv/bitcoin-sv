@@ -17,6 +17,7 @@ static const uint8_t REJECT_NONSTANDARD = 0x40;
 static const uint8_t REJECT_DUST = 0x41;
 static const uint8_t REJECT_INSUFFICIENTFEE = 0x42;
 static const uint8_t REJECT_CHECKPOINT = 0x43;
+static const uint8_t REJECT_TOOBUSY = 0x44;
 
 /** Capture information about block/transaction validation */
 class CValidationState {
