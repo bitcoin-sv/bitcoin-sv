@@ -17,6 +17,7 @@
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
+#include "mining/journal_builder.h"
 #include "net.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
@@ -55,6 +56,8 @@
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
 #endif
+
+using namespace mining;
 
 /**
  * Global state
@@ -541,16 +544,16 @@ bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state)
     return true;
 }
 
-static void LimitMempoolSize(CTxMemPool &pool, size_t limit,
-                             unsigned long age) {
-    int expired = pool.Expire(GetTime() - age);
+static void LimitMempoolSize(CTxMemPool &pool, CJournalChangeSetPtr& changeSet,
+                             size_t limit, unsigned long age) {
+    int expired = pool.Expire(GetTime() - age, changeSet);
     if (expired != 0) {
         LogPrint(BCLog::MEMPOOL,
                  "Expired %i transactions from the memory pool\n", expired);
     }
 
     std::vector<COutPoint> vNoSpendsRemaining;
-    pool.TrimToSize(limit, &vNoSpendsRemaining);
+    pool.TrimToSize(limit, changeSet, &vNoSpendsRemaining);
     for (const COutPoint &removed : vNoSpendsRemaining) {
         pcoinsTip->Uncache(removed);
     }
@@ -617,9 +620,11 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
  * Passing fAddToMempool=false will skip trying to add the transactions back,
  * and instead just erase from the mempool as needed.
  */
-void UpdateMempoolForReorg(const Config &config,
-                           DisconnectedBlockTransactions &disconnectpool,
-                           bool fAddToMempool) {
+static void UpdateMempoolForReorg(const Config &config,
+                                  DisconnectedBlockTransactions &disconnectpool,
+                                  bool fAddToMempool,
+                                  CJournalChangeSetPtr& changeSet)
+{
     AssertLockHeld(cs_main);
     std::vector<uint256> vHashUpdate;
     // disconnectpool's insertion_order index sorts the entries from oldest to
@@ -634,10 +639,10 @@ void UpdateMempoolForReorg(const Config &config,
         CValidationState stateDummy;
         if (!fAddToMempool || (*it)->IsCoinBase() ||
             !AcceptToMemoryPool(config, mempool, stateDummy, *it, false,
-                                nullptr, true)) {
+                                nullptr, changeSet, true)) {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
-            mempool.removeRecursive(**it, MemPoolRemovalReason::REORG);
+            mempool.removeRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
         } else if (mempool.exists((*it)->GetId())) {
             vHashUpdate.push_back((*it)->GetId());
         }
@@ -652,11 +657,12 @@ void UpdateMempoolForReorg(const Config &config,
     mempool.UpdateTransactionsFromBlock(vHashUpdate);
 
     // We also need to remove any now-immature transactions
-    mempool.removeForReorg(config, pcoinsTip, chainActive.Tip()->nHeight + 1,
+    mempool.removeForReorg(config, pcoinsTip, changeSet, chainActive.Tip()->nHeight + 1,
                            STANDARD_LOCKTIME_VERIFY_FLAGS);
     // Re-limit mempool size, in case we added any transactions
     LimitMempoolSize(
         mempool,
+        changeSet,
         gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
         gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 }
@@ -707,7 +713,8 @@ static bool AcceptToMemoryPoolWorker(
     const Config &config, CTxMemPool &pool, CValidationState &state,
     const CTransactionRef &ptx, bool fLimitFree, bool *pfMissingInputs,
     int64_t nAcceptTime, bool fOverrideMempoolLimit, const Amount nAbsurdFee,
-    std::vector<COutPoint> &coins_to_uncache) {
+    std::vector<COutPoint> &coins_to_uncache, CJournalChangeSetPtr& changeSet)
+{
     AssertLockHeld(cs_main);
 
     const CTransaction &tx = *ptx;
@@ -1022,12 +1029,13 @@ static bool AcceptToMemoryPoolWorker(
             IsCurrentForFeeEstimation() && pool.HasNoInputsOf(tx);
 
         // Store transaction in memory.
-        pool.addUnchecked(txid, entry, setAncestors, validForFeeEstimation);
+        pool.addUnchecked(txid, entry, setAncestors, changeSet, validForFeeEstimation);
 
         // Trim mempool and check if tx was trimmed.
         if (!fOverrideMempoolLimit) {
             LimitMempoolSize(
                 pool,
+                changeSet,
                 gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
                 gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 *
                     60);
@@ -1050,12 +1058,14 @@ static bool AcceptToMemoryPoolWithTime(const Config &config, CTxMemPool &pool,
                                        const CTransactionRef &tx,
                                        bool fLimitFree, bool *pfMissingInputs,
                                        int64_t nAcceptTime,
+                                       CJournalChangeSetPtr& changeSet,
                                        bool fOverrideMempoolLimit = false,
-                                       const Amount nAbsurdFee = Amount(0)) {
+                                       const Amount nAbsurdFee = Amount(0))
+{
     std::vector<COutPoint> coins_to_uncache;
     bool res = AcceptToMemoryPoolWorker(
         config, pool, state, tx, fLimitFree, pfMissingInputs, nAcceptTime,
-        fOverrideMempoolLimit, nAbsurdFee, coins_to_uncache);
+        fOverrideMempoolLimit, nAbsurdFee, coins_to_uncache, changeSet);
     if (!res) {
         for (const COutPoint &outpoint : coins_to_uncache) {
             pcoinsTip->Uncache(outpoint);
@@ -1072,9 +1082,11 @@ static bool AcceptToMemoryPoolWithTime(const Config &config, CTxMemPool &pool,
 bool AcceptToMemoryPool(const Config &config, CTxMemPool &pool,
                         CValidationState &state, const CTransactionRef &tx,
                         bool fLimitFree, bool *pfMissingInputs,
-                        bool fOverrideMempoolLimit, const Amount nAbsurdFee) {
+                        CJournalChangeSetPtr& changeSet,
+                        bool fOverrideMempoolLimit, const Amount nAbsurdFee)
+{
     return AcceptToMemoryPoolWithTime(config, pool, state, tx, fLimitFree,
-                                      pfMissingInputs, GetTime(),
+                                      pfMissingInputs, GetTime(), changeSet,
                                       fOverrideMempoolLimit, nAbsurdFee);
 }
 
@@ -2407,7 +2419,9 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
  * in any case).
  */
 static bool DisconnectTip(const Config &config, CValidationState &state,
-                          DisconnectedBlockTransactions *disconnectpool) {
+                          DisconnectedBlockTransactions *disconnectpool,
+                          CJournalChangeSetPtr& changeSet)
+{
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
 
@@ -2454,7 +2468,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
             // Drop the earliest entry, and remove its children from the
             // mempool.
             auto it = disconnectpool->queuedTx.get<insertion_order>().begin();
-            mempool.removeRecursive(**it, MemPoolRemovalReason::REORG);
+            mempool.removeRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
             disconnectpool->removeEntry(it);
         }
     }
@@ -2557,7 +2571,9 @@ static bool ConnectTip(const Config &config, CValidationState &state,
                        CBlockIndex *pindexNew,
                        const std::shared_ptr<const CBlock> &pblock,
                        ConnectTrace &connectTrace,
-                       DisconnectedBlockTransactions &disconnectpool) {
+                       DisconnectedBlockTransactions &disconnectpool,
+                       CJournalChangeSetPtr& changeSet)
+{
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
     int64_t nTime1 = GetTimeMicros();
@@ -2613,7 +2629,7 @@ static bool ConnectTip(const Config &config, CValidationState &state,
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // Remove conflicting transactions from the mempool.;
-    mempool.removeForBlock(blockConnecting.vtx, pindexNew->nHeight);
+    mempool.removeForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
     if(g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
@@ -2728,7 +2744,9 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
                                   CBlockIndex *pindexMostWork,
                                   const std::shared_ptr<const CBlock> &pblock,
                                   bool &fInvalidFound,
-                                  ConnectTrace &connectTrace) {
+                                  ConnectTrace &connectTrace,
+                                  CJournalChangeSetPtr& changeSet)
+{
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
@@ -2737,10 +2755,10 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
     bool fBlocksDisconnected = false;
     DisconnectedBlockTransactions disconnectpool;
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
-        if (!DisconnectTip(config, state, &disconnectpool)) {
+        if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
             // This is likely a fatal error, but keep the mempool consistent,
             // just in case. Only remove from the mempool in this case.
-            UpdateMempoolForReorg(config, disconnectpool, false);
+            UpdateMempoolForReorg(config, disconnectpool, false, changeSet);
             return false;
         }
         fBlocksDisconnected = true;
@@ -2770,7 +2788,8 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
                             pindexConnect == pindexMostWork
                                 ? pblock
                                 : std::shared_ptr<const CBlock>(),
-                            connectTrace, disconnectpool)) {
+                            connectTrace, disconnectpool,
+                            changeSet)) {
                 if (state.IsInvalid()) {
                     // The block violates a consensus rule.
                     if (!state.CorruptionPossible()) {
@@ -2785,7 +2804,7 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
                     // ...).
                     // Make the mempool consistent with the current tip, just in
                     // case any observers try to use it before shutdown.
-                    UpdateMempoolForReorg(config, disconnectpool, false);
+                    UpdateMempoolForReorg(config, disconnectpool, false, changeSet);
                     return false;
                 }
             } else {
@@ -2801,10 +2820,14 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
         }
     }
 
-    if (fBlocksDisconnected) {
+    if (fBlocksDisconnected)
+    {
+        // Whatever we thought this change set might be for, it's now definitely a reorg
+        changeSet->updateForReorg();
+
         // If any blocks were disconnected, disconnectpool may be non empty. Add
         // any disconnected transactions back to the mempool.
-        UpdateMempoolForReorg(config, disconnectpool, true);
+        UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
     }
     mempool.check(pcoinsTip);
 
@@ -2840,6 +2863,7 @@ static void NotifyHeaderTip() {
 }
 
 bool ActivateBestChain(const Config &config, CValidationState &state,
+                       CJournalChangeSetPtr& changeSet,
                        std::shared_ptr<const CBlock> pblock) {
     // Note that while we're often called here from ProcessNewBlock, this is
     // far from a guarantee. Things in the P2P/RPC will often end up calling
@@ -2884,7 +2908,7 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
                             pblock->GetHash() == pindexMostWork->GetBlockHash()
                         ? pblock
                         : nullBlockPtr,
-                    fInvalidFound, connectTrace)) {
+                    fInvalidFound, connectTrace, changeSet)) {
                 return false;
             }
 
@@ -2962,7 +2986,8 @@ bool PreciousBlock(const Config &config, CValidationState &state,
         }
     }
 
-    return ActivateBestChain(config, state);
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
+    return ActivateBestChain(config, state, changeSet);
 }
 
 bool InvalidateBlock(const Config &config, CValidationState &state,
@@ -2975,6 +3000,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     setBlockIndexCandidates.erase(pindex);
 
     DisconnectedBlockTransactions disconnectpool;
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
     while (chainActive.Contains(pindex)) {
         CBlockIndex *pindexWalk = chainActive.Tip();
         pindexWalk->nStatus = pindexWalk->nStatus.withFailedParent();
@@ -2982,17 +3008,17 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
         setBlockIndexCandidates.erase(pindexWalk);
         // ActivateBestChain considers blocks already in chainActive
         // unconditionally valid already, so force disconnect away from it.
-        if (!DisconnectTip(config, state, &disconnectpool)) {
+        if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
             // It's probably hopeless to try to make the mempool consistent
             // here if DisconnectTip failed, but we can try.
-            UpdateMempoolForReorg(config, disconnectpool, false);
+            UpdateMempoolForReorg(config, disconnectpool, false, changeSet);
             return false;
         }
     }
 
     // DisconnectTip will add transactions to disconnectpool; try to add these
     // back to the mempool.
-    UpdateMempoolForReorg(config, disconnectpool, true);
+    UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore,
     // so add it again.
@@ -3745,7 +3771,8 @@ bool ProcessNewBlock(const Config &config,
 
     // Only used to report errors, not invalidity - ignore it
     CValidationState state;
-    if (!ActivateBestChain(config, state, pblock)) {
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
+    if (!ActivateBestChain(config, state, changeSet, pblock)) {
         return error("%s: ActivateBestChain failed", __func__);
     }
 
@@ -4335,6 +4362,7 @@ bool RewindBlockIndex(const Config &config) {
     // tipheight + 1
     CValidationState state;
     CBlockIndex *pindex = chainActive.Tip();
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
     while (chainActive.Height() >= nHeight) {
         if (fPruneMode && !chainActive.Tip()->nStatus.hasData()) {
             // If pruning, don't try rewinding past the HAVE_DATA point; since
@@ -4343,7 +4371,7 @@ bool RewindBlockIndex(const Config &config) {
             // needless reindex/redownload of the blockchain).
             break;
         }
-        if (!DisconnectTip(config, state, nullptr)) {
+        if (!DisconnectTip(config, state, nullptr, changeSet)) {
             return error(
                 "RewindBlockIndex: unable to disconnect block at height %i",
                 pindex->nHeight);
@@ -4584,7 +4612,8 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                 // continue
                 if (hash == chainparams.GetConsensus().hashGenesisBlock) {
                     CValidationState state;
-                    if (!ActivateBestChain(config, state)) {
+                    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
+                    if (!ActivateBestChain(config, state, changeSet)) {
                         break;
                     }
                 }
@@ -4999,9 +5028,10 @@ bool LoadMempool(const Config &config) {
             }
             CValidationState state;
             if (nTime + nExpiryTimeout > nNow) {
+                CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT) };
                 LOCK(cs_main);
                 AcceptToMemoryPoolWithTime(config, mempool, state, tx, true,
-                                           nullptr, nTime);
+                                           nullptr, nTime, changeSet);
                 if (state.IsValid()) {
                     ++count;
                 } else {

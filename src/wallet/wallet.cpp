@@ -15,6 +15,7 @@
 #include "init.h"
 #include "key.h"
 #include "keystore.h"
+#include "mining/journal_builder.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
@@ -36,6 +37,8 @@
 #include <boost/thread.hpp>
 
 #include <cassert>
+
+using namespace mining;
 
 std::vector<CWalletRef> vpwallets;
 
@@ -4527,6 +4530,7 @@ int CMerkleTx::GetBlocksToMaturity() const {
 
 bool CMerkleTx::AcceptToMemoryPool(const Amount nAbsurdFee,
                                    CValidationState &state) {
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN) };
     return ::AcceptToMemoryPool(GlobalConfig::GetConfig(), mempool, state, tx, true, nullptr,
-                                false, nAbsurdFee);
+                                changeSet, false, nAbsurdFee);
 }

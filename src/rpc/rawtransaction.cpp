@@ -13,6 +13,7 @@
 #include "init.h"
 #include "keystore.h"
 #include "merkleblock.h"
+#include "mining/journal_builder.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
@@ -35,6 +36,7 @@
 
 #include <univalue.h>
 
+using namespace mining;
 
 void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
 {
@@ -1078,8 +1080,9 @@ static UniValue sendrawtransaction(const Config &config,
         // Push to local node and sync with wallets.
         CValidationState state;
         bool fMissingInputs;
+        CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN) };
         if (!AcceptToMemoryPool(config, mempool, state, std::move(tx),
-                                fLimitFree, &fMissingInputs, false,
+                                fLimitFree, &fMissingInputs, changeSet, false,
                                 nMaxRawTxFee)) {
             if (state.IsInvalid()) {
                 throw JSONRPCError(RPC_TRANSACTION_REJECTED,

@@ -12,11 +12,17 @@
 
 #include <boost/test/unit_test.hpp>
 
-std::vector<std::pair<uint256, CTransactionRef>> extra_txn;
+namespace
+{
 
-struct RegtestingSetup : public TestingSetup {
-    RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
-};
+    std::vector<std::pair<uint256, CTransactionRef>> extra_txn;
+
+    struct RegtestingSetup : public TestingSetup {
+        RegtestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
+    };
+
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+}
 
 BOOST_FIXTURE_TEST_SUITE(blockencodings_tests, RegtestingSetup)
 
@@ -64,7 +70,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
-    pool.addUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]));
+    pool.addUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), nullChangeSet);
     BOOST_CHECK_EQUAL(
         pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
@@ -91,7 +97,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
             SHARED_TX_OFFSET + 1);
 
         size_t poolSize = pool.size();
-        pool.removeRecursive(*block.vtx[2]);
+        pool.removeRecursive(*block.vtx[2], nullChangeSet);
         BOOST_CHECK_EQUAL(pool.size(), poolSize - 1);
 
         CBlock block2;
@@ -174,7 +180,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
-    pool.addUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]));
+    pool.addUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), nullChangeSet);
     BOOST_CHECK_EQUAL(
         pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
@@ -255,7 +261,7 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
-    pool.addUnchecked(block.vtx[1]->GetId(), entry.FromTx(*block.vtx[1]));
+    pool.addUnchecked(block.vtx[1]->GetId(), entry.FromTx(*block.vtx[1]), nullChangeSet);
     BOOST_CHECK_EQUAL(
         pool.mapTx.find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);

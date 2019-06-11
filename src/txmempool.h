@@ -31,6 +31,14 @@ class CAutoFile;
 class CBlockIndex;
 class Config;
 
+namespace mining
+{
+    class CJournalBuilder;
+    class CJournalChangeSet;
+    using CJournalBuilderPtr = std::unique_ptr<CJournalBuilder>;
+    using CJournalChangeSetPtr = std::shared_ptr<CJournalChangeSet>;
+}
+
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
 }
@@ -504,6 +512,9 @@ private:
     //!< minimum fee to get into the pool, decreases exponentially
     mutable double rollingMinimumFeeRate;
 
+    // Our journal builder
+    mining::CJournalBuilderPtr mJournalBuilder;
+
     void trackPackageRemoved(const CFeeRate &rate);
 
 public:
@@ -596,18 +607,19 @@ public:
     // addUnchecked can be used to have it call CalculateMemPoolAncestors(), and
     // then invoke the second version.
     bool addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
-                      bool validFeeEstimate = true);
+                      mining::CJournalChangeSetPtr& changeSet, bool validFeeEstimate = true);
     bool addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
-                      setEntries &setAncestors, bool validFeeEstimate = true);
+                      setEntries &setAncestors, mining::CJournalChangeSetPtr& changeSet,
+                      bool validFeeEstimate = true);
 
-    void removeRecursive(
-        const CTransaction &tx,
-        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+    void removeRecursive(const CTransaction &tx, mining::CJournalChangeSetPtr& changeSet,
+                         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
     void removeForReorg(const Config &config, const CCoinsViewCache *pcoins,
+                        mining::CJournalChangeSetPtr& changeSet,
                         unsigned int nMemPoolHeight, int flags);
-    void removeConflicts(const CTransaction &tx);
+    void removeConflicts(const CTransaction &tx, mining::CJournalChangeSetPtr& changeSet);
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
-                        unsigned int nBlockHeight);
+                        unsigned int nBlockHeight, mining::CJournalChangeSetPtr& changeSet);
 
     void clear();
     // lock free
@@ -632,6 +644,9 @@ public:
                      Amount &nFeeDelta) const;
     void ClearPrioritisation(const uint256 hash);
 
+    // Get a reference to the journal builder
+    const mining::CJournalBuilderPtr& getJournalBuilder() const { return mJournalBuilder; }
+
 public:
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
@@ -642,6 +657,7 @@ public:
      */
     void
     RemoveStaged(setEntries &stage, bool updateDescendants,
+                 mining::CJournalChangeSetPtr& changeSet,
                  MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     /**
@@ -697,11 +713,12 @@ public:
      * this mempool.
      */
     void TrimToSize(size_t sizelimit,
+                    mining::CJournalChangeSetPtr& changeSet,
                     std::vector<COutPoint> *pvNoSpendsRemaining = nullptr);
 
     /** Expire all transaction (and their dependencies) in the mempool older
      * than time. Return the number of removed transactions. */
-    int Expire(int64_t time);
+    int Expire(int64_t time, mining::CJournalChangeSetPtr& changeSet);
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
@@ -793,9 +810,9 @@ private:
      * transaction that is removed, so we can't remove intermediate transactions
      * in a chain before we've updated all the state for the removal.
      */
-    void removeUnchecked(
-        txiter entry,
-        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+    void removeUnchecked(txiter entry,
+                         mining::CJournalChangeSetPtr& changeSet,
+                         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 };
 
 /**

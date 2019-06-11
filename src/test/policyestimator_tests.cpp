@@ -12,6 +12,11 @@
 
 #include <boost/test/unit_test.hpp>
 
+namespace
+{
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+}
+
 BOOST_FIXTURE_TEST_SUITE(policyestimator_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
@@ -64,7 +69,8 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
                                        .Time(GetTime())
                                        .Priority(0)
                                        .Height(blocknum)
-                                       .FromTx(tx, &mpool));
+                                       .FromTx(tx, &mpool),
+                                   nullChangeSet);
                 txIds[j].push_back(txid);
             }
         }
@@ -82,7 +88,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
                 txIds[i].pop_back();
             }
         }
-        mpool.removeForBlock(block, ++blocknum);
+        mpool.removeForBlock(block, ++blocknum, nullChangeSet);
         block.clear();
         if (blocknum == 30) {
             // At this point we should need to combine 5 buckets to get enough
@@ -140,7 +146,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
     // change. We haven't decayed the moving average enough so we still have
     // enough data points in every bucket
     while (blocknum < 250) {
-        mpool.removeForBlock(block, ++blocknum);
+        mpool.removeForBlock(block, ++blocknum, nullChangeSet);
     }
 
     BOOST_CHECK(mpool.estimateFee(1) == CFeeRate(Amount(0)));
@@ -165,11 +171,12 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
                                        .Time(GetTime())
                                        .Priority(0)
                                        .Height(blocknum)
-                                       .FromTx(tx, &mpool));
+                                       .FromTx(tx, &mpool),
+                                   nullChangeSet);
                 txIds[j].push_back(txid);
             }
         }
-        mpool.removeForBlock(block, ++blocknum);
+        mpool.removeForBlock(block, ++blocknum, nullChangeSet);
     }
 
     int answerFound;
@@ -193,7 +200,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
             txIds[j].pop_back();
         }
     }
-    mpool.removeForBlock(block, 265);
+    mpool.removeForBlock(block, 265, nullChangeSet);
     block.clear();
     BOOST_CHECK(mpool.estimateFee(1) == CFeeRate(Amount(0)));
     for (int i = 2; i < 10; i++) {
@@ -215,14 +222,15 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
                                        .Time(GetTime())
                                        .Priority(0)
                                        .Height(blocknum)
-                                       .FromTx(tx, &mpool));
+                                       .FromTx(tx, &mpool),
+                                   nullChangeSet);
                 CTransactionRef ptx = mpool.get(txid);
                 if (ptx) {
                     block.push_back(ptx);
                 }
             }
         }
-        mpool.removeForBlock(block, ++blocknum);
+        mpool.removeForBlock(block, ++blocknum, nullChangeSet);
         block.clear();
     }
     BOOST_CHECK(mpool.estimateFee(1) == CFeeRate(Amount(0)));
@@ -236,10 +244,11 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
     mpool.addUnchecked(
         tx.GetId(),
         entry.Fee(feeV[5]).Time(GetTime()).Priority(0).Height(blocknum).FromTx(
-            tx, &mpool));
+            tx, &mpool),
+        nullChangeSet);
     // evict that transaction which should set a mempool min fee of
     // minRelayTxFee + feeV[5]
-    mpool.TrimToSize(1);
+    mpool.TrimToSize(1, nullChangeSet);
     BOOST_CHECK(mpool.GetMinFee(1).GetFeePerK() > feeV[5]);
     for (int i = 1; i < 10; i++) {
         BOOST_CHECK(mpool.estimateSmartFee(i).GetFeePerK() >=

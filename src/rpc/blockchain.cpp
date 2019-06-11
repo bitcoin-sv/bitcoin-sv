@@ -14,6 +14,7 @@
 #include "consensus/validation.h"
 #include "hash.h"
 #include "core_io.h"
+#include "mining/journal_builder.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/server.h"
@@ -1563,7 +1564,8 @@ UniValue invalidateblock(const Config &config, const JSONRPCRequest &request) {
     }
 
     if (state.IsValid()) {
-        ActivateBestChain(config, state);
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet() };
+        ActivateBestChain(config, state, changeSet);
     }
 
     if (!state.IsValid()) {
@@ -1603,7 +1605,8 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
     }
 
     CValidationState state;
-    ActivateBestChain(config, state);
+    mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::REORG) };
+    ActivateBestChain(config, state, changeSet);
 
     if (!state.IsValid()) {
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());

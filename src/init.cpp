@@ -22,6 +22,7 @@
 #include "httprpc.h"
 #include "httpserver.h"
 #include "key.h"
+#include "mining/journal_builder.h"
 #include "mining/legacy.h"
 #include "net.h"
 #include "net_processing.h"
@@ -1131,7 +1132,8 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
         // scan for better chains in the block chain database, that are not yet
         // connected in the active best chain
         CValidationState state;
-        if (!ActivateBestChain(config, state)) {
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
+        if (!ActivateBestChain(config, state, changeSet)) {
             LogPrintf("Failed to connect best block");
             StartShutdown();
         }

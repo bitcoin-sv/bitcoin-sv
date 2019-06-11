@@ -27,9 +27,10 @@ static bool ToMemPool(CMutableTransaction &tx) {
     LOCK(cs_main);
 
     CValidationState state;
+    mining::CJournalChangeSetPtr changeSet {nullptr};
     return AcceptToMemoryPool(GlobalConfig::GetConfig(), mempool, state,
-                              MakeTransactionRef(tx), false, nullptr, true,
-                              Amount(0));
+                              MakeTransactionRef(tx), false, nullptr, changeSet,
+                              true, Amount(0));
 }
 
 BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup) {
