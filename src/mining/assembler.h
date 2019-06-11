@@ -34,6 +34,8 @@ protected:
     uint64_t nMaxGeneratedBlockSize {0};
 
 public:
+    virtual ~BlockAssembler() = default;
+
     /** Construct a new block template with coinbase to scriptPubKeyIn */
     virtual std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev) = 0;
 
