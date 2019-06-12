@@ -73,6 +73,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	dbwrapper_tests.cpp
 	DoS_tests.cpp
 	dstencode_tests.cpp
+    enum_cast_tests.cpp
 	excessiveblock_tests.cpp
 	getarg_tests.cpp
 	hash_tests.cpp
