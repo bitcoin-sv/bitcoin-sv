@@ -3032,6 +3032,11 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
 
     InvalidChainFound(pindex);
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
+
+    if (state.IsValid()) {
+        ActivateBestChain(config, state, changeSet);
+    }
+
     return true;
 }
 

@@ -1563,11 +1563,6 @@ UniValue invalidateblock(const Config &config, const JSONRPCRequest &request) {
         InvalidateBlock(config, state, pblockindex);
     }
 
-    if (state.IsValid()) {
-        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet() };
-        ActivateBestChain(config, state, changeSet);
-    }
-
     if (!state.IsValid()) {
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
     }
