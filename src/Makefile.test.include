@@ -55,6 +55,7 @@ BITCOIN_TESTS =\
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
   test/inv_tests.cpp \
+  test/journal_tests.cpp \
   test/jsonutil.cpp \
   test/jsonutil.h \
   test/key_tests.cpp \
