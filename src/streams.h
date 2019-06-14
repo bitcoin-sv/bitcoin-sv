@@ -649,4 +649,84 @@ public:
     }
 };
 
+/**
+ * A pointer to read only contiguous data buffer of a certain size.
+ * CSpan doesn't take ownership of the underlying buffer so it is up to the
+ * user to guarantee that the buffer lives longer than the CSpan pointing to it.
+ */
+class CSpan
+{
+public:
+    CSpan() {/**/}
+
+    CSpan(const uint8_t* const begin, size_t size)
+        : mBegin{begin}
+        , mSize{size}
+    {/**/}
+
+    const uint8_t* Begin() const {return mBegin;}
+    size_t Size() const {return mSize;}
+
+private:
+    const uint8_t* mBegin = nullptr;
+    size_t mSize = 0;
+};
+
+/**
+ * Base class for forward readlonly streams of data that returns the underlying
+ * data in chunks of up to requested size.
+ * If a read error occurs while using CForwardReadonlyStream instance an
+ * exception is thrown and stream should not be used after that point as it will
+ * be in an invalid state.
+ */
+class CForwardReadonlyStream
+{
+public:
+    virtual ~CForwardReadonlyStream() = default;
+
+    virtual bool EndOfStream() const = 0;
+    /**
+     * Read next span of data that is up to maxSize long.
+     * Returned CSpan is valid until the next call to Read() or until stream
+     * is destroyed.
+     * Span can return less than maxSize bytes if end of stream is reached
+     * which can be checked by call to EndOfStream function.
+     * In case EndOfStream is false and Read span returned size of 0 the data
+     * is still being prepared and will be returned on next call to Read.
+     */
+    virtual CSpan Read(size_t maxSize) = 0;
+};
+
+/**
+ * Stream wrapper for std::vector<uint8_t>
+ */
+class CVectorStream : public CForwardReadonlyStream
+{
+public:
+    CVectorStream(std::vector<uint8_t>&& data)
+        : mData{std::move(data)}
+    {/**/}
+
+    bool EndOfStream() const override {return mData.size() == mConsumed;}
+    CSpan Read(size_t maxSize) override
+    {
+        if(mData.size() > mConsumed)
+        {
+            size_t consume = std::min(mData.size() - mConsumed, maxSize);
+            uint8_t* start = mData.data() + mConsumed;
+            mConsumed += consume;
+
+            return {start, consume};
+        }
+        else
+        {
+            return {};
+        }
+    }
+
+private:
+    std::vector<uint8_t> mData;
+    size_t mConsumed = 0u;
+};
+
 #endif // BITCOIN_STREAMS_H

@@ -38,6 +38,7 @@
 #endif
 
 #include <cmath>
+#include <utility>
 
 // Dump addresses to peers.dat and banlist.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
@@ -948,6 +949,104 @@ const uint256 &CNetMessage::GetMessageHash() const {
     return data_hash;
 }
 
+namespace
+{
+    /**
+     * Notification structure for SendMessage function that returns:
+     * sendComplete: whether the send was fully complete/partially complete and
+     *               data is needed for sending the rest later.
+     * sentSize: amount of data that was sent.
+     */
+    struct CSendResult
+    {
+        bool sendComplete;
+        size_t sentSize;
+    };
+
+    CSendResult SendMessage(
+        CNode& node,
+        CForwardReadonlyStream& data,
+        size_t maxChunkSize)
+    {
+        if (maxChunkSize == 0)
+        {
+            // if maxChunkSize is 0 assign some default chunk size value
+            maxChunkSize = 1024;
+        }
+        size_t sentSize = 0;
+
+        do
+        {
+            int nBytes = 0;
+            if (!node.mSendChunk)
+            {
+                node.mSendChunk = data.Read(maxChunkSize);
+
+                if (!node.mSendChunk->Size())
+                {
+                    // we need to wait for data to load so we should let others
+                    // send data in the meantime
+                    node.mSendChunk = std::nullopt;
+                    return {false, sentSize};
+                }
+            }
+
+            {
+                LOCK(node.cs_hSocket);
+                if (node.hSocket == INVALID_SOCKET)
+                {
+                    return {false, sentSize};
+                }
+
+                nBytes = send(node.hSocket,
+                              reinterpret_cast<const char *>(node.mSendChunk->Begin()),
+                              node.mSendChunk->Size(),
+                              MSG_NOSIGNAL | MSG_DONTWAIT);
+            }
+
+            if (nBytes == 0)
+            {
+                // couldn't send anything at all
+                return {false, sentSize};
+            }
+            if (nBytes < 0)
+            {
+                // error
+                int nErr = WSAGetLastError();
+                if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE &&
+                    nErr != WSAEINTR && nErr != WSAEINPROGRESS)
+                {
+                    LogPrintf("socket send error %s\n", NetworkErrorString(nErr));
+                    node.CloseSocketDisconnect();
+                }
+
+                return {false, sentSize};
+            }
+
+            assert(nBytes > 0);
+            node.nLastSend = GetSystemTimeInSeconds();
+            node.nSendBytes += nBytes;
+            sentSize += nBytes;
+            if (static_cast<size_t>(nBytes) != node.mSendChunk->Size())
+            {
+                // could not send full message; stop sending more
+                node.mSendChunk =
+                    CSpan{
+                        node.mSendChunk->Begin() + nBytes,
+                        node.mSendChunk->Size() - nBytes
+                    };
+                return {false, sentSize};
+            }
+            else
+            {
+                node.mSendChunk = std::nullopt;
+            }
+        } while(!data.EndOfStream());
+
+        return {true, sentSize};
+    }
+}
+
 // requires LOCK(cs_vSend)
 size_t CConnman::SocketSendData(const CNodePtr& pnode) const {
     AssertLockHeld(pnode->cs_vSend);
@@ -955,60 +1054,25 @@ size_t CConnman::SocketSendData(const CNodePtr& pnode) const {
     size_t nMsgCount = 0;
 
     for (const auto &data : pnode->vSendMsg) {
-        assert(data.size() > pnode->nSendOffset);
-        int nBytes = 0;
+        auto sent = SendMessage(*pnode, *data, nSendBufferMaxSize);
+        nSentSize += sent.sentSize;
+        pnode->nSendSize -= sent.sentSize;
 
+        if(sent.sendComplete == false)
         {
-            LOCK(pnode->cs_hSocket);
-            if (pnode->hSocket == INVALID_SOCKET) {
-                break;
-            }
-
-            nBytes = send(pnode->hSocket,
-                          reinterpret_cast<const char *>(data.data()) +
-                              pnode->nSendOffset,
-                          data.size() - pnode->nSendOffset,
-                          MSG_NOSIGNAL | MSG_DONTWAIT);
-        }
-
-        if (nBytes == 0) {
-            // couldn't send anything at all
             break;
         }
 
-        if (nBytes < 0) {
-            // error
-            int nErr = WSAGetLastError();
-            if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE &&
-                nErr != WSAEINTR && nErr != WSAEINPROGRESS) {
-                LogPrintf("socket send error %s\n", NetworkErrorString(nErr));
-                pnode->CloseSocketDisconnect();
-            }
-
-            break;
-        }
-
-        assert(nBytes > 0);
-        pnode->nLastSend = GetSystemTimeInSeconds();
-        pnode->nSendBytes += nBytes;
-        pnode->nSendOffset += nBytes;
-        nSentSize += nBytes;
-        if (pnode->nSendOffset != data.size()) {
-            // could not send full message; stop sending more
-            break;
-        }
-
-        pnode->nSendOffset = 0;
-        pnode->nSendSize -= data.size();
-        pnode->fPauseSend = pnode->nSendSize.getSendQueueBytes() > nSendBufferMaxSize;
-        nMsgCount++;
+        pnode->fPauseSend =
+            pnode->nSendSize.getSendQueueBytes() > nSendBufferMaxSize;
+        ++nMsgCount;
     }
 
     pnode->vSendMsg.erase(pnode->vSendMsg.begin(),
                           pnode->vSendMsg.begin() + nMsgCount);
 
     if (pnode->vSendMsg.empty()) {
-        assert(pnode->nSendOffset == 0);
+        assert(!pnode->mSendChunk);
         assert(pnode->nSendSize.getSendQueueBytes() == 0);
     }
 
@@ -3008,9 +3072,11 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
         if (pnode->nSendSize.getSendQueueBytes() > nSendBufferMaxSize) {
             pnode->fPauseSend = true;
         }
-        pnode->vSendMsg.push_back(std::move(serializedHeader));
+        pnode->vSendMsg.push_back(
+            std::make_unique<CVectorStream>(std::move(serializedHeader)));
         if (nPayloadLength) {
-            pnode->vSendMsg.push_back(std::move(msg.data));
+            pnode->vSendMsg.push_back(
+                std::make_unique<CVectorStream>(std::move(msg.data)));
         }
 
         // If write queue empty, attempt "optimistic write"

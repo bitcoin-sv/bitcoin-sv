@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #ifndef WIN32
@@ -632,10 +633,17 @@ public:
     SOCKET hSocket {0};
     // Total size of all vSendMsg entries.
     CSendQueueBytes nSendSize;
-    // Offset inside the first vSendMsg already sent.
-    size_t nSendOffset {0};
+    /**
+     * Storage for the last chunk being sent to the peer. This variable contains
+     * data for the duration of sending the chunk. Once the chunk is sent it is
+     * cleared.
+     * In case there is an interruption during sending (sent size exceeded or
+     * network layer can not process any more data at the moment) this variable
+     * remains set and is used to continue streaming on the next try.
+     */
+    std::optional<CSpan> mSendChunk;
     uint64_t nSendBytes {0};
-    std::deque<std::vector<uint8_t>> vSendMsg {};
+    std::deque<std::unique_ptr<CForwardReadonlyStream>> vSendMsg {};
     CCriticalSection cs_vSend {};
     CCriticalSection cs_hSocket {};
     CCriticalSection cs_vRecv {};
