@@ -3,7 +3,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import contextlib
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.cdefs import (ONE_MEGABYTE)
@@ -50,13 +49,13 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         getdata_request = msg_getdata([CInv(2, block)])
 
         for test_node in test_nodes:
-            test_node.on_block = on_block
-            test_node.on_reject = on_reject
-            test_node.send_message(getdata_request)
+            test_node.cb.on_block = on_block
+            test_node.cb.on_reject = on_reject
+            test_node.cb.send_message(getdata_request)
 
         # Let bitcoind process and send all the messages.
         for test_node in test_nodes:
-            test_node.sync_with_ping()
+            test_node.cb.sync_with_ping()
 
         return numberOfReceivedBlocks, numberOfRejectedMsgs
 
@@ -100,45 +99,6 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         return createdBlock
 
     def run_test(self):
-
-        @contextlib.contextmanager
-        def run_connection(factorMaxSendingBlocksSize, blockSize):
-            title = "Send GetData and receive block messages while factorMaxSendingBlockSize is {}.".format(factorMaxSendingBlocksSize)
-            logger.debug("setup %s", title)
-
-            args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize), 
-                    "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize), 
-                    "-factorMaxSendQueuesBytes={}".format(factorMaxSendingBlocksSize)]
-
-            self.start_node(0, args)       
-
-            test_nodes = []
-            for i in range(self.num_peers):
-                test_nodes.append(NodeConnCB())
-
-            connections = []
-            for test_node in test_nodes:
-                connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node)
-                connections.append(connection)
-                test_node.add_connection(connection)
-
-            thr = NetworkThread()
-            thr.start()
-            for test_node in test_nodes:
-                test_node.wait_for_verack()
-
-            logger.debug("before %s", title)
-            yield test_nodes
-            logger.debug("after %s", title)
-
-            for connection in connections:
-                connection.close()
-            del connections
-            thr.join()
-            disconnect_nodes(self.nodes[0],1)
-            self.stop_node(0)
-            logger.debug("finished %s", title)
-
         node = self.prepareChain()
 
          # Mine a big block.
@@ -150,27 +110,35 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         self.stop_node(0)
 
         # Scenario 1: Blocks from bitcoind should be sent in parallel as factorMaxSendQueuesBytes=num_peers.
-        with run_connection(self.num_peers, self.excessiveblocksize) as test_nodes:
-            numberOfReceivedBlocksParallel, numberOfRejectedMsgs = self.requestBlocks(test_nodes, oldBlock)
-        assert_equal(self.num_peers, numberOfReceivedBlocksParallel)
-        assert_equal(0, numberOfRejectedMsgs)
+        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize), 
+                "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize)]
+        with self.run_node_with_connections("should be sent in parallel as factorMaxSendQueuesBytes=num_peers", 0,
+            args+["-factorMaxSendQueuesBytes={}".format(self.num_peers)], self.num_peers) as connections:
+
+            numberOfReceivedBlocksParallel, numberOfRejectedMsgs = self.requestBlocks(connections, oldBlock)
+            assert_equal(self.num_peers, numberOfReceivedBlocksParallel)
+            assert_equal(0, numberOfRejectedMsgs)
 
         # Scenario 2: Blocks from bitcoind should not be sent in parallel because factorMaxSendQueuesBytes=1 
         # only allows one 3MB to be downloaded at once.
-        with run_connection(1, self.excessiveblocksize) as test_nodes:
-            numberOfReceivedBlocksSeries, numberOfRejectedMsgs = self.requestBlocks(test_nodes, oldBlock)
-        # numReceivedBlocksSeries may vary between test runs (based on processing power).
-        # But still we expect the processing to be slow enough that with 15 messages at least one will be rejected.
-        assert_greater_than(numberOfReceivedBlocksParallel, numberOfReceivedBlocksSeries)
-        assert_greater_than(numberOfRejectedMsgs, 0)
-        assert_equal(numberOfReceivedBlocksSeries+numberOfRejectedMsgs, 15)
-        logger.info("%d blocks received when running with factorMaxSendQueuesBytes=%d.", numberOfReceivedBlocksSeries, 1)
+        with self.run_node_with_connections("should not be sent in parallel because factorMaxSendQueuesBytes=1", 0,
+            args+["-factorMaxSendQueuesBytes=1"], self.num_peers) as connections:
+
+            numberOfReceivedBlocksSeries, numberOfRejectedMsgs = self.requestBlocks(connections, oldBlock)
+            # numReceivedBlocksSeries may vary between test runs (based on processing power).
+            # But still we expect the processing to be slow enough that with 15 messages at least one will be rejected.
+            assert_greater_than(numberOfReceivedBlocksParallel, numberOfReceivedBlocksSeries)
+            assert_greater_than(numberOfRejectedMsgs, 0)
+            assert_equal(numberOfReceivedBlocksSeries+numberOfRejectedMsgs, 15)
+            logger.info("%d blocks received when running with factorMaxSendQueuesBytes=%d.", numberOfReceivedBlocksSeries, 1)
 
         # Scenario 3: Blocks from bitcoind should be sent in parallel, because we are requesting the most recent block.
-        with run_connection(1, self.excessiveblocksize) as test_nodes:
-            numberOfReceivedBlocksNewBlock, numberOfRejectedMsgs = self.requestBlocks(test_nodes, newBlock)
-        assert_equal(self.num_peers, numberOfReceivedBlocksNewBlock)
-        assert_equal(0, numberOfRejectedMsgs)
+        with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block", 0,
+            args+["-factorMaxSendQueuesBytes=1"], self.num_peers) as connections:
+
+            numberOfReceivedBlocksNewBlock, numberOfRejectedMsgs = self.requestBlocks(connections, newBlock)
+            assert_equal(self.num_peers, numberOfReceivedBlocksNewBlock)
+            assert_equal(0, numberOfRejectedMsgs)
 
 if __name__ == '__main__':
     MaxSendQueuesBytesTest().main()

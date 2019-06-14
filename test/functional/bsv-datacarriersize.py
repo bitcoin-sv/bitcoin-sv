@@ -4,40 +4,9 @@
 from time import sleep
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal
 from test_framework.mininode import *
 from test_framework.script import CScript, OP_RETURN, OP_FALSE
-
-
-#context manager extension for the NodeConn.
-class SafeNodeConnection(NodeConn):
-
-    def __init__(self, dstaddr='127.0.0.1', dstport=None, rpc=None, callback=None, net="regtest", services=NODE_NETWORK, send_version=True):
-        assert rpc is not None, "Rpc must be specified"
-        super(SafeNodeConnection, self).__init__(dstaddr= dstaddr,
-                                                 dstport=(dstport if dstport is not None else p2p_port(0)),
-                                                 rpc=rpc,
-                                                 callback=(callback if callback is not None else NodeConnCB()),
-                                                 net=net,
-                                                 services=services,
-                                                 send_version=send_version)
-
-    @property
-    def callback(self):
-        return self.cb
-
-    def __enter__(self):
-        self.cb.add_connection(self)
-        self.thread = NetworkThread()
-        self.thread.start()
-        self.cb.wait_for_verack()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.disconnect_node()
-        self.thread.join()
-        return False
-
 
 # Test the functionality -datacarriersize works as expected. It should accept both OP_RETURN and OP_FALSE, OP_RETURN
 # 1. Set -datacarriersize to 500B.
@@ -48,27 +17,32 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
+        self.num_peers = 1
+        self.dataCarrierSize = 500;
         
     def setup_network(self):
-        self.add_nodes(self.num_nodes)
-        self.dataCarrierSize = 500;
-        # dataCarrierSize is used for checking the size of the whole script (CScript).
-        self.start_node(0, ['-datacarriersize=%d' % self.dataCarrierSize, '-acceptnonstdtxn=false'])
+        self.setup_nodes()
 
+    def setup_nodes(self):
+        self.add_nodes(self.num_nodes)
+        self.start_node(0)
+        
     def calc_overhead_bytes(self,script_op_codes):
         # Script consists of ((1 byte per op_code) + OP_PUSHDATA2(1 byte) + size (2 bytes) + data)
         return len(script_op_codes) + 3;
 
-    def run_test_parametrized(self, script_op_codes):
+    def run_test_parametrized(self, script_op_codes, description):
 
-        with SafeNodeConnection(rpc=self.nodes[0]) as connection:
+        # dataCarrierSize parameter is used for checking the size of the whole script (CScript).
+        with self.run_node_with_connections(description, 0, ['-datacarriersize=%d' % self.dataCarrierSize, '-acceptnonstdtxn=false'], self.num_peers) as connections:
 
+            connection = connections[0]
             rejected_txs = []
 
             def on_reject(conn, msg):
                 rejected_txs.append(msg)
 
-            connection.callback.on_reject = on_reject
+            connection.cb.on_reject = on_reject
 
             # Create and send transaction with data carrier size equal to 500B.
             out_value = 10000
@@ -80,7 +54,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
             ftx = FromHex(CTransaction(), ftxHex)
             ftx.rehash()
-            connection.send_message(msg_tx(ftx))
+            connection.cb.send_message(msg_tx(ftx))
 
             # Create and send transaction with data carrier size equal to 501B.
             tx = CTransaction()
@@ -88,10 +62,10 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             script_tx = CScript(script_op_codes + [b"a" * (self.dataCarrierSize + 1 - self.calc_overhead_bytes(script_op_codes))])
             tx.vout.append(CTxOut(out_value -1000, script_tx))
             tx.rehash()
-            connection.send_message(msg_tx(tx))
+            connection.cb.send_message(msg_tx(tx))
 
             # Wait for rejection.
-            connection.callback.wait_for_reject()
+            connection.cb.wait_for_reject()
 
             # Only second transaction should be rejected.
             assert_equal(len(rejected_txs), 1)
@@ -101,8 +75,10 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
     def run_test(self):
         self.nodes[0].generate(101)
-        self.run_test_parametrized([OP_RETURN])
-        self.run_test_parametrized([OP_FALSE, OP_RETURN])
+        self.stop_node(0)
+
+        self.run_test_parametrized([OP_RETURN], "script with OP_RETURN op code")
+        self.run_test_parametrized([OP_FALSE, OP_RETURN], "script with  OP_FALSE, OP_RETURN op code")
 
 if __name__ == '__main__':
     DataCarrierSizeTest().main()

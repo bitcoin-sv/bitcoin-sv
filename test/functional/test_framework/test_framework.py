@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import traceback
+import contextlib
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import NetworkThread
 
@@ -284,6 +285,42 @@ class BitcoinTestFramework():
             for node in self.nodes:
                 coverage.write_all_rpc_commands(
                     self.options.coveragedir, node.rpc)
+
+    # This method runs and stops bitcoind node with index 'node_index'.
+    # It also creates (and handles closing of) 'number_of_connections' connections to bitcoind node with index 'node_index'.
+    @contextlib.contextmanager
+    def run_node_with_connections(self, title, node_index, args, number_of_connections):
+        logger.debug("setup %s", title)
+
+        self.start_node(node_index, args)
+
+        connectionCbs = []
+        for i in range(number_of_connections):
+            connectionCbs.append(NodeConnCB())
+
+        connections = []
+        for connCb in connectionCbs:
+            connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[node_index], connCb)
+            connections.append(connection)
+            connCb.add_connection(connection)
+
+        thr = NetworkThread()
+        thr.start()
+        for connCb in connectionCbs:
+            connCb.wait_for_verack()
+
+        logger.debug("before %s", title)
+        yield connections
+        logger.debug("after %s", title)
+
+        for connection in connections:
+            connection.close()
+        del connections
+        # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
+        thr.join()
+        disconnect_nodes(self.nodes[node_index],1)
+        self.stop_node(node_index)
+        logger.debug("finished %s", title)
 
     def stop_node(self, i):
         """Stop a bitcoind test node"""
