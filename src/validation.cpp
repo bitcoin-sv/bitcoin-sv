@@ -2829,7 +2829,7 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
         // any disconnected transactions back to the mempool.
         UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
     }
-    mempool.check(pcoinsTip);
+    mempool.check(pcoinsTip, changeSet);
 
     // Callbacks/notifications for a new best chain.
     if (fInvalidFound) {
@@ -3036,6 +3036,9 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     if (state.IsValid()) {
         ActivateBestChain(config, state, changeSet);
     }
+
+    // Check mempool & journal
+    mempool.check(pcoinsTip, changeSet);
 
     return true;
 }

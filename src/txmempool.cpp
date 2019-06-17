@@ -724,7 +724,9 @@ void CTxMemPool::clear() {
     _clear();
 }
 
-void CTxMemPool::check(const CCoinsViewCache *pcoins) const {
+void CTxMemPool::check(const CCoinsViewCache *pcoins,
+                       mining::CJournalChangeSetPtr& changeSet) const
+{
     if (nCheckFrequency == 0) {
         return;
     }
@@ -869,6 +871,38 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const {
 
     assert(totalTxSize == checkTotal);
     assert(innerUsage == cachedInnerUsage);
+
+    /* Journal checking */
+    if(changeSet)
+    {
+        LogPrint(BCLog::JOURNAL, "Checking mempool against journal\n");
+
+        // Make journal consitent with mempool
+        changeSet->apply();
+
+        // Check mempool and journal have the same number of entries
+        CJournalTester tester { mJournalBuilder->getCurrentJournal() };
+        assert(mapTx.size() == tester.journalSize());
+
+        // Check mempool & journal agree on contents
+        for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
+        {
+            // Check this mempool txn also appears in the journal
+            const CJournalEntry tx { it->GetSharedTx(), it->GetAncestorDescendantCounts() };
+            assert(tester.checkTxnExists(tx));
+
+            for(const CTxIn& txin : tx.getTxn()->vin)
+            {
+                auto prevoutit { mapTx.find(txin.prevout.GetTxId()) };
+                if(prevoutit != mapTx.end())
+                {
+                    // Check this in mempool ancestor appears before its descendent in the journal
+                    const CJournalEntry prevout { prevoutit->GetSharedTx(), prevoutit->GetAncestorDescendantCounts() };
+                    assert(tester.checkTxnOrdering(prevout, tx) == CJournalTester::TxnOrder::BEFORE);
+                }
+            }
+        }
+    }
 }
 
 /**

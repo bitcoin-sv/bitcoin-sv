@@ -497,7 +497,7 @@ public:
 class CTxMemPool {
 private:
     //!< Value n means that n times in 2^32 we check.
-    uint32_t nCheckFrequency;
+    std::atomic_uint32_t nCheckFrequency;
     unsigned int nTransactionsUpdated;
     CBlockPolicyEstimator *minerPolicyEstimator;
 
@@ -594,10 +594,10 @@ public:
     /**
      * If sanity-checking is turned on, check makes sure the pool is consistent
      * (does not contain two transactions that spend the same inputs, all inputs
-     * are in the mapNextTx array). If sanity-checking is turned off, check does
-     * nothing.
+     * are in the mapNextTx array, journal is in agreement with mempool).
+     * If sanity-checking is turned off, check does nothing.
      */
-    void check(const CCoinsViewCache *pcoins) const;
+    void check(const CCoinsViewCache *pcoins, mining::CJournalChangeSetPtr& changeSet) const;
     void setSanityCheck(double dFrequency = 1.0) {
         nCheckFrequency = dFrequency * 4294967295.0;
     }
