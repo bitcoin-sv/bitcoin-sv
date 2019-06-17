@@ -424,6 +424,14 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-pid=<file>",
         strprintf(_("Specify pid file (default: %s)"), BITCOIN_PID_FILENAME));
 #endif
+
+    strUsage += HelpMessageOpt(
+        "-preload=<n>",
+            _("If n is set to 1, blockchain state will be preloaded into memory. If n is 0, no preload will happen. "
+              "Other values for n are not allowed. The default value is 0."
+              " This option is not supported on Windows operating systems.")
+            );
+
     strUsage += HelpMessageOpt(
         "-prune=<n>",
         strprintf(
@@ -960,13 +968,6 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-invalidheaderfreq=<n>",
          strprintf("Set the limit on the number of message headers transmitted from the local node over a given time period (default: %d)",
            DEFAULT_INVALID_HEADER_FREQUENCY)) ;
-
-    strUsage += HelpMessageOpt(
-                "-preload=<n>",
-                _("If n is set to 1, blockchain state will be preloaded into memory. If n is 0, no preload will happen. "
-                  "Other values for n are not allowed. The default value is 0."
-                  " This option is not supported on Windows operating systems.")
-                );
 
     return strUsage;
 }
