@@ -821,6 +821,8 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     std::string strHash = request.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
+    // previously, false and true were accepted for verbosity 0 and 1 respectively. this implementations maintains
+    // backward compatibility.
     int verbosity = 1;
     if (request.params.size() > 1) {
         if(request.params[1].isNum())
