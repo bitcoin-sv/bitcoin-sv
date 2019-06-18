@@ -204,6 +204,55 @@ break set --file interpreter.cpp --line 295
 run
 ```
 
+**code instrumentation**
+
+CMake and autotools builds support code sanitizers for gcc and clang.
+In addition CMake buid also supports clang static code analysis.
+
+For CMake they can be enabled through CMake gui or CMake curses gui where they
+are listed and can be toggled on or off or by providing them on command line
+with `-D` CMake list options:
+```
+cmake -D enable_asan=ON <path_to_source_code>
+```
+
+For autotools they can be enabled at configuration step:
+```
+../configure --enable-asan
+```
+
+
+Supported sanitizers are:
+
+- `enable_asan` in CMake (`--enable-asan` for autotools) for detecting memory corruption, leaks, illegal memory access
+  - This sanitizer does not work in combination with assembly version of crypto implementation
+    so assembly must be disabled by setting `CRYPTO_USE_ASM` CMake list option to `OFF`
+    (`cmake -D BITCOIN_DEV_USE_ADDRESS_SANITIZER=ON -D CRYPTO_USE_ASM=OFF <path_to_source_code>`)
+  - This sanitizer does not work in combination with thread sanitizer being enabled
+  - gcc sanitizer can trigger `LeakSanitizer does not work under ptrace` error. In that case run the executable
+    with `ASAN_OPTIONS` environment variable (`ASAN_OPTIONS=detect_leaks=0 <executable_name>`) to disable the offending
+    checks
+- `enable_tsan` in CMake (`--enable-tsan` for autotools) for detecting race conditions (on gcc also potential dead locks)
+  - This sanitizer does not work in combination with address or ub sanitizer being enabled
+  - When sanitizer is enabled code execution is slowed down to approximately between 5 to 15 times
+  - on gcc this sanitizer also does some static potential dead lock checking which can generate false positives
+    as it by design doesn't consider execution order/order of data initialization
+- `enable_ubsan` in CMake (`--enable-ubsan` for autotools) for detecting use of behavior that is undefined by C++ standard
+  - This sanitizer does not work in combination with thread sanitizer being enabled
+  - gcc version of the sanitizer doesn't print stacktraces by default so they need to be enabled by running executable
+    with `UBSAN_OPTIONS` environment variable (`UBSAN_OPTIONS="print_stacktrace=1" <executable_name>`)
+- `enable_static_analyzer` for static analysis of code during compilation
+
+NOTE: Sanitizers change generated assembly code of an executable so running a program with them enabled
+does not guarantee that executable will work with them being disabled so during testing they should not
+be enable all the time. Since enabling sanitizers during the build changes the resulting executable,
+disabling them means recompiling the executable with sanitizers disabled in CMake/autotools build.
+
+NOTE: Sanitizers are a runtime feature so they report errors/warnings only when they occur during execution.
+This is especially true for thread sanitizer which can only detect race conditions if they actually occur
+during execution so if a single run passes without errors/warning there is no guarantee that the consecutive
+runs will as well so they are not a replacement for testing.
+
 **writing script integration tests**
 
 Script integration tests are built using `src/test/script_tests.cpp`:
