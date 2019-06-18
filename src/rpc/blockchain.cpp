@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2009-2019 The Bitcoin Core developers
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/blockchain.h"
 
@@ -821,13 +821,15 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     std::string strHash = request.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
-    // previously, false and true were accepted for verbosity 0 and 1 respectively. this implementations maintains
+    // previously, false and true were accepted for verbosity 0 and 1 respectively. this code maintains
     // backward compatibility.
     int verbosity = 1;
     if (request.params.size() > 1) {
-        if(request.params[1].isNum())
+        if(request.params[1].isNum()) {
             verbosity = request.params[1].get_int();
-        else
+            if (verbosity < 0 || verbosity > 2)
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value out of range");
+        } else
             verbosity = request.params[1].get_bool() ? 1 : 0;
     }
 
@@ -859,7 +861,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         return strHex;
     }
 
-    return blockToJSON(config, block, pblockindex, verbosity >= 2);
+    return blockToJSON(config, block, pblockindex, verbosity == 2);
 }
 
 struct CCoinsStats {
