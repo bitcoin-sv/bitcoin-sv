@@ -562,8 +562,8 @@ public:
     };
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
 
-    const setEntries &GetMemPoolParents(txiter entry) const;
-    const setEntries &GetMemPoolChildren(txiter entry) const;
+    const setEntries &GetMemPoolParentsNL(txiter entry) const;
+    const setEntries &GetMemPoolChildrenNL(txiter entry) const;
 
 private:
     typedef std::map<txiter, setEntries, CompareIteratorByHash> cacheMap;
@@ -576,11 +576,11 @@ private:
     typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
     txlinksMap mapLinks;
 
-    void UpdateParent(txiter entry, txiter parent, bool add);
-    void UpdateChild(txiter entry, txiter child, bool add);
+    void UpdateParentNL(txiter entry, txiter parent, bool add);
+    void UpdateChildNL(txiter entry, txiter child, bool add);
 
     std::vector<indexed_transaction_set::const_iterator>
-    GetSortedDepthAndScore() const;
+    GetSortedDepthAndScoreNL() const;
 
 public:
     indirectmap<COutPoint, const CTransaction *> mapNextTx;

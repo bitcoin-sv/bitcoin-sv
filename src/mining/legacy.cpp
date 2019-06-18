@@ -190,7 +190,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
 }
 
 bool LegacyBlockAssembler::isStillDependent(CTxMemPool::txiter iter) {
-    for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter)) {
+    for (CTxMemPool::txiter parent : mempool.GetMemPoolParentsNL(iter)) {
         if (!inBlock.count(parent)) {
             return true;
         }
@@ -588,7 +588,7 @@ void LegacyBlockAssembler::addPriorityTxs() {
 
             // This tx was successfully added, so add transactions that depend
             // on this one to the priority queue to try again.
-            for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter)) {
+            for (CTxMemPool::txiter child : mempool.GetMemPoolChildrenNL(iter)) {
                 waitPriIter wpiter = waitPriMap.find(child);
                 if (wpiter != waitPriMap.end()) {
                     vecPriority.push_back(
