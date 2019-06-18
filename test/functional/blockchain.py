@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2019 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 """Test RPCs related to blockchainstate.
 
@@ -9,6 +9,7 @@ Test the following RPCs:
     - gettxoutsetinfo
     - getdifficulty
     - getbestblockhash
+    - getblock
     - getblockhash
     - getblockheader
     - getchaintxstats
@@ -41,12 +42,14 @@ class BlockchainTest(BitcoinTestFramework):
         self._test_getchaintxstats()
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
+        self._test_getblock()
         self._test_getdifficulty()
         self._test_getnetworkhashps()
         self._test_stopatheight()
         assert self.nodes[0].verifychain(4, 0)
 
     def _test_getchaintxstats(self):
+        self.log.info("Test getchaintxstats")
         chaintxstats = self.nodes[0].getchaintxstats(1)
         # 200 txs plus genesis tx
         assert_equal(chaintxstats['txcount'], 201)
@@ -94,8 +97,7 @@ class BlockchainTest(BitcoinTestFramework):
         assert_equal(len(res['bestblock']), 64)
         assert_equal(len(res['hash_serialized']), 64)
 
-        self.log.info(
-            "Test that gettxoutsetinfo() works for blockchain with just the genesis block")
+        self.log.info("Test that gettxoutsetinfo() works for blockchain with just the genesis block")
         b1hash = node.getblockhash(1)
         node.invalidateblock(b1hash)
 
@@ -108,8 +110,7 @@ class BlockchainTest(BitcoinTestFramework):
         assert_equal(res2['bestblock'], node.getblockhash(0))
         assert_equal(len(res2['hash_serialized']), 64)
 
-        self.log.info(
-            "Test that gettxoutsetinfo() returns the same result after invalidate/reconsider block")
+        self.log.info("Test that gettxoutsetinfo() returns the same result after invalidate/reconsider block")
         node.reconsiderblock(b1hash)
 
         res3 = node.gettxoutsetinfo()
@@ -121,7 +122,64 @@ class BlockchainTest(BitcoinTestFramework):
         assert_equal(res['bestblock'], res3['bestblock'])
         assert_equal(res['hash_serialized'], res3['hash_serialized'])
 
+    def _test_getblock(self):
+        node = self.nodes[0]
+        assert_raises_rpc_error(-5, "Block not found", node.getblockheader, "nonsense")
+
+        besthash = node.getbestblockhash()
+        secondbesthash = node.getblockhash(199)
+
+        self.log.info("Test getblock with verbosity=0")
+        blockhex = node.getblock(besthash, 0)
+        assert_is_hex_string(blockhex)
+
+        self.log.info("Test getblock with verbosity=1")
+        blockjson = node.getblock(besthash, 1)
+        assert_equal(blockjson['hash'], besthash)
+        assert_equal(blockjson['height'], 200)
+        assert_equal(blockjson['confirmations'], 1)
+        assert_equal(blockjson['previousblockhash'], secondbesthash)
+        assert_is_hex_string(blockjson['chainwork'])
+        assert_is_hash_string(blockjson['hash'])
+        assert_is_hash_string(blockjson['previousblockhash'])
+        assert_is_hash_string(blockjson['merkleroot'])
+        assert_is_hash_string(blockjson['bits'], length=None)
+        assert isinstance(blockjson['time'], int)
+        assert isinstance(blockjson['mediantime'], int)
+        assert isinstance(blockjson['nonce'], int)
+        assert isinstance(blockjson['version'], int)
+        assert isinstance(int(blockjson['versionHex'], 16), int)
+        assert isinstance(blockjson['difficulty'], Decimal)
+        assert isinstance(blockjson['tx'], list)
+        for tx in blockjson['tx']:
+            assert_is_hash_string(tx)
+
+        self.log.info("Test getblock with verbosity=2")
+        blockjson = node.getblock(besthash, 2)
+        assert_equal(blockjson['hash'], besthash)
+        assert_equal(blockjson['height'], 200)
+        assert_equal(blockjson['confirmations'], 1)
+        assert_equal(blockjson['previousblockhash'], secondbesthash)
+        assert_is_hex_string(blockjson['chainwork'])
+        assert_is_hash_string(blockjson['hash'])
+        assert_is_hash_string(blockjson['previousblockhash'])
+        assert_is_hash_string(blockjson['merkleroot'])
+        assert_is_hash_string(blockjson['bits'], length=None)
+        assert isinstance(blockjson['time'], int)
+        assert isinstance(blockjson['mediantime'], int)
+        assert isinstance(blockjson['nonce'], int)
+        assert isinstance(blockjson['version'], int)
+        assert isinstance(int(blockjson['versionHex'], 16), int)
+        assert isinstance(blockjson['difficulty'], Decimal)
+        for tx in blockjson['tx']:
+            assert isinstance(tx, dict)
+
+        self.log.info("Test getblock with invalid verbosity fails")
+        assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, 3)
+        assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, -1)
+
     def _test_getblockheader(self):
+        self.log.info("Test getblockheader")
         node = self.nodes[0]
 
         assert_raises_rpc_error(-5, "Block not found",
@@ -148,17 +206,20 @@ class BlockchainTest(BitcoinTestFramework):
         assert isinstance(header['difficulty'], Decimal)
 
     def _test_getdifficulty(self):
+        self.log.info("Test getdifficulty")
         difficulty = self.nodes[0].getdifficulty()
         # 1 hash in 2 should be valid, so difficulty should be 1/2**31
         # binary => decimal => binary math is why we do this check
         assert abs(difficulty * 2**31 - 1) < 0.0001
 
     def _test_getnetworkhashps(self):
+        self.log.info("Test getnetworkhashps")
         hashes_per_second = self.nodes[0].getnetworkhashps()
         # This should be 2 hashes every 10 minutes or 1/300
         assert abs(hashes_per_second * 300 - 1) < 0.0001
 
     def _test_stopatheight(self):
+        self.log.info("Test stopatheight")
         assert_equal(self.nodes[0].getblockcount(), 200)
         self.nodes[0].generate(6)
         assert_equal(self.nodes[0].getblockcount(), 206)
