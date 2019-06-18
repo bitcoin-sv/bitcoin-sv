@@ -605,6 +605,7 @@ public:
     std::string checkJournal() const;
 
     void setSanityCheck(double dFrequency = 1.0) {
+        LOCK(cs);
         nCheckFrequency = dFrequency * 4294967295.0;
     }
 
@@ -811,9 +812,9 @@ private:
                               const std::set<uint256> &setExclude);
     /** Update ancestors of hash to add/remove it as a descendant transaction.
      */
-    void UpdateAncestorsOf(bool add, txiter hash, setEntries &setAncestors);
+    void UpdateAncestorsOfNL(bool add, txiter hash, setEntries &setAncestors);
     /** Set ancestor state for an entry */
-    void UpdateEntryForAncestors(txiter it, const setEntries &setAncestors);
+    void UpdateEntryForAncestorsNL(txiter it, const setEntries &setAncestors);
     /**
      * For each transaction being removed, update ancestors and any direct
      * children. If updateDescendants is true, then also update in-mempool
@@ -850,6 +851,14 @@ private:
         uint64_t limitDescendantSize,
         std::string &errString,
         bool fSearchForParents = true) const;
+
+    // Non-locking version of addUnchecked
+    bool addUncheckedNL(
+        const uint256 &hash,
+        const CTxMemPoolEntry &entry,
+        setEntries &setAncestors,
+        mining::CJournalChangeSetPtr& changeSet,
+        bool validFeeEstimate = true);
 };
 
 /**

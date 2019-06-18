@@ -286,8 +286,9 @@ bool CTxMemPool::CalculateMemPoolAncestorsNL(
     return true;
 }
 
-void CTxMemPool::UpdateAncestorsOf(bool add, txiter it,
-                                   setEntries &setAncestors) {
+void CTxMemPool::UpdateAncestorsOfNL(bool add,
+                                     txiter it,
+                                     setEntries &setAncestors) {
     setEntries parentIters = GetMemPoolParentsNL(it);
     // add or remove this tx as a child of each parent
     for (txiter piter : parentIters) {
@@ -302,8 +303,8 @@ void CTxMemPool::UpdateAncestorsOf(bool add, txiter it,
     }
 }
 
-void CTxMemPool::UpdateEntryForAncestors(txiter it,
-                                         const setEntries &setAncestors) {
+void CTxMemPool::UpdateEntryForAncestorsNL(txiter it,
+                                           const setEntries &setAncestors) {
     int64_t updateCount = setAncestors.size();
     int64_t updateSize = 0;
     Amount updateFee(0);
@@ -378,9 +379,11 @@ void CTxMemPool::UpdateForRemoveFromMempool(const setEntries &entriesToRemove,
                                     nNoLimit,
                                     dummy,
                                     false);
-        // Note that UpdateAncestorsOf severs the child links that point to
+        // Note that UpdateAncestorsOfNL severs the child links that point to
         // removeIt in the entries for the parents of removeIt.
-        UpdateAncestorsOf(false, removeIt, setAncestors);
+        UpdateAncestorsOfNL(false,
+                            removeIt,
+                            setAncestors);
     }
     // After updating all the ancestor sizes, we can now sever the link between
     // each transaction being removed and any mempool children (ie, update
@@ -446,13 +449,30 @@ void CTxMemPool::AddTransactionsUpdated(unsigned int n) {
     nTransactionsUpdated += n;
 }
 
-bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
-                              setEntries &setAncestors, CJournalChangeSetPtr& changeSet,
-                              bool validFeeEstimate) {
-    NotifyEntryAdded(entry.GetSharedTx());
-    // Add to memory pool without checking anything.
-    // Used by AcceptToMemoryPool(), which DOES do all the appropriate checks.
+bool CTxMemPool::addUnchecked(
+    const uint256 &hash,
+    const CTxMemPoolEntry &entry,
+    setEntries &setAncestors,
+    CJournalChangeSetPtr& changeSet,
+    bool validFeeEstimate) {
+
     LOCK(cs);
+    // Add to memory pool without checking anything.
+    return addUncheckedNL(
+                hash,
+                entry,
+                setAncestors,
+                changeSet,
+                validFeeEstimate);
+}
+
+bool CTxMemPool::addUncheckedNL(
+    const uint256 &hash,
+    const CTxMemPoolEntry &entry,
+    setEntries &setAncestors,
+    CJournalChangeSetPtr& changeSet,
+    bool validFeeEstimate) {
+
     indexed_transaction_set::iterator newit = mapTx.insert(entry).first;
     mapLinks.insert(make_pair(newit, TxLinks()));
 
@@ -504,8 +524,8 @@ bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
             UpdateParentNL(newit, pit, true);
         }
     }
-    UpdateAncestorsOf(true, newit, setAncestors);
-    UpdateEntryForAncestors(newit, setAncestors);
+    UpdateAncestorsOfNL(true, newit, setAncestors);
+    UpdateEntryForAncestorsNL(newit, setAncestors);
 
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();
@@ -513,6 +533,8 @@ bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
 
     vTxHashes.emplace_back(tx.GetHash(), newit);
     newit->vTxHashesIdx = vTxHashes.size() - 1;
+
+    NotifyEntryAdded(entry.GetSharedTx());
 
     return true;
 }
@@ -1313,8 +1335,12 @@ bool CTxMemPool::CheckTxConflicts(const CTransaction &tx) const {
     return false;
 }
 
-bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
-                              CJournalChangeSetPtr& changeSet, bool validFeeEstimate) {
+bool CTxMemPool::addUnchecked(
+    const uint256 &hash,
+    const CTxMemPoolEntry &entry,
+    CJournalChangeSetPtr& changeSet,
+    bool validFeeEstimate) {
+
     LOCK(cs);
     setEntries setAncestors;
     uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
@@ -1327,7 +1353,7 @@ bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
         nNoLimit,
         nNoLimit,
         dummy);
-    return addUnchecked(
+    return addUncheckedNL(
                 hash,
                 entry,
                 setAncestors,
