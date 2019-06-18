@@ -832,9 +832,24 @@ private:
      * transaction that is removed, so we can't remove intermediate transactions
      * in a chain before we've updated all the state for the removal.
      */
-    void removeUnchecked(txiter entry,
-                         mining::CJournalChangeSetPtr& changeSet,
-                         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+    void removeUnchecked(
+        txiter entry,
+        mining::CJournalChangeSetPtr& changeSet,
+        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+
+    /**
+     * Non-locking private methods.
+     */
+    // Non-locking version of CalculateMemPoolAncestors
+    bool CalculateMemPoolAncestorsNL(
+        const CTxMemPoolEntry &entry,
+        setEntries &setAncestors,
+        uint64_t limitAncestorCount,
+        uint64_t limitAncestorSize,
+        uint64_t limitDescendantCount,
+        uint64_t limitDescendantSize,
+        std::string &errString,
+        bool fSearchForParents = true) const;
 };
 
 /**
