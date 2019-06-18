@@ -138,6 +138,7 @@ class MiningTest(BitcoinTestFramework):
         # Create UTXOs to build a bunch of transactions from
         self.relayfee = node.getnetworkinfo()['relayfee']
         utxos = create_confirmed_utxos(self.relayfee, node, 100)
+        self.sync_all()
 
         # Create a lot of transactions from the UTXOs
         newutxos = split_utxos(self.relayfee, node, num_trasactions, utxos)
