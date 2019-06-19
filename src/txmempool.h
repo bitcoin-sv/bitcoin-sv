@@ -658,6 +658,11 @@ public:
                                double dPriorityDelta, const Amount nFeeDelta);
     void ApplyDeltas(const uint256 hash, double &dPriorityDelta,
                      Amount &nFeeDelta) const;
+    // A non-locking version of ApplyDeltas
+    void ApplyDeltasNL(
+            const uint256 hash,
+            double &dPriorityDelta,
+            Amount &nFeeDelta) const;
 
     // Get a reference to the journal builder
     const mining::CJournalBuilderPtr& getJournalBuilder() const { return mJournalBuilder; }
@@ -703,10 +708,25 @@ public:
      * mempool
      */
     bool CalculateMemPoolAncestors(
-        const CTxMemPoolEntry &entry, setEntries &setAncestors,
-        uint64_t limitAncestorCount, uint64_t limitAncestorSize,
-        uint64_t limitDescendantCount, uint64_t limitDescendantSize,
-        std::string &errString, bool fSearchForParents = true) const;
+            const CTxMemPoolEntry &entry,
+            setEntries &setAncestors,
+            uint64_t limitAncestorCount,
+            uint64_t limitAncestorSize,
+            uint64_t limitDescendantCount,
+            uint64_t limitDescendantSize,
+            std::string &errString,
+            bool fSearchForParents = true) const;
+
+    // A non-locking version of CalculateMemPoolAncestors
+    bool CalculateMemPoolAncestorsNL(
+            const CTxMemPoolEntry &entry,
+            setEntries &setAncestors,
+            uint64_t limitAncestorCount,
+            uint64_t limitAncestorSize,
+            uint64_t limitDescendantCount,
+            uint64_t limitDescendantSize,
+            std::string &errString,
+            bool fSearchForParents = true) const;
 
     /**
      * Populate setDescendants with all in-mempool descendants of hash.
@@ -880,16 +900,6 @@ private:
     /**
      * A non-locking private methods.
      */
-    // A non-locking version of CalculateMemPoolAncestors
-    bool CalculateMemPoolAncestorsNL(
-            const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
-            uint64_t limitAncestorCount,
-            uint64_t limitAncestorSize,
-            uint64_t limitDescendantCount,
-            uint64_t limitDescendantSize,
-            std::string &errString,
-            bool fSearchForParents = true) const;
 
     // A non-locking version of addUnchecked
     bool addUncheckedNL(

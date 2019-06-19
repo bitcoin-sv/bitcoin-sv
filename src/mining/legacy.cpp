@@ -305,7 +305,9 @@ void LegacyBlockAssembler::AddToBlock(CTxMemPool::txiter iter) {
     if (fPrintPriority) {
         double dPriority = iter->GetPriority(nHeight);
         Amount dummy;
-        mempool.ApplyDeltas(iter->GetTx().GetId(), dPriority, dummy);
+        mempool.ApplyDeltasNL(iter->GetTx().GetId(),
+                              dPriority,
+                              dummy);
         LogPrintf(
             "priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString(),
@@ -485,8 +487,14 @@ void LegacyBlockAssembler::addPackageTxs(int &nPackagesSelected,
         CTxMemPool::setEntries ancestors;
         uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
         std::string dummy;
-        mempool.CalculateMemPoolAncestors(*iter, ancestors, nNoLimit, nNoLimit,
-                                          nNoLimit, nNoLimit, dummy, false);
+        mempool.CalculateMemPoolAncestorsNL(*iter,
+                                            ancestors,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            dummy,
+                                            false);
 
         onlyUnconfirmed(ancestors);
         ancestors.insert(iter);
@@ -545,7 +553,9 @@ void LegacyBlockAssembler::addPriorityTxs() {
          mi != mempool.mapTx.end(); ++mi) {
         double dPriority = mi->GetPriority(nHeight);
         Amount dummy;
-        mempool.ApplyDeltas(mi->GetTx().GetId(), dPriority, dummy);
+        mempool.ApplyDeltasNL(mi->GetTx().GetId(),
+                              dPriority,
+                              dummy);
         vecPriority.push_back(TxCoinAgePriority(dPriority, mi));
     }
     std::make_heap(vecPriority.begin(), vecPriority.end(), pricomparer);

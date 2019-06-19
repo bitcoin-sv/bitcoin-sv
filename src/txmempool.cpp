@@ -754,8 +754,10 @@ void CTxMemPool::removeForReorg(
     RemoveStagedNL(setAllRemoves, false, changeSet, MemPoolRemovalReason::REORG);
 }
 
-void CTxMemPool::removeConflictsNL(const CTransaction &tx, CJournalChangeSetPtr& changeSet)
-{
+void CTxMemPool::removeConflictsNL(
+    const CTransaction &tx,
+    CJournalChangeSetPtr& changeSet) {
+
     // Remove transactions which depend on inputs of tx, recursively
     for (const CTxIn &txin : tx.vin) {
         auto it = mapNextTx.find(txin.prevout);
@@ -1269,12 +1271,19 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash,
 void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta,
                              Amount &nFeeDelta) const {
     LOCK(cs);
+    ApplyDeltasNL(hash, dPriorityDelta, nFeeDelta);
+}
+
+void CTxMemPool::ApplyDeltasNL(
+        const uint256 hash,
+        double &dPriorityDelta,
+        Amount &nFeeDelta) const {
+
     std::map<uint256, std::pair<double, Amount>>::const_iterator pos =
         mapDeltas.find(hash);
     if (pos == mapDeltas.end()) {
         return;
     }
-
     const std::pair<double, Amount> &deltas = pos->second;
     dPriorityDelta += deltas.first;
     nFeeDelta += deltas.second;
