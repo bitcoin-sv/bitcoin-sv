@@ -436,6 +436,10 @@ CTxMemPool::~CTxMemPool() {
 
 bool CTxMemPool::isSpent(const COutPoint &outpoint) {
     LOCK(cs);
+    return isSpentNL(outpoint);
+}
+
+bool CTxMemPool::isSpentNL(const COutPoint &outpoint) {
     return mapNextTx.count(outpoint);
 }
 
