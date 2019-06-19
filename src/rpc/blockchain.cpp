@@ -823,14 +823,15 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
 
     // previously, false and true were accepted for verbosity 0 and 1 respectively. this code maintains
     // backward compatibility.
-    int verbosity = 1;
+    GetBlockVerbosity verbosity = GetBlockVerbosity::DECODE_HEADER;
     if (request.params.size() > 1) {
         if(request.params[1].isNum()) {
-            verbosity = request.params[1].get_int();
-            if (verbosity < 0 || verbosity > 2)
+            auto verbosityNum = request.params[1].get_int();
+            if (verbosityNum < 0 || verbosityNum > 2)
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value out of range");
+            verbosity = static_cast<GetBlockVerbosity>(verbosityNum);
         } else
-            verbosity = request.params[1].get_bool() ? 1 : 0;
+            verbosity = static_cast<GetBlockVerbosity>(request.params[1].get_bool() ? 1 : 0);
     }
 
     if (mapBlockIndex.count(hash) == 0) {
@@ -853,7 +854,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
 
-    if (verbosity <= 0) {
+    if (verbosity == GetBlockVerbosity::RAW_BLOCK) {
         CDataStream ssBlock(SER_NETWORK,
                             PROTOCOL_VERSION | RPCSerializationFlags());
         ssBlock << block;
@@ -861,7 +862,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         return strHex;
     }
 
-    return blockToJSON(config, block, pblockindex, verbosity == 2);
+    return blockToJSON(config, block, pblockindex, verbosity == GetBlockVerbosity::DECODE_TRANSACTIONS);
 }
 
 struct CCoinsStats {

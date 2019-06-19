@@ -15,4 +15,10 @@ UniValue getblockchaininfo(const Config &config, const JSONRPCRequest &request);
 
 double GetDifficulty(const CBlockIndex *blockindex);
 
+enum class GetBlockVerbosity {
+    RAW_BLOCK = 0,
+    DECODE_HEADER = 1,
+    DECODE_TRANSACTIONS = 2
+};
+
 #endif // BITCOIN_RPCBLOCKCHAIN_H
