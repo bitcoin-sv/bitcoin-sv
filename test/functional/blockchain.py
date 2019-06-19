@@ -132,6 +132,12 @@ class BlockchainTest(BitcoinTestFramework):
         self.log.info("Test getblock with verbosity=0")
         blockhex = node.getblock(besthash, 0)
         assert_is_hex_string(blockhex)
+        self.log.info("Test getblock with verbosity=RAW_BLOCK")
+        blockhex = node.getblock(besthash, "RAW_BLOCK")
+        assert_is_hex_string(blockhex)
+        self.log.info("Test getblock with verbosity=RaW_BlocK")
+        blockhex = node.getblock(besthash, "RaW_BlocK")
+        assert_is_hex_string(blockhex)
 
         self.log.info("Test getblock with verbosity=1")
         blockjson = node.getblock(besthash, 1)
@@ -151,6 +157,12 @@ class BlockchainTest(BitcoinTestFramework):
         assert isinstance(int(blockjson['versionHex'], 16), int)
         assert isinstance(blockjson['difficulty'], Decimal)
         assert isinstance(blockjson['tx'], list)
+        for tx in blockjson['tx']:
+            assert_is_hash_string(tx)
+
+        self.log.info("Test getblock with verbosity=DECODE_HEADER")
+        blockjson = node.getblock(besthash, "DECODE_HEADER")
+        assert_equal(blockjson['hash'], besthash)
         for tx in blockjson['tx']:
             assert_is_hash_string(tx)
 
@@ -174,9 +186,16 @@ class BlockchainTest(BitcoinTestFramework):
         for tx in blockjson['tx']:
             assert isinstance(tx, dict)
 
+        self.log.info("Test getblock with verbosity=DECODE_TRANSACTIONS")
+        blockjson = node.getblock(besthash, "DECODE_TRANSACTIONS")
+        assert_equal(blockjson['hash'], besthash)
+        for tx in blockjson['tx']:
+            assert isinstance(tx, dict)
+
         self.log.info("Test getblock with invalid verbosity fails")
         assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, 3)
         assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, -1)
+        assert_raises_rpc_error(-8, "Verbosity value not recognized", node.getblock, besthash, "ASDFG")
 
     def _test_getblockheader(self):
         self.log.info("Test getblockheader")

@@ -26,6 +26,7 @@
 #include "validation.h"
 
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
+#include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
 
 #include <condition_variable>
 #include <cstdint>
@@ -757,22 +758,59 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
     return blockheaderToJSON(pblockindex);
 }
 
+/**
+ * Verbosity can be passed in multiple forms:
+ *  - as bool true/false
+ *  - as integer 0/1/2
+ *  - as enum value RAW_BLOCK / DECODE_HEADER / DECODE_TRANSACTIONS
+ * To maintain compatibility with different clients we also try to parse JSON string as booleans and integers.
+ */
+static void parseGetBlockVerbosity(const UniValue& verbosityParam, GetBlockVerbosity& verbosity) {
+
+    if(verbosityParam.isNum()) {
+        auto verbosityNum = verbosityParam.get_int();
+        if (verbosityNum < 0 || verbosityNum > 2)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value out of range");
+        verbosity = static_cast<GetBlockVerbosity>(verbosityNum);
+    } else if (verbosityParam.isStr()) {
+        std::string verbosityStr = verbosityParam.get_str();
+        boost::to_upper(verbosityStr);
+
+        if (verbosityStr == "0" || verbosityStr == "FALSE") {
+            verbosity = GetBlockVerbosity::RAW_BLOCK;
+        } else if (verbosityStr == "1" || verbosityStr == "TRUE") {
+            verbosity = GetBlockVerbosity::DECODE_HEADER;
+        } else if (verbosityStr == "2") {
+            verbosity = GetBlockVerbosity::DECODE_TRANSACTIONS;
+        } else {
+            if (!GetBlockVerbosityNames::TryParse(verbosityStr, verbosity)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value not recognized");
+            }
+        }
+    } else if (verbosityParam.isBool()) {
+        verbosity = (verbosityParam.get_bool() ? GetBlockVerbosity::DECODE_HEADER : GetBlockVerbosity::RAW_BLOCK);
+    } else {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid verbosity input type");
+    }
+}
+
 UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 2) {
         throw std::runtime_error(
                 "getblock \"blockhash\" ( verbosity ) \n"
-                "\nIf verbosity is 0, returns a string that is serialized, "
+                "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is serialized, "
                 "hex-encoded data for block 'hash'.\n"
-                "If verbosity is 1, returns an Object with information about block <hash>.\n"
-                "If verbosity is 2, returns an Object with information about "
+                "If verbosity is 1 or DECODE_HEADER, returns an Object with information about block <hash>.\n"
+                "If verbosity is 2 or DECODE_TRANSACTIONS, returns an Object with information about "
                 "block <hash> and information about each transaction. \n"
                 "\nArguments:\n"
                 "1. \"blockhash\"          (string, required) The block hash\n"
-                "2. verbosity              (numeric, optional, default=1) 0 for hex encoded data, 1 for a json object, and 2 for json object with transaction data\n"
-                "\nResult (for verbosity = 0):\n"
+                "2. verbosity              (numeric or string, optional, default=1) 0 (RAW_BLOCK) for hex encoded data, "
+                "1 (DECODE_HEADER) for a json object, and 2 (DECODE_TRANSACTIONS) for json object with transaction data\n"
+                "\nResult (for verbosity = 0 or verbosity = RAW_BLOCK):\n"
                 "\"data\"             (string) A string that is serialized, hex-encoded data for block 'hash'.\n"
-                "\nResult (for verbosity = 1):\n"
+                "\nResult (for verbosity = 1 or verbosity = DECODE_HEADER):\n"
                 "{\n"
                 "  \"hash\" : \"hash\",     (string) the block hash (same as "
                 "provided)\n"
@@ -802,7 +840,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
                 "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
                 "next block\n"
                 "}\n"
-                "\nResult (for verbosity = 2):\n"
+                "\nResult (for verbosity = 2 or verbosity = DECODE_TRANSACTIONS):\n"
                 "{\n"
                 "  ...,                     Same output as verbosity = 1.\n"
                 "  \"tx\" : [               (array of Objects) The transactions in the format of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" result.\n"
@@ -825,13 +863,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     // backward compatibility.
     GetBlockVerbosity verbosity = GetBlockVerbosity::DECODE_HEADER;
     if (request.params.size() > 1) {
-        if(request.params[1].isNum()) {
-            auto verbosityNum = request.params[1].get_int();
-            if (verbosityNum < 0 || verbosityNum > 2)
-                throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value out of range");
-            verbosity = static_cast<GetBlockVerbosity>(verbosityNum);
-        } else
-            verbosity = static_cast<GetBlockVerbosity>(request.params[1].get_bool() ? 1 : 0);
+        parseGetBlockVerbosity(request.params[1], verbosity);
     }
 
     if (mapBlockIndex.count(hash) == 0) {

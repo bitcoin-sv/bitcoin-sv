@@ -21,4 +21,21 @@ enum class GetBlockVerbosity {
     DECODE_TRANSACTIONS = 2
 };
 
+class GetBlockVerbosityNames {
+public:
+    static bool TryParse(const std::string& name, GetBlockVerbosity& result) {
+        if (name == "RAW_BLOCK") {
+            result = GetBlockVerbosity::RAW_BLOCK;
+            return true;
+        } else if (name == "DECODE_HEADER") {
+            result = GetBlockVerbosity::DECODE_HEADER;
+            return true;
+        } else if (name == "DECODE_TRANSACTIONS") {
+            result = GetBlockVerbosity::DECODE_TRANSACTIONS;
+            return true;
+        }
+        return false;
+    }
+};
+
 #endif // BITCOIN_RPCBLOCKCHAIN_H
