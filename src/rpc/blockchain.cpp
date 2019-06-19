@@ -557,8 +557,8 @@ UniValue getmempooldescendants(const Config &config,
     }
 
     CTxMemPool::setEntries setDescendants;
-    mempool.CalculateDescendants(it, setDescendants);
-    // CTxMemPool::CalculateDescendants will include the given tx
+    mempool.CalculateDescendantsNL(it, setDescendants);
+    // CTxMemPool::CalculateDescendantsNL will include the given tx
     setDescendants.erase(it);
 
     if (!fVerbose) {

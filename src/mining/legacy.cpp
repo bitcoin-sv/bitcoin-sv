@@ -319,7 +319,7 @@ int LegacyBlockAssembler::UpdatePackagesForAdded(
     int nDescendantsUpdated = 0;
     for (const CTxMemPool::txiter it : alreadyAdded) {
         CTxMemPool::setEntries descendants;
-        mempool.CalculateDescendants(it, descendants);
+        mempool.CalculateDescendantsNL(it, descendants);
         // Insert all descendants (not yet in block) into the modified set.
         for (CTxMemPool::txiter desc : descendants) {
             if (alreadyAdded.count(desc)) {
