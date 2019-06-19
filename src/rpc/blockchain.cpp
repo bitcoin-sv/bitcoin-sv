@@ -548,19 +548,12 @@ UniValue getmempooldescendants(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    LOCK(mempool.cs);
-
-    CTxMemPool::txiter it = mempool.mapTx.find(hash);
-    if (it == mempool.mapTx.end()) {
+    CTxMemPool::setEntries setDescendants;
+    // Calculate descendants and exclude the given tx from the output
+    if (!mempool.CalculateDescendants(hash, setDescendants, true)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-
-    CTxMemPool::setEntries setDescendants;
-    mempool.CalculateDescendantsNL(it, setDescendants);
-    // CTxMemPool::CalculateDescendantsNL will include the given tx
-    setDescendants.erase(it);
-
     if (!fVerbose) {
         UniValue o(UniValue::VARR);
         for (CTxMemPool::txiter descendantIt : setDescendants) {

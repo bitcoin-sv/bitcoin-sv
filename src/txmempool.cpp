@@ -597,6 +597,21 @@ void CTxMemPool::CalculateDescendants(txiter entryit,
     }
 }
 
+bool CTxMemPool::CalculateDescendants(uint256 hash,
+                                      setEntries &setDescendants,
+                                      bool fEraseRootTx) {
+    LOCK(cs);
+    txiter it = mempool.mapTx.find(hash);
+    if (it != mempool.mapTx.end()) {
+        CalculateDescendantsNL(it, setDescendants);
+        if (fEraseRootTx) {
+            setDescendants.erase(it);
+        }
+        return true;
+    }
+    return false;
+}
+
 void CTxMemPool::CalculateDescendantsNL(txiter entryit,
                                         setEntries &setDescendants) {
     setEntries stage;

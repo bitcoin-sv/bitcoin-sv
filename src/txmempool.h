@@ -713,6 +713,10 @@ public:
      * Assumes that setDescendants includes all in-mempool descendants of
      * anything already in it.  */
     void CalculateDescendants(txiter it, setEntries &setDescendants);
+    bool CalculateDescendants(
+            uint256 hash,
+            setEntries &setDescendants,
+            bool fEraseRootTx=false);
     // Needs to be public for now (It will be moved into private section soon - where it should be)
     // A non-locking version of CalculateDescendants
     void CalculateDescendantsNL(
