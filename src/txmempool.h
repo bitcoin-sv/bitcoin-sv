@@ -642,7 +642,8 @@ public:
 
     void clear();
     bool CompareDepthAndScore(const uint256 &hasha, const uint256 &hashb);
-    bool CompareDepthAndScoreUnlocked(const uint256 &hasha, const uint256 &hashb);
+    // A non-locking version of CompareDepthAndScore
+    bool CompareDepthAndScoreNL(const uint256 &hasha, const uint256 &hashb);
     void queryHashes(std::vector<uint256> &vtxid);
     bool isSpent(const COutPoint &outpoint);
     unsigned int GetTransactionsUpdated() const;
