@@ -634,12 +634,13 @@ public:
             int nChainActiveHeight,
             int nMedianTimePast,
             int flags);
-    void removeForBlock(const std::vector<CTransactionRef> &vtx,
-                        unsigned int nBlockHeight, mining::CJournalChangeSetPtr& changeSet);
+
+    void removeForBlock(
+            const std::vector<CTransactionRef> &vtx,
+            unsigned int nBlockHeight,
+            mining::CJournalChangeSetPtr& changeSet);
 
     void clear();
-    // lock free
-    void _clear();
     bool CompareDepthAndScore(const uint256 &hasha, const uint256 &hashb);
     bool CompareDepthAndScoreUnlocked(const uint256 &hasha, const uint256 &hashb);
     void queryHashes(std::vector<uint256> &vtxid);
@@ -881,6 +882,8 @@ private:
     void removeConflictsNL(
             const CTransaction &tx,
             mining::CJournalChangeSetPtr& changeSet);
+
+    void clearNL();
 
     /**
      * Remove a set of transactions from the mempool. If a transaction is in

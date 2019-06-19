@@ -417,7 +417,7 @@ void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, Amount modifyFee,
 
 CTxMemPool::CTxMemPool() : nTransactionsUpdated(0) {
     // lock free clear
-    _clear();
+    clearNL();
 
     // Sanity checks off by default for performance, because otherwise accepting
     // transactions becomes O(N^2) where N is the number of transactions in the
@@ -808,7 +808,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
     blockSinceLastRollingFeeBump = true;
 }
 
-void CTxMemPool::_clear() {
+void CTxMemPool::clearNL() {
     mapLinks.clear();
     mapTx.clear();
     mapNextTx.clear();
@@ -828,7 +828,7 @@ void CTxMemPool::_clear() {
 
 void CTxMemPool::clear() {
     LOCK(cs);
-    _clear();
+    clearNL();
 }
 
 void CTxMemPool::check(
