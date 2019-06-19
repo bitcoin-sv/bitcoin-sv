@@ -47,16 +47,12 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "logging.h"
 
-#ifdef __APPLE__
-    #include <libgen.h>
-#endif
-
 #if defined(__linux__)
     #include <sys/ioctl.h>
     #include <sys/mount.h>
 #endif
 
-
+#include <libgen.h>
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
