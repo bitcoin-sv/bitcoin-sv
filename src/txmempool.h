@@ -781,7 +781,6 @@ public:
      * chain limit specified. */
     bool TransactionWithinChainLimit(const uint256 &txid,
                                      size_t chainLimit) const;
-
     unsigned long size() {
         LOCK(cs);
         return mapTx.size();
@@ -794,6 +793,10 @@ public:
 
     bool exists(uint256 hash) const {
         LOCK(cs);
+        return existsNL(hash);
+    }
+    // A non-locking version of exists
+    bool existsNL(uint256 hash) const {
         return mapTx.count(hash) != 0;
     }
 
@@ -804,7 +807,11 @@ public:
     }
 
     CTransactionRef get(const uint256 &hash) const;
+    // A non-locking version of get
+    CTransactionRef getNL(const uint256 &hash) const;
+
     TxMempoolInfo info(const uint256 &hash) const;
+
     std::vector<TxMempoolInfo> infoAll() const;
 
     /**

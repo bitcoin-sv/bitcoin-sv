@@ -621,7 +621,7 @@ static bool CheckInputsFromMempoolAndCache(
         if (coin.IsSpent()) {
             return false;
         }
-        const CTransactionRef &txFrom = pool.get(txin.prevout.GetTxId());
+        const CTransactionRef &txFrom = pool.getNL(txin.prevout.GetTxId());
         if (txFrom) {
             assert(txFrom->GetHash() == txin.prevout.GetTxId());
             assert(txFrom->vout.size() > txin.prevout.GetN());

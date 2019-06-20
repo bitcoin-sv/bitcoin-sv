@@ -1164,11 +1164,14 @@ std::vector<TxMempoolInfo> CTxMemPool::infoAll() const {
 
 CTransactionRef CTxMemPool::get(const uint256 &txid) const {
     LOCK(cs);
+    return getNL(txid);
+}
+
+CTransactionRef CTxMemPool::getNL(const uint256 &txid) const {
     indexed_transaction_set::const_iterator i = mapTx.find(txid);
     if (i == mapTx.end()) {
         return nullptr;
     }
-
     return i->GetSharedTx();
 }
 
