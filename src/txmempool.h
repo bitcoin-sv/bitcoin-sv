@@ -938,7 +938,9 @@ protected:
     const CTxMemPool &mempool;
 
 public:
+    // The caller of the constructor needs to hold mempool.smtx.
     CCoinsViewMemPool(CCoinsView *baseIn, const CTxMemPool &mempoolIn);
+    // The caller of GetCoin needs to hold mempool.smtx.
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
 };

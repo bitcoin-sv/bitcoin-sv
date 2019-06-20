@@ -1319,7 +1319,7 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     // guaranteed to never conflict with the underlying cache, and it cannot
     // have pruned entries (as it contains full) transactions. First checking
     // the underlying cache risks returning a pruned entry instead.
-    CTransactionRef ptx = mempool.get(outpoint.GetTxId());
+    CTransactionRef ptx = mempool.getNL(outpoint.GetTxId());
     if (ptx) {
         if (outpoint.GetN() < ptx->vout.size()) {
             coin = Coin(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
@@ -1332,7 +1332,7 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
 }
 
 bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const {
-    return mempool.exists(outpoint) || base->HaveCoin(outpoint);
+    return mempool.existsNL(outpoint) || base->HaveCoin(outpoint);
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {

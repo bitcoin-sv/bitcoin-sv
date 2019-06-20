@@ -686,6 +686,8 @@ bool SequenceLocks(const CTransaction &tx, int flags,
  * should not be considered valid if CheckSequenceLocks returns false.
  *
  * See consensus/consensus.h for flag definitions.
+ *
+ * The caller of the method needs to hold the mempool's smtx.
  */
 bool CheckSequenceLocks(
     const CTransaction &tx,
