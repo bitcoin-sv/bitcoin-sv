@@ -1,7 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2009-2019 The Bitcoin Core developers
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/blockchain.h"
 
@@ -13,6 +13,7 @@
 #include "config.h"
 #include "consensus/validation.h"
 #include "hash.h"
+#include "core_io.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/server.h"
@@ -25,6 +26,7 @@
 #include "validation.h"
 
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
+#include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
 
 #include <condition_variable>
 #include <cstdint>
@@ -119,7 +121,7 @@ UniValue blockToJSON(const Config &config, const CBlock &block,
     for (const auto &tx : block.vtx) {
         if (txDetails) {
             UniValue objTx(UniValue::VOBJ);
-            TxToJSON(config, *tx, uint256(), objTx);
+            TxToUniv(*tx, uint256(), objTx);
             txs.push_back(objTx);
         } else {
             txs.push_back(tx->GetId().GetHex());
@@ -756,57 +758,100 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
     return blockheaderToJSON(pblockindex);
 }
 
+/**
+ * Verbosity can be passed in multiple forms:
+ *  - as bool true/false
+ *  - as integer 0/1/2
+ *  - as enum value RAW_BLOCK / DECODE_HEADER / DECODE_TRANSACTIONS
+ * To maintain compatibility with different clients we also try to parse JSON string as booleans and integers.
+ */
+static void parseGetBlockVerbosity(const UniValue& verbosityParam, GetBlockVerbosity& verbosity) {
+
+    if(verbosityParam.isNum()) {
+        auto verbosityNum = verbosityParam.get_int();
+        if (verbosityNum < 0 || verbosityNum > 2)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value out of range");
+        verbosity = static_cast<GetBlockVerbosity>(verbosityNum);
+    } else if (verbosityParam.isStr()) {
+        std::string verbosityStr = verbosityParam.get_str();
+        boost::to_upper(verbosityStr);
+
+        if (verbosityStr == "0" || verbosityStr == "FALSE") {
+            verbosity = GetBlockVerbosity::RAW_BLOCK;
+        } else if (verbosityStr == "1" || verbosityStr == "TRUE") {
+            verbosity = GetBlockVerbosity::DECODE_HEADER;
+        } else if (verbosityStr == "2") {
+            verbosity = GetBlockVerbosity::DECODE_TRANSACTIONS;
+        } else {
+            if (!GetBlockVerbosityNames::TryParse(verbosityStr, verbosity)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Verbosity value not recognized");
+            }
+        }
+    } else if (verbosityParam.isBool()) {
+        verbosity = (verbosityParam.get_bool() ? GetBlockVerbosity::DECODE_HEADER : GetBlockVerbosity::RAW_BLOCK);
+    } else {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid verbosity input type");
+    }
+}
+
 UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 2) {
         throw std::runtime_error(
-            "getblock \"blockhash\" ( verbose )\n"
-            "\nIf verbose is false, returns a string that is serialized, "
-            "hex-encoded data for block 'hash'.\n"
-            "If verbose is true, returns an Object with information about "
-            "block <hash>.\n"
-            "\nArguments:\n"
-            "1. \"blockhash\"          (string, required) The block hash\n"
-            "2. verbose                (boolean, optional, default=true) true "
-            "for a json object, false for the hex encoded data\n"
-            "\nResult (for verbose = true):\n"
-            "{\n"
-            "  \"hash\" : \"hash\",     (string) the block hash (same as "
-            "provided)\n"
-            "  \"confirmations\" : n,   (numeric) The number of confirmations, "
-            "or -1 if the block is not on the main chain\n"
-            "  \"size\" : n,            (numeric) The block size\n"
-            "  \"height\" : n,          (numeric) The block height or index\n"
-            "  \"version\" : n,         (numeric) The block version\n"
-            "  \"versionHex\" : \"00000000\", (string) The block version "
-            "formatted in hexadecimal\n"
-            "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
-            "  \"tx\" : [               (array of string) The transaction ids\n"
-            "     \"transactionid\"     (string) The transaction id\n"
-            "     ,...\n"
-            "  ],\n"
-            "  \"time\" : ttt,          (numeric) The block time in seconds "
-            "since epoch (Jan 1 1970 GMT)\n"
-            "  \"mediantime\" : ttt,    (numeric) The median block time in "
-            "seconds since epoch (Jan 1 1970 GMT)\n"
-            "  \"nonce\" : n,           (numeric) The nonce\n"
-            "  \"bits\" : \"1d00ffff\", (string) The bits\n"
-            "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
-            "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
-            "required to produce the chain up to this block (in hex)\n"
-            "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
-            "previous block\n"
-            "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
-            "next block\n"
-            "}\n"
-            "\nResult (for verbose=false):\n"
-            "\"data\"             (string) A string that is serialized, "
-            "hex-encoded data for block 'hash'.\n"
-            "\nExamples:\n" +
-            HelpExampleCli("getblock", "\"00000000c937983704a73af28acdec37b049d"
-                                       "214adbda81d7e2a3dd146f6ed09\"") +
-            HelpExampleRpc("getblock", "\"00000000c937983704a73af28acdec37b049d"
-                                       "214adbda81d7e2a3dd146f6ed09\""));
+                "getblock \"blockhash\" ( verbosity ) \n"
+                "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is serialized, "
+                "hex-encoded data for block 'hash'.\n"
+                "If verbosity is 1 or DECODE_HEADER, returns an Object with information about block <hash>.\n"
+                "If verbosity is 2 or DECODE_TRANSACTIONS, returns an Object with information about "
+                "block <hash> and information about each transaction. \n"
+                "\nArguments:\n"
+                "1. \"blockhash\"          (string, required) The block hash\n"
+                "2. verbosity              (numeric or string, optional, default=1) 0 (RAW_BLOCK) for hex encoded data, "
+                "1 (DECODE_HEADER) for a json object, and 2 (DECODE_TRANSACTIONS) for json object with transaction data\n"
+                "\nResult (for verbosity = 0 or verbosity = RAW_BLOCK):\n"
+                "\"data\"             (string) A string that is serialized, hex-encoded data for block 'hash'.\n"
+                "\nResult (for verbosity = 1 or verbosity = DECODE_HEADER):\n"
+                "{\n"
+                "  \"hash\" : \"hash\",     (string) the block hash (same as "
+                "provided)\n"
+                "  \"confirmations\" : n,   (numeric) The number of confirmations, "
+                "or -1 if the block is not on the main chain\n"
+                "  \"size\" : n,            (numeric) The block size\n"
+                "  \"height\" : n,          (numeric) The block height or index\n"
+                "  \"version\" : n,         (numeric) The block version\n"
+                "  \"versionHex\" : \"00000000\", (string) The block version "
+                "formatted in hexadecimal\n"
+                "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+                "  \"tx\" : [               (array of string) The transaction ids\n"
+                "     \"transactionid\"     (string) The transaction id\n"
+                "     ,...\n"
+                "  ],\n"
+                "  \"time\" : ttt,          (numeric) The block time in seconds "
+                "since epoch (Jan 1 1970 GMT)\n"
+                "  \"mediantime\" : ttt,    (numeric) The median block time in "
+                "seconds since epoch (Jan 1 1970 GMT)\n"
+                "  \"nonce\" : n,           (numeric) The nonce\n"
+                "  \"bits\" : \"1d00ffff\", (string) The bits\n"
+                "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
+                "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
+                "required to produce the chain up to this block (in hex)\n"
+                "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
+                "previous block\n"
+                "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
+                "next block\n"
+                "}\n"
+                "\nResult (for verbosity = 2 or verbosity = DECODE_TRANSACTIONS):\n"
+                "{\n"
+                "  ...,                     Same output as verbosity = 1.\n"
+                "  \"tx\" : [               (array of Objects) The transactions in the format of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" result.\n"
+                "         ,...\n"
+                "  ],\n"
+                "  ,...                     Same output as verbosity = 1.\n"
+                "}\n"
+                "\nExamples:\n"
+                + HelpExampleCli("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"")
+                + HelpExampleRpc("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\"")
+        );
     }
 
     LOCK(cs_main);
@@ -814,9 +859,11 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     std::string strHash = request.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
-    bool fVerbose = true;
+    // previously, false and true were accepted for verbosity 0 and 1 respectively. this code maintains
+    // backward compatibility.
+    GetBlockVerbosity verbosity = GetBlockVerbosity::DECODE_HEADER;
     if (request.params.size() > 1) {
-        fVerbose = request.params[1].get_bool();
+        parseGetBlockVerbosity(request.params[1], verbosity);
     }
 
     if (mapBlockIndex.count(hash) == 0) {
@@ -839,7 +886,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
 
-    if (!fVerbose) {
+    if (verbosity == GetBlockVerbosity::RAW_BLOCK) {
         CDataStream ssBlock(SER_NETWORK,
                             PROTOCOL_VERSION | RPCSerializationFlags());
         ssBlock << block;
@@ -847,7 +894,7 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         return strHex;
     }
 
-    return blockToJSON(config, block, pblockindex);
+    return blockToJSON(config, block, pblockindex, verbosity == GetBlockVerbosity::DECODE_TRANSACTIONS);
 }
 
 struct CCoinsStats {
@@ -1114,7 +1161,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     }
     ret.push_back(Pair("value", ValueFromAmount(coin.GetTxOut().nValue)));
     UniValue o(UniValue::VOBJ);
-    ScriptPubKeyToJSON(config, coin.GetTxOut().scriptPubKey, o, true);
+    ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, o, true);
     ret.push_back(Pair("scriptPubKey", o));
     ret.push_back(Pair("coinbase", coin.IsCoinBase()));
 
@@ -1733,7 +1780,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "getchaintxstats",        &getchaintxstats,       true,  {"nblocks", "blockhash"} },
     { "blockchain",         "getbestblockhash",       getbestblockhash,       true,  {} },
     { "blockchain",         "getblockcount",          getblockcount,          true,  {} },
-    { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbose"} },
+    { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           getblockhash,           true,  {"height"} },
     { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbose"} },
     { "blockchain",         "getchaintips",           getchaintips,           true,  {} },
