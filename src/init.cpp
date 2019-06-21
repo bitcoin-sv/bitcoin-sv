@@ -1532,7 +1532,7 @@ bool AppInitParameterInteraction(Config &config) {
             0),
         1000000);
     if (ratio != 0) {
-        mempool.setSanityCheck(1.0 / ratio);
+        mempool.SetSanityCheck(1.0 / ratio);
     }
     fCheckBlockIndex = gArgs.GetBoolArg("-checkblockindex",
                                         chainparams.DefaultConsistencyChecks());

@@ -23,7 +23,7 @@ static void AddTx(const CTransaction &tx, const Amount &nFee,
     bool spendsCoinbase = false;
     unsigned int sigOpCost = 4;
     LockPoints lp;
-    pool.addUnchecked(tx.GetId(),
+    pool.AddUnchecked(tx.GetId(),
                       CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime,
                                       dPriority, nHeight, tx.GetValueOut(),
                                       spendsCoinbase, sigOpCost, lp),

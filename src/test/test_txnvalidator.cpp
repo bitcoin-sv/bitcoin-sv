@@ -100,7 +100,7 @@ namespace {
                     std::make_shared<CTxnDoubleSpendDetector>())
         };
         // Clear mempool before validation
-        mempool.clear();
+        mempool.Clear();
         // Schedule txns for processing.
         txnValidator->newTransaction(TxInputDataVec(source, spends, pNode));
         // Wait for the Validator to process all queued txns.
@@ -118,7 +118,7 @@ namespace {
                     std::make_shared<CTxnDoubleSpendDetector>())
         };
         // Clear mempool before validation
-        mempool.clear();
+        mempool.Clear();
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
         // Validate the first txn
@@ -201,13 +201,13 @@ BOOST_AUTO_TEST_CASE(txn_validator_istxnknown) {
 BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
     // Test: Txns from wallet.
     ProcessTxnsSynchApi(spends2, TxSource::wallet);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
     // Test: Txns from rpc.
     ProcessTxnsSynchApi(spends2, TxSource::rpc);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
     // Test: Txns from file.
     ProcessTxnsSynchApi(spends2, TxSource::file);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
     // Test: Txns from p2p.
     {
         // Create a dummy address
@@ -216,17 +216,17 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
             std::make_shared<CNode>(0, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
         };
         ProcessTxnsSynchApi(spends2, TxSource::p2p, pDummyNode);
-        BOOST_CHECK_EQUAL(mempool.size(), 1);
+        BOOST_CHECK_EQUAL(mempool.Size(), 1);
     }
     // Process txn if it is valid.
     ProcessTxnsSynchApi(spends2, TxSource::p2p);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
     // Test: Txns from reorg.
     ProcessTxnsSynchApi(spends2, TxSource::reorg);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
     // Process txn if it is valid.
     ProcessTxnsSynchApi(spends2, TxSource::unknown);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
 /**
@@ -235,19 +235,19 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
 BOOST_AUTO_TEST_CASE(txnvalidator_wallet_doublespend_via_asynch_api) {
     // Test: Txns from wallet.
     ProcessTxnsAsynchApi(spendsN, TxSource::wallet);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_rpc_doublespend_via_asynch_api) {
     // Test: Txns from rpc.
     ProcessTxnsAsynchApi(spendsN, TxSource::rpc);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_file_doublespend_via_asynch_api) {
     // Test: Txns from file.
     ProcessTxnsAsynchApi(spendsN, TxSource::file);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_p2p_doublespend_via_asynch_api) {
@@ -259,23 +259,23 @@ BOOST_AUTO_TEST_CASE(txnvalidator_p2p_doublespend_via_asynch_api) {
             std::make_shared<CNode>(0, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
         };
         ProcessTxnsAsynchApi(spendsN, TxSource::p2p, pDummyNode);
-        BOOST_CHECK_EQUAL(mempool.size(), 1);
+        BOOST_CHECK_EQUAL(mempool.Size(), 1);
     }
     // Process txn if it is valid.
     ProcessTxnsAsynchApi(spendsN, TxSource::p2p);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_reorg_doublespend_via_asynch_api) {
     // Test: Txns from reorg.
     ProcessTxnsAsynchApi(spendsN, TxSource::reorg);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_dummy_doublespend_via_asynch_api) {
     // Process txn if it is valid.
     ProcessTxnsAsynchApi(spendsN, TxSource::unknown);
-    BOOST_CHECK_EQUAL(mempool.size(), 1);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

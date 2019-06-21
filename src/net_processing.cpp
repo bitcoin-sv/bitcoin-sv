@@ -1050,7 +1050,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
             // output 0 and 1. This works well enough in practice and we get
             // diminishing returns with 2 onward.
             return g_connman->CheckTxnInRecentRejects(inv.hash) ||
-                   mempool.exists(inv.hash) ||
+                   mempool.Exists(inv.hash) ||
                    g_connman->CheckOrphanTxnExists(inv.hash) ||
                    g_connman->CheckTxnExistsInValidatorsQueue(inv.hash) ||
                    pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 0)) ||
@@ -1066,7 +1066,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
 void RelayTransaction(const CTransaction &tx, CConnman &connman) {
     CInv inv { MSG_TX, tx.GetId() };
 
-    TxMempoolInfo txinfo { mempool.info(tx.GetId()) };
+    TxMempoolInfo txinfo { mempool.Info(tx.GetId()) };
     if(txinfo.tx)
     {
         connman.EnqueueTransaction( {inv, txinfo} );
@@ -1439,7 +1439,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         msgMaker.Make(NetMsgType::TX, *mi->second));
                     push = true;
                 } else if (pfrom->timeLastMempoolReq) {
-                    auto txinfo = mempool.info(inv.hash);
+                    auto txinfo = mempool.Info(inv.hash);
                     // To protect privacy, do not answer getdata using the
                     // mempool when that TX couldn't have been INVed in reply to
                     // a MEMPOOL request.
@@ -3915,7 +3915,7 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
 
     // Respond to BIP35 mempool requests
     if (fSendTrickle && pto->fSendMempool) {
-        auto vtxinfo = mempool.infoAll();
+        auto vtxinfo = mempool.InfoAll();
         pto->fSendMempool = false;
         Amount filterrate(0);
         {

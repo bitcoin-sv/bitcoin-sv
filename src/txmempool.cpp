@@ -362,7 +362,7 @@ void CTxMemPool::updateForRemoveFromMempoolNL(const setEntries &entriesToRemove,
         // the mempool can be in an inconsistent state. In this case, the set of
         // ancestors reachable via mapLinks will be the same as the set of
         // ancestors whose packages include this transaction, because when we
-        // add a new transaction to the mempool in addUnchecked(), we assume it
+        // add a new transaction to the mempool in AddUnchecked(), we assume it
         // has no children, and in the case of a reorg where that assumption is
         // false, the in-mempool children aren't linked to the in-block tx's
         // until UpdateTransactionsFromBlock() is called. So if we're being
@@ -434,12 +434,12 @@ CTxMemPool::~CTxMemPool() {
     delete minerPolicyEstimator;
 }
 
-bool CTxMemPool::isSpent(const COutPoint &outpoint) {
+bool CTxMemPool::IsSpent(const COutPoint &outpoint) {
     LOCK(cs);
-    return isSpentNL(outpoint);
+    return IsSpentNL(outpoint);
 }
 
-bool CTxMemPool::isSpentNL(const COutPoint &outpoint) {
+bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) {
     return mapNextTx.count(outpoint);
 }
 
@@ -453,7 +453,7 @@ void CTxMemPool::AddTransactionsUpdated(unsigned int n) {
     nTransactionsUpdated += n;
 }
 
-bool CTxMemPool::addUnchecked(
+bool CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
@@ -639,7 +639,7 @@ void CTxMemPool::CalculateDescendantsNL(txiter entryit,
     }
 }
 
-void CTxMemPool::removeRecursive(
+void CTxMemPool::RemoveRecursive(
     const CTransaction &origTx,
     CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason) {
@@ -688,7 +688,7 @@ void CTxMemPool::removeRecursiveNL(
     removeStagedNL(setAllRemoves, false, changeSet, reason);
 }
 
-void CTxMemPool::removeForReorg(
+void CTxMemPool::RemoveForReorg(
     const Config &config,
     const CCoinsViewCache *pcoins,
     CJournalChangeSetPtr& changeSet,
@@ -779,10 +779,11 @@ void CTxMemPool::removeConflictsNL(
  * Called when a block is connected. Removes from mempool and updates the miner
  * fee estimator.
  */
-void CTxMemPool::removeForBlock(const std::vector<CTransactionRef> &vtx,
-                                unsigned int nBlockHeight,
-                                CJournalChangeSetPtr& changeSet)
-{
+void CTxMemPool::RemoveForBlock(
+    const std::vector<CTransactionRef> &vtx,
+    unsigned int nBlockHeight,
+    CJournalChangeSetPtr& changeSet) {
+
     LOCK(cs);
     std::vector<const CTxMemPoolEntry *> entries;
     for (const auto &tx : vtx) {
@@ -830,12 +831,12 @@ void CTxMemPool::clearNL() {
     }
 }
 
-void CTxMemPool::clear() {
+void CTxMemPool::Clear() {
     LOCK(cs);
     clearNL();
 }
 
-void CTxMemPool::check(
+void CTxMemPool::Check(
     const int64_t nSpendHeight,
     const CCoinsViewCache *pcoins,
     mining::CJournalChangeSetPtr& changeSet) const {
@@ -1130,7 +1131,7 @@ CTxMemPool::getSortedDepthAndScoreNL() const {
     return iters;
 }
 
-void CTxMemPool::queryHashes(std::vector<uint256> &vtxid) {
+void CTxMemPool::QueryHashes(std::vector<uint256> &vtxid) {
     LOCK(cs);
     auto iters = getSortedDepthAndScoreNL();
 
@@ -1149,25 +1150,27 @@ GetInfo(CTxMemPool::indexed_transaction_set::const_iterator it) {
                          it->GetModifiedFee() - it->GetFee()};
 }
 
-std::vector<TxMempoolInfo> CTxMemPool::infoAll() const {
+std::vector<TxMempoolInfo> CTxMemPool::InfoAll() const {
     LOCK(cs);
-    auto iters = getSortedDepthAndScoreNL();
+    return InfoAllNL();
+}
 
+std::vector<TxMempoolInfo> CTxMemPool::InfoAllNL() const {
+    auto iters = getSortedDepthAndScoreNL();
     std::vector<TxMempoolInfo> ret;
     ret.reserve(mapTx.size());
     for (auto it : iters) {
         ret.push_back(GetInfo(it));
     }
-
     return ret;
 }
 
-CTransactionRef CTxMemPool::get(const uint256 &txid) const {
+CTransactionRef CTxMemPool::Get(const uint256 &txid) const {
     LOCK(cs);
-    return getNL(txid);
+    return GetNL(txid);
 }
 
-CTransactionRef CTxMemPool::getNL(const uint256 &txid) const {
+CTransactionRef CTxMemPool::GetNL(const uint256 &txid) const {
     indexed_transaction_set::const_iterator i = mapTx.find(txid);
     if (i == mapTx.end()) {
         return nullptr;
@@ -1175,7 +1178,7 @@ CTransactionRef CTxMemPool::getNL(const uint256 &txid) const {
     return i->GetSharedTx();
 }
 
-TxMempoolInfo CTxMemPool::info(const uint256 &txid) const {
+TxMempoolInfo CTxMemPool::Info(const uint256 &txid) const {
     LOCK(cs);
     indexed_transaction_set::const_iterator i = mapTx.find(txid);
     if (i == mapTx.end()) {
@@ -1185,11 +1188,11 @@ TxMempoolInfo CTxMemPool::info(const uint256 &txid) const {
     return GetInfo(i);
 }
 
-CFeeRate CTxMemPool::estimateFee(int nBlocks) const {
+CFeeRate CTxMemPool::EstimateFee(int nBlocks) const {
     LOCK(cs);
     return minerPolicyEstimator->estimateFee(nBlocks);
 }
-CFeeRate CTxMemPool::estimateSmartFee(int nBlocks,
+CFeeRate CTxMemPool::EstimateSmartFee(int nBlocks,
                                       int *answerFoundAtBlocks) const {
     LOCK(cs);
     return minerPolicyEstimator->estimateSmartFee(nBlocks, answerFoundAtBlocks,
@@ -1303,7 +1306,7 @@ void CTxMemPool::clearPrioritisationNL(const uint256 hash) {
 bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const {
     LOCK(cs);
     for (const CTxIn &in : tx.vin) {
-        if (exists(in.prevout.GetTxId())) {
+        if (ExistsNL(in.prevout.GetTxId())) {
             return false;
         }
     }
@@ -1319,7 +1322,7 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     // guaranteed to never conflict with the underlying cache, and it cannot
     // have pruned entries (as it contains full) transactions. First checking
     // the underlying cache risks returning a pruned entry instead.
-    CTransactionRef ptx = mempool.getNL(outpoint.GetTxId());
+    CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
     if (ptx) {
         if (outpoint.GetN() < ptx->vout.size()) {
             coin = Coin(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
@@ -1332,7 +1335,7 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
 }
 
 bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const {
-    return mempool.existsNL(outpoint) || base->HaveCoin(outpoint);
+    return mempool.ExistsNL(outpoint) || base->HaveCoin(outpoint);
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {
@@ -1390,7 +1393,7 @@ bool CTxMemPool::CheckTxConflicts(const CTransaction &tx) const {
     return false;
 }
 
-bool CTxMemPool::addUnchecked(
+bool CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     CJournalChangeSetPtr& changeSet,
@@ -1523,7 +1526,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
         if (pvNoSpendsRemaining) {
             for (const CTransaction &tx : txn) {
                 for (const CTxIn &txin : tx.vin) {
-                    if (exists(txin.prevout.GetTxId())) {
+                    if (ExistsNL(txin.prevout.GetTxId())) {
                         continue;
                     }
                     if (!mapNextTx.count(txin.prevout)) {

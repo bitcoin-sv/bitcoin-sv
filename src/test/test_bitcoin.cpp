@@ -82,7 +82,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
                                          (int)(InsecureRandRange(100000)));
     fs::create_directories(pathTemp);
     gArgs.ForceSetArg("-datadir", pathTemp.string());
-    mempool.setSanityCheck(1.0);
+    mempool.SetSanityCheck(1.0);
     pblocktree = new CBlockTreeDB(1 << 20, true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);

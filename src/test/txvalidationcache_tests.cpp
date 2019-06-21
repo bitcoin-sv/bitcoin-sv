@@ -156,13 +156,13 @@ BOOST_AUTO_TEST_CASE(tx_mempool_block_doublespend) {
     BOOST_CHECK(ToMemPool(spends[0]));
     block = CreateAndProcessBlock(spends, scriptPubKey);
     BOOST_CHECK(chainActive.Tip()->GetBlockHash() != block.GetHash());
-    mempool.clear();
+    mempool.Clear();
 
     // Test 3: ... and should be rejected if spend2 is in the memory pool
     BOOST_CHECK(ToMemPool(spends[1]));
     block = CreateAndProcessBlock(spends, scriptPubKey);
     BOOST_CHECK(chainActive.Tip()->GetBlockHash() != block.GetHash());
-    mempool.clear();
+    mempool.Clear();
 
     // Final sanity test: first spend in mempool, second in block, that's OK:
     std::vector<CMutableTransaction> oneSpend;
@@ -172,7 +172,7 @@ BOOST_AUTO_TEST_CASE(tx_mempool_block_doublespend) {
     BOOST_CHECK(chainActive.Tip()->GetBlockHash() == block.GetHash());
     // spends[1] should have been removed from the mempool when the block with
     // spends[0] is accepted:
-    BOOST_CHECK_EQUAL(mempool.size(), 0);
+    BOOST_CHECK_EQUAL(mempool.Size(), 0);
 }
 
 BOOST_AUTO_TEST_CASE(checkinputs_test) {

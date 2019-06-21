@@ -597,14 +597,14 @@ public:
      * are in the mapNextTx array, journal is in agreement with mempool).
      * If sanity-checking is turned off, check does nothing.
      */
-    void check(
+    void Check(
         const int64_t nSpendHeight,
         const CCoinsViewCache *pcoins,
         mining::CJournalChangeSetPtr& changeSet) const;
 
     std::string checkJournal() const;
 
-    void setSanityCheck(double dFrequency = 1.0) {
+    void SetSanityCheck(double dFrequency = 1.0) {
         LOCK(cs);
         nCheckFrequency = dFrequency * 4294967295.0;
     }
@@ -616,18 +616,18 @@ public:
     // to track size/count of descendant transactions. First version of
     // addUnchecked can be used to have it call CalculateMemPoolAncestors(), and
     // then invoke the second version.
-    bool addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
+    bool AddUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
                       mining::CJournalChangeSetPtr& changeSet, bool validFeeEstimate = true);
-    bool addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
+    bool AddUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
                       setEntries &setAncestors, mining::CJournalChangeSetPtr& changeSet,
                       bool validFeeEstimate = true);
 
-    void removeRecursive(
+    void RemoveRecursive(
         const CTransaction &tx,
         mining::CJournalChangeSetPtr& changeSet,
         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
-    void removeForReorg(
+    void RemoveForReorg(
             const Config &config,
             const CCoinsViewCache *pcoins,
             mining::CJournalChangeSetPtr& changeSet,
@@ -635,19 +635,20 @@ public:
             int nMedianTimePast,
             int flags);
 
-    void removeForBlock(
+    void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             unsigned int nBlockHeight,
             mining::CJournalChangeSetPtr& changeSet);
 
-    void clear();
+    void Clear();
+
     bool CompareDepthAndScore(const uint256 &hasha, const uint256 &hashb);
     // A non-locking version of CompareDepthAndScore
     bool CompareDepthAndScoreNL(const uint256 &hasha, const uint256 &hashb);
-    void queryHashes(std::vector<uint256> &vtxid);
-    bool isSpent(const COutPoint &outpoint);
-    // A non-locking version of isSpent
-    bool isSpentNL(const COutPoint &outpoint);
+    void QueryHashes(std::vector<uint256> &vtxid);
+    bool IsSpent(const COutPoint &outpoint);
+    // A non-locking version of IsSpent
+    bool IsSpentNL(const COutPoint &outpoint);
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
     /**
@@ -781,7 +782,7 @@ public:
      * chain limit specified. */
     bool TransactionWithinChainLimit(const uint256 &txid,
                                      size_t chainLimit) const;
-    unsigned long size() {
+    unsigned long Size() {
         LOCK(cs);
         return mapTx.size();
     }
@@ -791,43 +792,45 @@ public:
         return totalTxSize;
     }
 
-    bool exists(uint256 hash) const {
+    bool Exists(uint256 hash) const {
         LOCK(cs);
-        return existsNL(hash);
+        return ExistsNL(hash);
     }
-    // A non-locking version of exists
-    bool existsNL(uint256 hash) const {
+    // A non-locking version of Exists
+    bool ExistsNL(uint256 hash) const {
         return mapTx.count(hash) != 0;
     }
 
-    bool exists(const COutPoint &outpoint) const {
+    bool Exists(const COutPoint &outpoint) const {
         LOCK(cs);
-        return existsNL(outpoint);
+        return ExistsNL(outpoint);
     }
-    // A non-locking version of exists
-    bool existsNL(const COutPoint &outpoint) const {
+    // A non-locking version of Exists
+    bool ExistsNL(const COutPoint &outpoint) const {
         auto it = mapTx.find(outpoint.GetTxId());
         return it != mapTx.end() && outpoint.GetN() < it->GetTx().vout.size();
     }
 
-    CTransactionRef get(const uint256 &hash) const;
-    // A non-locking version of get
-    CTransactionRef getNL(const uint256 &hash) const;
+    CTransactionRef Get(const uint256 &hash) const;
+    // A non-locking version of Get
+    CTransactionRef GetNL(const uint256 &hash) const;
 
-    TxMempoolInfo info(const uint256 &hash) const;
+    TxMempoolInfo Info(const uint256 &hash) const;
 
-    std::vector<TxMempoolInfo> infoAll() const;
+    std::vector<TxMempoolInfo> InfoAll() const;
+    // A non-locking version of InfoAll
+    std::vector<TxMempoolInfo> InfoAllNL() const;
 
     /**
      * Estimate fee rate needed to get into the next nBlocks. If no answer can
      * be given at nBlocks, return an estimate at the lowest number of blocks
      * where one can be given.
      */
-    CFeeRate estimateSmartFee(int nBlocks,
+    CFeeRate EstimateSmartFee(int nBlocks,
                               int *answerFoundAtBlocks = nullptr) const;
 
     /** Estimate fee rate needed to get into the next nBlocks */
-    CFeeRate estimateFee(int nBlocks) const;
+    CFeeRate EstimateFee(int nBlocks) const;
 
     /** Write/Read estimates to disk */
     bool WriteFeeEstimates(CAutoFile &fileout) const;
@@ -919,14 +922,14 @@ private:
     /**
      * A non-locking private methods.
      */
-    // A non-locking version of addUnchecked
+    // A non-locking version of AddUnchecked
     bool addUncheckedNL(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             mining::CJournalChangeSetPtr& changeSet,
             bool validFeeEstimate = true);
-    // A non-locking version of removeRecursive
+    // A non-locking version of RemoveRecursive
     void removeRecursiveNL(
             const CTransaction &tx,
             mining::CJournalChangeSetPtr& changeSet,

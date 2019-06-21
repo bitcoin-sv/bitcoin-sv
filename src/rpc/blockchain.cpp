@@ -377,7 +377,7 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) {
     const CTransaction &tx = e.GetTx();
     std::set<std::string> setDepends;
     for (const CTxIn &txin : tx.vin) {
-        if (mempool.existsNL(txin.prevout.GetTxId())) {
+        if (mempool.ExistsNL(txin.prevout.GetTxId())) {
             setDepends.insert(txin.prevout.GetTxId().ToString());
         }
     }
@@ -403,7 +403,7 @@ UniValue mempoolToJSON(bool fVerbose = false) {
         return o;
     } else {
         std::vector<uint256> vtxids;
-        mempool.queryHashes(vtxids);
+        mempool.QueryHashes(vtxids);
 
         UniValue a(UniValue::VARR);
         for (const uint256 &txid : vtxids) {
@@ -1221,7 +1221,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     if (fMempool) {
         LOCK(mempool.cs);
         CCoinsViewMemPool view(pcoinsTip, mempool);
-        if (!view.GetCoin(out, coin) || mempool.isSpentNL(out)) {
+        if (!view.GetCoin(out, coin) || mempool.IsSpentNL(out)) {
             // TODO: this should be done by the CCoinsViewMemPool
             return NullUniValue;
         }
@@ -1534,7 +1534,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
 
 UniValue mempoolInfoToJSON() {
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("size", (int64_t)mempool.size()));
+    ret.push_back(Pair("size", (int64_t)mempool.Size()));
     ret.push_back(Pair("journalsize", (int64_t)mempool.getJournalBuilder()->getCurrentJournal()->size()));
     ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t)mempool.DynamicMemoryUsage()));

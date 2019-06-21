@@ -256,7 +256,7 @@ static UniValue getmininginfo(const Config &config,
                                   DEFAULT_BLOCK_PRIORITY_PERCENTAGE))));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     obj.push_back(Pair("networkhashps", getnetworkhashps(config, request)));
-    obj.push_back(Pair("pooledtx", uint64_t(mempool.size())));
+    obj.push_back(Pair("pooledtx", uint64_t(mempool.Size())));
     obj.push_back(Pair("chain", config.GetChainParams().NetworkIDString()));
     return obj;
 }
@@ -853,7 +853,7 @@ static UniValue estimatefee(const Config &config,
         nBlocks = 1;
     }
 
-    CFeeRate feeRate = mempool.estimateFee(nBlocks);
+    CFeeRate feeRate = mempool.EstimateFee(nBlocks);
     if (feeRate == CFeeRate(Amount(0))) {
         return -1.0;
     }

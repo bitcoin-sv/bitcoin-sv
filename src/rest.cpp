@@ -597,7 +597,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
             Coin coin;
             bool hit = false;
             if (view.GetCoin(vOutPoints[i], coin) &&
-                !mempool.isSpentNL(vOutPoints[i])) {
+                !mempool.IsSpentNL(vOutPoints[i])) {
                 hit = true;
                 outs.emplace_back(std::move(coin));
             }

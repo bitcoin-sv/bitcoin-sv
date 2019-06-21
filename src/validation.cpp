@@ -621,7 +621,7 @@ static bool CheckInputsFromMempoolAndCache(
         if (coin.IsSpent()) {
             return false;
         }
-        const CTransactionRef &txFrom = pool.getNL(txin.prevout.GetTxId());
+        const CTransactionRef &txFrom = pool.GetNL(txin.prevout.GetTxId());
         if (txFrom) {
             assert(txFrom->GetHash() == txin.prevout.GetTxId());
             assert(txFrom->vout.size() > txin.prevout.GetN());
@@ -848,7 +848,7 @@ void CommitTxToMempool(
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
     // Store transaction in the mempool.
-    pool.addUnchecked(
+    pool.AddUnchecked(
             txid,
             pMempoolEntry,
             setAncestors,
@@ -862,7 +862,7 @@ void CommitTxToMempool(
             changeSet,
             gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
             gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
-        if (!pool.exists(txid)) {
+        if (!pool.Exists(txid)) {
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                      "mempool full");
             return;
@@ -925,7 +925,7 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
     // Is it already in the memory pool?
-    if (pool.exists(txid)) {
+    if (pool.Exists(txid)) {
         state.Invalid(false, REJECT_ALREADY_KNOWN,
                      "txn-already-in-mempool");
         return Result{state, pTxInputData};
@@ -1268,7 +1268,7 @@ static void LogTxnCommitStatus(
              enum_cast<std::string>(source),
              tx.GetId().ToString(),
              sTxnStatusMsg,
-             pool.size(),
+             pool.Size(),
              pool.DynamicMemoryUsage() / 1000,
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
 }
@@ -1562,7 +1562,7 @@ static void PostValidationStepsForP2PTxn(
     const CValidationState& state = txStatus.mState;
     // Post processing step for successfully commited txns (non-orphans & orphans)
     if (state.IsValid()) {
-        pool.check(GetSpendHeight(pcoinsTip), pcoinsTip, handlers.mJournalChangeSet);
+        pool.Check(GetSpendHeight(pcoinsTip), pcoinsTip, handlers.mJournalChangeSet);
         RelayTransaction(*ptx, *g_connman);
         pNode->nLastTXTime = GetTime();
         // At this stage we want to collect outpoints of successfully submitted txn.
@@ -1625,8 +1625,8 @@ static void UpdateMempoolForReorg(const Config &config,
         if (fRemoveRecursive) {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
-            mempool.removeRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
-        } else if (mempool.exists((*it)->GetId())) {
+            mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+        } else if (mempool.Exists((*it)->GetId())) {
             vHashUpdate.push_back((*it)->GetId());
         }
         ++it;
@@ -1643,7 +1643,7 @@ static void UpdateMempoolForReorg(const Config &config,
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions");
     mempool.
-        removeForReorg(
+        RemoveForReorg(
             config,
             pcoinsTip,
             changeSet,
@@ -1669,7 +1669,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
 
     LOCK(cs_main);
 
-    CTransactionRef ptx = mempool.get(txid);
+    CTransactionRef ptx = mempool.Get(txid);
     if (ptx) {
         txOut = ptx;
         return true;
@@ -3167,7 +3167,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
             // Drop the earliest entry, and remove its children from the
             // mempool.
             auto it = disconnectpool->queuedTx.get<insertion_order>().begin();
-            mempool.removeRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+            mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
             disconnectpool->removeEntry(it);
         }
     }
@@ -3328,7 +3328,7 @@ static bool ConnectTip(const Config &config, CValidationState &state,
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // Remove conflicting transactions from the mempool.;
-    mempool.removeForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
+    mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
     if(g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
@@ -3533,7 +3533,7 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
     {
         changeSet->apply();
     }
-    mempool.check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
+    mempool.Check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
 
     // Callbacks/notifications for a new best chain.
     if (fInvalidFound) {
@@ -3742,7 +3742,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     }
 
     // Check mempool & journal
-    mempool.check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
+    mempool.Check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
 
     return true;
 }
@@ -5172,7 +5172,7 @@ void UnloadBlockIndex() {
     chainActive.SetTip(nullptr);
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
-    mempool.clear();
+    mempool.Clear();
     mapBlocksUnlinked.clear();
     pBlockFileInfoStore->Clear();
     nBlockSequenceId = 1;
@@ -5847,7 +5847,7 @@ void DumpMempool(void) {
         for (const auto &i : mempool.mapDeltas) {
             mapDeltas[i.first] = i.second.second;
         }
-        vinfo = mempool.infoAll();
+        vinfo = mempool.InfoAllNL();
     }
 
     int64_t mid = GetTimeMicros();

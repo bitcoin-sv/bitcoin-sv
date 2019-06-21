@@ -1805,7 +1805,7 @@ bool CWalletTx::RelayWalletTransaction(CConnman *connman) {
         LogPrintf("Relaying wtx %s\n", GetId().ToString());
         if (connman) {
             CInv inv { MSG_TX, GetId() };
-            TxMempoolInfo txinfo { mempool.info(GetId()) };
+            TxMempoolInfo txinfo { mempool.Info(GetId()) };
             connman->EnqueueTransaction( {inv, txinfo} );
             return true;
         }
@@ -1986,7 +1986,7 @@ Amount CWalletTx::GetChange() const {
 }
 
 bool CWalletTx::InMempool() const {
-    return mempool.exists(GetId());
+    return mempool.Exists(GetId());
 }
 
 bool CWalletTx::IsTrusted() const {
@@ -3136,7 +3136,7 @@ Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
     // User didn't set: use -txconfirmtarget to estimate...
     if (nFeeNeeded == Amount(0)) {
         int estimateFoundTarget = nConfirmTarget;
-        nFeeNeeded = pool.estimateSmartFee(nConfirmTarget, &estimateFoundTarget)
+        nFeeNeeded = pool.EstimateSmartFee(nConfirmTarget, &estimateFoundTarget)
                          .GetFee(nTxBytes);
         // ... unless we don't have enough mempool data for estimatefee, then
         // use fallbackFee.
