@@ -802,6 +802,10 @@ public:
 
     bool exists(const COutPoint &outpoint) const {
         LOCK(cs);
+        return existsNL(outpoint);
+    }
+    // A non-locking version of exists
+    bool existsNL(const COutPoint &outpoint) const {
         auto it = mapTx.find(outpoint.GetTxId());
         return it != mapTx.end() && outpoint.GetN() < it->GetTx().vout.size();
     }
