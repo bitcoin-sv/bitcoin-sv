@@ -447,7 +447,7 @@ public:
  *
  * Usually when a new transaction is added to the mempool, it has no in-mempool
  * children (because any such children would be an orphan). So in
- * addUnchecked(), we:
+ * AddUnchecked(), we:
  * - update a new entry's setMemPoolParents to include all in-mempool parents
  * - update the new entry's direct parents to include the new tx as a child
  * - update all ancestors of the transaction to include the new tx's size/fee
@@ -470,7 +470,7 @@ public:
  * unreachable from just looking at transactions in the mempool (the linking
  * transactions may also be in the disconnected block, waiting to be added).
  * Because of this, there's not much benefit in trying to search for in-mempool
- * children in addUnchecked(). Instead, in the special case of transactions
+ * children in AddUnchecked(). Instead, in the special case of transactions
  * being added from a disconnected block, we require the caller to clean up the
  * state, to account for in-mempool, out-of-block descendants for all the
  * in-block transactions by calling UpdateTransactionsFromBlock(). Note that
@@ -604,17 +604,14 @@ public:
 
     std::string checkJournal() const;
 
-    void SetSanityCheck(double dFrequency = 1.0) {
-        LOCK(cs);
-        nCheckFrequency = dFrequency * 4294967295.0;
-    }
+    void SetSanityCheck(double dFrequency = 1.0);
 
     /** Rebuild the journal contents so they match the mempool */
     void rebuildJournal() const;
 
-    // addUnchecked must updated state for all ancestors of a given transaction,
+    // AddUnchecked must updated state for all ancestors of a given transaction,
     // to track size/count of descendant transactions. First version of
-    // addUnchecked can be used to have it call CalculateMemPoolAncestors(), and
+    // AddUnchecked can be used to have it call CalculateMemPoolAncestors(), and
     // then invoke the second version.
     bool AddUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
                       mining::CJournalChangeSetPtr& changeSet, bool validFeeEstimate = true);
@@ -782,34 +779,17 @@ public:
      * chain limit specified. */
     bool TransactionWithinChainLimit(const uint256 &txid,
                                      size_t chainLimit) const;
-    unsigned long Size() {
-        LOCK(cs);
-        return mapTx.size();
-    }
+    unsigned long Size();
 
-    uint64_t GetTotalTxSize() {
-        LOCK(cs);
-        return totalTxSize;
-    }
+    uint64_t GetTotalTxSize();
 
-    bool Exists(uint256 hash) const {
-        LOCK(cs);
-        return ExistsNL(hash);
-    }
+    bool Exists(uint256 hash) const;
     // A non-locking version of Exists
-    bool ExistsNL(uint256 hash) const {
-        return mapTx.count(hash) != 0;
-    }
+    bool ExistsNL(uint256 hash) const;
 
-    bool Exists(const COutPoint &outpoint) const {
-        LOCK(cs);
-        return ExistsNL(outpoint);
-    }
+    bool Exists(const COutPoint &outpoint) const;
     // A non-locking version of Exists
-    bool ExistsNL(const COutPoint &outpoint) const {
-        auto it = mapTx.find(outpoint.GetTxId());
-        return it != mapTx.end() && outpoint.GetN() < it->GetTx().vout.size();
-    }
+    bool ExistsNL(const COutPoint &outpoint) const;
 
     CTransactionRef Get(const uint256 &hash) const;
     // A non-locking version of Get

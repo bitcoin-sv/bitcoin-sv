@@ -1066,6 +1066,11 @@ void CTxMemPool::rebuildJournal() const
     changeSet->apply();
 }
 
+void CTxMemPool::SetSanityCheck(double dFrequency) {
+    LOCK(cs);
+    nCheckFrequency = dFrequency * 4294967295.0;
+}
+
 /**
 * Compare 2 transactions to determine their relative priority.
 */
@@ -1551,6 +1556,35 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
     auto it = mapTx.find(txid);
     return it == mapTx.end() || (it->GetCountWithAncestors() < chainLimit &&
                                  it->GetCountWithDescendants() < chainLimit);
+}
+
+unsigned long CTxMemPool::Size() {
+    LOCK(cs);
+    return mapTx.size();
+}
+
+uint64_t CTxMemPool::GetTotalTxSize() {
+    LOCK(cs);
+    return totalTxSize;
+}
+
+bool CTxMemPool::Exists(uint256 hash) const {
+    LOCK(cs);
+    return ExistsNL(hash);
+}
+
+bool CTxMemPool::ExistsNL(uint256 hash) const {
+    return mapTx.count(hash) != 0;
+}
+
+bool CTxMemPool::Exists(const COutPoint &outpoint) const {
+    LOCK(cs);
+    return ExistsNL(outpoint);
+}
+
+bool CTxMemPool::ExistsNL(const COutPoint &outpoint) const {
+    auto it = mapTx.find(outpoint.GetTxId());
+    return it != mapTx.end() && outpoint.GetN() < it->GetTx().vout.size();
 }
 
 SaltedTxidHasher::SaltedTxidHasher()
