@@ -80,9 +80,9 @@ void CTxMemPoolEntry::UpdateLockPoints(const LockPoints &lp) {
 // Update the given tx for any in-mempool descendants.
 // Assumes that setMemPoolChildren is correct for the given tx and all
 // descendants.
-void CTxMemPool::UpdateForDescendants(txiter updateIt,
-                                      cacheMap &cachedDescendants,
-                                      const std::set<uint256> &setExclude) {
+void CTxMemPool::UpdateForDescendantsNL(txiter updateIt,
+                                        cacheMap &cachedDescendants,
+                                        const std::set<uint256> &setExclude) {
     setEntries stageEntries, setAllDescendants;
     stageEntries = GetMemPoolChildrenNL(updateIt);
 
@@ -149,7 +149,7 @@ void CTxMemPool::UpdateTransactionsFromBlock(
     // we are sure that all in-mempool descendants have already been processed.
     // This maximizes the benefit of the descendant cache and guarantees that
     // setMemPoolChildren will be updated, an assumption made in
-    // UpdateForDescendants.
+    // UpdateForDescendantsNL.
     for (const uint256 &hash : boost::adaptors::reverse(vHashesToUpdate)) {
         // we cache the in-mempool children to avoid duplicate updates
         setEntries setChildren;
@@ -174,7 +174,7 @@ void CTxMemPool::UpdateTransactionsFromBlock(
                 UpdateParentNL(childIter, it, true);
             }
         }
-        UpdateForDescendants(it, mapMemPoolDescendantsToUpdate,
+        UpdateForDescendantsNL(it, mapMemPoolDescendantsToUpdate,
                              setAlreadyIncluded);
     }
 }

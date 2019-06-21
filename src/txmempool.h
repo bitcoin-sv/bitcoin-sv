@@ -841,7 +841,7 @@ public:
 
 private:
     /**
-     * UpdateForDescendants is used by UpdateTransactionsFromBlock to update the
+     * UpdateForDescendantsNL is used by UpdateTransactionsFromBlock to update the
      * descendants for a single transaction that has been added to the mempool
      * but may have child transactions in the mempool, eg during a chain reorg.
      * setExclude is the set of descendant transactions in the mempool that must
@@ -853,8 +853,10 @@ private:
      * being updated, so that future invocations don't need to walk the same
      * transaction again, if encountered in another transaction chain.
      */
-    void UpdateForDescendants(txiter updateIt, cacheMap &cachedDescendants,
-                              const std::set<uint256> &setExclude);
+    void UpdateForDescendantsNL(
+            txiter updateIt,
+            cacheMap &cachedDescendants,
+            const std::set<uint256> &setExclude);
 
     /**
      * Update ancestors of hash to add/remove it as a descendant transaction.
