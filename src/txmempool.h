@@ -656,13 +656,13 @@ public:
     bool HasNoInputsOf(const CTransaction &tx) const;
 
     /** Affect CreateNewBlock prioritisation of transactions */
-    void PrioritiseTransaction(const uint256 hash, const std::string strHash,
+    void PrioritiseTransaction(const uint256& hash, const std::string strHash,
                                double dPriorityDelta, const Amount nFeeDelta);
-    void ApplyDeltas(const uint256 hash, double &dPriorityDelta,
+    void ApplyDeltas(const uint256& hash, double &dPriorityDelta,
                      Amount &nFeeDelta) const;
     // A non-locking version of ApplyDeltas
     void ApplyDeltasNL(
-            const uint256 hash,
+            const uint256& hash,
             double &dPriorityDelta,
             Amount &nFeeDelta) const;
 
@@ -779,19 +779,19 @@ public:
 
     uint64_t GetTotalTxSize();
 
-    bool Exists(uint256 hash) const;
+    bool Exists(const uint256& hash) const;
     // A non-locking version of Exists
-    bool ExistsNL(uint256 hash) const;
+    bool ExistsNL(const uint256& hash) const;
 
     bool Exists(const COutPoint &outpoint) const;
     // A non-locking version of Exists
     bool ExistsNL(const COutPoint &outpoint) const;
 
-    CTransactionRef Get(const uint256 &hash) const;
+    CTransactionRef Get(const uint256& hash) const;
     // A non-locking version of Get
-    CTransactionRef GetNL(const uint256 &hash) const;
+    CTransactionRef GetNL(const uint256& hash) const;
 
-    TxMempoolInfo Info(const uint256 &hash) const;
+    TxMempoolInfo Info(const uint256& hash) const;
 
     std::vector<TxMempoolInfo> InfoAll() const;
     // A non-locking version of InfoAll
@@ -893,14 +893,14 @@ private:
             mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
-    void clearPrioritisationNL(const uint256 hash);
+    void clearPrioritisationNL(const uint256& hash);
 
     /**
      * A non-locking private methods.
      */
     // A non-locking version of AddUnchecked
     bool addUncheckedNL(
-            const uint256 &hash,
+            const uint256& hash,
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             mining::CJournalChangeSetPtr& changeSet,

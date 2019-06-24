@@ -1223,7 +1223,7 @@ bool CTxMemPool::ReadFeeEstimates(CAutoFile &filein) {
     return true;
 }
 
-void CTxMemPool::PrioritiseTransaction(const uint256 hash,
+void CTxMemPool::PrioritiseTransaction(const uint256& hash,
                                        const std::string strHash,
                                        double dPriorityDelta,
                                        const Amount nFeeDelta) {
@@ -1266,14 +1266,14 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash,
               dPriorityDelta, FormatMoney(nFeeDelta));
 }
 
-void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta,
+void CTxMemPool::ApplyDeltas(const uint256& hash, double &dPriorityDelta,
                              Amount &nFeeDelta) const {
     LOCK(cs);
     ApplyDeltasNL(hash, dPriorityDelta, nFeeDelta);
 }
 
 void CTxMemPool::ApplyDeltasNL(
-        const uint256 hash,
+        const uint256& hash,
         double &dPriorityDelta,
         Amount &nFeeDelta) const {
 
@@ -1287,7 +1287,7 @@ void CTxMemPool::ApplyDeltasNL(
     nFeeDelta += deltas.second;
 }
 
-void CTxMemPool::clearPrioritisationNL(const uint256 hash) {
+void CTxMemPool::clearPrioritisationNL(const uint256& hash) {
     mapDeltas.erase(hash);
 }
 
@@ -1551,12 +1551,12 @@ uint64_t CTxMemPool::GetTotalTxSize() {
     return totalTxSize;
 }
 
-bool CTxMemPool::Exists(uint256 hash) const {
+bool CTxMemPool::Exists(const uint256& hash) const {
     LOCK(cs);
     return ExistsNL(hash);
 }
 
-bool CTxMemPool::ExistsNL(uint256 hash) const {
+bool CTxMemPool::ExistsNL(const uint256& hash) const {
     return mapTx.count(hash) != 0;
 }
 
