@@ -595,25 +595,8 @@ void CTxMemPool::removeUncheckedNL(
 // iterating over those entries.
 void CTxMemPool::CalculateDescendants(txiter entryit,
                                       setEntries &setDescendants) {
-    {
-        LOCK(cs);
-        CalculateDescendantsNL(entryit, setDescendants);
-    }
-}
-
-bool CTxMemPool::CalculateDescendants(uint256 hash,
-                                      setEntries &setDescendants,
-                                      bool fEraseRootTx) {
     LOCK(cs);
-    txiter it = mempool.mapTx.find(hash);
-    if (it != mempool.mapTx.end()) {
-        CalculateDescendantsNL(it, setDescendants);
-        if (fEraseRootTx) {
-            setDescendants.erase(it);
-        }
-        return true;
-    }
-    return false;
+    CalculateDescendantsNL(entryit, setDescendants);
 }
 
 void CTxMemPool::CalculateDescendantsNL(txiter entryit,

@@ -483,24 +483,28 @@ UniValue getmempoolancestors(const Config &config,
 
     LOCK(mempool.cs);
 
-    CTxMemPool::txiter it = mempool.mapTx.find(hash);
-    if (it == mempool.mapTx.end()) {
+    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
+    if (txIter == mempool.mapTx.end()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-
     CTxMemPool::setEntries setAncestors;
     uint64_t noLimit = std::numeric_limits<uint64_t>::max();
     std::string dummy;
-    mempool.CalculateMemPoolAncestorsNL(*it, setAncestors, noLimit, noLimit,
-                                      noLimit, noLimit, dummy, false);
-
+    mempool.CalculateMemPoolAncestorsNL(
+                *txIter,
+                setAncestors,
+                noLimit,
+                noLimit,
+                noLimit,
+                noLimit,
+                dummy,
+                false);
     if (!fVerbose) {
         UniValue o(UniValue::VARR);
         for (CTxMemPool::txiter ancestorIt : setAncestors) {
             o.push_back(ancestorIt->GetTx().GetId().ToString());
         }
-
         return o;
     } else {
         UniValue o(UniValue::VOBJ);
@@ -548,18 +552,26 @@ UniValue getmempooldescendants(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    CTxMemPool::setEntries setDescendants;
-    // Calculate descendants and exclude the given tx from the output
-    if (!mempool.CalculateDescendants(hash, setDescendants, true)) {
+    LOCK(mempool.cs);
+
+    // Check if tx is present in the mempool
+    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
+    if (txIter == mempool.mapTx.end()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
+    CTxMemPool::setEntries setDescendants;
+    // Calculate descendants
+    mempool.CalculateDescendantsNL(
+                txIter,
+                setDescendants);
+    // Exclude the given tx from the output
+    setDescendants.erase(txIter);
     if (!fVerbose) {
         UniValue o(UniValue::VARR);
         for (CTxMemPool::txiter descendantIt : setDescendants) {
             o.push_back(descendantIt->GetTx().GetId().ToString());
         }
-
         return o;
     } else {
         UniValue o(UniValue::VOBJ);
@@ -594,13 +606,12 @@ UniValue getmempoolentry(const Config &config, const JSONRPCRequest &request) {
 
     LOCK(mempool.cs);
 
-    CTxMemPool::txiter it = mempool.mapTx.find(hash);
-    if (it == mempool.mapTx.end()) {
+    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
+    if (txIter == mempool.mapTx.end()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-
-    const CTxMemPoolEntry &e = *it;
+    const CTxMemPoolEntry &e = *txIter;
     UniValue info(UniValue::VOBJ);
     entryToJSONNL(info, e);
     return info;
