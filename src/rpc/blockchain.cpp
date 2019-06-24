@@ -1454,6 +1454,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
 UniValue mempoolInfoToJSON() {
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("size", (int64_t)mempool.size()));
+    ret.push_back(Pair("journalsize", (int64_t)mempool.getJournalBuilder()->getCurrentJournal()->size()));
     ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t)mempool.DynamicMemoryUsage()));
     size_t maxmempool =
@@ -1474,6 +1475,7 @@ UniValue getmempoolinfo(const Config &config, const JSONRPCRequest &request) {
             "\nResult:\n"
             "{\n"
             "  \"size\": xxxxx,               (numeric) Current tx count\n"
+            "  \"journalsize\": xxxxx,        (numeric) Current tx count within the journal\n"
             "  \"bytes\": xxxxx,              (numeric) Transaction size.\n"
             "  \"usage\": xxxxx,              (numeric) Total memory usage for "
             "the mempool\n"
