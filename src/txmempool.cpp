@@ -1328,6 +1328,10 @@ bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const {
 
 size_t CTxMemPool::DynamicMemoryUsage() const {
     LOCK(cs);
+    return DynamicMemoryUsageNL();
+}
+
+size_t CTxMemPool::DynamicMemoryUsageNL() const {
     // Estimate the overhead of mapTx to be 15 pointers + an allocation, as no
     // exact formula for boost::multi_index_contained is implemented.
     return memusage::MallocUsage(sizeof(CTxMemPoolEntry) +
@@ -1450,9 +1454,9 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
     int64_t time = GetTime();
     if (time > lastRollingFeeUpdate + 10) {
         double halflife = ROLLING_FEE_HALFLIFE;
-        if (DynamicMemoryUsage() < sizelimit / 4) {
+        if (DynamicMemoryUsageNL() < sizelimit / 4) {
             halflife /= 4;
-        } else if (DynamicMemoryUsage() < sizelimit / 2) {
+        } else if (DynamicMemoryUsageNL() < sizelimit / 2) {
             halflife /= 2;
         }
 
@@ -1482,7 +1486,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     unsigned nTxnRemoved = 0;
     CFeeRate maxFeeRateRemoved(Amount(0));
     std::vector<TxId> vRemovedTxIds {};
-    while (!mapTx.empty() && DynamicMemoryUsage() > sizelimit) {
+    while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
         indexed_transaction_set::index<descendant_score>::type::iterator it =
             mapTx.get<descendant_score>().begin();
 

@@ -813,6 +813,8 @@ public:
     bool ReadFeeEstimates(CAutoFile &filein);
 
     size_t DynamicMemoryUsage() const;
+    // A non-locking version of DynamicMemoryUsage.
+    size_t DynamicMemoryUsageNL() const;
 
     boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
