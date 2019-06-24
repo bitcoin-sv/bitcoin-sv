@@ -356,7 +356,6 @@ std::string EntryDescriptionString() {
 }
 
 void entryToJSONNL(UniValue &info, const CTxMemPoolEntry &e) {
-    AssertLockHeld(mempool.cs);
 
     info.push_back(Pair("size", (int)e.GetTxSize()));
     info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
@@ -392,7 +391,7 @@ void entryToJSONNL(UniValue &info, const CTxMemPoolEntry &e) {
 
 UniValue mempoolToJSON(bool fVerbose = false) {
     if (fVerbose) {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         UniValue o(UniValue::VOBJ);
         for (const CTxMemPoolEntry &e : mempool.mapTx) {
             const uint256 &txid = e.GetTx().GetId();
@@ -481,7 +480,7 @@ UniValue getmempoolancestors(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    LOCK(mempool.cs);
+    std::shared_lock lock(mempool.smtx);
 
     CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
     if (txIter == mempool.mapTx.end()) {
@@ -552,7 +551,7 @@ UniValue getmempooldescendants(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    LOCK(mempool.cs);
+    std::shared_lock lock(mempool.smtx);
 
     // Check if tx is present in the mempool
     CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
@@ -604,7 +603,7 @@ UniValue getmempoolentry(const Config &config, const JSONRPCRequest &request) {
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    LOCK(mempool.cs);
+    std::shared_lock lock(mempool.smtx);
 
     CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
     if (txIter == mempool.mapTx.end()) {
@@ -1230,7 +1229,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
 
     Coin coin;
     if (fMempool) {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         CCoinsViewMemPool view(pcoinsTip, mempool);
         if (!view.GetCoin(out, coin) || mempool.IsSpentNL(out)) {
             // TODO: this should be done by the CCoinsViewMemPool
@@ -1816,7 +1815,7 @@ UniValue checkjournal(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("checkjournal", ""));
     }
 
-    std::string checkResult { mempool.checkJournal() };
+    std::string checkResult { mempool.CheckJournal() };
 
     UniValue result { UniValue::VOBJ };
     if(checkResult.empty())
@@ -1843,7 +1842,7 @@ UniValue rebuildjournal(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("rebuildjournal", ""));
     }
 
-    mempool.rebuildJournal();
+    mempool.RebuildJournal();
     return NullUniValue;
 }
 

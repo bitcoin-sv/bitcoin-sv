@@ -73,7 +73,7 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
         txnDetails.emplace_back(inv, txn);
     }
     {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         std::sort(txnDetails.begin(), txnDetails.end(), comp);
     }
 
@@ -83,7 +83,7 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
 
         // Ensure we always take our lock first, then the mempool lock
         std::unique_lock<std::mutex> lock { mNewTxnsMtx };
-        LOCK(mempool.cs);
+        std::shared_lock(mempool.smtx);
 
         std::sort(mNewTxns.begin(), mNewTxns.end(), comp);
         std::set_difference(mNewTxns.begin(), mNewTxns.end(), txnDetails.begin(), txnDetails.end(),
@@ -93,7 +93,7 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
 
     // Update lists of pending transactions for each node
     {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         auto results { g_connman->ParallelForEachNode([&txnDetails](const CNodePtr& node) { node->RemoveTxnsFromInventory(txnDetails); }) };
 
         // Wait for all nodes to finish processing so we can safely release the mempool lock
@@ -156,7 +156,7 @@ void CTxnPropagator::processNewTransactions()
 {
     {
         // Take the mempool lock so we can do all the difficult txn sorting and node updating in parallel.
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         auto results { g_connman->ParallelForEachNode([this](const CNodePtr& node) { node->AddTxnsToInventory(mNewTxns); }) };
 
         // Wait for all nodes to finish processing so we can safely release the mempool lock

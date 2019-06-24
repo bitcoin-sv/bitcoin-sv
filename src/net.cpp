@@ -788,7 +788,11 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
 
     // Try and lock the mempool (for txn ordering) and our inventory list,
     // if we fail to take either then don't hold up the caller by waiting.
-    TRY_LOCK(mempool.cs, mempoolLocked);
+    std::shared_lock lock(mempool.smtx, std::defer_lock);
+    bool mempoolLocked {false};
+    if (lock.try_lock()) {
+        mempoolLocked = true;
+    }
     TRY_LOCK(cs_mInvList, invLocked);
     if(!mempoolLocked || !invLocked)
         return results;

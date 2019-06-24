@@ -160,7 +160,7 @@ ReadStatus PartiallyDownloadedBlock::InitData(
 
     std::vector<bool> have_txn(txns_available.size());
     {
-        LOCK(pool->cs);
+        std::shared_lock lock(pool->smtx);
         const std::vector<std::pair<uint256, CTxMemPool::txiter>> &vTxHashes =
             pool->vTxHashes;
         for (auto txHash : vTxHashes) {

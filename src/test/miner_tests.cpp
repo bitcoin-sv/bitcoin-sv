@@ -92,7 +92,7 @@ CBlockIndex CreateBlockIndex(int nHeight) {
 }
 
 bool TestSequenceLocks(const CTransaction &tx, int flags) {
-    LOCK(mempool.cs);
+    std::shared_lock lock(mempool.smtx);
     return CheckSequenceLocks(tx, mempool, flags);
 }
 

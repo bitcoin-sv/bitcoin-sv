@@ -791,7 +791,7 @@ static UniValue signrawtransaction(const Config &config,
     CCoinsView viewDummy;
     CCoinsViewCache view(&viewDummy);
     {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         CCoinsViewCache &viewChain = *pcoinsTip;
         CCoinsViewMemPool viewMempool(&viewChain, mempool);
         // Temporarily switch cache backend to db+mempool view.

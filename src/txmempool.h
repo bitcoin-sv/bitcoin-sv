@@ -26,6 +26,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <mutex>
+#include <shared_mutex>
 
 class CAutoFile;
 class CBlockIndex;
@@ -548,7 +550,7 @@ public:
                                  CompareTxMemPoolEntryByAncestorFee>>>
         indexed_transaction_set;
 
-    mutable CCriticalSection cs;
+    mutable std::shared_mutex smtx;
     indexed_transaction_set mapTx;
 
     typedef indexed_transaction_set::nth_index<0>::type::iterator txiter;
@@ -602,12 +604,12 @@ public:
         const CCoinsViewCache *pcoins,
         mining::CJournalChangeSetPtr& changeSet) const;
 
-    std::string checkJournal() const;
+    std::string CheckJournal() const;
 
     void SetSanityCheck(double dFrequency = 1.0);
 
     /** Rebuild the journal contents so they match the mempool */
-    void rebuildJournal() const;
+    void RebuildJournal() const;
 
     // AddUnchecked must updated state for all ancestors of a given transaction,
     // to track size/count of descendant transactions. First version of
@@ -916,6 +918,9 @@ private:
             const CTransaction &tx,
             mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+
+    // A non-locking version of checkJournal
+    std::string checkJournalNL() const;
 };
 
 /**

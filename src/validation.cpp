@@ -343,9 +343,9 @@ bool CheckSequenceLocks(
     int flags,
     LockPoints *lp,
     bool useExistingLockPoints) {
-    // cs_main is held by TxnValidator during TxnValidation call.
-    AssertLockHeld(pool.cs);
 
+    // cs_main is held by TxnValidator during TxnValidation call.
+    // pool.smtx is held by TxnValidation method. It is required for viewMemPool::GetCoin()
     CBlockIndex *tip = chainActive.Tip();
     CBlockIndex index;
     index.pprev = tip;
@@ -609,7 +609,7 @@ static bool CheckInputsFromMempoolAndCache(
 
     // Take the mempool lock to enforce that the mempool doesn't change
     // between when we check the view and when we actually call through to CheckInputs
-    LOCK(pool.cs);
+    std::shared_lock lock(pool.smtx);
 
     assert(!tx.IsCoinBase());
     for (const CTxIn &txin : tx.vin) {
@@ -943,7 +943,7 @@ CTxnValResult TxnValidation(
     Amount nValueIn(0);
     LockPoints lp;
     {
-        LOCK(pool.cs);
+        std::shared_lock lock(pool.smtx);
         // Combine db & mempool views together.
         CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
         // Temporarily switch cache backend to db+mempool view
@@ -5843,7 +5843,7 @@ void DumpMempool(void) {
     std::vector<TxMempoolInfo> vinfo;
 
     {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         for (const auto &i : mempool.mapDeltas) {
             mapDeltas[i.first] = i.second.second;
         }

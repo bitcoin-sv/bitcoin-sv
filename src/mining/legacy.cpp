@@ -135,7 +135,8 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
     // updated at end
     pblocktemplate->vTxSigOpsCount.push_back(-1);
 
-    LOCK2(cs_main, mempool.cs);
+    LOCK(cs_main);
+    std::unique_lock lock(mempool.smtx);
     CBlockIndex* pindexPrevNew = chainActive.Tip();
     nHeight = pindexPrevNew->nHeight + 1;
 
