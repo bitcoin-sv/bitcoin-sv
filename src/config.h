@@ -7,7 +7,7 @@
 
 #include "amount.h"
 #include "consensus/consensus.h"
-#include "validation.h"
+#include "mining/factory.h"
 #include "policy/policy.h"
 #include "script/standard.h"
 #include "validation.h"
@@ -74,6 +74,8 @@ public:
     virtual uint64_t GetFactorMaxSendQueuesBytes() const = 0;
     virtual uint64_t GetMaxSendQueuesBytes() const = 0; // calculated based on factorMaxSendQueuesBytes
 
+    virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
+    virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -131,8 +133,10 @@ public:
     uint64_t GetFactorMaxSendQueuesBytes() const override;
     uint64_t GetMaxSendQueuesBytes() const override;
 
-    // Reset state of this object to match a newly constructed one. 
-    // Used in constructor and for unit testing to always start with a clean state
+    void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override;
+    mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override;
+
+    // Reset state of this object to match a newly constructed one.
     void Reset(); 
     static GlobalConfig& GetConfig();
 
@@ -164,6 +168,7 @@ private:
     uint64_t limitAncestorSize;
 
     bool testBlockCandidateValidity;
+    mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
 };
 
 // Dummy for subclassing in unittests
@@ -235,6 +240,11 @@ public:
     void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) override {}
     uint64_t GetFactorMaxSendQueuesBytes() const override { return 0;}
     uint64_t GetMaxSendQueuesBytes() const override { return 0; }
+
+    void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override {}
+    mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override {
+        return mining::CMiningFactory::BlockAssemblerType::LEGACY;
+    }
 
 private:
     std::unique_ptr<CChainParams> chainParams;

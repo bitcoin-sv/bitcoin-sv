@@ -38,6 +38,7 @@ void GlobalConfig::Reset()
     limitAncestorSize = DEFAULT_ANCESTOR_SIZE_LIMIT;
 
     testBlockCandidateValidity = false;
+    blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -229,6 +230,14 @@ void GlobalConfig::SetTestBlockCandidateValidity(bool test) {
 
 bool GlobalConfig::GetTestBlockCandidateValidity() const {
     return testBlockCandidateValidity;
+}
+
+void GlobalConfig::SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) {
+    blockAssemblerType = type;
+}
+
+mining::CMiningFactory::BlockAssemblerType GlobalConfig::GetMiningCandidateBuilder() const {
+    return blockAssemblerType;
 }
 
 DummyConfig::DummyConfig()

@@ -61,6 +61,7 @@
 #include <signal.h>
 #endif
 
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -908,6 +909,12 @@ std::string HelpMessage(HelpMessageMode mode) {
                            "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
     }
 
+    strUsage += HelpMessageOpt(
+        "-blockassembler=<type>",
+        strprintf(_("Set the type of block assembler to use for mining. Supported options are "
+                    "LEGACY or JOURNALING. (default: %s)"),
+                  enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
+
     strUsage += HelpMessageGroup(_("RPC server options:"));
     strUsage += HelpMessageOpt("-server",
                                _("Accept command line and JSON-RPC commands"));
@@ -1590,6 +1597,15 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure whether to run extra block candidate validity checks
     config.SetTestBlockCandidateValidity(
         gArgs.GetBoolArg("-blockcandidatevaliditytest", chainparams.TestBlockCandidateValidity()));
+
+    // Configure mining block assembler
+    if(gArgs.IsArgSet("-blockassembler")) {
+        std::string assemblerStr { boost::to_upper_copy<std::string>(gArgs.GetArg("-blockassembler", "")) };
+        mining::CMiningFactory::BlockAssemblerType assembler { enum_cast<mining::CMiningFactory::BlockAssemblerType>(assemblerStr) };
+        if(assembler == mining::CMiningFactory::BlockAssemblerType::UNKNOWN)
+            assembler = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
+        config.SetMiningCandidateBuilder(assembler);
+    }
 
     // Configure data carrier size.
     if(gArgs.IsArgSet("-datacarriersize")) {
