@@ -43,10 +43,20 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     BOOST_CHECK(builder);
 
     // Tester to inspect journals
-    CJournalTester tester { builder->getCurrentJournal() };
+    CJournalPtr journal { builder->getCurrentJournal() };
+    CJournalTester tester { journal };
 
-    // Journal is empty to start with
-    BOOST_CHECK_EQUAL(tester.journalSize(), 0);
+    // Check journal initial state
+    BOOST_CHECK_EQUAL(journal->size(), 0);
+    BOOST_CHECK_EQUAL(journal->getLastInvalidatingTime(), 0);
+    BOOST_CHECK(journal->getCurrent());
+
+    // Check index initial state
+    CJournal::Index index {};
+    BOOST_CHECK(!index.valid());
+    index = CJournal::ReadLock{journal}.begin();
+    BOOST_CHECK(index.valid());
+    BOOST_CHECK(index == CJournal::ReadLock{journal}.end());
 
     // Play single txn into the journal and check it
     CJournalChangeSetPtr changeSet { builder->getNewChangeSet(JournalUpdateReason::NEW_TXN) };
@@ -57,6 +67,13 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     BOOST_CHECK_EQUAL(tester.journalSize(), 1);
     BOOST_CHECK(tester.checkTxnExists(singletxn));
     BOOST_CHECK_EQUAL(tester.checkTxnOrdering(singletxn, singletxn), CJournalTester::TxnOrder::DUPLICATE);
+
+    // begin() now points to this first txn
+    index.reset();
+    BOOST_CHECK(index.valid());
+    BOOST_CHECK(index != CJournal::ReadLock{journal}.end());
+    BOOST_CHECK(index == CJournal::ReadLock{journal}.begin());
+    BOOST_CHECK(index.at().getTxn()->GetId() == singletxn.getTxn()->GetId());
 
     // Play a series of txns into the journal
     using OpList = std::vector<std::pair<CJournalChangeSet::Operation, CJournalEntry>>;
@@ -81,12 +98,22 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     BOOST_CHECK_EQUAL(tester.checkTxnOrdering(ops[1].second, ops[0].second), CJournalTester::TxnOrder::AFTER);
     BOOST_CHECK_EQUAL(tester.checkTxnOrdering(ops[0].second, ops[2].second), CJournalTester::TxnOrder::BEFORE);
 
+    // Check iterator movement
+    BOOST_CHECK(index.valid());
+    BOOST_CHECK((++index).at().getTxn()->GetId() == ops[0].second.getTxn()->GetId());
+    BOOST_CHECK((++index).at().getTxn()->GetId() == ops[1].second.getTxn()->GetId());
+    BOOST_CHECK((++index).at().getTxn()->GetId() == ops[2].second.getTxn()->GetId());
+    BOOST_CHECK(index != CJournal::ReadLock{journal}.end());
+    ++index;
+    BOOST_CHECK(index.valid());
+    BOOST_CHECK(index == CJournal::ReadLock{journal}.end());
+
     // Remove some txns
     OpList ops2 = {
         { CJournalChangeSet::Operation::REMOVE, ops[0].second },
         { CJournalChangeSet::Operation::REMOVE, ops[2].second }
     };
-    changeSet = builder->getNewChangeSet(JournalUpdateReason::NEW_BLOCK);
+    changeSet = builder->getNewChangeSet(JournalUpdateReason::REMOVE_TXN);
     for(const auto& [ op, txn ] : ops2)
     {
         changeSet->addOperation(op, txn);
@@ -101,6 +128,10 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     BOOST_CHECK(!tester.checkTxnExists(ops[2].second));
     BOOST_CHECK_EQUAL(tester.checkTxnOrdering(ops[0].second, ops[1].second), CJournalTester::TxnOrder::NOTFOUND);
     BOOST_CHECK_EQUAL(tester.checkTxnOrdering(singletxn, ops[1].second), CJournalTester::TxnOrder::BEFORE);
+
+    // Iterator is no longer valid
+    BOOST_CHECK(!index.valid());
+    BOOST_CHECK_THROW(index.reset(), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(TestJournalReorg)
@@ -110,10 +141,11 @@ BOOST_AUTO_TEST_CASE(TestJournalReorg)
     BOOST_CHECK(builder);
 
     // Tester to inspect journals
-    CJournalTester tester { builder->getCurrentJournal() };
+    CJournalPtr journal { builder->getCurrentJournal() };
+    CJournalTester tester { journal };
 
     // Journal is empty to start with
-    BOOST_CHECK_EQUAL(tester.journalSize(), 0);
+    BOOST_CHECK_EQUAL(journal->size(), 0);
 
     // Populate with some initial txns
     using OpList = std::vector<std::pair<CJournalChangeSet::Operation, CJournalEntry>>;
@@ -130,6 +162,7 @@ BOOST_AUTO_TEST_CASE(TestJournalReorg)
     }
     changeSet.reset();
     BOOST_CHECK_EQUAL(tester.journalSize(), 4);
+    BOOST_CHECK(journal->getCurrent());
  
     // Apply a reorg with a mix of additions and removals
     CJournalEntry singletxn { NewTxn() };
@@ -147,6 +180,7 @@ BOOST_AUTO_TEST_CASE(TestJournalReorg)
     }
     BOOST_CHECK(!changeSet->getSimple());
     changeSet.reset();
+    BOOST_CHECK(!journal->getCurrent());
     tester.updateJournal(builder->getCurrentJournal());
 
     BOOST_CHECK_EQUAL(tester.journalSize(), 3);
