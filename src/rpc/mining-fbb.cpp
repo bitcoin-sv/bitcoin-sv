@@ -108,7 +108,7 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     pblock->nNonce = 0;
 
     // Create candidate and return it
-    CMiningCandidateRef candidate  { CMiningFactory::GetCandidateManager().Create(blockref) };
+    CMiningCandidateRef candidate  { mining::CMiningFactory::GetCandidateManager().Create(blockref) };
     return candidate;
 }
 
@@ -154,7 +154,7 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     UniValue ret(UniValue::VOBJ);
     CBlockRef block = candidate->GetBlock();
 
-    CMiningFactory::GetCandidateManager().RemoveOldCandidates();
+    mining::CMiningFactory::GetCandidateManager().RemoveOldCandidates();
 
     std::stringstream idstr {};
     idstr << candidate->GetId();
@@ -259,7 +259,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     std::string idstr { rcvd["id"].get_str() };
     MiningCandidateId id { boost::lexical_cast<MiningCandidateId>(idstr) };
 
-    CMiningCandidateRef result { CMiningFactory::GetCandidateManager().Get(id) };
+    CMiningCandidateRef result { mining::CMiningFactory::GetCandidateManager().Get(id) };
     if (!result)
     {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block candidate ID not found");
@@ -355,7 +355,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     }
 
     // Clear out old candidates
-    CMiningFactory::GetCandidateManager().RemoveOldCandidates();
+    mining::CMiningFactory::GetCandidateManager().RemoveOldCandidates();
 
     return submitted;
 }
