@@ -131,6 +131,7 @@ BITCOIN_CORE_H = \
   mining/journal_builder.h \
   mining/journal_change_set.h \
   mining/journal_entry.h \
+  mining/journaling_block_assembler.h \
   mining/legacy.h \
   mod_pri_queue.h \
   net.h \
@@ -231,6 +232,7 @@ libbitcoin_server_a_SOURCES = \
   mining/journal.cpp \
   mining/journal_builder.cpp \
   mining/journal_change_set.cpp \
+  mining/journaling_block_assembler.cpp \
   mining/legacy.cpp \
   net.cpp \
   net_processing.cpp \

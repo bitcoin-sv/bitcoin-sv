@@ -16,11 +16,12 @@ namespace mining
  */
 class CBlockTemplate {
 private:
-    CBlockRef block;
+    CBlockRef mBlock { std::make_shared<CBlock>() };
 
 public:
-    CBlockTemplate() : block{std::make_shared<CBlock>()} {};
-    CBlockRef GetBlockRef() const { return block; };
+    CBlockTemplate() = default;
+    CBlockTemplate(const CBlockRef& block) : mBlock{block} {}
+    CBlockRef GetBlockRef() const { return mBlock; }
 
     std::vector<Amount> vTxFees;
     std::vector<int64_t> vTxSigOpsCount;
