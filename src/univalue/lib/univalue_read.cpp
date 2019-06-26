@@ -358,6 +358,7 @@ bool UniValue::read(const char *raw, size_t size)
             stack.pop_back();
             clearExpect(OBJ_NAME);
             setExpect(NOT_VALUE);
+            --ObjArrCounter;
             break;
             }
 
