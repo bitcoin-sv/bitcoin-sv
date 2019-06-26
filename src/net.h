@@ -92,6 +92,11 @@ static const uint64_t DEFAULT_MAX_UPLOAD_TARGET = 0;
 static const uint64_t MAX_UPLOAD_TIMEFRAME = 60 * 60 * 24;
 /** Default for blocks only*/
 static const bool DEFAULT_BLOCKSONLY = false;
+/** Default factor that will be multiplied with excessiveBlockSize
+* to limit the maximum bytes in all sending queues. If this
+* size is exceeded, no response to block related P2P messages is sent.
+**/
+static const unsigned int DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES = 4;
 
 // Force DNS seed use ahead of UAHF fork, to ensure peers are found
 // as long as seeders are working.
@@ -589,6 +594,38 @@ public:
     int readData(const char *pch, uint32_t nBytes);
 };
 
+class CSendQueueBytes {
+    // nSendQueueBytes holds data of how many bytes are currently in queue for specific node
+    size_t nSendQueueBytes = 0;
+    // nTotalSendQueuesBytes holds data of how many bytes are currently in all queues across the network (all nodes)
+    static std::atomic_size_t nTotalSendQueuesBytes;
+
+public:
+    ~CSendQueueBytes() {
+        nTotalSendQueuesBytes -= nSendQueueBytes;
+    }
+
+    size_t operator-= (size_t nBytes) {
+        nSendQueueBytes -= nBytes;
+        nTotalSendQueuesBytes -= nBytes;
+        return nSendQueueBytes;
+    }
+
+     size_t operator+= (size_t nBytes) {
+        nSendQueueBytes += nBytes;
+        nTotalSendQueuesBytes += nBytes;
+        return nSendQueueBytes;
+    }
+
+    size_t getSendQueueBytes() const {
+        return nSendQueueBytes;
+    }
+
+    static size_t getTotalSendQueuesBytes() {
+        return nTotalSendQueuesBytes;
+    }
+};
+
 /** Information about a peer */
 class CNode {
     friend class CConnman;
@@ -600,7 +637,7 @@ public:
     ServiceFlags nServicesExpected {NODE_NONE};
     SOCKET hSocket {0};
     // Total size of all vSendMsg entries.
-    size_t nSendSize {0};
+    CSendQueueBytes nSendSize;
     // Offset inside the first vSendMsg already sent.
     size_t nSendOffset {0};
     uint64_t nSendBytes {0};

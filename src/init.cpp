@@ -527,6 +527,13 @@ std::string HelpMessage(HelpMessageMode mode) {
                                           "<n>*1000 bytes (default: %u)"),
                                         DEFAULT_MAXSENDBUFFER));
     strUsage += HelpMessageOpt(
+        "-factorMaxSendQueuesBytes=<n>",
+        strprintf(_("Factor that will be multiplied with excessiveBlockSize"
+            " to limit the maximum bytes in all sending queues. If this"
+            " size is exceeded, no response to block related P2P messages is sent."
+            " (default factor: %u)"),
+            DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES));
+    strUsage += HelpMessageOpt(
         "-maxtimeadjustment",
         strprintf(_("Maximum allowed median peer time offset adjustment. Local "
                     "perspective of time may be influenced by peers forward or "
@@ -1546,6 +1553,11 @@ bool AppInitParameterInteraction(Config &config) {
                 LEGACY_MAX_BLOCK_SIZE
             ));
         }
+    }
+
+    if(gArgs.IsArgSet("-factorMaxSendQueuesBytes")) {
+        const uint64_t factorMaxSendQueuesBytes = gArgs.GetArg("-factorMaxSendQueuesBytes", DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES);
+        config.SetFactorMaxSendQueuesBytes(factorMaxSendQueuesBytes);
     }
 
     // Configure max generated block size.

@@ -25,7 +25,8 @@ static const unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
 static const int64_t MAX_INV_BROADCAST_DELAY = 50 * 1000;
 /** Default broadcast delay duration in milliseconds **/
 static const int64_t DEFAULT_INV_BROADCAST_DELAY = 150;
-
+/** Delay for not downloading blocks from a peer if it sends us REJECT_TOOBUSY message **/
+static const int64_t TOOBUSY_RETRY_DELAY = 5000000;
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals &nodeSignals);
 /** Unregister a network node */
