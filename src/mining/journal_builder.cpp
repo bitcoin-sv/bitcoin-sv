@@ -29,7 +29,9 @@ CJournalPtr CJournalBuilder::getCurrentJournal() const
 void CJournalBuilder::clearJournal()
 {
     std::unique_lock<std::shared_mutex> lock { mMtx };
+    CJournalPtr oldJournal { mJournal };
     mJournal = std::make_shared<CJournal>();
+    oldJournal->setCurrent(false);
 }
 
 // Apply a change set
@@ -45,8 +47,11 @@ void CJournalBuilder::applyChangeSet(const CJournalChangeSet& changeSet)
         LogPrint(BCLog::JOURNAL, "Journal builder creating new journal for %s\n",
             enum_cast<std::string>(changeSet.getUpdateReason()).c_str());
 
+        // Replace old journal
         std::unique_lock<std::shared_mutex> lock { mMtx };
-        mJournal = std::make_shared<CJournal>(*mJournal);
+        CJournalPtr oldJournal { mJournal };
+        mJournal = std::make_shared<CJournal>(*oldJournal);
+        oldJournal->setCurrent(false);
     }
 
     // Don't log for every individual transaction, it'll swamp the log

@@ -3,6 +3,7 @@
 
 #include <mining/journal.h>
 #include <mining/journal_change_set.h>
+#include <utiltime.h>
 
 using mining::CJournal;
 using mining::CJournalTester;
@@ -34,7 +35,7 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
     TransactionListByName& index0 { mTransactions.get<0>() };
     TransactionListByPosition& index1 { mTransactions.get<1>() };
 
-    // For REORGS we need to remember the current start position
+    // For REORGs we need to remember the current start position
     TransactionListByPosition::const_iterator begin1 {};
     TransactionListByName::const_iterator begin0 {};
     bool isReorg { changeSet.getUpdateReason() == JournalUpdateReason::REORG };
@@ -77,6 +78,102 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
             }
         }
     }
+
+    // Do we need to invalidate any observers after this change?
+    if(!changeSet.getSimple())
+    {
+        mInvalidatingTime = GetTimeMicros();
+    }
+}
+
+// Get start index for our underlying sequence
+CJournal::Index CJournal::begin() const
+{
+    return Index { this, index<1>().begin() };
+}
+
+// Get end index for our underlying sequence
+CJournal::Index CJournal::end() const
+{
+    return Index { this, index<1>().end() };
+}
+
+
+/** Journal Index **/
+
+// Constructor
+CJournal::Index::Index(const CJournal* journal, const Underlying& begin)
+: mJournal{journal}, mValidTime{GetTimeMicros()}, mCurrItem{begin}
+{
+    // Work out what to do for previous item pointer
+    if(mCurrItem == mJournal->index<1>().begin())
+    {
+        // Can't point before the start
+        mPrevItem = mJournal->index<1>().end();
+    }
+    else if(mCurrItem == mJournal->index<1>().end())
+    {
+        if(!mJournal->index<1>().empty())
+        {
+            // Point 1 before the end
+            mPrevItem = mJournal->index<1>().end();
+            --mPrevItem;
+        }
+        else
+        {
+            mPrevItem = mJournal->index<1>().end();
+        }
+    }
+    else
+    {
+        // Point 1 before current position
+        mPrevItem = mCurrItem;
+        --mPrevItem;
+    }
+}
+
+// Are we still valid?
+bool CJournal::Index::valid() const
+{
+    // We're valid if we were initialised after the last invalidating time
+    return { mJournal && mValidTime > mJournal->getLastInvalidatingTime() };
+}
+
+// Increment
+CJournal::Index& CJournal::Index::operator++()
+{
+    // Set previous to current, and move on current
+    mPrevItem = mCurrItem++;
+    return *this;
+}
+
+void CJournal::Index::reset()
+{
+    if(!valid())
+    {
+        // Can't reset once we're invalid
+        throw std::runtime_error("Can't reset invalidated index");
+    }
+
+    if(mCurrItem == mJournal->index<1>().end())
+    {
+        if(mPrevItem != mJournal->index<1>().end())
+        {
+            Underlying prevNext { mPrevItem };
+            ++prevNext;
+            if(prevNext != mJournal->index<1>().end())
+            {
+                // New items have arrived, reset current pointer
+                mCurrItem = prevNext;
+            }
+        }
+        else if(!mJournal->index<1>().empty())
+        {
+            // Previously the journal must have been empty, but now items have
+            // arrived. Reset current pointer.
+            mCurrItem = mJournal->index<1>().begin();
+        }
+    }
 }
 
 
@@ -95,7 +192,7 @@ bool CJournalTester::checkTxnExists(const CJournalEntry& txn) const
     std::lock_guard<std::mutex> lock { mJournal->mMtx };
 
     // Get view on index 0, which is based on unique Id
-    const auto& index { mJournal->mTransactions.get<0>() };
+    const auto& index { mJournal->index<0>() };
 
     // Lookup requested txn Id
     return (index.count(txn) > 0);
@@ -108,7 +205,7 @@ CJournalTester::TxnOrder CJournalTester::checkTxnOrdering(const CJournalEntry& t
     std::lock_guard<std::mutex> lock { mJournal->mMtx };
 
     // Get view on index 0, which is based on unique Id
-    const auto& index0 { mJournal->mTransactions.get<0>() };
+    const auto& index0 { mJournal->index<0>() };
 
     // Lookup txn1 and txn2
     auto it1 { index0.find(txn1) };
@@ -128,7 +225,7 @@ CJournalTester::TxnOrder CJournalTester::checkTxnOrdering(const CJournalEntry& t
 
     // Now iterate from the start of the ordered view and see which one we hit first. Without
     // random access iterators this is the best we can do.
-    const auto& index1 { mJournal->mTransactions.get<1>() };
+    const auto& index1 { mJournal->index<1>() };
     for(auto it = index1.begin(); it != index1.end(); ++it)
     {
         if(it == orderedIt1)
@@ -152,7 +249,7 @@ void CJournalTester::dumpJournalContents(std::ostream& str) const
     std::lock_guard<std::mutex> lock { mJournal->mMtx };
 
     // Get view on index 1, which is based on ordering
-    const auto& index { mJournal->mTransactions.get<1>() };
+    const auto& index { mJournal->index<1>() };
 
     // Dump out the contents
     for(const auto& txn : index)

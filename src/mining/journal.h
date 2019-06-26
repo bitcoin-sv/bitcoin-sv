@@ -10,6 +10,7 @@
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <ostream>
@@ -47,6 +48,13 @@ class CJournal final
     // Get size of journal
     size_t size() const;
 
+    // Get time we were last updated by an invalidating change
+    int64_t getLastInvalidatingTime() const { return mInvalidatingTime; }
+
+    // Get/set whether we are still the current best journal
+    bool getCurrent() const { return mCurrent; }
+    void setCurrent(bool current) { mCurrent = current; }
+
     // Apply changes to the journal
     void applyChanges(const CJournalChangeSet& changeSet);
 
@@ -80,6 +88,53 @@ class CJournal final
     >;
     TransactionList mTransactions {};
 
+    // Convenience accessor to fetch the given multi-index index
+    template<unsigned I>
+    const typename TransactionList::nth_index<I>::type& index() const
+    {
+        return mTransactions.get<I>();
+    }
+
+    // Time of last invalidating change
+    std::atomic_int64_t mInvalidatingTime {0};
+
+    // Are we still current?
+    std::atomic_bool mCurrent {true};
+
+  public:
+
+    // An index into our transaction list to read them in sequence and check
+    // whether our position in the sequence can still be considered valid.
+    // Indexes provide the funtionality we need that is missing from the
+    // (non random-access) iterators provided by the underlying boost
+    // multi-index container.
+    class Index
+    {
+        using Underlying = TransactionList::nth_index<1>::type::const_iterator;
+
+      public:
+        Index() = default;
+        Index(const CJournal* journal, const Underlying& begin);
+
+        bool valid() const;
+        const CJournalEntry& at() const { return *mCurrItem; }
+        void reset();
+
+        Index& operator++();
+        bool operator==(const Index& that) { return (mCurrItem == that.mCurrItem); }
+        bool operator!=(const Index& that) { return !(*this == that); }
+
+      private:
+
+        const CJournal* mJournal {nullptr};
+        int64_t mValidTime       {-1};
+        Underlying mCurrItem     {};
+        Underlying mPrevItem     {};
+    };
+
+    // Get start/end indexes for our underlying sequence
+    Index begin() const;
+    Index end() const;
 };
 
 using CJournalPtr = std::shared_ptr<CJournal>;
