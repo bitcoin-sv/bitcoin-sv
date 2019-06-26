@@ -1,6 +1,9 @@
 # Bitcoin SV version 0.2.1 Release Notes
 
 ## List of Changes
+    getblock optionally returns rpc transaction details
+    fix to univalue read to mitigate memory issues. 
+    New parameter (-factorMaxSendQueuesBytes) which limits total size of blocks currently in queue for sending to peers.
     Help message for "-preload" options moved to another section.
     libgen.h included unconditionally in vmtouch.cpp.
     Fixes for Mac and Windows builds.
