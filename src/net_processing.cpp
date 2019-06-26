@@ -226,6 +226,7 @@ struct CNodeState {
     double dInvalidHeaderFrequency=0;
     std::chrono::system_clock::time_point nTimeOfLastHeaderMessage;
 
+    int64_t nextSendThresholdTime;
 
     CNodeState(CAddress addrIn, std::string addrNameIn)
         : address(addrIn), name(addrNameIn) {
@@ -251,6 +252,11 @@ struct CNodeState {
         nTimeOfLastInvalidChecksumHeader=std::chrono::system_clock::now();
         dInvalidHeaderFrequency=0;
         nTimeOfLastHeaderMessage=std::chrono::system_clock::now();
+        nextSendThresholdTime=0;
+    }
+
+    bool CanSend() const {
+        return nextSendThresholdTime < GetTimeMicros();
     }
 };
 
@@ -1171,10 +1177,33 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
     }
 }
 
+static bool rejectIfMaxDownloadExceeded(const Config &config, CSerializedNetMsg &msg, bool isMostRecentBlock, const CNodePtr& pfrom, CConnman &connman) {
+
+    uint64_t maxSendQueuesBytes = config.GetMaxSendQueuesBytes();
+    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.data.size() + CMessageHeader::HEADER_SIZE;
+    if (totalSize > maxSendQueuesBytes) {
+        if (!isMostRecentBlock) {
+            LogPrint(BCLog::NET, "Size of all msgs currently sending across "
+                "all the queues is too large: %s. Maximum size: %s. Request ignored, block will not be sent. "
+                "Sending reject.\n", totalSize, maxSendQueuesBytes); 
+            connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+                .Make(NetMsgType::REJECT, std::string(NetMsgType::GETDATA), REJECT_TOOBUSY, strprintf("Max blocks' downloading size exceeded.")));
+            return true;
+        } else {
+            LogPrint(BCLog::NET, "Size of all msgs currently sending across "
+                "all the queues is too large: %s. Maximum size: %s. Sending last block anyway. \n",
+                totalSize, maxSendQueuesBytes);
+        }
+    }
+
+    return false;
+}
+
 static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                            const Consensus::Params &consensusParams,
                            CConnman &connman,
                            const std::atomic<bool> &interruptMsgProc) {
+
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
     std::vector<CInv> vNotFound;
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
@@ -1262,6 +1291,8 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     pfrom->fDisconnect = true;
                     send = false;
                 }
+
+                bool isMostRecentBlock = chainActive.Tip() == mi->second;
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
                 if (send && (mi->second->nStatus.hasData())) {
@@ -1272,8 +1303,11 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     }
 
                     if (inv.type == MSG_BLOCK) {
-                        connman.PushMessage(
-                            pfrom, msgMaker.Make(NetMsgType::BLOCK, block));
+                        CSerializedNetMsg blockMsg = msgMaker.Make(NetMsgType::BLOCK, block);
+                        if (rejectIfMaxDownloadExceeded(config, blockMsg, isMostRecentBlock, pfrom, connman)) {
+                            break;
+                        }
+                        connman.PushMessage(pfrom, std::move(blockMsg));
                     } else if (inv.type == MSG_FILTERED_BLOCK) {
                         bool sendMerkleBlock = false;
                         CMerkleBlock merkleBlock;
@@ -1286,10 +1320,11 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             }
                         }
                         if (sendMerkleBlock) {
-                            connman.PushMessage(
-                                pfrom,
-                                msgMaker.Make(NetMsgType::MERKLEBLOCK,
-                                              merkleBlock));
+                            CSerializedNetMsg merkleBlockMsg = msgMaker.Make(NetMsgType::MERKLEBLOCK, merkleBlock);
+                            if (rejectIfMaxDownloadExceeded(config, merkleBlockMsg, isMostRecentBlock, pfrom, connman)) {
+                                break;
+                            }
+                            connman.PushMessage(pfrom, std::move(merkleBlockMsg));
                             // CMerkleBlock just contains hashes, so also push
                             // any transactions in the block the client did not
                             // see. This avoids hurting performance by
@@ -1322,16 +1357,18 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             mi->second->nHeight >=
                                 chainActive.Height() - MAX_CMPCTBLOCK_DEPTH) {
                             CBlockHeaderAndShortTxIDs cmpctblock(block);
-                            connman.PushMessage(
-                                pfrom,
-                                msgMaker.Make(nSendFlags,
-                                              NetMsgType::CMPCTBLOCK,
-                                              cmpctblock));
+
+                            CSerializedNetMsg compactBlockMsg = msgMaker.Make(nSendFlags, NetMsgType::CMPCTBLOCK, cmpctblock);
+                            if (rejectIfMaxDownloadExceeded(config, compactBlockMsg, isMostRecentBlock, pfrom, connman)) {
+                                break;
+                            }
+                            connman.PushMessage(pfrom, std::move(compactBlockMsg));
                         } else {
-                            connman.PushMessage(pfrom,
-                                                msgMaker.Make(nSendFlags,
-                                                              NetMsgType::BLOCK,
-                                                              block));
+                            CSerializedNetMsg blockMsg = msgMaker.Make(NetMsgType::BLOCK, block);
+                            if (rejectIfMaxDownloadExceeded(config, blockMsg, isMostRecentBlock, pfrom, connman)) {
+                                break;
+                            }
+                            connman.PushMessage(pfrom, std::move(blockMsg));
                         }
                     }
 
@@ -1426,7 +1463,7 @@ inline static void SendBlockTransactions(const CBlock &block,
 /**
 * Process reject messages.
 */
-static void ProcessRejectMessage(CDataStream& vRecv)
+static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
 {
     if(LogAcceptCategory(BCLog::NET))
     {
@@ -1449,6 +1486,18 @@ static void ProcessRejectMessage(CDataStream& vRecv)
                 ss << ": hash " << hash.ToString();
             }
             LogPrint(BCLog::NET, "Reject %s\n", SanitizeString(ss.str()));
+
+            if (ccode == REJECT_TOOBUSY) {
+                // Peer is too busy with sending blocks so we will not ask from a peer for TOOBUSY_RETRY_DELAY.
+                LOCK(cs_main);
+                CNodeState& state = *State(pfrom->id);
+
+                state.nextSendThresholdTime = GetTimeMicros() + TOOBUSY_RETRY_DELAY;
+                for (const QueuedBlock &entry : state.vBlocksInFlight) {
+                    mapBlocksInFlight.erase(entry.hash);
+                }
+
+            }
         }
         catch (const std::ios_base::failure &)
         {
@@ -3200,7 +3249,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     if (strCommand == NetMsgType::REJECT) {
-        ProcessRejectMessage(vRecv);
+        ProcessRejectMessage(vRecv, pfrom);
         return true;
     }
 
@@ -4200,8 +4249,11 @@ bool SendMessages(const Config &config, const CNodePtr& pto, CConnman &connman,
         return true;
     }
 
-    // Message: getdata (blocks)
-    SendGetDataBlocks(config, pto, connman, msgMaker, state);
+    // Node is not too busy so we can send him GetData requests.
+    if (state.CanSend()) {
+        // Message: getdata (blocks)
+        SendGetDataBlocks(config, pto, connman, msgMaker, state);
+    }
 
     // Message: getdata (non-blocks)
     SendGetDataNonBlocks(pto, connman, msgMaker);

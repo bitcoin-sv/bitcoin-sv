@@ -6,6 +6,7 @@
 #include "chainparams.h"
 #include "consensus/consensus.h"
 #include "validation.h"
+#include "net.h"
 
 GlobalConfig::GlobalConfig() {
     Reset();
@@ -17,7 +18,8 @@ void GlobalConfig::Reset()
     feePerKB = CFeeRate {};
     blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
-    
+    factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
+
     setDefaultBlockSizeParamsCalled = false;
 
     blockSizeActivationTime = 0;
@@ -96,6 +98,20 @@ uint64_t GlobalConfig::GetMaxBlockSize(int64_t nMedianTimePast) const {
     }
 
     return maxSize;
+}
+
+void GlobalConfig::SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytesIn) {
+    factorMaxSendQueuesBytes = factorMaxSendQueuesBytesIn;
+}
+
+uint64_t GlobalConfig::GetFactorMaxSendQueuesBytes() const {
+    return factorMaxSendQueuesBytes;
+}
+
+uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
+    // Use the "after upgrade" excessive block size to determine the maximum size of 
+    // block related messages that we are prepared to queue
+    return factorMaxSendQueuesBytes * GetMaxBlockSize();
 }
 
 bool GlobalConfig::MaxBlockSizeOverridden() const {

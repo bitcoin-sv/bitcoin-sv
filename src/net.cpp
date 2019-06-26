@@ -77,6 +77,7 @@ bool fRelayTxes = true;
 CCriticalSection cs_mapLocalHost;
 std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};
+std::atomic_size_t CSendQueueBytes::nTotalSendQueuesBytes = 0;
 
 limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
@@ -989,7 +990,7 @@ size_t CConnman::SocketSendData(const CNodePtr& pnode) const {
 
         pnode->nSendOffset = 0;
         pnode->nSendSize -= data.size();
-        pnode->fPauseSend = pnode->nSendSize > nSendBufferMaxSize;
+        pnode->fPauseSend = pnode->nSendSize.getSendQueueBytes() > nSendBufferMaxSize;
         nMsgCount++;
     }
 
@@ -998,7 +999,7 @@ size_t CConnman::SocketSendData(const CNodePtr& pnode) const {
 
     if (pnode->vSendMsg.empty()) {
         assert(pnode->nSendOffset == 0);
-        assert(pnode->nSendSize == 0);
+        assert(pnode->nSendSize.getSendQueueBytes() == 0);
     }
 
     return nSentSize;
@@ -2993,7 +2994,7 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
         pnode->mapSendBytesPerMsgCmd[msg.command] += nTotalSize;
         pnode->nSendSize += nTotalSize;
 
-        if (pnode->nSendSize > nSendBufferMaxSize) {
+        if (pnode->nSendSize.getSendQueueBytes() > nSendBufferMaxSize) {
             pnode->fPauseSend = true;
         }
         pnode->vSendMsg.push_back(std::move(serializedHeader));

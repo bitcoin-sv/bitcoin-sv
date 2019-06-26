@@ -1222,11 +1222,11 @@ class msg_reject():
     command = b"reject"
     REJECT_MALFORMED = 1
 
-    def __init__(self):
-        self.message = b""
-        self.code = 0
-        self.reason = b""
-        self.data = 0
+    def __init__(self, message=b"", code=0, reason=b"", data=0):
+        self.message = message
+        self.code = code
+        self.reason = reason
+        self.data = data
 
     def deserialize(self, f):
         self.message = deser_string(f)
