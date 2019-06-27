@@ -16,6 +16,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import *
 from test_framework.util import *
 from test_framework.cdefs import (ONE_MEGABYTE)
+from test_framework.blocktools import merkle_root_from_merkle_proof, create_block_from_candidate
 import math
 import random
 
@@ -163,6 +164,7 @@ class MiningJournal(BitcoinTestFramework):
         self.maxblocksize = 1 * ONE_MEGABYTE
         self.num_nodes = 2
         self.extra_args = [['-whitelist=127.0.0.1', '-maxmempool=20', '-maxtipage={}'.format(max_tip_age),
+                            '-debug=journal', '-blockassembler=journaling',
                             '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool']] * self.num_nodes
         self.conncbs = []
         self.num_utxos = 5000
@@ -182,6 +184,22 @@ class MiningJournal(BitcoinTestFramework):
         split_utxos(self.relayfee, self.nodes[txnNode], self.num_utxos, utxos)
         self.sync_all([[self.nodes[txnNode]]])
         self.conncbs[txnNode].set_setup_finished()
+
+    def create_and_submit_block(self, blockNode, candidate, get_coinbase):
+        node = self.nodes[blockNode]
+
+        # Do POW for mining candidate and submit solution
+        block, coinbase_tx = create_block_from_candidate(candidate, get_coinbase)
+        self.log.info("block hash before submit: " + str(block.hash))
+
+        if (get_coinbase):
+            self.log.info("Checking submission with provided coinbase")
+            return node.submitminingsolution({'id': candidate['id'], 'nonce': block.nNonce})
+        else:
+            self.log.info("Checking submission with generated coinbase")
+            return node.submitminingsolution({'id': candidate['id'],
+                                              'nonce': block.nNonce,
+                                              'coinbase': '{}'.format(ToHex(coinbase_tx))})
 
     def init_test(self):
         # Create a P2P connection to our nodes
@@ -217,9 +235,20 @@ class MiningJournal(BitcoinTestFramework):
     def check_mining_candidate(self, txnNode):
         self.log.info("Testing mining candidate...")
 
-        # TODO - Will be fleshed out in a later PR
-        pass
+        # Just check that a provided mining candidate can be mined
+        infoBefore = self.nodes[txnNode].getmempoolinfo()
+        assert_greater_than(infoBefore["size"], 0)
+        assert_greater_than(infoBefore["journalsize"], 0)
 
+        candidate = self.nodes[txnNode].getminingcandidate(True)
+        merkleLen = len(candidate["merkleProof"])
+        assert_greater_than(merkleLen, 0)
+        submitResult = self.create_and_submit_block(txnNode, candidate, True)
+        assert submitResult
+
+        infoAfter = self.nodes[txnNode].getmempoolinfo()
+        assert_equal(infoAfter["size"], 0)
+        assert_equal(infoAfter["journalsize"], 0)
 
     # Mine a few blocks and check the journal and mempool still agree
     def test_mine_block(self, txnNode, numTxns=100, mainTest=False):
@@ -227,7 +256,7 @@ class MiningJournal(BitcoinTestFramework):
             self.log.info("Testing block creation...")
 
         for i in range(1,3):
-            if i > 1:
+            if mainTest or i > 1:
                 # Topup and check the mempool again
                 self.test_initial_mempool(txnNode, numTxns=numTxns)
 
@@ -253,14 +282,14 @@ class MiningJournal(BitcoinTestFramework):
         # Disconnect them again
         disconnect_nodes(self.nodes[node0], node1)
 
-        # Mine 50 blocks on node0 and lots more on node1
-        for i in range(1,26):
+        # Mine 20 blocks on node0 and lots more on node1
+        for i in range(1,11):
             self.test_mine_block(node0, numTxns=250)
         blockheight = self.nodes[node0].getblockchaininfo()['blocks']
         blockhash1 = self.nodes[node0].getblockhash(blockheight - 10)
 
         self.setup_for_submission(node1)
-        for i in range(1,26):
+        for i in range(1,11):
             self.test_mine_block(node1, numTxns=100)
 
         info0 = self.nodes[node0].getmempoolinfo()
@@ -278,7 +307,7 @@ class MiningJournal(BitcoinTestFramework):
 
         # Invalidate a block on node0 to force it to complex reorg back to the fork it was on earlier
         blockheight = self.nodes[node0].getblockchaininfo()['blocks']
-        blockhash2 = self.nodes[node0].getblockhash(blockheight - 150)
+        blockhash2 = self.nodes[node0].getblockhash(blockheight - 120)
         self.nodes[node0].invalidateblock(blockhash1)
         self.nodes[node0].invalidateblock(blockhash2)
         info0 = self.nodes[node0].getmempoolinfo()
@@ -313,6 +342,19 @@ class MiningJournal(BitcoinTestFramework):
         # otherwise the test framework treats it as a test failure
         time.sleep(5)
  
+    # Test the RPC rebuildJounral command
+    def test_rebuild(self, rebuildNode):
+        self.log.info("Testing journal rebuild...")
+
+        # Verify good state at start
+        status = self.nodes[rebuildNode].checkjournal()
+        assert(status["ok"])
+
+        # Rebuild and check again
+        self.nodes[rebuildNode].rebuildjournal()
+        status = self.nodes[rebuildNode].checkjournal()
+        assert(status["ok"])
+
 
     def run_test(self):
 
@@ -331,6 +373,9 @@ class MiningJournal(BitcoinTestFramework):
 
         # Test reorg
         self.test_reorg(0, 1)
+
+        # Test journal rebuild
+        self.test_rebuild(0)
 
         # Shutdown/restart with mempool persist
         self.test_shutdown_restart(0)

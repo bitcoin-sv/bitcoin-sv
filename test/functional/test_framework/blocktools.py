@@ -28,31 +28,6 @@ def create_block(hashprev, coinbase, nTime=None):
     block.calc_sha256()
     return block
 
-def create_block_from_candidate(miningCandidate):
-    block = CBlock()
-    block.nVersion = miningCandidate["version"]
-    block.hashPrevBlock = int(miningCandidate["prevhash"], 16)
-    block.nTime = miningCandidate["time"]
-    block.nBits = int(miningCandidate["nBits"], 16)
-    block.nNonce = 0
-
-    coinbase_tx = create_coinbase(height=int(miningCandidate["height"]) + 1)
-    coinbase_tx.rehash()
-    block.vtx = [coinbase_tx]
-    block.hashMerkleRoot = merkle_root_from_merkle_proof(coinbase_tx.sha256, miningCandidate["merkleProof"])
-    
-    return block
-
-# Calculate the merkle root for a block
-def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
-    merkleRootBytes = ser_uint256(coinbase_hash)
-    for mp in merkle_proof:
-        mp = int(mp, 16)
-        mpBytes = ser_uint256(mp)
-        merkleRootBytes = hash256(merkleRootBytes + mpBytes)
-        merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
-    return uint256_from_str(merkleRootBytes)
-
 # Do incorrect POW for block
 def solve_bad(block):
     block.rehash()
@@ -75,6 +50,41 @@ def serialize_script_num(value):
     elif neg:
         r[-1] |= 0x80
     return r
+
+
+# Calculate the merkle root for a block
+def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
+    merkleRootBytes = ser_uint256(coinbase_hash)
+    for mp in merkle_proof:
+        mp = int(mp, 16)
+        mpBytes = ser_uint256(mp)
+        merkleRootBytes = hash256(merkleRootBytes + mpBytes)
+        merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
+    return uint256_from_str(merkleRootBytes)
+
+# Create a valid submittable block (and coinbase) from a mining candidate
+def create_block_from_candidate(candidate, get_coinbase):
+    block = CBlock()
+    block.nVersion = candidate["version"]
+    block.hashPrevBlock = int(candidate["prevhash"], 16)
+    block.nTime = candidate["time"]
+    block.nBits = int(candidate["nBits"], 16)
+    block.nNonce = 0
+
+    if(get_coinbase):
+        coinbase_tx = FromHex(CTransaction(), candidate["coinbase"])
+    else:
+        coinbase_tx = create_coinbase(height=int(candidate["height"]) + 1)
+    coinbase_tx.rehash()
+    block.vtx = [coinbase_tx]
+
+    # Calculate merkle root & solve
+    block.hashMerkleRoot = merkle_root_from_merkle_proof(coinbase_tx.sha256, candidate["merkleProof"])
+    block.solve()
+    block.rehash()
+
+    return block, coinbase_tx
+
 
 # Create a coinbase transaction, assuming no miner fees.
 # If pubkey is passed in, the coinbase output will be a P2PK output;

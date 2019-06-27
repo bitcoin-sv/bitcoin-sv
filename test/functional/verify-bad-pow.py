@@ -24,7 +24,7 @@ class VerifyWithoutPowTest(BitcoinTestFramework):
         node.generate(1)
         candidate = node.getminingcandidate()
 
-        block = create_block_from_candidate(candidate)
+        [block, coinbase] = create_block_from_candidate(candidate, False)
         solve_bad(block)
 
         submitResult = node.submitblock(ToHex(block))

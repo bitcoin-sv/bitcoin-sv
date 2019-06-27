@@ -9,11 +9,12 @@ Spin up some nodes, feed in some transactions, use the mining API to
 mine some blocks, verify all nodes accept the mined blocks.
 """
 
-from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof, solve_bad
+from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof, solve_bad, create_block_from_candidate
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.comptool import TestManager, TestInstance
-from test_framework.mininode import *
-from test_framework.util import *
+from test_framework.mininode import CBlock, CTransaction, FromHex, ToHex, uint256_from_compact
+from test_framework.util import connect_nodes_bi, create_confirmed_utxos, satoshi_round, assert_raises_rpc_error
+from decimal import Decimal
 import math
 import time
 
@@ -147,24 +148,7 @@ class MiningTest(BitcoinTestFramework):
 
     def _create_and_submit_block(self, node, candidate, get_coinbase):
         # Do POW for mining candidate and submit solution
-        block = CBlock()
-        block.nVersion = candidate["version"]
-        block.hashPrevBlock = int(candidate["prevhash"], 16)
-        block.nTime = candidate["time"]
-        block.nBits = int(candidate["nBits"], 16)
-        block.nNonce = 0
-
-        if(get_coinbase):
-            coinbase_tx = FromHex(CTransaction(), candidate["coinbase"])
-        else:
-            coinbase_tx = create_coinbase(height=int(candidate["height"]) + 1)
-        coinbase_tx.rehash()
-        block.vtx = [coinbase_tx]
-
-        # Calculate merkle root & solve
-        block.hashMerkleRoot = merkle_root_from_merkle_proof(coinbase_tx.sha256, candidate["merkleProof"])
-        block.solve()
-        block.rehash()
+        block, coinbase_tx = create_block_from_candidate(candidate, get_coinbase)
         self.log.info("block hash before submit: " + str(block.hash))
 
         if (get_coinbase):
