@@ -9,6 +9,7 @@
 #include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
+#include "mining/journal_builder.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "streams.h"
@@ -35,7 +36,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
     nModSize = tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(tx);
 
-    nCountWithDescendants = 1;
+    ancestorDescendantCounts = std::make_shared<AncestorDescendantCounts>(1, 1);
     nSizeWithDescendants = GetTxSize();
     nModFeesWithDescendants = nFee;
     Amount nValueIn = tx->GetValueOut() + nFee;
@@ -43,7 +44,6 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
 
     feeDelta = Amount(0);
 
-    nCountWithAncestors = 1;
     nSizeWithAncestors = GetTxSize();
     nModFeesWithAncestors = nFee;
     nSigOpCountWithAncestors = sigOpCount;
@@ -364,8 +364,8 @@ void CTxMemPoolEntry::UpdateDescendantState(int64_t modifySize,
     nSizeWithDescendants += modifySize;
     assert(int64_t(nSizeWithDescendants) > 0);
     nModFeesWithDescendants += modifyFee;
-    nCountWithDescendants += modifyCount;
-    assert(int64_t(nCountWithDescendants) > 0);
+    ancestorDescendantCounts->nCountWithDescendants += modifyCount;
+    assert(int64_t(ancestorDescendantCounts->nCountWithDescendants) > 0);
 }
 
 void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, Amount modifyFee,
@@ -374,8 +374,8 @@ void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, Amount modifyFee,
     nSizeWithAncestors += modifySize;
     assert(int64_t(nSizeWithAncestors) > 0);
     nModFeesWithAncestors += modifyFee;
-    nCountWithAncestors += modifyCount;
-    assert(int64_t(nCountWithAncestors) > 0);
+    ancestorDescendantCounts->nCountWithAncestors += modifyCount;
+    assert(int64_t(ancestorDescendantCounts->nCountWithAncestors) > 0);
     nSigOpCountWithAncestors += modifySigOps;
     assert(int(nSigOpCountWithAncestors) >= 0);
 }

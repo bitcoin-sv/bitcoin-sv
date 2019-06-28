@@ -62,6 +62,22 @@ struct LockPoints {
 
 class CTxMemPool;
 
+/**
+ * Shared ancestor/descendant count information.
+ */
+struct AncestorDescendantCounts
+{
+    AncestorDescendantCounts(uint64_t ancestors, uint64_t descendants)
+    : nCountWithAncestors{ancestors}, nCountWithDescendants{descendants}
+    {}
+
+    // These don't actually need to be atomic currently, but there's no cost
+    // if they are and we might want to access them across threads in the future.
+    std::atomic_uint64_t nCountWithAncestors   {0};
+    std::atomic_uint64_t nCountWithDescendants {0};
+};
+using AncestorDescendantCountsPtr = std::shared_ptr<AncestorDescendantCounts>;
+
 /** \class CTxMemPoolEntry
  *
  * CTxMemPoolEntry stores data about the corresponding transaction, as well as
@@ -114,14 +130,13 @@ private:
     // dirty, and nSizeWithDescendants and nModFeesWithDescendants will not be
     // correct.
     //!< number of descendant transactions
-    uint64_t nCountWithDescendants;
+    AncestorDescendantCountsPtr ancestorDescendantCounts;
     //!< ... and size
     uint64_t nSizeWithDescendants;
     //!< ... and total fees (all including us)
     Amount nModFeesWithDescendants;
 
     // Analogous statistics for ancestor transactions
-    uint64_t nCountWithAncestors;
     uint64_t nSizeWithAncestors;
     Amount nModFeesWithAncestors;
     int64_t nSigOpCountWithAncestors;
@@ -162,13 +177,14 @@ public:
     // Update the LockPoints after a reorg
     void UpdateLockPoints(const LockPoints &lp);
 
-    uint64_t GetCountWithDescendants() const { return nCountWithDescendants; }
+    const AncestorDescendantCountsPtr& GetAncestorDescendantCounts() const { return ancestorDescendantCounts; }
+    uint64_t GetCountWithDescendants() const { return ancestorDescendantCounts->nCountWithDescendants; }
     uint64_t GetSizeWithDescendants() const { return nSizeWithDescendants; }
     Amount GetModFeesWithDescendants() const { return nModFeesWithDescendants; }
 
     bool GetSpendsCoinbase() const { return spendsCoinbase; }
 
-    uint64_t GetCountWithAncestors() const { return nCountWithAncestors; }
+    uint64_t GetCountWithAncestors() const { return ancestorDescendantCounts->nCountWithAncestors; }
     uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
     Amount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
     int64_t GetSigOpCountWithAncestors() const {
