@@ -429,12 +429,12 @@ bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
     // Apply to the current journal, either via the passed in change set or directly ourselves
     if(changeSet)
     {
-        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry.GetSharedTx(), entry.GetAncestorDescendantCounts() });
+        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
     }
     else
     {
         CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry.GetSharedTx(), entry.GetAncestorDescendantCounts() });
+        tmpChangeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
     }
 
     // Update transaction for any feeDelta created by PrioritiseTransaction
@@ -511,12 +511,12 @@ void CTxMemPool::removeUnchecked(txiter it, CJournalChangeSetPtr& changeSet,
     // Apply to the current journal, either via the passed in change set or directly ourselves
     if(changeSet)
     {
-        changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { txn, it->GetAncestorDescendantCounts() });
+        changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
     }
     else
     {
         CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { txn, it->GetAncestorDescendantCounts() });
+        tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
     }
 
     totalTxSize -= it->GetTxSize();
@@ -888,7 +888,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins,
         for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
         {
             // Check this mempool txn also appears in the journal
-            const CJournalEntry tx { it->GetSharedTx(), it->GetAncestorDescendantCounts() };
+            const CJournalEntry tx { *it };
             assert(tester.checkTxnExists(tx));
 
             for(const CTxIn& txin : tx.getTxn()->vin)
@@ -897,7 +897,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins,
                 if(prevoutit != mapTx.end())
                 {
                     // Check this in mempool ancestor appears before its descendent in the journal
-                    const CJournalEntry prevout { prevoutit->GetSharedTx(), prevoutit->GetAncestorDescendantCounts() };
+                    const CJournalEntry prevout { *prevoutit };
                     assert(tester.checkTxnOrdering(prevout, tx) == CJournalTester::TxnOrder::BEFORE);
                 }
             }

@@ -20,7 +20,7 @@ namespace
         static uint32_t lockTime {0};
         CMutableTransaction txn {};
         txn.nLockTime = lockTime++;
-        return { MakeTransactionRef(std::move(txn)), std::make_shared<AncestorDescendantCounts>(1, 1) };
+        return { MakeTransactionRef(std::move(txn)), std::make_shared<AncestorDescendantCounts>(1, 1), Amount{0}, 0 };
     }
 }
 
