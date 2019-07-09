@@ -33,6 +33,7 @@
 #include <boost/uuid/uuid_io.hpp>
 
 using namespace std;
+using mining::CBlockTemplate;
 
 namespace
 {

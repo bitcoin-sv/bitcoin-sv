@@ -121,10 +121,10 @@ struct update_for_parent_inclusion {
 };
 
 /** Generate a new block, without valid proof-of-work */
-class LegacyBlockAssembler : public BlockAssembler {
+class LegacyBlockAssembler : public mining::BlockAssembler {
 private:
     // The constructed block template
-    std::unique_ptr<CBlockTemplate> pblocktemplate;
+    std::unique_ptr<mining::CBlockTemplate> pblocktemplate;
     // A convenience pointer that always refers to the CBlock in pblocktemplate
     CBlock *pblock;
 
@@ -135,14 +135,14 @@ private:
     uint64_t nBlockSize;
     uint64_t nBlockTx;
     uint64_t nBlockSigOps;
-    Amount nFees;
     CTxMemPool::setEntries inBlock;
+
+    // Cache the current maximum generated block size
+    uint64_t nMaxGeneratedBlockSize;
 
     // Chain context for the block
     int nHeight;
     int64_t nLockTimeCutoff;
-
-    const Config *config;
 
     // Variables used for addPriorityTxs
     int lastFewTxs;
@@ -151,7 +151,10 @@ private:
 public:
     LegacyBlockAssembler(const Config &_config);
     /** Construct a new block template with coinbase to scriptPubKeyIn */
-    std::unique_ptr<CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev) override;
+    std::unique_ptr<mining::CBlockTemplate> CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev) override;
+
+    /** Get the maximum generated block size for the current config and chain tip */
+    uint64_t GetMaxGeneratedBlockSize() const override { return nMaxGeneratedBlockSize; }
 
 private:
     // utility functions

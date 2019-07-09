@@ -225,6 +225,7 @@ libbitcoin_server_a_SOURCES = \
   init.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
+  mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
   mining/journal.cpp \
