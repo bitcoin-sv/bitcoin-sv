@@ -593,6 +593,19 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
+static bool IsGenesisEnabled(const Config& config, int nHeight) {
+    return nHeight >= config.GetChainParams().GetConsensus().genesisHeight;
+}
+
+bool IsGenesisEnabled(const Config& config, const CBlockIndex* pindexPrev) {
+    if (pindexPrev == nullptr) {
+        return false;
+    }
+
+    // Genesis is enabled on the currently processed block, not on the current tip.
+    return IsGenesisEnabled(config, pindexPrev->nHeight + 1);
+}
+
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
 // were somehow broken and returning the wrong scriptPubKeys.
 //
