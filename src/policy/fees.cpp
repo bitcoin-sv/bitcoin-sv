@@ -182,7 +182,13 @@ double TxConfirmStats::EstimateMedianVal(int confTarget, double sufficientTxVal,
                                  "mempool)\n",
              confTarget, requireGreater ? ">" : "<", successBreakPoint,
              requireGreater ? ">" : "<", median, buckets[minBucket],
-             buckets[maxBucket], 100 * nConf / (totalNum + extraNum), nConf,
+             buckets[maxBucket],
+             (
+                totalNum + extraNum != 0
+                ? (100 * nConf / (totalNum + extraNum))
+                : 0
+             ),
+             nConf,
              totalNum, extraNum);
 
     return median;
