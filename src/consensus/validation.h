@@ -26,18 +26,15 @@ private:
         MODE_VALID,   //!< everything ok
         MODE_INVALID, //!< network rule violation (DoS value may be set)
         MODE_ERROR,   //!< run-time error
-    } mode;
-    int nDoS;
-    std::string strRejectReason;
-    unsigned int chRejectCode;
-    bool corruptionPossible;
-    std::string strDebugMessage;
+    } mode {MODE_VALID};
+    int nDoS {0};
+    std::string strDebugMessage {};
+    std::string strRejectReason {};
+    unsigned int chRejectCode {0};
+    bool corruptionPossible {false};
+    bool fMissingInputs {false};
 
 public:
-    CValidationState()
-        : mode(MODE_VALID), nDoS(0), chRejectCode(0),
-          corruptionPossible(false) {}
-
     bool DoS(int level, bool ret = false, unsigned int chRejectCodeIn = 0,
              const std::string &strRejectReasonIn = "",
              bool corruptionIn = false,
@@ -79,9 +76,12 @@ public:
         }
         return false;
     }
+    bool IsMissingInputs() const { return fMissingInputs; }
 
     bool CorruptionPossible() const { return corruptionPossible; }
     void SetCorruptionPossible() { corruptionPossible = true; }
+    void SetMissingInputs() { fMissingInputs = true; }
+
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
     std::string GetDebugMessage() const { return strDebugMessage; }
