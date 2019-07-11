@@ -252,6 +252,7 @@ add_library(server
 	txdb.cpp
 	txmempool.cpp
 	txn_propagator.cpp
+	txn_validation_data.cpp
 	ui_interface.cpp
 	validation.cpp
 	validationinterface.cpp
