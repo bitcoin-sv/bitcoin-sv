@@ -120,6 +120,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	test_bitcoin.cpp
 	test_bitcoin_main.cpp
 	test_double_spend_detector.cpp
+	test_orphantxns.cpp
 	test_recent_rejects.cpp
 	testutil.cpp
     threadpool_tests.cpp

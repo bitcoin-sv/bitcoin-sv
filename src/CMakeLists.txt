@@ -232,6 +232,7 @@ add_library(server
 	net.cpp
 	net_processing.cpp
 	noui.cpp
+	orphan_txns.cpp
 	policy/fees.cpp
 	policy/policy.cpp
 	pow.cpp
