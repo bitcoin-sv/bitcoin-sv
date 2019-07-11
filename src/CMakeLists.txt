@@ -251,6 +251,7 @@ add_library(server
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+	txn_double_spend_detector.cpp
 	txn_propagator.cpp
 	txn_validation_data.cpp
 	ui_interface.cpp

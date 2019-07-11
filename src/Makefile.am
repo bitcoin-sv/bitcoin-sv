@@ -178,6 +178,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txdb.h \
   txmempool.h \
+  txn_double_spend_detector.h \
   txn_propagator.h \
   txn_sending_details.h \
   txn_validation_config.h \
@@ -260,6 +261,7 @@ libbitcoin_server_a_SOURCES = \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
+  txn_double_spend_detector.cpp \
   txn_propagator.cpp \
   txn_validation_data.cpp \
   ui_interface.cpp \
