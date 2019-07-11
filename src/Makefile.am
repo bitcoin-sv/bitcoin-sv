@@ -180,6 +180,7 @@ BITCOIN_CORE_H = \
   txmempool.h \
   txn_double_spend_detector.h \
   txn_propagator.h \
+  txn_recent_rejects.h \
   txn_sending_details.h \
   txn_validation_config.h \
   txn_validation_data.h \
@@ -264,6 +265,7 @@ libbitcoin_server_a_SOURCES = \
   txn_double_spend_detector.cpp \
   txn_propagator.cpp \
   txn_validation_data.cpp \
+  txn_recent_rejects.cpp \
   ui_interface.cpp \
   validation.cpp \
   validationinterface.cpp \
