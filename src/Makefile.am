@@ -248,7 +248,6 @@ libbitcoin_server_a_SOURCES = \
   ui_interface.cpp \
   validation.cpp \
   validationinterface.cpp \
-  versionbits.cpp \
   vmtouch.cpp \
   $(BITCOIN_CORE_H)
 
