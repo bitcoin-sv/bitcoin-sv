@@ -724,6 +724,12 @@ public:
      * than time. Return the number of removed transactions. */
     int Expire(int64_t time, mining::CJournalChangeSetPtr& changeSet);
 
+    /**
+     * Check for conflicts with in-mempool transactions.
+     * @param tx A reference to the given txn
+     */
+    bool CheckTxConflicts(const CTransaction &tx) const;
+
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
     bool TransactionWithinChainLimit(const uint256 &txid,

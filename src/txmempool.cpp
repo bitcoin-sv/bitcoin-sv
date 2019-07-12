@@ -1246,6 +1246,16 @@ int CTxMemPool::Expire(int64_t time, mining::CJournalChangeSetPtr& changeSet)
     return stage.size();
 }
 
+bool CTxMemPool::CheckTxConflicts(const CTransaction &tx) const {
+    LOCK(cs);
+    for (const CTxIn &txin : tx.vin) {
+        if (mapNextTx.find(txin.prevout) != mapNextTx.end()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
                               CJournalChangeSetPtr& changeSet, bool validFeeEstimate) {
     LOCK(cs);
