@@ -7,6 +7,7 @@
 #include "consensus/consensus.h"
 #include "validation.h"
 #include "net.h"
+#include "util.h"
 
 GlobalConfig::GlobalConfig() {
     Reset();
@@ -69,10 +70,12 @@ void GlobalConfig::CheckSetDefaultCalled() const
     }
 }
 
-bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize) {
+bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
     if (maxSize <= LEGACY_MAX_BLOCK_SIZE) {
+        if (err)
+            *err = _("Excessive block size (excessiveblocksize) must be larger than ") + std::to_string(LEGACY_MAX_BLOCK_SIZE);
         return false;
     }
 
@@ -118,12 +121,7 @@ bool GlobalConfig::MaxBlockSizeOverridden() const {
     return maxBlockSizeOverridden;
 }
 
-bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize) {
-    // Check generated max size does not exceed max accepted size
-    if (maxSize > maxBlockSizeAfter) {
-        return false;
-    }
-
+bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) {
     maxGeneratedBlockSizeAfter = maxSize;
     maxGeneratedBlockSizeOverridden = true;
 
@@ -150,7 +148,7 @@ bool GlobalConfig::MaxGeneratedBlockSizeOverridden() const {
     return maxGeneratedBlockSizeOverridden;
 };
 
-bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime) {
+bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime, std::string* err) {
     blockSizeActivationTime = activationTime;
     return true;
 };
@@ -160,9 +158,11 @@ int64_t GlobalConfig::GetBlockSizeActivationTime() const {
     return blockSizeActivationTime;
 };
 
-bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage) {
+bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage, std::string* err) {
     // blockPriorityPercentage has to belong to [0..100]
     if ((percentage < 0) || (percentage > 100)) {
+        if (err)
+            *err = _("Block priority percentage has to belong to the [0..100] interval.");
         return false;
     }
     blockPriorityPercentage = percentage;
