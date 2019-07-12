@@ -610,7 +610,7 @@ void CTxMemPool::removeForReorg(const Config &config,
         CValidationState state;
         if (!ContextualCheckTransactionForCurrentBlock(config, tx, state,
                                                        flags) ||
-            !CheckSequenceLocks(tx, flags, &lp, validLP)) {
+            !CheckSequenceLocks(tx, *this, flags, &lp, validLP)) {
             // Note if CheckSequenceLocks fails the LockPoints may still be
             // invalid. So it's critical that we remove the tx and not depend on
             // the LockPoints.

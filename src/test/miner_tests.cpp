@@ -93,7 +93,7 @@ CBlockIndex CreateBlockIndex(int nHeight) {
 
 bool TestSequenceLocks(const CTransaction &tx, int flags) {
     LOCK(mempool.cs);
-    return CheckSequenceLocks(tx, flags);
+    return CheckSequenceLocks(tx, mempool, flags);
 }
 
 // Test suite for ancestor feerate transaction selection.

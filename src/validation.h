@@ -583,9 +583,12 @@ bool SequenceLocks(const CTransaction &tx, int flags,
  *
  * See consensus/consensus.h for flag definitions.
  */
-bool CheckSequenceLocks(const CTransaction &tx, int flags,
-                        LockPoints *lp = nullptr,
-                        bool useExistingLockPoints = false);
+bool CheckSequenceLocks(
+    const CTransaction &tx,
+    const CTxMemPool &pool,
+    int flags,
+    LockPoints *lp = nullptr,
+    bool useExistingLockPoints = false);
 
 /**
  * Closure representing one script verification.
