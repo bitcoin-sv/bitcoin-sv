@@ -92,6 +92,10 @@ enum {
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
     SCRIPT_ENABLE_BIG_INTS = (1U << 17),
+
+    // Is Genesis enabled
+    //
+    SCRIPT_GENESIS = (1U << 18),
 };
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H

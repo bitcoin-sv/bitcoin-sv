@@ -30,6 +30,7 @@ static std::map<std::string, uint32_t> mapFlagNames = {
     {"CHECKSEQUENCEVERIFY", SCRIPT_VERIFY_CHECKSEQUENCEVERIFY},
     {"COMPRESSED_PUBKEYTYPE", SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE},
     {"SIGHASH_FORKID", SCRIPT_ENABLE_SIGHASH_FORKID},
+    {"GENESIS", SCRIPT_GENESIS},
 };
 
 uint32_t ParseScriptFlags(std::string strFlags) {
