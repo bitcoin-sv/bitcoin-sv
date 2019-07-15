@@ -4,7 +4,6 @@
 
 #include "orphan_txns.h"
 #include "policy/policy.h"
-#include "net_processing.h"
 
 COrphanTxns::COrphanTxns(
     size_t maxCollectedOutpoints,
