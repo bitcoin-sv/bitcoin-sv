@@ -2300,12 +2300,15 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
         } else if (!check()) {
             const bool hasNonMandatoryFlags =
                 (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-            if (hasNonMandatoryFlags) {
+            const bool doesNotHaveGenesis =
+                    (flags & SCRIPT_GENESIS) == 0;
+            if (hasNonMandatoryFlags || doesNotHaveGenesis) {
                 // Check whether the failure was caused by a non-mandatory
                 // script verification check, such as non-standard DER encodings
                 // or non-null dummy arguments; if so, don't trigger DoS
                 // protection to avoid splitting the network between upgraded
                 // and non-upgraded nodes.
+                // FIXME: CORE-257 has to check if genesis check is necessary also in check2
                 CScriptCheck check2(
                     scriptPubKey, amount, tx, i,
                     (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
