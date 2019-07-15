@@ -2441,7 +2441,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
 
     if(!AlreadyHave(inv) && AcceptToMemoryPool(config, mempool, state, ptx, true, &fMissingInputs, changeSet))
     {
-        mempool.check(pcoinsTip, changeSet);
+        mempool.check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
         RelayTransaction(tx, connman);
         for(size_t i = 0; i < tx.vout.size(); i++) {
             vWorkQueue.emplace_back(inv.hash, i);
@@ -2514,7 +2514,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
                         recentRejects->insert(orphanId);
                     }
                 }
-                mempool.check(pcoinsTip, changeSet);
+                mempool.check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
             }
         }
 

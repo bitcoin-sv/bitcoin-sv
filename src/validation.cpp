@@ -3565,7 +3565,7 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
     {
         changeSet->apply();
     }
-    mempool.check(pcoinsTip, changeSet);
+    mempool.check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
 
     // Callbacks/notifications for a new best chain.
     if (fInvalidFound) {
@@ -3774,7 +3774,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     }
 
     // Check mempool & journal
-    mempool.check(pcoinsTip, changeSet);
+    mempool.check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
 
     return true;
 }

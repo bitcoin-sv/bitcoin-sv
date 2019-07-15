@@ -724,9 +724,11 @@ void CTxMemPool::clear() {
     _clear();
 }
 
-void CTxMemPool::check(const CCoinsViewCache *pcoins,
-                       mining::CJournalChangeSetPtr& changeSet) const
-{
+void CTxMemPool::check(
+    const int64_t nSpendHeight,
+    const CCoinsViewCache *pcoins,
+    mining::CJournalChangeSetPtr& changeSet) const {
+
     if (nCheckFrequency == 0) {
         return;
     }
@@ -743,7 +745,6 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins,
     uint64_t innerUsage = 0;
 
     CCoinsViewCache mempoolDuplicate(const_cast<CCoinsViewCache *>(pcoins));
-    const int64_t nSpendHeight = GetSpendHeight(mempoolDuplicate);
 
     LOCK(cs);
     std::list<const CTxMemPoolEntry *> waitingOnDependants;

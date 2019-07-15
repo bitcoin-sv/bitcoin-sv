@@ -597,8 +597,13 @@ public:
      * are in the mapNextTx array, journal is in agreement with mempool).
      * If sanity-checking is turned off, check does nothing.
      */
-    void check(const CCoinsViewCache *pcoins, mining::CJournalChangeSetPtr& changeSet) const;
+    void check(
+        const int64_t nSpendHeight,
+        const CCoinsViewCache *pcoins,
+        mining::CJournalChangeSetPtr& changeSet) const;
+
     std::string checkJournal() const;
+
     void setSanityCheck(double dFrequency = 1.0) {
         nCheckFrequency = dFrequency * 4294967295.0;
     }
