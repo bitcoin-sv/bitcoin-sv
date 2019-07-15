@@ -16,7 +16,7 @@
 #include "test/sigutil.h"
 #include "test/test_bitcoin.h"
 #include "txmempool.h"
-#include "txn_handlers.h"
+#include "txn_validator.h"
 #include "utiltime.h"
 
 #include <boost/test/unit_test.hpp>
@@ -26,9 +26,6 @@ namespace {
         /**
          * Check if txn is valid and accepted by the mempool.
          *
-         * At this moment we do a basic compatibility test: ATMP vs TxnValidation & ProcessValidatedTxn.
-         * An incomming update will introduce txn Validator and remove an explicit calls to
-         * TxnValidation & ProcessValidatedTxn methods.
          */
         // ATMP
         bool ToMemPool(CMutableTransaction &tx) {
@@ -40,45 +37,34 @@ namespace {
                                       MakeTransactionRef(tx), false, nullptr, changeSet, true,
                                       Amount(0));
         }
-        // TxnValidation & ProcessValidatedTxn
+        // TxnValidator
         bool ToMemPool2(CMutableTransaction &tx) {
             // Mock rpc txn
-            CTxInputData txInputData {
-                TxSource::rpc,            // tx source
-                MakeTransactionRef(tx),   // a pointer to the tx
-                GetTime(),                // nAcceptTime
-                false,                    // fLimitFree
-            };
             auto pTxInputData {
-                std::make_shared<CTxInputData>(std::move(txInputData))
+                std::make_shared<CTxInputData>(
+                                    TxSource::rpc,            // tx source
+                                    MakeTransactionRef(tx),   // a pointer to the tx
+                                    GetTime(),                // nAcceptTime
+                                    false)                    // fLimitFree
             };
-
-            LOCK(cs_main);
-            // Trigger validation for the given txn
-            auto txnValResult {
-                TxnValidation(
-                        pTxInputData,
-                        GlobalConfig::GetConfig(),
-                        mempool,
-                        dsDetector)
-            };
+            // Mempool Journal ChangeSet
             mining::CJournalChangeSetPtr changeSet {nullptr};
-            // Create default handlers.
-            CTxnHandlers handlers {
-                // Mempool Journal ChangeSet
-                changeSet,
-                // Double Spend Detector
-                dsDetector
+            // Execute validation via synchronous interface
+            const auto& status {
+                txnValidator->processValidation(pTxInputData, changeSet)
             };
-            // Process validated transaction.
-            ProcessValidatedTxn(mempool, txnValResult, handlers, false);
-            CValidationState& state = txnValResult.mState;
-            // Return overal validation status.
-            return state.IsValid();
+            return status.IsValid();
         }
         // A default double spend detector
         TxnDoubleSpendDetectorSPtr dsDetector {
             std::make_shared<CTxnDoubleSpendDetector>()
+        };
+        // Create txn validator
+        std::shared_ptr<CTxnValidator> txnValidator {
+            std::make_shared<CTxnValidator>(
+                    GlobalConfig::GetConfig(),
+                    mempool,
+                    dsDetector)
         };
     };
 

@@ -255,6 +255,7 @@ add_library(server
 	txn_double_spend_detector.cpp
 	txn_propagator.cpp
 	txn_validation_data.cpp
+	txn_validator.cpp
 	txn_recent_rejects.cpp
 	ui_interface.cpp
 	validation.cpp

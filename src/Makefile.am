@@ -187,6 +187,7 @@ BITCOIN_CORE_H = \
   txn_validation_config.h \
   txn_validation_data.h \
   txn_validation_result.h \
+  txn_validator.h \
   ui_interface.h \
   undo.h \
   util.h \
@@ -269,6 +270,7 @@ libbitcoin_server_a_SOURCES = \
   txn_propagator.cpp \
   txn_validation_data.cpp \
   txn_recent_rejects.cpp \
+  txn_validator.cpp \
   ui_interface.cpp \
   validation.cpp \
   validationinterface.cpp \
