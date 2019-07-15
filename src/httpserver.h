@@ -110,6 +110,12 @@ public:
      * this.
      */
     void WriteReply(int nStatus, const std::string &strReply = "");
+
+    void StartWritingChunks(int nStatus);
+
+    void WriteReplyChunk(std::string_view strReply);
+
+    void StopWritingChunks();
 };
 
 /** Event handler closure.

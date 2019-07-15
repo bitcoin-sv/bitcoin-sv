@@ -525,6 +525,7 @@ struct event_base *EventBase() {
     return eventBase;
 }
 
+// this callback is called after successful or failed transmission
 static void httpevent_callback_fn(evutil_socket_t, short, void *data) {
     // Static handler: simply call inner handler
     HTTPEvent *self = ((HTTPEvent *)data);
@@ -615,6 +616,31 @@ void HTTPRequest::WriteReply(int nStatus, const std::string &strReply) {
     ev->trigger(0);
     replySent = true;
     // transferred back to main thread.
+    req = 0;
+}
+
+void HTTPRequest::StartWritingChunks(int nStatus) {
+    HTTPEvent *ev = new HTTPEvent(eventBase, true, std::bind(evhttp_send_reply_start, req, nStatus, (const char *)nullptr));
+    ev->trigger(nullptr);
+}
+
+void HTTPRequest::WriteReplyChunk(std::string_view strReply) {
+    struct evbuffer *evb = evbuffer_new();
+    evbuffer_add(evb, strReply.data(), strReply.length());
+
+    // Send event to main http thread to send reply message
+    HTTPEvent *ev = new HTTPEvent(eventBase, true, std::bind(evhttp_send_reply_chunk, req, evb));
+    ev->trigger(nullptr);
+
+    HTTPEvent *evDel = new HTTPEvent(eventBase, true, std::bind(evbuffer_free, evb));
+    evDel->trigger(nullptr);
+}
+
+void HTTPRequest::StopWritingChunks() {
+    HTTPEvent *ev = new HTTPEvent(eventBase, true, std::bind(evhttp_send_reply_end, req));
+    ev->trigger(nullptr);
+
+    replySent = true;
     req = 0;
 }
 
