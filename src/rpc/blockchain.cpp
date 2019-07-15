@@ -25,6 +25,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
+#include "blockfileinfostore.h"
 
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
@@ -896,6 +897,127 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
     }
 
     return blockToJSON(config, block, pblockindex, verbosity == GetBlockVerbosity::DECODE_TRANSACTIONS);
+}
+
+void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
+    CForwardReadonlyStream& stream, CBlockIndex& blockIndex) {
+
+    CHash256 hasher;
+    CDiskBlockMetaData metadata;
+
+    bool hasDiskBlockMetaData;
+    {
+        LOCK(cs_main);
+        hasDiskBlockMetaData = blockIndex.nStatus.hasDiskBlockMetaData();
+    }
+
+    do
+    {
+        auto chunk = stream.Read(4096);
+        auto begin = reinterpret_cast<const char*>(chunk.Begin());
+        if (!isHexEncoded) {
+            req.WriteReplyChunk({begin, chunk.Size()});
+        } else {
+            req.WriteReplyChunk(HexStr(begin, begin + chunk.Size()));
+        }
+
+        if (!hasDiskBlockMetaData) {
+            hasher.Write(chunk.Begin(), chunk.Size());
+            metadata.diskDataSize += chunk.Size();
+        }
+    } while(!stream.EndOfStream());
+
+    if (!hasDiskBlockMetaData) {
+        hasher.Finalize(reinterpret_cast<uint8_t*>(&metadata.diskDataHash));
+        SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);
+    }
+}
+
+void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &req,
+                        bool showTxDetails, CBlockIndex& blockIndex) {
+
+    bool hasDiskBlockMetaData;
+    {
+        LOCK(cs_main);
+        hasDiskBlockMetaData = blockIndex.nStatus.hasDiskBlockMetaData();
+    }
+
+    auto reader = GetDiskBlockStreamReader(blockIndex.GetBlockPos(), !hasDiskBlockMetaData);
+    if (!reader) {
+        assert(!"cannot load block from disk");
+    }
+
+    std::string delimiter;
+
+    req.WriteReplyChunk("{\"tx\":[");
+    do
+    {
+        const CTransaction& transaction = reader->ReadTransaction();
+        UniValue objBlockTx = blockTxToJSON(config, transaction, showTxDetails);
+        std::string strJSON = delimiter + objBlockTx.write();
+        req.WriteReplyChunk(strJSON);
+        delimiter = ",";  
+    } while(!reader->EndOfStream());
+
+    CBlockHeader header = reader->GetBlockHeader();
+
+    // set metadata so it is available when setting header in the next step
+    if (!hasDiskBlockMetaData) {
+        CDiskBlockMetaData metadata = reader->getDiskBlockMetadata();
+        SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);
+    }
+
+    req.WriteReplyChunk("]," + headerBlockToJSON(config, header, &blockIndex) + "}");
+}
+
+std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHeader,
+                     const CBlockIndex *blockindex) {
+
+    UniValue result(UniValue::VOBJ);
+
+    result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
+    int confirmations = -1;
+    // Only report confirmations if the block is on the main chain
+    if (chainActive.Contains(blockindex)) {
+        confirmations = chainActive.Height() - blockindex->nHeight + 1;
+    }
+    result.push_back(Pair("confirmations", confirmations));
+    if (blockindex->nStatus.hasDiskBlockMetaData()) {
+        result.push_back(Pair("size", blockindex->GetDiskBlockMetaData().diskDataSize));
+    }
+    result.push_back(Pair("height", blockindex->nHeight));
+    result.push_back(Pair("version", blockHeader.nVersion));
+    result.push_back(Pair("versionHex", strprintf("%08x", blockHeader.nVersion)));
+    result.push_back(Pair("merkleroot", blockHeader.hashMerkleRoot.GetHex()));
+    result.push_back(Pair("time", blockHeader.GetBlockTime()));
+    result.push_back(
+        Pair("mediantime", int64_t(blockindex->GetMedianTimePast())));
+    result.push_back(Pair("nonce", uint64_t(blockHeader.nNonce)));
+    result.push_back(Pair("bits", strprintf("%08x", blockHeader.nBits)));
+    result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
+    result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
+
+    if (blockindex->pprev) {
+        result.push_back(Pair("previousblockhash",
+                              blockindex->pprev->GetBlockHash().GetHex()));
+    }
+    CBlockIndex *pnext = chainActive.Next(blockindex);
+    if (pnext) {
+        result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
+    }
+
+    std::string headerJSON = result.write();
+    return headerJSON.substr(1, headerJSON.size() - 2);
+}
+
+UniValue blockTxToJSON(const Config &config, const CTransaction& tx, bool txDetails) {
+    if (txDetails) {
+        UniValue objTx(UniValue::VOBJ);
+        TxToUniv(tx, uint256(), objTx);
+        return objTx;
+    } 
+
+    return tx.GetId().GetHex();
 }
 
 struct CCoinsStats {

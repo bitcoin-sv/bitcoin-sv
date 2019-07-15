@@ -1224,6 +1224,16 @@ bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
     return true;
 }
 
+void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata)
+{
+    LOCK(cs_main);
+    if (!index.nStatus.hasDiskBlockMetaData()) {
+        LogPrintf("Setting block index file metadata for block %s\n", index.GetBlockHash().ToString());
+        index.SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
+        setDirtyBlockIndex.insert(&index);
+    }
+}
+
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config) {
     if (!ReadBlockFromDisk(block, pindex->GetBlockPos(), config)) {
@@ -1240,7 +1250,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
 }
 
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CDiskBlockPos& pos)
+    const CDiskBlockPos& pos, bool calculateDiskBlockMetadata)
 {
     std::unique_ptr<FILE, CCloseFile> file{
         CDiskFiles::OpenBlockFile(pos, true)};
@@ -1253,7 +1263,8 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     return
         std::make_unique<CBlockStreamReader<CFileReader>>(
             std::move(file),
-            CStreamVersionAndType{SER_DISK, CLIENT_VERSION});
+            CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
+            calculateDiskBlockMetadata);
 }
 
 static bool PopulateBlockIndexBlockDiskMetaData(
@@ -1280,8 +1291,7 @@ static bool PopulateBlockIndexBlockDiskMetaData(
 
     hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
 
-    index.SetDiskBlockMetaData(std::move(hash), size);
-    setDirtyBlockIndex.insert(&index);
+    SetBlockIndexFileMetaDataIfNotSet(index, CDiskBlockMetaData{hash, size});
 
     if(fseek(file, index.GetBlockPos().nPos, SEEK_SET) != 0)
     {
@@ -1325,6 +1335,34 @@ std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
         std::make_unique<CFixedSizeStream<CAsyncFileReader>>(
             index.GetDiskBlockMetaData().diskDataSize,
             CAsyncFileReader{std::move(file)});
+}
+
+
+std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& index)
+{
+    AssertLockHeld(cs_main);
+
+    std::unique_ptr<FILE, CCloseFile> file{
+        CDiskFiles::OpenBlockFile(index.GetBlockPos(), true)};
+
+    if (!file)
+    {
+        return {}; // could not open a stream
+    }
+
+    if (index.nStatus.hasDiskBlockMetaData())
+    {
+        return
+            std::make_unique<CSyncFixedSizeStream<CFileReader>>(
+                index.GetDiskBlockMetaData().diskDataSize,
+                CFileReader{std::move(file)});
+    }
+
+    return 
+        std::make_unique<CBlockStream<CFileReader>>(
+            CFileReader{std::move(file)},
+            CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
+            CStreamVersionAndType{SER_NETWORK, PROTOCOL_VERSION});
 }
 
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams) {

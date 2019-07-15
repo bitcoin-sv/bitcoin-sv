@@ -8,6 +8,8 @@
 #include "consensus/consensus.h"
 #include "primitives/transaction.h"
 #include "streams.h"
+#include "chain.h"
+#include "hash.h"
 
 #include <memory>
 #include <vector>
@@ -33,8 +35,9 @@ template<typename Reader>
 class CBlockStreamReader
 {
 public:
-    CBlockStreamReader(Reader&& reader, const CStreamVersionAndType& version)
-        : mReader{std::move(reader)}
+    CBlockStreamReader(Reader&& reader, const CStreamVersionAndType& version, bool calculateDiskBlockMetadata=false)
+        : mCalculateDiskBlockMetadata(calculateDiskBlockMetadata)
+        , mReader{std::move(reader)}
         , mDeserializationStream{this, version.type, version.version}
     {
         mDeserializationStream >> mBlockHeader;
@@ -66,6 +69,11 @@ public:
         mDeserializationStream >> mTransaction;
         --mRemainingTransactionsCounter;
 
+        // After reading the last transactions, we can finalize the hash.
+        if (EndOfStream() && mCalculateDiskBlockMetadata) {
+            hasher.Finalize(reinterpret_cast<uint8_t*>(&diskBlockMetaData.diskDataHash));
+        }
+
         return *mTransaction;
     }
 
@@ -86,10 +94,36 @@ public:
         if(read != size)
         {
             throw std::runtime_error("Unexpected end of stream!");
+
+        }
+
+        if (mCalculateDiskBlockMetadata) 
+        {
+            updateDiskBlockMetadata(reinterpret_cast<uint8_t*>(pch), size);
         }
     }
 
+    const CDiskBlockMetaData& getDiskBlockMetadata()
+    {
+        if (EndOfStream() && mCalculateDiskBlockMetadata)
+        {
+            return diskBlockMetaData;
+        }
+
+        throw std::runtime_error("Cannot access disk block metadata while block is still being read!");
+    }
+
 private:
+    CHash256 hasher;
+    CDiskBlockMetaData diskBlockMetaData;
+    bool mCalculateDiskBlockMetadata;
+
+    void updateDiskBlockMetadata(uint8_t* begin, size_t chunkSize)
+    {
+        hasher.Write(begin, chunkSize);
+        diskBlockMetaData.diskDataSize += chunkSize;
+    }
+
     Reader mReader;
     OverrideStream<CBlockStreamReader> mDeserializationStream;
 

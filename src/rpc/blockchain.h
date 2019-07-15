@@ -6,12 +6,21 @@
 #define BITCOIN_RPCBLOCKCHAIN_H
 
 #include <univalue.h>
+#include "streams.h"
+#include "httpserver.h"
+#include "uint256.h"
+#include "chain.h"
 
 class CBlockIndex;
 class Config;
 class JSONRPCRequest;
 
 UniValue getblockchaininfo(const Config &config, const JSONRPCRequest &request);
+void getblock(const Config &config, const JSONRPCRequest &request, HTTPRequest *req);
+void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &req,
+                          bool showTxDetails, CBlockIndex& blockindex);
+void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
+                          CForwardReadonlyStream& stream, CBlockIndex& blockIndex);
 
 double GetDifficulty(const CBlockIndex *blockindex);
 

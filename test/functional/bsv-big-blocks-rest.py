@@ -35,7 +35,6 @@ class BSVBigBlockRestCall(ComparisonTestFramework):
             url.hostname, url.port, '/rest/block/' + block_hash + self.FORMAT_SEPARATOR + 'json')
 
         assert_equal(response.status, 200)
-        assert_greater_than(int(response.getheader('content-length')), block_size)
 
         json_string = response.read().decode('utf-8')
         json_obj = json.loads(json_string)
