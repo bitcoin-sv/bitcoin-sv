@@ -22,6 +22,8 @@
 #include "script/script_error.h"
 #include "sync.h"
 #include "streams.h"
+#include "txn_double_spend_detector.h"
+#include "txn_validation_result.h"
 #include "versionbits.h"
 
 #include <algorithm>
@@ -43,6 +45,7 @@ class CInv;
 class Config;
 class CScriptCheck;
 class CTxMemPool;
+class CTxnHandlers;
 class CTxUndo;
 class CValidationInterface;
 class CValidationState;
@@ -472,6 +475,72 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /** Check if DAA HF has activated. */
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
+
+/**
+ * Limit mempool size.
+ *
+ * @param pool A reference to the mempool
+ * @param changeSet A reference to the Jorunal ChangeSet
+ * @param limit A size limit for txn to remove
+ * @param age Time limit for txn to remove
+ */
+void LimitMempoolSize(
+    CTxMemPool &pool,
+    mining::CJournalChangeSetPtr& changeSet,
+    size_t limit,
+    unsigned long age);
+
+/**
+ * Submit transaction to the mempool.
+ *
+ * @param ptx A reference to the transaction
+ * @param entry A valid entry point for the given transaction
+ * @param fTxValidForFeeEstimation A flag to inform if txn is valid for fee estimations.
+ * @param setAncestors  A set of ancestors
+ * @param pool A reference to the mempool
+ * @param state A reference to a state variable
+ * @param changeSet A reference to the Jorunal ChangeSet
+ * @param fLimitMempoolSize A flag to limit a mempool size
+ * @return true if txn is successfully commited, false otherwise
+ */
+bool CommitTxToMempool(const CTransactionRef &ptx,
+                       const CTxMemPoolEntry& entry,
+                       bool fTxValidForFeeEstimation,
+                       CTxMemPool::setEntries& setAncestors,
+                       CTxMemPool& pool,
+                       CValidationState& state,
+                       mining::CJournalChangeSetPtr& changeSet,
+                       bool fLimitMempoolSize=true);
+
+/**
+ * The function performs essential checks which need to be fulfilled by a transaction
+ * before submitting to the mempool.
+ *
+ * @param pTxInputData A reference to transaction's details
+ * @param config A reference to a configuration
+ * @param pool A reference to the mempool
+ * @param dsDetector A reference to a double spend detector
+ * @return A result of validation.
+ */
+CTxnValResult TxnValidation(
+    const TxInputDataSPtr& pTxInputData,
+    const Config &config,
+    CTxMemPool &pool,
+    TxnDoubleSpendDetectorSPtr dsDetector);
+
+/**
+ * Process validated txn. Submit txn to the mempool if it is valid.
+ *
+ * @param pool A reference to the mempool
+ * @param txStatus A result of validation
+ * @param handlers Txn handlers
+ * @param fLimitMempoolSize A flag to limit a mempool size
+ */
+void ProcessValidatedTxn(
+    CTxMemPool& pool,
+    CTxnValResult& txStatus,
+    CTxnHandlers& handlers,
+    bool fLimitMempoolSize);
 
 /**
  * (try to) add transaction to memory pool

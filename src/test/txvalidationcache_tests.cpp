@@ -16,24 +16,133 @@
 #include "test/sigutil.h"
 #include "test/test_bitcoin.h"
 #include "txmempool.h"
+#include "txn_handlers.h"
 #include "utiltime.h"
-#include "validation.h"
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_AUTO_TEST_SUITE(txvalidationcache_tests)
+namespace {
+    struct TestChain100Setup2 : TestChain100Setup {
+        /**
+         * Check if txn is valid and accepted by the mempool.
+         *
+         * At this moment we do a basic compatibility test: ATMP vs TxnValidation & ProcessValidatedTxn.
+         * An incomming update will introduce txn Validator and remove an explicit calls to
+         * TxnValidation & ProcessValidatedTxn methods.
+         */
+        // ATMP
+        bool ToMemPool(CMutableTransaction &tx) {
+            LOCK(cs_main);
 
-static bool ToMemPool(CMutableTransaction &tx) {
-    LOCK(cs_main);
+            CValidationState state;
+            mining::CJournalChangeSetPtr changeSet {nullptr};
+            return AcceptToMemoryPool(GlobalConfig::GetConfig(), mempool, state,
+                                      MakeTransactionRef(tx), false, nullptr, changeSet, true,
+                                      Amount(0));
+        }
+        // TxnValidation & ProcessValidatedTxn
+        bool ToMemPool2(CMutableTransaction &tx) {
+            // Mock rpc txn
+            CTxInputData txInputData {
+                TxSource::rpc,            // tx source
+                MakeTransactionRef(tx),   // a pointer to the tx
+                GetTime(),                // nAcceptTime
+                false,                    // fLimitFree
+            };
+            auto pTxInputData {
+                std::make_shared<CTxInputData>(std::move(txInputData))
+            };
 
-    CValidationState state;
-    mining::CJournalChangeSetPtr changeSet {nullptr};
-    return AcceptToMemoryPool(GlobalConfig::GetConfig(), mempool, state,
-                              MakeTransactionRef(tx), false, nullptr, changeSet,
-                              true, Amount(0));
+            LOCK(cs_main);
+            // Trigger validation for the given txn
+            auto txnValResult {
+                TxnValidation(
+                        pTxInputData,
+                        GlobalConfig::GetConfig(),
+                        mempool,
+                        dsDetector)
+            };
+            mining::CJournalChangeSetPtr changeSet {nullptr};
+            // Create default handlers.
+            CTxnHandlers handlers {
+                // Mempool Journal ChangeSet
+                changeSet,
+                // Double Spend Detector
+                dsDetector
+            };
+            // Process validated transaction.
+            ProcessValidatedTxn(mempool, txnValResult, handlers, false);
+            CValidationState& state = txnValResult.mState;
+            // Return overal validation status.
+            return state.IsValid();
+        }
+        // A default double spend detector
+        TxnDoubleSpendDetectorSPtr dsDetector {
+            std::make_shared<CTxnDoubleSpendDetector>()
+        };
+    };
+
+    // Run CheckInputs (using pcoinsTip) on the given transaction, for all script
+    // flags. Test that CheckInputs passes for all flags that don't overlap with the
+    // failing_flags argument, but otherwise fails.
+    // CHECKLOCKTIMEVERIFY and CHECKSEQUENCEVERIFY (and future NOP codes that may
+    // get reassigned) have an interaction with DISCOURAGE_UPGRADABLE_NOPS: if the
+    // script flags used contain DISCOURAGE_UPGRADABLE_NOPS but don't contain
+    // CHECKLOCKTIMEVERIFY (or CHECKSEQUENCEVERIFY), but the script does contain
+    // OP_CHECKLOCKTIMEVERIFY (or OP_CHECKSEQUENCEVERIFY), then script execution
+    // should fail.
+    // Capture this interaction with the upgraded_nop argument: set it when
+    // evaluating any script flag that is implemented as an upgraded NOP code.
+    void ValidateCheckInputsForAllFlags(const CMutableTransaction &mutableTx,
+                                        uint32_t failing_flags, bool add_to_cache,
+                                        bool upgraded_nop) {
+        const CTransaction tx(mutableTx);
+        PrecomputedTransactionData txdata(tx);
+        // If we add many more flags, this loop can get too expensive, but we can
+        // rewrite in the future to randomly pick a set of flags to evaluate.
+        for (size_t test_flags = 0; test_flags < (1U << 17); test_flags += 1) {
+            CValidationState state;
+            // Make sure the mandatory flags are enabled.
+            test_flags |= MANDATORY_SCRIPT_VERIFY_FLAGS;
+
+            bool ret = CheckInputs(tx, state, pcoinsTip, true, test_flags, true,
+                                   add_to_cache, txdata, nullptr);
+
+            // CheckInputs should succeed iff test_flags doesn't intersect with
+            // failing_flags
+            bool expected_return_value = !(test_flags & failing_flags);
+            if (expected_return_value && upgraded_nop) {
+                // If the script flag being tested corresponds to an upgraded NOP,
+                // then script execution should fail if DISCOURAGE_UPGRADABLE_NOPS
+                // is set.
+                expected_return_value =
+                    !(test_flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS);
+            }
+
+            BOOST_CHECK_EQUAL(ret, expected_return_value);
+
+            // Test the caching
+            if (ret && add_to_cache) {
+                // Check that we get a cache hit if the tx was valid
+                std::vector<CScriptCheck> scriptchecks;
+                BOOST_CHECK(CheckInputs(tx, state, pcoinsTip, true, test_flags,
+                                        true, add_to_cache, txdata, &scriptchecks));
+                BOOST_CHECK(scriptchecks.empty());
+            } else {
+                // Check that we get script executions to check, if the transaction
+                // was invalid, or we didn't add to cache.
+                std::vector<CScriptCheck> scriptchecks;
+                BOOST_CHECK(CheckInputs(tx, state, pcoinsTip, true, test_flags,
+                                        true, add_to_cache, txdata, &scriptchecks));
+                BOOST_CHECK_EQUAL(scriptchecks.size(), tx.vin.size());
+            }
+        }
+    }
 }
 
-BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup) {
+BOOST_FIXTURE_TEST_SUITE(txvalidationcache_tests, TestChain100Setup2)
+
+BOOST_AUTO_TEST_CASE(tx_mempool_block_doublespend) {
     // Make sure skipping validation of transctions that were validated going
     // into the memory pool does not allow double-spends in blocks to pass
     // validation when they should not.
@@ -90,64 +199,64 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup) {
     BOOST_CHECK_EQUAL(mempool.size(), 0);
 }
 
-// Run CheckInputs (using pcoinsTip) on the given transaction, for all script
-// flags. Test that CheckInputs passes for all flags that don't overlap with the
-// failing_flags argument, but otherwise fails.
-// CHECKLOCKTIMEVERIFY and CHECKSEQUENCEVERIFY (and future NOP codes that may
-// get reassigned) have an interaction with DISCOURAGE_UPGRADABLE_NOPS: if the
-// script flags used contain DISCOURAGE_UPGRADABLE_NOPS but don't contain
-// CHECKLOCKTIMEVERIFY (or CHECKSEQUENCEVERIFY), but the script does contain
-// OP_CHECKLOCKTIMEVERIFY (or OP_CHECKSEQUENCEVERIFY), then script execution
-// should fail.
-// Capture this interaction with the upgraded_nop argument: set it when
-// evaluating any script flag that is implemented as an upgraded NOP code.
-void ValidateCheckInputsForAllFlags(const CMutableTransaction &mutableTx,
-                                    uint32_t failing_flags, bool add_to_cache,
-                                    bool upgraded_nop) {
-    const CTransaction tx(mutableTx);
-    PrecomputedTransactionData txdata(tx);
-    // If we add many more flags, this loop can get too expensive, but we can
-    // rewrite in the future to randomly pick a set of flags to evaluate.
-    for (size_t test_flags = 0; test_flags < (1U << 17); test_flags += 1) {
-        CValidationState state;
-        // Make sure the mandatory flags are enabled.
-        test_flags |= MANDATORY_SCRIPT_VERIFY_FLAGS;
+BOOST_AUTO_TEST_CASE(tx_mempool_block_doublespend2) {
+    // Make sure skipping validation of transctions that were validated going
+    // into the memory pool does not allow double-spends in blocks to pass
+    // validation when they should not.
+    CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey())
+                                     << OP_CHECKSIG;
 
-        bool ret = CheckInputs(tx, state, pcoinsTip, true, test_flags, true,
-                               add_to_cache, txdata, nullptr);
+    // Create a double-spend of mature coinbase txn:
+    std::vector<CMutableTransaction> spends;
+    spends.resize(2);
+    for (int i = 0; i < 2; i++) {
+        spends[i].nVersion = 1;
+        spends[i].vin.resize(1);
+        spends[i].vin[0].prevout = COutPoint(coinbaseTxns[0].GetId(), 0);
+        spends[i].vout.resize(1);
+        spends[i].vout[0].nValue = 11 * CENT;
+        spends[i].vout[0].scriptPubKey = scriptPubKey;
 
-        // CheckInputs should succeed iff test_flags doesn't intersect with
-        // failing_flags
-        bool expected_return_value = !(test_flags & failing_flags);
-        if (expected_return_value && upgraded_nop) {
-            // If the script flag being tested corresponds to an upgraded NOP,
-            // then script execution should fail if DISCOURAGE_UPGRADABLE_NOPS
-            // is set.
-            expected_return_value =
-                !(test_flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS);
-        }
-
-        BOOST_CHECK_EQUAL(ret, expected_return_value);
-
-        // Test the caching
-        if (ret && add_to_cache) {
-            // Check that we get a cache hit if the tx was valid
-            std::vector<CScriptCheck> scriptchecks;
-            BOOST_CHECK(CheckInputs(tx, state, pcoinsTip, true, test_flags,
-                                    true, add_to_cache, txdata, &scriptchecks));
-            BOOST_CHECK(scriptchecks.empty());
-        } else {
-            // Check that we get script executions to check, if the transaction
-            // was invalid, or we didn't add to cache.
-            std::vector<CScriptCheck> scriptchecks;
-            BOOST_CHECK(CheckInputs(tx, state, pcoinsTip, true, test_flags,
-                                    true, add_to_cache, txdata, &scriptchecks));
-            BOOST_CHECK_EQUAL(scriptchecks.size(), tx.vin.size());
-        }
+        // Sign:
+        std::vector<uint8_t> vchSig;
+        uint256 hash = SignatureHash(scriptPubKey, CTransaction(spends[i]), 0,
+                                     SigHashType().withForkId(),
+                                     coinbaseTxns[0].vout[0].nValue);
+        BOOST_CHECK(coinbaseKey.Sign(hash, vchSig));
+        vchSig.push_back(uint8_t(SIGHASH_ALL | SIGHASH_FORKID));
+        spends[i].vin[0].scriptSig << vchSig;
     }
+
+    CBlock block;
+
+    // Test 1: block with both of those transactions should be rejected.
+    block = CreateAndProcessBlock(spends, scriptPubKey);
+    BOOST_CHECK(chainActive.Tip()->GetBlockHash() != block.GetHash());
+
+    // Test 2: ... and should be rejected if spend1 is in the memory pool
+    BOOST_CHECK(ToMemPool2(spends[0]));
+    block = CreateAndProcessBlock(spends, scriptPubKey);
+    BOOST_CHECK(chainActive.Tip()->GetBlockHash() != block.GetHash());
+    mempool.clear();
+
+    // Test 3: ... and should be rejected if spend2 is in the memory pool
+    BOOST_CHECK(ToMemPool2(spends[1]));
+    block = CreateAndProcessBlock(spends, scriptPubKey);
+    BOOST_CHECK(chainActive.Tip()->GetBlockHash() != block.GetHash());
+    mempool.clear();
+
+    // Final sanity test: first spend in mempool, second in block, that's OK:
+    std::vector<CMutableTransaction> oneSpend;
+    oneSpend.push_back(spends[0]);
+    BOOST_CHECK(ToMemPool2(spends[1]));
+    block = CreateAndProcessBlock(oneSpend, scriptPubKey);
+    BOOST_CHECK(chainActive.Tip()->GetBlockHash() == block.GetHash());
+    // spends[1] should have been removed from the mempool when the block with
+    // spends[0] is accepted:
+    BOOST_CHECK_EQUAL(mempool.size(), 0);
 }
 
-BOOST_FIXTURE_TEST_CASE(checkinputs_test, TestChain100Setup) {
+BOOST_AUTO_TEST_CASE(checkinputs_test) {
     // Test that passing CheckInputs with one set of script flags doesn't imply
     // that we would pass again with a different set of flags.
     InitScriptExecutionCache();

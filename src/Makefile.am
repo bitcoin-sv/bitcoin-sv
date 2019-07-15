@@ -180,6 +180,7 @@ BITCOIN_CORE_H = \
   txdb.h \
   txmempool.h \
   txn_double_spend_detector.h \
+  txn_handlers.h \
   txn_propagator.h \
   txn_recent_rejects.h \
   txn_sending_details.h \
