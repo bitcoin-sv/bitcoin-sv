@@ -593,8 +593,8 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
-static bool IsGenesisEnabled(const Config& config, int nHeight) {
-    return nHeight >= config.GetChainParams().GetConsensus().genesisHeight;
+static bool IsGenesisEnabled(const Config &config, int nHeight) {
+    return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
 }
 
 bool IsGenesisEnabled(const Config& config, const CBlockIndex* pindexPrev) {
