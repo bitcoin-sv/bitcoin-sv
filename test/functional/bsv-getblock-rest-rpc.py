@@ -3,8 +3,10 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
 Test for getting block with REST and RPC call with different options.
+
 Check REST call /rest/block/BLOCKHASH for BIN, HEX and JSON formats.
 Content-length should be set for BIN and HEX response, because we know the length.
+Check RPC call for verbosity levels 0 (HEX), 1 (JSON without transactions details) and 2 (JSON with transaction details).
 Content-length is never set for JSON, because we do not know the length of JSON response.
 """
 
@@ -94,6 +96,30 @@ class BSVGetBlock(ComparisonTestFramework):
 
         #rest hex
         self.getBlock(block, block_size, "hex")
+
+        #rpc hex
+        assert_equal(ToHex(block), self.nodes[0].getblock(block.hash, 0))
+
+        #rpc json with no tx details
+        checkJsonBlock(self.nodes[0].getblock(block.hash, 1), False, block.hash)
+
+        #rpc json with tx details
+        checkJsonBlock(self.nodes[0].getblock(block.hash, 2), True, block.hash)
+
+        #check getblock errors still work
+        assert_raises_rpc_error(
+            -5, "Block not found", self.nodes[0].getblock, "somehash")
+
+        #check errors still work
+        batch = self.nodes[0].batch([self.nodes[0].getblock.get_request(block.hash),
+                          self.nodes[0].getblockcount.get_request(),
+                          self.nodes[0].undefinedmethod.get_request()])
+
+        assert_equal(batch[0]["result"], None)
+        assert_equal(batch[0]["error"]["message"], "getblock cannot be processed in batch")
+        assert_equal(batch[1]["error"], None)
+        assert_equal(batch[2]["result"], None)
+        assert_equal(batch[2]["error"]["message"], "Method not found")
 
 if __name__ == '__main__':
     BSVGetBlock().main()

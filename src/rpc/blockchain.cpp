@@ -796,9 +796,9 @@ static void parseGetBlockVerbosity(const UniValue& verbosityParam, GetBlockVerbo
     }
 }
 
-UniValue getblock(const Config &config, const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() < 1 ||
-        request.params.size() > 2) {
+void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq, HTTPRequest *httpReq) {
+    if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
+        jsonRPCReq.params.size() > 2) {
         throw std::runtime_error(
                 "getblock \"blockhash\" ( verbosity ) \n"
                 "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is serialized, "
@@ -858,14 +858,15 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
 
     LOCK(cs_main);
 
-    std::string strHash = request.params[0].get_str();
+    std::string strHash = jsonRPCReq.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
     // previously, false and true were accepted for verbosity 0 and 1 respectively. this code maintains
     // backward compatibility.
     GetBlockVerbosity verbosity = GetBlockVerbosity::DECODE_HEADER;
-    if (request.params.size() > 1) {
-        parseGetBlockVerbosity(request.params[1], verbosity);
+
+    if (jsonRPCReq.params.size() > 1) {
+        parseGetBlockVerbosity(jsonRPCReq.params[1], verbosity);
     }
 
     if (mapBlockIndex.count(hash) == 0) {
@@ -880,7 +881,8 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
     }
 
-    if (!ReadBlockFromDisk(block, pblockindex, config)) {
+    auto stream = StreamSyncBlockFromDisk(*pblockindex);
+    if (!stream) {
         // Block not found on disk. This could be because we have the block
         // header in our index but don't have the block (for example if a
         // non-whitelisted node sends us an unrequested long chain of valid
@@ -888,15 +890,20 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
 
+    httpReq->WriteHeader("Content-Type", "application/json");
+    httpReq->StartWritingChunks(HTTP_OK);
+
     if (verbosity == GetBlockVerbosity::RAW_BLOCK) {
-        CDataStream ssBlock(SER_NETWORK,
-                            PROTOCOL_VERSION | RPCSerializationFlags());
-        ssBlock << block;
-        std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
-        return strHex;
+        httpReq->WriteReplyChunk("{\"result\": \"");
+        writeBlockChunksAndUpdateMetadata(true, *httpReq, *stream, *pblockindex);
+        httpReq->WriteReplyChunk("\", \"error\": "+NullUniValue.write()+", \"id\": "+jsonRPCReq.id.write()+"}");
+    } else {
+        httpReq->WriteReplyChunk("{\"result\":");
+        writeBlockJsonChunksAndUpdateMetadata(config, *httpReq, verbosity == GetBlockVerbosity::DECODE_TRANSACTIONS, *pblockindex);
+        httpReq->WriteReplyChunk(", \"error\": "+NullUniValue.write()+", \"id\": "+jsonRPCReq.id.write()+"}");
     }
 
-    return blockToJSON(config, block, pblockindex, verbosity == GetBlockVerbosity::DECODE_TRANSACTIONS);
+    httpReq->StopWritingChunks();
 }
 
 void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
@@ -1886,7 +1893,8 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "getchaintxstats",        &getchaintxstats,       true,  {"nblocks", "blockhash"} },
     { "blockchain",         "getbestblockhash",       getbestblockhash,       true,  {} },
     { "blockchain",         "getblockcount",          getblockcount,          true,  {} },
-    { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
+    // getblock command is processed in a special way, because it uses streaming
+    // { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           getblockhash,           true,  {"height"} },
     { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbose"} },
     { "blockchain",         "getchaintips",           getchaintips,           true,  {} },

@@ -402,9 +402,12 @@ static UniValue JSONRPCExecOne(Config &config, JSONRPCRequest jreq,
 
     try {
         jreq.parse(req);
-
-        UniValue result = tableRPC.execute(config, jreq);
-        rpc_result = JSONRPCReplyObj(result, NullUniValue, jreq.id);
+        if (jreq.strMethod == "getblock") {
+            rpc_result = JSONRPCReplyObj(NullUniValue, JSONRPCError(-1, "getblock cannot be processed in batch"), jreq.id);
+        } else {
+            UniValue result = tableRPC.execute(config, jreq);
+            rpc_result = JSONRPCReplyObj(result, NullUniValue, jreq.id);
+        }
     } catch (const UniValue &objError) {
         rpc_result = JSONRPCReplyObj(NullUniValue, objError, jreq.id);
     } catch (const std::exception &e) {

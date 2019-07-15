@@ -16,6 +16,7 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "rpc/blockchain.h"
 
 #include <boost/algorithm/string.hpp> // boost::trim
 
@@ -322,20 +323,25 @@ static bool HTTPReq_JSONRPC(Config &config, HTTPRequest *req,
         // singleton request
         if (valRequest.isObject()) {
             jreq.parse(valRequest);
+            // getBlock is not present in tableRpc, so we need to explicitly check for it
+            if (jreq.strMethod == "getblock") {
+                getblock(config, jreq, req);
+            } else {
+                UniValue result = tableRPC.execute(config, jreq);
+                strReply = JSONRPCReply(result, NullUniValue, jreq.id);
+                req->WriteHeader("Content-Type", "application/json");
+                req->WriteReply(HTTP_OK, strReply);
+            }
 
-            UniValue result = tableRPC.execute(config, jreq);
-
-            // Send reply
-            strReply = JSONRPCReply(result, NullUniValue, jreq.id);
+        // array of requests
         } else if (valRequest.isArray()) {
-            // array of requests
             strReply = JSONRPCExecBatch(config, jreq, valRequest.get_array());
+            req->WriteHeader("Content-Type", "application/json");
+            req->WriteReply(HTTP_OK, strReply);
         } else {
             throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
         }
 
-        req->WriteHeader("Content-Type", "application/json");
-        req->WriteReply(HTTP_OK, strReply);
     } catch (const UniValue &objError) {
         JSONErrorReply(req, objError, jreq.id);
         return false;
