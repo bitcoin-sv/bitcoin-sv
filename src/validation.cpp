@@ -3201,6 +3201,18 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         return false;
     }
 
+    if ((IsGenesisEnabled(config, pindexDelete)) &&
+        (!IsGenesisEnabled(config, pindexDelete->pprev)))
+    {
+        mempool.Clear();
+        // While not strictly necessary, clearing the disconnect pool is also
+        // beneficial so we don't try to reuse its content at the end of the
+        // reorg, which we know will fail.
+        if (disconnectpool) {
+            disconnectpool->clear();
+        }
+    }
+
     if (disconnectpool) {
         // Save transactions to re-add to mempool at end of reorg
         for (const auto &tx : boost::adaptors::reverse(block.vtx)) {
