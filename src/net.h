@@ -313,6 +313,32 @@ public:
         return results;
     };
 
+    /** Get a handle to our transaction validator */
+    std::shared_ptr<CTxnValidator> getTxnValidator();
+    /** Enqueue a new transaction for validation */
+    void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
+    void EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData);
+    /** Check if the given txn is already known by the Validator */
+    bool CheckTxnExistsInValidatorsQueue(const uint256& txHash) const;
+    /* Find node by it's id */
+    CNodePtr FindNodeById(int64_t nodeId);
+    /* Erase transaction from the given peer */
+    void EraseOrphanTxnsFromPeer(NodeId peer);
+    /* Erase transaction by it's hash */
+    int EraseOrphanTxn(const uint256& txHash);
+    /* Check if orphan transaction exists by prevout */
+    bool CheckOrphanTxnExists(const COutPoint& prevout) const;
+    /* Check if orphan transaction exists by txn hash */
+    bool CheckOrphanTxnExists(const uint256& txHash) const;
+    /* Get transaction's hash for orphan transactions (by prevout) */
+    std::vector<uint256> GetOrphanTxnsHash(const COutPoint& prevout) const;
+    /* Check if transaction exists in recent rejects */
+    bool CheckTxnInRecentRejects(const uint256& txHash) const;
+    /* Reset recent rejects */
+    void ResetRecentRejects();
+    /* Get extra txns for block reconstruction */
+    std::vector<std::pair<uint256, CTransactionRef>> GetCompactExtraTxns() const;
+
     // Addrman functions
     size_t GetAddressCount() const;
     void SetServices(const CService &addr, ServiceFlags nServices);

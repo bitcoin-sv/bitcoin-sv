@@ -3148,6 +3148,76 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
     }
 }
 
+std::shared_ptr<CTxnValidator> CConnman::getTxnValidator() {
+	return mTxnValidator;
+}
+
+/** Enqueue a new transaction for validation */
+void CConnman::EnqueueTxnForValidator(std::shared_ptr<CTxInputData> pTxInputData) {
+    mTxnValidator->newTransaction(std::move(pTxInputData));
+}
+/* Support for a vector */
+void CConnman::EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData) {
+    mTxnValidator->newTransaction(std::move(vTxInputData));
+}
+
+/** Check if the txn is already known */
+bool CConnman::CheckTxnExistsInValidatorsQueue(const uint256& txid) const {
+    return mTxnValidator->isTxnKnown(txid);
+}
+
+/* Find node by it's id */
+CNodePtr CConnman::FindNodeById(int64_t nodeId) {
+    LOCK(cs_vNodes);
+    for (const CNodePtr& pnode : vNodes) {
+        if (pnode->id == nodeId) {
+            return pnode;
+        }
+    }
+    return nullptr;
+}
+
+/* Erase transaction from the given peer */
+void CConnman::EraseOrphanTxnsFromPeer(NodeId peer) {
+    mTxnValidator->getOrphanTxnsPtr()->eraseTxnsFromPeer(peer);
+}
+
+/* Erase transaction by it's hash */
+int CConnman::EraseOrphanTxn(const uint256& hash) {
+    return mTxnValidator->getOrphanTxnsPtr()->eraseTxn(hash);
+}
+
+/* Check if orphan transaction exists by prevout */
+bool CConnman::CheckOrphanTxnExists(const COutPoint& prevout) const {
+    return mTxnValidator->getOrphanTxnsPtr()->checkTxnExists(prevout);
+}
+
+/* Check if orphan transaction exists by txn hash */
+bool CConnman::CheckOrphanTxnExists(const uint256& txHash) const {
+    return mTxnValidator->getOrphanTxnsPtr()->checkTxnExists(txHash);
+}
+
+/* Get transaction's hash for orphan transactions (by prevout) */
+std::vector<uint256> CConnman::GetOrphanTxnsHash(const COutPoint& prevout) const {
+    return mTxnValidator->getOrphanTxnsPtr()->getTxnsHash(prevout);
+}
+
+/* Check if transaction exists in recent rejects */
+bool CConnman::CheckTxnInRecentRejects(const uint256& txHash) const {
+    return mTxnValidator->getTxnRecentRejectsPtr()->isRejected(txHash);
+}
+
+/* Reset recent rejects */
+void CConnman::ResetRecentRejects() {
+    mTxnValidator->getTxnRecentRejectsPtr()->reset();
+}
+
+/* Get extra txns for block reconstruction */
+std::vector<std::pair<uint256, CTransactionRef>>
+CConnman::GetCompactExtraTxns() const {
+    return mTxnValidator->getOrphanTxnsPtr()->getCompactExtraTxns();
+}
+
 /** Enqueue a new transaction for later sending to our peers */
 void CConnman::EnqueueTransaction(const CTxnSendingDetails& txn)
 {

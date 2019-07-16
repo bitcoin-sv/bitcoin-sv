@@ -1216,7 +1216,6 @@ void PeerLogicValidation::BlockChecked(const CBlock &block,
 //
 // Messages
 //
-
 bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
     switch (inv.type) {
         case MSG_TX: {
@@ -1228,7 +1227,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
                 // valid, or a double-spend. Reset the rejects filter and give
                 // those txs a second chance.
                 hashRecentRejectsChainTip = chainActive.Tip()->GetBlockHash();
-                recentRejects->reset();
+                g_connman->ResetRecentRejects();
             }
 
             // Use pcoinsTip->HaveCoinInCache as a quick approximation to
@@ -1236,9 +1235,10 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
             // included in a block. As this is best effort, we only check for
             // output 0 and 1. This works well enough in practice and we get
             // diminishing returns with 2 onward.
-            return recentRejects->contains(inv.hash) ||
+            return g_connman->CheckTxnInRecentRejects(inv.hash) ||
                    mempool.exists(inv.hash) ||
-                   mapOrphanTransactions.count(inv.hash) ||
+                   g_connman->CheckOrphanTxnExists(inv.hash) ||
+                   g_connman->CheckTxnExistsInValidatorsQueue(inv.hash) ||
                    pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 0)) ||
                    pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 1));
         }
