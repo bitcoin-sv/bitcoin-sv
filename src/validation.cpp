@@ -6138,6 +6138,8 @@ bool LoadMempool(const Config &config) {
         uint64_t num;
         file >> num;
         double prioritydummy = 0;
+        // Take a reference to the validator.
+        const auto& txValidator = g_connman->getTxnValidator();
         while (num--) {
             CTransactionRef tx;
             int64_t nTime;
@@ -6145,19 +6147,31 @@ bool LoadMempool(const Config &config) {
             file >> tx;
             file >> nTime;
             file >> nFeeDelta;
-
             Amount amountdelta(nFeeDelta);
             if (amountdelta != Amount(0)) {
                 mempool.PrioritiseTransaction(tx->GetId(),
                                               tx->GetId().ToString(),
                                               prioritydummy, amountdelta);
             }
-            CValidationState state;
             if (nTime + nExpiryTimeout > nNow) {
-                CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT) };
-                LOCK(cs_main);
-                AcceptToMemoryPoolWithTime(config, mempool, state, tx, true,
-                                           nullptr, nTime, changeSet);
+                // Mempool Journal ChangeSet
+                CJournalChangeSetPtr changeSet {
+                    mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT)
+                };
+                CValidationState state {};
+                {
+                    LOCK(cs_main);
+                    // Execute txn validation synchronously.
+                    state = txValidator->processValidation(
+                                        std::make_shared<CTxInputData>(
+                                                            TxSource::file, // tx source
+                                                            tx,    // a pointer to the tx
+                                                            nTime, // nAcceptTime
+                                                            true),  // fLimitFree
+                                        changeSet, // an instance of the mempool journal
+                                        true); // fLimitMempoolSize
+                }
+                // Check results
                 if (state.IsValid()) {
                     ++count;
                 } else {
