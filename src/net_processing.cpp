@@ -1217,7 +1217,7 @@ void PeerLogicValidation::BlockChecked(const CBlock &block,
 // Messages
 //
 
-static bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
     switch (inv.type) {
         case MSG_TX: {
             assert(recentRejects);
@@ -1249,7 +1249,7 @@ static bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
     return true;
 }
 
-static void RelayTransaction(const CTransaction &tx, CConnman &connman) {
+void RelayTransaction(const CTransaction &tx, CConnman &connman) {
     CInv inv { MSG_TX, tx.GetId() };
 
     TxMempoolInfo txinfo { mempool.info(tx.GetId()) };

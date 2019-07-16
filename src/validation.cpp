@@ -21,6 +21,8 @@
 #include "init.h"
 #include "mining/journal_builder.h"
 #include "net.h"
+#include "net_processing.h"
+#include "netmessagemaker.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "pow.h"
@@ -814,7 +816,7 @@ static uint32_t GetScriptVerifyFlags(const Config &config) {
     return scriptVerifyFlags;
 }
 
-void LimitMempoolSize(
+std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     CJournalChangeSetPtr& changeSet,
     size_t limit,
@@ -827,11 +829,12 @@ void LimitMempoolSize(
     }
 
     std::vector<COutPoint> vNoSpendsRemaining;
-    pool.TrimToSize(limit, changeSet, &vNoSpendsRemaining);
+    std::vector<TxId> vRemovedTxIds = pool.TrimToSize(limit, changeSet, &vNoSpendsRemaining);
     pcoinsTip->Uncache(vNoSpendsRemaining);
+    return vRemovedTxIds;
 }
 
-bool CommitTxToMempool(
+void CommitTxToMempool(
     const CTransactionRef &ptx,
     const CTxMemPoolEntry& pMempoolEntry,
     bool fTxValidForFeeEstimation,
@@ -859,13 +862,13 @@ bool CommitTxToMempool(
             gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
             gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
         if (!pool.exists(txid)) {
-            return state.DoS(0, false, REJECT_INSUFFICIENTFEE,
-                             "mempool full");
+            state.DoS(0, false, REJECT_INSUFFICIENTFEE,
+                     "mempool full");
+            return;
         }
     }
     // Notify subscribers that a new txn was added to the mempool.
     GetMainSignals().TransactionAddedToMempool(ptx);
-    return true;
 }
 
 CTxnValResult TxnValidation(
@@ -1161,22 +1164,74 @@ CTxnValResult TxnValidation(
                   fTxValidForFeeEstimation};
 }
 
+std::vector<CTxnValResult> TxnValidationBatchProcessing(
+    const TxInputDataSPtrRefVec& vTxInputData,
+    const Config& config,
+    CTxMemPool& pool,
+    CTxnHandlers& handlers) {
+
+    std::vector<CTxnValResult> results {};
+    results.reserve(vTxInputData.size());
+    for (const auto& elem : vTxInputData) {
+        // Forward results to the next processing stage
+        results.emplace_back(
+            // Execute validation for the given txn
+            TxnValidation(
+                    elem,
+                    config,
+                    pool,
+                    handlers.mpTxnDoubleSpendDetector));
+    }
+    return results;
+}
+
+static void HandleInvalidP2POrphanTxn(
+    const CTxnValResult& txStatus,
+    CTxnHandlers& handlers);
+
+static void HandleInvalidP2PNonOrphanTxn(
+    const CTxnValResult& txStatus,
+    CTxnHandlers& handlers);
+
+static void HandleInvalidStateForP2PNonOrphanTxn(
+    const CNodePtr& pNode,
+    const CTxnValResult& txStatus,
+    int nDoS,
+    CTxnHandlers& handlers);
+
+static void PostValidationStepsForP2PTxn(
+    const CTxnValResult& txStatus,
+    CTxMemPool& pool,
+    CTxnHandlers& handlers);
+
 static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
+    const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
     const TxSource source = txStatus.mTxInputData->mTxSource;
+    std::string sTxnStatusMsg;
+    if (!fOrphanTxn && state.IsMissingInputs()) {
+        sTxnStatusMsg = "detected orphan";
+    } else if (fOrphanTxn && !state.IsMissingInputs()) {
+        sTxnStatusMsg = "invalid orphan";
+    } else if (!fOrphanTxn) {
+        sTxnStatusMsg = "rejected " + FormatStateMessage(state);
+    } else {
+        sTxnStatusMsg = "rejected orphan";
+    }
     LogPrint(BCLog::TXNVAL,
             "%s: txn= %s %s\n",
-             TxSourceToString(source),
+             enum_cast<std::string>(source),
              tx.GetId().ToString(),
-             state.IsMissingInputs() ? "detected orphan" : "rejected " + FormatStateMessage(state));
+             sTxnStatusMsg);
 }
 
 static void LogTxnCommitStatus(
     const CTxnValResult& txStatus,
     CTxMemPool& pool) {
 
+    const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
@@ -1185,11 +1240,26 @@ static void LogTxnCommitStatus(
     const std::string csPeerId {
         TxSource::p2p == source ? (pNode ? std::to_string(pNode->GetId()) : "-1")  : ""
     };
+    std::string sTxnStatusMsg;
+    if (state.IsValid()) {
+        if (!fOrphanTxn) {
+            sTxnStatusMsg = "accepted";
+        } else {
+            sTxnStatusMsg = "accepted orphan";
+        }
+    } else {
+        if (!fOrphanTxn) {
+            sTxnStatusMsg = "rejected ";
+        } else {
+            sTxnStatusMsg = "rejected orphan ";
+        }
+        sTxnStatusMsg += FormatStateMessage(state);
+    }
     LogPrint(state.IsValid() ? BCLog::MEMPOOL : BCLog::MEMPOOLREJ,
             "%s: txn= %s %s (poolsz %u txn, %u kB) %s\n",
-             TxSourceToString(source),
+             enum_cast<std::string>(source),
              tx.GetId().ToString(),
-             state.IsValid() ? "accepted" : "rejected " + FormatStateMessage(state),
+             sTxnStatusMsg,
              pool.size(),
              pool.DynamicMemoryUsage() / 1000,
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
@@ -1201,21 +1271,35 @@ void ProcessValidatedTxn(
     CTxnHandlers& handlers,
     bool fLimitMempoolSize) {
 
+    TxSource source {
+        txStatus.mTxInputData->mTxSource
+    };
     CValidationState& state = txStatus.mState;
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
     const CTransaction &tx = *ptx;
     /**
      * 1. Txn validation has failed
+     *    - Handle an invalid state for p2p txn
      *    - Log txn invalid status
      *    - Uncache coins
      *    - Remove double spends
      * 2. Txn validation has succeeded
      *    - Submit txn to the mempool
+     *    - Execute post validation steps for p2p txn
      *    - Log commit status
      *    - Remove double spends
      */
     // Txn validation has failed.
     if (!state.IsValid()) {
+        // Handle an invalid state for p2p txn.
+        if (TxSource::p2p == source) {
+            const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
+            if (fOrphanTxn) {
+                HandleInvalidP2POrphanTxn(txStatus, handlers);
+            } else {
+                HandleInvalidP2PNonOrphanTxn(txStatus, handlers);
+            }
+        }
         // Logging txn status
         LogTxnInvalidStatus(txStatus);
     }
@@ -1233,6 +1317,10 @@ void ProcessValidatedTxn(
             state,
             handlers.mJournalChangeSet,
             fLimitMempoolSize);
+        // Check txn's commit status and do all required actions.
+        if (TxSource::p2p == source) {
+            PostValidationStepsForP2PTxn(txStatus, pool, handlers);
+        }
         // Logging txn commit status
         LogTxnCommitStatus(txStatus, pool);
     }
@@ -1246,6 +1334,245 @@ void ProcessValidatedTxn(
     // - txn validation has failed
     // - txn committed to the mempool or rejected
     handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
+}
+
+static void AskForMissingParents(
+    const CNodePtr& pNode,
+    const CTransaction &tx) {
+
+    for (const CTxIn &txin : tx.vin) {
+        // FIXME: MSG_TX should use a TxHash, not a TxId.
+        CInv inv(MSG_TX, txin.prevout.GetTxId());
+        pNode->AddInventoryKnown(inv);
+        if (!AlreadyHave(inv)) {
+            pNode->AskFor(inv);
+        }
+    }
+}
+
+static void HandleOrphanAndRejectedP2PTxns(
+    const CNodePtr& pNode,
+    const CTxnValResult& txStatus,
+    CTxnHandlers& handlers) {
+
+    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransaction &tx = *ptx;
+    // It may be the case that the orphans parents have all been rejected.
+    bool fRejectedParents = false;
+    for (const CTxIn &txin : tx.vin) {
+        if (handlers.mpTxnRecentRejects->isRejected(txin.prevout.GetTxId())) {
+            fRejectedParents = true;
+            break;
+        }
+    }
+    if (!fRejectedParents) {
+        // Add txn to the orphan queue if it is not there.
+        if (!handlers.mpOrphanTxnsP2PQ->checkTxnExists(tx.GetId())) {
+            AskForMissingParents(pNode, tx);
+            handlers.mpOrphanTxnsP2PQ->addTxn(txStatus.mTxInputData);
+        }
+        // DoS prevention: do not allow mpOrphanTxnsP2PQ to grow unbounded
+        unsigned int nMaxOrphanTxns {
+            static_cast<unsigned int>(
+                    std::max(gArgs.GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS),
+                             (int64_t)0))
+        };
+        unsigned int nEvicted = handlers.mpOrphanTxnsP2PQ->limitTxnsNumber(nMaxOrphanTxns);
+        if (nEvicted > 0) {
+            LogPrint(BCLog::MEMPOOL,
+                    "%s: mapOrphan overflow, removed %u tx\n",
+                     enum_cast<std::string>(TxSource::p2p),
+                     nEvicted);
+        }
+    } else {
+        // We will continue to reject this tx since it has rejected
+        // parents so avoid re-requesting it from other peers.
+        handlers.mpTxnRecentRejects->insert(tx.GetId());
+        LogPrint(BCLog::MEMPOOL,
+                "%s: not keeping orphan with rejected parents txn= %s txnsrc peer=%d \n",
+                 enum_cast<std::string>(TxSource::p2p),
+                 tx.GetId().ToString(),
+                 pNode->GetId());
+    }
+}
+
+void CreateTxRejectMsgForP2PTxn(
+    const TxInputDataSPtr& pTxInputData,
+    unsigned int nRejectCode,
+    const std::string& sRejectReason) {
+
+    const CNodePtr& pNode = pTxInputData->mpNode;
+    // Never send validation's internal codes over P2P.
+    if (pNode && nRejectCode > 0 && nRejectCode < REJECT_INTERNAL) {
+        const CNetMsgMaker msgMaker(pNode->GetSendVersion());
+        // Push tx reject message
+        g_connman->PushMessage(
+                        pNode,
+                        msgMaker.Make(
+                            NetMsgType::REJECT, std::string(NetMsgType::TX),
+                            uint8_t(nRejectCode),
+                            sRejectReason.substr(0, MAX_REJECT_MESSAGE_LENGTH),
+                            pTxInputData->mpTx->GetId()));
+    }
+}
+
+static void HandleInvalidP2POrphanTxn(
+    const CTxnValResult& txStatus,
+    CTxnHandlers& handlers) {
+
+    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
+    if (!pNode) {
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        return;
+    }
+    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransaction &tx = *ptx;
+    const CValidationState& state = txStatus.mState;
+    // Handle invalid orphan txn for which all inputs are known
+    if (!state.IsMissingInputs()) {
+        int nDoS = 0;
+        if (state.IsInvalid(nDoS) && nDoS > 0) {
+            // Punish peer that gave us an invalid orphan tx
+            Misbehaving(pNode->GetId(), nDoS, "invalid-orphan-tx");
+            // Remove all orphan txns queued from the punished peer
+            handlers.mpOrphanTxnsP2PQ->eraseTxnsFromPeer(pNode->GetId());
+        } else {
+            // Erase an invalid orphan as we don't want to reprocess it again.
+            handlers.mpOrphanTxnsP2PQ->eraseTxn(tx.GetId());
+        }
+        // Has inputs but not accepted to mempool
+        // Probably non-standard or insufficient fee/priority
+        if (!state.CorruptionPossible()) {
+            // Do not use rejection cache for witness
+            // transactions or witness-stripped transactions, as
+            // they can have been malleated. See
+            // https://github.com/bitcoin/bitcoin/issues/8279
+            // for details.
+            handlers.mpTxnRecentRejects->insert(tx.GetId());
+        }
+        // Create reject msg if non-internal reject code was returned from txn validation.
+        CreateTxRejectMsgForP2PTxn(
+            txStatus.mTxInputData,
+            state.GetRejectCode(),
+            state.GetRejectReason());
+    }
+    // No-operation defined for a known orphan with missing inputs.
+}
+
+static void HandleInvalidP2PNonOrphanTxn(
+    const CTxnValResult& txStatus,
+    CTxnHandlers& handlers) {
+
+    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
+    if (!pNode) {
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        return;
+    }
+    const CValidationState& state = txStatus.mState;
+    // Handle txn with missing inputs
+    if (state.IsMissingInputs()) {
+        HandleOrphanAndRejectedP2PTxns(pNode, txStatus, handlers);
+    // Handle an invalid state
+    } else {
+        int nDoS = 0;
+        if (state.IsInvalid(nDoS)) {
+            // Handle invalid state
+            HandleInvalidStateForP2PNonOrphanTxn(pNode, txStatus, nDoS, handlers);
+        }
+    }
+    // No-operation defined for a known orphan with missing inputs.
+}
+
+static void HandleInvalidStateForP2PNonOrphanTxn(
+    const CNodePtr& pNode,
+    const CTxnValResult& txStatus,
+    int nDoS,
+    CTxnHandlers& handlers) {
+
+    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransaction &tx = *ptx;
+    const CValidationState& state = txStatus.mState;
+
+    if (!state.CorruptionPossible()) {
+        // Do not use rejection cache for witness transactions or
+        // witness-stripped transactions, as they can have been
+        // malleated. See https://github.com/bitcoin/bitcoin/issues/8279
+        // for details.
+        handlers.mpTxnRecentRejects->insert(tx.GetId());
+        if (RecursiveDynamicUsage(tx) < 100000) {
+            handlers.mpOrphanTxnsP2PQ->addToCompactExtraTxns(ptx);
+        }
+    }
+    bool fWhiteListForceRelay {
+            gArgs.GetBoolArg("-whitelistforcerelay",
+                              DEFAULT_WHITELISTFORCERELAY)
+    };
+    if (pNode->fWhitelisted && fWhiteListForceRelay) {
+        auto nodeId = pNode->GetId();
+        // Always relay transactions received from whitelisted peers,
+        // even if they were already in the mempool or rejected from it
+        // due to policy, allowing the node to function as a gateway for
+        // nodes hidden behind it.
+        //
+        // Never relay transactions that we would assign a non-zero DoS
+        // score for, as we expect peers to do the same with us in that
+        // case.
+        if (nDoS == 0) {
+            LogPrint(BCLog::TXNVAL,
+                    "%s: Force relaying tx %s from whitelisted peer=%d\n",
+                     enum_cast<std::string>(TxSource::p2p),
+                     tx.GetId().ToString(),
+                     nodeId);
+            RelayTransaction(tx, *g_connman);
+         } else {
+            LogPrint(BCLog::TXNVAL,
+                    "%s: Not relaying invalid txn %s from whitelisted peer=%d (%s)\n",
+                     enum_cast<std::string>(TxSource::p2p),
+                     tx.GetId().ToString(),
+                     nodeId,
+                     FormatStateMessage(state));
+        }
+    }
+    // Create reject msg if non-internal reject code was returned from txn validation.
+    CreateTxRejectMsgForP2PTxn(
+        txStatus.mTxInputData,
+        state.GetRejectCode(),
+        state.GetRejectReason());
+    if (nDoS > 0) {
+        // Punish peer that gave us an invalid tx
+        Misbehaving(pNode->GetId(), nDoS, state.GetRejectReason());
+    }
+}
+
+static void PostValidationStepsForP2PTxn(
+    const CTxnValResult& txStatus,
+    CTxMemPool& pool,
+    CTxnHandlers& handlers) {
+
+    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
+    if (!pNode) {
+        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+        return;
+    }
+    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransaction &tx = *ptx;
+    const CValidationState& state = txStatus.mState;
+    // Post processing step for successfully commited txns (non-orphans & orphans)
+    if (state.IsValid()) {
+        pool.check(GetSpendHeight(pcoinsTip), pcoinsTip, handlers.mJournalChangeSet);
+        RelayTransaction(*ptx, *g_connman);
+        pNode->nLastTXTime = GetTime();
+        // At this stage we want to collect outpoints of successfully submitted txn.
+        // There might be other related txns being validated at the same time.
+        handlers.mpOrphanTxnsP2PQ->collectTxnOutpoints(tx);
+        // Remove tx if it was queued as an orphan txn.
+        handlers.mpOrphanTxnsP2PQ->eraseTxn(tx.GetId());
+    }
+    // For P2P txns the Validator executes LimitMempoolSize when a batch of txns is
+    // fully processed (validation is finished and all valid txns were commited)
+    // so the else condition can not be interpreted if limit mempool size flag
+    // is set on transaction level. As a consequence AddToCompactExtraTransactions is not
+    // being called for txns added and then removed from the mempool.
 }
 
 /**
@@ -2171,7 +2498,7 @@ bool CScriptCheck::operator()() {
 }
 
 int GetSpendHeight(const CCoinsViewCache &inputs) {
-    LOCK(cs_main);
+    //LOCK(cs_main);
     CBlockIndex *pindexPrev = mapBlockIndex.find(inputs.GetBestBlock())->second;
     return pindexPrev->nHeight + 1;
 }

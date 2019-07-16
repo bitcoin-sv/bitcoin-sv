@@ -49,6 +49,7 @@ class Config;
 class CNode;
 class CScheduler;
 class CTxnPropagator;
+class CTxnValidator;
 
 using CNodePtr = std::shared_ptr<CNode>;
 
@@ -241,6 +242,74 @@ public:
                 results.emplace_back(make_task(mThreadPool, func, node));
         }
 
+        return results;
+    };
+
+    /** Call the specified function for parallel validation (batch processing) */
+    template <typename Callable>
+    auto ParallelTxValidationBatchProcessing(
+            Callable&& func,
+            size_t nTxnsPerTaskThreshold,
+            const Config* config,
+            CTxMemPool *pool,
+            TxInputDataSPtrVec& vNewTxns,
+            CTxnHandlers& handlers)
+        -> std::vector<std::future<typename std::result_of<
+            Callable(const TxInputDataSPtrRefVec&,
+                const Config*,
+                CTxMemPool*,
+                CTxnHandlers&)>::type>> {
+        using resultType = typename std::result_of<
+            Callable(const TxInputDataSPtrRefVec&,
+                const Config*,
+                CTxMemPool*,
+                CTxnHandlers&)>::type;
+        // A variable which stors results
+        std::vector<std::future<resultType>> results {};
+        size_t numThreads = mValidatorThreadPool.getPoolSize();
+        // Calculate txns per thread ratio.
+        size_t nTxnsPerTaskRatio {vNewTxns.size() / numThreads};
+        // Calculate number of txns for batch processing (per thread)
+        size_t nBatchSize {0};
+        if (nTxnsPerTaskRatio < nTxnsPerTaskThreshold) {
+            nBatchSize = vNewTxns.size();
+        } else {
+            nBatchSize = vNewTxns.size() / numThreads;
+            if (vNewTxns.size() % numThreads) {
+                ++nBatchSize;
+            }
+        }
+        // Allocate a buffer for results
+        size_t nNumOfBatches = (nTxnsPerTaskRatio < nTxnsPerTaskThreshold) ? 1 : numThreads;
+        results.reserve(nNumOfBatches);
+        auto chunkBeginIter = vNewTxns.begin();
+        auto chunkEndIter = vNewTxns.begin();
+        size_t currChunkBeginPos {0};
+        // Lambda function which creats a task with batch txns
+        auto create_batch_task {
+            [&](const TxInputDataSPtrRefVec& vBatchTxns) {
+                results.emplace_back(
+                        make_task(mValidatorThreadPool, func,
+                            vBatchTxns,
+                            config,
+                            pool,
+                            handlers));
+                }
+        };
+        // Calculate a chunk of txns & create a task which executes a batch processing.
+        while (currChunkBeginPos + nBatchSize <= vNewTxns.size()) {
+            std::advance(chunkEndIter, nBatchSize);
+            const TxInputDataSPtrRefVec vBatchTxns(chunkBeginIter, chunkEndIter);
+            create_batch_task(vBatchTxns);
+            chunkBeginIter = chunkEndIter;
+            currChunkBeginPos += nBatchSize;
+        }
+        // Last chunk
+        size_t nLastChunkSize = vNewTxns.size() - currChunkBeginPos;
+        if (nLastChunkSize) {
+            const TxInputDataSPtrRefVec vBatchTxns(chunkBeginIter, vNewTxns.end());
+            create_batch_task(vBatchTxns);
+        }
         return results;
     };
 
@@ -447,6 +516,10 @@ private:
     std::shared_ptr<CTxnPropagator> mTxnPropagator {};
 
     CThreadPool<CQueueAdaptor> mThreadPool { "ConnmanPool" };
+
+    /** Transaction validator */
+    std::shared_ptr<CTxnValidator> mTxnValidator {};
+    CThreadPool<CQueueAdaptor> mValidatorThreadPool { "ValidatorPool" };
 
     CThreadInterrupt interruptNet;
 

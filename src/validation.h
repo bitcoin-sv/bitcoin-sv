@@ -502,8 +502,9 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
  * @param changeSet A reference to the Jorunal ChangeSet
  * @param limit A size limit for txn to remove
  * @param age Time limit for txn to remove
+ * @return A vector with all TxIds which were removed from the mempool
  */
-void LimitMempoolSize(
+std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     mining::CJournalChangeSetPtr& changeSet,
     size_t limit,
@@ -520,9 +521,8 @@ void LimitMempoolSize(
  * @param state A reference to a state variable
  * @param changeSet A reference to the Jorunal ChangeSet
  * @param fLimitMempoolSize A flag to limit a mempool size
- * @return true if txn is successfully commited, false otherwise
  */
-bool CommitTxToMempool(const CTransactionRef &ptx,
+void CommitTxToMempool(const CTransactionRef &ptx,
                        const CTxMemPoolEntry& entry,
                        bool fTxValidForFeeEstimation,
                        CTxMemPool::setEntries& setAncestors,
@@ -548,6 +548,20 @@ CTxnValResult TxnValidation(
     TxnDoubleSpendDetectorSPtr dsDetector);
 
 /**
+ * Batch processing support for txns validation.
+ *
+ * @param vTxInputData A vector of txns data
+ * @param config A reference to a configuration
+ * @param pool A reference to the mempool
+ * @return A vector of validation results
+ */
+std::vector<CTxnValResult> TxnValidationBatchProcessing(
+    const TxInputDataSPtrRefVec& vTxInputData,
+    const Config &config,
+    CTxMemPool &pool,
+    CTxnHandlers& handlers);
+
+/**
  * Process validated txn. Submit txn to the mempool if it is valid.
  *
  * @param pool A reference to the mempool
@@ -560,6 +574,18 @@ void ProcessValidatedTxn(
     CTxnValResult& txStatus,
     CTxnHandlers& handlers,
     bool fLimitMempoolSize);
+
+/**
+ * Create a tx reject message.
+ *
+ * @param pTxInputData A reference to transaction's details
+ * @param nRejectCode A reject code
+ * @param sRejectReason A reject reason
+ */
+void CreateTxRejectMsgForP2PTxn(
+    const TxInputDataSPtr& pTxInputData,
+    unsigned int nRejectCode,
+    const std::string& sRejectReason);
 
 /**
  * (try to) add transaction to memory pool

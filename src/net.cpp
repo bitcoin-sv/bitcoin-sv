@@ -21,6 +21,7 @@
 #include "primitives/transaction.h"
 #include "scheduler.h"
 #include "txn_propagator.h"
+#include "txn_validator.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
 
@@ -2480,7 +2481,12 @@ CConnman::CConnman(
     nBestHeight = 0;
     clientInterface = nullptr;
     flagInterruptMsgProc = false;
-
+    // Create an instance of the Validator
+    mTxnValidator =
+        std::make_shared<CTxnValidator>(
+            configIn,
+            mempool,
+            std::make_shared<CTxnDoubleSpendDetector>());
     mTxnPropagator = std::make_shared<CTxnPropagator>();
 }
 
@@ -2678,6 +2684,7 @@ void CConnman::Stop() {
         fAddressesInitialized = false;
     }
 
+   mTxnValidator->shutdown();
    mTxnPropagator->shutdown();
 
     // Close sockets

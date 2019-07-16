@@ -12,6 +12,12 @@
 #include <boost/test/unit_test.hpp>
 
 namespace {
+    // Support for P2P node.
+    CService ip(uint32_t i) {
+        struct in_addr s;
+        s.s_addr = i;
+        return CService(CNetAddr(s), Params().GetDefaultPort());
+    }
     // Create scriptPubKey from a given key
     CScript GetScriptPubKey(CKey& key) {
         CScript scriptPubKey = CScript() << ToByteVector(key.GetPubKey())
@@ -51,7 +57,7 @@ namespace {
         };
         return spends;
     }
-    // Create txInputData for a given txn and source
+    // Create txn input data for a given txn and source
     TxInputDataSPtr TxInputData(TxSource source,
                                 CMutableTransaction& spend,
                                 std::shared_ptr<CNode> pNode = nullptr) {
@@ -63,6 +69,42 @@ namespace {
                                    false,    // mfLimitFree
                                    Amount(0),// nAbsurdFee
                                    pNode);   // pNode
+    }
+    // Create a vector with input data for a given txn and source
+    std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
+                                                std::vector<CMutableTransaction>& spends,
+                                                std::shared_ptr<CNode> pNode = nullptr) {
+        std::vector<TxInputDataSPtr> vTxInputData {};
+        for (auto& elem : spends) {
+            vTxInputData.
+                emplace_back(
+                        std::make_shared<CTxInputData>(
+                                            source,   // tx source
+                                            MakeTransactionRef(elem),  // a pointer to the tx
+                                            GetTime(),// nAcceptTime
+                                            false,    // mfLimitFree
+                                            Amount(0),// nAbsurdFee
+                                            pNode));   // pNode
+        }
+        return vTxInputData;
+    }
+    // Validate txn using asynchronous validation interface
+    void ProcessTxnsAsynchApi(std::vector<CMutableTransaction>& spends,
+                                       TxSource source,
+                                       std::shared_ptr<CNode> pNode = nullptr) {
+        // Create txn validator
+        std::shared_ptr<CTxnValidator> txnValidator {
+            std::make_shared<CTxnValidator>(
+                    GlobalConfig::GetConfig(),
+                    mempool,
+                    std::make_shared<CTxnDoubleSpendDetector>())
+        };
+        // Clear mempool before validation
+        mempool.clear();
+        // Schedule txns for processing.
+        txnValidator->newTransaction(TxInputDataVec(source, spends, pNode));
+        // Wait for the Validator to process all queued txns.
+        txnValidator->waitForEmptyQueue();
     }
     // Validate txn using synchronous validation interface
     void ProcessTxnsSynchApi(std::vector<CMutableTransaction>& spends,
@@ -115,7 +157,42 @@ BOOST_AUTO_TEST_CASE(txn_validator_creation) {
                 mempool,
                 std::make_shared<CTxnDoubleSpendDetector>())
     };
-	BOOST_REQUIRE(txnValidator);
+    // Check if the Validator was created
+    BOOST_REQUIRE(txnValidator);
+    // Check if orphan txns buffer was created
+    BOOST_REQUIRE(txnValidator->getOrphanTxnsPtr());
+    // Check if txn recent rejects buffer was created
+    BOOST_REQUIRE(txnValidator->getTxnRecentRejectsPtr());
+}
+
+BOOST_AUTO_TEST_CASE(txn_validator_set_get_frequency) {
+    // Create txn validator
+    std::shared_ptr<CTxnValidator> txnValidator {
+        std::make_shared<CTxnValidator>(
+                GlobalConfig::GetConfig(),
+                mempool,
+                std::make_shared<CTxnDoubleSpendDetector>())
+    };
+    auto defaultfreq = std::chrono::milliseconds(CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS);
+    BOOST_CHECK(defaultfreq == txnValidator->getRunFrequency());
+    txnValidator->setRunFrequency(++defaultfreq);
+    BOOST_CHECK(defaultfreq == txnValidator->getRunFrequency());
+}
+
+BOOST_AUTO_TEST_CASE(txn_validator_istxnknown) {
+    // Create txn validator
+    std::shared_ptr<CTxnValidator> txnValidator {
+        std::make_shared<CTxnValidator>(
+                GlobalConfig::GetConfig(),
+                mempool,
+                std::make_shared<CTxnDoubleSpendDetector>())
+    };
+    // Schedule txns for processing.
+    txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, spendsN));
+    BOOST_CHECK(txnValidator->isTxnKnown(spendsN[0].GetId()));
+    // Wait for the Validator to process all queued txns.
+    txnValidator->waitForEmptyQueue();
+    BOOST_CHECK(!txnValidator->isTxnKnown(spendsN[0].GetId()));
 }
 
 /**
@@ -131,11 +208,73 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
     // Test: Txns from file.
     ProcessTxnsSynchApi(spends2, TxSource::file);
     BOOST_CHECK_EQUAL(mempool.size(), 1);
+    // Test: Txns from p2p.
+    {
+        // Create a dummy address
+        CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
+        std::shared_ptr<CNode> pDummyNode {
+            std::make_shared<CNode>(0, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
+        };
+        ProcessTxnsSynchApi(spends2, TxSource::p2p, pDummyNode);
+        BOOST_CHECK_EQUAL(mempool.size(), 1);
+    }
+    // Process txn if it is valid.
+    ProcessTxnsSynchApi(spends2, TxSource::p2p);
+    BOOST_CHECK_EQUAL(mempool.size(), 1);
     // Test: Txns from reorg.
     ProcessTxnsSynchApi(spends2, TxSource::reorg);
     BOOST_CHECK_EQUAL(mempool.size(), 1);
     // Process txn if it is valid.
     ProcessTxnsSynchApi(spends2, TxSource::unknown);
+    BOOST_CHECK_EQUAL(mempool.size(), 1);
+}
+
+/**
+ * TxnValidator: Test asynch interface.
+ */
+BOOST_AUTO_TEST_CASE(txnvalidator_wallet_doublespend_via_asynch_api) {
+    // Test: Txns from wallet.
+    ProcessTxnsAsynchApi(spendsN, TxSource::wallet);
+    BOOST_CHECK_EQUAL(mempool.size(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_rpc_doublespend_via_asynch_api) {
+    // Test: Txns from rpc.
+    ProcessTxnsAsynchApi(spendsN, TxSource::rpc);
+    BOOST_CHECK_EQUAL(mempool.size(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_file_doublespend_via_asynch_api) {
+    // Test: Txns from file.
+    ProcessTxnsAsynchApi(spendsN, TxSource::file);
+    BOOST_CHECK_EQUAL(mempool.size(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_p2p_doublespend_via_asynch_api) {
+    // Test: Txns from p2p.
+    {
+        // Create a dummy address
+        CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
+        std::shared_ptr<CNode> pDummyNode {
+            std::make_shared<CNode>(0, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
+        };
+        ProcessTxnsAsynchApi(spendsN, TxSource::p2p, pDummyNode);
+        BOOST_CHECK_EQUAL(mempool.size(), 1);
+    }
+    // Process txn if it is valid.
+    ProcessTxnsAsynchApi(spendsN, TxSource::p2p);
+    BOOST_CHECK_EQUAL(mempool.size(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_reorg_doublespend_via_asynch_api) {
+    // Test: Txns from reorg.
+    ProcessTxnsAsynchApi(spendsN, TxSource::reorg);
+    BOOST_CHECK_EQUAL(mempool.size(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_dummy_doublespend_via_asynch_api) {
+    // Process txn if it is valid.
+    ProcessTxnsAsynchApi(spendsN, TxSource::unknown);
     BOOST_CHECK_EQUAL(mempool.size(), 1);
 }
 

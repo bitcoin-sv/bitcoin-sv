@@ -38,6 +38,8 @@
 #include "torcontrol.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "txn_validation_config.h"
+#include "txn_validator.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -393,10 +395,6 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-loadblock=<file>",
         _("Imports blocks from external blk000??.dat file on startup"));
-    strUsage += HelpMessageOpt(
-        "-maxorphantx=<n>", strprintf(_("Keep at most <n> unconnectable "
-                                        "transactions in memory (default: %u)"),
-                                      DEFAULT_MAX_ORPHAN_TRANSACTIONS));
     strUsage += HelpMessageOpt("-maxmempool=<n>",
                                strprintf(_("Keep the transaction memory pool "
                                            "below <n> megabytes (default: %u)"),
@@ -420,11 +418,6 @@ std::string HelpMessage(HelpMessageMode mode) {
                        strprintf(_("Whether to save the mempool on shutdown "
                                    "and load on restart (default: %u)"),
                                  DEFAULT_PERSIST_MEMPOOL));
-    strUsage += HelpMessageOpt(
-        "-blockreconstructionextratxn=<n>",
-        strprintf(_("Extra transactions to keep in memory for compact block "
-                    "reconstructions (default: %u)"),
-                  DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN));
     strUsage += HelpMessageOpt(
         "-par=<n>",
         strprintf(_("Set the number of script verification threads (%u to %d, "
@@ -999,6 +992,35 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-invalidheaderfreq=<n>",
          strprintf("Set the limit on the number of message headers transmitted from the local node over a given time period (default: %d)",
            DEFAULT_INVALID_HEADER_FREQUENCY)) ;
+
+    /** COrphanTxns */
+    strUsage += HelpMessageGroup(_("Orphan txns config :"));
+    strUsage += HelpMessageOpt(
+        "-blockreconstructionextratxn=<n>",
+        strprintf(_("Extra transactions to keep in memory for compact block "
+                    "reconstructions (default: %u)"),
+            DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN));
+    strUsage += HelpMessageOpt(
+        "-maxorphantx=<n>",
+        strprintf(_("Keep at most <n> unconnectable "
+                    "transactions in memory (default: %u)"),
+            DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+    strUsage += HelpMessageOpt(
+        "-maxcollectedoutpoints=<n>",
+        strprintf(_("Keep at most <n> collected "
+                    "outpoints in memory (default: %u)"),
+            COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS));
+
+    /** TxnValidator */
+    strUsage += HelpMessageGroup(_("TxnValidator options:"));
+    strUsage += HelpMessageOpt(
+        "-txnspertaskthreshold=<n>",
+        strprintf("Set the limit on the min number of txns per task (default: %d)",
+            DEFAULT_TXNS_PER_TASK_THRESHOLD)) ;
+    strUsage += HelpMessageOpt(
+        "-txnvalidationasynchrunfreq=<n>",
+        strprintf("Set run frequency in asynchronous mode (default: %dms)",
+            CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS)) ;
 
     return strUsage;
 }

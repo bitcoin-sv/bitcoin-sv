@@ -52,6 +52,12 @@ struct CNodeStateStats {
     std::vector<int> vHeightInFlight;
 };
 
+/** Check if inv already known */
+bool AlreadyHave(const CInv &inv);
+
+/** Relay transaction */
+void RelayTransaction(const CTransaction &tx, CConnman &connman);
+
 /** Get statistics from node state */
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
 /** Increase a node's misbehavior score. */
