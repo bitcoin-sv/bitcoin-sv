@@ -24,6 +24,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "txmempool.h"
+#include "txn_validator.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
 #include "validation.h"
@@ -1050,10 +1051,7 @@ static UniValue sendrawtransaction(const Config &config,
             "\nAs a json rpc call\n" +
             HelpExampleRpc("sendrawtransaction", "\"signedhex\""));
     }
-
-    LOCK(cs_main);
     RPCTypeCheck(request.params, {UniValue::VSTR, UniValue::VBOOL});
-
     // parse hex string from parameter
     CMutableTransaction mtx;
     if (!DecodeHexTx(mtx, request.params[0].get_str())) {
@@ -1063,44 +1061,9 @@ static UniValue sendrawtransaction(const Config &config,
     CTransactionRef tx(MakeTransactionRef(std::move(mtx)));
     const uint256 &txid = tx->GetId();
 
-    bool fLimitFree = false;
     Amount nMaxRawTxFee = maxTxFee;
     if (request.params.size() > 1 && request.params[1].get_bool()) {
         nMaxRawTxFee = Amount(0);
-    }
-
-    CCoinsViewCache &view = *pcoinsTip;
-    bool fHaveChain = false;
-    for (size_t o = 0; !fHaveChain && o < tx->vout.size(); o++) {
-        const Coin &existingCoin = view.AccessCoin(COutPoint(txid, o));
-        fHaveChain = !existingCoin.IsSpent();
-    }
-
-    bool fHaveMempool = mempool.exists(txid);
-    if (!fHaveMempool && !fHaveChain) {
-        // Push to local node and sync with wallets.
-        CValidationState state;
-        bool fMissingInputs;
-        CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN) };
-        if (!AcceptToMemoryPool(config, mempool, state, std::move(tx),
-                                fLimitFree, &fMissingInputs, changeSet, false,
-                                nMaxRawTxFee)) {
-            if (state.IsInvalid()) {
-                throw JSONRPCError(RPC_TRANSACTION_REJECTED,
-                                   strprintf("%i: %s", state.GetRejectCode(),
-                                             state.GetRejectReason()));
-            } else {
-                if (fMissingInputs) {
-                    throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
-                }
-
-                throw JSONRPCError(RPC_TRANSACTION_ERROR,
-                                   state.GetRejectReason());
-            }
-        }
-    } else if (fHaveChain) {
-        throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN,
-                           "transaction already in block chain");
     }
 
     if (!g_connman) {
@@ -1108,9 +1071,58 @@ static UniValue sendrawtransaction(const Config &config,
             RPC_CLIENT_P2P_DISABLED,
             "Error: Peer-to-peer functionality missing or disabled");
     }
-
+    if (!mempool.exists(txid)) {
+        // Mempool Journal ChangeSet
+        CJournalChangeSetPtr changeSet {
+            mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
+        };
+        // Forward transaction to the validator and wait for results.
+        // To support backward compatibility (of this interface) we need
+        // to wait until the transaction is processed.
+        // At this stage any information about validation failure (or mempool rejects)
+        // are put into the log file.
+        const auto& txValidator = g_connman->getTxnValidator();
+        const CValidationState& status {
+            txValidator->processValidation(
+                            std::make_shared<CTxInputData>(
+                                                TxSource::rpc, // tx source
+                                                std::move(tx), // a pointer to the tx
+                                                GetTime(),     // nAcceptTime
+                                                false,         // fLimitFree
+                                                nMaxRawTxFee), // nAbsurdFee
+                            changeSet, // an instance of the journal
+                            true) // fLimitMempoolSize
+        };
+        // Check if the transaction was accepted by the mempool.
+        // Due to potential race-condition we have to explicitly call exists() instead of
+        // checking a result from the status variable.
+        if (!mempool.exists(txid)) {
+            if (!status.IsValid()) {
+                if (status.IsMissingInputs()) {
+                        throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
+                } else if (status.IsInvalid()) {
+                    throw JSONRPCError(RPC_TRANSACTION_REJECTED,
+                                       strprintf("%i: %s", status.GetRejectCode(),
+                                                 status.GetRejectReason()));
+                } else {
+                    throw JSONRPCError(RPC_TRANSACTION_ERROR, status.GetRejectReason());
+                }
+            }
+        // At this stage we do reject a request which reached this point due to a race
+        // condition so we can return correct error code to the caller.
+        } else if (!status.IsValid()) {
+            throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN,
+                               "Transaction already in the mempool");
+        }
+    } else {
+        throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN,
+                           "Transaction already in the mempool");
+    }
     CInv inv(MSG_TX, txid);
     TxMempoolInfo txinfo { mempool.info(txid) };
+    // It is possible that we relay txn which was added and removed from the mempool, because:
+    // - block was mined
+    // - the Validator's asynch mode removed the txn (and triggered reject msg)
     g_connman->EnqueueTransaction( {inv, txinfo} );
 
     LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
