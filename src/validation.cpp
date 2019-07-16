@@ -37,7 +37,7 @@
 #include "tinyformat.h"
 #include "txdb.h"
 #include "txmempool.h"
-#include "txn_handlers.h"
+#include "txn_validator.h"
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
@@ -1605,10 +1605,22 @@ static void UpdateMempoolForReorg(const Config &config,
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
         // ignore validation errors in resurrected transactions
-        CValidationState stateDummy;
-        if (!fAddToMempool || (*it)->IsCoinBase() ||
-            !AcceptToMemoryPool(config, mempool, stateDummy, *it, false,
-                                nullptr, changeSet, true)) {
+        bool fRemoveRecursive { !fAddToMempool || (*it)->IsCoinBase() };
+        if (!fRemoveRecursive) {
+            const auto& txValidator = g_connman->getTxnValidator();
+            const auto& state {
+                // Execute txn validation synchronously
+                txValidator->processValidation(
+                                std::make_shared<CTxInputData>(
+                                                    TxSource::reorg, // tx source
+                                                   *it,       // a pointer to the tx
+                                                    GetTime(),// nAcceptTime
+                                                    false),    // fLimitFree
+                                changeSet)
+            };
+            fRemoveRecursive = !state.IsValid();
+        }
+        if (fRemoveRecursive) {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
             mempool.removeRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
@@ -1618,14 +1630,16 @@ static void UpdateMempoolForReorg(const Config &config,
         ++it;
     }
     disconnectpool.queuedTx.clear();
-    // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
+    // Validator/addUnchecked all assume that new mempool entries have
     // no in-mempool children, which is generally not true when adding
     // previously-confirmed transactions back to the mempool.
     // UpdateTransactionsFromBlock finds descendants of any transactions in the
     // disconnectpool that were added back and cleans up the mempool state.
+    LogPrint(BCLog::MEMPOOL, "Update transactions from block");
     mempool.UpdateTransactionsFromBlock(vHashUpdate);
 
     // We also need to remove any now-immature transactions
+    LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions");
     mempool.removeForReorg(config, pcoinsTip, changeSet, chainActive.Tip()->nHeight + 1,
                            STANDARD_LOCKTIME_VERIFY_FLAGS);
     // Re-limit mempool size, in case we added any transactions
