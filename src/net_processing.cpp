@@ -363,8 +363,8 @@ void FinalizeNode(NodeId nodeid, bool &fUpdateConnectionTime) {
             ++it;
         }
     }
-
-    EraseOrphansFor(nodeid);
+    // Erase orphan txns received from the given nodeId
+    g_connman->EraseOrphanTxnsFromPeer(nodeid);
     nPreferredDownload -= state->fPreferredDownload;
     nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
     assert(nPeersWithValidatedDownloads >= 0);
@@ -917,36 +917,30 @@ void PeerLogicValidation::BlockConnected(
     const std::shared_ptr<const CBlock> &pblock, const CBlockIndex *pindex,
     const std::vector<CTransactionRef> &vtxConflicted) {
     LOCK(cs_main);
-
-    std::vector<uint256> vOrphanErase;
-
+    std::vector<uint256> vOrphanErase {};
     for (const CTransactionRef &ptx : pblock->vtx) {
         const CTransaction &tx = *ptx;
-
         // Which orphan pool entries must we evict?
         for (size_t j = 0; j < tx.vin.size(); j++) {
-            auto itByPrev = mapOrphanTransactionsByPrev.find(tx.vin[j].prevout);
-            if (itByPrev == mapOrphanTransactionsByPrev.end()) {
+            auto vOrphanTxns = g_connman->GetOrphanTxnsHash(tx.vin[j].prevout);
+            if (vOrphanTxns.empty()) {
                 continue;
-            }
-
-            for (auto mi = itByPrev->second.begin();
-                 mi != itByPrev->second.end(); ++mi) {
-                const CTransaction &orphanTx = *(*mi)->second.tx;
-                const uint256 &orphanHash = orphanTx.GetHash();
-                vOrphanErase.push_back(orphanHash);
+            } else {
+                vOrphanErase.insert(
+                        vOrphanErase.end(),
+                        std::make_move_iterator(vOrphanTxns.begin()),
+                        std::make_move_iterator(vOrphanTxns.end()));
             }
         }
     }
-
     // Erase orphan transactions include or precluded by this block
     if (vOrphanErase.size()) {
         int nErased = 0;
         for (uint256 &orphanId : vOrphanErase) {
-            nErased += EraseOrphanTx(orphanId);
+            nErased += g_connman->EraseOrphanTxn(orphanId);
         }
         LogPrint(BCLog::MEMPOOL,
-                 "Erased %d orphan tx included or conflicted by block\n",
+                 "Erased %d orphan txns included or conflicted by block\n",
                  nErased);
     }
 }
@@ -2853,7 +2847,7 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
                 }
 
                 PartiallyDownloadedBlock& partialBlock = *(*queuedBlockIt)->partialBlock;
-                ReadStatus status = partialBlock.InitData(cmpctblock, vExtraTxnForCompact);
+                ReadStatus status = partialBlock.InitData(cmpctblock, g_connman->GetCompactExtraTxns());
                 if(status == READ_STATUS_INVALID) {
                     // Reset in-flight state in case of whitelist
                     MarkBlockAsReceived(pindex->GetBlockHash());
@@ -2895,7 +2889,7 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
                 // download from. Optimistically try to reconstruct anyway
                 // since we might be able to without any round trips.
                 PartiallyDownloadedBlock tempBlock(config, &mempool);
-                ReadStatus status = tempBlock.InitData(cmpctblock, vExtraTxnForCompact);
+                ReadStatus status = tempBlock.InitData(cmpctblock, g_connman->GetCompactExtraTxns());
                 if(status != READ_STATUS_OK) {
                     // TODO: don't ignore failures
                     return true;
