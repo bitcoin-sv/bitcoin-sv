@@ -587,16 +587,6 @@ void CreateTxRejectMsgForP2PTxn(
     unsigned int nRejectCode,
     const std::string& sRejectReason);
 
-/**
- * (try to) add transaction to memory pool
- */
-bool AcceptToMemoryPool(const Config &config, CTxMemPool &pool,
-                        CValidationState &state, const CTransactionRef &tx,
-                        bool fLimitFree, bool *pfMissingInputs,
-                        mining::CJournalChangeSetPtr& changeSet,
-                        bool fOverrideMempoolLimit = false,
-                        const Amount nAbsurdFee = Amount(0));
-
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
 

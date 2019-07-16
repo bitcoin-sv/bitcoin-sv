@@ -8,7 +8,6 @@
 
 #include "net.h"
 #include "validationinterface.h"
-#include "orphan_txns.h"
 
 class Config;
 
