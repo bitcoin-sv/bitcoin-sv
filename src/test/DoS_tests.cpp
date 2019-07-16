@@ -12,9 +12,9 @@
 #include "pow.h"
 #include "script/sign.h"
 #include "serialize.h"
+#include "txn_validator.h"
 #include "util.h"
 #include "validation.h"
-
 #include "test/test_bitcoin.h"
 
 #include <cstdint>
@@ -22,24 +22,14 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/test/unit_test.hpp>
 
-// Tests these internal-to-net_processing.cpp methods:
-extern bool AddOrphanTx(const CTransactionRef &tx, NodeId peer);
-extern void EraseOrphansFor(NodeId peer);
-extern unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans);
-struct COrphanTx {
-    CTransactionRef tx;
-    NodeId fromPeer;
-    int64_t nTimeExpire;
-};
-extern std::map<uint256, COrphanTx> mapOrphanTransactions;
-
-CService ip(uint32_t i) {
-    struct in_addr s;
-    s.s_addr = i;
-    return CService(CNetAddr(s), Params().GetDefaultPort());
+namespace {
+    CService ip(uint32_t i) {
+        struct in_addr s;
+        s.s_addr = i;
+        return CService(CNetAddr(s), Params().GetDefaultPort());
+    }
+    NodeId id = 0;
 }
-
-static NodeId id = 0;
 
 BOOST_FIXTURE_TEST_SUITE(DoS_tests, TestingSetup)
 
@@ -130,23 +120,33 @@ BOOST_AUTO_TEST_CASE(DoS_bantime) {
     BOOST_CHECK(!connman->IsBanned(addr));
 }
 
-CTransactionRef RandomOrphan() {
-    std::map<uint256, COrphanTx>::iterator it;
-    it = mapOrphanTransactions.lower_bound(InsecureRand256());
-    if (it == mapOrphanTransactions.end()) {
-        it = mapOrphanTransactions.begin();
-    }
-    return it->second.tx;
-}
-
 BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
-    CKey key;
-    key.MakeNewKey(true);
     CBasicKeyStore keystore;
-    keystore.AddKey(key);
+    CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
+
+    size_t maxCollectedOutpoints {
+        static_cast<size_t>(
+            gArgs.GetArg("-maxcollectedoutpoints",
+                      COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS))
+    };
+    size_t maxExtraTxnsForCompactBlock {
+        static_cast<size_t>(
+            gArgs.GetArg("-blockreconstructionextratxn",
+                      DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN))
+    };
+    // A common buffer with orphan txns
+    std::shared_ptr<COrphanTxns> orphanTxns {
+        std::make_shared<COrphanTxns>(
+                            maxCollectedOutpoints,
+                            maxExtraTxnsForCompactBlock)
+    };
 
     // 50 orphan transactions:
-    for (int i = 0; i < 50; i++) {
+    for (NodeId i = 0; i < 50; i++) {
+        CKey key;
+        key.MakeNewKey(true);
+        keystore.AddKey(key);
+
         CMutableTransaction tx;
         tx.vin.resize(1);
         tx.vin[0].prevout = COutPoint(InsecureRand256(), 0);
@@ -155,14 +155,34 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
-
-        AddOrphanTx(MakeTransactionRef(tx), i);
+        auto pNode {
+            std::make_shared<CNode>(i, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
+        };
+        // Add txn input data to the queue
+        orphanTxns->addTxn(
+            std::make_shared<CTxInputData>(
+                                TxSource::p2p, // tx source
+                                MakeTransactionRef(tx),  // a pointer to the tx
+                                GetTime(),     // nAcceptTime
+                                false,         // mfLimitFree
+                                Amount(0),     // nAbsurdFee
+                                pNode));       // pNode
     }
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 50);
 
     // ... and 50 that depend on other orphans:
-    for (int i = 0; i < 50; i++) {
-        CTransactionRef txPrev = RandomOrphan();
+    for (NodeId i = 0; i < 50; i++) {
+        CKey key;
+        key.MakeNewKey(true);
+        keystore.AddKey(key);
+        // Get a random orphan txn
+        TxInputDataSPtr pRndTxInputData {
+            orphanTxns->getRndOrphanByLowerBound(InsecureRand256())
+        };
+        BOOST_CHECK(pRndTxInputData);
 
+        CTransactionRef txPrev = pRndTxInputData->mpTx;
+        // Create a dependant txn
         CMutableTransaction tx;
         tx.vin.resize(1);
         tx.vin[0].prevout = COutPoint(txPrev->GetId(), 0);
@@ -171,14 +191,30 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
         SignSignature(keystore, *txPrev, tx, 0, SigHashType());
-
-        AddOrphanTx(MakeTransactionRef(tx), i);
+        // Add txn input data to the queue
+        orphanTxns->addTxn(
+            std::make_shared<CTxInputData>(
+                                TxSource::p2p, // tx source
+                                MakeTransactionRef(tx),  // a pointer to the tx
+                                GetTime(),     // nAcceptTime
+                                false,         // mfLimitFree
+                                Amount(0),     // nAbsurdFee
+                                pRndTxInputData->mpNode)); // pNode
     }
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 100);
 
     // This really-big orphan should be ignored:
-    for (int i = 0; i < 10; i++) {
-        CTransactionRef txPrev = RandomOrphan();
+    for (NodeId i = 0; i < 10; i++) {
+        CKey key;
+        key.MakeNewKey(true);
+        keystore.AddKey(key);
+        // Get a random orphan txn
+        TxInputDataSPtr pRndTxInputData {
+            orphanTxns->getRndOrphanByLowerBound(InsecureRand256())
+        };
+        BOOST_CHECK(pRndTxInputData);
 
+        CTransactionRef txPrev = pRndTxInputData->mpTx;
         CMutableTransaction tx;
         tx.vout.resize(1);
         tx.vout[0].nValue = 1 * CENT;
@@ -193,24 +229,26 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         // (they don't have to be valid for this test)
         for (unsigned int j = 1; j < tx.vin.size(); j++)
             tx.vin[j].scriptSig = tx.vin[0].scriptSig;
-
-        BOOST_CHECK(!AddOrphanTx(MakeTransactionRef(tx), i));
+        // Create a shared object with txn input data
+        auto pTxInputData {
+            std::make_shared<CTxInputData>(
+                                TxSource::p2p, // tx source
+                                MakeTransactionRef(tx),  // a pointer to the tx
+                                GetTime(),     // nAcceptTime
+                                false,         // mfLimitFree
+                                Amount(0),     // nAbsurdFee
+                                pRndTxInputData->mpNode) // pNode
+        };
+        // Add txn input data to the queue
+        orphanTxns->addTxn(pTxInputData);
+        BOOST_CHECK(!orphanTxns->checkTxnExists(pTxInputData->mpTx->GetId()));
     }
-
-    // Test EraseOrphansFor:
+    // Test erase orphans from a given peer:
     for (NodeId i = 0; i < 3; i++) {
-        size_t sizeBefore = mapOrphanTransactions.size();
-        EraseOrphansFor(i);
-        BOOST_CHECK(mapOrphanTransactions.size() < sizeBefore);
+        size_t sizeBefore = orphanTxns->getTxnsNumber();
+        orphanTxns->eraseTxnsFromPeer(i);
+        BOOST_CHECK(orphanTxns->getTxnsNumber() < sizeBefore);
     }
-
-    // Test LimitOrphanTxSize() function:
-    LimitOrphanTxSize(40);
-    BOOST_CHECK(mapOrphanTransactions.size() <= 40);
-    LimitOrphanTxSize(10);
-    BOOST_CHECK(mapOrphanTransactions.size() <= 10);
-    LimitOrphanTxSize(0);
-    BOOST_CHECK(mapOrphanTransactions.empty());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
