@@ -26,6 +26,7 @@
 #include "script/sign.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "txn_validator.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -1784,14 +1785,11 @@ void CWallet::ReacceptWalletTransactions() {
             mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
         }
     }
-
     // Try to add wallet transactions to memory pool.
     for (std::pair<const int64_t, CWalletTx *> &item : mapSorted) {
         CWalletTx &wtx = *(item.second);
-
-        LOCK(mempool.cs);
         CValidationState state;
-        wtx.AcceptToMemoryPool(maxTxFee, state);
+        wtx.SubmitTxToMempool(maxTxFee, state);
     }
 }
 
@@ -1803,7 +1801,7 @@ bool CWalletTx::RelayWalletTransaction(CConnman *connman) {
 
     CValidationState state;
     // GetDepthInMainChain already catches known conflicts.
-    if (InMempool() || AcceptToMemoryPool(maxTxFee, state)) {
+    if (InMempool() || SubmitTxToMempool(maxTxFee, state)) {
         LogPrintf("Relaying wtx %s\n", GetId().ToString());
         if (connman) {
             CInv inv { MSG_TX, GetId() };
@@ -1988,12 +1986,7 @@ Amount CWalletTx::GetChange() const {
 }
 
 bool CWalletTx::InMempool() const {
-    LOCK(mempool.cs);
-    if (mempool.exists(GetId())) {
-        return true;
-    }
-
-    return false;
+    return mempool.exists(GetId());
 }
 
 bool CWalletTx::IsTrusted() const {
@@ -3075,7 +3068,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey,
 
     if (fBroadcastTransactions) {
         // Broadcast
-        if (!wtxNew.AcceptToMemoryPool(maxTxFee, state)) {
+        if (!wtxNew.SubmitTxToMempool(maxTxFee, state)) {
             LogPrintf("CommitTransaction(): Transaction cannot be "
                       "broadcast immediately, %s\n",
                       state.GetRejectReason());
@@ -4537,9 +4530,28 @@ int CMerkleTx::GetBlocksToMaturity() const {
     return std::max(0, (COINBASE_MATURITY + 1) - GetDepthInMainChain());
 }
 
-bool CMerkleTx::AcceptToMemoryPool(const Amount nAbsurdFee,
+bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
                                    CValidationState &state) {
-    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN) };
-    return ::AcceptToMemoryPool(GlobalConfig::GetConfig(), mempool, state, tx, true, nullptr,
-                                changeSet, false, nAbsurdFee);
+    // Check if g_connman is accessible
+    if (!g_connman) {
+        throw std::runtime_error("Error: P2P functionality missing or disabled");
+    }
+    // Mempool Journal ChangeSet
+    CJournalChangeSetPtr changeSet {
+        mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
+    };
+    // Forward transaction to the validator and wait for results.
+    // To support backward compatibility (of this interface) we need
+    // to wait until the transaction is processed.
+    const auto& txValidator = g_connman->getTxnValidator();
+    state = txValidator->processValidation(
+                            std::make_shared<CTxInputData>(
+                                                TxSource::wallet, // tx source
+                                                tx,           // a pointer to the tx
+                                                GetTime(),    // nAcceptTime
+                                                true,         // fLimitFree
+                                                nAbsurdFee),  // nAbsurdFee
+                            changeSet, // an instance of the mempool journal
+                            true); // fLimitMempoolSize
+    return state.IsValid();
 }
