@@ -343,6 +343,7 @@ bool CheckSequenceLocks(
     int flags,
     LockPoints *lp,
     bool useExistingLockPoints) {
+    // cs_main is held by TxnValidator during TxnValidation call.
     AssertLockHeld(pool.cs);
 
     CBlockIndex *tip = chainActive.Tip();
@@ -550,7 +551,7 @@ std::string FormatStateMessage(const CValidationState &state) {
 }
 
 static bool IsCurrentForFeeEstimation() {
-    AssertLockHeld(cs_main);
+    // cs_main is held by TxnValidator during TxnValidation call.
     if (IsInitialBlockDownload()) {
         return false;
     }
@@ -2514,7 +2515,6 @@ void ThreadScriptCheck(int workerNum) {
 // Returns the script flags which should be checked for a given block
 static uint32_t GetBlockScriptFlags(const Config &config,
                                     const CBlockIndex *pChainTip) {
-    AssertLockHeld(cs_main);
     const Consensus::Params &consensusparams =
         config.GetChainParams().GetConsensus();
 
