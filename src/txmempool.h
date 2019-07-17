@@ -598,9 +598,13 @@ public:
      * If sanity-checking is turned off, check does nothing.
      */
     void check(const CCoinsViewCache *pcoins, mining::CJournalChangeSetPtr& changeSet) const;
+    std::string checkJournal() const;
     void setSanityCheck(double dFrequency = 1.0) {
         nCheckFrequency = dFrequency * 4294967295.0;
     }
+
+    /** Rebuild the journal contents so they match the mempool */
+    void rebuildJournal() const;
 
     // addUnchecked must updated state for all ancestors of a given transaction,
     // to track size/count of descendant transactions. First version of

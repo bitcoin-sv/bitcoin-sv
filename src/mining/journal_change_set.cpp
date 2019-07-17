@@ -22,7 +22,8 @@ const enumTableT<JournalUpdateReason>& mining::enumTable(JournalUpdateReason)
         { JournalUpdateReason::REPLACE_TXN, "REPLACE_TXN" },
         { JournalUpdateReason::NEW_BLOCK,   "NEW_BLOCK" },
         { JournalUpdateReason::REORG,       "REORG" },
-        { JournalUpdateReason::INIT,        "INIT" }
+        { JournalUpdateReason::INIT,        "INIT" },
+        { JournalUpdateReason::RESET,       "RESET" }
     };
     return table;
 }
@@ -47,16 +48,18 @@ CJournalChangeSet::~CJournalChangeSet()
 }
 
 // Add a new operation to the set
+void CJournalChangeSet::addOperation(Operation op, CJournalEntry&& txn)
+{
+    std::unique_lock<std::mutex> lock { mMtx };
+    mChangeSet.emplace_back(op, std::move(txn));
+    addOperationCommon(op);
+}
+
 void CJournalChangeSet::addOperation(Operation op, const CJournalEntry& txn)
 {
     std::unique_lock<std::mutex> lock { mMtx };
     mChangeSet.emplace_back(op, txn);
-
-    // If this was a remove operation then we're no longer a simple change
-    if(op != Operation::ADD)
-    {
-        mSimple = false;
-    }
+    addOperationCommon(op);
 }
 
 // Apply our changes to the journal
@@ -66,13 +69,16 @@ void CJournalChangeSet::apply()
 
     if(!mChangeSet.empty())
     {
-        if(mUpdateReason == JournalUpdateReason::REORG)
+        // There are a lot of corner cases that can happen with REORG change sets,
+        // particularly to do with error handling, that can result in surprising
+        // ordering of the transactions within the change set. Rather than trying
+        // to handle them all individually just do a sort of the change set to
+        // ensure it is always right.
+        //
+        // Also sort RESET change sets here because they have been created directly
+        // from the mempool with no attempt to put things in the correct order.
+        if(mUpdateReason == JournalUpdateReason::REORG || mUpdateReason == JournalUpdateReason::RESET)
         {
-            // There are a lot of corner cases that can happen with REORG change sets,
-            // particularly to do with error handling, that can result in surprising
-            // ordering of the transactions within the change set. Rather than trying
-            // to handle them all individually just do a sort of the change set to
-            // ensure it is always right.
             // FIXME: Once C++17 parallel algorithms are widely supported, make this
             // use them.
             std::stable_sort(mChangeSet.begin(), mChangeSet.end(),
@@ -89,6 +95,16 @@ void CJournalChangeSet::apply()
 
         // Make sure we don't get applied again if we are later called by the destructor
         mChangeSet.clear();
+    }
+}
+
+// Common post operation addition steps - caller holds mutex
+void CJournalChangeSet::addOperationCommon(Operation op)
+{
+    // If this was a remove operation then we're no longer a simple change
+    if(op != Operation::ADD)
+    {
+        mSimple = false;
     }
 }
 

@@ -1710,6 +1710,52 @@ UniValue getchaintxstats(const Config &config, const JSONRPCRequest &request) {
     return ret;
 }
 
+UniValue checkjournal(const Config &config, const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "checkjournal\n"
+            "\nChecks for consistency between the TX memory pool and the block assembly journal.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"ok\": xx,                    (boolean) True if check passed, False otherwise\n"
+            "  \"errors\": xxxxx,             (string) If check failed, a string listing the errors\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("checkjournal", "") +
+            HelpExampleRpc("checkjournal", ""));
+    }
+
+    std::string checkResult { mempool.checkJournal() };
+
+    UniValue result { UniValue::VOBJ };
+    if(checkResult.empty())
+    {
+        result.push_back(Pair("ok", true));
+    }
+    else
+    {
+        result.push_back(Pair("ok", false));
+        result.push_back(Pair("errors", checkResult));
+    }
+
+    return result;
+}
+
+UniValue rebuildjournal(const Config &config, const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "rebuildjournal\n"
+            "\nForces the block assembly journal to be rebuilt to make it consistent with the TX mempool.\n"
+            "\nResult:\n"
+            "\nExamples:\n" +
+            HelpExampleCli("rebuildjournal", "") +
+            HelpExampleRpc("rebuildjournal", ""));
+    }
+
+    mempool.rebuildJournal();
+    return NullUniValue;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -1733,6 +1779,8 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "pruneblockchain",        pruneblockchain,        true,  {"height"} },
     { "blockchain",         "verifychain",            verifychain,            true,  {"checklevel","nblocks"} },
     { "blockchain",         "preciousblock",          preciousblock,          true,  {"blockhash"} },
+    { "blockchain",         "checkjournal",           checkjournal,           true,  {} },
+    { "blockchain",         "rebuildjournal",         rebuildjournal,         true,  {} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        invalidateblock,        true,  {"blockhash"} },

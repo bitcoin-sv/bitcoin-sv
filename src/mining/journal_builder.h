@@ -48,6 +48,9 @@ class CJournalBuilder final
     // Apply a change set
     void applyChangeSet(const CJournalChangeSet& changeSet);
 
+    // Clear the current journal - caller holds mutex
+    void clearJournalUnlocked();
+
     // Protect our data
     mutable std::shared_mutex mMtx {};
 

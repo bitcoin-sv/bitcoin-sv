@@ -27,7 +27,8 @@ enum class JournalUpdateReason
     REPLACE_TXN,
     NEW_BLOCK,
     REORG,
-    INIT
+    INIT,
+    RESET
 };
 /// Enable enum_cast for JournalUpdateReason, so we can log informatively
 const enumTableT<JournalUpdateReason>& enumTable(JournalUpdateReason);
@@ -57,6 +58,7 @@ class CJournalChangeSet final
     using ChangeSet = std::vector<Change>;
 
     // Add a new operation to the set
+    void addOperation(Operation op, CJournalEntry&& txn);
     void addOperation(Operation op, const CJournalEntry& txn);
 
     // Update ourselves to be for a reorg
@@ -75,6 +77,9 @@ class CJournalChangeSet final
     void apply();
 
   private:
+
+    // Common post operation addition steps
+    void addOperationCommon(Operation op);
 
     mutable std::mutex mMtx {};
 
