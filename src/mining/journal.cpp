@@ -211,20 +211,33 @@ CJournal::ReadLock& CJournal::ReadLock::operator=(ReadLock&& that)
 
 /** Journal Tester **/
 
+CJournalTester::CJournalTester(const CJournalPtr& journal)
+{
+    using TransactionListByPosition = TesterTransactionList::nth_index<1>::type;
+    TransactionListByPosition& index1 { mTransactions.get<1>() };
+
+    // Lock journal while we copy it
+    std::shared_lock lock { journal->mMtx };
+
+    // Rebuild the journal in our faster iterating (but slower updating) format.
+    const auto& journalIndex { journal->index<1>() };
+    for(auto it = journalIndex.begin(); it != journalIndex.end(); ++it)
+    {
+        index1.emplace_back(*it);
+    }
+}
+
 // Get size of journal
 size_t CJournalTester::journalSize() const
 {
-    return mJournal->size();
+    return mTransactions.size();
 }
 
 // Check the given transaction exists in the journal
 bool CJournalTester::checkTxnExists(const CJournalEntry& txn) const
 {
-    // Lock journal while we probe it
-    std::lock_guard<std::mutex> lock { mJournal->mMtx };
-
     // Get view on index 0, which is based on unique Id
-    const auto& index { mJournal->index<0>() };
+    const auto& index { mTransactions.get<0>() };
 
     // Lookup requested txn Id
     return (index.count(txn) > 0);
@@ -233,11 +246,8 @@ bool CJournalTester::checkTxnExists(const CJournalEntry& txn) const
 // Report on the relative ordering within the journal of txn1 compared to txn2.
 CJournalTester::TxnOrder CJournalTester::checkTxnOrdering(const CJournalEntry& txn1, const CJournalEntry& txn2) const
 {
-    // Lock journal while we probe it
-    std::lock_guard<std::mutex> lock { mJournal->mMtx };
-
     // Get view on index 0, which is based on unique Id
-    const auto& index0 { mJournal->index<0>() };
+    const auto& index0 { mTransactions.get<0>() };
 
     // Lookup txn1 and txn2
     auto it1 { index0.find(txn1) };
@@ -252,36 +262,25 @@ CJournalTester::TxnOrder CJournalTester::checkTxnOrdering(const CJournalEntry& t
     }
 
     // Project onto index 1 to find them in the ordered view
-    auto orderedIt1 { mJournal->mTransactions.project<1>(it1) };
-    auto orderedIt2 { mJournal->mTransactions.project<1>(it2) };
+    auto orderedIt1 { mTransactions.project<1>(it1) };
+    auto orderedIt2 { mTransactions.project<1>(it2) };
 
-    // Now iterate from the start of the ordered view and see which one we hit first. Without
-    // random access iterators this is the best we can do.
-    const auto& index1 { mJournal->index<1>() };
-    for(auto it = index1.begin(); it != index1.end(); ++it)
+    // Work out which comes first
+    if(std::distance(orderedIt1, orderedIt2) > 0)
     {
-        if(it == orderedIt1)
-        {
-            return CJournalTester::TxnOrder::BEFORE;
-        }
-        else if(it == orderedIt2)
-        {
-            return CJournalTester::TxnOrder::AFTER;
-        }
+        return CJournalTester::TxnOrder::BEFORE;
     }
-
-    // Should never happen
-    return CJournalTester::TxnOrder::UNKNOWN;
+    else
+    {
+        return CJournalTester::TxnOrder::AFTER;
+    }
 }
 
 // Dump out the contents of the journal
 void CJournalTester::dumpJournalContents(std::ostream& str) const
 {
-    // Lock journal while we probe it
-    std::lock_guard<std::mutex> lock { mJournal->mMtx };
-
     // Get view on index 1, which is based on ordering
-    const auto& index { mJournal->index<1>() };
+    const auto& index { mTransactions.get<1>() };
 
     // Dump out the contents
     for(const auto& txn : index)

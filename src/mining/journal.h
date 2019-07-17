@@ -9,6 +9,7 @@
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/random_access_index.hpp>
 
 #include <atomic>
 #include <memory>
@@ -171,10 +172,7 @@ class CJournalTester final
 {
   public:
 
-    CJournalTester(const CJournalPtr& journal) : mJournal{journal} {}
-
-    // Update journal we track
-    void updateJournal(const CJournalPtr& journal) { mJournal = journal; }
+    CJournalTester(const CJournalPtr& journal);
 
     // Get size of journal
     size_t journalSize() const;
@@ -196,8 +194,21 @@ class CJournalTester final
 
   private:
 
-    // Journal we want to check
-    CJournalPtr mJournal {nullptr};
+    // For speed of checking we need to rebuild the journal using a random access
+    // ordered index.
+    using TesterTransactionList = boost::multi_index_container<
+        CJournalEntry,
+        boost::multi_index::indexed_by<
+            // Unique transaction
+            boost::multi_index::ordered_unique<
+                boost::multi_index::identity<CJournalEntry>,
+                CJournal::EntrySorter
+            >,
+            // Order of replay
+            boost::multi_index::random_access<>
+        >
+    >;
+    TesterTransactionList mTransactions {};
 };
 
 /// Enable enum_cast of TxnOrder for testing and debugging
