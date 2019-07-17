@@ -146,7 +146,8 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
     // Returns total number of characters written.
     int ret = 0;
 
-    std::string strTimestamped = LogTimestampStr(str);
+    std::string strThreadName = "["+GetThreadName()+"] ";
+    std::string strTimestamped = LogTimestampStr(strThreadName+str);
 
     if (fPrintToConsole) {
         // Print to console.

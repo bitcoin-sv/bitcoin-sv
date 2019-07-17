@@ -3,6 +3,7 @@
 
 #include "txn_propagator.h"
 #include "net.h"
+#include "util.h"
 
 // When we get C++17 we should loose this redundant definition, until then it's required.
 constexpr unsigned CTxnPropagator::DEFAULT_RUN_FREQUENCY_MILLIS;
@@ -121,6 +122,7 @@ void CTxnPropagator::shutdown()
 /** Thread entry point for new transaction queue handling */
 void CTxnPropagator::threadNewTxnHandler() noexcept
 {
+    RenameThread("bitcoin-txnpropagator");
     try
     {
         LogPrint(BCLog::TXNPROP, "New transaction handling thread starting\n");

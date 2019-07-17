@@ -386,7 +386,7 @@ void UnloadBlockIndex();
 /**
  * Run an instance of the script checking thread.
  */
-void ThreadScriptCheck();
+void ThreadScriptCheck(int workerNum);
 
 /**
  * Check whether we are doing an initial block download (synchronizing from disk

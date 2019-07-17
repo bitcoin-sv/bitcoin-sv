@@ -354,8 +354,10 @@ static bool HTTPBindAddresses(struct evhttp *http) {
 }
 
 /** Simple wrapper to set thread name and run work queue */
-static void HTTPWorkQueueRun(WorkQueue<HTTPClosure> *queue) {
-    RenameThread("bitcoin-httpworker");
+static void HTTPWorkQueueRun(WorkQueue<HTTPClosure> *queue, int workerNum)
+{
+    std::string s = strprintf("bitcoin-httpworker%d", workerNum);
+    RenameThread(s.c_str());
     queue->Run();
 }
 
@@ -464,7 +466,7 @@ bool StartHTTPServer() {
     threadHTTP = std::thread(std::move(task), eventBase, eventHTTP);
 
     for (int i = 0; i < rpcThreads; i++) {
-        std::thread rpc_worker(HTTPWorkQueueRun, workQueue);
+        std::thread rpc_worker(HTTPWorkQueueRun, workQueue, i);
         rpc_worker.detach();
     }
     return true;

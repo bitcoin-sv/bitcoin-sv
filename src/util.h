@@ -196,6 +196,7 @@ std::string HelpMessageOpt(const std::string &option,
 int GetNumCores();
 
 void RenameThread(const char *name);
+std::string GetThreadName();
 
 /**
  * .. and a wrapper that just calls func once
