@@ -434,7 +434,7 @@ class BIP68Test(BitcoinTestFramework):
         # We have a block that has CSV activated, but we want to be at
         # the activation point, so we invalidate the tip.
         self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
-        sync_blocks(self.nodes)
+        sync_blocks(self.nodes, timeout=240)
 
     # Use self.nodes[1] to test standardness relay policy
     def test_version2_relay(self, before_activation):

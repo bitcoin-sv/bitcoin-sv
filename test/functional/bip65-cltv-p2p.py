@@ -137,7 +137,7 @@ class BIP65Test(BitcoinTestFramework):
         # accepted to the mempool (which we can achieve with
         # -promiscuousmempoolflags).
         node0.send_and_ping(msg_tx(spendtx))
-        assert spendtx.hash in self.nodes[0].getrawmempool()
+        wait_until(lambda: spendtx.hash in self.nodes[0].getrawmempool(), timeout=240)
 
         # Now we verify that a block with this transaction is invalid.
         block.vtx.append(spendtx)

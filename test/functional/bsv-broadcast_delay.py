@@ -84,7 +84,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
     # submits requested number of transactions from txs and returns timings
     def syncNodesWithTransaction(self, num_transactions, txs, connection1, connection2): 
         times = []
-        for i in range(1, num_transactions):
+        for i in range(num_transactions):
             tx = txs.pop(0)
             begin_test = datetime.datetime.now()
 
@@ -97,7 +97,6 @@ class BroadcastDelayTest(BitcoinTestFramework):
             end_test = datetime.datetime.now()
             elapsed_test = end_test - begin_test
             times.append(elapsed_test)
-
         # calculate average of times without the first time (ignoring warm-up)
         return sum(times[1:], datetime.timedelta(0)) / len(times[1:])
 
@@ -116,6 +115,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
         txs =  self.make_transactions(50)
         self.stop_node(0)
 
+        num_txns_to_sync = 15
         # 1. Send 15 transactions with broadcast delay of 0 seconds to calculate average overhead.
         ### txnpropagationfreq is set to 1ms to limit its effect on propagation test. 
         ### Default value 1s is not suitable for this test, since it is much larger than 150ms.
@@ -142,6 +142,5 @@ class BroadcastDelayTest(BitcoinTestFramework):
                 assert(propagation_delay < datetime.timedelta(milliseconds=1500))
                 assert(propagation_delay > datetime.timedelta(milliseconds=500))
 
- 
 if __name__ == '__main__':
     BroadcastDelayTest().main()
