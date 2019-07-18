@@ -119,16 +119,34 @@ class CTransaction;
 class CNodeStats;
 class CClientUIInterface;
 
-struct CSerializedNetMsg {
-    CSerializedNetMsg() = default;
+class CSerializedNetMsg
+{
+public:
     CSerializedNetMsg(CSerializedNetMsg &&) = default;
     CSerializedNetMsg &operator=(CSerializedNetMsg &&) = default;
     // No copying, only moves.
     CSerializedNetMsg(const CSerializedNetMsg &msg) = delete;
     CSerializedNetMsg &operator=(const CSerializedNetMsg &) = delete;
 
-    std::vector<uint8_t> data;
-    std::string command;
+    CSerializedNetMsg(
+        std::string&& command,
+        std::vector<uint8_t>&& data)
+        : mCommand{std::move(command)}
+        , mHash{::Hash(data.data(), data.data() + data.size())}
+        , mSize{data.size()}
+        , mData{std::make_unique<CVectorStream>(std::move(data))}
+    {/**/}
+
+    const std::string& Command() const {return mCommand;}
+    std::unique_ptr<CForwardReadonlyStream> MoveData() {return std::move(mData);}
+    const uint256& Hash() const {return mHash;}
+    size_t Size() const {return mSize;}
+
+private:
+    std::string mCommand;
+    uint256 mHash;
+    size_t mSize;
+    std::unique_ptr<CForwardReadonlyStream> mData;
 };
 
 class CConnman {

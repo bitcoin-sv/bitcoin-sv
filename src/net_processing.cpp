@@ -1192,7 +1192,7 @@ static void RelayAddress(const CAddress &addr, bool fReachable,
 static bool rejectIfMaxDownloadExceeded(const Config &config, CSerializedNetMsg &msg, bool isMostRecentBlock, const CNodePtr& pfrom, CConnman &connman) {
 
     uint64_t maxSendQueuesBytes = config.GetMaxSendQueuesBytes();
-    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.data.size() + CMessageHeader::HEADER_SIZE;
+    size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::HEADER_SIZE;
     if (totalSize > maxSendQueuesBytes) {
         if (!isMostRecentBlock) {
             LogPrint(BCLog::NET, "Size of all msgs currently sending across "

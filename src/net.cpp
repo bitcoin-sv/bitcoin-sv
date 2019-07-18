@@ -3046,17 +3046,16 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
 }
 
 void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
-    size_t nPayloadLength = msg.data.size();
+    size_t nPayloadLength = msg.Size();
     size_t nTotalSize = nPayloadLength + CMessageHeader::HEADER_SIZE;
     LogPrint(BCLog::NET, "sending %s (%d bytes) peer=%d\n",
-             SanitizeString(msg.command.c_str()), nPayloadLength, pnode->id);
+             SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
 
     std::vector<uint8_t> serializedHeader;
     serializedHeader.reserve(CMessageHeader::HEADER_SIZE);
-    uint256 hash = Hash(msg.data.data(), msg.data.data() + nPayloadLength);
-    CMessageHeader hdr(config->GetChainParams().NetMagic(), msg.command.c_str(),
-                       nPayloadLength);
-    memcpy(hdr.pchChecksum, hash.begin(), CMessageHeader::CHECKSUM_SIZE);
+    CMessageHeader hdr(config->GetChainParams().NetMagic(),
+                       msg.Command().c_str(), nPayloadLength);
+    memcpy(hdr.pchChecksum, msg.Hash().begin(), CMessageHeader::CHECKSUM_SIZE);
 
     CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
 
@@ -3066,7 +3065,7 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
         bool optimisticSend(pnode->vSendMsg.empty());
 
         // log total amount of bytes per command
-        pnode->mapSendBytesPerMsgCmd[msg.command] += nTotalSize;
+        pnode->mapSendBytesPerMsgCmd[msg.Command()] += nTotalSize;
         pnode->nSendSize += nTotalSize;
 
         if (pnode->nSendSize.getSendQueueBytes() > nSendBufferMaxSize) {
@@ -3075,8 +3074,7 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
         pnode->vSendMsg.push_back(
             std::make_unique<CVectorStream>(std::move(serializedHeader)));
         if (nPayloadLength) {
-            pnode->vSendMsg.push_back(
-                std::make_unique<CVectorStream>(std::move(msg.data)));
+            pnode->vSendMsg.push_back(msg.MoveData());
         }
 
         // If write queue empty, attempt "optimistic write"
