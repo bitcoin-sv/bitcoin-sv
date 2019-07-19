@@ -1169,12 +1169,12 @@ void CTxMemPool::ClearPrioritisation(const uint256 hash) {
 }
 
 bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const {
+    LOCK(cs);
     for (const CTxIn &in : tx.vin) {
         if (exists(in.prevout.GetTxId())) {
             return false;
         }
     }
-
     return true;
 }
 
