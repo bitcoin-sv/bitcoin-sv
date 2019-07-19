@@ -634,6 +634,12 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     } break;
 
                     case OP_RETURN: {
+                        if (flags & SCRIPT_UTXO_AFTER_GENESIS) {
+                            // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
+                            // presence of unbalanced IFs, invalid opcodes etc)
+                            return set_success(serror);
+                        }
+                        // Pre-Genesis OP_RETURN marks script as invalid
                         return set_error(serror, SCRIPT_ERR_OP_RETURN);
                     } break;
 

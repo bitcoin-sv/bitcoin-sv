@@ -76,6 +76,14 @@
 ["1","NOTIF 0 NOTIF RETURN ELSE RETURN ELSE RETURN ENDIF ELSE 0 NOTIF 1 ELSE RETURN ELSE 1 ENDIF ELSE RETURN ENDIF ADD 2 EQUAL","P2SH,STRICTENC","OK"],
 
 ["0","IF RETURN ENDIF 1","P2SH,STRICTENC","OK","RETURN only works if executed"],
+["0","IF RETURN ENDIF 1","P2SH,STRICTENC,UTXO_AFTER_GENESIS","OK","RETURN only works if executed"],
+["1","RETURN","P2SH,STRICTENC","OP_RETURN"],
+["0","RETURN","P2SH,STRICTENC","OP_RETURN"],
+["1","RETURN","P2SH,STRICTENC,UTXO_AFTER_GENESIS","OK", "Genesis: top stack value used to determine success"],
+["0","RETURN","P2SH,STRICTENC,UTXO_AFTER_GENESIS","EVAL_FALSE","Genesis: top stack value used to determine success"],
+["RETURN","1","P2SH,STRICTENC","OP_RETURN"],
+["RETURN","1","P2SH,STRICTENC,UTXO_AFTER_GENESIS","OK"],
+["RETURN","1","P2SH,STRICTENC,UTXO_AFTER_GENESIS,SIGPUSHONLY","SIG_PUSHONLY", "Originally, due to a bug, OP_TRUE OP_RETURN could be used to solve any lock script. SIGPUSHONLY now prohibits OP_RETURN in unlock scripts. If UTXO_AFTER_GENESIS is set, SIGPUSHONLY will also always be set (Genesis will enforce it), since we are being mined into a block that is spending post-genesis outputs."],
 
 ["1 1","VERIFY","P2SH,STRICTENC","OK"],
 ["1 0x05 0x0100000000","VERIFY","P2SH,STRICTENC","OK","values >4 bytes can be cast to boolean"],
@@ -758,7 +766,12 @@
 ["0 0","NOTIF IF 1 ELSE 0 ENDIF ELSE IF 0 ELSE 1 ENDIF ENDIF","P2SH,STRICTENC","EVAL_FALSE"],
 
 ["1","IF RETURN ELSE ELSE 1 ENDIF","P2SH,STRICTENC","OP_RETURN","Multiple ELSEs"],
+["1","IF RETURN ELSE ELSE 1 ENDIF","P2SH,STRICTENC,UTXO_AFTER_GENESIS","EVAL_FALSE","Multiple ELSEs - Genesis: 1 is consumed by IF and OP_RETURN returns with empty stack, whcih fails the execution"],
 ["1","IF 1 ELSE ELSE RETURN ENDIF","P2SH,STRICTENC","OP_RETURN"],
+["1","IF 1 ELSE ELSE RETURN ENDIF","P2SH,STRICTENC,UTXO_AFTER_GENESIS","OK", "Valid for Genesis"],
+[ "0", "IF RETURN 'data1' ELSE 1 RETURN 'data2' ENDIF", "P2SH,STRICTENC", "OP_RETURN", "OP_RETURN in different branches" ],
+[ "0", "IF RETURN 'data1' ELSE 1 RETURN 'data2' ENDIF", "P2SH,STRICTENC,UTXO_AFTER_GENESIS", "OK", "Genesis: valid since 1 is pushed on the stack in ELSE branch" ],
+
 
 ["1","ENDIF","P2SH,STRICTENC","UNBALANCED_CONDITIONAL","Malformed IF/ELSE/ENDIF sequence"],
 ["1","ELSE ENDIF","P2SH,STRICTENC","UNBALANCED_CONDITIONAL"],
@@ -769,11 +782,14 @@
 ["1","IF ENDIF ENDIF","P2SH,STRICTENC","UNBALANCED_CONDITIONAL"],
 ["1","IF ELSE ELSE ENDIF ENDIF","P2SH,STRICTENC","UNBALANCED_CONDITIONAL"],
 
-["1","RETURN","P2SH,STRICTENC","OP_RETURN"],
 ["1","DUP IF RETURN ENDIF","P2SH,STRICTENC","OP_RETURN"],
+["1","DUP IF RETURN ENDIF","P2SH,STRICTENC,UTXO_AFTER_GENESIS","OK", "Genesis: top stack value determines success"],
 
-["1","RETURN 'data'","P2SH,STRICTENC","OP_RETURN","canonical prunable txout format"],
+["1","RETURN 'data'","P2SH,STRICTENC","OP_RETURN","canonical prunable txout format (pre Genesis)"],
+["1","RETURN 'data'","P2SH,STRICTENC,UTXO_AFTER_GENESIS","OK","no longer prunable after genesis - it is evaluated as each other opcode"],
 ["0 IF","RETURN ENDIF 1","P2SH,STRICTENC","UNBALANCED_CONDITIONAL","still prunable because IF/ENDIF can't span scriptSig/scriptPubKey"],
+["0 IF","RETURN ENDIF 1","P2SH,STRICTENC,UTXO_AFTER_GENESIS","UNBALANCED_CONDITIONAL","IF/ENDIF can't span scriptSig/scriptPubKey"],
+["0","IF 0 RETURN ENDIF 1","P2SH,STRICTENC,UTXO_AFTER_GENESIS","OK","IF is not executed, so the last '1' determines success"],
 
 ["0","VERIFY 1","P2SH,STRICTENC","VERIFY"],
 ["1","VERIFY","P2SH,STRICTENC","EVAL_FALSE"],
