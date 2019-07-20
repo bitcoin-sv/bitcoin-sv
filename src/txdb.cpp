@@ -14,6 +14,7 @@
 #include "ui_interface.h"
 #include "uint256.h"
 #include "util.h"
+#include "validation.h" // required for IsGenesisEnabled()
 
 #include <boost/thread.hpp>
 
@@ -421,7 +422,7 @@ bool CCoinsViewDB::Upgrade() {
         TxId id(key.second);
         for (size_t i = 0; i < old_coins.vout.size(); ++i) {
             if (!old_coins.vout[i].IsNull() &&
-                !old_coins.vout[i].scriptPubKey.IsUnspendable()) {
+                !old_coins.vout[i].scriptPubKey.IsUnspendable(IsGenesisEnabled(GlobalConfig::GetConfig(), old_coins.nHeight))) {
                 Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight,
                              old_coins.fCoinBase);
                 COutPoint outpoint(id, i);

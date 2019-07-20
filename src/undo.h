@@ -132,7 +132,7 @@ enum DisconnectResult {
  * @return A DisconnectResult
  */
 DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
-                               const COutPoint &out);
+                               const COutPoint &out, const Config &config);
 
 /**
  * Undo a block from the block and the undoblock data.

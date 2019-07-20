@@ -1677,7 +1677,7 @@ void CWalletTx::GetAmounts(std::list<COutputEntry> &listReceived,
         CTxDestination address;
 
         if (!ExtractDestination(txout.scriptPubKey, address) &&
-            !txout.scriptPubKey.IsUnspendable()) {
+            !txout.scriptPubKey.IsKnownOpReturn()) {
             LogPrintf("CWalletTx::GetAmounts: Unknown transaction type found, "
                       "txid %s\n",
                       this->GetId().ToString());
@@ -2743,6 +2743,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 nValueToSelect += nFeeRet;
             }
 
+            Config &config = GlobalConfig::GetConfig();
             double dPriority = 0;
             // vouts to the payees
             for (const auto &recipient : vecSend) {
@@ -2760,7 +2761,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     }
                 }
 
-                if (txout.IsDust(dustRelayFee)) {
+                if (txout.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
                     if (recipient.fSubtractFeeFromAmount &&
                         nFeeRet > Amount(0)) {
                         if (txout.nValue < Amount(0)) {
@@ -2847,8 +2848,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 // purpose of the all-inclusive feature. So instead we raise the
                 // change and deduct from the recipient.
                 if (nSubtractFeeFromAmount > 0 &&
-                    newTxOut.IsDust(dustRelayFee)) {
-                    Amount nDust = newTxOut.GetDustThreshold(dustRelayFee) -
+                    newTxOut.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
+                    Amount nDust = newTxOut.GetDustThreshold(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1)) -
                                    newTxOut.nValue;
                     // Raise change until no more dust.
                     newTxOut.nValue += nDust;
@@ -2856,7 +2857,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     for (unsigned int i = 0; i < vecSend.size(); i++) {
                         if (vecSend[i].fSubtractFeeFromAmount) {
                             txNew.vout[i].nValue -= nDust;
-                            if (txNew.vout[i].IsDust(dustRelayFee)) {
+                            if (txNew.vout[i].IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
                                 strFailReason =
                                     _("The transaction amount is too small "
                                       "to send after the fee has been "
@@ -2871,7 +2872,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
 
                 // Never create dust outputs; if we would, just add the dust to
                 // the fee.
-                if (newTxOut.IsDust(dustRelayFee)) {
+                if (newTxOut.IsDust(dustRelayFee, IsGenesisEnabled(config, chainActive.Height() + 1))) {
                     nChangePosInOut = -1;
                     nFeeRet += nChange;
                     reservekey.ReturnKey();
@@ -2940,7 +2941,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             // If we made it here and we aren't even able to meet the relay fee
             // on the next pass, give up because we must be at the maximum
             // allowed fee.
-            Amount minFee = GlobalConfig::GetConfig().GetMinFeePerKB().GetFee(nBytes);
+            Amount minFee = config.GetMinFeePerKB().GetFee(nBytes);
             if (nFeeNeeded < minFee) {
                 strFailReason = _("Transaction too large for fee policy");
                 return false;
@@ -3289,7 +3290,7 @@ bool CWallet::DelAddressBook(const CTxDestination &address) {
 const std::string &CWallet::GetAccountName(const CScript &scriptPubKey) const {
     CTxDestination address;
     if (ExtractDestination(scriptPubKey, address) &&
-        !scriptPubKey.IsUnspendable()) {
+        !scriptPubKey.IsKnownOpReturn()) { // we do not know how to spend coins containing OP_RETURN (for both pre and post Genesis OP_RETURNs)
         auto mi = mapAddressBook.find(address);
         if (mi != mapAddressBook.end()) {
             return mi->second.name;

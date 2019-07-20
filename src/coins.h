@@ -233,9 +233,11 @@ public:
     /**
      * Add a coin. Set potential_overwrite to true if a non-pruned version may
      * already exist.
+     * genesisActivationHeight parameter is used to check if Genesis upgrade rules
+     * are in effect for this coin. It is required to correctly determine if coin is unspendable.
      */
     void AddCoin(const COutPoint &outpoint, Coin coin,
-                 bool potential_overwrite);
+                 bool potential_overwrite, uint64_t genesisActivationHeight);
 
     /**
      * Spend a coin. Pass moveto in order to get the deleted data.
@@ -323,7 +325,7 @@ private:
 // an addition is an overwrite.
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight,
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight, uint64_t genesisActivationHeight,
               bool check = false);
 
 //! Utility function to find any unspent output with a given txid.

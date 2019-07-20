@@ -107,10 +107,12 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &w
 
 /**
  * Check for standard transaction types
+ * @param[in] nHeight represents the height that transactions was mined or the height that
+ * we expect transcation will be mined in (in case transcation is being added to mempool)
  * @return True if all outputs (scriptPubKeys) use only standard transaction
  * forms
  */
-bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &reason);
+bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std::string &reason);
 
 /**
  * Check for standard transaction types

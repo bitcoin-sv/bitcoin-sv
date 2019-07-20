@@ -593,7 +593,7 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
-static bool IsGenesisEnabled(const Config &config, int nHeight) {
+bool IsGenesisEnabled(const Config &config, int nHeight) {
     return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
 }
 
@@ -924,8 +924,15 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
+    // We determine if a transaction is standard or not based on assumption that
+    // it will be mined in the next block. We accept the fact that it might get mined
+    // into a later block and thus can become non standard transaction. 
+    // Example: Transaction containing output with "OP_RETURN" and 0 value 
+    //          is not dust under old rules, but it is dust under new rules,
+    //          but we will mine it nevertheless. Anyone can collect such
+    //          coin by providing OP_1 unlock script
     std::string reason;
-    if (fRequireStandard && !IsStandardTx(config, tx, reason)) {
+    if (fRequireStandard && !IsStandardTx(config, tx, chainActive.Height() + 1, reason)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                   reason);
         return Result{state, pTxInputData};
@@ -2163,7 +2170,7 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
     }
 
     // Add outputs.
-    AddCoins(inputs, tx, nHeight);
+    AddCoins(inputs, tx, nHeight, GlobalConfig::GetConfig().GetGenesisActivationHeight());
 }
 
 void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight) {
@@ -2425,7 +2432,7 @@ bool AbortNode(CValidationState &state, const std::string &strMessage,
 
 /** Restore the UTXO in a Coin at a given COutPoint. */
 DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
-                               const COutPoint &out) {
+                               const COutPoint &out, const Config &config) {
     bool fClean = true;
 
     if (view.HaveCoin(out)) {
@@ -2455,7 +2462,7 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
     // if we know for sure that the coin did not already exist in the cache. As
     // we have queried for that above using HaveCoin, we don't need to guess.
     // When fClean is false, a coin already existed and it is an overwrite.
-    view.AddCoin(out, std::move(undo), !fClean);
+    view.AddCoin(out, std::move(undo), !fClean, config.GetGenesisActivationHeight());
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
@@ -2498,10 +2505,11 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
         const CTransaction &tx = *(block.vtx[i]);
         uint256 txid = tx.GetId();
 
+        Config &config = GlobalConfig::GetConfig();
         // Check that all outputs are available and match the outputs in the
         // block itself exactly.
         for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (tx.vout[o].scriptPubKey.IsUnspendable()) {
+            if (tx.vout[o].scriptPubKey.IsUnspendable(IsGenesisEnabled(config, pindex->nHeight))) {
                 continue;
             }
 
@@ -2529,7 +2537,7 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
         for (size_t j = tx.vin.size(); j-- > 0;) {
             const COutPoint &out = tx.vin[j].prevout;
             const Coin &undo = txundo.vprevout[j];
-            DisconnectResult res = UndoCoinSpend(undo, view, out);
+            DisconnectResult res = UndoCoinSpend(undo, view, out, config);
             if (res == DISCONNECT_FAILED) {
                 return DISCONNECT_FAILED;
             }
@@ -5073,7 +5081,7 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CCoinsViewCache &inputs,
         }
 
         // Pass check = true as every addition may be an overwrite.
-        AddCoins(inputs, *tx, pindex->nHeight, true);
+        AddCoins(inputs, *tx, pindex->nHeight, config.GetGenesisActivationHeight(), true);
     }
 
     return true;

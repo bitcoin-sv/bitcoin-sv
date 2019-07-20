@@ -107,9 +107,9 @@ std::string ScriptToAsmStr(const CScript &script,
             if (vch.size() <= static_cast<std::vector<uint8_t>::size_type>(4)) {
                 str += strprintf("%d", CScriptNum(vch, false).getint());
             } else {
-                // the IsUnspendable check makes sure not to try to decode
+                // the IsKnownOpReturn check makes sure not to try to decode
                 // OP_RETURN data that may match the format of a signature
-                if (fAttemptSighashDecode && !script.IsUnspendable()) {
+                if (fAttemptSighashDecode && !script.IsKnownOpReturn()) {
                     std::string strSigHashDecode;
                     // goal: only attempt to decode a defined sighash type from
                     // data that looks like a signature within a scriptSig. This

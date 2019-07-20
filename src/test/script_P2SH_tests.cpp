@@ -89,7 +89,7 @@ BOOST_AUTO_TEST_CASE(sign) {
         txFrom.vout[i + 4].scriptPubKey = standardScripts[i];
         txFrom.vout[i + 4].nValue = COIN;
     }
-    BOOST_CHECK(IsStandardTx(config, CTransaction(txFrom), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(txFrom), 1, reason));
 
     CMutableTransaction txTo[8]; // Spending transactions
     for (int i = 0; i < 8; i++) {
@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE(set) {
         txFrom.vout[i].scriptPubKey = outer[i];
         txFrom.vout[i].nValue = CENT;
     }
-    BOOST_CHECK(IsStandardTx(config, CTransaction(txFrom), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(txFrom), 1, reason));
 
     // Spending transactions
     CMutableTransaction txTo[4];
@@ -216,7 +216,7 @@ BOOST_AUTO_TEST_CASE(set) {
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(IsStandardTx(config, CTransaction(txTo[i]), reason),
+        BOOST_CHECK_MESSAGE(IsStandardTx(config, CTransaction(txTo[i]), 1, reason),
                             strprintf("txTo[%d].IsStandard", i));
     }
 }
@@ -386,8 +386,8 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     txFrom.vout[6].scriptPubKey =
         GetScriptForDestination(CScriptID(twentySigops));
     txFrom.vout[6].nValue = Amount(6000);
-
-    AddCoins(coins, CTransaction(txFrom), 0);
+    
+    AddCoins(coins, CTransaction(txFrom), 0, 0);
 
     CMutableTransaction txTo;
     txTo.vout.resize(1);

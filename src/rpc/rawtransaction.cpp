@@ -900,7 +900,11 @@ static UniValue signrawtransaction(const Config &config,
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing amount");
                 }
 
-                view.AddCoin(out, Coin(txout, 1, false), true);
+                // We do not have coin height here. We assume that both coin height
+                // and Genesis activation height is 1, effectively using Genesis rules. 
+                // This basically means, that output script starting with OP_RETURN will
+                // be treated as possibly spendable.
+                view.AddCoin(out, Coin(txout, 1, false), true, 1);
             }
 
             // If redeemScript given and not using the local wallet (private

@@ -645,7 +645,11 @@ static void MutateTxSign(CMutableTransaction &tx, const std::string &flagStr) {
                 txout.nValue = AmountFromValue(prevOut["amount"]);
             }
 
-            view.AddCoin(out, Coin(txout, 1, false), true);
+            // We do not have coin height here. We assume that both coin height
+            // and Genesis activation height is 1, effectively using Genesis rules. 
+            // This basically means, that output script starting with OP_RETURN will
+            // be treated as possibly spendable.
+            view.AddCoin(out, Coin(txout, 1, false), true, 1);
         }
 
         // If redeemScript given and private keys given, add redeemScript to the

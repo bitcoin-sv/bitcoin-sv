@@ -9,6 +9,7 @@
 #include "random.h"
 
 #include <cassert>
+#include <config.h>
 
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     return false;
@@ -103,10 +104,11 @@ bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const {
 }
 
 void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin coin,
-                              bool possible_overwrite) {
+                              bool possible_overwrite,
+                              uint64_t genesisActivationHeight) {
     std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     assert(!coin.IsSpent());
-    if (coin.GetTxOut().scriptPubKey.IsUnspendable()) {
+    if (coin.GetTxOut().scriptPubKey.IsUnspendable( coin.GetHeight() >= genesisActivationHeight)) {
         return;
     }
     CCoinsMap::iterator it;
@@ -131,7 +133,7 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin coin,
     cachedCoinsUsage += it->second.coin.DynamicMemoryUsage();
 }
 
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight,
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight, uint64_t genesisActivationHeight,
               bool check) {
     bool fCoinbase = tx.IsCoinBase();
     const TxId txid = tx.GetId();
@@ -142,7 +144,7 @@ void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight,
         // in order to correctly deal with the pre-BIP30 occurrences of
         // duplicate coinbase transactions.
         cache.AddCoin(outpoint, Coin(tx.vout[i], nHeight, fCoinbase),
-                      overwrite);
+                      overwrite, genesisActivationHeight);
     }
 }
 
