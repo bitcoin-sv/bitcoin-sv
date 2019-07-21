@@ -28,9 +28,9 @@
  * expensive-to-check-upon-redemption script like:
  *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
  */
-bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &whichType) {
+bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType) {
     std::vector<std::vector<uint8_t>> vSolutions;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
+    if (!SolverWithData(scriptPubKey, IsGenesisEnabled(config, nScriptPubKeyHeight), whichType, vSolutions)) {
         return false;
     }
 
@@ -89,7 +89,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
     unsigned int nDataSize = 0;
     txnouttype whichType;
     for (const CTxOut &txout : tx.vout) {
-        if (!::IsStandard(config, txout.scriptPubKey, whichType)) {
+        if (!::IsStandard(config, txout.scriptPubKey, nHeight, whichType)) {
             reason = "scriptpubkey";
             return false;
         }
@@ -128,7 +128,7 @@ bool AreInputsStandard(const CTransaction &tx,
         txnouttype whichType;
         // get the scriptPubKey corresponding to this input:
         const CScript &prevScript = prev.scriptPubKey;
-        if (!Solver(prevScript, whichType, vSolutions)) {
+        if (!SolverNoData(prevScript, whichType, vSolutions)) {
             return false;
         }
 

@@ -75,8 +75,28 @@ typedef boost::variant<CNoDestination, CKeyID, CScriptID> CTxDestination;
 const char *GetTxnOutputType(txnouttype t);
 bool IsValidDestination(const CTxDestination &dest);
 
-bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
-            std::vector<std::vector<uint8_t>> &vSolutionsRet);
+/**
+ * Return public keys or hashes from scriptPubKey, for 'standard' transaction
+ * types.
+ * For correctly identifiying TX_NULL_DATA output, you must provide info if Genesis
+ * update rules are active for this scriptPubKey (and NOT if the Genesis rules are active for transactions spending this ouput) 
+ * Use SolverNoData if you do not care about differentiating between TX_NULL_DATA and TX_NONSTANDARD
+ */
+bool SolverWithData(const CScript& scriptPubKey, bool isGenesisEnabled, txnouttype& typeRet,
+    std::vector<std::vector<uint8_t>>& vSolutionsRet);
+
+/* Use this version of Solver when you are interested only if we know how to spend
+ * provided output script and you do not care about data (TX_NULL_DATA) outputs.
+ *
+ * This version does not try to identify TX_NULL_DATA output - it will return
+ * TX_NONSTANDARD and false for such outputs.
+ *
+ * The meaning of OP_RETURN has changed in the Genesis upgrade and to correctly
+ * identify them  you need to provide height of the output - use SolverWithData() to do so.
+ */
+bool SolverNoData(const CScript& scriptPubKey, txnouttype& typeRet,
+    std::vector<std::vector<uint8_t>>& vSolutionsRet);
+
 bool ExtractDestination(const CScript &scriptPubKey,
                         CTxDestination &addressRet);
 bool ExtractDestinations(const CScript &scriptPubKey, txnouttype &typeRet,

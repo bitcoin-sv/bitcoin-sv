@@ -265,13 +265,14 @@ public:
     void SetAcceptP2SH(bool acceptP2SHIn) override { acceptP2SH = acceptP2SHIn; }
     bool GetAcceptP2SH() const override { return acceptP2SH; }
 
-    void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) override {}
-    uint64_t GetGenesisActivationHeight() const override { return 0; }
+    void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) override { genesisActivationHeight = genesisActivationHeightIn; }
+    uint64_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
 
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
     bool acceptP2SH { DEFAULT_ACCEPT_P2SH };
+    uint64_t genesisActivationHeight;
 };
 
 #endif

@@ -1853,4 +1853,97 @@ BOOST_AUTO_TEST_CASE(script_FindAndDelete) {
     BOOST_CHECK(s == expect);
 }
 
+BOOST_AUTO_TEST_CASE(script_IsUnspendable) {
+
+    BOOST_CHECK((CScript() << OP_RETURN).IsUnspendable(false));
+    BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(false));
+
+    // OP_RETURN is no longer unspendable in Genesis
+    BOOST_CHECK(!(CScript() << OP_RETURN).IsUnspendable(true));
+    BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(true));
+}
+
+void CheckSolverNoData(const CScript scriptPubKey,  txnouttype expectedOutType, bool expectedResult)
+{
+    std::vector<std::vector<uint8_t>> solutions;
+    txnouttype outType;
+    BOOST_CHECK(SolverNoData(scriptPubKey, outType, solutions) == expectedResult);
+    BOOST_CHECK(outType == expectedOutType);
+}
+
+void CheckSolverWithData(const CScript scriptPubKey, bool isGenesisEnabled, txnouttype expectedOutType, bool expectedResult)
+{
+    std::vector<std::vector<uint8_t>> solutions;
+    txnouttype outType;
+    BOOST_CHECK(SolverWithData(scriptPubKey, isGenesisEnabled, outType, solutions) == expectedResult);
+    BOOST_CHECK(outType == expectedOutType);
+}
+
+BOOST_AUTO_TEST_CASE(script_Solver) {
+
+    // Dummy for differnt parts of the script
+    std::vector<uint8_t> pubKey(33, 1);
+    std::vector<uint8_t> hash160(20, 2);
+    std::vector<uint8_t> data(100, 3);
+
+    CScript nonStandard= CScript() << OP_1;
+    CScript P2PK = CScript() << pubKey << OP_CHECKSIG;
+    CScript P2PKH = CScript() << OP_DUP << OP_HASH160 << hash160 << OP_EQUALVERIFY << OP_CHECKSIG;
+    CScript P2SH = CScript() << OP_HASH160 << hash160 << OP_EQUAL;
+    CScript opReturn = CScript() << OP_RETURN << data;
+    CScript opFalseOpReturn = CScript()<< OP_FALSE << OP_RETURN << data;
+    CScript multisig = CScript() << OP_2 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
+
+    // Test CheckSolverNoData
+    CheckSolverNoData(nonStandard, TX_NONSTANDARD, false);
+    CheckSolverNoData(P2PK, TX_PUBKEY, true);
+    CheckSolverNoData(P2PKH, TX_PUBKEYHASH, true);
+    CheckSolverNoData(P2SH, TX_SCRIPTHASH, true);
+    CheckSolverNoData(multisig, TX_MULTISIG, true);
+
+    //// TX_NULL_DATA is not recognized with SolverNoData version of function
+    CheckSolverNoData(opReturn, TX_NONSTANDARD, false);
+    CheckSolverNoData(opFalseOpReturn, TX_NONSTANDARD, false);
+
+
+    // Test CheckSolverWithData - isGenesisEnabled should have no effect  on the result
+    // Test for IsGenesis = false:
+    CheckSolverWithData(nonStandard, false, TX_NONSTANDARD, false);
+    CheckSolverWithData(P2PK, false, TX_PUBKEY, true);
+    CheckSolverWithData(P2PKH, false, TX_PUBKEYHASH, true);
+    CheckSolverWithData(P2SH, false, TX_SCRIPTHASH, true);
+    CheckSolverWithData(multisig, false, TX_MULTISIG, true);
+
+    // Test for IsGenesis = true:
+    CheckSolverWithData(nonStandard, true, TX_NONSTANDARD, false);
+    CheckSolverWithData(P2PK, true, TX_PUBKEY, true);
+    CheckSolverWithData(P2PKH, true, TX_PUBKEYHASH, true);
+    CheckSolverWithData(P2SH, true, TX_SCRIPTHASH, true);
+    CheckSolverWithData(multisig, true, TX_MULTISIG, true);
+
+    // Test CheckSolverWithData - before Genesis both "OP_RETURN" and "OP_FALSE OP_RETURN" is recognized as data
+    CheckSolverWithData(opReturn, false, TX_NULL_DATA, true);
+    CheckSolverWithData(opFalseOpReturn, false, TX_NULL_DATA, true);
+
+    // Test CheckSolverWithData - after Genesis only "OP_FALSE OP_RETURN" is recognized as data
+    CheckSolverWithData(opReturn, true, TX_NONSTANDARD, false);
+    CheckSolverWithData(opFalseOpReturn, true, TX_NULL_DATA, true);
+
+}
+
+BOOST_AUTO_TEST_CASE(txout_IsDust) {
+
+    CFeeRate feerate(Amount(1000));
+    std::vector<uint8_t> data(100, 3);
+    CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN << data;
+
+    CScript opReturn = CScript() << OP_RETURN << data;
+    
+    BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, false)); 
+    BOOST_CHECK(!CTxOut(Amount(10), opReturn).IsDust(feerate, false));
+
+    BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, true));
+    BOOST_CHECK(CTxOut(Amount(10), opReturn).IsDust(feerate, true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
+}
+
 BOOST_AUTO_TEST_SUITE_END()

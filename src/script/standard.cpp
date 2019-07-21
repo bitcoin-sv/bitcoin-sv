@@ -39,8 +39,11 @@ const char *GetTxnOutputType(txnouttype t) {
  * Return public keys or hashes from scriptPubKey, for 'standard' transaction
  * types.
  */
-bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
-            std::vector<std::vector<uint8_t>> &vSolutionsRet) {
+bool SolverInternal(const CScript &scriptPubKey, 
+    bool identifyData,
+    bool isGenesisEnabled, // used only when identifyData == true
+    txnouttype &typeRet,
+    std::vector<std::vector<uint8_t>> &vSolutionsRet) {
     // Templates
     static std::multimap<txnouttype, CScript> mTemplates{
             // Standard tx, sender provides pubkey, receiver adds signature
@@ -75,10 +78,20 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
         return true;
     }
 
+    // Even when we do NOT need to identify TX_NULL_DATA, we still check if it looks like data to avoid 
+    // comparing against the templates. We do not have height information available in this case, 
+    // but we know that neither "OP_FALSE OP_RETURN" nor "OP_RETURN" will match any other templates,
+    // so we can return TX_NONSTANDARD in this case.
+
+    if (!identifyData)
+    {
+        isGenesisEnabled = false; // try to identify both OP_RETURN patterns and bail out with TX_NONSTANDARD
+    }
+    
     bool isOpReturn = false;
     int offset = 0;
-    //check if starts with OP_RETURN or OP_FALSE, OP_RETURN
-    if (scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN){
+    //check if starts with OP_RETURN (only before Genesis upgrade) or OP_FALSE, OP_RETURN (both pre and post Genesis upgrade)
+    if (!isGenesisEnabled && scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN) {
         isOpReturn = true;
         offset = 1;
     }
@@ -93,9 +106,19 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
     // byte passes the IsPushOnly() test we don't care what exactly is in the
     // script.
     if (isOpReturn && scriptPubKey.IsPushOnly(scriptPubKey.begin() + offset)) {
-        typeRet = TX_NULL_DATA;
-        return true;
+        if (identifyData)
+        {
+            typeRet = TX_NULL_DATA;
+            return true;
+        }
+        else
+        {
+            // Return TX_NONSTANDARD instead of TX_NULL_DATA if we were not asked to identify data 
+            typeRet = TX_NONSTANDARD;
+            return false;
+        }
     }
+
 
     // Scan templates
     const CScript &script1 = scriptPubKey;
@@ -176,11 +199,21 @@ bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
     return false;
 }
 
+bool SolverNoData(const CScript& scriptPubKey, txnouttype& typeRet,
+    std::vector<std::vector<uint8_t>>& vSolutionsRet) {
+    return SolverInternal(scriptPubKey, false, false /* not used*/, typeRet, vSolutionsRet);
+}
+
+bool SolverWithData(const CScript& scriptPubKey, bool isGenesisEnabled, txnouttype& typeRet,
+    std::vector<std::vector<uint8_t>>& vSolutionsRet) {
+    return SolverInternal(scriptPubKey, true, isGenesisEnabled, typeRet, vSolutionsRet);
+}
+
 bool ExtractDestination(const CScript &scriptPubKey,
                         CTxDestination &addressRet) {
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
+    if (!SolverNoData(scriptPubKey, whichType, vSolutions)) {
         return false;
     }
 
@@ -201,7 +234,7 @@ bool ExtractDestination(const CScript &scriptPubKey,
         addressRet = CScriptID(uint160(vSolutions[0]));
         return true;
     }
-    // Multisig txns have more than one address...
+    // Multisig txns have more than one address and OP_RETURN outputs have no addresses
     return false;
 }
 
@@ -211,7 +244,7 @@ bool ExtractDestinations(const CScript &scriptPubKey, txnouttype &typeRet,
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
     std::vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, typeRet, vSolutions)) {
+    if (!SolverNoData(scriptPubKey, typeRet, vSolutions)) { // TODO: We need to correctly identify data here. This will be solved in next commit
         return false;
     }
     if (typeRet == TX_NULL_DATA) {

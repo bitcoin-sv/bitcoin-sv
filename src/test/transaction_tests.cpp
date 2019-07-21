@@ -611,6 +611,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
         SetupDummyInputs(keystore, coins);
 
     DummyConfig config(CBaseChainParams::MAIN);
+    config.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);
 
     CMutableTransaction t;
     t.vin.resize(1);
@@ -652,11 +653,23 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     // OP_TRUE, OP_RETURN is not a standard transaction
     t.vout[0].scriptPubKey = CScript() << OP_TRUE << OP_RETURN;
     BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+
+    // OP_FALSE OP_RETURN is standard before and after genesis upgrade:
+    t.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN;
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), config.GetGenesisActivationHeight() - 1 , reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), config.GetGenesisActivationHeight(), reason));
+
+    // OP_RETURN is standard only before Genesis upgrade:
+    t.vout[0].scriptPubKey = CScript() << OP_RETURN;
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), config.GetGenesisActivationHeight() - 1 , reason));
+    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), config.GetGenesisActivationHeight(), reason));
+
 }
 
 void TestIsStandardWithScriptFactory(std::function<CScript()> scriptFactory, uint64_t initialScriptSize) {
 
     DummyConfig config(CBaseChainParams::MAIN);
+    config.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);
     uint64_t TEMP_DATA_CARRIER_SIZE = 222 + initialScriptSize;
     config.SetDataCarrierSize(TEMP_DATA_CARRIER_SIZE);
 
@@ -812,7 +825,7 @@ void TestIsStandardWithScriptFactory(std::function<CScript()> scriptFactory, uin
     BOOST_CHECK_EQUAL(reason, "datacarrier-size-exceeded");
 }
 
-BOOST_AUTO_TEST_CASE(test_IsStandard_OP_RETURN){
+BOOST_AUTO_TEST_CASE(test_IsStandard_OP_RETURN) {
     TestIsStandardWithScriptFactory([]() { return CScript() << OP_RETURN; }, 1);
 }
 

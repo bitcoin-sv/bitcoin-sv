@@ -103,7 +103,7 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS =
     LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
 
-bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &whichType);
+bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType);
 
 /**
  * Check for standard transaction types
