@@ -23,6 +23,7 @@ RUN apt-get update &&   \
     
 RUN cpanm install PerlIO::gzip
 RUN cpanm install JSON
+RUN cpanm install Term::readline
 RUN git clone https://github.com/linux-test-project/lcov.git && cd lcov && make install
 
 COPY contrib/nchain/devops/* .
