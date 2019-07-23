@@ -1,7 +1,7 @@
 // Pipeline for building Bitcoin SV for QA use
 pipeline {
     agent { 
-        dockerfile  true
+        dockerfile  {filename "contrib/nchain/devops/Dockerfile"}
     }
 
     triggers {
