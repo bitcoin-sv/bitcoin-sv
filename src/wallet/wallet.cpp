@@ -1726,13 +1726,22 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
 
     while (pindex) {
         
-        CBlock block;
-        if (ReadBlockFromDisk(block, pindex, GlobalConfig::GetConfig())) {
-            for (size_t posInBlock = 0; posInBlock < block.vtx.size();
-                 ++posInBlock) {
-                AddToWalletIfInvolvingMe(block.vtx[posInBlock], pindex,
-                                         posInBlock, fUpdate);
-            }
+        auto stream = GetDiskBlockStreamReader(pindex->GetBlockPos());
+
+        if (stream)
+        {
+            int posInBlock = 0;
+            do
+            {
+                const CTransaction& transaction = stream->ReadTransaction();
+                AddToWalletIfInvolvingMe(
+                    MakeTransactionRef(transaction),
+                    pindex,
+                    posInBlock,
+                    fUpdate);
+                ++posInBlock;
+            } while(!stream->EndOfStream());
+
             if (!ret) {
                 ret = pindex;
             }
