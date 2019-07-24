@@ -142,7 +142,7 @@ uint256 ParseHashV(const UniValue &v, std::string strName) {
     if (!IsHex(strHex))
         throw JSONRPCError(RPC_INVALID_PARAMETER,
                            strName + " must be hexadecimal string (not '" +
-                               strHex + "')");
+                               strHex + "') and length of it must be devisible by 2");
     if (64 != strHex.length())
         throw JSONRPCError(RPC_INVALID_PARAMETER,
                            strprintf("%s must be of length %d (not %d)",
@@ -160,7 +160,7 @@ std::vector<uint8_t> ParseHexV(const UniValue &v, std::string strName) {
     if (!IsHex(strHex))
         throw JSONRPCError(RPC_INVALID_PARAMETER,
                            strName + " must be hexadecimal string (not '" +
-                               strHex + "')");
+                               strHex + "') and length of it must be devisible by 2");
     return ParseHex(strHex);
 }
 std::vector<uint8_t> ParseHexO(const UniValue &o, std::string strKey) {

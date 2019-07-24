@@ -283,7 +283,8 @@ static void MutateTxAddOutAddr(CMutableTransaction &tx,
     std::string strAddr = vStrInputParts[1];
     CTxDestination destination = DecodeDestination(strAddr, chainParams);
     if (!IsValidDestination(destination)) {
-        throw std::runtime_error("invalid TX output address");
+        throw std::runtime_error("invalid TX output address or specific chain "
+                                 "setting missing e.g -regtest");
     }
     CScript scriptPubKey = GetScriptForDestination(destination);
 
