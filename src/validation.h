@@ -649,7 +649,8 @@ uint64_t GetTransactionSigOpCount(const CTransaction &tx,
  * corresponding cache which are matched. This is useful for checking blocks
  * where we will likely never need the cache entry again.
  */
-bool CheckInputs(const CTransaction &tx, CValidationState &state,
+bool CheckInputs(const Config& config,
+                 const CTransaction &tx, CValidationState &state,
                  const CCoinsViewCache &view, bool fScriptChecks,
                  const uint32_t flags, bool sigCacheStore,
                  bool scriptCacheStore,

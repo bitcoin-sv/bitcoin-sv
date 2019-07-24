@@ -615,6 +615,7 @@ bool IsGenesisEnabled(const Config& config, const CBlockIndex* pindexPrev) {
 // so that it can not be shared by other threads.
 // Mt support is present in CCoinsViewCache class.
 static bool CheckInputsFromMempoolAndCache(
+    const Config& config,
     const CTransaction& tx,
     CValidationState& state,
     const CCoinsViewCache* pcoinsTip,
@@ -650,6 +651,7 @@ static bool CheckInputsFromMempoolAndCache(
         }
     }
     return CheckInputs(
+                config,
                 tx,
                 state,
                 view,
@@ -1118,7 +1120,8 @@ CTxnValResult TxnValidation(
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
-    if (!CheckInputs(tx,
+    if (!CheckInputs(config,
+                     tx,
                      state,
                      view,
                      true,      /* fScriptChecks */
@@ -1147,6 +1150,7 @@ CTxnValResult TxnValidation(
     uint32_t currentBlockScriptVerifyFlags =
         GetBlockScriptFlags(config, chainActive.Tip());
     if (!CheckInputsFromMempoolAndCache(
+            config,
             tx,
             state,
             pcoinsTip,
@@ -1165,7 +1169,8 @@ CTxnValResult TxnValidation(
                 __func__, txid.ToString(), FormatStateMessage(state));
             return Result{state, pTxInputData, vCoinsToUncache};
         }
-        if (!CheckInputs(tx,
+        if (!CheckInputs(config,
+                         tx,
                          state,
                          view,
                          true,      /* fScriptChecks */
@@ -2259,7 +2264,8 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 }
 } // namespace Consensus
 
-bool CheckInputs(const CTransaction &tx, CValidationState &state,
+bool CheckInputs(const Config& config,
+                 const CTransaction &tx, CValidationState &state,
                  const CCoinsViewCache &inputs, bool fScriptChecks,
                  const uint32_t flags, bool sigCacheStore,
                  bool scriptCacheStore,
@@ -2310,8 +2316,20 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
         const CScript &scriptPubKey = coin.GetTxOut().scriptPubKey;
         const Amount amount = coin.GetTxOut().nValue;
 
+        int inputScriptBlockHeight = coin.GetHeight();
+        
+        uint32_t perInputScriptFlags = 0;
+        
+        if (IsGenesisEnabled(config, inputScriptBlockHeight)) 
+        {
+            perInputScriptFlags = SCRIPT_UTXO_AFTER_GENESIS;
+        }
+        // TODO: Currently, scriptExecutionCache does NOT contain per-input flags. 
+        //       This means that it can contain wrong cached result when Genesis activation line is crossed in either
+        //       direction (when  a block is mined or when there is a reorg). This will be fixed as part of CORE-204)
+        
         // Verify signature
-        CScriptCheck check(scriptPubKey, amount, tx, i, flags, sigCacheStore,
+        CScriptCheck check(scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
                            txdata);
         if (pvChecks) {
             pvChecks->push_back(std::move(check));
@@ -2846,7 +2864,7 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
             bool fCacheResults = fJustCheck;
 
             std::vector<CScriptCheck> vChecks;
-            if (!CheckInputs(tx, state, view, fScriptChecks, flags,
+            if (!CheckInputs(config, tx, state, view, fScriptChecks, flags,
                              fCacheResults, fCacheResults,
                              PrecomputedTransactionData(tx), &vChecks)) {
                 return error("ConnectBlock(): CheckInputs on %s failed with %s",
