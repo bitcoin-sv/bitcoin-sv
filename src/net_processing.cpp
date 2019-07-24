@@ -1270,6 +1270,48 @@ static void SendBlock(
     connman.PushMessage(pfrom, std::move(blockMsg));
 }
 
+static void SendUnseenTransactions(
+    // requires: ascending ordered
+    const std::vector<std::pair<unsigned int, uint256>>& vOrderedUnseenTransactions,
+    CConnman& connman,
+    const CNodePtr& pfrom,
+    const CNetMsgMaker msgMaker,
+    const CDiskBlockPos& pos)
+{
+    if (vOrderedUnseenTransactions.empty())
+    {
+        return;
+    }
+
+    auto stream = GetDiskBlockStreamReader(pos);
+    if (!stream) {
+        assert(!"can not load block from disk");
+    }
+
+    size_t currentTransactionNumber = 0;
+    auto nextMissingIt = vOrderedUnseenTransactions.begin();
+    do
+    {
+        const CTransaction& transaction = stream->ReadTransaction();
+        if (nextMissingIt->first == currentTransactionNumber)
+        {
+            connman.PushMessage(
+                pfrom,
+                msgMaker.Make(NetMsgType::TX, transaction));
+            ++nextMissingIt;
+
+            if (nextMissingIt == vOrderedUnseenTransactions.end())
+            {
+                return;
+            }
+        }
+
+        ++currentTransactionNumber;
+    } while(!stream->EndOfStream());
+
+    assert(!"vOrderedUnseenTransactions was not ascending ordered or block didn't contain all transactions!");
+}
+
 static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                            const Consensus::Params &consensusParams,
                            CConnman &connman,
@@ -1379,8 +1421,9 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             connman,
                             *mi->second);
                     } else if (inv.type == MSG_FILTERED_BLOCK) {
-                        CBlock block;
-                        if (!ReadBlockFromDisk(block, (*mi).second, config)) {
+                        auto stream =
+                            GetDiskBlockStreamReader(mi->second->GetBlockPos());
+                        if (!stream) {
                             assert(!"can not load block from disk");
                         }
 
@@ -1391,7 +1434,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             if (pfrom->pfilter) {
                                 sendMerkleBlock = true;
                                 merkleBlock =
-                                    CMerkleBlock(block, *pfrom->pfilter);
+                                    CMerkleBlock(*stream, *pfrom->pfilter);
                             }
                         }
                         if (sendMerkleBlock) {
@@ -1411,13 +1454,12 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             // allows for us to provide duplicate txn here,
                             // however we MUST always provide at least what the
                             // remote peer needs.
-                            typedef std::pair<unsigned int, uint256> PairType;
-                            for (PairType &pair : merkleBlock.vMatchedTxn) {
-                                connman.PushMessage(
-                                    pfrom,
-                                    msgMaker.Make(NetMsgType::TX,
-                                                  *block.vtx[pair.first]));
-                            }
+                            SendUnseenTransactions(
+                                merkleBlock.vMatchedTxn,
+                                connman,
+                                pfrom,
+                                msgMaker,
+                                mi->second->GetBlockPos());
                         }
                         // else
                         // no response

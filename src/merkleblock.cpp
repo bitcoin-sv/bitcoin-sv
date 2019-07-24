@@ -5,9 +5,12 @@
 
 #include "merkleblock.h"
 
+#include "blockstreams.h"
+#include "clientversion.h"
 #include "consensus/consensus.h"
 #include "hash.h"
 #include "utilstrencodings.h"
+#include "streams.h"
 
 CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter) {
     header = block.GetBlockHeader();
@@ -30,6 +33,33 @@ CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter) {
 
         vHashes.push_back(txid);
     }
+
+    txn = CPartialMerkleTree(vHashes, vMatch);
+}
+
+CMerkleBlock::CMerkleBlock(
+    CBlockStreamReader<CFileReader>& stream,
+    CBloomFilter& filter)
+    : header{stream.GetBlockHeader()}
+{
+    std::vector<bool> vMatch;
+    std::vector<uint256> vHashes;
+
+    vMatch.reserve(stream.GetRemainingTransactionsCount());
+    vHashes.reserve(stream.GetRemainingTransactionsCount());
+    do
+    {
+        const CTransaction& transaction = stream.ReadTransaction();
+        const uint256& txid = transaction.GetId();
+        if (filter.IsRelevantAndUpdate(transaction)) {
+            vMatchedTxn.emplace_back(vMatch.size(), txid);
+            vMatch.push_back(true);
+        } else {
+            vMatch.push_back(false);
+        }
+
+        vHashes.push_back(txid);
+    } while(!stream.EndOfStream());
 
     txn = CPartialMerkleTree(vHashes, vMatch);
 }

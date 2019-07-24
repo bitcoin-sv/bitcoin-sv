@@ -13,6 +13,10 @@
 
 #include <vector>
 
+class CFileReader;
+template<typename Reader>
+class CBlockStreamReader;
+
 /**
  * Data structure that represents a partial merkle tree.
  *
@@ -160,6 +164,7 @@ public:
      * transaction, thus the filter will likely be modified.
      */
     CMerkleBlock(const CBlock &block, CBloomFilter &filter);
+    CMerkleBlock(CBlockStreamReader<CFileReader>& stream, CBloomFilter &filter);
 
     // Create from a CBlock, matching the txids in the set.
     CMerkleBlock(const CBlock &block, const std::set<TxId> &txids);
