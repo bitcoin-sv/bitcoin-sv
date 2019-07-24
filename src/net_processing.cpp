@@ -4,6 +4,8 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <chrono>
+#include <optional>
+#include <shared_mutex>
 #include "net_processing.h"
 
 #include "addrman.h"
@@ -970,17 +972,131 @@ void PeerLogicValidation::BlockConnected(
     }
 }
 
-static CCriticalSection cs_most_recent_block;
-static std::shared_ptr<const CBlock> most_recent_block;
-static std::shared_ptr<const CBlockHeaderAndShortTxIDs>
-    most_recent_compact_block;
-static uint256 most_recent_block_hash;
+namespace
+{
+    class CMostRecentBlockCache
+    {
+    public:
+        struct CCompactBlockMessageData
+        {
+            CCompactBlockMessageData(
+                std::shared_ptr<const std::vector<uint8_t>> inData)
+                : data{inData}
+                , hash{::Hash(data->data(), data->data() + data->size())}
+                , size{data->size()}
+            {/**/}
+
+            CCompactBlockMessageData(
+                std::shared_ptr<const std::vector<uint8_t>> inData,
+                uint256 inHash,
+                size_t inSize)
+                : data{inData}
+                , hash{inHash}
+                , size{inSize}
+            {/**/}
+
+            CSerializedNetMsg CreateCompactBlockMessage() const
+            {
+                return
+                    {
+                        NetMsgType::CMPCTBLOCK,
+                        hash,
+                        size,
+                        std::make_unique<CSharedVectorStream>(data)
+                    };
+            }
+
+            const std::shared_ptr<const std::vector<uint8_t>> data;
+            const uint256 hash;
+            const size_t size;
+        };
+
+        void SetBlock(
+            std::shared_ptr<const CBlock> block,
+            const CBlockIndex& index)
+        {
+            assert(block);
+
+            std::unique_lock lock{mMutex};
+
+            mBlock = std::move(block);
+            auto serializedData = std::make_shared<std::vector<uint8_t>>();
+            // serialize compact block data
+            CVectorWriter{
+                SER_NETWORK,
+                PROTOCOL_VERSION,
+                *serializedData,
+                0,
+                CBlockHeaderAndShortTxIDs{*mBlock}};
+
+            if(index.nStatus.hasDiskBlockMetaData())
+            {
+                auto metaData = index.GetDiskBlockMetaData();
+                mCompactBlockMessage =
+                    std::make_shared<const CCompactBlockMessageData>(
+                        std::move(serializedData),
+                        metaData.diskDataHash,
+                        metaData.diskDataSize);
+            }
+            else
+            {
+                mCompactBlockMessage =
+                    std::make_shared<const CCompactBlockMessageData>(
+                        std::move(serializedData));
+            }
+        }
+
+        std::shared_ptr<const CBlock> GetBlock() const
+        {
+            std::shared_lock lock{mMutex};
+
+            return mBlock;
+        }
+
+        std::shared_ptr<const CBlock> GetBlockIfMatch(
+            const uint256& expectedBlockHash) const
+        {
+            std::shared_lock lock{mMutex};
+
+            if(mBlock && mBlock->GetHash() == expectedBlockHash)
+            {
+                return mBlock;
+            }
+
+            return {};
+        }
+
+        std::shared_ptr<const CCompactBlockMessageData> GetCompactBlockMessage() const
+        {
+            std::shared_lock lock{mMutex};
+
+            return mCompactBlockMessage;
+        }
+
+        std::shared_ptr<const CCompactBlockMessageData> GetCompactBlockMessageIfMatch(
+            const uint256& expectedBlockHash) const
+        {
+            std::shared_lock lock{mMutex};
+
+            if(mBlock && mBlock->GetHash() == expectedBlockHash)
+            {
+                return mCompactBlockMessage;
+            }
+
+            return {};
+        }
+
+    private:
+        mutable std::shared_mutex mMutex;
+        std::shared_ptr<const CBlock> mBlock;
+        std::shared_ptr<const CCompactBlockMessageData> mCompactBlockMessage;
+    };
+
+    CMostRecentBlockCache mostRecentBlock;
+}
 
 void PeerLogicValidation::NewPoWValidBlock(
     const CBlockIndex *pindex, const std::shared_ptr<const CBlock> &pblock) {
-    std::shared_ptr<const CBlockHeaderAndShortTxIDs> pcmpctblock =
-        std::make_shared<const CBlockHeaderAndShortTxIDs>(*pblock);
-    const CNetMsgMaker msgMaker(PROTOCOL_VERSION);
 
     LOCK(cs_main);
 
@@ -992,16 +1108,10 @@ void PeerLogicValidation::NewPoWValidBlock(
 
     uint256 hashBlock(pblock->GetHash());
 
-    {
-        LOCK(cs_most_recent_block);
-        most_recent_block_hash = hashBlock;
-        most_recent_block = pblock;
-        most_recent_compact_block = pcmpctblock;
-    }
+    mostRecentBlock.SetBlock(pblock, *pindex);
+    auto msgData = mostRecentBlock.GetCompactBlockMessage();
 
-    connman->ForEachNode([this, &pcmpctblock, pindex, &msgMaker,
-                          &hashBlock](const CNodePtr& pnode) {
-        // TODO: Avoid the repeated-serialization here
+    connman->ForEachNode([this, &msgData, pindex, &hashBlock](const CNodePtr& pnode) {
         if (pnode->nVersion < INVALID_CB_NO_BAN_VERSION || pnode->fDisconnect) {
             return;
         }
@@ -1016,7 +1126,8 @@ void PeerLogicValidation::NewPoWValidBlock(
                      "PeerLogicValidation::NewPoWValidBlock",
                      hashBlock.ToString(), pnode->id);
             connman->PushMessage(
-                pnode, msgMaker.Make(NetMsgType::CMPCTBLOCK, *pcmpctblock));
+                pnode,
+                msgData->CreateCompactBlockMessage());
             state.pindexBestHeaderSent = pindex;
         }
     });
@@ -1221,8 +1332,7 @@ static bool SendCompactBlock(
     const CNodePtr& node,
     CConnman& connman,
     const CNetMsgMaker msgMaker,
-    const CDiskBlockPos& pos,
-    int sendFlags)
+    const CDiskBlockPos& pos)
 {
     auto reader = GetDiskBlockStreamReader(pos);
     if (!reader) {
@@ -1232,7 +1342,7 @@ static bool SendCompactBlock(
     CBlockHeaderAndShortTxIDs cmpctblock{*reader};
 
     CSerializedNetMsg compactBlockMsg =
-        msgMaker.Make(sendFlags, NetMsgType::CMPCTBLOCK, cmpctblock);
+        msgMaker.Make(NetMsgType::CMPCTBLOCK, cmpctblock);
     if (rejectIfMaxDownloadExceeded(config, compactBlockMsg, isMostRecentBlock, node, connman)) {
         return false;
     }
@@ -1350,11 +1460,8 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         // ActivateBestChain but after AcceptBlock). In this
                         // case, we need to run ActivateBestChain prior to
                         // checking the relay conditions below.
-                        std::shared_ptr<const CBlock> a_recent_block;
-                        {
-                            LOCK(cs_most_recent_block);
-                            a_recent_block = most_recent_block;
-                        }
+                        std::shared_ptr<const CBlock> a_recent_block =
+                            mostRecentBlock.GetBlock();
                         CValidationState dummy;
                         CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
                         ActivateBestChain(config, dummy, changeSet, a_recent_block);
@@ -1469,7 +1576,6 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         // against a compact block, and we don't feel like
                         // constructing the object for them, so instead we
                         // respond with the full, non-compact block.
-                        int nSendFlags = 0;
                         if (CanDirectFetch(consensusParams) &&
                             mi->second->nHeight >=
                                 chainActive.Height() - MAX_CMPCTBLOCK_DEPTH)
@@ -1480,8 +1586,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                                 pfrom,
                                 connman,
                                 msgMaker,
-                                mi->second->GetBlockPos(),
-                                nSendFlags);
+                                mi->second->GetBlockPos());
                             if (!sent)
                             {
                                 break;
@@ -1514,11 +1619,10 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 // Send stream from relay memory
                 bool push = false;
                 auto mi = mapRelay.find(inv.hash);
-                int nSendFlags = 0;
                 if (mi != mapRelay.end()) {
                     connman.PushMessage(
                         pfrom,
-                        msgMaker.Make(nSendFlags, NetMsgType::TX, *mi->second));
+                        msgMaker.Make(NetMsgType::TX, *mi->second));
                     push = true;
                 } else if (pfrom->timeLastMempoolReq) {
                     auto txinfo = mempool.info(inv.hash);
@@ -1528,8 +1632,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     if (txinfo.tx &&
                         txinfo.nTime <= pfrom->timeLastMempoolReq) {
                         connman.PushMessage(pfrom,
-                                            msgMaker.Make(nSendFlags,
-                                                          NetMsgType::TX,
+                                            msgMaker.Make(NetMsgType::TX,
                                                           *txinfo.tx));
                         push = true;
                     }
@@ -1579,9 +1682,8 @@ inline static void SendBlockTransactions(const CBlock &block,
     }
 
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
-    int nSendFlags = 0;
     connman.PushMessage(pfrom,
-                        msgMaker.Make(nSendFlags, NetMsgType::BLOCKTXN, resp));
+                        msgMaker.Make(NetMsgType::BLOCKTXN, resp));
 }
 
 /**
@@ -2130,11 +2232,8 @@ static void ProcessGetBlocksMessage(const Config& config, const CNodePtr& pfrom,
     // for getheaders requests, and there are no known nodes which support
     // compact blocks but still use getblocks to request blocks.
     {
-        std::shared_ptr<const CBlock> a_recent_block;
-        {
-            LOCK(cs_most_recent_block);
-            a_recent_block = most_recent_block;
-        }
+        std::shared_ptr<const CBlock> a_recent_block =
+            mostRecentBlock.GetBlock();
         CValidationState dummy;
         CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
         ActivateBestChain(config, dummy, changeSet, a_recent_block);
@@ -2196,14 +2295,8 @@ static OptBool ProcessGetBlockTxnMessage(const Config& config, const CNodePtr& p
     BlockTransactionsRequest req;
     vRecv >> req;
 
-    std::shared_ptr<const CBlock> recent_block;
-    {
-        LOCK(cs_most_recent_block);
-        if(most_recent_block_hash == req.blockhash) {
-            recent_block = most_recent_block;
-        }
-        // Unlock cs_most_recent_block to avoid cs_main lock inversion
-    }
+    std::shared_ptr<const CBlock> recent_block =
+        mostRecentBlock.GetBlockIfMatch(req.blockhash);
     if(recent_block) {
         SendBlockTransactions(*recent_block, req, pfrom, connman);
         return true;
@@ -3987,21 +4080,23 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
                      "%s sending header-and-ids %s to peer=%d\n", __func__,
                      vHeaders.front().GetHash().ToString(), pto->id);
 
-            int nSendFlags = 0;
-
             bool fGotBlockFromCache = false;
+            if (pBestIndex != nullptr)
             {
-                LOCK(cs_most_recent_block);
-                if (pBestIndex != nullptr && most_recent_block_hash == pBestIndex->GetBlockHash()) {
-                    CBlockHeaderAndShortTxIDs cmpctblock(
-                        *most_recent_block);
+                auto msgData =
+                    mostRecentBlock.GetCompactBlockMessageIfMatch(
+                        pBestIndex->GetBlockHash());
+
+                if(msgData)
+                {
                     connman.PushMessage(
                         pto,
-                        msgMaker.Make(nSendFlags, NetMsgType::CMPCTBLOCK,
-                                      cmpctblock));
+                        msgData->CreateCompactBlockMessage());
+
                     fGotBlockFromCache = true;
                 }
             }
+
             if (!fGotBlockFromCache) {
                 // FIXME pBestIndex could be null... what to do in that case?
                 SendCompactBlock(
@@ -4010,8 +4105,7 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
                     pto,
                     connman,
                     msgMaker,
-                    pBestIndex->GetBlockPos(),
-                    nSendFlags);
+                    pBestIndex->GetBlockPos());
             }
             state.pindexBestHeaderSent = pBestIndex;
         }

@@ -17,6 +17,7 @@
 #include <ios>
 #include <limits>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -886,7 +887,7 @@ public:
         if(mData.size() > mConsumed)
         {
             size_t consume = std::min(mData.size() - mConsumed, maxSize);
-            uint8_t* start = mData.data() + mConsumed;
+            const uint8_t* start = mData.data() + mConsumed;
             mConsumed += consume;
 
             return {start, consume};
@@ -899,6 +900,38 @@ public:
 
 private:
     std::vector<uint8_t> mData;
+    size_t mConsumed = 0u;
+};
+
+/**
+ * Stream wrapper for std::shared_ptr<const std::vector<uint8_t>>
+ */
+class CSharedVectorStream : public CForwardAsyncReadonlyStream
+{
+public:
+    CSharedVectorStream(std::shared_ptr<const std::vector<uint8_t>> data)
+        : mData{std::move(data)}
+    {/**/}
+
+    bool EndOfStream() const override {return mData->size() == mConsumed;}
+    CSpan ReadAsync(size_t maxSize) override
+    {
+        if(mData->size() > mConsumed)
+        {
+            size_t consume = std::min(mData->size() - mConsumed, maxSize);
+            const uint8_t* start = mData->data() + mConsumed;
+            mConsumed += consume;
+
+            return {start, consume};
+        }
+        else
+        {
+            return {};
+        }
+    }
+
+private:
+    std::shared_ptr<const std::vector<uint8_t>> mData;
     size_t mConsumed = 0u;
 };
 
