@@ -17,6 +17,7 @@ RUN apt-get update &&   \
        libzmq3-dev      \
        git              \
        python3          \
+       python3-pip      \
        perl             \
        cpanminus        \
        libperlio-gzip-perl \
