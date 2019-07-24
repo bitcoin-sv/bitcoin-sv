@@ -15,15 +15,18 @@ pipeline {
     }
 
     stages {
+    
+        stage ('Prepare') {
+            steps {
+                sh 'mv /*.py .'
+                sh 'ls -alrt'                
+            }
+        }
 
         stage ('Build') {
             steps {
                 bitbucketStatusNotify(buildState: 'BUILDING')
-                sh 'ls -alrt'                
-                sh 'ls -alrt ..'
-                sh 'ls -alrt /'
-                
-                sh 'python3 /entrypoint.py'
+                sh 'python3 entrypoint.py'
             }
         }
  
