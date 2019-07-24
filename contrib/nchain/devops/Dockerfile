@@ -32,7 +32,7 @@ RUN cpanm JSON
 RUN cpanm Term::ReadLine
 RUN git clone https://github.com/linux-test-project/lcov.git && cd lcov && make install
 
-COPY contrib/nchain/devops/* .
+COPY contrib/nchain/devops/* ./
 RUN  chmod +x /entrypoint.py
 RUN  useradd -G users jenkins
 USER jenkins
