@@ -12,6 +12,7 @@
 #endif
 
 #include "amount.h"
+#include "blockstreams.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/consensus.h"
@@ -632,6 +633,8 @@ bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
                        const Config &config);
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
+std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+    const CDiskBlockPos& pos);
 std::unique_ptr<CForwardReadonlyStream> StreamBlockFromDisk(
     CBlockIndex& index,
     int networkVersion);

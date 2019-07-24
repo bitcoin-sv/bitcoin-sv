@@ -1215,11 +1215,37 @@ static bool rejectIfMaxDownloadExceeded(const Config &config, CSerializedNetMsg 
     return false;
 }
 
+static bool SendCompactBlock(
+    const Config& config,
+    bool isMostRecentBlock,
+    const CNodePtr& node,
+    CConnman& connman,
+    const CNetMsgMaker msgMaker,
+    const CDiskBlockPos& pos,
+    int sendFlags)
+{
+    auto reader = GetDiskBlockStreamReader(pos);
+    if (!reader) {
+        assert(!"cannot load block from disk");
+    }
+
+    CBlockHeaderAndShortTxIDs cmpctblock{*reader};
+
+    CSerializedNetMsg compactBlockMsg =
+        msgMaker.Make(sendFlags, NetMsgType::CMPCTBLOCK, cmpctblock);
+    if (rejectIfMaxDownloadExceeded(config, compactBlockMsg, isMostRecentBlock, node, connman)) {
+        return false;
+    }
+    connman.PushMessage(node, std::move(compactBlockMsg));
+
+    return true;
+}
+
 static void SendBlock(
-    const Config &config,
+    const Config& config,
     bool isMostRecentBlock,
     const CNodePtr& pfrom,
-    CConnman &connman,
+    CConnman& connman,
     CBlockIndex& index)
 {
     auto stream = StreamBlockFromDisk(index, pfrom->GetSendVersion());
@@ -1406,18 +1432,18 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             mi->second->nHeight >=
                                 chainActive.Height() - MAX_CMPCTBLOCK_DEPTH)
                         {
-                            CBlock block;
-                            if (!ReadBlockFromDisk(block, (*mi).second, config)) {
-                                assert(!"can not load block from disk");
-                            }
-
-                            CBlockHeaderAndShortTxIDs cmpctblock(block);
-
-                            CSerializedNetMsg compactBlockMsg = msgMaker.Make(nSendFlags, NetMsgType::CMPCTBLOCK, cmpctblock);
-                            if (rejectIfMaxDownloadExceeded(config, compactBlockMsg, isMostRecentBlock, pfrom, connman)) {
+                            bool sent = SendCompactBlock(
+                                config,
+                                isMostRecentBlock,
+                                pfrom,
+                                connman,
+                                msgMaker,
+                                mi->second->GetBlockPos(),
+                                nSendFlags);
+                            if (!sent)
+                            {
                                 break;
                             }
-                            connman.PushMessage(pfrom, std::move(compactBlockMsg));
                         } else {
                             SendBlock(
                                 config,
@@ -3935,14 +3961,15 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
                 }
             }
             if (!fGotBlockFromCache) {
-                    CBlock block;
-                    bool ret = ReadBlockFromDisk(block, pBestIndex, config);
-                    assert(ret);
-                    CBlockHeaderAndShortTxIDs cmpctblock(block);
-                    connman.PushMessage(pto,
-                                        msgMaker.Make(nSendFlags,
-                                                      NetMsgType::CMPCTBLOCK,
-                                                      cmpctblock));
+                // FIXME pBestIndex could be null... what to do in that case?
+                SendCompactBlock(
+                    config,
+                    true,
+                    pto,
+                    connman,
+                    msgMaker,
+                    pBestIndex->GetBlockPos(),
+                    nSendFlags);
             }
             state.pindexBestHeaderSent = pBestIndex;
         }

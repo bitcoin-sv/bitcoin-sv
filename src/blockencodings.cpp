@@ -3,7 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blockencodings.h"
-#include "chainparams.h"
+#include "blockstreams.h"
+#include "clientversion.h"
 #include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
@@ -27,6 +28,37 @@ CBlockHeaderAndShortTxIDs::CBlockHeaderAndShortTxIDs(const CBlock &block)
         const CTransaction &tx = *block.vtx[i];
         shorttxids[i - 1] = GetShortID(tx.GetHash());
     }
+}
+
+CBlockHeaderAndShortTxIDs::CBlockHeaderAndShortTxIDs(
+    CBlockStreamReader<CFileReader>& stream)
+    : nonce{GetRand(std::numeric_limits<uint64_t>::max())}
+    , prefilledtxn{1}
+{
+    assert(stream.GetRemainingTransactionsCount() > 0);
+
+    shorttxids.reserve(stream.GetRemainingTransactionsCount() - 1);
+    header = stream.GetBlockHeader();
+    FillShortTxIDSelector();
+
+    bool firstTransaction = true;
+    do
+    {
+        const CTransaction& transaction = stream.ReadTransaction();
+        if (firstTransaction)
+        {
+            // TODO: Use our mempool prior to block acceptance
+            // to predictively fill more than just the coinbase.
+            prefilledtxn[0] =
+                {0, MakeTransactionRef(transaction)};
+            firstTransaction = false;
+        }
+        else
+        {
+            shorttxids.push_back(
+                GetShortID(transaction.GetHash()));
+        }
+    } while(!stream.EndOfStream());
 }
 
 void CBlockHeaderAndShortTxIDs::FillShortTxIDSelector() const {

@@ -150,9 +150,8 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
         uint256 randomHash = GetRandHash();
         index.SetDiskBlockMetaData(randomHash, 1);
 
-        auto streamCorruptMetaData = StreamBlockFromDisk(
-            index,
-            INIT_PROTO_VERSION);
+        auto streamCorruptMetaData =
+            StreamBlockFromDisk(index, INIT_PROTO_VERSION);
         auto metaData = index.GetDiskBlockMetaData();
         BOOST_REQUIRE_EQUAL(metaData.diskDataSize, 1);
         BOOST_REQUIRE_EQUAL(

@@ -1238,6 +1238,23 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
     return true;
 }
 
+std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+    const CDiskBlockPos& pos)
+{
+    std::unique_ptr<FILE, CCloseFile> file{
+        CDiskFiles::OpenBlockFile(pos, true)};
+
+    if (!file)
+    {
+        return {}; // could not open a stream
+    }
+
+    return
+        std::make_unique<CBlockStreamReader<CFileReader>>(
+            std::move(file),
+            CStreamVersionAndType{SER_DISK, CLIENT_VERSION});
+}
+
 static bool PopulateBlockIndexBlockDiskMetaData(
     FILE* file,
     CBlockIndex& index,
