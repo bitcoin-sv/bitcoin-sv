@@ -14,21 +14,21 @@ using mining::CJournalEntry;
 CJournal::CJournal(const CJournal& that)
 {
     // Lock journal we are copying from, and copy its contents
-    std::unique_lock<std::mutex> lock { that.mMtx };
+    std::shared_lock lock { that.mMtx };
     mTransactions = that.mTransactions;
 }
 
 // Get size of journal
 size_t CJournal::size() const
 {
-    std::lock_guard<std::mutex> lock { mMtx };
+    std::shared_lock lock { mMtx };
     return mTransactions.size();
 }
 
 // Apply changes to the journal
 void CJournal::applyChanges(const CJournalChangeSet& changeSet)
 {
-    std::lock_guard<std::mutex> lock { mMtx };
+    std::unique_lock lock { mMtx };
 
     using TransactionListByName = TransactionList::nth_index<0>::type;
     using TransactionListByPosition = TransactionList::nth_index<1>::type;
@@ -87,15 +87,15 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
 }
 
 // Get start index for our underlying sequence
-CJournal::Index CJournal::begin() const
+CJournal::Index CJournal::ReadLock::begin() const
 {
-    return Index { this, index<1>().begin() };
+    return Index { mJournal.get(), mJournal->index<1>().begin() };
 }
 
 // Get end index for our underlying sequence
-CJournal::Index CJournal::end() const
+CJournal::Index CJournal::ReadLock::end() const
 {
-    return Index { this, index<1>().end() };
+    return Index { mJournal.get(), mJournal->index<1>().end() };
 }
 
 
@@ -147,6 +147,9 @@ CJournal::Index& CJournal::Index::operator++()
     return *this;
 }
 
+// Reset the index to ensure it points to the next item. This needs to happen
+// for example if the index had previously reached the end, and then some more
+// items were subsequently added.
 void CJournal::Index::reset()
 {
     if(!valid())
@@ -174,6 +177,35 @@ void CJournal::Index::reset()
             mCurrItem = mJournal->index<1>().begin();
         }
     }
+}
+
+
+/** Journal read lock **/
+
+// Standard constructor
+CJournal::ReadLock::ReadLock(const std::shared_ptr<CJournal>& journal)
+: mJournal{journal}, mLock{mJournal->mMtx}
+{
+}
+
+// Move constructor
+CJournal::ReadLock::ReadLock(ReadLock&& that)
+: mJournal{std::move(that.mJournal)}, mLock{std::move(that.mLock)}
+{
+}
+
+// Move assignment
+CJournal::ReadLock& CJournal::ReadLock::operator=(ReadLock&& that)
+{
+    if(this != &that)
+    {
+        // Need to make sure the old lock gets unlocked before the old journal
+        // gets destroyed.
+        mLock = std::move(that.mLock);
+        mJournal = std::move(that.mJournal);
+    }
+
+    return *this;
 }
 
 

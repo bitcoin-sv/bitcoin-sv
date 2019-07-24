@@ -12,8 +12,8 @@
 
 #include <atomic>
 #include <memory>
-#include <mutex>
 #include <ostream>
+#include <shared_mutex>
 
 namespace mining
 {
@@ -61,7 +61,7 @@ class CJournal final
   private:
 
     // Protect our data structures
-    mutable std::mutex mMtx {};
+    mutable std::shared_mutex mMtx {};
 
     // Compare journal entries
     struct EntrySorter
@@ -108,6 +108,9 @@ class CJournal final
     // Indexes provide the funtionality we need that is missing from the
     // (non random-access) iterators provided by the underlying boost
     // multi-index container.
+    //
+    // NOTE: It is only safe to test/read/update an Index while the journal
+    // it came from is locked by holding a ReadLock (see below).
     class Index
     {
         using Underlying = TransactionList::nth_index<1>::type::const_iterator;
@@ -132,9 +135,29 @@ class CJournal final
         Underlying mPrevItem     {};
     };
 
-    // Get start/end indexes for our underlying sequence
-    Index begin() const;
-    Index end() const;
+    // An RAII wrapper for holding a read lock on the journal
+    class ReadLock final
+    {
+      public:
+        ReadLock(const std::shared_ptr<CJournal>& journal);
+        ~ReadLock() = default;
+
+        ReadLock(const ReadLock&) = delete;
+        ReadLock& operator=(const ReadLock&) = delete;
+        ReadLock(ReadLock&& that);
+        ReadLock& operator=(ReadLock&& that);
+
+        // Get start/end indexes for our underlying sequence
+        Index begin() const;
+        Index end() const;
+
+      private:
+        // Order of declaration is important; we need the lock to be destroyed
+        // and the mutex unlocked before the journal that owns it.
+        std::shared_ptr<CJournal> mJournal {};
+        std::shared_lock<std::shared_mutex> mLock {};
+    };
+
 };
 
 using CJournalPtr = std::shared_ptr<CJournal>;
