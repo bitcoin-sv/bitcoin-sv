@@ -19,6 +19,8 @@ RUN apt-get update &&   \
        python3          \
        perl             \
        cpanminus        \
+       libperlio-gzip-perl \
+       libjson-perl     \
        bsdmainutils
 
 
