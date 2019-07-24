@@ -284,26 +284,27 @@ static UniValue gettxoutproof(const Config &config,
         pblockindex = mapBlockIndex[hashBlock];
     }
 
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pblockindex, config)) {
+    auto stream =
+        GetDiskBlockStreamReader(pblockindex->GetBlockPos());
+    if (!stream) {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
     }
 
-    unsigned int ntxFound = 0;
-    for (const auto &tx : block.vtx) {
-        if (setTxIds.count(tx->GetId())) {
-            ntxFound++;
-        }
-    }
+    CMerkleBlock mb;
 
-    if (ntxFound != setTxIds.size()) {
-        throw JSONRPCError(
-            RPC_INVALID_ADDRESS_OR_KEY,
-            "Not all transactions found in specified or retrieved block");
+    try
+    {
+        mb = {*stream, setTxIds};
+    }
+    catch(const CMerkleBlock::CNotAllExpectedTransactionsFound& e)
+    {
+        throw
+            JSONRPCError(
+                RPC_INVALID_ADDRESS_OR_KEY,
+                "Not all transactions found in specified or retrieved block");
     }
 
     CDataStream ssMB(SER_NETWORK, PROTOCOL_VERSION);
-    CMerkleBlock mb(block, setTxIds);
     ssMB << mb;
     std::string strHex = HexStr(ssMB.begin(), ssMB.end());
     return strHex;

@@ -64,19 +64,36 @@ CMerkleBlock::CMerkleBlock(
     txn = CPartialMerkleTree(vHashes, vMatch);
 }
 
-CMerkleBlock::CMerkleBlock(const CBlock &block, const std::set<TxId> &txids) {
-    header = block.GetBlockHeader();
-
+CMerkleBlock::CMerkleBlock(
+    CBlockStreamReader<CFileReader>& stream,
+    const std::set<TxId>& txids)
+    : header{stream.GetBlockHeader()}
+{
     std::vector<bool> vMatch;
     std::vector<uint256> vHashes;
 
-    vMatch.reserve(block.vtx.size());
-    vHashes.reserve(block.vtx.size());
-
-    for (const auto &tx : block.vtx) {
-        const TxId &txid = tx->GetId();
-        vMatch.push_back(txids.count(txid));
+    vMatch.reserve(stream.GetRemainingTransactionsCount());
+    vHashes.reserve(stream.GetRemainingTransactionsCount());
+    size_t foundCount = 0;
+    do
+    {
+        const CTransaction& transaction = stream.ReadTransaction();
+        const TxId& txid = transaction.GetId();
+        if(txids.count(txid))
+        {
+            vMatch.push_back(true);
+            ++foundCount;
+        }
+        else
+        {
+            vMatch.push_back(false);
+        }
         vHashes.push_back(txid);
+    } while(!stream.EndOfStream());
+
+    if(txids.size() != foundCount)
+    {
+        throw CNotAllExpectedTransactionsFound{};
     }
 
     txn = CPartialMerkleTree(vHashes, vMatch);
