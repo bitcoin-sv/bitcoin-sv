@@ -20,7 +20,9 @@ RUN apt-get update &&   \
        perl             \
        cpanminus        \
        bsdmainutils
-    
+
+
+RUN pip3 install requests   
 RUN cpanm install PerlIO::gzip
 RUN cpanm install JSON
 RUN cpanm install Term::ReadLine
