@@ -25,9 +25,9 @@ RUN apt-get update &&   \
 
 
 RUN pip3 install requests   
-RUN cpanm install PerlIO::gzip
-RUN cpanm install JSON
-RUN cpanm install Term::ReadLine
+RUN cpanm PerlIO::gzip
+RUN cpanm JSON
+RUN cpanm Term::ReadLine
 RUN git clone https://github.com/linux-test-project/lcov.git && cd lcov && make install
 
 COPY contrib/nchain/devops/* .
