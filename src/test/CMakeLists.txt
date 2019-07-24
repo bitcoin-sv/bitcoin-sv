@@ -144,7 +144,12 @@ target_include_directories(test_bitcoin
 
 find_package(Boost 1.58 REQUIRED unit_test_framework)
 
-target_link_libraries(test_bitcoin Boost::unit_test_framework rpcclient server)
+target_link_libraries(
+	test_bitcoin
+	Boost::unit_test_framework
+	rpcclient
+	server
+	$<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
 
 # We need to detect if the BOOST_TEST_DYN_LINK flag is required.
 set(CMAKE_REQUIRED_LIBRARIES Boost::unit_test_framework)

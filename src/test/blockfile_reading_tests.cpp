@@ -127,7 +127,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
     // check that blockIndex was updated with disk content size and hash data
     {
         auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
-        std::vector<uint8_t> serializedData{StreamSerialize(*stream, 5u)};
+        std::vector<uint8_t> serializedData{SerializeAsyncStream(*stream, 5u)};
 
         uint256 expectedHash =
             Hash(serializedData.begin(), serializedData.end());
@@ -158,7 +158,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
             metaData.diskDataHash.GetCheapHash(),
             randomHash.GetCheapHash());
         BOOST_REQUIRE_EQUAL(
-            StreamSerialize(*streamCorruptMetaData, 5u).size(),
+            SerializeAsyncStream(*streamCorruptMetaData, 5u).size(),
             1);
     }
 }
@@ -204,7 +204,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
                 deleted = true;
             }
 
-            auto chunk = stream->Read(5u);
+            auto chunk = stream->ReadAsync(5u);
 
             serializedData.insert(
                 serializedData.end(),

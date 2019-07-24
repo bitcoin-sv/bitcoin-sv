@@ -34,4 +34,5 @@ target_link_libraries(bench_bitcoin
         leveldb
         memenv
         secp256k1
-        univalue)
+        univalue
+        $<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux

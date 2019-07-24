@@ -141,7 +141,7 @@ public:
         std::string&& command,
         const uint256& hash,
         size_t size,
-        std::unique_ptr<CForwardReadonlyStream> data)
+        std::unique_ptr<CForwardAsyncReadonlyStream> data)
         : mCommand{std::move(command)}
         , mHash{hash}
         , mSize{size}
@@ -149,7 +149,7 @@ public:
     {/**/}
 
     const std::string& Command() const {return mCommand;}
-    std::unique_ptr<CForwardReadonlyStream> MoveData() {return std::move(mData);}
+    std::unique_ptr<CForwardAsyncReadonlyStream> MoveData() {return std::move(mData);}
     const uint256& Hash() const {return mHash;}
     size_t Size() const {return mSize;}
 
@@ -157,7 +157,7 @@ private:
     std::string mCommand;
     uint256 mHash;
     size_t mSize;
-    std::unique_ptr<CForwardReadonlyStream> mData;
+    std::unique_ptr<CForwardAsyncReadonlyStream> mData;
 };
 
 class CConnman {
@@ -672,7 +672,7 @@ public:
      */
     std::optional<CSpan> mSendChunk;
     uint64_t nSendBytes {0};
-    std::deque<std::unique_ptr<CForwardReadonlyStream>> vSendMsg {};
+    std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> vSendMsg {};
     CCriticalSection cs_vSend {};
     CCriticalSection cs_hSocket {};
     CCriticalSection cs_vRecv {};

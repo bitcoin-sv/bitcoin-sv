@@ -101,7 +101,61 @@ BOOST_AUTO_TEST_CASE(known_size_input)
         expectedSerializedData.size(),
         CMemoryReader{expectedSerializedData}};
     std::vector<uint8_t> serializedData{
-        StreamSerialize(stream, 5u)};
+         SerializeAsyncStream(stream, 5u)};
+
+    BOOST_REQUIRE_EQUAL_COLLECTIONS(
+        serializedData.begin(), serializedData.end(),
+        expectedSerializedData.begin(), expectedSerializedData.end());
+}
+
+BOOST_AUTO_TEST_CASE(known_size_input_async_reader)
+{
+    struct CTestAsyncReader : private CMemoryReader
+    {
+        CTestAsyncReader(const std::vector<uint8_t>& source, size_t& skipCount)
+            : CMemoryReader{source}
+            , mSkipCount{skipCount}
+        {/**/}
+
+        size_t Read(char* pch, size_t maxSize)
+        {
+            auto now = std::chrono::steady_clock::now();
+
+            using namespace std::chrono_literals;
+            if(now - mStart < 100ms)
+            {
+                // skip the read
+                ++mSkipCount;
+
+                return 0;
+            }
+
+            mStart = now;
+
+            return CMemoryReader::Read(pch, maxSize);
+        }
+
+        bool EndOfStream() const
+        {
+            return CMemoryReader::EndOfStream();
+        }
+
+        std::chrono::time_point<std::chrono::steady_clock> mStart = std::chrono::steady_clock::now();
+        size_t& mSkipCount;
+    };
+
+    std::vector<uint8_t> expectedSerializedData{
+        Serialize(BuildRandomTestBlock())};
+
+    size_t skipCount = 0u;
+    CFixedSizeStream stream{
+        expectedSerializedData.size(),
+        CTestAsyncReader{expectedSerializedData, skipCount}};
+    std::vector<uint8_t> serializedData{
+        SerializeAsyncStream(stream, 4096u)};
+
+    // check that we really did at least a couple of skipps
+    BOOST_REQUIRE_GT(skipCount, 2);
 
     BOOST_REQUIRE_EQUAL_COLLECTIONS(
         serializedData.begin(), serializedData.end(),

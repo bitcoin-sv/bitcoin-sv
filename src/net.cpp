@@ -965,7 +965,7 @@ namespace
 
     CSendResult SendMessage(
         CNode& node,
-        CForwardReadonlyStream& data,
+        CForwardAsyncReadonlyStream& data,
         size_t maxChunkSize)
     {
         if (maxChunkSize == 0)
@@ -980,7 +980,7 @@ namespace
             int nBytes = 0;
             if (!node.mSendChunk)
             {
-                node.mSendChunk = data.Read(maxChunkSize);
+                node.mSendChunk = data.ReadAsync(maxChunkSize);
 
                 if (!node.mSendChunk->Size())
                 {

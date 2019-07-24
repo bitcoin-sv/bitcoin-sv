@@ -697,6 +697,31 @@ public:
     virtual CSpan Read(size_t maxSize) = 0;
 };
 
+/**
+ * Base class for forward readlonly streams of data that returns the underlying
+ * data in chunks of up to requested size.
+ * If a read error occurs while using CForwardAsyncReadonlyStream instance an
+ * exception is thrown and stream should not be used after that point as it will
+ * be in an invalid state.
+ */
+class CForwardAsyncReadonlyStream
+{
+public:
+    virtual ~CForwardAsyncReadonlyStream() = default;
+
+    virtual bool EndOfStream() const = 0;
+    /**
+     * Read next span of data that is up to maxSize long.
+     * Returned CSpan is valid until the next call to Read() or until stream
+     * is destroyed.
+     * Span can return less than maxSize bytes if end of stream is reached
+     * which can be checked by call to EndOfStream function.
+     * In case EndOfStream is false and Read span returned size of 0 the data
+     * is still being prepared and will be returned on next call to Read.
+     */
+    virtual CSpan ReadAsync(size_t maxSize) = 0;
+};
+
 // helper function for use with std::unique_ptr to enable RAII file closing
 struct CCloseFile
 {
@@ -790,7 +815,7 @@ private:
  * much data we want to read from it.
  */
 template<typename Reader>
-class CFixedSizeStream : public CForwardReadonlyStream, private Reader
+class CFixedSizeStream : public CForwardAsyncReadonlyStream, private Reader
 {
 public:
     CFixedSizeStream(size_t size, Reader&& reader)
@@ -799,15 +824,36 @@ public:
     {/**/}
 
     bool EndOfStream() const override {return mSize == mConsumed;}
-    CSpan Read(size_t maxSize) override
+    CSpan ReadAsync(size_t maxSize) override
     {
+        // it's not feasible to try and read 0 bytes
+        assert(maxSize > 0);
+
+        // once read request has started the requested size may not change as an
+        // async read request requires mBuffer stability until the end of
+        // request or Reader destruction
+        size_t maxConsumable = std::min(mSize - mConsumed, maxSize);
+        assert(mPendingReadSize == 0 || mPendingReadSize == maxConsumable);
+
         if(mSize > mConsumed)
         {
-            size_t consume = std::min(mSize - mConsumed, maxSize);
-            mBuffer.resize(consume);
+            if(!mPendingReadSize)
+            {
+                mPendingReadSize = maxConsumable;
+                mBuffer.resize(mPendingReadSize);
+            }
 
-            size_t read = Reader::Read(reinterpret_cast<char*>(mBuffer.data()), consume);
-            mConsumed += read;
+            size_t read =
+                Reader::Read(
+                    reinterpret_cast<char*>(mBuffer.data()),
+                    mPendingReadSize);
+
+            if(read > 0)
+            {
+                // read request has finished
+                mPendingReadSize = 0;
+                mConsumed += read;
+            }
 
             return {mBuffer.data(), read};
         }
@@ -821,12 +867,13 @@ private:
     size_t mSize;
     std::vector<uint8_t> mBuffer;
     size_t mConsumed = 0u;
+    size_t mPendingReadSize = 0u;
 };
 
 /**
  * Stream wrapper for std::vector<uint8_t>
  */
-class CVectorStream : public CForwardReadonlyStream
+class CVectorStream : public CForwardAsyncReadonlyStream
 {
 public:
     CVectorStream(std::vector<uint8_t>&& data)
@@ -834,7 +881,7 @@ public:
     {/**/}
 
     bool EndOfStream() const override {return mData.size() == mConsumed;}
-    CSpan Read(size_t maxSize) override
+    CSpan ReadAsync(size_t maxSize) override
     {
         if(mData.size() > mConsumed)
         {

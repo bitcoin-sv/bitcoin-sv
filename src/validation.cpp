@@ -7,6 +7,7 @@
 #include "validation.h"
 
 #include "arith_uint256.h"
+#include "async_file_reader.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -1292,7 +1293,7 @@ static bool PopulateBlockIndexBlockDiskMetaData(
     return true;
 }
 
-std::unique_ptr<CForwardReadonlyStream> StreamBlockFromDisk(
+std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
     CBlockIndex& index,
     int networkVersion)
 {
@@ -1321,9 +1322,9 @@ std::unique_ptr<CForwardReadonlyStream> StreamBlockFromDisk(
     // network. If this would change in the future then CBlockStream would need
     // to be used to change the resulting fromat.
     return
-        std::make_unique<CFixedSizeStream<CFileReader>>(
+        std::make_unique<CFixedSizeStream<CAsyncFileReader>>(
             index.GetDiskBlockMetaData().diskDataSize,
-            CFileReader{std::move(file)});
+            CAsyncFileReader{std::move(file)});
 }
 
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams) {
