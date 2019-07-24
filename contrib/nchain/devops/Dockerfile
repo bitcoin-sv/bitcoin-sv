@@ -21,6 +21,7 @@ RUN apt-get update &&   \
        cpanminus        \
        libperlio-gzip-perl \
        libjson-perl     \
+       zlib1g-dev       \
        bsdmainutils
 
 
