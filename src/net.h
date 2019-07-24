@@ -137,6 +137,17 @@ public:
         , mData{std::make_unique<CVectorStream>(std::move(data))}
     {/**/}
 
+    CSerializedNetMsg(
+        std::string&& command,
+        const uint256& hash,
+        size_t size,
+        std::unique_ptr<CForwardReadonlyStream> data)
+        : mCommand{std::move(command)}
+        , mHash{hash}
+        , mSize{size}
+        , mData{std::move(data)}
+    {/**/}
+
     const std::string& Command() const {return mCommand;}
     std::unique_ptr<CForwardReadonlyStream> MoveData() {return std::move(mData);}
     const uint256& Hash() const {return mHash;}

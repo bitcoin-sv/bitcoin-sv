@@ -20,6 +20,7 @@
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "script/script_error.h"
 #include "sync.h"
+#include "streams.h"
 #include "versionbits.h"
 
 #include <algorithm>
@@ -631,6 +632,11 @@ bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
                        const Config &config);
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
+std::unique_ptr<CForwardReadonlyStream> StreamBlockFromDisk(
+    CBlockIndex& index,
+    int networkVersion,
+    size_t& outSize,
+    uint256& outHash);
 
 /** Functions for validating blocks and updating the block tree */
 

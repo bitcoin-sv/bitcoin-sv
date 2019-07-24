@@ -95,6 +95,7 @@ BITCOIN_TESTS =\
   test/sigutil.h \
   test/skiplist_tests.cpp \
   test/streams_tests.cpp \
+  test/stream_serialization_tests.cpp \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
   test/test_bitcoin_main.cpp \

@@ -697,6 +697,132 @@ public:
     virtual CSpan Read(size_t maxSize) = 0;
 };
 
+// helper function for use with std::unique_ptr to enable RAII file closing
+struct CCloseFile
+{
+    void operator()(FILE* file) { ::fclose(file); }
+};
+
+/**
+ * RAII file reader for use with streams that want to take ownership of the
+ * underlying FILE pointer. File pointer is closed once the CFileReader instance
+ * gets out of scope.
+ */
+class CFileReader
+{
+public:
+    CFileReader(std::unique_ptr<FILE, CCloseFile>&& file)
+        : mFile{std::move(file)}
+    {
+        assert(mFile);
+    }
+
+    CFileReader(CFileReader&&) = default;
+    CFileReader& operator=(CFileReader&&) = default;
+
+    CFileReader(const CFileReader&) = delete;
+    CFileReader& operator=(const CFileReader&) = delete;
+
+    size_t Read(char* pch, size_t maxSize)
+    {
+        size_t read = fread(pch, 1, maxSize, mFile.get());
+
+        if (read == 0 && !EndOfStream())
+        {
+            throw std::ios_base::failure{"CFileReader::Read: fread failed"};
+        }
+
+        return read;
+    }
+
+    bool EndOfStream() const
+    {
+        return feof(mFile.get());
+    }
+
+private:
+    std::unique_ptr<FILE, CCloseFile> mFile;
+};
+
+/**
+ * File reader for use with streams that don't want to take ownership of the
+ * underlying FILE pointer - it's up to the file pointer provider to close it
+ * afterwards.
+ */
+class CNonOwningFileReader
+{
+public:
+    CNonOwningFileReader(FILE* file)
+        : mFile{file}
+    {
+        assert(mFile);
+    }
+
+    CNonOwningFileReader(CNonOwningFileReader&&) = default;
+    CNonOwningFileReader& operator=(CNonOwningFileReader&&) = default;
+
+    CNonOwningFileReader(const CNonOwningFileReader&) = delete;
+    CNonOwningFileReader& operator=(const CNonOwningFileReader&) = delete;
+
+    size_t Read(char* pch, size_t maxSize)
+    {
+        size_t read = fread(pch, 1, maxSize, mFile);
+
+        if (read == 0 && !EndOfStream())
+        {
+            throw std::ios_base::failure{"CNonOwningFileReader::Read: fread failed"};
+        }
+
+        return read;
+    }
+
+    bool EndOfStream() const
+    {
+        return feof(mFile);
+    }
+
+private:
+    FILE* mFile;
+};
+
+/**
+ * Stream wrapper for cases where we have a data Reader and know exactly how
+ * much data we want to read from it.
+ */
+template<typename Reader>
+class CFixedSizeStream : public CForwardReadonlyStream, private Reader
+{
+public:
+    CFixedSizeStream(size_t size, Reader&& reader)
+        : Reader{std::move(reader)}
+        , mSize{size}
+    {/**/}
+
+    bool EndOfStream() const override {return mSize == mConsumed;}
+    CSpan Read(size_t maxSize) override
+    {
+        if(mSize > mConsumed)
+        {
+            size_t consume = std::min(mSize - mConsumed, maxSize);
+            mBuffer.resize(consume);
+
+            size_t read = Reader::Read(reinterpret_cast<char*>(mBuffer.data()), consume);
+            mConsumed += read;
+
+            return {mBuffer.data(), read};
+        }
+        else
+        {
+            return {};
+        }
+    }
+
+private:
+    size_t mSize;
+    std::vector<uint8_t> mBuffer;
+    size_t mConsumed = 0u;
+};
+
 /**
  * Stream wrapper for std::vector<uint8_t>
  */

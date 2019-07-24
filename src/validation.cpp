@@ -7,6 +7,7 @@
 #include "validation.h"
 
 #include "arith_uint256.h"
+#include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -1226,6 +1227,56 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
     }
 
     return true;
+}
+
+std::unique_ptr<CForwardReadonlyStream> StreamBlockFromDisk(
+    CBlockIndex& index,
+    int networkVersion,
+    size_t& outSize,
+    uint256& outHash)
+{
+    AssertLockHeld(cs_main);
+
+    std::unique_ptr<FILE, CCloseFile> file{
+        CDiskFiles::OpenBlockFile(index.GetBlockPos(), true)};
+
+    if (!file)
+    {
+        return {}; // could not open a stream
+    }
+
+    outSize = 0;
+    {
+        CBlockStream stream{
+            CNonOwningFileReader{file.get()},
+            CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
+            CStreamVersionAndType{SER_NETWORK, networkVersion}};
+        CHash256 hasher;
+
+        do
+        {
+            auto chunk = stream.Read(4096);
+            hasher.Write(chunk.Begin(), chunk.Size());
+            outSize += chunk.Size();
+        } while(!stream.EndOfStream());
+
+        hasher.Finalize(reinterpret_cast<uint8_t*>(&outHash));
+
+        if(fseek(file.get(), index.GetBlockPos().nPos, SEEK_SET) != 0)
+        {
+            // this should never happen but for some odd reason we aren't
+            // able to rewind the file pointer back to the beginning
+            return {};
+        }
+    }
+
+    // We expect that block data on disk is in same format as data sent over the
+    // network. If this would change in the future then CBlockStream would need
+    // to be used to change the resulting fromat.
+    return
+        std::make_unique<CFixedSizeStream<CFileReader>>(
+            outSize,
+            CFileReader{std::move(file)});
 }
 
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams) {

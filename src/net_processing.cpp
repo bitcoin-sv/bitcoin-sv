@@ -9,7 +9,9 @@
 #include "addrman.h"
 #include "arith_uint256.h"
 #include "blockencodings.h"
+#include "blockstreams.h"
 #include "chainparams.h"
+#include "clientversion.h"
 #include "config.h"
 #include "consensus/validation.h"
 #include "hash.h"
@@ -37,6 +39,8 @@
 #include <boost/optional.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
+
+#include "blockfileinfostore.h"
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
@@ -1211,6 +1215,37 @@ static bool rejectIfMaxDownloadExceeded(const Config &config, CSerializedNetMsg 
     return false;
 }
 
+static void SendBlock(
+    const Config &config,
+    bool isMostRecentBlock,
+    const CNodePtr& pfrom,
+    CConnman &connman,
+    CBlockIndex& index)
+{
+    size_t size = 0;
+    uint256 hash;
+    auto stream =
+        StreamBlockFromDisk(index, pfrom->GetSendVersion(), size, hash);
+
+    if (!stream)
+    {
+        assert(!"can not load block from disk");
+    }
+
+    CSerializedNetMsg blockMsg{
+            NetMsgType::BLOCK,
+            std::move(hash),
+            size,
+            std::move(stream)
+        };
+
+    if (rejectIfMaxDownloadExceeded(config, blockMsg, isMostRecentBlock, pfrom, connman)) {
+        return;
+    }
+
+    connman.PushMessage(pfrom, std::move(blockMsg));
+}
+
 static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                            const Consensus::Params &consensusParams,
                            CConnman &connman,
@@ -1310,18 +1345,21 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 // it's available before trying to send.
                 if (send && (mi->second->nStatus.hasData())) {
                     // Send block from disk
-                    CBlock block;
-                    if (!ReadBlockFromDisk(block, (*mi).second, config)) {
-                        assert(!"cannot load block from disk");
-                    }
 
-                    if (inv.type == MSG_BLOCK) {
-                        CSerializedNetMsg blockMsg = msgMaker.Make(NetMsgType::BLOCK, block);
-                        if (rejectIfMaxDownloadExceeded(config, blockMsg, isMostRecentBlock, pfrom, connman)) {
-                            break;
-                        }
-                        connman.PushMessage(pfrom, std::move(blockMsg));
+                    if (inv.type == MSG_BLOCK)
+                    {
+                        SendBlock(
+                            config,
+                            isMostRecentBlock,
+                            pfrom,
+                            connman,
+                            *mi->second);
                     } else if (inv.type == MSG_FILTERED_BLOCK) {
+                        CBlock block;
+                        if (!ReadBlockFromDisk(block, (*mi).second, config)) {
+                            assert(!"can not load block from disk");
+                        }
+
                         bool sendMerkleBlock = false;
                         CMerkleBlock merkleBlock;
                         {
@@ -1368,7 +1406,13 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         int nSendFlags = 0;
                         if (CanDirectFetch(consensusParams) &&
                             mi->second->nHeight >=
-                                chainActive.Height() - MAX_CMPCTBLOCK_DEPTH) {
+                                chainActive.Height() - MAX_CMPCTBLOCK_DEPTH)
+                        {
+                            CBlock block;
+                            if (!ReadBlockFromDisk(block, (*mi).second, config)) {
+                                assert(!"can not load block from disk");
+                            }
+
                             CBlockHeaderAndShortTxIDs cmpctblock(block);
 
                             CSerializedNetMsg compactBlockMsg = msgMaker.Make(nSendFlags, NetMsgType::CMPCTBLOCK, cmpctblock);
@@ -1377,11 +1421,12 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             }
                             connman.PushMessage(pfrom, std::move(compactBlockMsg));
                         } else {
-                            CSerializedNetMsg blockMsg = msgMaker.Make(NetMsgType::BLOCK, block);
-                            if (rejectIfMaxDownloadExceeded(config, blockMsg, isMostRecentBlock, pfrom, connman)) {
-                                break;
-                            }
-                            connman.PushMessage(pfrom, std::move(blockMsg));
+                            SendBlock(
+                                config,
+                                isMostRecentBlock,
+                                pfrom,
+                                connman,
+                                *mi->second);
                         }
                     }
 
