@@ -15,6 +15,7 @@
 #include <boost/filesystem.hpp>
 
 #include <exception>
+#include <iostream>
 #include <string>
 #include <optional>
 #include <vector>
@@ -24,9 +25,9 @@ namespace
     void WriteBlockToDisk(
         const Config& config,
         const CBlock& block,
-        CBlockIndex& index)
+        CBlockIndex& index,
+        CBlockFileInfoStore& blockFileInfoStore)
     {
-        CBlockFileInfoStore blockFileInfoStore;
         unsigned int nBlockSizeWithHeader =
             ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION)
             + BLOCKFILE_BLOCK_HEADER_SIZE;
@@ -75,16 +76,11 @@ namespace
 
         fileout << block;
     }
-}
 
-BOOST_FIXTURE_TEST_SUITE(blockfile_reading_tests, BasicTestingSetup)
-
-BOOST_AUTO_TEST_CASE(read_without_meta_info)
-{
     struct CScopeSetupTeardown
     {
-        CScopeSetupTeardown()
-            : path{boost::filesystem::current_path() / "tmp_data/read_without_meta_info"}
+        CScopeSetupTeardown(const std::string& testName)
+            : path{boost::filesystem::current_path() / "tmp_data" / testName}
         {
             ClearDatadirCache();
             boost::filesystem::create_directories(path);
@@ -110,14 +106,21 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
         boost::filesystem::path path;
         std::optional<std::string> odlDataDir;
     };
+}
 
-    CScopeSetupTeardown guard;
+BOOST_FIXTURE_TEST_SUITE(blockfile_reading_tests, BasicTestingSetup)
+
+BOOST_AUTO_TEST_CASE(read_without_meta_info)
+{
+
+    CScopeSetupTeardown guard{"read_without_meta_info"};
     const DummyConfig config;
 
     auto block = BuildRandomTestBlock();
     CBlockIndex index{block};
 
-    WriteBlockToDisk(config, block, index);
+    CBlockFileInfoStore blockFileInfoStore;
+    WriteBlockToDisk(config, block, index, blockFileInfoStore);
 
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
@@ -159,6 +162,61 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
             StreamSerialize(*streamCorruptMetaData, 5u).size(),
             1);
     }
+}
+
+BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
+{
+    // Test that calling UnlinkPrunedFiles doesn't cause active file streams
+    // termination
+    CScopeSetupTeardown guard{"delete_block_file_while_reading"};
+    const DummyConfig config;
+
+    auto block = BuildRandomTestBlock();
+    CBlockIndex index{block};
+
+    WriteBlockToDisk(config, block, index, *pBlockFileInfoStore);
+
+    std::vector<uint8_t> expectedSerializedData{Serialize(block)};
+
+    auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
+    std::vector<uint8_t> serializedData;
+
+    // start reading and inbetween the read try to delete the file on disk
+    {
+        auto runStart = std::chrono::steady_clock::now();
+        bool deleted = false;
+
+        do
+        {
+            using namespace std::chrono_literals;
+
+            if ((std::chrono::steady_clock::now() - runStart) > 5s)
+            {
+                throw std::runtime_error("Test took too long");
+            }
+
+            if (!deleted &&
+                ((expectedSerializedData.size() / 2) <= serializedData.size()))
+            {
+                // we're half way through the file so it's time to delete it
+                std::set<int> fileIds;
+                fileIds.insert(index.nFile);
+                UnlinkPrunedFiles(fileIds);
+                deleted = true;
+            }
+
+            auto chunk = stream->Read(5u);
+
+            serializedData.insert(
+                serializedData.end(),
+                chunk.Begin(), chunk.Begin() + chunk.Size());
+        }
+        while(!stream->EndOfStream());
+    }
+
+    BOOST_REQUIRE_EQUAL_COLLECTIONS(
+        serializedData.begin(), serializedData.end(),
+        expectedSerializedData.begin(), expectedSerializedData.end());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
