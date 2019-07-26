@@ -449,12 +449,7 @@ Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 double GuessVerificationProgress(const ChainTxData &data, CBlockIndex *pindex);
 
 /**
- * Mark one block file as pruned.
- */
-void PruneOneBlockFile(const int fileNumber);
-
-/**
- * Actually unlink the specified files
+ * Unlink the specified files and mark associated block indices as pruned
  */
 void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune);
 

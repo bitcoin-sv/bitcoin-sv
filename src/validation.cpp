@@ -3859,7 +3859,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
 /**
  * Prune a block file (modify associated database entries)
  */
-void PruneOneBlockFile(const int fileNumber) {
+static void PruneOneBlockFile(const int fileNumber) {
     for (const std::pair<const uint256, CBlockIndex *> &it : mapBlockIndex) {
         CBlockIndex *pindex = it.second;
         if (pindex->nFile == fileNumber) {
@@ -3890,12 +3890,31 @@ void PruneOneBlockFile(const int fileNumber) {
     pBlockFileInfoStore->ClearFileInfo(fileNumber);
 }
 
-void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune) {
-    for (const int i : setFilesToPrune) {
-        CDiskBlockPos pos(i, 0);
-        fs::remove(GetBlockPosFilename(pos, "blk"));
-        fs::remove(GetBlockPosFilename(pos, "rev"));
-        LogPrintf("Prune: %s deleted blk/rev (%05u)\n", __func__, i);
+void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune)
+{
+    for (const int i : setFilesToPrune)
+    {
+        CDiskBlockPos pos{i, 0};
+        boost::system::error_code ec;
+        fs::remove(GetBlockPosFilename(pos, "blk"), ec);
+
+        if(!ec) // if there was no error
+        {
+            // only delete rev file and remove block index data if blk file
+            // deletion succeeded otherwise keep the data for now as it's most
+            // likely still being used
+            fs::remove(GetBlockPosFilename(pos, "rev"));
+            PruneOneBlockFile(i);
+            LogPrintf("Prune: %s deleted blk/rev (%05u)\n", __func__, i);
+        }
+        else
+        {
+            LogPrintf(
+                "Prune: %s deletion skipped blk/rev (%05u). "
+                "File is most likely still in use\n",
+                __func__,
+                i);
+        }
     }
 }
 

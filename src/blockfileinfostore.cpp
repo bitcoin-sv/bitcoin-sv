@@ -216,11 +216,10 @@ void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
             vinfoBlockFile[fileNumber].nHeightLast > nLastBlockWeCanPrune) {
             continue;
         }
-        PruneOneBlockFile(fileNumber);
         setFilesToPrune.insert(fileNumber);
         count++;
     }
-    LogPrintf("Prune (Manual): prune_height=%d removed %d blk/rev pairs\n",
+    LogPrintf("Prune (Manual): prune_height=%d found %d blk/rev pairs for removal\n",
         nLastBlockWeCanPrune, count);
 }
 
@@ -286,7 +285,6 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
                 continue;
             }
 
-            PruneOneBlockFile(fileNumber);
             // Queue up the files for removal
             setFilesToPrune.insert(fileNumber);
             nCurrentUsage -= nBytesToPrune;
@@ -295,7 +293,7 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
     }
 
     LogPrint(BCLog::PRUNE, "Prune: target=%dMiB actual=%dMiB diff=%dMiB "
-        "max_prune_height=%d removed %d blk/rev pairs\n",
+        "max_prune_height=%d found %d blk/rev pairs for removal\n",
         nPruneTarget / 1024 / 1024, nCurrentUsage / 1024 / 1024,
         ((int64_t)nPruneTarget - (int64_t)nCurrentUsage) / 1024 / 1024,
         nLastBlockWeCanPrune, count);
