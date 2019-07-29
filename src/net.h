@@ -31,6 +31,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <memory>
@@ -183,7 +184,11 @@ public:
         uint64_t nMaxOutboundTimeframe = 0;
         uint64_t nMaxOutboundLimit = 0;
     };
-    CConnman(const Config &configIn, uint64_t seed0, uint64_t seed1);
+    CConnman(
+        const Config &configIn,
+        uint64_t seed0,
+        uint64_t seed1,
+        std::chrono::milliseconds debugP2PTheadStallsThreshold);
     ~CConnman();
     bool Start(CScheduler &scheduler, std::string &strNodeError,
                Options options);
@@ -450,6 +455,8 @@ private:
     std::thread threadOpenAddedConnections;
     std::thread threadOpenConnections;
     std::thread threadMessageHandler;
+
+    std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);

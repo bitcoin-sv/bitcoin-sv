@@ -38,6 +38,7 @@
 #endif
 
 #include <cmath>
+#include <optional>
 #include <utility>
 
 // Dump addresses to peers.dat and banlist.dat every 15 minutes (900s)
@@ -2159,6 +2160,52 @@ bool CConnman::OpenNetworkConnection(const CAddress &addrConnect,
     return true;
 }
 
+namespace
+{
+    /**
+     * Helper class for logging the duration of ThreadMessageHandler reqest
+     * processing. It writes to log all the requests that take more time to
+     * process than the provided threshold.
+     */
+    class CLogP2PStallDuration
+    {
+    public:
+        CLogP2PStallDuration(
+            std::string command,
+            std::chrono::milliseconds debugP2PTheadStallsThreshold)
+            : mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
+            , mProcessingStart{std::chrono::steady_clock::now()}
+            , mCommand{std::move(command)}
+        {/**/}
+
+
+        ~CLogP2PStallDuration()
+        {
+            if(!mCommand.empty())
+            {
+                auto processingDuration =
+                        std::chrono::steady_clock::now() - mProcessingStart;
+
+                if(processingDuration > mDebugP2PTheadStallsThreshold)
+                {
+                    LogPrint(
+                        BCLog::NET,
+                        "CConnman request processing took %s ms to complete "
+                        "processing '%s' request!\n",
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            processingDuration).count(),
+                        mCommand);
+                }
+            }
+        }
+
+    private:
+        std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
+        std::chrono::time_point<std::chrono::steady_clock> mProcessingStart;
+        std::string mCommand;
+    };
+}
+
 void CConnman::ThreadMessageHandler() {
     while (!flagInterruptMsgProc) {
         std::vector<CNodePtr> vNodesCopy;
@@ -2172,6 +2219,20 @@ void CConnman::ThreadMessageHandler() {
         for (const CNodePtr& pnode : vNodesCopy) {
             if (pnode->fDisconnect) {
                 continue;
+            }
+
+            std::optional<CLogP2PStallDuration> durationLog;
+
+            using namespace std::literals::chrono_literals;
+
+            if(!pnode->vProcessMsg.empty() &&
+                mDebugP2PTheadStallsThreshold > 0ms)
+            {
+                durationLog =
+                    {
+                        pnode->vProcessMsg.begin()->hdr.GetCommand(),
+                        mDebugP2PTheadStallsThreshold
+                    };
             }
 
             // Receive messages
@@ -2188,6 +2249,7 @@ void CConnman::ThreadMessageHandler() {
                 GetNodeSignals().SendMessages(*config, pnode, *this,
                                               flagInterruptMsgProc);
             }
+
             if (flagInterruptMsgProc) {
                 return;
             }
@@ -2391,8 +2453,16 @@ void CConnman::SetNetworkActive(bool active) {
     uiInterface.NotifyNetworkActiveChanged(fNetworkActive);
 }
 
-CConnman::CConnman(const Config &configIn, uint64_t nSeed0In, uint64_t nSeed1In)
-    : config(&configIn), nSeed0(nSeed0In), nSeed1(nSeed1In) {
+CConnman::CConnman(
+    const Config &configIn,
+    uint64_t nSeed0In,
+    uint64_t nSeed1In,
+    std::chrono::milliseconds debugP2PTheadStallsThreshold)
+    : config(&configIn)
+    , nSeed0(nSeed0In)
+    , nSeed1(nSeed1In)
+    , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
+{
     fNetworkActive = true;
     setBannedIsDirty = false;
     fAddressesInitialized = false;
