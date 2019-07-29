@@ -115,7 +115,9 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         with self.run_node_with_connections("should be sent in parallel as factorMaxSendQueuesBytes=num_peers", 0,
             args+["-factorMaxSendQueuesBytes={}".format(self.num_peers)], self.num_peers) as connections:
 
+            start = time.time()
             numberOfReceivedBlocksParallel, numberOfRejectedMsgs = self.requestBlocks(connections, oldBlock)
+            logger.info("finished requestBlock duration %s s", time.time() - start)
             assert_equal(self.num_peers, numberOfReceivedBlocksParallel)
             assert_equal(0, numberOfRejectedMsgs)
 
@@ -124,7 +126,9 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         with self.run_node_with_connections("should not be sent in parallel because factorMaxSendQueuesBytes=1", 0,
             args+["-factorMaxSendQueuesBytes=1"], self.num_peers) as connections:
 
+            start = time.time()
             numberOfReceivedBlocksSeries, numberOfRejectedMsgs = self.requestBlocks(connections, oldBlock)
+            logger.info("finished requestBlock duration %s s", time.time() - start)
             # numReceivedBlocksSeries may vary between test runs (based on processing power).
             # But still we expect the processing to be slow enough that with 15 messages at least one will be rejected.
             assert_greater_than(numberOfReceivedBlocksParallel, numberOfReceivedBlocksSeries)
@@ -136,7 +140,9 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block", 0,
             args+["-factorMaxSendQueuesBytes=1"], self.num_peers) as connections:
 
+            start = time.time()
             numberOfReceivedBlocksNewBlock, numberOfRejectedMsgs = self.requestBlocks(connections, newBlock)
+            logger.info("finished requestBlock duration %s s", time.time() - start)
             assert_equal(self.num_peers, numberOfReceivedBlocksNewBlock)
             assert_equal(0, numberOfRejectedMsgs)
 
