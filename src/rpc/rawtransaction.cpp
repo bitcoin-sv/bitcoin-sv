@@ -482,7 +482,7 @@ static UniValue createrawtransaction(const Config &config,
             std::vector<uint8_t> data =
                 ParseHexV(sendTo[name_].getValStr(), "Data");
 
-            CTxOut out(Amount(0), CScript() << OP_RETURN << data);
+            CTxOut out(Amount(0), CScript() << OP_FALSE << OP_RETURN << data);
             rawTx.vout.push_back(out);
         } else {
             CTxDestination destination =

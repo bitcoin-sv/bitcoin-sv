@@ -422,7 +422,7 @@ static void MutateTxAddOutData(CMutableTransaction &tx,
 
     std::vector<uint8_t> data = ParseHex(strData);
 
-    CTxOut txout(value, CScript() << OP_RETURN << data);
+    CTxOut txout(value, CScript() << OP_FALSE << OP_RETURN << data);
     tx.vout.push_back(txout);
 }
 
