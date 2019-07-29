@@ -630,6 +630,7 @@ extern bool fDiscover;
 extern bool fListen;
 extern bool fRelayTxes;
 
+extern CCriticalSection cs_invQueries;
 extern limitedmap<uint256, int64_t> mapAlreadyAskedFor;
 
 struct LocalServiceInfo {

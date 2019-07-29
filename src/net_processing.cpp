@@ -2245,7 +2245,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
     LogPrint(BCLog::TXNSRC, "got txn: %s txnsrc peer=%d\n", inv.hash.ToString(), pfrom->id);
     // Update 'ask for' inv set
     {
-        LOCK(cs_main);
+        LOCK(cs_invQueries);
         pfrom->setAskFor.erase(inv.hash);
         mapAlreadyAskedFor.erase(inv.hash);
     }
@@ -4050,23 +4050,26 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
     //
     int64_t nNow = GetTimeMicros();
     std::vector<CInv> vGetData {};
-    while (!pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow) {
-        const CInv &inv = (*pto->mapAskFor.begin()).second;
-        if (!AlreadyHave(inv)) {
-            LogPrint(BCLog::NET, "Requesting %s peer=%d\n", inv.ToString(),
-                     pto->id);
-            vGetData.push_back(inv);
-            // if next element will cause too large message, then we send it now, as message size is still under limit
-            if (vGetData.size() == pto->maxInvElements) {
-                connman.PushMessage(
-                    pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
-                vGetData.clear();
+    {
+        LOCK(cs_invQueries);
+        while (!pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow) {
+            const CInv &inv = (*pto->mapAskFor.begin()).second;
+            if (!AlreadyHave(inv)) {
+                LogPrint(BCLog::NET, "Requesting %s peer=%d\n", inv.ToString(),
+                         pto->id);
+                vGetData.push_back(inv);
+                // if next element will cause too large message, then we send it now, as message size is still under limit
+                if (vGetData.size() == pto->maxInvElements) {
+                    connman.PushMessage(
+                        pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                    vGetData.clear();
+                }
+            } else {
+                // If we're not going to ask, don't expect a response.
+                pto->setAskFor.erase(inv.hash);
             }
-        } else {
-            // If we're not going to ask, don't expect a response.
-            pto->setAskFor.erase(inv.hash);
+            pto->mapAskFor.erase(pto->mapAskFor.begin());
         }
-        pto->mapAskFor.erase(pto->mapAskFor.begin());
     }
     if (!vGetData.empty()) {
         connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
