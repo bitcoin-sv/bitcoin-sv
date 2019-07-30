@@ -462,7 +462,7 @@ bool CTxMemPool::AddUnchecked(
 
     LOCK(cs);
     // Add to memory pool without checking anything.
-    return addUncheckedNL(
+    return AddUncheckedNL(
                 hash,
                 entry,
                 setAncestors,
@@ -470,7 +470,7 @@ bool CTxMemPool::AddUnchecked(
                 validFeeEstimate);
 }
 
-bool CTxMemPool::addUncheckedNL(
+bool CTxMemPool::AddUncheckedNL(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
@@ -1403,7 +1403,7 @@ bool CTxMemPool::AddUnchecked(
         nNoLimit,
         nNoLimit,
         dummy);
-    return addUncheckedNL(
+    return AddUncheckedNL(
                 hash,
                 entry,
                 setAncestors,

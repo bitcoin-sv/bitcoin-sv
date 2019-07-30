@@ -613,11 +613,25 @@ public:
     // to track size/count of descendant transactions. First version of
     // AddUnchecked can be used to have it call CalculateMemPoolAncestors(), and
     // then invoke the second version.
-    bool AddUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
-                      mining::CJournalChangeSetPtr& changeSet, bool validFeeEstimate = true);
-    bool AddUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
-                      setEntries &setAncestors, mining::CJournalChangeSetPtr& changeSet,
-                      bool validFeeEstimate = true);
+    bool AddUnchecked(
+            const uint256 &hash,
+            const CTxMemPoolEntry &entry,
+            mining::CJournalChangeSetPtr& changeSet,
+            bool validFeeEstimate = true);
+
+    bool AddUnchecked(
+            const uint256 &hash,
+            const CTxMemPoolEntry &entry,
+            setEntries &setAncestors,
+            mining::CJournalChangeSetPtr& changeSet,
+            bool validFeeEstimate = true);
+    // A non-locking version of AddUnchecked
+    bool AddUncheckedNL(
+            const uint256& hash,
+            const CTxMemPoolEntry &entry,
+            setEntries &setAncestors,
+            mining::CJournalChangeSetPtr& changeSet,
+            bool validFeeEstimate = true);
 
     void RemoveRecursive(
         const CTransaction &tx,
@@ -897,16 +911,6 @@ private:
 
     void clearPrioritisationNL(const uint256& hash);
 
-    /**
-     * A non-locking private methods.
-     */
-    // A non-locking version of AddUnchecked
-    bool addUncheckedNL(
-            const uint256& hash,
-            const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
-            mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true);
     // A non-locking version of RemoveRecursive
     void removeRecursiveNL(
             const CTransaction &tx,
