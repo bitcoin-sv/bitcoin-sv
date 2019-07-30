@@ -112,14 +112,17 @@ class BSVGetBlock(ComparisonTestFramework):
 
         #check errors still work
         batch = self.nodes[0].batch([self.nodes[0].getblock.get_request(block.hash),
+                          self.nodes[0].getblock.get_request("somehash"),
                           self.nodes[0].getblockcount.get_request(),
                           self.nodes[0].undefinedmethod.get_request()])
 
-        assert_equal(batch[0]["result"], None)
-        assert_equal(batch[0]["error"]["message"], "getblock cannot be processed in batch")
-        assert_equal(batch[1]["error"], None)
-        assert_equal(batch[2]["result"], None)
-        assert_equal(batch[2]["error"]["message"], "Method not found")
+        checkJsonBlock(batch[0]["result"], False, block.hash)
+        assert_equal(batch[0]["error"], None)
+        assert_equal(batch[1]["result"], None)
+        assert_equal(batch[1]["error"]["message"], "Block not found")
+        assert_equal(batch[2]["error"], None)
+        assert_equal(batch[3]["result"], None)
+        assert_equal(batch[3]["error"]["message"], "Method not found")
 
 if __name__ == '__main__':
     BSVGetBlock().main()

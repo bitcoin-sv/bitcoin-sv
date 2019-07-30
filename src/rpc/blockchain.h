@@ -16,7 +16,7 @@ class Config;
 class JSONRPCRequest;
 
 UniValue getblockchaininfo(const Config &config, const JSONRPCRequest &request);
-void getblock(const Config &config, const JSONRPCRequest &request, HTTPRequest *req);
+void getblock(const Config &config, const JSONRPCRequest &request, HTTPRequest *req, bool processedInBatch);
 void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &req,
                           bool showTxDetails, CBlockIndex& blockindex);
 void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,

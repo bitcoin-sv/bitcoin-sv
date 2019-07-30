@@ -325,7 +325,7 @@ static bool HTTPReq_JSONRPC(Config &config, HTTPRequest *req,
             jreq.parse(valRequest);
             // getBlock is not present in tableRpc, so we need to explicitly check for it
             if (jreq.strMethod == "getblock") {
-                getblock(config, jreq, req);
+                getblock(config, jreq, req, false);
             } else {
                 UniValue result = tableRPC.execute(config, jreq);
                 strReply = JSONRPCReply(result, NullUniValue, jreq.id);
@@ -335,9 +335,7 @@ static bool HTTPReq_JSONRPC(Config &config, HTTPRequest *req,
 
         // array of requests
         } else if (valRequest.isArray()) {
-            strReply = JSONRPCExecBatch(config, jreq, valRequest.get_array());
-            req->WriteHeader("Content-Type", "application/json");
-            req->WriteReply(HTTP_OK, strReply);
+            JSONRPCExecBatch(config, jreq, valRequest.get_array(), *req);
         } else {
             throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
         }

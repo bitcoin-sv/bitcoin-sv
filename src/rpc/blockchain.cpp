@@ -750,7 +750,7 @@ static void parseGetBlockVerbosity(const UniValue& verbosityParam, GetBlockVerbo
     }
 }
 
-void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq, HTTPRequest *httpReq) {
+void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq, HTTPRequest *httpReq, bool processedInBatch) {
     if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
         jsonRPCReq.params.size() > 2) {
         throw std::runtime_error(
@@ -844,8 +844,10 @@ void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq, HTTPReques
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
 
-    httpReq->WriteHeader("Content-Type", "application/json");
-    httpReq->StartWritingChunks(HTTP_OK);
+    if (!processedInBatch) {
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
+    }
 
     if (verbosity == GetBlockVerbosity::RAW_BLOCK) {
         httpReq->WriteReplyChunk("{\"result\": \"");
@@ -857,7 +859,9 @@ void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq, HTTPReques
         httpReq->WriteReplyChunk(", \"error\": "+NullUniValue.write()+", \"id\": "+jsonRPCReq.id.write()+"}");
     }
 
-    httpReq->StopWritingChunks();
+    if (!processedInBatch) {
+        httpReq->StopWritingChunks();
+    }
 }
 
 void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
