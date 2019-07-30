@@ -1231,7 +1231,7 @@ bool CTxMemPool::ReadFeeEstimates(CAutoFile &filein) {
 }
 
 void CTxMemPool::PrioritiseTransaction(const uint256& hash,
-                                       const std::string strHash,
+                                       const std::string& strHash,
                                        double dPriorityDelta,
                                        const Amount nFeeDelta) {
     {

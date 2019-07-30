@@ -679,7 +679,7 @@ public:
     /** Affect CreateNewBlock prioritisation of transactions */
     void PrioritiseTransaction(
             const uint256& hash,
-            const std::string strHash,
+            const std::string& strHash,
             double dPriorityDelta,
             const Amount nFeeDelta);
 
