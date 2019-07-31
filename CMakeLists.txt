@@ -25,10 +25,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
     #   ASAN_OPTIONS=detect_leaks=0 <executable_name>
     option(enable_asan "Use clang/gcc address sanitizer" OFF)
     if(enable_asan)
-        if(CRYPTO_USE_ASM)
-            message(FATAL_ERROR "enable_asan can not be used with"
-                " CRYPTO_USE_ASM enabled!")
-        elseif(enable_tsan)
+        if(enable_tsan)
             message(FATAL_ERROR "enable_asan can not be"
                     " used with enable_tsan enabled!")
         endif()
