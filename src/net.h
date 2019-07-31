@@ -655,6 +655,18 @@ class CNode {
     friend class CConnman;
 
 public:
+    /**
+     * Notification structure for SendMessage function that returns:
+     * sendComplete: whether the send was fully complete/partially complete and
+     *               data is needed for sending the rest later.
+     * sentSize: amount of data that was sent.
+     */
+    struct CSendResult
+    {
+        bool sendComplete;
+        size_t sentSize;
+    };
+
     // socket
     std::atomic<ServiceFlags> nServices {NODE_NONE};
     // Services expected from a peer, otherwise it will be disconnected
@@ -662,16 +674,6 @@ public:
     SOCKET hSocket {0};
     // Total size of all vSendMsg entries.
     CSendQueueBytes nSendSize;
-    /**
-     * Storage for the last chunk being sent to the peer. This variable contains
-     * data for the duration of sending the chunk. Once the chunk is sent it is
-     * cleared.
-     * In case there is an interruption during sending (sent size exceeded or
-     * network layer can not process any more data at the moment) this variable
-     * remains set and is used to continue streaming on the next try.
-     */
-    std::optional<CSpan> mSendChunk;
-    uint64_t nSendBytes {0};
     std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> vSendMsg {};
     CCriticalSection cs_vSend {};
     CCriticalSection cs_hSocket {};
@@ -800,9 +802,22 @@ public:
           bool fInboundIn = false);
     ~CNode();
 
+    CNode(CNode&&) = delete;
+    CNode& operator=(CNode&&) = delete;
+    CNode(const CNode&) = delete;
+    CNode& operator=(const CNode&) = delete;
+
 private:
-    CNode(const CNode &);
-    void operator=(const CNode &);
+    /**
+     * Storage for the last chunk being sent to the peer. This variable contains
+     * data for the duration of sending the chunk. Once the chunk is sent it is
+     * cleared.
+     * In case there is an interruption during sending (sent size exceeded or
+     * network layer can not process any more data at the moment) this variable
+     * remains set and is used to continue streaming on the next try.
+     */
+    std::optional<CSpan> mSendChunk;
+    uint64_t nSendBytes {0};
 
     const uint64_t nLocalHostNonce {};
     // Services offered to this peer
@@ -826,6 +841,10 @@ private:
 
 public:
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
+
+    CSendResult SendMessage(
+        CForwardAsyncReadonlyStream& data,
+        size_t maxChunkSize);
 
     /** Add some new transactions to our pending inventory list */
     void AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns);

@@ -949,104 +949,6 @@ const uint256 &CNetMessage::GetMessageHash() const {
     return data_hash;
 }
 
-namespace
-{
-    /**
-     * Notification structure for SendMessage function that returns:
-     * sendComplete: whether the send was fully complete/partially complete and
-     *               data is needed for sending the rest later.
-     * sentSize: amount of data that was sent.
-     */
-    struct CSendResult
-    {
-        bool sendComplete;
-        size_t sentSize;
-    };
-
-    CSendResult SendMessage(
-        CNode& node,
-        CForwardAsyncReadonlyStream& data,
-        size_t maxChunkSize)
-    {
-        if (maxChunkSize == 0)
-        {
-            // if maxChunkSize is 0 assign some default chunk size value
-            maxChunkSize = 1024;
-        }
-        size_t sentSize = 0;
-
-        do
-        {
-            int nBytes = 0;
-            if (!node.mSendChunk)
-            {
-                node.mSendChunk = data.ReadAsync(maxChunkSize);
-
-                if (!node.mSendChunk->Size())
-                {
-                    // we need to wait for data to load so we should let others
-                    // send data in the meantime
-                    node.mSendChunk = std::nullopt;
-                    return {false, sentSize};
-                }
-            }
-
-            {
-                LOCK(node.cs_hSocket);
-                if (node.hSocket == INVALID_SOCKET)
-                {
-                    return {false, sentSize};
-                }
-
-                nBytes = send(node.hSocket,
-                              reinterpret_cast<const char *>(node.mSendChunk->Begin()),
-                              node.mSendChunk->Size(),
-                              MSG_NOSIGNAL | MSG_DONTWAIT);
-            }
-
-            if (nBytes == 0)
-            {
-                // couldn't send anything at all
-                return {false, sentSize};
-            }
-            if (nBytes < 0)
-            {
-                // error
-                int nErr = WSAGetLastError();
-                if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE &&
-                    nErr != WSAEINTR && nErr != WSAEINPROGRESS)
-                {
-                    LogPrintf("socket send error %s\n", NetworkErrorString(nErr));
-                    node.CloseSocketDisconnect();
-                }
-
-                return {false, sentSize};
-            }
-
-            assert(nBytes > 0);
-            node.nLastSend = GetSystemTimeInSeconds();
-            node.nSendBytes += nBytes;
-            sentSize += nBytes;
-            if (static_cast<size_t>(nBytes) != node.mSendChunk->Size())
-            {
-                // could not send full message; stop sending more
-                node.mSendChunk =
-                    CSpan{
-                        node.mSendChunk->Begin() + nBytes,
-                        node.mSendChunk->Size() - nBytes
-                    };
-                return {false, sentSize};
-            }
-            else
-            {
-                node.mSendChunk = std::nullopt;
-            }
-        } while(!data.EndOfStream());
-
-        return {true, sentSize};
-    }
-}
-
 // requires LOCK(cs_vSend)
 size_t CConnman::SocketSendData(const CNodePtr& pnode) const {
     AssertLockHeld(pnode->cs_vSend);
@@ -1054,7 +956,7 @@ size_t CConnman::SocketSendData(const CNodePtr& pnode) const {
     size_t nMsgCount = 0;
 
     for (const auto &data : pnode->vSendMsg) {
-        auto sent = SendMessage(*pnode, *data, nSendBufferMaxSize);
+        auto sent = pnode->SendMessage(*data, nSendBufferMaxSize);
         nSentSize += sent.sentSize;
         pnode->nSendSize -= sent.sentSize;
 
@@ -2995,6 +2897,85 @@ CNode::~CNode() {
     if (pfilter) {
         delete pfilter;
     }
+}
+
+auto CNode::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)
+    -> CSendResult
+{
+    if (maxChunkSize == 0)
+    {
+        // if maxChunkSize is 0 assign some default chunk size value
+        maxChunkSize = 1024;
+    }
+    size_t sentSize = 0;
+
+    do
+    {
+        int nBytes = 0;
+        if (!mSendChunk)
+        {
+            mSendChunk = data.ReadAsync(maxChunkSize);
+
+            if (!mSendChunk->Size())
+            {
+                // we need to wait for data to load so we should let others
+                // send data in the meantime
+                mSendChunk = std::nullopt;
+                return {false, sentSize};
+            }
+        }
+
+        {
+            LOCK(cs_hSocket);
+            if (hSocket == INVALID_SOCKET)
+            {
+                return {false, sentSize};
+            }
+
+            nBytes = send(hSocket,
+                          reinterpret_cast<const char *>(mSendChunk->Begin()),
+                          mSendChunk->Size(),
+                          MSG_NOSIGNAL | MSG_DONTWAIT);
+        }
+
+        if (nBytes == 0)
+        {
+            // couldn't send anything at all
+            return {false, sentSize};
+        }
+        if (nBytes < 0)
+        {
+            // error
+            int nErr = WSAGetLastError();
+            if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE &&
+                nErr != WSAEINTR && nErr != WSAEINPROGRESS)
+            {
+                LogPrintf("socket send error %s\n", NetworkErrorString(nErr));
+                CloseSocketDisconnect();
+            }
+
+            return {false, sentSize};
+        }
+
+        assert(nBytes > 0);
+        nLastSend = GetSystemTimeInSeconds();
+        nSendBytes += nBytes;
+        sentSize += nBytes;
+        if (static_cast<size_t>(nBytes) != mSendChunk->Size())
+        {
+            // could not send full message; stop sending more
+            mSendChunk =
+                CSpan{
+                    mSendChunk->Begin() + nBytes,
+                    mSendChunk->Size() - nBytes
+                };
+            return {false, sentSize};
+        }
+
+        mSendChunk = std::nullopt;
+    } while(!data.EndOfStream());
+
+    return {true, sentSize};
 }
 
 void CNode::AskFor(const CInv &inv) {
