@@ -42,6 +42,9 @@ public:
     /** Get the maximum generated block size for the current config and chain tip */
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
 
+    /** Get (and reset) whether we might produce an updated template */
+    virtual bool GetTemplateUpdated() { return false; }
+
 protected:
     uint64_t ComputeMaxGeneratedBlockSize(const CBlockIndex* pindex) const;
 

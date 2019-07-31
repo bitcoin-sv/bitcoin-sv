@@ -60,13 +60,14 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
     }
 
-    static unsigned int nTransactionsUpdatedLast = std::numeric_limits<unsigned int>::max();
+    auto assembler { mining::CMiningFactory::GetAssembler(config) };
 
     // Update block
     static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
+    static unsigned int nTransactionsUpdatedLast = std::numeric_limits<unsigned int>::max();
     static std::unique_ptr<CBlockTemplate> pblocktemplate { std::make_unique<CBlockTemplate>() };
-    if (pindexPrev != chainActive.Tip() ||
+    if (pindexPrev != chainActive.Tip() || assembler->GetTemplateUpdated() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
@@ -93,7 +94,7 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
             coinbaseScriptPubKey = coinbaseScript->reserveScript;
         }
-        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScriptPubKey, pindexPrev);
+        pblocktemplate = assembler->CreateNewBlock(coinbaseScriptPubKey, pindexPrev);
 
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
