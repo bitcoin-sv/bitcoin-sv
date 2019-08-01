@@ -696,6 +696,92 @@ protected:
     }
 };
 
+UniValue processBlock(
+    const Config& config,
+    const std::shared_ptr<CBlock>& blockptr,
+    std::function<bool(const Config&, const std::shared_ptr<CBlock>&)> performBlockOperation)
+{
+    CBlock &block = *blockptr;
+    if (block.vtx.empty() || !block.vtx[0]->IsCoinBase()) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
+                           "Block does not start with a coinbase");
+    }
+
+    uint256 hash = block.GetHash();
+    bool fBlockPresent = false;
+    {
+        LOCK(cs_main);
+        BlockMap::iterator mi = mapBlockIndex.find(hash);
+        if (mi != mapBlockIndex.end()) {
+            CBlockIndex *pindex = mi->second;
+            if (pindex->IsValid(BlockValidity::SCRIPTS)) {
+                return "duplicate";
+            }
+            if (pindex->nStatus.isInvalid()) {
+                return "duplicate-invalid";
+            }
+            // Otherwise, we might only have the header - process the block
+            // before returning
+            fBlockPresent = true;
+        }
+    }
+
+    submitblock_StateCatcher sc(block.GetHash());
+    RegisterValidationInterface(&sc);
+    bool fAccepted = performBlockOperation(config, blockptr);
+    UnregisterValidationInterface(&sc);
+    if (fBlockPresent) {
+        if (fAccepted && !sc.found) {
+            return "duplicate-inconclusive";
+        }
+        return "duplicate";
+    }
+
+    if (!sc.found) {
+        return "inconclusive";
+    }
+
+    return BIP22ValidationResult(config, sc.state);
+}
+
+static UniValue verifyblockcandidate(const Config &config,
+                            const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() < 1 ||
+        request.params.size() > 2) {
+        throw std::runtime_error(
+            "verifyblockcandidate \"hexdata\" ( \"jsonparametersobject\" )\n"
+            "\nTest a block template for validity without a valid PoW.\n"
+            "The 'jsonparametersobject' parameter is currently ignored.\n"
+            "See https://en.bitcoin.it/wiki/BIP_0022 for full specification.\n"
+
+            "\nArguments\n"
+            "1. \"hexdata\"        (string, required) the hex-encoded block "
+            "data to submit\n"
+            "2. \"parameters\"     (string, optional) object of optional "
+            "parameters\n"
+            "    {\n"
+            "      \"workid\" : \"id\"    (string, optional) if the server "
+            "provided a workid, it MUST be included with submissions\n"
+            "    }\n"
+            "\nResult:\n"
+            "\nExamples:\n" +
+            HelpExampleCli("verifyblockcandidate", "\"mydata\"") +
+            HelpExampleRpc("verifyblockcandidate", "\"mydata\""));
+    }
+
+    std::shared_ptr<CBlock> blockptr = std::make_shared<CBlock>();
+    CBlock &block = *blockptr;
+    if (!DecodeHexBlk(block, request.params[0].get_str())) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+    }
+
+    auto verifyBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
+    {
+        return VerifyNewBlock(config, blockptr);
+    };
+    return processBlock(config, blockptr, verifyBlock);
+}
+
 static UniValue submitblock(const Config &config,
                             const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() < 1 ||
@@ -727,52 +813,11 @@ static UniValue submitblock(const Config &config,
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
 
-    return SubmitBlock(config, blockptr);
-}
-
-UniValue SubmitBlock(const Config& config, const std::shared_ptr<CBlock>& blockptr)
-{
-    CBlock &block = *blockptr;
-    if (block.vtx.empty() || !block.vtx[0]->IsCoinBase()) {
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
-                           "Block does not start with a coinbase");
-    }
-
-    uint256 hash = block.GetHash();
-    bool fBlockPresent = false;
+    auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
     {
-        LOCK(cs_main);
-        BlockMap::iterator mi = mapBlockIndex.find(hash);
-        if (mi != mapBlockIndex.end()) {
-            CBlockIndex *pindex = mi->second;
-            if (pindex->IsValid(BlockValidity::SCRIPTS)) {
-                return "duplicate";
-            }
-            if (pindex->nStatus.isInvalid()) {
-                return "duplicate-invalid";
-            }
-            // Otherwise, we might only have the header - process the block
-            // before returning
-            fBlockPresent = true;
-        }
-    }
-
-    submitblock_StateCatcher sc(block.GetHash());
-    RegisterValidationInterface(&sc);
-    bool fAccepted = ProcessNewBlock(config, blockptr, true, nullptr);
-    UnregisterValidationInterface(&sc);
-    if (fBlockPresent) {
-        if (fAccepted && !sc.found) {
-            return "duplicate-inconclusive";
-        }
-        return "duplicate";
-    }
-
-    if (!sc.found) {
-        return "inconclusive";
-    }
-
-    return BIP22ValidationResult(config, sc.state);
+        return ProcessNewBlock(config, blockptr, true, nullptr);
+    };
+    return processBlock(config, blockptr, submitBlock);
 }
 
 static UniValue estimatefee(const Config &config,
@@ -822,6 +867,7 @@ static const CRPCCommand commands[] = {
     {"mining",     "getmininginfo",         getmininginfo,         true, {}},
     {"mining",     "prioritisetransaction", prioritisetransaction, true, {"txid", "priority_delta", "fee_delta"}},
     {"mining",     "getblocktemplate",      getblocktemplate,      true, {"template_request"}},
+    {"mining",     "verifyblockcandidate",  verifyblockcandidate,  true, {"hexdata", "parameters"}},
     {"mining",     "submitblock",           submitblock,           true, {"hexdata", "parameters"}},
 
     {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},

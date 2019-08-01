@@ -3693,6 +3693,23 @@ static bool AcceptBlock(const Config &config,
     return true;
 }
 
+bool VerifyNewBlock(const Config &config,
+                    const std::shared_ptr<const CBlock> pblock) {
+
+    CValidationState state;
+    BlockValidationOptions validationOptions{false, true};
+
+    bool ret = CheckBlock(config, *pblock, state, validationOptions);
+
+    GetMainSignals().BlockChecked(*pblock, state);
+
+    if (!ret) {
+        return error("%s: VerifyNewBlock FAILED", __func__);
+    }
+
+    return true;
+}
+
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock> pblock,
                      bool fForceProcessing, bool *fNewBlock) {

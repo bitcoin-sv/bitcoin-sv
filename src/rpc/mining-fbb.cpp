@@ -338,7 +338,11 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         block->fChecked = false;
 
         LOCK(cs_main);
-        submitted = SubmitBlock(config, block); // returns string on failure
+        auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr) 
+        {
+            return ProcessNewBlock(config, blockptr, true, nullptr);
+        };
+        submitted = processBlock(config, block, submitBlock); // returns string on failure
     }
     if(submitted.isNull())
     {

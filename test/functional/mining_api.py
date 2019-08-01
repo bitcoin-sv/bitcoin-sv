@@ -9,31 +9,13 @@ Spin up some nodes, feed in some transactions, use the mining API to
 mine some blocks, verify all nodes accept the mined blocks.
 """
 
-from test_framework.blocktools import create_coinbase
+from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof, solve_bad
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.comptool import TestManager, TestInstance
 from test_framework.mininode import *
 from test_framework.util import *
 import math
 import time
-
-# Calculate the merkle root for a block
-def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
-    merkleRootBytes = ser_uint256(coinbase_hash)
-    for mp in merkle_proof:
-        mp = int(mp, 16)
-        mpBytes = ser_uint256(mp)
-        merkleRootBytes = hash256(merkleRootBytes + mpBytes)
-        merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
-    return uint256_from_str(merkleRootBytes)
-
-# Do incorrect POW for block
-def solve_bad(block):
-    block.rehash()
-    target = uint256_from_compact(block.nBits)
-    while block.sha256 <= target:
-        block.nNonce += 1
-        block.rehash()
 
 # Split some UTXOs into some number of spendable outputs
 def split_utxos(fee, node, count, utxos):
