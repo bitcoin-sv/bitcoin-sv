@@ -334,7 +334,6 @@ public:
         fTestBlockCandidateValidity = false;
     }
 };
-CStnParams stnParams;
 
 /**
  * Testnet (v3)
