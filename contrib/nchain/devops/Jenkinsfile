@@ -86,12 +86,12 @@ pipeline {
                       message:"SUCCESS: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")
 	    
             bitbucketStatusNotify(buildState: 'SUCCESSFUL')        
-            archiveArtifacts 'release-notes.txt 
-                             , src/bitcoin-cli 
-                             , src/bitcoin-seeder 
-                             , src/bitcoin-miner 
-                             , src/bitcoin-txt 
-                             , src/bitcoind 
+            archiveArtifacts 'release-notes.txt \
+                             , src/bitcoin-cli \
+                             , src/bitcoin-seeder \
+                             , src/bitcoin-miner \
+                             , src/bitcoin-txt \
+                             , src/bitcoind \
                              , build/reports/**'
             junit 'build/reports/*.xml'
         }
@@ -102,7 +102,7 @@ pipeline {
                       message:"FAILURE: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")
 	    
             script: emailext (
-                to: '$DEFAULT_RECIPIENTS',
+               to: '$DEFAULT_RECIPIENTS',
                 subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: """<p>FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
                 <p>Check console output (account needed) at &QUOT; \
