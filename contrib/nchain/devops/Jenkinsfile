@@ -1,4 +1,4 @@
-// Pipeline for building Bitcoin SV for QA use
+// Pipeline for building Bitcoin SV
 pipeline {
     agent { 
         dockerfile  {filename "contrib/nchain/devops/Dockerfile"}
@@ -19,7 +19,10 @@ pipeline {
         stage ('Prepare') {
             steps {
                 sh 'mv /*.py .'
-                sh 'ls -alrt'                
+                sh 'ls -alrt'
+		
+		slackSend(color:'good',
+		    message:"START: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")
             }
         }
 
@@ -79,14 +82,27 @@ pipeline {
         cleanup { script:  cleanWs() }
         always  { chuckNorris() }
         success {
+            slackSend(color:'good',
+                      message:"SUCCESS: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")
+	    
             bitbucketStatusNotify(buildState: 'SUCCESSFUL')        
-            archiveArtifacts 'release-notes.txt , src/bitcoin-cli , src/bitcoin-seeder , src/bitcoin-miner , src/bitcoin-txt , src/bitcoind , build/reports/**'
+            archiveArtifacts 'release-notes.txt 
+                             , src/bitcoin-cli 
+                             , src/bitcoin-seeder 
+                             , src/bitcoin-miner 
+                             , src/bitcoin-txt 
+                             , src/bitcoind 
+                             , build/reports/**'
             junit 'build/reports/*.xml'
         }
         failure {
             bitbucketStatusNotify(buildState: 'FAILED')
+	    
+            slackSend(color:'danger',
+                      message:"FAILURE: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")
+	    
             script: emailext (
-        to: '$DEFAULT_RECIPIENTS',
+                to: '$DEFAULT_RECIPIENTS',
                 subject: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
                 body: """<p>FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]':</p>
                 <p>Check console output (account needed) at &QUOT; \
@@ -99,5 +115,9 @@ pipeline {
                                      [$class: 'UpstreamComitterRecipientProvider']]
             )
         }
+        unstable {
+	    slackSend(color:'warning',
+		message:"UNSTABLE: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")
+	}
     }
 }
