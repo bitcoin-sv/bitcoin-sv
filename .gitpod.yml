@@ -1,7 +1,10 @@
 image:
   file:  .gitpod.dockerfile
 github:
-  prebuilds:
+tasks:
+  - init: cd /workspace/bitcoin-sv/
+    command:  ./autogen.sh && ./configure && make && make install  
+prebuilds:
     # enable for the master/default branch (defaults to true)
     master: true
     # enable for all branches in this repo (defaults to false)
