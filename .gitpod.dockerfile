@@ -8,11 +8,11 @@ RUN sudo add-apt-repository universe
 RUN sudo apt-get update
 RUN sudo apt-get install -y libboost-all-dev
 
-RUN sudo apt-get install -y libdb-dev \
- && sudo apt-get install -y libdb++-dev
+RUN sudo apt-get install -y libdb-dev
+RUN sudo apt-get install -y libdb++-dev
  
-RUN sudo ./autogen.sh \
- && sudo ./configure \
- && make \
- && make install
+RUN sudo ./autogen.sh
+RUN sudo ./configure
+RUN make
+RUN make install
 
