@@ -10,9 +10,5 @@ RUN sudo apt-get install -y libboost-all-dev
 
 RUN sudo apt-get install -y libdb-dev
 RUN sudo apt-get install -y libdb++-dev
- 
-RUN sudo ./autogen.sh
-RUN sudo ./configure
-RUN make
-RUN make install
+
 
