@@ -39,6 +39,7 @@
 #include <fcntl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <thread>
 
 #else
 
@@ -578,7 +579,10 @@ void runCommand(const std::string &strCommand) {
                   nErr);
 }
 
-void RenameThread(const char *name) {
+thread_local std::string threadName;
+void RenameThread(const char *name)
+{
+    threadName = name;
 #if defined(PR_SET_NAME)
     // Only the first 15 characters are used (16 - NUL terminator)
     ::prctl(PR_SET_NAME, name, 0, 0, 0);
@@ -592,6 +596,15 @@ void RenameThread(const char *name) {
     (void)name;
 #endif
 }
+
+std::string GetThreadName()
+{
+    if (threadName.empty()) {
+        return strprintf("thread-%d", std::this_thread::get_id());
+    }
+    return threadName;
+}
+
 
 void SetupEnvironment() {
 // On most POSIX systems (e.g. Linux, but not BSD) the environment's locale may

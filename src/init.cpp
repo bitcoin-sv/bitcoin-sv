@@ -1892,7 +1892,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
               nScriptCheckThreads);
     if (nScriptCheckThreads) {
         for (int i = 0; i < nScriptCheckThreads - 1; i++) {
-            threadGroup.create_thread(&ThreadScriptCheck);
+            threadGroup.create_thread([i]() { return ThreadScriptCheck(i); });
         }
     }
 

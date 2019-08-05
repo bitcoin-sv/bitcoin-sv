@@ -1787,8 +1787,9 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
 
 static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
-void ThreadScriptCheck() {
-    RenameThread("bitcoin-scriptch");
+void ThreadScriptCheck(int workerNum) {
+    std::string s = strprintf("bitcoin-scriptch%d", workerNum);
+    RenameThread(s.c_str());
     scriptcheckqueue.Thread();
 }
 
