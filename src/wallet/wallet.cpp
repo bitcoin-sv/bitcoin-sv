@@ -1991,7 +1991,10 @@ bool CWalletTx::InMempool() const {
 
 bool CWalletTx::IsTrusted() const {
     // Quick answer in most cases
-    if (!CheckFinalTx(*this)) {
+    if (!CheckFinalTx(
+           *this,
+            chainActive.Height(),
+            chainActive.Tip()->GetMedianTimePast())) {
         return false;
     }
 
@@ -2214,7 +2217,11 @@ Amount CWallet::GetLegacyBalance(const isminefilter &filter, int minDepth,
     for (const auto &entry : mapWallet) {
         const CWalletTx &wtx = entry.second;
         const int depth = wtx.GetDepthInMainChain();
-        if (depth < 0 || !CheckFinalTx(*wtx.tx) ||
+        if (depth < 0 ||
+            !CheckFinalTx(
+               *wtx.tx,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast()) ||
             wtx.GetBlocksToMaturity() > 0) {
             continue;
         }
@@ -2257,7 +2264,10 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
         const uint256 &wtxid = it->first;
         const CWalletTx *pcoin = &(*it).second;
 
-        if (!CheckFinalTx(*pcoin)) {
+        if (!CheckFinalTx(
+               *pcoin,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast())) {
             continue;
         }
 

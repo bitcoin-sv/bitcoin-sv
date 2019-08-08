@@ -621,11 +621,17 @@ public:
                       setEntries &setAncestors, mining::CJournalChangeSetPtr& changeSet,
                       bool validFeeEstimate = true);
 
-    void removeRecursive(const CTransaction &tx, mining::CJournalChangeSetPtr& changeSet,
-                         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
-    void removeForReorg(const Config &config, const CCoinsViewCache *pcoins,
-                        mining::CJournalChangeSetPtr& changeSet,
-                        unsigned int nMemPoolHeight, int flags);
+    void removeRecursive(
+        const CTransaction &tx,
+        mining::CJournalChangeSetPtr& changeSet,
+        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+    void removeForReorg(
+            const Config &config,
+            const CCoinsViewCache *pcoins,
+            mining::CJournalChangeSetPtr& changeSet,
+            int nChainActiveHeight,
+            int nMedianTimePast,
+            int flags);
     void removeConflicts(const CTransaction &tx, mining::CJournalChangeSetPtr& changeSet);
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
                         unsigned int nBlockHeight, mining::CJournalChangeSetPtr& changeSet);

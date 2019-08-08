@@ -633,7 +633,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
     }
 
     // Sequence locks fail.
@@ -660,7 +665,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
     }
 
     // Sequence locks fail.
@@ -694,7 +704,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(!ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-nonfinal");
     }
 
@@ -723,7 +738,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(!ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-nonfinal");
     }
 
@@ -750,7 +770,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
     }
 
     // Sequence locks pass.

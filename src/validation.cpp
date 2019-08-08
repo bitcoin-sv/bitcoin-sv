@@ -911,7 +911,12 @@ CTxnValResult TxnValidation(
     // be mined yet.
     CValidationState ctxState;
     if (!ContextualCheckTransactionForCurrentBlock(
-            config, tx, ctxState, STANDARD_LOCKTIME_VERIFY_FLAGS)) {
+            config,
+            tx,
+            chainActive.Height(),
+            chainActive.Tip()->GetMedianTimePast(),
+            ctxState,
+            STANDARD_LOCKTIME_VERIFY_FLAGS)) {
         // We copy the state from a dummy to ensure we don't increase the
         // ban score of peer for transaction that could be valid in the future.
         state.DoS(0, false, REJECT_NONSTANDARD,
@@ -1640,8 +1645,14 @@ static void UpdateMempoolForReorg(const Config &config,
 
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions");
-    mempool.removeForReorg(config, pcoinsTip, changeSet, chainActive.Tip()->nHeight + 1,
-                           STANDARD_LOCKTIME_VERIFY_FLAGS);
+    mempool.
+        removeForReorg(
+            config,
+            pcoinsTip,
+            changeSet,
+            chainActive.Height(),
+            chainActive.Tip()->GetMedianTimePast(),
+            STANDARD_LOCKTIME_VERIFY_FLAGS);
     // Re-limit mempool size, in case we added any transactions
     LimitMempoolSize(
         mempool,
@@ -4102,11 +4113,13 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
     return true;
 }
 
-bool ContextualCheckTransactionForCurrentBlock(const Config &config,
-                                               const CTransaction &tx,
-                                               CValidationState &state,
-                                               int flags) {
-    AssertLockHeld(cs_main);
+bool ContextualCheckTransactionForCurrentBlock(
+    const Config &config,
+    const CTransaction &tx,
+    int nChainActiveHeight,
+    int nMedianTimePast,
+    CValidationState &state,
+    int flags) {
 
     // By convention a negative value for flags indicates that the current
     // network-enforced consensus rules should be used. In a future soft-fork
@@ -4121,7 +4134,7 @@ bool ContextualCheckTransactionForCurrentBlock(const Config &config,
     // is used. Thus if we want to know if a transaction can be part of the
     // *next* block, we need to call ContextualCheckTransaction() with one more
     // than chainActive.Height().
-    const int nBlockHeight = chainActive.Height() + 1;
+    const int nBlockHeight = nChainActiveHeight + 1;
 
     // BIP113 will require that time-locked transactions have nLockTime set to
     // less than the median time of the previous block they're contained in.
@@ -4129,11 +4142,15 @@ bool ContextualCheckTransactionForCurrentBlock(const Config &config,
     // chain tip, so we use that to calculate the median time passed to
     // ContextualCheckTransaction() if LOCKTIME_MEDIAN_TIME_PAST is set.
     const int64_t nLockTimeCutoff = (flags & LOCKTIME_MEDIAN_TIME_PAST)
-                                        ? chainActive.Tip()->GetMedianTimePast()
+                                        ? nMedianTimePast
                                         : GetAdjustedTime();
 
-    return ContextualCheckTransaction(config, tx, state, nBlockHeight,
-                                      nLockTimeCutoff);
+    return ContextualCheckTransaction(
+                config,
+                tx,
+                state,
+                nBlockHeight,
+                nLockTimeCutoff);
 }
 
 static bool ContextualCheckBlock(const Config &config, const CBlock &block,

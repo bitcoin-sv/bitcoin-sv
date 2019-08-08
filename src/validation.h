@@ -774,14 +774,25 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
 
 /**
  * This is a variant of ContextualCheckTransaction which computes the contextual
- * check for a transaction based on the chain tip.
+ * check for a transaction based on nChainActiveHeight and nMedianTimePast
+ * of the active chain tip (including block flags).
  *
  * See consensus/consensus.h for flag definitions.
+ *
+ * @param config A reference to the configuration
+ * @param tx A reference to the transaction
+ * @param nChainActiveHeight The maximal height in the current active chain
+ * @param nMedianTimePast A median time of the tip for the current active chain
+ * @param state A reference to store a validation state
+ * @param flags Flags assigned to the block
  */
-bool ContextualCheckTransactionForCurrentBlock(const Config &config,
-                                               const CTransaction &tx,
-                                               CValidationState &state,
-                                               int flags = -1);
+bool ContextualCheckTransactionForCurrentBlock(
+    const Config &config,
+    const CTransaction &tx,
+    int nChainActiveHeight,
+    int nMedianTimePast,
+    CValidationState &state,
+    int flags = -1);
 
 /**
  * Check a block is completely valid from start to finish (only works on top of

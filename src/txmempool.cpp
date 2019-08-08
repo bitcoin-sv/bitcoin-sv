@@ -593,10 +593,15 @@ void CTxMemPool::removeRecursive(const CTransaction &origTx,
     RemoveStaged(setAllRemoves, false, changeSet, reason);
 }
 
-void CTxMemPool::removeForReorg(const Config &config,
-                                const CCoinsViewCache *pcoins,
-                                CJournalChangeSetPtr& changeSet,
-                                unsigned int nMemPoolHeight, int flags) {
+void CTxMemPool::removeForReorg(
+    const Config &config,
+    const CCoinsViewCache *pcoins,
+    CJournalChangeSetPtr& changeSet,
+    int nChainActiveHeight,
+    int nMedianTimePast,
+    int flags) {
+
+    const int64_t nMemPoolHeight = nChainActiveHeight + 1;
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
     LOCK(cs);
@@ -608,9 +613,19 @@ void CTxMemPool::removeForReorg(const Config &config,
         bool validLP = TestLockPointValidity(&lp);
 
         CValidationState state;
-        if (!ContextualCheckTransactionForCurrentBlock(config, tx, state,
-                                                       flags) ||
-            !CheckSequenceLocks(tx, *this, flags, &lp, validLP)) {
+        if (!ContextualCheckTransactionForCurrentBlock(
+                config,
+                tx,
+                nChainActiveHeight,
+                nMedianTimePast,
+                state,
+                flags) ||
+            !CheckSequenceLocks(
+                tx,
+                *this,
+                flags,
+                &lp,
+                validLP)) {
             // Note if CheckSequenceLocks fails the LockPoints may still be
             // invalid. So it's critical that we remove the tx and not depend on
             // the LockPoints.
@@ -630,7 +645,7 @@ void CTxMemPool::removeForReorg(const Config &config,
 
                 if (coin.IsSpent() ||
                     (coin.IsCoinBase() &&
-                     int64_t(nMemPoolHeight) - coin.GetHeight() <
+                     nMemPoolHeight - coin.GetHeight() <
                          COINBASE_MATURITY)) {
                     txToRemove.insert(it);
                     break;
