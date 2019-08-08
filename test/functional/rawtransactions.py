@@ -13,7 +13,10 @@
 """
 
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.mininode import CTransaction
 from test_framework.util import *
+
+from io import BytesIO
 
 # Create one-input, one-output, no-fee transaction:
 
@@ -206,6 +209,43 @@ class RawTransactionsTest(BitcoinTestFramework):
         rawtx = self.nodes[0].createrawtransaction(inputs, outputs)
         decrawtx = self.nodes[0].decoderawtransaction(rawtx)
         assert_equal(decrawtx['vin'][0]['sequence'], 4294967294)
+
+        # tests with transactions containing data
+        # 1. sending ffffffff, we get 006a04ffffffff
+        # 00(OP_FALSE) 6a(OP_RETURN) 04(size of data, 4 bytes in this case) ffffffff(data)
+        addr = self.nodes[0].getnewaddress()
+        txid = self.nodes[0].sendtoaddress(addr, 2.0)
+        inputs = [{
+            "txid": txid,
+            "vout": 0,
+        }]
+        outputs = {
+                self.nodes[0].getnewaddress(): 0.5,
+                "data": 'ffffffff'
+            }
+        rawtx = self.nodes[0].createrawtransaction(inputs, outputs)
+        tx = CTransaction()
+        f = BytesIO(hex_str_to_bytes(rawtx))
+        tx.deserialize(f)
+        assert_equal(tx.vout[1].scriptPubKey.hex(), "006a04ffffffff")
+
+        # 2. sending ffffffff00000000, we get 006a08ffffffff00000000
+        # 00(OP_FALSE) 6a(OP_RETURN) 08(size of data, 8 bytes in this case) ffffffff00000000(data)
+        addr = self.nodes[0].getnewaddress()
+        txid = self.nodes[0].sendtoaddress(addr, 2.0)
+        inputs = [{
+            "txid": txid,
+            "vout": 0,
+        }]
+        outputs = {
+            self.nodes[0].getnewaddress(): 0.5,
+            "data": 'ffffffff00000000'
+        }
+        rawtx = self.nodes[0].createrawtransaction(inputs, outputs)
+        tx = CTransaction()
+        f = BytesIO(hex_str_to_bytes(rawtx))
+        tx.deserialize(f)
+        assert_equal(tx.vout[1].scriptPubKey.hex(), "006a08ffffffff00000000")
 
 
 if __name__ == '__main__':
