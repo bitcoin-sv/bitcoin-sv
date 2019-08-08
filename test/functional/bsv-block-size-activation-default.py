@@ -66,7 +66,9 @@ class BSVBlockSizeActivation(ComparisonTestFramework):
         block = self.chain.next_block
 
         # Create a new block
-        block(0)
+        blk = block(0)
+        blk.nTime = activation_time - 3600
+        self.chain.update_block(0, [])
         self.chain.save_spendable_output()
         yield self.accepted()
 
