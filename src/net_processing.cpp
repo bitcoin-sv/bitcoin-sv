@@ -15,6 +15,7 @@
 #include "hash.h"
 #include "init.h"
 #include "merkleblock.h"
+#include "mining/journal_builder.h"
 #include "net.h"
 #include "netbase.h"
 #include "netmessagemaker.h"
@@ -39,6 +40,8 @@
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."
 #endif
+
+using namespace mining;
 
 // Used only to inform the wallet of when we last received a block.
 std::atomic<int64_t> nTimeBestReceived(0);
@@ -1243,7 +1246,8 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             a_recent_block = most_recent_block;
                         }
                         CValidationState dummy;
-                        ActivateBestChain(config, dummy, a_recent_block);
+                        CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
+                        ActivateBestChain(config, dummy, changeSet, a_recent_block);
                     }
                     if (chainActive.Contains(mi->second)) {
                         send = true;
@@ -2018,7 +2022,8 @@ static void ProcessGetBlocksMessage(const Config& config, const CNodePtr& pfrom,
             a_recent_block = most_recent_block;
         }
         CValidationState dummy;
-        ActivateBestChain(config, dummy, a_recent_block);
+        CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
+        ActivateBestChain(config, dummy, changeSet, a_recent_block);
     }
 
     LOCK(cs_main);
@@ -2218,17 +2223,18 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
 
     LogPrint(BCLog::TXNSRC, "got txn: %s txnsrc peer=%d\n", inv.hash.ToString(), pfrom->id);
 
-    LOCK(cs_main);
-
     bool fMissingInputs = false;
     CValidationState state;
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN) };
+
+    LOCK(cs_main);
 
     pfrom->setAskFor.erase(inv.hash);
     mapAlreadyAskedFor.erase(inv.hash);
 
-    if(!AlreadyHave(inv) && AcceptToMemoryPool(config, mempool, state, ptx, true, &fMissingInputs))
+    if(!AlreadyHave(inv) && AcceptToMemoryPool(config, mempool, state, ptx, true, &fMissingInputs, changeSet))
     {
-        mempool.check(pcoinsTip);
+        mempool.check(pcoinsTip, changeSet);
         RelayTransaction(tx, connman);
         for(size_t i = 0; i < tx.vout.size(); i++) {
             vWorkQueue.emplace_back(inv.hash, i);
@@ -2268,7 +2274,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
                     continue;
                 }
                 if(AcceptToMemoryPool(config, mempool, stateDummy,
-                                       porphanTx, true, &fMissingInputs2)) {
+                                       porphanTx, true, &fMissingInputs2, changeSet)) {
                     LogPrint(BCLog::MEMPOOL, "   accepted orphan tx %s\n",
                              orphanId.ToString());
                     RelayTransaction(orphanTx, connman);
@@ -2301,7 +2307,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
                         recentRejects->insert(orphanId);
                     }
                 }
-                mempool.check(pcoinsTip);
+                mempool.check(pcoinsTip, changeSet);
             }
         }
 

@@ -192,6 +192,10 @@
   "time": 10
  },
  {
+  "name": "mining_journal.py",
+  "time": 1080
+ },
+ {
   "name": "multi_rpc.py",
   "time": 7
  },

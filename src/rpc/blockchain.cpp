@@ -14,6 +14,7 @@
 #include "consensus/validation.h"
 #include "hash.h"
 #include "core_io.h"
+#include "mining/journal_builder.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/server.h"
@@ -1454,6 +1455,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
 UniValue mempoolInfoToJSON() {
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("size", (int64_t)mempool.size()));
+    ret.push_back(Pair("journalsize", (int64_t)mempool.getJournalBuilder()->getCurrentJournal()->size()));
     ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t)mempool.DynamicMemoryUsage()));
     size_t maxmempool =
@@ -1474,6 +1476,7 @@ UniValue getmempoolinfo(const Config &config, const JSONRPCRequest &request) {
             "\nResult:\n"
             "{\n"
             "  \"size\": xxxxx,               (numeric) Current tx count\n"
+            "  \"journalsize\": xxxxx,        (numeric) Current tx count within the journal\n"
             "  \"bytes\": xxxxx,              (numeric) Transaction size.\n"
             "  \"usage\": xxxxx,              (numeric) Total memory usage for "
             "the mempool\n"
@@ -1560,10 +1563,6 @@ UniValue invalidateblock(const Config &config, const JSONRPCRequest &request) {
         InvalidateBlock(config, state, pblockindex);
     }
 
-    if (state.IsValid()) {
-        ActivateBestChain(config, state);
-    }
-
     if (!state.IsValid()) {
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
     }
@@ -1601,7 +1600,8 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
     }
 
     CValidationState state;
-    ActivateBestChain(config, state);
+    mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::REORG) };
+    ActivateBestChain(config, state, changeSet);
 
     if (!state.IsValid()) {
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());

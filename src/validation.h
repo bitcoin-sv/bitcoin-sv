@@ -16,6 +16,7 @@
 #include "coins.h"
 #include "consensus/consensus.h"
 #include "fs.h"
+#include "mining/journal_change_set.h"
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "script/script_error.h"
 #include "sync.h"
@@ -437,6 +438,7 @@ bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
  */
 bool ActivateBestChain(
     const Config &config, CValidationState &state,
+    mining::CJournalChangeSetPtr& changeSet,
     std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
@@ -477,6 +479,7 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 bool AcceptToMemoryPool(const Config &config, CTxMemPool &pool,
                         CValidationState &state, const CTransactionRef &tx,
                         bool fLimitFree, bool *pfMissingInputs,
+                        mining::CJournalChangeSetPtr& changeSet,
                         bool fOverrideMempoolLimit = false,
                         const Amount nAbsurdFee = Amount(0));
 

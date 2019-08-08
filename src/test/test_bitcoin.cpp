@@ -13,6 +13,7 @@
 #include "key.h"
 #include "logging.h"
 #include "mining/factory.h"
+#include "mining/journal_builder.h"
 #include "net_processing.h"
 #include "pubkey.h"
 #include "random.h"
@@ -88,7 +89,8 @@ TestingSetup::TestingSetup(const std::string &chainName)
     }
     {
         CValidationState state;
-        if (!ActivateBestChain(config, state)) {
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
+        if (!ActivateBestChain(config, state, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }

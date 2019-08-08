@@ -222,6 +222,9 @@ add_library(server
 	merkleblock.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
+	mining/journal.cpp
+	mining/journal_builder.cpp
+	mining/journal_change_set.cpp
     mining/legacy.cpp
 	net.cpp
 	net_processing.cpp

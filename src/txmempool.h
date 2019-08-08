@@ -31,6 +31,14 @@ class CAutoFile;
 class CBlockIndex;
 class Config;
 
+namespace mining
+{
+    class CJournalBuilder;
+    class CJournalChangeSet;
+    using CJournalBuilderPtr = std::unique_ptr<CJournalBuilder>;
+    using CJournalChangeSetPtr = std::shared_ptr<CJournalChangeSet>;
+}
+
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
 }
@@ -61,6 +69,22 @@ struct LockPoints {
 };
 
 class CTxMemPool;
+
+/**
+ * Shared ancestor/descendant count information.
+ */
+struct AncestorDescendantCounts
+{
+    AncestorDescendantCounts(uint64_t ancestors, uint64_t descendants)
+    : nCountWithAncestors{ancestors}, nCountWithDescendants{descendants}
+    {}
+
+    // These don't actually need to be atomic currently, but there's no cost
+    // if they are and we might want to access them across threads in the future.
+    std::atomic_uint64_t nCountWithAncestors   {0};
+    std::atomic_uint64_t nCountWithDescendants {0};
+};
+using AncestorDescendantCountsPtr = std::shared_ptr<AncestorDescendantCounts>;
 
 /** \class CTxMemPoolEntry
  *
@@ -114,14 +138,13 @@ private:
     // dirty, and nSizeWithDescendants and nModFeesWithDescendants will not be
     // correct.
     //!< number of descendant transactions
-    uint64_t nCountWithDescendants;
+    AncestorDescendantCountsPtr ancestorDescendantCounts;
     //!< ... and size
     uint64_t nSizeWithDescendants;
     //!< ... and total fees (all including us)
     Amount nModFeesWithDescendants;
 
     // Analogous statistics for ancestor transactions
-    uint64_t nCountWithAncestors;
     uint64_t nSizeWithAncestors;
     Amount nModFeesWithAncestors;
     int64_t nSigOpCountWithAncestors;
@@ -162,13 +185,14 @@ public:
     // Update the LockPoints after a reorg
     void UpdateLockPoints(const LockPoints &lp);
 
-    uint64_t GetCountWithDescendants() const { return nCountWithDescendants; }
+    const AncestorDescendantCountsPtr& GetAncestorDescendantCounts() const { return ancestorDescendantCounts; }
+    uint64_t GetCountWithDescendants() const { return ancestorDescendantCounts->nCountWithDescendants; }
     uint64_t GetSizeWithDescendants() const { return nSizeWithDescendants; }
     Amount GetModFeesWithDescendants() const { return nModFeesWithDescendants; }
 
     bool GetSpendsCoinbase() const { return spendsCoinbase; }
 
-    uint64_t GetCountWithAncestors() const { return nCountWithAncestors; }
+    uint64_t GetCountWithAncestors() const { return ancestorDescendantCounts->nCountWithAncestors; }
     uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
     Amount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
     int64_t GetSigOpCountWithAncestors() const {
@@ -473,7 +497,7 @@ public:
 class CTxMemPool {
 private:
     //!< Value n means that n times in 2^32 we check.
-    uint32_t nCheckFrequency;
+    std::atomic_uint32_t nCheckFrequency;
     unsigned int nTransactionsUpdated;
     CBlockPolicyEstimator *minerPolicyEstimator;
 
@@ -487,6 +511,9 @@ private:
     mutable bool blockSinceLastRollingFeeBump;
     //!< minimum fee to get into the pool, decreases exponentially
     mutable double rollingMinimumFeeRate;
+
+    // Our journal builder
+    mining::CJournalBuilderPtr mJournalBuilder;
 
     void trackPackageRemoved(const CFeeRate &rate);
 
@@ -567,10 +594,10 @@ public:
     /**
      * If sanity-checking is turned on, check makes sure the pool is consistent
      * (does not contain two transactions that spend the same inputs, all inputs
-     * are in the mapNextTx array). If sanity-checking is turned off, check does
-     * nothing.
+     * are in the mapNextTx array, journal is in agreement with mempool).
+     * If sanity-checking is turned off, check does nothing.
      */
-    void check(const CCoinsViewCache *pcoins) const;
+    void check(const CCoinsViewCache *pcoins, mining::CJournalChangeSetPtr& changeSet) const;
     void setSanityCheck(double dFrequency = 1.0) {
         nCheckFrequency = dFrequency * 4294967295.0;
     }
@@ -580,18 +607,19 @@ public:
     // addUnchecked can be used to have it call CalculateMemPoolAncestors(), and
     // then invoke the second version.
     bool addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
-                      bool validFeeEstimate = true);
+                      mining::CJournalChangeSetPtr& changeSet, bool validFeeEstimate = true);
     bool addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
-                      setEntries &setAncestors, bool validFeeEstimate = true);
+                      setEntries &setAncestors, mining::CJournalChangeSetPtr& changeSet,
+                      bool validFeeEstimate = true);
 
-    void removeRecursive(
-        const CTransaction &tx,
-        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+    void removeRecursive(const CTransaction &tx, mining::CJournalChangeSetPtr& changeSet,
+                         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
     void removeForReorg(const Config &config, const CCoinsViewCache *pcoins,
+                        mining::CJournalChangeSetPtr& changeSet,
                         unsigned int nMemPoolHeight, int flags);
-    void removeConflicts(const CTransaction &tx);
+    void removeConflicts(const CTransaction &tx, mining::CJournalChangeSetPtr& changeSet);
     void removeForBlock(const std::vector<CTransactionRef> &vtx,
-                        unsigned int nBlockHeight);
+                        unsigned int nBlockHeight, mining::CJournalChangeSetPtr& changeSet);
 
     void clear();
     // lock free
@@ -616,6 +644,9 @@ public:
                      Amount &nFeeDelta) const;
     void ClearPrioritisation(const uint256 hash);
 
+    // Get a reference to the journal builder
+    const mining::CJournalBuilderPtr& getJournalBuilder() const { return mJournalBuilder; }
+
 public:
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
@@ -626,6 +657,7 @@ public:
      */
     void
     RemoveStaged(setEntries &stage, bool updateDescendants,
+                 mining::CJournalChangeSetPtr& changeSet,
                  MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     /**
@@ -681,11 +713,12 @@ public:
      * this mempool.
      */
     void TrimToSize(size_t sizelimit,
+                    mining::CJournalChangeSetPtr& changeSet,
                     std::vector<COutPoint> *pvNoSpendsRemaining = nullptr);
 
     /** Expire all transaction (and their dependencies) in the mempool older
      * than time. Return the number of removed transactions. */
-    int Expire(int64_t time);
+    int Expire(int64_t time, mining::CJournalChangeSetPtr& changeSet);
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
@@ -777,9 +810,9 @@ private:
      * transaction that is removed, so we can't remove intermediate transactions
      * in a chain before we've updated all the state for the removal.
      */
-    void removeUnchecked(
-        txiter entry,
-        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+    void removeUnchecked(txiter entry,
+                         mining::CJournalChangeSetPtr& changeSet,
+                         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 };
 
 /**

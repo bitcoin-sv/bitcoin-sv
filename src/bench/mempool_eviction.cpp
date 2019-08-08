@@ -9,6 +9,11 @@
 #include <list>
 #include <vector>
 
+namespace
+{
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+}
+
 static void AddTx(const CTransaction &tx, const Amount &nFee,
                   CTxMemPool &pool) {
     int64_t nTime = 0;
@@ -20,7 +25,8 @@ static void AddTx(const CTransaction &tx, const Amount &nFee,
     pool.addUnchecked(tx.GetId(),
                       CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime,
                                       dPriority, nHeight, tx.GetValueOut(),
-                                      spendsCoinbase, sigOpCost, lp));
+                                      spendsCoinbase, sigOpCost, lp),
+                      nullChangeSet);
 }
 
 // Right now this is only testing eviction performance in an extremely small
@@ -115,8 +121,8 @@ static void MempoolEviction(benchmark::State &state) {
         AddTx(t5, Amount(1000LL), pool);
         AddTx(t6, Amount(1100LL), pool);
         AddTx(t7, Amount(9000LL), pool);
-        pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4);
-        pool.TrimToSize(t1.GetTotalSize());
+        pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4, nullChangeSet);
+        pool.TrimToSize(t1.GetTotalSize(), nullChangeSet);
     }
 }
 
