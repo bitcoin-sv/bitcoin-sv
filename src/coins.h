@@ -258,6 +258,11 @@ public:
      */
     void Uncache(const COutPoint &outpoint);
 
+    /**
+     * Removes UTXOs with the given outpoints from the cache.
+     */
+    void Uncache(const std::vector<COutPoint>& vOutpoints);
+
     //! Calculate the size of the cache (in number of transaction outputs)
     unsigned int GetCacheSize() const;
 
@@ -297,6 +302,8 @@ private:
     bool HaveCoinNL(const COutPoint &outpoint) const;
     // A non-locking fetch coin
     CCoinsMap::iterator FetchCoinNL(const COutPoint &outpoint) const;
+    // A non-locking version of Uncache
+    void UncacheNL(const COutPoint &outpoint);
 
     /**
      * By making the copy constructor private, we prevent accidentally using it

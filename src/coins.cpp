@@ -303,10 +303,21 @@ bool CCoinsViewCache::Flush() {
 
 void CCoinsViewCache::Uncache(const COutPoint &outpoint) {
     std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    UncacheNL(outpoint);
+}
+
+void CCoinsViewCache::UncacheNL(const COutPoint &outpoint) {
     CCoinsMap::iterator it = cacheCoins.find(outpoint);
     if (it != cacheCoins.end() && it->second.flags == 0) {
         cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
         cacheCoins.erase(it);
+    }
+}
+
+void CCoinsViewCache::Uncache(const std::vector<COutPoint>& vOutpoints) {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    for (const COutPoint &outpoint : vOutpoints) {
+         UncacheNL(outpoint);
     }
 }
 
