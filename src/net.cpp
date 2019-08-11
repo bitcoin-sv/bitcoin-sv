@@ -2974,6 +2974,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn,
 CNode::~CNode() {
     CloseSocket(hSocket);
 
+    LOCK(cs_filter);
     if (pfilter) {
         delete pfilter;
     }
