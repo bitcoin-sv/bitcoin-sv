@@ -64,11 +64,12 @@ CCoinsViewCache::CCoinsViewCache(CCoinsView *baseIn)
     : CCoinsViewBacked(baseIn), cachedCoinsUsage(0) {}
 
 size_t CCoinsViewCache::DynamicMemoryUsage() const {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     return memusage::DynamicUsage(cacheCoins) + cachedCoinsUsage;
 }
 
 CCoinsMap::iterator
-CCoinsViewCache::FetchCoin(const COutPoint &outpoint) const {
+CCoinsViewCache::FetchCoinNL(const COutPoint &outpoint) const {
     CCoinsMap::iterator it = cacheCoins.find(outpoint);
     if (it != cacheCoins.end()) {
         return it;
@@ -92,7 +93,8 @@ CCoinsViewCache::FetchCoin(const COutPoint &outpoint) const {
 }
 
 bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    CCoinsMap::const_iterator it = FetchCoin(outpoint);
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    CCoinsMap::const_iterator it = FetchCoinNL(outpoint);
     if (it == cacheCoins.end()) {
         return false;
     }
@@ -102,6 +104,7 @@ bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const {
 
 void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin coin,
                               bool possible_overwrite) {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     assert(!coin.IsSpent());
     if (coin.GetTxOut().scriptPubKey.IsUnspendable()) {
         return;
@@ -144,7 +147,8 @@ void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight,
 }
 
 bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout) {
-    CCoinsMap::iterator it = FetchCoin(outpoint);
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    CCoinsMap::iterator it = FetchCoinNL(outpoint);
     if (it == cacheCoins.end()) {
         return false;
     }
@@ -163,8 +167,13 @@ bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout) {
 
 static const Coin coinEmpty;
 
-const Coin &CCoinsViewCache::AccessCoin(const COutPoint &outpoint) const {
-    CCoinsMap::const_iterator it = FetchCoin(outpoint);
+const Coin& CCoinsViewCache::AccessCoin(const COutPoint &outpoint) const {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    return AccessCoinNL(outpoint);
+}
+
+const Coin& CCoinsViewCache::AccessCoinNL(const COutPoint &outpoint) const {
+    CCoinsMap::const_iterator it = FetchCoinNL(outpoint);
     if (it == cacheCoins.end()) {
         return coinEmpty;
     }
@@ -172,16 +181,23 @@ const Coin &CCoinsViewCache::AccessCoin(const COutPoint &outpoint) const {
 }
 
 bool CCoinsViewCache::HaveCoin(const COutPoint &outpoint) const {
-    CCoinsMap::const_iterator it = FetchCoin(outpoint);
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    return HaveCoinNL(outpoint);
+}
+
+bool CCoinsViewCache::HaveCoinNL(const COutPoint &outpoint) const {
+    CCoinsMap::const_iterator it = FetchCoinNL(outpoint);
     return it != cacheCoins.end() && !it->second.coin.IsSpent();
 }
 
 bool CCoinsViewCache::HaveCoinInCache(const COutPoint &outpoint) const {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     CCoinsMap::const_iterator it = cacheCoins.find(outpoint);
     return it != cacheCoins.end();
 }
 
 uint256 CCoinsViewCache::GetBestBlock() const {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     if (hashBlock.IsNull()) {
         hashBlock = base->GetBestBlock();
     }
@@ -189,11 +205,13 @@ uint256 CCoinsViewCache::GetBestBlock() const {
 }
 
 void CCoinsViewCache::SetBestBlock(const uint256 &hashBlockIn) {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     hashBlock = hashBlockIn;
 }
 
 bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
                                  const uint256 &hashBlockIn) {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         // Ignore non-dirty entries (optimization).
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
@@ -255,7 +273,28 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
     return true;
 }
 
+CCoinsViewCursor* CCoinsViewCache::Cursor() const {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    return base->Cursor();
+}
+
+std::vector<uint256> CCoinsViewCache::GetHeadBlocks() const {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    return base->GetHeadBlocks();
+}
+
+void CCoinsViewCache::SetBackend(CCoinsView &viewIn) {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    base = &viewIn;
+}
+
+size_t CCoinsViewCache::EstimateSize() const {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    return base->EstimateSize();
+}
+
 bool CCoinsViewCache::Flush() {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     bool fOk = base->BatchWrite(cacheCoins, hashBlock);
     cacheCoins.clear();
     cachedCoinsUsage = 0;
@@ -263,6 +302,7 @@ bool CCoinsViewCache::Flush() {
 }
 
 void CCoinsViewCache::Uncache(const COutPoint &outpoint) {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     CCoinsMap::iterator it = cacheCoins.find(outpoint);
     if (it != cacheCoins.end() && it->second.flags == 0) {
         cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
@@ -271,11 +311,17 @@ void CCoinsViewCache::Uncache(const COutPoint &outpoint) {
 }
 
 unsigned int CCoinsViewCache::GetCacheSize() const {
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     return cacheCoins.size();
 }
 
 const CTxOut &CCoinsViewCache::GetOutputFor(const CTxIn &input) const {
-    const Coin &coin = AccessCoin(input.prevout);
+    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+    return GetOutputForNL(input);
+}
+
+const CTxOut &CCoinsViewCache::GetOutputForNL(const CTxIn &input) const {
+    const Coin &coin = AccessCoinNL(input.prevout);
     assert(!coin.IsSpent());
     return coin.GetTxOut();
 }
@@ -286,10 +332,12 @@ Amount CCoinsViewCache::GetValueIn(const CTransaction &tx) const {
     }
 
     Amount nResult(0);
-    for (size_t i = 0; i < tx.vin.size(); i++) {
-        nResult += GetOutputFor(tx.vin[i]).nValue;
+    {
+        std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+        for (const auto& input: tx.vin) {
+            nResult += GetOutputForNL(input).nValue;
+        }
     }
-
     return nResult;
 }
 
@@ -297,13 +345,14 @@ bool CCoinsViewCache::HaveInputs(const CTransaction &tx) const {
     if (tx.IsCoinBase()) {
         return true;
     }
-
-    for (size_t i = 0; i < tx.vin.size(); i++) {
-        if (!HaveCoin(tx.vin[i].prevout)) {
-            return false;
+    {
+        std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+        for (const auto& input: tx.vin) {
+            if (!HaveCoinNL(input.prevout)) {
+                return false;
+            }
         }
     }
-
     return true;
 }
 
@@ -314,15 +363,18 @@ double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight,
         return 0.0;
     }
     double dResult = 0.0;
-    for (const CTxIn &txin : tx.vin) {
-        const Coin &coin = AccessCoin(txin.prevout);
-        if (coin.IsSpent()) {
-            continue;
-        }
-        if (int64_t(coin.GetHeight()) <= nHeight) {
-            dResult += double(coin.GetTxOut().nValue.GetSatoshis()) *
-                       (nHeight - coin.GetHeight());
-            inChainInputValue += coin.GetTxOut().nValue;
+    {
+        std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+        for (const CTxIn &txin : tx.vin) {
+            const Coin &coin = AccessCoinNL(txin.prevout);
+            if (coin.IsSpent()) {
+                continue;
+            }
+            if (int64_t(coin.GetHeight()) <= nHeight) {
+                dResult += double(coin.GetTxOut().nValue.GetSatoshis()) *
+                           (nHeight - coin.GetHeight());
+                inChainInputValue += coin.GetTxOut().nValue;
+            }
         }
     }
     return tx.ComputePriority(dResult);

@@ -16,6 +16,7 @@
 #include <cassert>
 #include <cstdint>
 #include <unordered_map>
+#include <mutex>
 
 /**
  * A UTXO entry.
@@ -180,7 +181,7 @@ public:
     bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const override;
     std::vector<uint256> GetHeadBlocks() const override;
-    void SetBackend(CCoinsView &viewIn);
+    virtual void SetBackend(CCoinsView &viewIn);
     bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;
     CCoinsViewCursor *Cursor() const override;
     size_t EstimateSize() const override;
@@ -210,6 +211,10 @@ public:
     uint256 GetBestBlock() const override;
     void SetBestBlock(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;
+    CCoinsViewCursor *Cursor() const override;
+    std::vector<uint256> GetHeadBlocks() const override;
+    void SetBackend(CCoinsView &viewIn) override;
+    size_t EstimateSize() const override;
 
     /**
      * Check if we have the given utxo already loaded in this cache.
@@ -284,13 +289,24 @@ public:
     const CTxOut &GetOutputFor(const CTxIn &input) const;
 
 private:
-    CCoinsMap::iterator FetchCoin(const COutPoint &outpoint) const;
+    // A non-locking version of AccessCoin
+    const Coin &AccessCoinNL(const COutPoint &output) const;
+    // A non-locking version of GetOutputFor
+    const CTxOut &GetOutputForNL(const CTxIn &input) const;
+    // A non-locking version of HaveCoin
+    bool HaveCoinNL(const COutPoint &outpoint) const;
+    // A non-locking fetch coin
+    CCoinsMap::iterator FetchCoinNL(const COutPoint &outpoint) const;
 
     /**
      * By making the copy constructor private, we prevent accidentally using it
      * when one intends to create a cache on top of a base cache.
      */
     CCoinsViewCache(const CCoinsViewCache &);
+
+private:
+    /* A mutex to support a thread safe access. */
+    mutable std::mutex mCoinsViewCacheMtx {};
 };
 
 //! Utility function to add all of a transaction's outputs to a cache.
