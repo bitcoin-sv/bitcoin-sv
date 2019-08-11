@@ -1901,7 +1901,7 @@ bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,
         // serror is set
         return false;
     }
-    if (flags & SCRIPT_VERIFY_P2SH) {
+    if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
         stackCopy = stack;
     }
     if (!EvalScript(stack, scriptPubKey, flags, checker, serror)) {
@@ -1916,7 +1916,11 @@ bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,
     }
 
     // Additional validation for spend-to-script-hash transactions:
-    if ((flags & SCRIPT_VERIFY_P2SH) && scriptPubKey.IsPayToScriptHash()) {
+    // But only if if the utxo is before genesis
+    if(  (flags & SCRIPT_VERIFY_P2SH) &&
+        !(flags & SCRIPT_UTXO_AFTER_GENESIS) &&
+        scriptPubKey.IsPayToScriptHash())
+    {
         // scriptSig must be literals-only or validation fails
         if (!scriptSig.IsPushOnly()) {
             return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
