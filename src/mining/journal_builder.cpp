@@ -10,6 +10,7 @@ using mining::CJournalBuilder;
 using mining::CJournalChangeSetPtr;
 using mining::CJournalPtr;
 using mining::JournalUpdateReason;
+using mining::CJournalChangeSet;
 
 // Fetch a new empty change set
 CJournalChangeSetPtr CJournalBuilder::getNewChangeSet(JournalUpdateReason updateReason)
