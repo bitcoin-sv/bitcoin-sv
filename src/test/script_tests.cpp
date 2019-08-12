@@ -1,6 +1,7 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
 // Copyright (c) 2019 Bitcoin Association
-// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+// Distributed under the Open BSV software license, see the accompanying file
+// LICENSE.
 
 #include "data/script_tests.json.h"
 
@@ -1024,6 +1025,17 @@ BOOST_AUTO_TEST_CASE(script_build) {
             .PushRedeem()
             .ScriptError(SCRIPT_ERR_SIG_PUSHONLY));
     tests.push_back(
+        TestBuilder(CScript() << OP_FALSE,
+                    "P2SH with OP_FALSE redeem script, passes because it is not evaluated after genesis",
+                    SCRIPT_VERIFY_P2SH | SCRIPT_UTXO_AFTER_GENESIS, true)
+            .PushRedeem());
+    tests.push_back(
+        TestBuilder(CScript() << OP_FALSE,
+                    "P2SH with OP_FALSE redeem script",
+                    SCRIPT_VERIFY_P2SH , true)
+            .PushRedeem()
+            .ScriptError(SCRIPT_ERR_EVAL_FALSE));
+    tests.push_back(
         TestBuilder(CScript() << OP_2 << ToByteVector(keys.pubkey1C)
                               << ToByteVector(keys.pubkey1C) << OP_2
                               << OP_CHECKMULTISIG,
@@ -1109,8 +1121,8 @@ BOOST_AUTO_TEST_CASE(script_build) {
         std::string str = JSONPrettyPrint(test.GetJSON());
 #ifndef UPDATE_JSON_TESTS
         if (tests_set.count(str) == 0) {
-            BOOST_CHECK_MESSAGE(
-                false, "Missing auto script_valid test: " + test.GetComment());
+            BOOST_CHECK_MESSAGE(false, "Missing auto script_valid test: " +
+                                           test.GetComment());
         }
 #endif
         strGen += str + ",\n";
@@ -1404,7 +1416,7 @@ BOOST_AUTO_TEST_CASE(script_CHECKMULTISIG23) {
                         ScriptErrorString(err));
 }
 
-BOOST_AUTO_TEST_CASE(script_combineSigs) {
+void TestCombineSigs(bool genesisEnabled, bool utxoAfterGenesis) {
     // Test the CombineSignatures function
     Amount amount(0);
     CBasicKeyStore keystore;
@@ -1435,26 +1447,27 @@ BOOST_AUTO_TEST_CASE(script_combineSigs) {
     SignatureData empty;
     SignatureData combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        empty, empty);
+        empty, empty, utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig.empty());
 
     // Single signature case:
-    SignSignature(keystore, CTransaction(txFrom), txTo, 0,
+    SignSignature(keystore, genesisEnabled, utxoAfterGenesis, CTransaction(txFrom), txTo, 0,
                   SigHashType()); // changes scriptSig
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(scriptSig), empty);
+        SignatureData(scriptSig), empty, utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == scriptSig);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        empty, SignatureData(scriptSig));
+        empty, SignatureData(scriptSig), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == scriptSig);
     CScript scriptSigCopy = scriptSig;
     // Signing again will give a different, valid signature:
-    SignSignature(keystore, CTransaction(txFrom), txTo, 0, SigHashType());
+    SignSignature(keystore, genesisEnabled, utxoAfterGenesis, CTransaction(txFrom), txTo, 0,
+                  SigHashType());
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(scriptSigCopy), SignatureData(scriptSig));
+        SignatureData(scriptSigCopy), SignatureData(scriptSig), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == scriptSigCopy ||
                 combined.scriptSig == scriptSig);
 
@@ -1463,46 +1476,61 @@ BOOST_AUTO_TEST_CASE(script_combineSigs) {
     pkSingle << ToByteVector(keys[0].GetPubKey()) << OP_CHECKSIG;
     keystore.AddCScript(pkSingle);
     scriptPubKey = GetScriptForDestination(CScriptID(pkSingle));
-    SignSignature(keystore, CTransaction(txFrom), txTo, 0, SigHashType());
+    SignSignature(keystore, genesisEnabled, utxoAfterGenesis, CTransaction(txFrom), txTo, 0,
+                  SigHashType());
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(scriptSig), empty);
+        SignatureData(scriptSig), empty, utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == scriptSig);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        empty, SignatureData(scriptSig));
+        empty, SignatureData(scriptSig), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == scriptSig);
     scriptSigCopy = scriptSig;
-    SignSignature(keystore, CTransaction(txFrom), txTo, 0, SigHashType());
+    SignSignature(keystore, genesisEnabled, utxoAfterGenesis, CTransaction(txFrom), txTo, 0,
+                  SigHashType());
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(scriptSigCopy), SignatureData(scriptSig));
+        SignatureData(scriptSigCopy), SignatureData(scriptSig), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == scriptSigCopy ||
                 combined.scriptSig == scriptSig);
     // dummy scriptSigCopy with placeholder, should always choose
     // non-placeholder:
-    scriptSigCopy = CScript() << OP_0 << std::vector<uint8_t>(pkSingle.begin(),
-                                                              pkSingle.end());
+    scriptSigCopy = CScript()
+                    << OP_0
+                    << std::vector<uint8_t>(pkSingle.begin(), pkSingle.end());
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(scriptSigCopy), SignatureData(scriptSig));
-    BOOST_CHECK(combined.scriptSig == scriptSig);
+        SignatureData(scriptSigCopy), SignatureData(scriptSig), utxoAfterGenesis);
+    if (utxoAfterGenesis) {
+        // after genesis scriptPubKey will be nonstandard, CombineSignature will choose bigger or first SignatureData if they are equal
+        BOOST_CHECK(combined.scriptSig == scriptSigCopy);
+    } else {
+        // 
+        BOOST_CHECK(combined.scriptSig == scriptSig);
+    }
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(scriptSig), SignatureData(scriptSigCopy));
-    BOOST_CHECK(combined.scriptSig == scriptSig);
+        SignatureData(scriptSig), SignatureData(scriptSigCopy), utxoAfterGenesis);
+    if (utxoAfterGenesis) {
+        // after genesis scriptPubKey will be nonstandard, CombineSignature will choose bigger or first SignatureData if they are equal
+        BOOST_CHECK(combined.scriptSig == scriptSigCopy);
+    } else {
+        BOOST_CHECK(combined.scriptSig == scriptSig);
+    }
 
     // Hardest case:  Multisig 2-of-3
     scriptPubKey = GetScriptForMultisig(2, pubkeys);
     keystore.AddCScript(scriptPubKey);
-    SignSignature(keystore, CTransaction(txFrom), txTo, 0, SigHashType());
+    SignSignature(keystore, genesisEnabled, utxoAfterGenesis, CTransaction(txFrom), txTo, 0,
+                  SigHashType());
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(scriptSig), empty);
+        SignatureData(scriptSig), empty, utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == scriptSig);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        empty, SignatureData(scriptSig));
+        empty, SignatureData(scriptSig), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == scriptSig);
 
     // A couple of partially-signed versions:
@@ -1538,36 +1566,42 @@ BOOST_AUTO_TEST_CASE(script_combineSigs) {
 
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(partial1a), SignatureData(partial1b));
+        SignatureData(partial1a), SignatureData(partial1b), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == partial1a);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(partial1a), SignatureData(partial2a));
+        SignatureData(partial1a), SignatureData(partial2a), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == complete12);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(partial2a), SignatureData(partial1a));
+        SignatureData(partial2a), SignatureData(partial1a), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == complete12);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(partial1b), SignatureData(partial2b));
+        SignatureData(partial1b), SignatureData(partial2b), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == complete12);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(partial3b), SignatureData(partial1b));
+        SignatureData(partial3b), SignatureData(partial1b), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == complete13);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(partial2a), SignatureData(partial3a));
+        SignatureData(partial2a), SignatureData(partial3a), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == complete23);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(partial3b), SignatureData(partial2b));
+        SignatureData(partial3b), SignatureData(partial2b), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == complete23);
     combined = CombineSignatures(
         scriptPubKey, MutableTransactionSignatureChecker(&txTo, 0, amount),
-        SignatureData(partial3b), SignatureData(partial3a));
+        SignatureData(partial3b), SignatureData(partial3a), utxoAfterGenesis);
     BOOST_CHECK(combined.scriptSig == partial3c);
+}
+
+BOOST_AUTO_TEST_CASE(script_combineSigs) {
+    TestCombineSigs(true, true);
+    TestCombineSigs(true, false);
+    TestCombineSigs(false, false);
 }
 
 BOOST_AUTO_TEST_CASE(script_standard_push) {
@@ -1863,19 +1897,21 @@ BOOST_AUTO_TEST_CASE(script_IsUnspendable) {
     BOOST_CHECK((CScript() << OP_FALSE << OP_RETURN).IsUnspendable(true));
 }
 
-void CheckSolverNoData(const CScript scriptPubKey,  txnouttype expectedOutType, bool expectedResult)
-{
+void CheckSolverNoData(const CScript scriptPubKey, bool isGenesisEnabled,
+                       txnouttype expectedOutType, bool expectedResult) {
     std::vector<std::vector<uint8_t>> solutions;
     txnouttype outType;
-    BOOST_CHECK(SolverNoData(scriptPubKey, outType, solutions) == expectedResult);
+    BOOST_CHECK(SolverNoData(scriptPubKey, isGenesisEnabled, outType,
+                             solutions) == expectedResult);
     BOOST_CHECK(outType == expectedOutType);
 }
 
-void CheckSolverWithData(const CScript scriptPubKey, bool isGenesisEnabled, txnouttype expectedOutType, bool expectedResult)
-{
+void CheckSolverWithData(const CScript scriptPubKey, bool isGenesisEnabled,
+                         txnouttype expectedOutType, bool expectedResult) {
     std::vector<std::vector<uint8_t>> solutions;
     txnouttype outType;
-    BOOST_CHECK(SolverWithData(scriptPubKey, isGenesisEnabled, outType, solutions) == expectedResult);
+    BOOST_CHECK(SolverWithData(scriptPubKey, isGenesisEnabled, outType,
+                               solutions) == expectedResult);
     BOOST_CHECK(outType == expectedOutType);
 }
 
@@ -1886,28 +1922,40 @@ BOOST_AUTO_TEST_CASE(script_Solver) {
     std::vector<uint8_t> hash160(20, 2);
     std::vector<uint8_t> data(100, 3);
 
-    CScript nonStandard= CScript() << OP_1;
+    CScript nonStandard = CScript() << OP_1;
     CScript P2PK = CScript() << pubKey << OP_CHECKSIG;
-    CScript P2PKH = CScript() << OP_DUP << OP_HASH160 << hash160 << OP_EQUALVERIFY << OP_CHECKSIG;
+    CScript P2PKH = CScript() << OP_DUP << OP_HASH160 << hash160
+                              << OP_EQUALVERIFY << OP_CHECKSIG;
     CScript P2SH = CScript() << OP_HASH160 << hash160 << OP_EQUAL;
     CScript opReturn = CScript() << OP_RETURN << data;
-    CScript opFalseOpReturn = CScript()<< OP_FALSE << OP_RETURN << data;
-    CScript multisig = CScript() << OP_2 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
+    CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN << data;
+    CScript multisig = CScript()
+                       << OP_2 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
 
-    // Test CheckSolverNoData
-    CheckSolverNoData(nonStandard, TX_NONSTANDARD, false);
-    CheckSolverNoData(P2PK, TX_PUBKEY, true);
-    CheckSolverNoData(P2PKH, TX_PUBKEYHASH, true);
-    CheckSolverNoData(P2SH, TX_SCRIPTHASH, true);
-    CheckSolverNoData(multisig, TX_MULTISIG, true);
+    // Test CheckSolverNoData before genesis
+    CheckSolverNoData(nonStandard, false, TX_NONSTANDARD, false);
+    CheckSolverNoData(P2PK, false, TX_PUBKEY, true);
+    CheckSolverNoData(P2PKH, false, TX_PUBKEYHASH, true);
+    CheckSolverNoData(P2SH, false, TX_SCRIPTHASH, true);
+    CheckSolverNoData(multisig, false, TX_MULTISIG, true);
 
     //// TX_NULL_DATA is not recognized with SolverNoData version of function
-    CheckSolverNoData(opReturn, TX_NONSTANDARD, false);
-    CheckSolverNoData(opFalseOpReturn, TX_NONSTANDARD, false);
+    CheckSolverNoData(opReturn, false, TX_NONSTANDARD, false);
+    CheckSolverNoData(opFalseOpReturn, false, TX_NONSTANDARD, false);
 
+    // Test CheckSolverNoData after genesis
+    CheckSolverNoData(nonStandard, true, TX_NONSTANDARD, false);
+    CheckSolverNoData(P2PK, true, TX_PUBKEY, true);
+    CheckSolverNoData(P2PKH, true, TX_PUBKEYHASH, true);
+    CheckSolverNoData(P2SH, true, TX_NONSTANDARD, false);
+    CheckSolverNoData(multisig, true, TX_MULTISIG, true);
 
-    // Test CheckSolverWithData - isGenesisEnabled should have no effect  on the result
-    // Test for IsGenesis = false:
+    //// TX_NULL_DATA is not recognized with SolverNoData version of function
+    CheckSolverNoData(opReturn, true, TX_NONSTANDARD, false);
+    CheckSolverNoData(opFalseOpReturn, true, TX_NONSTANDARD, false);
+
+    // Test CheckSolverWithData - isGenesisEnabled should have no effect  on the
+    // result Test for IsGenesis = false:
     CheckSolverWithData(nonStandard, false, TX_NONSTANDARD, false);
     CheckSolverWithData(P2PK, false, TX_PUBKEY, true);
     CheckSolverWithData(P2PKH, false, TX_PUBKEYHASH, true);
@@ -1918,17 +1966,19 @@ BOOST_AUTO_TEST_CASE(script_Solver) {
     CheckSolverWithData(nonStandard, true, TX_NONSTANDARD, false);
     CheckSolverWithData(P2PK, true, TX_PUBKEY, true);
     CheckSolverWithData(P2PKH, true, TX_PUBKEYHASH, true);
-    CheckSolverWithData(P2SH, true, TX_SCRIPTHASH, true);
+    CheckSolverWithData(P2SH, true, TX_NONSTANDARD, false);
     CheckSolverWithData(multisig, true, TX_MULTISIG, true);
 
-    // Test CheckSolverWithData - before Genesis both "OP_RETURN" and "OP_FALSE OP_RETURN" is recognized as data
+    // Test CheckSolverWithData - before Genesis both "OP_RETURN" and "OP_FALSE
+    // Test CheckSolver - before Genesis both "OP_RETURN" and "OP_FALSE
+    // OP_RETURN" is recognized as data
     CheckSolverWithData(opReturn, false, TX_NULL_DATA, true);
     CheckSolverWithData(opFalseOpReturn, false, TX_NULL_DATA, true);
 
-    // Test CheckSolverWithData - after Genesis only "OP_FALSE OP_RETURN" is recognized as data
+    // Test CheckSolverWithData - after Genesis only "OP_FALSE OP_RETURN" is
+    // recognized as data
     CheckSolverWithData(opReturn, true, TX_NONSTANDARD, false);
     CheckSolverWithData(opFalseOpReturn, true, TX_NULL_DATA, true);
-
 }
 
 BOOST_AUTO_TEST_CASE(txout_IsDust) {
@@ -1938,8 +1988,8 @@ BOOST_AUTO_TEST_CASE(txout_IsDust) {
     CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN << data;
 
     CScript opReturn = CScript() << OP_RETURN << data;
-    
-    BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, false)); 
+
+    BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, false));
     BOOST_CHECK(!CTxOut(Amount(10), opReturn).IsDust(feerate, false));
 
     BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, true));
