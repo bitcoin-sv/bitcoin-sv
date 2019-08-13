@@ -9,6 +9,7 @@
 using mining::CJournalEntry;
 using mining::CJournalChangeSet;
 using mining::JournalUpdateReason;
+using mining::CJournalBuilder;
 
 // Enable enum_cast for JournalUpdateReason, so we can log informatively
 const enumTableT<JournalUpdateReason>& mining::enumTable(JournalUpdateReason)

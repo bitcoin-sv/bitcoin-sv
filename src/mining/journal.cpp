@@ -7,6 +7,7 @@
 using mining::CJournal;
 using mining::CJournalTester;
 using mining::CJournalChangeSet;
+using mining::CJournalEntry;
 
 // Copy constructor, only required by journal builder
 CJournal::CJournal(const CJournal& that)
