@@ -34,6 +34,7 @@ BITCOIN_TESTS =\
   test/base58_tests.cpp \
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
+  test/big_int_tests.cpp \
   test/blockcheck_tests.cpp \
   test/blockencodings_tests.cpp \
   test/blockmaxsize_tests.cpp \
@@ -54,6 +55,7 @@ BITCOIN_TESTS =\
   test/excessiveblock_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
+  test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
   test/journal_tests.cpp \
   test/jsonutil.cpp \
