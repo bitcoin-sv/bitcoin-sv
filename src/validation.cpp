@@ -594,6 +594,10 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
 }
 
 bool IsGenesisEnabled(const Config &config, int nHeight) {
+    if (nHeight == MEMPOOL_HEIGHT) {
+        throw std::runtime_error("Checking if genesis is enabled with height == MEMPOOL_HEIGHT.");
+    }
+
     return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
 }
 
@@ -2264,6 +2268,15 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 }
 } // namespace Consensus
 
+static int GetInputScriptBlockHeight(int coinHeight) {
+    if (coinHeight == MEMPOOL_HEIGHT) {
+        // When spending an output that was created in mempool, we assume that it will be mined in the next block.
+        return chainActive.Height() + 1;
+    }
+
+    return coinHeight;
+}
+
 bool CheckInputs(const Config& config,
                  const CTransaction &tx, CValidationState &state,
                  const CCoinsViewCache &inputs, bool fScriptChecks,
@@ -2316,9 +2329,8 @@ bool CheckInputs(const Config& config,
         const CScript &scriptPubKey = coin.GetTxOut().scriptPubKey;
         const Amount amount = coin.GetTxOut().nValue;
 
-        int inputScriptBlockHeight = coin.GetHeight();
-        
         uint32_t perInputScriptFlags = 0;
+        int inputScriptBlockHeight = GetInputScriptBlockHeight(coin.GetHeight());
         
         if (IsGenesisEnabled(config, inputScriptBlockHeight)) 
         {
