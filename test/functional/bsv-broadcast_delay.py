@@ -4,7 +4,6 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
 from test_framework.mininode import *
 from test_framework.script import CScript, OP_TRUE
 from test_framework.blocktools import create_block, create_coinbase
@@ -73,13 +72,14 @@ class BroadcastDelayTest(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
-        
+        self.num_peers = 3
+
+    def setup_nodes(self):
+        self.add_nodes(self.num_nodes)
+
     def setup_network(self):
         self.add_nodes(self.num_nodes)
-        # txnpropagationfreq is set to 1ms to limit its effect on propagation test. 
-        # Default value 1s is not suitable for this test, since it is much larger than 150ms.
-        self.start_node(0, ['-broadcastdelay=0', '-txnpropagationfreq=1'])
-
+        self.start_node(0)
 
     # submits requested number of transactions from txs and returns timings
     def syncNodesWithTransaction(self, num_transactions, txs, connection1, connection2): 
@@ -89,10 +89,10 @@ class BroadcastDelayTest(BitcoinTestFramework):
             begin_test = datetime.datetime.now()
 
             # node1 sends transaction to bitcoind
-            connection1.send_message(msg_tx(tx))
+            connection1.cb.send_message(msg_tx(tx))
             # assert that node2 gets INV with previously sent transaction
             msg = [CInv(1, tx.sha256)]
-            connection2.wait_for_inv(msg)
+            connection2.cb.wait_for_inv(msg)
 
             end_test = datetime.datetime.now()
             elapsed_test = end_test - begin_test
@@ -102,89 +102,45 @@ class BroadcastDelayTest(BitcoinTestFramework):
         return sum(times[1:], datetime.timedelta(0)) / len(times[1:])
 
     def run_test(self):
-
         @contextlib.contextmanager
-        def run_connection(connection1, connection2, title):
-            logger.debug("setup %s", title)
-
+        def run_pinging_connection(connection):
             # Connection3 is used here only for constantly pinging bitcoind node. 
             # It is needed so that bitcoind is awake all the time (without 100ms sleeps).
-            connection3 = NodeConnCB()
-
-            connections = []
-            connections.extend([NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], connection1),
-                            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], connection2),
-                            NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], connection3)])
-
-            connection1.add_connection(connections[0])
-            connection2.add_connection(connections[1])
-            connection3.add_connection(connections[2])
-
-            thr = NetworkThread()
-            thr.start()
-
-            connection1.wait_for_verack()
-            connection2.wait_for_verack()
-            connection3.wait_for_verack()
-
-            syncThr = NetworkThreadPinging(connection3)
+            syncThr = NetworkThreadPinging(connection)
             syncThr.start()
-
-            logger.debug("before %s", title)
-            yield
-            logger.debug("after %s", title)
-  
+            yield       
             syncThr.stop()
             syncThr.join()
 
-            connections[0].close()
-            connections[1].close()
-            connections[2].close()
-            del connections
-            thr.join()
-
-            disconnect_nodes(self.nodes[0],1)
-            self.stop_node(0)
-
-            logger.debug("finished %s", title)
-
+        # Make some transactions to work with.
         txs =  self.make_transactions(50)
+        self.stop_node(0)
 
         # 1. Send 15 transactions with broadcast delay of 0 seconds to calculate average overhead.
-        connection1 = NodeConnCB()
-        connection2 = NodeConnCB()
-        
-        with run_connection(connection1, connection2, "calculating overhead"):
-            average_overhead = self.syncNodesWithTransaction(15, txs, connection1, connection2)
-            self.log.info("Average overhead: %s", average_overhead)
-  
-
+        ### txnpropagationfreq is set to 1ms to limit its effect on propagation test. 
+        ### Default value 1s is not suitable for this test, since it is much larger than 150ms.
+        with self.run_node_with_connections("calculating overhead", 0, ['-broadcastdelay=0', '-txnpropagationfreq=1'], self.num_peers) as connections:
+            with run_pinging_connection(connections[2]):
+                average_overhead = self.syncNodesWithTransaction(15, txs, connections[0], connections[1])
+                self.log.info("Average overhead: %s", average_overhead)
+     
         # 2. Send 15 transactions with default broadcast delay (150ms) and calculate average broadcast delay
-        self.start_node(0, ['-txnpropagationfreq=1'])
-
-        connection1 = NodeConnCB()
-        connection2 = NodeConnCB()
-
-        with run_connection(connection1, connection2, "calculating propagation delay (default)"):
-            average_roundtrip = self.syncNodesWithTransaction(15, txs, connection1, connection2)
-            propagation_delay = average_roundtrip - average_overhead
-            self.log.info("Propagation delay, expected 150ms: %s", propagation_delay)
-            assert(propagation_delay < datetime.timedelta(milliseconds=300))
-            assert(propagation_delay > datetime.timedelta(milliseconds=30))
-
+        with self.run_node_with_connections("calculating propagation delay (default)", 0, ['-txnpropagationfreq=1'], self.num_peers) as connections:
+            with run_pinging_connection(connections[2]):
+                average_roundtrip = self.syncNodesWithTransaction(15, txs, connections[0], connections[1])
+                propagation_delay = average_roundtrip - average_overhead
+                self.log.info("Propagation delay, expected 150ms: %s", propagation_delay)
+                assert(propagation_delay < datetime.timedelta(milliseconds=300))
+                assert(propagation_delay > datetime.timedelta(milliseconds=30))
 
         # 3. Send 15 transactions with broadcast delay 1s
-        self.start_node(0, ['-broadcastdelay=1000'])
-
-        connection1 = NodeConnCB()
-        connection2 = NodeConnCB()
-
-        with run_connection(connection1, connection2, "calculating propagation delay (1000ms)"):
-            average_roundtrip_1s_delay = self.syncNodesWithTransaction(15, txs, connection1, connection2)
-            propagation_delay = average_roundtrip_1s_delay - average_overhead
-            self.log.info("Propagation delay, expected 1000ms: %s", propagation_delay)
-            assert(propagation_delay < datetime.timedelta(milliseconds=1500))
-            assert(propagation_delay > datetime.timedelta(milliseconds=500))
+        with self.run_node_with_connections("calculating propagation delay (1000ms)", 0, ['-broadcastdelay=1000'], self.num_peers) as connections:
+            with run_pinging_connection(connections[2]):
+                average_roundtrip_1s_delay = self.syncNodesWithTransaction(15, txs, connections[0], connections[1])
+                propagation_delay = average_roundtrip_1s_delay - average_overhead
+                self.log.info("Propagation delay, expected 1000ms: %s", propagation_delay)
+                assert(propagation_delay < datetime.timedelta(milliseconds=1500))
+                assert(propagation_delay > datetime.timedelta(milliseconds=500))
 
  
 if __name__ == '__main__':
