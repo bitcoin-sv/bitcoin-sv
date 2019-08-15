@@ -93,6 +93,6 @@ class CJournalChangeSet final
 
 };
 
-using CJournalChangeSetPtr = std::shared_ptr<CJournalChangeSet>;
+using CJournalChangeSetPtr = std::unique_ptr<CJournalChangeSet>;
 
 }

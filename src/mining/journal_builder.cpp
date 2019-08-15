@@ -15,7 +15,7 @@ using mining::CJournalChangeSet;
 // Fetch a new empty change set
 CJournalChangeSetPtr CJournalBuilder::getNewChangeSet(JournalUpdateReason updateReason)
 {
-    return std::make_shared<CJournalChangeSet>(*this, updateReason);
+    return std::make_unique<CJournalChangeSet>(*this, updateReason);
 }
 
 // Get our current journal

@@ -36,7 +36,7 @@ namespace mining
     class CJournalBuilder;
     class CJournalChangeSet;
     using CJournalBuilderPtr = std::unique_ptr<CJournalBuilder>;
-    using CJournalChangeSetPtr = std::shared_ptr<CJournalChangeSet>;
+    using CJournalChangeSetPtr = std::unique_ptr<CJournalChangeSet>;
 }
 
 inline double AllowFreeThreshold() {

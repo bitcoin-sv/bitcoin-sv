@@ -14,7 +14,7 @@ class CJournal;
 class CJournalChangeSet;
 enum class JournalUpdateReason;
 using CJournalPtr = std::shared_ptr<CJournal>;
-using CJournalChangeSetPtr = std::shared_ptr<CJournalChangeSet>;
+using CJournalChangeSetPtr = std::unique_ptr<CJournalChangeSet>;
 
 /**
 * A class to handle building & updating mining journals.
