@@ -31,6 +31,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 #include "validation.h"
+#include "protocol.h"
 #include "validationinterface.h"
 
 #include <boost/optional.hpp>
@@ -318,6 +319,14 @@ void PushNodeVersion(const Config &config, const CNodePtr& pnode, CConnman &conn
             PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), nodeid);
     }
 }
+
+void PushProtoconf(const CNodePtr& pnode, CConnman &connman) {
+    connman.PushMessage(
+            pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::PROTOCONF, CProtoconf(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH)));
+
+    LogPrint(BCLog::NET, "send protoconf message: max size %d, number of fields =%d, ", MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, 1);
+}
+
 
 void InitializeNode(const Config &config, const CNodePtr& pnode, CConnman &connman) {
     CAddress addr = pnode->addr;
@@ -1609,6 +1618,9 @@ static bool ProcessVersionMessage(const Config& config, const CNodePtr& pfrom, c
 
     connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::VERACK));
 
+    // Announce our protocol configuration immediately after we send VERACK.
+    PushProtoconf(pfrom, connman);
+
     pfrom->nServices = nServices;
     pfrom->SetAddrLocal(addrMe);
     {
@@ -1900,11 +1912,6 @@ static OptBool ProcessInvMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
-    if(vInv.size() > MAX_INV_SZ) {
-        Misbehaving(pfrom, 20, "oversized-inv");
-        return error("message inv size() = %u", vInv.size());
-    }
-
     bool fBlocksOnly = !fRelayTxes;
 
     // Allow whitelisted peers to send data other than blocks in blocks only
@@ -1980,10 +1987,6 @@ static OptBool ProcessGetDataMessage(const Config& config, const CNodePtr& pfrom
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
-    if(vInv.size() > MAX_INV_SZ) {
-        Misbehaving(pfrom, 20, "too-many-inv");
-        return error("message getdata size() = %u", vInv.size());
-    }
 
     LogPrint(BCLog::NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
 
@@ -3226,6 +3229,51 @@ static void ProcessFeeFilterMessage(const CNodePtr& pfrom, CDataStream& vRecv)
                  CFeeRate(newFeeFilter).ToString(), pfrom->id);
     }
 }
+
+/**
+* Process protoconf message.
+*/
+static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, const std::string& strCommand)
+{
+    if (pfrom->protoconfReceived) {
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    pfrom->protoconfReceived = true;
+
+    CProtoconf protoconf;
+
+    try {
+        vRecv >> protoconf; // exception happens if received protoconf cannot be deserialized or if number of fields is zero      
+    } catch (const std::ios_base::failure &e) {
+        LogPrint(BCLog::NET, "Invalid protoconf received \"%s\" from peer=%d, exception = %s\n",
+            SanitizeString(strCommand), pfrom->id, e.what());
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    // Parse known fields:
+    if (protoconf.numberOfFields >= 1) {
+        // if peer sends maxRecvPayloadLength less than LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, it is considered protocol violation
+        if (protoconf.maxRecvPayloadLength < LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH) {
+            LogPrint(BCLog::NET, "Invalid protoconf received \"%s\" from peer=%d, peer's proposed maximal message size is too low (%d).\n",
+            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength);
+            pfrom->fDisconnect = true;
+            return false;
+        }
+
+        // Limit the amount of data we are willing to send to MAX_PROTOCOL_SEND_PAYLOAD_LENGTH if a peer (or an attacker)
+        // that is running a newer version sends us large size, that we are not prepared to handle. 
+        pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, protoconf.maxRecvPayloadLength));
+
+        LogPrint(BCLog::NET, "Protoconf received \"%s\" from peer=%d; peer's proposed max message size: %d," 
+            "absolute maximal allowed message size: %d, calculated maximal number of Inv elements in a message = %d\n",
+            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, pfrom->maxInvElements);
+    }
+
+    return true;
+}
  
 /**
 * Process next message.
@@ -3403,6 +3451,10 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
         ProcessFeeFilterMessage(pfrom, vRecv);
     }
 
+    else if (strCommand == NetMsgType::PROTOCONF) {
+        return ProcessProtoconfMessage(pfrom, vRecv, strCommand);
+    }
+
     else if (strCommand == NetMsgType::NOTFOUND) {
         // We do not care about the NOTFOUND message, but logging an Unknown
         // Command message would be undesirable as we transmit it ourselves.
@@ -3528,7 +3580,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     std::string strCommand = hdr.GetCommand();
 
     // Message size
-    unsigned int nMessageSize = hdr.nMessageSize;
+    unsigned int nPayloadLength = hdr.nPayloadLength;
 
     // Checksum
     CDataStream &vRecv = msg.vRecv;
@@ -3536,7 +3588,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) !=0) {
         LogPrint(BCLog::NET,
             "%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
-            SanitizeString(strCommand), nMessageSize,
+            SanitizeString(strCommand), nPayloadLength,
             HexStr(hash.begin(), hash.begin() + CMessageHeader::CHECKSUM_SIZE),
             HexStr(hdr.pchChecksum,
                    hdr.pchChecksum + CMessageHeader::CHECKSUM_SIZE));
@@ -3590,16 +3642,16 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             LogPrint(BCLog::NET,
                 "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
                 "message being shorter than its stated length\n",
-                __func__, SanitizeString(strCommand), nMessageSize, e.what());
+                __func__, SanitizeString(strCommand), nPayloadLength, e.what());
         } else if (strstr(e.what(), "size too large")) {
             // Allow exceptions from over-long size
             LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
-                      SanitizeString(strCommand), nMessageSize, e.what());
+                      SanitizeString(strCommand), nPayloadLength, e.what());
             Misbehaving(pfrom, 1, "Over-long size message protection");
         } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
             // Allow exceptions from non-canonical encoding
             LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
-                      SanitizeString(strCommand), nMessageSize, e.what());
+                      SanitizeString(strCommand), nPayloadLength, e.what());
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
         }
@@ -3611,7 +3663,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
 
     if (!fRet) {
         LogPrint(BCLog::NET, "%s(%s, %u bytes) FAILED peer=%d\n", __func__,
-                  SanitizeString(strCommand), nMessageSize, pfrom->id);
+                  SanitizeString(strCommand), nPayloadLength, pfrom->id);
     }
 
     LOCK(cs_main);
@@ -3936,8 +3988,9 @@ void SendTxnInventory(const Config &config, const CNodePtr& pto, CConnman &connm
     for(const CTxnSendingDetails& txn : vInvTx)
     {
         vInv.emplace_back(txn.getInv());
-        if(vInv.size() == MAX_INV_SZ)
-        {
+        // if next element will cause too large message, then we send it now, as message size is still under limit
+        // vInv size is actually limited before -- with INVENTORY_BROADCAST_MAX_PER_MB
+        if (vInv.size() == pto->maxInvElements) {
             connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
             vInv.clear();
         }
@@ -3971,7 +4024,9 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
     // Add blocks
     for (const uint256 &hash : pto->vInventoryBlockToSend) {
         vInv.push_back(CInv(MSG_BLOCK, hash));
-        if (vInv.size() == MAX_INV_SZ) {
+        // if next element will cause too large message, then we send it now, as message size is still under limit
+        // vInv size is actually limited before -- with INVENTORY_BROADCAST_MAX_PER_MB
+        if (vInv.size() == pto->maxInvElements) {
             connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
             vInv.clear();
         }
@@ -4021,7 +4076,8 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
             }
             pto->filterInventoryKnown.insert(txid);
             vInv.push_back(inv);
-            if (vInv.size() == MAX_INV_SZ) {
+            // if next element will cause too large message, then we send it now, as message size is still under limit
+            if (vInv.size() == pto->maxInvElements) {
                 connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
                 vInv.clear();
             }
@@ -4135,7 +4191,8 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
             LogPrint(BCLog::NET, "Requesting %s peer=%d\n", inv.ToString(),
                      pto->id);
             vGetData.push_back(inv);
-            if (vGetData.size() >= 1000) {
+            // if next element will cause too large message, then we send it now, as message size is still under limit
+            if (vGetData.size() == pto->maxInvElements) {
                 connman.PushMessage(
                     pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
                 vGetData.clear();

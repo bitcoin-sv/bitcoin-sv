@@ -62,8 +62,6 @@ static const int PING_INTERVAL = 2 * 60;
 static const int TIMEOUT_INTERVAL = 20 * 60;
 /** Run the feeler connection loop once every 2 minutes or 120 seconds. **/
 static const int FEELER_INTERVAL = 120;
-/** The maximum number of entries in an 'inv' protocol message */
-static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
 /** Maximum length of strSubVer in `version` message */
@@ -80,10 +78,6 @@ static const bool DEFAULT_UPNP = USE_UPNP;
 #else
 static const bool DEFAULT_UPNP = false;
 #endif
-/** The maximum number of entries in mapAskFor */
-static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
-/** The maximum number of entries in setAskFor (larger due to getdata latency)*/
-static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** The default for -maxuploadtarget. 0 = Unlimited */
@@ -580,7 +574,7 @@ public:
             return false;
         }
 
-        return (hdr.nMessageSize == nDataPos);
+        return (hdr.nPayloadLength == nDataPos);
     }
 
     const uint256 &GetMessageHash() const;
@@ -757,6 +751,11 @@ public:
     CCriticalSection cs_feeFilter {};
     Amount lastSentFeeFilter {0};
     int64_t nextSendTimeFeeFilter {0};
+
+    /** Maximum number of CInv elements this peers is willing to accept */
+    uint32_t maxInvElements {CInv::estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)};
+    /** protoconfReceived is false by default and set to true when protoconf is received from peer **/
+    bool protoconfReceived {false};
 
     CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn,
           SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn,

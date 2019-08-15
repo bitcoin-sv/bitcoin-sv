@@ -147,6 +147,7 @@ enum {
 };
 
 #define READWRITE(obj) (::SerReadWrite(s, (obj), ser_action))
+#define READWRITECOMPACTSIZE(obj) (::SerReadWriteCompactSize(s, (obj), ser_action))
 #define READWRITEMANY(...) (::SerReadWriteMany(s, ser_action, __VA_ARGS__))
 
 /**
@@ -848,6 +849,21 @@ inline void SerReadWrite(Stream &s, const T &obj,
 template <typename Stream, typename T>
 inline void SerReadWrite(Stream &s, T &obj, CSerActionUnserialize ser_action) {
     ::Unserialize(s, obj);
+}
+
+/**
+ * Support for READWRITECOMPACTSIZE macro
+ */
+
+template <typename Stream>
+inline void SerReadWriteCompactSize(Stream &s, const uint64_t &obj,
+                         CSerActionSerialize ser_action) {
+    ::WriteCompactSize(s, obj);
+}
+
+template <typename Stream>
+inline void SerReadWriteCompactSize(Stream &s, uint64_t &obj, CSerActionUnserialize ser_action) {
+    obj = ::ReadCompactSize(s);
 }
 
 /**

@@ -79,7 +79,13 @@ std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfLimited[NET_MAX] = {};
 std::atomic_size_t CSendQueueBytes::nTotalSendQueuesBytes = 0;
 
-limitedmap<uint256, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
+limitedmap<uint256, int64_t> mapAlreadyAskedFor(CInv::estimateMaxInvElements(MAX_PROTOCOL_SEND_PAYLOAD_LENGTH));
+
+/** The maximum number of entries in mapAskFor */
+static const size_t MAPASKFOR_MAX_SIZE = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
+/** The maximum number of entries in setAskFor (larger due to getdata latency)*/
+static const size_t SETASKFOR_MAX_SIZE = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * 2);
+
 
 // Signals for message handling
 static CNodeSignals g_signals;
@@ -847,7 +853,7 @@ CNode::RECV_STATUS CNode::ReceiveMsgBytes(const Config &config, const char *pch,
             }
 
             assert(i != mapRecvBytesPerMsgCmd.end());
-            i->second += msg.hdr.nMessageSize + CMessageHeader::HEADER_SIZE;
+            i->second += msg.hdr.nPayloadLength + CMessageHeader::HEADER_SIZE;
 
             msg.nTime = nTimeMicros;
             complete = true;
@@ -918,13 +924,13 @@ int CNetMessage::readHeader(const Config &config, const char *pch,
 }
 
 int CNetMessage::readData(const char *pch, uint32_t nBytes) {
-    unsigned int nRemaining = hdr.nMessageSize - nDataPos;
+    unsigned int nRemaining = hdr.nPayloadLength - nDataPos;
     unsigned int nCopy = std::min(nRemaining, nBytes);
 
     if (vRecv.size() < nDataPos + nCopy) {
         // Allocate up to 256 KiB ahead, but never more than the total message
         // size.
-        vRecv.resize(std::min(hdr.nMessageSize, nDataPos + nCopy + 256 * 1024));
+        vRecv.resize(std::min(hdr.nPayloadLength, nDataPos + nCopy + 256 * 1024));
     }
 
     hasher.Write((const uint8_t *)pch, nCopy);
@@ -2928,8 +2934,9 @@ CNode::~CNode() {
 }
 
 void CNode::AskFor(const CInv &inv) {
-    if (mapAskFor.size() > MAPASKFOR_MAX_SZ ||
-        setAskFor.size() > SETASKFOR_MAX_SZ) {
+    // if mapAskFor is too large, we will never ask for it (it becomes lost)
+    if (mapAskFor.size() > MAPASKFOR_MAX_SIZE ||
+        setAskFor.size() > SETASKFOR_MAX_SIZE) {
         return;
     }
 
@@ -2975,16 +2982,16 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
 }
 
 void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
-    size_t nMessageSize = msg.data.size();
-    size_t nTotalSize = nMessageSize + CMessageHeader::HEADER_SIZE;
+    size_t nPayloadLength = msg.data.size();
+    size_t nTotalSize = nPayloadLength + CMessageHeader::HEADER_SIZE;
     LogPrint(BCLog::NET, "sending %s (%d bytes) peer=%d\n",
-             SanitizeString(msg.command.c_str()), nMessageSize, pnode->id);
+             SanitizeString(msg.command.c_str()), nPayloadLength, pnode->id);
 
     std::vector<uint8_t> serializedHeader;
     serializedHeader.reserve(CMessageHeader::HEADER_SIZE);
-    uint256 hash = Hash(msg.data.data(), msg.data.data() + nMessageSize);
+    uint256 hash = Hash(msg.data.data(), msg.data.data() + nPayloadLength);
     CMessageHeader hdr(config->GetChainParams().NetMagic(), msg.command.c_str(),
-                       nMessageSize);
+                       nPayloadLength);
     memcpy(hdr.pchChecksum, hash.begin(), CMessageHeader::CHECKSUM_SIZE);
 
     CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
@@ -3002,7 +3009,7 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
             pnode->fPauseSend = true;
         }
         pnode->vSendMsg.push_back(std::move(serializedHeader));
-        if (nMessageSize) {
+        if (nPayloadLength) {
             pnode->vSendMsg.push_back(std::move(msg.data));
         }
 
