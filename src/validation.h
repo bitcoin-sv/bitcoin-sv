@@ -274,6 +274,14 @@ static const unsigned int DEFAULT_CHECKLEVEL = 3;
 /** Default for treating transactions with P2SH in output as non-standard */
 static const bool DEFAULT_ACCEPT_P2SH = false;
 
+// Flush modes to update on-disk chain state
+enum FlushStateMode {
+    FLUSH_STATE_NONE,
+    FLUSH_STATE_IF_NEEDED,
+    FLUSH_STATE_PERIODIC,
+    FLUSH_STATE_ALWAYS
+};
+
 /**
  * Require that user allocate at least 550MB for block & undo files (blk???.dat
  * and rev???.dat)
@@ -463,6 +471,17 @@ void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune);
 
 /** Create a new block index entry for a given block hash */
 CBlockIndex *InsertBlockIndex(uint256 hash);
+/**
+ * Update the on-disk chain state.
+ * The caches and indexes are flushed depending on the mode we're called with if
+ * they're too large, if it's been a while since the last write, or always and
+ * in all cases if we're in prune mode and are deleting files.
+ */
+bool FlushStateToDisk(
+    const CChainParams &chainParams,
+    CValidationState &state,
+    FlushStateMode mode,
+    int nManualPruneHeight = 0);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
 /** Prune block files and flush state to disk. */

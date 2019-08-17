@@ -198,17 +198,6 @@ CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
 CCoinsViewCache *pcoinsTip = nullptr;
 CBlockTreeDB *pblocktree = nullptr;
 
-enum FlushStateMode {
-    FLUSH_STATE_NONE,
-    FLUSH_STATE_IF_NEEDED,
-    FLUSH_STATE_PERIODIC,
-    FLUSH_STATE_ALWAYS
-};
-
-// See definition for documentation
-static bool FlushStateToDisk(const CChainParams &chainParams,
-                             CValidationState &state, FlushStateMode mode,
-                             int nManualPruneHeight = 0);
 static uint32_t GetBlockScriptFlags(const Config &config,
                                     const CBlockIndex *pChainTip);
 
@@ -2928,13 +2917,13 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
 
 /**
  * Update the on-disk chain state.
- * The caches and indexes are flushed depending on the mode we're called with if
- * they're too large, if it's been a while since the last write, or always and
- * in all cases if we're in prune mode and are deleting files.
  */
-static bool FlushStateToDisk(const CChainParams &chainparams,
-                             CValidationState &state, FlushStateMode mode,
-                             int nManualPruneHeight) {
+bool FlushStateToDisk(
+    const CChainParams &chainparams,
+    CValidationState &state,
+    FlushStateMode mode,
+    int nManualPruneHeight) {
+
     int64_t nMempoolUsage = mempool.DynamicMemoryUsage();
     LOCK(cs_main);
     static int64_t nLastWrite = 0;
