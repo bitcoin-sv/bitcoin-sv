@@ -198,9 +198,9 @@ public:
     {
         using resultType = typename std::result_of<Callable(const CNodePtr&)>::type;
         std::vector<std::future<resultType>> results {};
-        results.reserve(vNodes.size());
 
         LOCK(cs_vNodes);
+        results.reserve(vNodes.size());
         for(const CNodePtr& node : vNodes) {
             if(NodeFullyConnected(node))
                 results.emplace_back(make_task(mThreadPool, func, node));
