@@ -12,17 +12,6 @@
 #include <vector>
 #include <random>
 
-/** Default for -maxorphantx, maximum number of orphan transactions kept in
- * memory */
-static constexpr unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 100;
-/** Expiration time for orphan transactions in seconds */
-static constexpr int64_t ORPHAN_TX_EXPIRE_TIME = 20 * 60;
-/** Minimum time between orphan transactions expire time checks in seconds */
-static constexpr int64_t ORPHAN_TX_EXPIRE_INTERVAL = 5 * 60;
-/** Default number of orphan+recently-replaced txn to keep around for block
- * reconstruction */
-static constexpr unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
-
 struct COrphanTxnEntry {
     TxInputDataSPtr pTxInputData {nullptr};
     int64_t nTimeExpire {};
@@ -42,9 +31,20 @@ using CompactExtraTxnsVec = std::vector<std::pair<uint256, CTransactionRef>>;
  * A class created to support orphan txns during validation.
  */
 class COrphanTxns {
+    /** Expiration time for orphan transactions in seconds */
+    static constexpr int64_t ORPHAN_TX_EXPIRE_TIME = 20 * 60;
+    /** Minimum time between orphan transactions expire time checks in seconds */
+    static constexpr int64_t ORPHAN_TX_EXPIRE_INTERVAL = 5 * 60;
+
   public:
     /** A default max limit for collected outpoints */
     static constexpr unsigned int DEFAULT_MAX_COLLECTED_OUTPOINTS = 300000;
+    /** Default for -maxorphantx, maximum number of orphan transactions kept in
+     *  memory */
+    static constexpr unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 100;
+    /** Default number of orphan+recently-replaced txn to keep around for block
+     *  reconstruction */
+    static constexpr unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
 
     COrphanTxns(
         size_t maxCollectedOutpoints,

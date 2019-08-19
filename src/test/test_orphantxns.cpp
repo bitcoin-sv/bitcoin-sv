@@ -18,7 +18,7 @@ namespace {
     }
     // Use a default configuration
     size_t maxCollectedOutpoints = COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS;
-    size_t maxExtraTxnsForCompactBlock = DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN;
+    size_t maxExtraTxnsForCompactBlock = COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN;
     // Create txn inputs
     std::vector<CTxIn> CreateTxnInputs(size_t nNumOfInputs, uint256 txid=InsecureRand256()) {
         std::vector<CTxIn> vin;

@@ -999,12 +999,12 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-blockreconstructionextratxn=<n>",
         strprintf(_("Extra transactions to keep in memory for compact block "
                     "reconstructions (default: %u)"),
-            DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN));
+            COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN));
     strUsage += HelpMessageOpt(
         "-maxorphantx=<n>",
         strprintf(_("Keep at most <n> unconnectable "
                     "transactions in memory (default: %u)"),
-            DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+            COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS));
     strUsage += HelpMessageOpt(
         "-maxcollectedoutpoints=<n>",
         strprintf(_("Keep at most <n> collected "

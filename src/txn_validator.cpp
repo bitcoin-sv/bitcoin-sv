@@ -29,7 +29,7 @@ CTxnValidator::CTxnValidator(
     size_t maxExtraTxnsForCompactBlock {
         static_cast<size_t>(
                 gArgs.GetArg("-blockreconstructionextratxn",
-                        DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN))
+                        COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN))
     };
     mpOrphanTxnsP2PQ = std::make_shared<COrphanTxns>(
                                             maxCollectedOutpoints,

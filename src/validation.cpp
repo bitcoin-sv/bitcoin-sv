@@ -1374,7 +1374,8 @@ static void HandleOrphanAndRejectedP2PTxns(
         // DoS prevention: do not allow mpOrphanTxnsP2PQ to grow unbounded
         unsigned int nMaxOrphanTxns {
             static_cast<unsigned int>(
-                    std::max(gArgs.GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS),
+                    std::max(gArgs.GetArg("-maxorphantx",
+                                        COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS),
                              (int64_t)0))
         };
         unsigned int nEvicted = handlers.mpOrphanTxnsP2PQ->limitTxnsNumber(nMaxOrphanTxns);

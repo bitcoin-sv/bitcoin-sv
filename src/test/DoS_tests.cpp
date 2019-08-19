@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
     size_t maxExtraTxnsForCompactBlock {
         static_cast<size_t>(
             gArgs.GetArg("-blockreconstructionextratxn",
-                      DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN))
+                      COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN))
     };
     // A common buffer with orphan txns
     std::shared_ptr<COrphanTxns> orphanTxns {
