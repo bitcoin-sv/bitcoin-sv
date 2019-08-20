@@ -634,9 +634,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
 std::unique_ptr<CForwardReadonlyStream> StreamBlockFromDisk(
     CBlockIndex& index,
-    int networkVersion,
-    size_t& outSize,
-    uint256& outHash);
+    int networkVersion);
 
 /** Functions for validating blocks and updating the block tree */
 

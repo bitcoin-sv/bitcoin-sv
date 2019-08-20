@@ -1162,8 +1162,12 @@ bool GetTransaction(const Config &config, const TxId &txid,
 // CBlock and CBlockIndex
 //
 
-static bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos,
-                             const CMessageHeader::MessageMagic &messageStart) {
+static bool WriteBlockToDisk(
+    const CBlock &block,
+    CDiskBlockPos &pos,
+    const CMessageHeader::MessageMagic &messageStart,
+    CDiskBlockMetaData& metaData)
+{
     // Open history file to append
     CAutoFile fileout(CDiskFiles::OpenBlockFile(pos), SER_DISK, CLIENT_VERSION);
     if (fileout.IsNull()) {
@@ -1181,7 +1185,12 @@ static bool WriteBlockToDisk(const CBlock &block, CDiskBlockPos &pos,
     }
 
     pos.nPos = (unsigned int)fileOutPos;
-    fileout << block;
+
+    std::vector<uint8_t> data;
+    CVectorWriter{SER_DISK, CLIENT_VERSION, data, 0, block};
+    metaData = { Hash(data.begin(), data.end()), data.size() };
+
+    fileout.write(reinterpret_cast<const char*>(data.data()), data.size());
 
     return true;
 }
@@ -1229,11 +1238,46 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
     return true;
 }
 
+static bool PopulateBlockIndexBlockDiskMetaData(
+    FILE* file,
+    CBlockIndex& index,
+    int networkVersion)
+{
+    AssertLockHeld(cs_main);
+
+    CBlockStream stream{
+        CNonOwningFileReader{file},
+        CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
+        CStreamVersionAndType{SER_NETWORK, networkVersion}};
+    CHash256 hasher;
+    uint256 hash;
+    size_t size = 0;
+
+    do
+    {
+        auto chunk = stream.Read(4096);
+        hasher.Write(chunk.Begin(), chunk.Size());
+        size += chunk.Size();
+    } while(!stream.EndOfStream());
+
+    hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
+
+    index.SetDiskBlockMetaData(std::move(hash), size);
+    setDirtyBlockIndex.insert(&index);
+
+    if(fseek(file, index.GetBlockPos().nPos, SEEK_SET) != 0)
+    {
+        // this should never happen but for some odd reason we aren't
+        // able to rewind the file pointer back to the beginning
+        return false;
+    }
+
+    return true;
+}
+
 std::unique_ptr<CForwardReadonlyStream> StreamBlockFromDisk(
     CBlockIndex& index,
-    int networkVersion,
-    size_t& outSize,
-    uint256& outHash)
+    int networkVersion)
 {
     AssertLockHeld(cs_main);
 
@@ -1245,37 +1289,23 @@ std::unique_ptr<CForwardReadonlyStream> StreamBlockFromDisk(
         return {}; // could not open a stream
     }
 
-    outSize = 0;
+    if (!index.nStatus.hasDiskBlockMetaData())
     {
-        CBlockStream stream{
-            CNonOwningFileReader{file.get()},
-            CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
-            CStreamVersionAndType{SER_NETWORK, networkVersion}};
-        CHash256 hasher;
-
-        do
+        if (!PopulateBlockIndexBlockDiskMetaData(file.get(), index, networkVersion))
         {
-            auto chunk = stream.Read(4096);
-            hasher.Write(chunk.Begin(), chunk.Size());
-            outSize += chunk.Size();
-        } while(!stream.EndOfStream());
-
-        hasher.Finalize(reinterpret_cast<uint8_t*>(&outHash));
-
-        if(fseek(file.get(), index.GetBlockPos().nPos, SEEK_SET) != 0)
-        {
-            // this should never happen but for some odd reason we aren't
-            // able to rewind the file pointer back to the beginning
             return {};
         }
     }
+
+    assert(index.GetDiskBlockMetaData().diskDataSize > 0);
+    assert(!index.GetDiskBlockMetaData().diskDataHash.IsNull());
 
     // We expect that block data on disk is in same format as data sent over the
     // network. If this would change in the future then CBlockStream would need
     // to be used to change the resulting fromat.
     return
         std::make_unique<CFixedSizeStream<CFileReader>>(
-            outSize,
+            index.GetDiskBlockMetaData().diskDataSize,
             CFileReader{std::move(file)});
 }
 
@@ -3179,16 +3209,14 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
  * Mark a block as having its data received and checked (up to
  * BLOCK_VALID_TRANSACTIONS).
  */
-bool ReceivedBlockTransactions(const CBlock &block, CValidationState &state,
-                               CBlockIndex *pindexNew,
-                               const CDiskBlockPos &pos) {
-    pindexNew->nTx = block.vtx.size();
-    pindexNew->nChainTx = 0;
-    pindexNew->nFile = pos.nFile;
-    pindexNew->nDataPos = pos.nPos;
-    pindexNew->nUndoPos = 0;
-    pindexNew->nStatus = pindexNew->nStatus.withData();
-    pindexNew->RaiseValidity(BlockValidity::TRANSACTIONS);
+static bool ReceivedBlockTransactions(
+    const CBlock &block,
+    CValidationState &state,
+    CBlockIndex *pindexNew,
+    const CDiskBlockPos &pos,
+    const CDiskBlockMetaData& metaData)
+{
+    pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData);
     setDirtyBlockIndex.insert(pindexNew);
 
     if (pindexNew->pprev == nullptr || pindexNew->pprev->nChainTx) {
@@ -3783,12 +3811,13 @@ static bool AcceptBlock(const Config &config,
                           block.GetBlockTime(), fCheckForPruning, dbp != nullptr)) {
             return error("AcceptBlock(): FindBlockPos failed");
         }
+        CDiskBlockMetaData metaData;
         if (dbp == nullptr) {
-            if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic())) {
+            if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData)) {
                 AbortNode(state, "Failed to write block");
             }
         }
-        if (!ReceivedBlockTransactions(block, state, pindex, blockPos)) {
+        if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData)) {
             return error("AcceptBlock(): ReceivedBlockTransactions failed");
         }
     } catch (const std::runtime_error &e) {
@@ -3914,10 +3943,7 @@ static void PruneOneBlockFile(const int fileNumber) {
     for (const std::pair<const uint256, CBlockIndex *> &it : mapBlockIndex) {
         CBlockIndex *pindex = it.second;
         if (pindex->nFile == fileNumber) {
-            pindex->nStatus = pindex->nStatus.withData(false).withUndo(false);
-            pindex->nFile = 0;
-            pindex->nDataPos = 0;
-            pindex->nUndoPos = 0;
+            pindex->ClearFileInfo();
             setDirtyBlockIndex.insert(pindex);
 
             // Prune from mapBlocksUnlinked -- any block we prune would have
@@ -4568,12 +4594,13 @@ bool InitBlockIndex(const Config &config) {
                                fCheckForPruning)) {
                 return error("LoadBlockIndex(): FindBlockPos failed");
             }
-            if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic())) {
+            CDiskBlockMetaData metaData;
+            if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData)) {
                 return error(
                     "LoadBlockIndex(): writing genesis block to disk failed");
             }
             CBlockIndex *pindex = AddToBlockIndex(block);
-            if (!ReceivedBlockTransactions(block, state, pindex, blockPos)) {
+            if (!ReceivedBlockTransactions(block, state, pindex, blockPos, metaData)) {
                 return error("LoadBlockIndex(): genesis block not accepted");
             }
         } catch (const std::runtime_error &e) {

@@ -14,37 +14,6 @@ BOOST_FIXTURE_TEST_SUITE(stream_serialization_tests, BasicTestingSetup)
 
 namespace
 {
-    template<typename Serializer>
-    std::vector<uint8_t> StreamSerialize(
-        Serializer& serializer,
-        size_t maxChunkSize)
-    {
-        std::vector<uint8_t> serializedData;
-        auto runStart = std::chrono::steady_clock::now();
-
-        do
-        {
-            using namespace std::chrono_literals;
-
-            if ((std::chrono::steady_clock::now() - runStart) > 5s)
-            {
-                throw std::runtime_error("Test took too long");
-            }
-
-            auto chunk = serializer.Read(maxChunkSize);
-
-            if (chunk.Size())
-            {
-                serializedData.insert(
-                    serializedData.end(),
-                    chunk.Begin(), chunk.Begin() + chunk.Size());
-            }
-        }
-        while(!serializer.EndOfStream());
-
-        return serializedData;
-    }
-
     template<typename Reader = CMemoryReader>
     void CompareSerializeWithStreamingSerialization(
         const CBlock& serializable,

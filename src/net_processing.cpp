@@ -1222,20 +1222,18 @@ static void SendBlock(
     CConnman &connman,
     CBlockIndex& index)
 {
-    size_t size = 0;
-    uint256 hash;
-    auto stream =
-        StreamBlockFromDisk(index, pfrom->GetSendVersion(), size, hash);
+    auto stream = StreamBlockFromDisk(index, pfrom->GetSendVersion());
 
     if (!stream)
     {
         assert(!"can not load block from disk");
     }
 
+    auto metaData = index.GetDiskBlockMetaData();
     CSerializedNetMsg blockMsg{
             NetMsgType::BLOCK,
-            std::move(hash),
-            size,
+            std::move(metaData.diskDataHash),
+            metaData.diskDataSize,
             std::move(stream)
         };
 
