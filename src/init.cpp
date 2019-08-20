@@ -54,6 +54,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <memory>
+#include <cinttypes>
 
 #ifndef WIN32
 #include <signal.h>

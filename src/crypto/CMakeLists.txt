@@ -4,6 +4,8 @@
 
 project(crypto)
 
+option(CRYPTO_USE_ASM "Use assembly version of crypto primitives" ON)
+
 # The library
 add_library(crypto
 	aes.cpp
@@ -28,8 +30,11 @@ target_include_directories(crypto
 target_compile_definitions(crypto PUBLIC HAVE_CONFIG_H)
 
 # Use assembly is specified
-option(CRYPTO_USE_ASM "Use assembly version of crypto primitives" ON)
 if(CRYPTO_USE_ASM)
+	if(enable_asan)
+		message(FATAL_ERROR "enable_asan can not be used with"
+			" CRYPTO_USE_ASM enabled!")
+	endif()
 	target_compile_definitions(crypto PRIVATE USE_ASM)
 endif()
 
