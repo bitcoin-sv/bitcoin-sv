@@ -30,7 +30,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         self.next_block = 0
         self.headerSize = 24
         self.num_peers = 15
-        self.excessiveblocksize = 3 * ONE_MEGABYTE
+        self.excessiveblocksize = 5 * ONE_MEGABYTE
 
     # Request block "block" from all nodes.
     def requestBlocks(self, test_nodes, block):
@@ -131,10 +131,10 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
             logger.info("finished requestBlock duration %s s", time.time() - start)
             # numReceivedBlocksSeries may vary between test runs (based on processing power).
             # But still we expect the processing to be slow enough that with 15 messages at least one will be rejected.
+            logger.info("%d blocks received when running with factorMaxSendQueuesBytes=%d.", numberOfReceivedBlocksSeries, 1)
             assert_greater_than(numberOfReceivedBlocksParallel, numberOfReceivedBlocksSeries)
             assert_greater_than(numberOfRejectedMsgs, 0)
             assert_equal(numberOfReceivedBlocksSeries+numberOfRejectedMsgs, 15)
-            logger.info("%d blocks received when running with factorMaxSendQueuesBytes=%d.", numberOfReceivedBlocksSeries, 1)
 
         # Scenario 3: Blocks from bitcoind should be sent in parallel, because we are requesting the most recent block.
         with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block", 0,

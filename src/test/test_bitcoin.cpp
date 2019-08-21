@@ -37,6 +37,8 @@
 #include <memory>
 #include <thread>
 
+using mining::CBlockTemplate;
+
 uint256 insecure_rand_seed = GetRandHash();
 FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
@@ -140,7 +142,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const Config &config = GlobalConfig::GetConfig();
     CBlockIndex* pindexPrev {nullptr};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+            mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
     CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock &block = *blockRef;
 

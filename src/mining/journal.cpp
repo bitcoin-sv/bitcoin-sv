@@ -3,6 +3,7 @@
 
 #include <mining/journal.h>
 #include <mining/journal_change_set.h>
+#include <utiltime.h>
 
 using mining::CJournal;
 using mining::CJournalTester;
@@ -13,28 +14,28 @@ using mining::CJournalEntry;
 CJournal::CJournal(const CJournal& that)
 {
     // Lock journal we are copying from, and copy its contents
-    std::unique_lock<std::mutex> lock { that.mMtx };
+    std::shared_lock lock { that.mMtx };
     mTransactions = that.mTransactions;
 }
 
 // Get size of journal
 size_t CJournal::size() const
 {
-    std::lock_guard<std::mutex> lock { mMtx };
+    std::shared_lock lock { mMtx };
     return mTransactions.size();
 }
 
 // Apply changes to the journal
 void CJournal::applyChanges(const CJournalChangeSet& changeSet)
 {
-    std::lock_guard<std::mutex> lock { mMtx };
+    std::unique_lock lock { mMtx };
 
     using TransactionListByName = TransactionList::nth_index<0>::type;
     using TransactionListByPosition = TransactionList::nth_index<1>::type;
     TransactionListByName& index0 { mTransactions.get<0>() };
     TransactionListByPosition& index1 { mTransactions.get<1>() };
 
-    // For REORGS we need to remember the current start position
+    // For REORGs we need to remember the current start position
     TransactionListByPosition::const_iterator begin1 {};
     TransactionListByName::const_iterator begin0 {};
     bool isReorg { changeSet.getUpdateReason() == JournalUpdateReason::REORG };
@@ -77,25 +78,166 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
             }
         }
     }
+
+    // Do we need to invalidate any observers after this change?
+    if(!changeSet.getSimple())
+    {
+        mInvalidatingTime = GetTimeMicros();
+    }
+}
+
+// Get start index for our underlying sequence
+CJournal::Index CJournal::ReadLock::begin() const
+{
+    return Index { mJournal.get(), mJournal->index<1>().begin() };
+}
+
+// Get end index for our underlying sequence
+CJournal::Index CJournal::ReadLock::end() const
+{
+    return Index { mJournal.get(), mJournal->index<1>().end() };
+}
+
+
+/** Journal Index **/
+
+// Constructor
+CJournal::Index::Index(const CJournal* journal, const Underlying& begin)
+: mJournal{journal}, mValidTime{GetTimeMicros()}, mCurrItem{begin}
+{
+    // Work out what to do for previous item pointer
+    if(mCurrItem == mJournal->index<1>().begin())
+    {
+        // Can't point before the start
+        mPrevItem = mJournal->index<1>().end();
+    }
+    else if(mCurrItem == mJournal->index<1>().end())
+    {
+        if(!mJournal->index<1>().empty())
+        {
+            // Point 1 before the end
+            mPrevItem = mJournal->index<1>().end();
+            --mPrevItem;
+        }
+        else
+        {
+            mPrevItem = mJournal->index<1>().end();
+        }
+    }
+    else
+    {
+        // Point 1 before current position
+        mPrevItem = mCurrItem;
+        --mPrevItem;
+    }
+}
+
+// Are we still valid?
+bool CJournal::Index::valid() const
+{
+    // We're valid if we were initialised after the last invalidating time
+    return { mJournal && mValidTime > mJournal->getLastInvalidatingTime() };
+}
+
+// Increment
+CJournal::Index& CJournal::Index::operator++()
+{
+    // Set previous to current, and move on current
+    mPrevItem = mCurrItem++;
+    return *this;
+}
+
+// Reset the index to ensure it points to the next item. This needs to happen
+// for example if the index had previously reached the end, and then some more
+// items were subsequently added.
+void CJournal::Index::reset()
+{
+    if(!valid())
+    {
+        // Can't reset once we're invalid
+        throw std::runtime_error("Can't reset invalidated index");
+    }
+
+    if(mCurrItem == mJournal->index<1>().end())
+    {
+        if(mPrevItem != mJournal->index<1>().end())
+        {
+            Underlying prevNext { mPrevItem };
+            ++prevNext;
+            if(prevNext != mJournal->index<1>().end())
+            {
+                // New items have arrived, reset current pointer
+                mCurrItem = prevNext;
+            }
+        }
+        else if(!mJournal->index<1>().empty())
+        {
+            // Previously the journal must have been empty, but now items have
+            // arrived. Reset current pointer.
+            mCurrItem = mJournal->index<1>().begin();
+        }
+    }
+}
+
+
+/** Journal read lock **/
+
+// Standard constructor
+CJournal::ReadLock::ReadLock(const std::shared_ptr<CJournal>& journal)
+: mJournal{journal}, mLock{mJournal->mMtx}
+{
+}
+
+// Move constructor
+CJournal::ReadLock::ReadLock(ReadLock&& that)
+: mJournal{std::move(that.mJournal)}, mLock{std::move(that.mLock)}
+{
+}
+
+// Move assignment
+CJournal::ReadLock& CJournal::ReadLock::operator=(ReadLock&& that)
+{
+    if(this != &that)
+    {
+        // Need to make sure the old lock gets unlocked before the old journal
+        // gets destroyed.
+        mLock = std::move(that.mLock);
+        mJournal = std::move(that.mJournal);
+    }
+
+    return *this;
 }
 
 
 /** Journal Tester **/
 
+CJournalTester::CJournalTester(const CJournalPtr& journal)
+{
+    using TransactionListByPosition = TesterTransactionList::nth_index<1>::type;
+    TransactionListByPosition& index1 { mTransactions.get<1>() };
+
+    // Lock journal while we copy it
+    std::shared_lock lock { journal->mMtx };
+
+    // Rebuild the journal in our faster iterating (but slower updating) format.
+    const auto& journalIndex { journal->index<1>() };
+    for(auto it = journalIndex.begin(); it != journalIndex.end(); ++it)
+    {
+        index1.emplace_back(*it);
+    }
+}
+
 // Get size of journal
 size_t CJournalTester::journalSize() const
 {
-    return mJournal->size();
+    return mTransactions.size();
 }
 
 // Check the given transaction exists in the journal
 bool CJournalTester::checkTxnExists(const CJournalEntry& txn) const
 {
-    // Lock journal while we probe it
-    std::lock_guard<std::mutex> lock { mJournal->mMtx };
-
     // Get view on index 0, which is based on unique Id
-    const auto& index { mJournal->mTransactions.get<0>() };
+    const auto& index { mTransactions.get<0>() };
 
     // Lookup requested txn Id
     return (index.count(txn) > 0);
@@ -104,11 +246,8 @@ bool CJournalTester::checkTxnExists(const CJournalEntry& txn) const
 // Report on the relative ordering within the journal of txn1 compared to txn2.
 CJournalTester::TxnOrder CJournalTester::checkTxnOrdering(const CJournalEntry& txn1, const CJournalEntry& txn2) const
 {
-    // Lock journal while we probe it
-    std::lock_guard<std::mutex> lock { mJournal->mMtx };
-
     // Get view on index 0, which is based on unique Id
-    const auto& index0 { mJournal->mTransactions.get<0>() };
+    const auto& index0 { mTransactions.get<0>() };
 
     // Lookup txn1 and txn2
     auto it1 { index0.find(txn1) };
@@ -123,36 +262,25 @@ CJournalTester::TxnOrder CJournalTester::checkTxnOrdering(const CJournalEntry& t
     }
 
     // Project onto index 1 to find them in the ordered view
-    auto orderedIt1 { mJournal->mTransactions.project<1>(it1) };
-    auto orderedIt2 { mJournal->mTransactions.project<1>(it2) };
+    auto orderedIt1 { mTransactions.project<1>(it1) };
+    auto orderedIt2 { mTransactions.project<1>(it2) };
 
-    // Now iterate from the start of the ordered view and see which one we hit first. Without
-    // random access iterators this is the best we can do.
-    const auto& index1 { mJournal->mTransactions.get<1>() };
-    for(auto it = index1.begin(); it != index1.end(); ++it)
+    // Work out which comes first
+    if(std::distance(orderedIt1, orderedIt2) > 0)
     {
-        if(it == orderedIt1)
-        {
-            return CJournalTester::TxnOrder::BEFORE;
-        }
-        else if(it == orderedIt2)
-        {
-            return CJournalTester::TxnOrder::AFTER;
-        }
+        return CJournalTester::TxnOrder::BEFORE;
     }
-
-    // Should never happen
-    return CJournalTester::TxnOrder::UNKNOWN;
+    else
+    {
+        return CJournalTester::TxnOrder::AFTER;
+    }
 }
 
 // Dump out the contents of the journal
 void CJournalTester::dumpJournalContents(std::ostream& str) const
 {
-    // Lock journal while we probe it
-    std::lock_guard<std::mutex> lock { mJournal->mMtx };
-
     // Get view on index 1, which is based on ordering
-    const auto& index { mJournal->mTransactions.get<1>() };
+    const auto& index { mTransactions.get<1>() };
 
     // Dump out the contents
     for(const auto& txn : index)

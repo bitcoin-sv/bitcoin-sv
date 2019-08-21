@@ -31,6 +31,8 @@
 #include <cstdint>
 #include <memory>
 
+using mining::CBlockTemplate;
+
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
  * or from the last difficulty change if 'lookup' is nonpositive. If 'height' is
@@ -131,7 +133,7 @@ UniValue generateBlocks(const Config &config,
     CBlockIndex* pindexPrev {nullptr};
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
-            CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript, pindexPrev));
+            mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript, pindexPrev));
 
         if (!pblocktemplate.get()) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
@@ -582,7 +584,7 @@ static UniValue getblocktemplate(const Config &config,
 
         // Create new block
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptDummy, pindexPrev);
+        pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptDummy, pindexPrev);
         if (!pblocktemplate) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
         }

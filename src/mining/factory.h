@@ -1,26 +1,41 @@
 // Copyright (c) 2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#ifndef BITCOINSV_FACTORY_H
-#define BITCOINSV_FACTORY_H
+#pragma once
 
-#include "mining/candidates.h"
-#include "mining/legacy.h"
+#include <enum_cast.h>
+#include <mining/candidates.h>
+#include <mining/legacy.h>
 
 class Config;
 
+namespace mining
+{
 
-class CMiningFactory {
-private:
-    static CMiningCandidateManager manager;
+class CMiningFactory
+{
+  public:
 
-public:
-    static BlockAssemblerRef GetAssembler(const Config &config) {
-        return std::make_shared<LegacyBlockAssembler>(config);
+    // The types of supported block assembler
+    enum class BlockAssemblerType
+    {
+        UNKNOWN,
+        LEGACY,
+        JOURNALING
     };
-    static CMiningCandidateManager &GetCandidateManager() {
-        return manager;
-    };
+
+    // Get an appropriate block assembler
+    static BlockAssemblerRef GetAssembler(const Config& config);
+
+    // Get a reference to the mining candidate manager
+    static CMiningCandidateManager& GetCandidateManager();
+
 };
 
-#endif //BITCOINSV_FACTORY_H
+// Enable enum_cast for BlockAssemblerType
+const enumTableT<CMiningFactory::BlockAssemblerType>& enumTable(CMiningFactory::BlockAssemblerType);
+
+// Default block assembler type to use
+constexpr CMiningFactory::BlockAssemblerType DEFAULT_BLOCK_ASSEMBLER_TYPE { CMiningFactory::BlockAssemblerType::LEGACY };
+
+}

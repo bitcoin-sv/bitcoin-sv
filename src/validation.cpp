@@ -2928,6 +2928,11 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
         // any disconnected transactions back to the mempool.
         UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
     }
+
+    if(changeSet)
+    {
+        changeSet->apply();
+    }
     mempool.check(pcoinsTip, changeSet);
 
     // Callbacks/notifications for a new best chain.

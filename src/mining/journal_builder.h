@@ -14,7 +14,7 @@ class CJournal;
 class CJournalChangeSet;
 enum class JournalUpdateReason;
 using CJournalPtr = std::shared_ptr<CJournal>;
-using CJournalChangeSetPtr = std::shared_ptr<CJournalChangeSet>;
+using CJournalChangeSetPtr = std::unique_ptr<CJournalChangeSet>;
 
 /**
 * A class to handle building & updating mining journals.
@@ -47,6 +47,9 @@ class CJournalBuilder final
 
     // Apply a change set
     void applyChangeSet(const CJournalChangeSet& changeSet);
+
+    // Clear the current journal - caller holds mutex
+    void clearJournalUnlocked();
 
     // Protect our data
     mutable std::shared_mutex mMtx {};

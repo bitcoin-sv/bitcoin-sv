@@ -429,12 +429,12 @@ bool CTxMemPool::addUnchecked(const uint256 &hash, const CTxMemPoolEntry &entry,
     // Apply to the current journal, either via the passed in change set or directly ourselves
     if(changeSet)
     {
-        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry.GetSharedTx(), entry.GetAncestorDescendantCounts() });
+        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
     }
     else
     {
         CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry.GetSharedTx(), entry.GetAncestorDescendantCounts() });
+        tmpChangeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
     }
 
     // Update transaction for any feeDelta created by PrioritiseTransaction
@@ -511,12 +511,12 @@ void CTxMemPool::removeUnchecked(txiter it, CJournalChangeSetPtr& changeSet,
     // Apply to the current journal, either via the passed in change set or directly ourselves
     if(changeSet)
     {
-        changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { txn, it->GetAncestorDescendantCounts() });
+        changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
     }
     else
     {
         CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { txn, it->GetAncestorDescendantCounts() });
+        tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
     }
 
     totalTxSize -= it->GetTxSize();
@@ -875,34 +875,77 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins,
     /* Journal checking */
     if(changeSet)
     {
-        LogPrint(BCLog::JOURNAL, "Checking mempool against journal\n");
-
-        // Make journal consitent with mempool
+        // Make journal consitent with mempool & check
         changeSet->apply();
+        std::string journalResult { checkJournal() };
+        assert(journalResult.empty());
+    }
+}
 
-        // Check mempool and journal have the same number of entries
-        CJournalTester tester { mJournalBuilder->getCurrentJournal() };
-        assert(mapTx.size() == tester.journalSize());
+std::string CTxMemPool::checkJournal() const
+{
+    LogPrint(BCLog::JOURNAL, "Checking mempool against journal\n");
+    std::stringstream res {};
 
-        // Check mempool & journal agree on contents
-        for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
+    LOCK(cs);
+
+    // Check mempool and journal have the same number of entries
+    CJournalTester tester { mJournalBuilder->getCurrentJournal() };
+    if(mapTx.size() != tester.journalSize())
+    {
+        res << "Mempool size = " << mapTx.size() << ", journal size = " << tester.journalSize() << std::endl;
+    }
+
+    // Check mempool & journal agree on contents
+    for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
+    {
+        // Check this mempool txn also appears in the journal
+        const CJournalEntry tx { *it };
+        if(!tester.checkTxnExists(tx))
         {
-            // Check this mempool txn also appears in the journal
-            const CJournalEntry tx { it->GetSharedTx(), it->GetAncestorDescendantCounts() };
-            assert(tester.checkTxnExists(tx));
+            res << "Txn " << tx.getTxn()->GetId().ToString() << " is in the mempool but not the journal" << std::endl;
+        }
 
-            for(const CTxIn& txin : tx.getTxn()->vin)
+        for(const CTxIn& txin : tx.getTxn()->vin)
+        {
+            auto prevoutit { mapTx.find(txin.prevout.GetTxId()) };
+            if(prevoutit != mapTx.end())
             {
-                auto prevoutit { mapTx.find(txin.prevout.GetTxId()) };
-                if(prevoutit != mapTx.end())
+                // Check this in mempool ancestor appears before its descendent in the journal
+                const CJournalEntry prevout { *prevoutit };
+                CJournalTester::TxnOrder order { tester.checkTxnOrdering(prevout, tx) };
+                if(order != CJournalTester::TxnOrder::BEFORE)
                 {
-                    // Check this in mempool ancestor appears before its descendent in the journal
-                    const CJournalEntry prevout { prevoutit->GetSharedTx(), prevoutit->GetAncestorDescendantCounts() };
-                    assert(tester.checkTxnOrdering(prevout, tx) == CJournalTester::TxnOrder::BEFORE);
+                    res << "Ancestor " << prevout.getTxn()->GetId().ToString() << " of "
+                        << tx.getTxn()->GetId().ToString() << " appears "
+                        << enum_cast<std::string>(order) << " in the journal" << std::endl;
                 }
             }
         }
     }
+
+    LogPrint(BCLog::JOURNAL, "Result of journal check: %s\n", res.str().c_str());
+    return res.str();
+}
+
+// Rebuild the journal contents so they match the mempool
+void CTxMemPool::rebuildJournal() const
+{
+    LogPrint(BCLog::JOURNAL, "Rebuilding journal\n");
+
+    CJournalChangeSetPtr changeSet { mJournalBuilder->getNewChangeSet(JournalUpdateReason::RESET) };
+
+    LOCK(cs);
+
+    // Build a change set that contains all our transactions. No need to try and
+    // order them correctly because that will be done later for us.
+    for(const auto& entry : mapTx)
+    {
+        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
+    }
+
+    // Apply the changes
+    changeSet->apply();
 }
 
 /**
