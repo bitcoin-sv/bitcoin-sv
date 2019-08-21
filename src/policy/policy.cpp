@@ -44,11 +44,6 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &w
         if (!fAcceptDatacarrier) {
             return false;
         }
-
-        auto nMaxDatacarrierBytes = config.GetDataCarrierSize();
-        if (scriptPubKey.size() > nMaxDatacarrierBytes) {
-            return false;
-        }
     }
 
     return whichType != TX_NONSTANDARD;
@@ -87,7 +82,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &rea
         }
     }
 
-    unsigned int nDataOut = 0;
+    unsigned int nDataSize = 0;
     txnouttype whichType;
     for (const CTxOut &txout : tx.vout) {
         if (!::IsStandard(config, txout.scriptPubKey, whichType)) {
@@ -96,7 +91,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &rea
         }
 
         if (whichType == TX_NULL_DATA) {
-            nDataOut++;
+            nDataSize += txout.scriptPubKey.size();
         } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
@@ -106,9 +101,9 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &rea
         }
     }
 
-    // only one OP_RETURN txout is permitted
-    if (nDataOut > 1) {
-        reason = "multi-op-return";
+    // cumulative size of all OP_RETURN txout should be smaller than -datacarriersize
+    if (nDataSize > config.GetDataCarrierSize()) {
+        reason = "datacarrier-size-exceeded";
         return false;
     }
 

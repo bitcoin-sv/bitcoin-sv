@@ -756,7 +756,7 @@ void TestIsStandardWithScriptFactory(std::function<CScript()> scriptFactory, uin
     t.vout[0].scriptPubKey = scriptFactory();
     BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
-    // Only one TX_NULL_DATA permitted in all cases
+    // Multiple TX_NULL_DATA are permitted
     t.vout.resize(2);
     t.vout[0].scriptPubKey =
         scriptFactory()
@@ -766,18 +766,51 @@ void TestIsStandardWithScriptFactory(std::function<CScript()> scriptFactory, uin
         scriptFactory()
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
                               "a67962e0ea1f61deb649f6bc3f4cef38");
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
     t.vout[0].scriptPubKey =
         scriptFactory()
                   << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
                               "a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey = scriptFactory();
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
 
     t.vout[0].scriptPubKey = scriptFactory();
     t.vout[1].scriptPubKey = scriptFactory();
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
+
+    //Check datacarriersize for multiple TX_NULL_DATA
+
+    newMaxSize = 82 + 2 * initialScriptSize;
+    config.SetDataCarrierSize(newMaxSize);
+
+    t.vout.resize(2);
+    t.vout[0].scriptPubKey =
+        scriptFactory()
+                  << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
+                              "a67962e0ea1f61deb649f6bc3f4cef38");
+    t.vout[1].scriptPubKey =
+        scriptFactory()
+                  << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
+                              "a67962e0ea1f61deb649f6bc3f4cef38");
+
+    BOOST_CHECK_EQUAL(newMaxSize, t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size());
+    BOOST_CHECK(IsStandardTx(config, CTransaction(t), reason));
+
+    t.vout[0].scriptPubKey =
+        scriptFactory()
+                  << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
+                              "a67962e0ea1f61deb649f6bc3f4cef38");
+    t.vout[1].scriptPubKey =
+        scriptFactory()
+                  << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
+                              "a67962e0ea1f61deb649f6bc3f4cef38ff");
+
+    BOOST_CHECK_EQUAL(newMaxSize + 1, t.vout[0].scriptPubKey.size() + t.vout[1].scriptPubKey.size());
     BOOST_CHECK(!IsStandardTx(config, CTransaction(t), reason));
+    BOOST_CHECK_EQUAL(reason, "datacarrier-size-exceeded");
+
+
 }
 
 BOOST_AUTO_TEST_CASE(test_IsStandard_OP_RETURN){

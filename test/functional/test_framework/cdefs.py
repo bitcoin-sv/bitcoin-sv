@@ -39,6 +39,7 @@ REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER =  _extractPolicyValue('REGTEST_DEFAULT_MAX
 REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = _extractPolicyValue('REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE')
 REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = _extractPolicyValue('REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER')
 
+MAX_STANDARD_TX_SIZE = _extractPolicyValue('MAX_STANDARD_TX_SIZE')
 
 # The following consensus parameters should not be automatically imported.
 # They *should* cause test failures if application code is changed in ways
@@ -74,3 +75,4 @@ if __name__ == "__main__":
     print("MAX_BLOCK_SIGOPS_PER_MB = %d (sigops)" % MAX_BLOCK_SIGOPS_PER_MB)
     print("MAX_TX_SIGOPS_COUNT = %d (sigops)" % MAX_TX_SIGOPS_COUNT)
     print("COINBASE_MATURITY = %d (blocks)" % COINBASE_MATURITY)
+    print("MAX_STANDARD_TX_SIZE = %d" % MAX_STANDARD_TX_SIZE)
