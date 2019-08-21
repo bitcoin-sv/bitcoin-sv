@@ -719,11 +719,12 @@ public:
      * Remove transactions from the mempool until its dynamic size is <=
      * sizelimit. pvNoSpendsRemaining, if set, will be populated with the list
      * of outpoints which are not in mempool which no longer have any spends in
-     * this mempool.
+     * this mempool. Return TxIds which were removed (if pvNoSpendsRemaining is set).
      */
-    void TrimToSize(size_t sizelimit,
-                    mining::CJournalChangeSetPtr& changeSet,
-                    std::vector<COutPoint> *pvNoSpendsRemaining = nullptr);
+    std::vector<TxId> TrimToSize(
+        size_t sizelimit,
+        mining::CJournalChangeSetPtr& changeSet,
+        std::vector<COutPoint> *pvNoSpendsRemaining = nullptr);
 
     /** Expire all transaction (and their dependencies) in the mempool older
      * than time. Return the number of removed transactions. */

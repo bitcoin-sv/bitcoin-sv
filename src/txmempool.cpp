@@ -1333,14 +1333,16 @@ void CTxMemPool::trackPackageRemoved(const CFeeRate &rate) {
     }
 }
 
-void CTxMemPool::TrimToSize(size_t sizelimit,
-                            mining::CJournalChangeSetPtr& changeSet,
-                            std::vector<COutPoint> *pvNoSpendsRemaining)
-{
+std::vector<TxId> CTxMemPool::TrimToSize(
+    size_t sizelimit,
+    mining::CJournalChangeSetPtr& changeSet,
+    std::vector<COutPoint> *pvNoSpendsRemaining) {
+
     LOCK(cs);
 
     unsigned nTxnRemoved = 0;
     CFeeRate maxFeeRateRemoved(Amount(0));
+    std::vector<TxId> vRemovedTxIds {};
     while (!mapTx.empty() && DynamicMemoryUsage() > sizelimit) {
         indexed_transaction_set::index<descendant_score>::type::iterator it =
             mapTx.get<descendant_score>().begin();
@@ -1366,6 +1368,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit,
             txn.reserve(stage.size());
             for (txiter iter : stage) {
                 txn.push_back(iter->GetTx());
+                vRemovedTxIds.emplace_back(iter->GetTx().GetId());
             }
         }
 
@@ -1389,6 +1392,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit,
                  "Removed %u txn, rolling minimum fee bumped to %s\n",
                  nTxnRemoved, maxFeeRateRemoved.ToString());
     }
+    return vRemovedTxIds;
 }
 
 bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
