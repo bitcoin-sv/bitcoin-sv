@@ -11,6 +11,9 @@
 
 class Config;
 class CTxMemPool;
+class CFileReader;
+template<typename Reader>
+class CBlockStreamReader;
 
 // Dumb helper to handle CTransaction compression at serialize-time
 struct TransactionCompressor {
@@ -165,6 +168,7 @@ public:
     CBlockHeaderAndShortTxIDs() {}
 
     CBlockHeaderAndShortTxIDs(const CBlock &block);
+    CBlockHeaderAndShortTxIDs(CBlockStreamReader<CFileReader>& stream);
 
     uint64_t GetShortID(const uint256 &txhash) const;
 

@@ -12,6 +12,11 @@
 #include "uint256.h"
 
 #include <vector>
+#include <exception>
+
+class CFileReader;
+template<typename Reader>
+class CBlockStreamReader;
 
 /**
  * Data structure that represents a partial merkle tree.
@@ -151,6 +156,9 @@ public:
     CPartialMerkleTree txn;
 
 public:
+    // exception class that is thrown from constructor for matching txids.
+    class CNotAllExpectedTransactionsFound : public std::exception {};
+
     /** Public only for unit testing and relay testing (not relayed) */
     std::vector<std::pair<unsigned int, uint256>> vMatchedTxn;
 
@@ -160,9 +168,18 @@ public:
      * transaction, thus the filter will likely be modified.
      */
     CMerkleBlock(const CBlock &block, CBloomFilter &filter);
+    CMerkleBlock(CBlockStreamReader<CFileReader>& stream, CBloomFilter &filter);
 
-    // Create from a CBlock, matching the txids in the set.
-    CMerkleBlock(const CBlock &block, const std::set<TxId> &txids);
+    /**
+     * Create from a CBlock, matching the txids in the set.
+     *
+     * throws: in case not all txids are found in the block stream a
+     *         CMerkleBlock::CNotAllExpectedTransactionsFound exception
+     *         is thrown.
+     */
+    CMerkleBlock(
+        CBlockStreamReader<CFileReader>& stream,
+        const std::set<TxId> &txids);
 
     CMerkleBlock() {}
 

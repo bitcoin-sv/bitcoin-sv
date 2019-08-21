@@ -60,6 +60,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	blockcheck_tests.cpp
 	blockencodings_tests.cpp
 	blockmaxsize_tests.cpp
+	blockfile_reading_tests.cpp
 	blockstatus_tests.cpp
 	bloom_tests.cpp
 	bswap_tests.cpp
@@ -88,6 +89,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	merkle_tests.cpp
 	miner_tests.cpp
     mod_pri_queue_tests.cpp
+	object_stream_deserialization_tests.cpp
 	opcode_tests.cpp
 	multisig_tests.cpp
 	net_tests.cpp
@@ -114,6 +116,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	sigutil.cpp
 	skiplist_tests.cpp
 	streams_tests.cpp
+	stream_serialization_tests.cpp
 	test_bitcoin.cpp
 	test_bitcoin_main.cpp
 	testutil.cpp
@@ -141,7 +144,12 @@ target_include_directories(test_bitcoin
 
 find_package(Boost 1.58 REQUIRED unit_test_framework)
 
-target_link_libraries(test_bitcoin Boost::unit_test_framework rpcclient server)
+target_link_libraries(
+	test_bitcoin
+	Boost::unit_test_framework
+	rpcclient
+	server
+	$<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
 
 # We need to detect if the BOOST_TEST_DYN_LINK flag is required.
 set(CMAKE_REQUIRED_LIBRARIES Boost::unit_test_framework)

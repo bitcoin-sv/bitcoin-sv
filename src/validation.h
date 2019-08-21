@@ -12,6 +12,7 @@
 #endif
 
 #include "amount.h"
+#include "blockstreams.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/consensus.h"
@@ -20,6 +21,7 @@
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "script/script_error.h"
 #include "sync.h"
+#include "streams.h"
 #include "versionbits.h"
 
 #include <algorithm>
@@ -449,12 +451,7 @@ Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 double GuessVerificationProgress(const ChainTxData &data, CBlockIndex *pindex);
 
 /**
- * Mark one block file as pruned.
- */
-void PruneOneBlockFile(const int fileNumber);
-
-/**
- * Actually unlink the specified files
+ * Unlink the specified files and mark associated block indices as pruned
  */
 void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune);
 
@@ -636,6 +633,11 @@ bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
                        const Config &config);
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
+std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+    const CDiskBlockPos& pos);
+std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
+    CBlockIndex& index,
+    int networkVersion);
 
 /** Functions for validating blocks and updating the block tree */
 

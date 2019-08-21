@@ -55,6 +55,7 @@
 #include <cstdio>
 #include <memory>
 #include <cinttypes>
+#include <chrono>
 
 #ifndef WIN32
 #include <signal.h>
@@ -748,6 +749,10 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-help-debug",
         _("Show all debugging options (usage: --help -help-debug)"));
+    strUsage += HelpMessageOpt(
+        "-debugp2pthreadstalls",
+        _("Log P2P requests that stall request processing loop for longer than "
+          "specified milliseconds (default: disabled)"));
     strUsage += HelpMessageOpt(
         "-logips",
         strprintf(_("Include IP addresses in debug output (default: %d)"),
@@ -1934,9 +1939,14 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // need to reindex later.
 
     assert(!g_connman);
-    g_connman = std::unique_ptr<CConnman>(
-        new CConnman(config, GetRand(std::numeric_limits<uint64_t>::max()),
-                     GetRand(std::numeric_limits<uint64_t>::max())));
+    {
+        int64_t duration = gArgs.GetArg("-debugp2pthreadstalls", 0);
+        g_connman =
+            std::make_unique<CConnman>(
+                config, GetRand(std::numeric_limits<uint64_t>::max()),
+                GetRand(std::numeric_limits<uint64_t>::max()),
+                std::chrono::milliseconds{duration > 0 ? duration : 0});
+    }
     CConnman &connman = *g_connman;
 
     peerLogic.reset(new PeerLogicValidation(&connman));

@@ -100,7 +100,9 @@ TestingSetup::TestingSetup(const std::string &chainName)
     }
 
     // Deterministic randomness for tests.
-    g_connman = std::unique_ptr<CConnman>(new CConnman(config, 0x1337, 0x1337));
+    g_connman =
+        std::make_unique<CConnman>(
+            config, 0x1337, 0x1337, std::chrono::milliseconds{0});
     connman = g_connman.get();
     RegisterNodeSignals(GetNodeSignals());
 }

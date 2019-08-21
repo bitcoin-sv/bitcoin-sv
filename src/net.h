@@ -31,9 +31,11 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #ifndef WIN32
@@ -118,16 +120,45 @@ class CTransaction;
 class CNodeStats;
 class CClientUIInterface;
 
-struct CSerializedNetMsg {
-    CSerializedNetMsg() = default;
+class CSerializedNetMsg
+{
+public:
     CSerializedNetMsg(CSerializedNetMsg &&) = default;
     CSerializedNetMsg &operator=(CSerializedNetMsg &&) = default;
     // No copying, only moves.
     CSerializedNetMsg(const CSerializedNetMsg &msg) = delete;
     CSerializedNetMsg &operator=(const CSerializedNetMsg &) = delete;
 
-    std::vector<uint8_t> data;
-    std::string command;
+    CSerializedNetMsg(
+        std::string&& command,
+        std::vector<uint8_t>&& data)
+        : mCommand{std::move(command)}
+        , mHash{::Hash(data.data(), data.data() + data.size())}
+        , mSize{data.size()}
+        , mData{std::make_unique<CVectorStream>(std::move(data))}
+    {/**/}
+
+    CSerializedNetMsg(
+        std::string&& command,
+        const uint256& hash,
+        size_t size,
+        std::unique_ptr<CForwardAsyncReadonlyStream> data)
+        : mCommand{std::move(command)}
+        , mHash{hash}
+        , mSize{size}
+        , mData{std::move(data)}
+    {/**/}
+
+    const std::string& Command() const {return mCommand;}
+    std::unique_ptr<CForwardAsyncReadonlyStream> MoveData() {return std::move(mData);}
+    const uint256& Hash() const {return mHash;}
+    size_t Size() const {return mSize;}
+
+private:
+    std::string mCommand;
+    uint256 mHash;
+    size_t mSize;
+    std::unique_ptr<CForwardAsyncReadonlyStream> mData;
 };
 
 class CConnman {
@@ -153,7 +184,11 @@ public:
         uint64_t nMaxOutboundTimeframe = 0;
         uint64_t nMaxOutboundLimit = 0;
     };
-    CConnman(const Config &configIn, uint64_t seed0, uint64_t seed1);
+    CConnman(
+        const Config &configIn,
+        uint64_t seed0,
+        uint64_t seed1,
+        std::chrono::milliseconds debugP2PTheadStallsThreshold);
     ~CConnman();
     bool Start(CScheduler &scheduler, std::string &strNodeError,
                Options options);
@@ -420,6 +455,8 @@ private:
     std::thread threadOpenAddedConnections;
     std::thread threadOpenConnections;
     std::thread threadMessageHandler;
+
+    std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);
@@ -625,6 +662,18 @@ class CNode {
     friend class CConnman;
 
 public:
+    /**
+     * Notification structure for SendMessage function that returns:
+     * sendComplete: whether the send was fully complete/partially complete and
+     *               data is needed for sending the rest later.
+     * sentSize: amount of data that was sent.
+     */
+    struct CSendResult
+    {
+        bool sendComplete;
+        size_t sentSize;
+    };
+
     // socket
     std::atomic<ServiceFlags> nServices {NODE_NONE};
     // Services expected from a peer, otherwise it will be disconnected
@@ -632,10 +681,7 @@ public:
     SOCKET hSocket {0};
     // Total size of all vSendMsg entries.
     CSendQueueBytes nSendSize;
-    // Offset inside the first vSendMsg already sent.
-    size_t nSendOffset {0};
-    uint64_t nSendBytes {0};
-    std::deque<std::vector<uint8_t>> vSendMsg {};
+    std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> vSendMsg {};
     CCriticalSection cs_vSend {};
     CCriticalSection cs_hSocket {};
     CCriticalSection cs_vRecv {};
@@ -763,9 +809,22 @@ public:
           bool fInboundIn = false);
     ~CNode();
 
+    CNode(CNode&&) = delete;
+    CNode& operator=(CNode&&) = delete;
+    CNode(const CNode&) = delete;
+    CNode& operator=(const CNode&) = delete;
+
 private:
-    CNode(const CNode &);
-    void operator=(const CNode &);
+    /**
+     * Storage for the last chunk being sent to the peer. This variable contains
+     * data for the duration of sending the chunk. Once the chunk is sent it is
+     * cleared.
+     * In case there is an interruption during sending (sent size exceeded or
+     * network layer can not process any more data at the moment) this variable
+     * remains set and is used to continue streaming on the next try.
+     */
+    std::optional<CSpan> mSendChunk;
+    uint64_t nSendBytes {0};
 
     const uint64_t nLocalHostNonce {};
     // Services offered to this peer
@@ -789,6 +848,10 @@ private:
 
 public:
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
+
+    CSendResult SendMessage(
+        CForwardAsyncReadonlyStream& data,
+        size_t maxChunkSize);
 
     /** Add some new transactions to our pending inventory list */
     void AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns);

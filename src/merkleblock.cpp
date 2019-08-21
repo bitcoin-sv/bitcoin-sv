@@ -5,9 +5,12 @@
 
 #include "merkleblock.h"
 
+#include "blockstreams.h"
+#include "clientversion.h"
 #include "consensus/consensus.h"
 #include "hash.h"
 #include "utilstrencodings.h"
+#include "streams.h"
 
 CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter) {
     header = block.GetBlockHeader();
@@ -34,19 +37,63 @@ CMerkleBlock::CMerkleBlock(const CBlock &block, CBloomFilter &filter) {
     txn = CPartialMerkleTree(vHashes, vMatch);
 }
 
-CMerkleBlock::CMerkleBlock(const CBlock &block, const std::set<TxId> &txids) {
-    header = block.GetBlockHeader();
-
+CMerkleBlock::CMerkleBlock(
+    CBlockStreamReader<CFileReader>& stream,
+    CBloomFilter& filter)
+    : header{stream.GetBlockHeader()}
+{
     std::vector<bool> vMatch;
     std::vector<uint256> vHashes;
 
-    vMatch.reserve(block.vtx.size());
-    vHashes.reserve(block.vtx.size());
+    vMatch.reserve(stream.GetRemainingTransactionsCount());
+    vHashes.reserve(stream.GetRemainingTransactionsCount());
+    do
+    {
+        const CTransaction& transaction = stream.ReadTransaction();
+        const uint256& txid = transaction.GetId();
+        if (filter.IsRelevantAndUpdate(transaction)) {
+            vMatchedTxn.emplace_back(vMatch.size(), txid);
+            vMatch.push_back(true);
+        } else {
+            vMatch.push_back(false);
+        }
 
-    for (const auto &tx : block.vtx) {
-        const TxId &txid = tx->GetId();
-        vMatch.push_back(txids.count(txid));
         vHashes.push_back(txid);
+    } while(!stream.EndOfStream());
+
+    txn = CPartialMerkleTree(vHashes, vMatch);
+}
+
+CMerkleBlock::CMerkleBlock(
+    CBlockStreamReader<CFileReader>& stream,
+    const std::set<TxId>& txids)
+    : header{stream.GetBlockHeader()}
+{
+    std::vector<bool> vMatch;
+    std::vector<uint256> vHashes;
+
+    vMatch.reserve(stream.GetRemainingTransactionsCount());
+    vHashes.reserve(stream.GetRemainingTransactionsCount());
+    size_t foundCount = 0;
+    do
+    {
+        const CTransaction& transaction = stream.ReadTransaction();
+        const TxId& txid = transaction.GetId();
+        if(txids.count(txid))
+        {
+            vMatch.push_back(true);
+            ++foundCount;
+        }
+        else
+        {
+            vMatch.push_back(false);
+        }
+        vHashes.push_back(txid);
+    } while(!stream.EndOfStream());
+
+    if(txids.size() != foundCount)
+    {
+        throw CNotAllExpectedTransactionsFound{};
     }
 
     txn = CPartialMerkleTree(vHashes, vMatch);

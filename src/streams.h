@@ -17,6 +17,7 @@
 #include <ios>
 #include <limits>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -647,6 +648,291 @@ public:
             nReadPos++;
         }
     }
+};
+
+/**
+ * A pointer to read only contiguous data buffer of a certain size.
+ * CSpan doesn't take ownership of the underlying buffer so it is up to the
+ * user to guarantee that the buffer lives longer than the CSpan pointing to it.
+ */
+class CSpan
+{
+public:
+    CSpan() {/**/}
+
+    CSpan(const uint8_t* const begin, size_t size)
+        : mBegin{begin}
+        , mSize{size}
+    {/**/}
+
+    const uint8_t* Begin() const {return mBegin;}
+    size_t Size() const {return mSize;}
+
+private:
+    const uint8_t* mBegin = nullptr;
+    size_t mSize = 0;
+};
+
+/**
+ * Base class for forward readlonly streams of data that returns the underlying
+ * data in chunks of up to requested size.
+ * If a read error occurs while using CForwardReadonlyStream instance an
+ * exception is thrown and stream should not be used after that point as it will
+ * be in an invalid state.
+ */
+class CForwardReadonlyStream
+{
+public:
+    virtual ~CForwardReadonlyStream() = default;
+
+    virtual bool EndOfStream() const = 0;
+    /**
+     * Read next span of data that is up to maxSize long.
+     * Returned CSpan is valid until the next call to Read() or until stream
+     * is destroyed.
+     * Span can return less than maxSize bytes if end of stream is reached
+     * which can be checked by call to EndOfStream function.
+     * In case EndOfStream is false and Read span returned size of 0 the data
+     * is still being prepared and will be returned on next call to Read.
+     */
+    virtual CSpan Read(size_t maxSize) = 0;
+};
+
+/**
+ * Base class for forward readlonly streams of data that returns the underlying
+ * data in chunks of up to requested size.
+ * If a read error occurs while using CForwardAsyncReadonlyStream instance an
+ * exception is thrown and stream should not be used after that point as it will
+ * be in an invalid state.
+ */
+class CForwardAsyncReadonlyStream
+{
+public:
+    virtual ~CForwardAsyncReadonlyStream() = default;
+
+    virtual bool EndOfStream() const = 0;
+    /**
+     * Read next span of data that is up to maxSize long.
+     * Returned CSpan is valid until the next call to Read() or until stream
+     * is destroyed.
+     * Span can return less than maxSize bytes if end of stream is reached
+     * which can be checked by call to EndOfStream function.
+     * In case EndOfStream is false and Read span returned size of 0 the data
+     * is still being prepared and will be returned on next call to Read.
+     */
+    virtual CSpan ReadAsync(size_t maxSize) = 0;
+};
+
+// helper function for use with std::unique_ptr to enable RAII file closing
+struct CCloseFile
+{
+    void operator()(FILE* file) { ::fclose(file); }
+};
+
+/**
+ * RAII file reader for use with streams that want to take ownership of the
+ * underlying FILE pointer. File pointer is closed once the CFileReader instance
+ * gets out of scope.
+ */
+class CFileReader
+{
+public:
+    CFileReader(std::unique_ptr<FILE, CCloseFile>&& file)
+        : mFile{std::move(file)}
+    {
+        assert(mFile);
+    }
+
+    CFileReader(CFileReader&&) = default;
+    CFileReader& operator=(CFileReader&&) = default;
+
+    CFileReader(const CFileReader&) = delete;
+    CFileReader& operator=(const CFileReader&) = delete;
+
+    size_t Read(char* pch, size_t maxSize)
+    {
+        size_t read = fread(pch, 1, maxSize, mFile.get());
+
+        if (read == 0 && !EndOfStream())
+        {
+            throw std::ios_base::failure{"CFileReader::Read: fread failed"};
+        }
+
+        return read;
+    }
+
+    bool EndOfStream() const
+    {
+        return feof(mFile.get());
+    }
+
+private:
+    std::unique_ptr<FILE, CCloseFile> mFile;
+};
+
+/**
+ * File reader for use with streams that don't want to take ownership of the
+ * underlying FILE pointer - it's up to the file pointer provider to close it
+ * afterwards.
+ */
+class CNonOwningFileReader
+{
+public:
+    CNonOwningFileReader(FILE* file)
+        : mFile{file}
+    {
+        assert(mFile);
+    }
+
+    CNonOwningFileReader(CNonOwningFileReader&&) = default;
+    CNonOwningFileReader& operator=(CNonOwningFileReader&&) = default;
+
+    CNonOwningFileReader(const CNonOwningFileReader&) = delete;
+    CNonOwningFileReader& operator=(const CNonOwningFileReader&) = delete;
+
+    size_t Read(char* pch, size_t maxSize)
+    {
+        size_t read = fread(pch, 1, maxSize, mFile);
+
+        if (read == 0 && !EndOfStream())
+        {
+            throw std::ios_base::failure{"CNonOwningFileReader::Read: fread failed"};
+        }
+
+        return read;
+    }
+
+    bool EndOfStream() const
+    {
+        return feof(mFile);
+    }
+
+private:
+    FILE* mFile;
+};
+
+/**
+ * Stream wrapper for cases where we have a data Reader and know exactly how
+ * much data we want to read from it.
+ */
+template<typename Reader>
+class CFixedSizeStream : public CForwardAsyncReadonlyStream, private Reader
+{
+public:
+    CFixedSizeStream(size_t size, Reader&& reader)
+        : Reader{std::move(reader)}
+        , mSize{size}
+    {/**/}
+
+    bool EndOfStream() const override {return mSize == mConsumed;}
+    CSpan ReadAsync(size_t maxSize) override
+    {
+        // it's not feasible to try and read 0 bytes
+        assert(maxSize > 0);
+
+        // once read request has started the requested size may not change as an
+        // async read request requires mBuffer stability until the end of
+        // request or Reader destruction
+        size_t maxConsumable = std::min(mSize - mConsumed, maxSize);
+        assert(mPendingReadSize == 0 || mPendingReadSize == maxConsumable);
+
+        if(mSize > mConsumed)
+        {
+            if(!mPendingReadSize)
+            {
+                mPendingReadSize = maxConsumable;
+                mBuffer.resize(mPendingReadSize);
+            }
+
+            size_t read =
+                Reader::Read(
+                    reinterpret_cast<char*>(mBuffer.data()),
+                    mPendingReadSize);
+
+            if(read > 0)
+            {
+                // read request has finished
+                mPendingReadSize = 0;
+                mConsumed += read;
+            }
+
+            return {mBuffer.data(), read};
+        }
+        else
+        {
+            return {};
+        }
+    }
+
+private:
+    size_t mSize;
+    std::vector<uint8_t> mBuffer;
+    size_t mConsumed = 0u;
+    size_t mPendingReadSize = 0u;
+};
+
+/**
+ * Stream wrapper for std::vector<uint8_t>
+ */
+class CVectorStream : public CForwardAsyncReadonlyStream
+{
+public:
+    CVectorStream(std::vector<uint8_t>&& data)
+        : mData{std::move(data)}
+    {/**/}
+
+    bool EndOfStream() const override {return mData.size() == mConsumed;}
+    CSpan ReadAsync(size_t maxSize) override
+    {
+        if(mData.size() > mConsumed)
+        {
+            size_t consume = std::min(mData.size() - mConsumed, maxSize);
+            const uint8_t* start = mData.data() + mConsumed;
+            mConsumed += consume;
+
+            return {start, consume};
+        }
+        else
+        {
+            return {};
+        }
+    }
+
+private:
+    std::vector<uint8_t> mData;
+    size_t mConsumed = 0u;
+};
+
+/**
+ * Stream wrapper for std::shared_ptr<const std::vector<uint8_t>>
+ */
+class CSharedVectorStream : public CForwardAsyncReadonlyStream
+{
+public:
+    CSharedVectorStream(std::shared_ptr<const std::vector<uint8_t>> data)
+        : mData{std::move(data)}
+    {/**/}
+
+    bool EndOfStream() const override {return mData->size() == mConsumed;}
+    CSpan ReadAsync(size_t maxSize) override
+    {
+        if(mData->size() > mConsumed)
+        {
+            size_t consume = std::min(mData->size() - mConsumed, maxSize);
+            const uint8_t* start = mData->data() + mConsumed;
+            mConsumed += consume;
+
+            return {start, consume};
+        }
+        else
+        {
+            return {};
+        }
+    }
+
+private:
+    std::shared_ptr<const std::vector<uint8_t>> mData;
+    size_t mConsumed = 0u;
 };
 
 #endif // BITCOIN_STREAMS_H
