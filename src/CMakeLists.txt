@@ -22,6 +22,7 @@ endif()
 
 option(BUILD_BITCOIN_CLI "Build bitcoin-cli" ON)
 option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
+option(BUILD_BITCOIN_MINER "Build bitcoin-miner" ON)
 option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
 # Ensure that WINDRES_PREPROC is enabled when using windres.
@@ -329,6 +330,13 @@ if(BUILD_BITCOIN_TX)
 	endif()
 
 	target_link_libraries(bitcoin-tx bitcoinconsensus)
+endif()
+
+# bitcoin-miner
+if(BUILD_BITCOIN_MINER)
+	add_executable(bitcoin-miner bitcoin-miner.cpp)
+	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
+	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
 endif()
 
 # bitcoind
