@@ -12,7 +12,7 @@ def main():
     try:
         args = ["python3", "test/functional/test_runner.py" \
                 , "--extended" \
-                , "--junitouput=build/reports/func-tests.xml"]
+                , "--junitouput=build/reports/func-tests.xml", "--jobs=2"]
         r1 = subprocess.call(args)
     except Exception as e:
         print("Problem running tests")
