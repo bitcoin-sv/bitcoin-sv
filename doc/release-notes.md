@@ -1,5 +1,8 @@
 # Bitcoin SV version x.y.z Release Notes
 
+## Important Changes
+* [P2SH Sunset Changes](p2sh-sunset.md) - Transactions with P2SH outputs will not be propagated or mined by the node by default.
+
 ## List of Changes
 
 ## Scaling Test Network Reset
