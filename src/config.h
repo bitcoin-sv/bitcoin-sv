@@ -76,6 +76,9 @@ public:
 
     virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
+
+    virtual void SetAcceptP2SH(bool acceptP2SHIn) = 0;
+    virtual bool GetAcceptP2SH() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -136,7 +139,11 @@ public:
     void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override;
     mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override;
 
-    // Reset state of this object to match a newly constructed one.
+    void SetAcceptP2SH(bool acceptP2SHIn) override;
+    bool GetAcceptP2SH() const override;
+
+    // Reset state of this object to match a newly constructed one. 
+    // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
     static GlobalConfig& GetConfig();
 
@@ -169,6 +176,7 @@ private:
 
     bool testBlockCandidateValidity;
     mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
+    bool acceptP2SH;
 };
 
 // Dummy for subclassing in unittests
@@ -246,9 +254,13 @@ public:
         return mining::CMiningFactory::BlockAssemblerType::LEGACY;
     }
 
+    void SetAcceptP2SH(bool acceptP2SHIn) override { acceptP2SH = acceptP2SHIn; }
+    bool GetAcceptP2SH() const override { return acceptP2SH; }
+
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
+    bool acceptP2SH { DEFAULT_ACCEPT_P2SH };
 };
 
 #endif

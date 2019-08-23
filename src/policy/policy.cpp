@@ -34,7 +34,11 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &w
         return false;
     }
 
-    if (whichType == TX_MULTISIG) {
+    // P2SH will be disabled in Genesis.
+    // In preparation for genesis, node can already treat transactions with P2SH in output as non-standard.
+    if (whichType == TX_SCRIPTHASH && !config.GetAcceptP2SH()) {
+        return false;
+    } else if (whichType == TX_MULTISIG) {
         uint8_t m = vSolutions.front()[0];
         uint8_t n = vSolutions.back()[0];
         // Support up to x-of-3 multisig txns as standard

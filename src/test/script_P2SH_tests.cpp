@@ -52,6 +52,7 @@ BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(sign) {
 
     DummyConfig config(CBaseChainParams::MAIN);
+    config.SetAcceptP2SH(true);
     LOCK(cs_main);
     // Pay-to-script-hash looks like this:
     // scriptSig:    <sig> <sig...> <serialized_script>
@@ -161,6 +162,7 @@ BOOST_AUTO_TEST_CASE(norecurse) {
 BOOST_AUTO_TEST_CASE(set) {
 
     DummyConfig config(CBaseChainParams::MAIN);
+    config.SetAcceptP2SH(true);
 
     LOCK(cs_main);
     // Test the CScript::Set* methods

@@ -845,6 +845,11 @@ std::string HelpMessage(HelpMessageMode mode) {
                                     DateTimeStrFormat("%Y-%m-%d %H:%M:%S", testnetChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
                                     testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfter
                                  ));
+    strUsage += HelpMessageOpt(
+    "-acceptP2SH", strprintf(_("Relay and mine transactions with P2SH outputs. "
+                            "When the value is 0 such transactions are treated as non-standard. "
+                            " (default: %d)"),
+                          DEFAULT_ACCEPT_P2SH));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
@@ -1605,6 +1610,11 @@ bool AppInitParameterInteraction(Config &config) {
         if(assembler == mining::CMiningFactory::BlockAssemblerType::UNKNOWN)
             assembler = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
         config.SetMiningCandidateBuilder(assembler);
+    }
+    
+    // Configure if transactions with P2SH in pubkey should be treated as non-standard.
+    if(gArgs.IsArgSet("-acceptP2SH")) {
+        config.SetAcceptP2SH(gArgs.GetArg("-acceptP2SH", DEFAULT_ACCEPT_P2SH));
     }
 
     // Configure data carrier size.
