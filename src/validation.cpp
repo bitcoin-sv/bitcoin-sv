@@ -119,6 +119,14 @@ struct CBlockIndexWorkComparator {
             return true;
         }
 
+        // ... then by when block was completely validated, ...
+        if (pa->GetValidationCompletionTime() < pb->GetValidationCompletionTime()) {
+            return false;
+        }
+        if (pa->GetValidationCompletionTime() > pb->GetValidationCompletionTime()) {
+            return true;
+        }
+
         // ... then by earliest time received, ...
         if (pa->nSequenceId < pb->nSequenceId) {
             return false;
@@ -128,7 +136,7 @@ struct CBlockIndexWorkComparator {
         }
 
         // Use pointer address as tie breaker (should only happen with blocks
-        // loaded from disk, as those all have id 0).
+        // loaded from disk, as those all have id 0 and validation time 0).
         if (pa < pb) {
             return false;
         }
@@ -2988,7 +2996,12 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
             pindex->nStatus = pindex->nStatus.withUndo();
         }
 
+        // since we are changing validation time we need to update
+        // setBlockIndexCandidates as well - it sorts by that time
+        setBlockIndexCandidates.erase(pindex);
         pindex->RaiseValidity(BlockValidity::SCRIPTS);
+        setBlockIndexCandidates.insert(pindex);
+
         setDirtyBlockIndex.insert(pindex);
     }
 
@@ -3820,6 +3833,7 @@ bool PreciousBlock(const Config &config, CValidationState &state,
         }
         nLastPreciousChainwork = chainActive.Tip()->nChainWork;
         setBlockIndexCandidates.erase(pindex);
+        pindex->IgnoreValidationTime();
         pindex->nSequenceId = nBlockReverseSequenceId;
         if (nBlockReverseSequenceId > std::numeric_limits<int32_t>::min()) {
             // We can't keep reducing the counter if somebody really wants to
