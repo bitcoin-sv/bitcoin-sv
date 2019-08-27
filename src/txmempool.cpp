@@ -444,12 +444,10 @@ bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) {
 }
 
 unsigned int CTxMemPool::GetTransactionsUpdated() const {
-    std::shared_lock lock(smtx);
     return nTransactionsUpdated;
 }
 
 void CTxMemPool::AddTransactionsUpdated(unsigned int n) {
-    std::unique_lock lock(smtx);
     nTransactionsUpdated += n;
 }
 

@@ -500,7 +500,7 @@ class CTxMemPool {
 private:
     //!< Value n means that n times in 2^32 we check.
     std::atomic_uint32_t nCheckFrequency;
-    unsigned int nTransactionsUpdated;
+    std::atomic_uint nTransactionsUpdated;
     CBlockPolicyEstimator *minerPolicyEstimator;
 
     //!< sum of all mempool tx's virtual sizes.
