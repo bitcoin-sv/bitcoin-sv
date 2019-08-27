@@ -54,6 +54,11 @@ struct ChainTxData;
 struct PrecomputedTransactionData;
 struct LockPoints;
 
+namespace boost
+{
+    class thread_group;
+}
+
 #define MIN_TRANSACTION_SIZE                                                   \
     (::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION))
 
@@ -432,9 +437,9 @@ void LoadChainTip(const CChainParams &chainparams);
 void UnloadBlockIndex();
 
 /**
- * Run an instance of the script checking thread.
+ * Initialize script checking pool.
  */
-void ThreadScriptCheck(int workerNum);
+void InitScriptCheckQueues(boost::thread_group& threadGroup, size_t threadCount);
 
 /**
  * Check whether we are doing an initial block download (synchronizing from disk

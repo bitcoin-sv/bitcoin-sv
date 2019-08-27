@@ -1954,11 +1954,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
     LogPrintf("Using %u threads for script verification\n",
               nScriptCheckThreads);
-    if (nScriptCheckThreads) {
-        for (int i = 0; i < nScriptCheckThreads - 1; i++) {
-            threadGroup.create_thread([i]() { return ThreadScriptCheck(i); });
-        }
-    }
+    InitScriptCheckQueues(threadGroup, nScriptCheckThreads);
 
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop =

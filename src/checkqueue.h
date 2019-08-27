@@ -12,8 +12,6 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 
-template <typename T> class CCheckQueueControl;
-
 /**
  * Queue for verifications that have to be performed.
  * The verifications are represented by a type T, which must provide an
@@ -155,8 +153,6 @@ public:
         }
     }
 
-    ~CCheckQueue() {}
-
     bool IsIdle() {
         boost::unique_lock<boost::mutex> lock(mutex);
         return (nTotal == nIdle && nTodo == 0 && fAllOk == true);
@@ -181,6 +177,18 @@ public:
             assert(isIdle);
         }
     }
+
+    CCheckQueueControl(CCheckQueueControl&& other) noexcept
+        : pqueue{other.pqueue}
+        , fDone{other.fDone}
+    {
+        other.pqueue = nullptr;
+        other.fDone = true;
+    }
+
+    CCheckQueueControl& operator=(CCheckQueueControl&&) = delete;
+    CCheckQueueControl(const CCheckQueueControl&) = delete;
+    CCheckQueueControl& operator=(const CCheckQueueControl&) = delete;
 
     bool Wait() {
         if (pqueue == nullptr) return true;

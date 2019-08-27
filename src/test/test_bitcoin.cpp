@@ -97,9 +97,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
         }
     }
     nScriptCheckThreads = 3;
-    for (int i = 0; i < nScriptCheckThreads - 1; i++) {
-        threadGroup.create_thread([i]() { return ThreadScriptCheck(i); });
-    }
+    InitScriptCheckQueues(threadGroup, nScriptCheckThreads);
 
     // Deterministic randomness for tests.
     g_connman =

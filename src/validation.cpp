@@ -11,7 +11,7 @@
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
-#include "checkqueue.h"
+#include "checkqueuepool.h"
 #include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
@@ -2613,12 +2613,19 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
-static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
+static std::unique_ptr<checkqueue::CCheckQueuePool<CScriptCheck>> scriptCheckQueuePool;
 
-void ThreadScriptCheck(int workerNum) {
-    std::string s = strprintf("bitcoin-scriptch%d", workerNum);
-    RenameThread(s.c_str());
-    scriptcheckqueue.Thread();
+void InitScriptCheckQueues(boost::thread_group& threadGroup, size_t threadCount)
+{
+    constexpr size_t SCRIPT_CHECK_POOL_SIZE = 4;
+    constexpr size_t SCRIPT_CHECK_BATCH_SIZE = 128;
+
+    scriptCheckQueuePool =
+        std::make_unique<checkqueue::CCheckQueuePool<CScriptCheck>>(
+            SCRIPT_CHECK_POOL_SIZE,
+            threadGroup,
+            threadCount,
+            SCRIPT_CHECK_BATCH_SIZE);
 }
 
 // Returns the script flags which should be checked for a given block
@@ -2827,8 +2834,14 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
 
     CBlockUndo blockundo;
 
-    CCheckQueueControl<CScriptCheck> control(fScriptChecks ? &scriptcheckqueue
-                                                           : nullptr);
+    // CCheckQueueScopeGuard that does nothing and does not belong to any pool.
+    using NullScriptChecker =
+        checkqueue::CCheckQueuePool<CScriptCheck>::CCheckQueueScopeGuard;
+
+    auto control =
+        fScriptChecks
+        ? scriptCheckQueuePool->GetChecker()
+        : NullScriptChecker{};
 
     std::vector<int> prevheights;
     Amount nFees(0);
