@@ -1,3 +1,7 @@
+// Copyright (c) 2019 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file
+// LICENSE.
+
 #pragma once
 
 // requires Op models concept of Binary Operation with Domain(T)
