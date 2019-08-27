@@ -453,7 +453,7 @@ void CTxMemPool::AddTransactionsUpdated(unsigned int n) {
     nTransactionsUpdated += n;
 }
 
-bool CTxMemPool::AddUnchecked(
+void CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
@@ -462,15 +462,15 @@ bool CTxMemPool::AddUnchecked(
 
     LOCK(cs);
     // Add to memory pool without checking anything.
-    return AddUncheckedNL(
-                hash,
-                entry,
-                setAncestors,
-                changeSet,
-                validFeeEstimate);
+    AddUncheckedNL(
+         hash,
+         entry,
+         setAncestors,
+         changeSet,
+         validFeeEstimate);
 }
 
-bool CTxMemPool::AddUncheckedNL(
+void CTxMemPool::AddUncheckedNL(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
@@ -539,8 +539,6 @@ bool CTxMemPool::AddUncheckedNL(
     newit->vTxHashesIdx = vTxHashes.size() - 1;
 
     NotifyEntryAdded(entry.GetSharedTx());
-
-    return true;
 }
 
 void CTxMemPool::removeUncheckedNL(
@@ -1385,7 +1383,7 @@ bool CTxMemPool::CheckTxConflicts(const CTransaction &tx) const {
     return false;
 }
 
-bool CTxMemPool::AddUnchecked(
+void CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     CJournalChangeSetPtr& changeSet,
@@ -1403,12 +1401,13 @@ bool CTxMemPool::AddUnchecked(
         nNoLimit,
         nNoLimit,
         dummy);
-    return AddUncheckedNL(
-                hash,
-                entry,
-                setAncestors,
-                changeSet,
-                validFeeEstimate);
+
+    AddUncheckedNL(
+         hash,
+         entry,
+         setAncestors,
+         changeSet,
+         validFeeEstimate);
 }
 
 void CTxMemPool::updateChildNL(txiter entry, txiter child, bool add) {

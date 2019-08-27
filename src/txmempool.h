@@ -613,20 +613,20 @@ public:
     // to track size/count of descendant transactions. First version of
     // AddUnchecked can be used to have it call CalculateMemPoolAncestors(), and
     // then invoke the second version.
-    bool AddUnchecked(
+    void AddUnchecked(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
             mining::CJournalChangeSetPtr& changeSet,
             bool validFeeEstimate = true);
 
-    bool AddUnchecked(
+    void AddUnchecked(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             mining::CJournalChangeSetPtr& changeSet,
             bool validFeeEstimate = true);
     // A non-locking version of AddUnchecked
-    bool AddUncheckedNL(
+    void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
