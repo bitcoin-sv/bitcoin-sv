@@ -8,6 +8,7 @@
 #include <cassert>
 #include <iostream>
 #include <limits>
+#include <utility>
 
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
