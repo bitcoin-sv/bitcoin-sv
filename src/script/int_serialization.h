@@ -154,7 +154,7 @@ namespace bsv
         return negative ? -result : result;
     }
 
-    // I Models the RandomAccess Iterator concept
+    // I Models the Iterator concept
     // T Models the Integer concept
     template <typename T, typename I>
     inline T deserialize(I f, I l)
