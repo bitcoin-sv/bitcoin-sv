@@ -56,11 +56,6 @@ namespace bsv
         
         int size_bytes() const;
 
-        int to_int() const;
-        int to_uint() const;
-        int64_t to_int64_t() const;
-        uint64_t to_uint64_t() const;
-        
         friend std::ostream& operator<<(std::ostream&, const bint&);
 
         friend bool is_negative(const bint&);

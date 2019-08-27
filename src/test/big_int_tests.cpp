@@ -28,44 +28,6 @@ BOOST_AUTO_TEST_CASE(is_negative_)
     BOOST_CHECK(is_negative(bint{-1}));
 }
 
-BOOST_AUTO_TEST_CASE(negative_to_int)
-{
-    {
-        bint a{-1};
-        const auto b = a.to_int();
-        BOOST_CHECK_EQUAL(b, -1);
-    }
-    {
-        bint a{0};
-        const auto b = a.to_int();
-        BOOST_CHECK_EQUAL(b, 0);
-    }
-    {
-        bint a{1};
-        const auto b = a.to_int();
-        BOOST_CHECK_EQUAL(b, 1);
-    }
-}
-
-BOOST_AUTO_TEST_CASE(to_int64_t)
-{
-    {
-        bint a{-1};
-        const auto b = a.to_int64_t();
-        BOOST_CHECK_EQUAL(b, -1);
-    }
-    {
-        bint a{0};
-        const auto b = a.to_int64_t();
-        BOOST_CHECK_EQUAL(b, 0);
-    }
-    {
-        bint a{1};
-        const auto b = a.to_int64_t();
-        BOOST_CHECK_EQUAL(b, 1);
-    }
-}
-
 BOOST_AUTO_TEST_CASE(equality)
 {
     array<bint, 3> v = {bint{1}, bint{0}, bint{-1}};
