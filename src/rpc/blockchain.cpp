@@ -355,7 +355,7 @@ std::string EntryDescriptionString() {
            "       ... ]\n";
 }
 
-void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) {
+void entryToJSONNL(UniValue &info, const CTxMemPoolEntry &e) {
     AssertLockHeld(mempool.cs);
 
     info.push_back(Pair("size", (int)e.GetTxSize()));
@@ -397,7 +397,7 @@ UniValue mempoolToJSON(bool fVerbose = false) {
         for (const CTxMemPoolEntry &e : mempool.mapTx) {
             const uint256 &txid = e.GetTx().GetId();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSONNL(info, e);
             o.push_back(Pair(txid.ToString(), info));
         }
         return o;
@@ -508,7 +508,7 @@ UniValue getmempoolancestors(const Config &config,
             const CTxMemPoolEntry &e = *ancestorIt;
             const uint256 &_hash = e.GetTx().GetId();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSONNL(info, e);
             o.push_back(Pair(_hash.ToString(), info));
         }
         return o;
@@ -567,7 +567,7 @@ UniValue getmempooldescendants(const Config &config,
             const CTxMemPoolEntry &e = *descendantIt;
             const uint256 &_hash = e.GetTx().GetId();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSONNL(info, e);
             o.push_back(Pair(_hash.ToString(), info));
         }
         return o;
@@ -602,7 +602,7 @@ UniValue getmempoolentry(const Config &config, const JSONRPCRequest &request) {
 
     const CTxMemPoolEntry &e = *it;
     UniValue info(UniValue::VOBJ);
-    entryToJSON(info, e);
+    entryToJSONNL(info, e);
     return info;
 }
 
