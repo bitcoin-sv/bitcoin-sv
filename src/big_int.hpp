@@ -81,7 +81,7 @@ namespace bsv
             void operator()(bignum_st* ) const;
         };
         using unique_bn_ptr = std::unique_ptr<bignum_st, empty_bn_deleter>;
-        static_assert(sizeof(unique_bn_ptr) == 8);
+        static_assert(sizeof(unique_bn_ptr) == sizeof(bignum_st*));
         unique_bn_ptr value_;
     };
 

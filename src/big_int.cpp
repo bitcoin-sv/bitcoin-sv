@@ -101,7 +101,7 @@ namespace
         void operator()(BN_CTX* p) const { ::BN_CTX_free(p); }
     };
     using unique_ctx_ptr = std::unique_ptr<BN_CTX, empty_ctx_deleter>;
-    static_assert(sizeof(unique_ctx_ptr) == 8);
+    static_assert(sizeof(unique_ctx_ptr) == sizeof(BN_CTX*));
 
     unique_ctx_ptr make_unique_ctx_ptr()
     {
@@ -293,7 +293,7 @@ namespace
     };
     using unique_asn1_deleter =
         std::unique_ptr<ASN1_INTEGER, empty_asn1_deleter>;
-    static_assert(sizeof(unique_asn1_deleter) == 8);
+    static_assert(sizeof(unique_asn1_deleter) == sizeof(ASN1_INTEGER*));
 
     unique_asn1_deleter to_asn1(bignum_st* bn)
     {
@@ -373,7 +373,7 @@ namespace
         void operator()(const char* p) const { ::OPENSSL_free((void*)p); }
     };
     using unique_str_ptr = std::unique_ptr<const char, empty_str_deleter>;
-    static_assert(sizeof(unique_str_ptr) == 8);
+    static_assert(sizeof(unique_str_ptr) == sizeof(const char*));
 
     unique_str_ptr to_str(bignum_st* bn)
     {
