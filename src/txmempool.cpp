@@ -1048,7 +1048,6 @@ void CTxMemPool::rebuildJournal() const
 }
 
 void CTxMemPool::SetSanityCheck(double dFrequency) {
-    LOCK(cs);
     nCheckFrequency = dFrequency * 4294967295.0;
 }
 
