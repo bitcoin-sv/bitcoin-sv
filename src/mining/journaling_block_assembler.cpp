@@ -89,7 +89,7 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
     pindexPrev = pindexPrevNew;
     mRecentlyUpdated = false;
 
-    return std::move(blockTemplate);
+    return blockTemplate;
 }
 
 // Get the maximum generated block size for the current config and chain tip
