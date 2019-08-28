@@ -460,14 +460,18 @@ void CTxMemPool::AddUnchecked(
     CJournalChangeSetPtr& changeSet,
     bool validFeeEstimate) {
 
-    std::unique_lock lock(smtx);
-    // Add to memory pool without checking anything.
-    AddUncheckedNL(
-         hash,
-         entry,
-         setAncestors,
-         changeSet,
-         validFeeEstimate);
+    {
+        std::unique_lock lock(smtx);
+        // Add to memory pool without checking anything.
+        AddUncheckedNL(
+             hash,
+             entry,
+             setAncestors,
+             changeSet,
+             validFeeEstimate);
+    }
+    // Notify entry added without holding the mempool's lock
+    NotifyEntryAdded(entry.GetSharedTx());
 }
 
 void CTxMemPool::AddUncheckedNL(
@@ -537,8 +541,6 @@ void CTxMemPool::AddUncheckedNL(
 
     vTxHashes.emplace_back(tx.GetHash(), newit);
     newit->vTxHashesIdx = vTxHashes.size() - 1;
-
-    NotifyEntryAdded(entry.GetSharedTx());
 }
 
 void CTxMemPool::removeUncheckedNL(
@@ -1114,7 +1116,6 @@ public:
 std::vector<CTxMemPool::indexed_transaction_set::const_iterator>
 CTxMemPool::getSortedDepthAndScoreNL() const {
     std::vector<indexed_transaction_set::const_iterator> iters;
-
     iters.reserve(mapTx.size());
     for (indexed_transaction_set::iterator mi = mapTx.begin();
          mi != mapTx.end(); ++mi) {
@@ -1397,25 +1398,29 @@ void CTxMemPool::AddUnchecked(
     CJournalChangeSetPtr& changeSet,
     bool validFeeEstimate) {
 
-    std::unique_lock lock(smtx);
-    setEntries setAncestors;
-    uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
-    std::string dummy;
-    CalculateMemPoolAncestorsNL(
-        entry,
-        setAncestors,
-        nNoLimit,
-        nNoLimit,
-        nNoLimit,
-        nNoLimit,
-        dummy);
+    {
+        std::unique_lock lock(smtx);
+        setEntries setAncestors;
+        uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+        std::string dummy;
+        CalculateMemPoolAncestorsNL(
+            entry,
+            setAncestors,
+            nNoLimit,
+            nNoLimit,
+            nNoLimit,
+            nNoLimit,
+            dummy);
 
-    AddUncheckedNL(
-         hash,
-         entry,
-         setAncestors,
-         changeSet,
-         validFeeEstimate);
+        AddUncheckedNL(
+             hash,
+             entry,
+             setAncestors,
+             changeSet,
+             validFeeEstimate);
+    }
+    // Notify entry added without holding the mempool's lock
+    NotifyEntryAdded(entry.GetSharedTx());
 }
 
 void CTxMemPool::updateChildNL(txiter entry, txiter child, bool add) {

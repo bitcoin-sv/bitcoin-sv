@@ -356,7 +356,6 @@ std::string EntryDescriptionString() {
 }
 
 void entryToJSONNL(UniValue &info, const CTxMemPoolEntry &e) {
-
     info.push_back(Pair("size", (int)e.GetTxSize()));
     info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
     info.push_back(Pair("modifiedfee", ValueFromAmount(e.GetModifiedFee())));

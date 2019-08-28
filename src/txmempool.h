@@ -626,6 +626,8 @@ public:
             mining::CJournalChangeSetPtr& changeSet,
             bool validFeeEstimate = true);
     // A non-locking version of AddUnchecked
+    // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
+    // It needs to be called explicitly by a user if AddUncheckedNL is used.
     void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
@@ -653,9 +655,14 @@ public:
 
     void Clear();
 
-    bool CompareDepthAndScore(const uint256 &hasha, const uint256 &hashb);
+    bool CompareDepthAndScore(
+            const uint256 &hasha,
+            const uint256 &hashb);
     // A non-locking version of CompareDepthAndScore
-    bool CompareDepthAndScoreNL(const uint256 &hasha, const uint256 &hashb);
+    bool CompareDepthAndScoreNL(
+            const uint256 &hasha,
+            const uint256 &hashb);
+
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
     // A non-locking version of IsSpent
@@ -670,10 +677,16 @@ public:
     bool HasNoInputsOf(const CTransaction &tx) const;
 
     /** Affect CreateNewBlock prioritisation of transactions */
-    void PrioritiseTransaction(const uint256& hash, const std::string strHash,
-                               double dPriorityDelta, const Amount nFeeDelta);
-    void ApplyDeltas(const uint256& hash, double &dPriorityDelta,
-                     Amount &nFeeDelta) const;
+    void PrioritiseTransaction(
+            const uint256& hash,
+            const std::string strHash,
+            double dPriorityDelta,
+            const Amount nFeeDelta);
+
+    void ApplyDeltas(
+            const uint256& hash,
+            double &dPriorityDelta,
+            Amount &nFeeDelta) const;
     // A non-locking version of ApplyDeltas
     void ApplyDeltasNL(
             const uint256& hash,
@@ -708,8 +721,8 @@ public:
      * for).  Note: hashesToUpdate should be the set of transactions from the
      * disconnected block that have been accepted back into the mempool.
      */
-    void
-    UpdateTransactionsFromBlock(const std::vector<uint256> &hashesToUpdate);
+    void UpdateTransactionsFromBlock(
+            const std::vector<uint256> &hashesToUpdate);
 
     /**
      * Try to calculate all in-mempool ancestors of entry.
@@ -732,7 +745,6 @@ public:
             uint64_t limitDescendantSize,
             std::string &errString,
             bool fSearchForParents = true) const;
-
     // A non-locking version of CalculateMemPoolAncestors
     bool CalculateMemPoolAncestorsNL(
             const CTxMemPoolEntry &entry,
@@ -748,8 +760,9 @@ public:
      * Populate setDescendants with all in-mempool descendants of hash.
      * Assumes that setDescendants includes all in-mempool descendants of
      * anything already in it.  */
-    void CalculateDescendants(txiter it, setEntries &setDescendants);
-    // Needs to be public for now (It will be moved into private section soon - where it should be)
+    void CalculateDescendants(
+            txiter it,
+            setEntries &setDescendants);
     // A non-locking version of CalculateDescendants
     void CalculateDescendantsNL(
             txiter it,
@@ -787,8 +800,10 @@ public:
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
-    bool TransactionWithinChainLimit(const uint256 &txid,
-                                     size_t chainLimit) const;
+    bool TransactionWithinChainLimit(
+            const uint256 &txid,
+            size_t chainLimit) const;
+
     unsigned long Size();
 
     uint64_t GetTotalTxSize();
@@ -816,8 +831,9 @@ public:
      * be given at nBlocks, return an estimate at the lowest number of blocks
      * where one can be given.
      */
-    CFeeRate EstimateSmartFee(int nBlocks,
-                              int *answerFoundAtBlocks = nullptr) const;
+    CFeeRate EstimateSmartFee(
+            int nBlocks,
+            int *answerFoundAtBlocks = nullptr) const;
 
     /** Estimate fee rate needed to get into the next nBlocks */
     CFeeRate EstimateFee(int nBlocks) const;
@@ -856,12 +872,17 @@ private:
     /**
      * Update ancestors of hash to add/remove it as a descendant transaction.
      */
-    void updateAncestorsOfNL(bool add, txiter hash, setEntries &setAncestors);
+    void updateAncestorsOfNL(
+            bool add,
+            txiter hash,
+            setEntries &setAncestors);
 
     /**
      * Set ancestor state for an entry
      */
-    void updateEntryForAncestorsNL(txiter it, const setEntries &setAncestors);
+    void updateEntryForAncestorsNL(
+            txiter it,
+            const setEntries &setAncestors);
 
     /**
      * For each transaction being removed, update ancestors and any direct
