@@ -4,10 +4,11 @@
 
 #include "test/test_bitcoin.h"
 
+#include "keystore.h"
 #include "policy/policy.h"
 #include "script/interpreter.h"
+#include "script/script_num.h"
 #include "script/sign.h"
-#include "keystore.h"
 
 #include <boost/test/unit_test.hpp>
 

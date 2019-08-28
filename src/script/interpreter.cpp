@@ -12,6 +12,7 @@
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/script.h"
+#include "script/script_num.h"
 #include "uint256.h"
 
 typedef std::vector<uint8_t> valtype;

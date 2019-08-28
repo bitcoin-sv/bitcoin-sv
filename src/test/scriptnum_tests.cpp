@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script/script.h"
+#include "script/script_num.h"
 #include "scriptnum10.h"
 #include "test/test_bitcoin.h"
 
