@@ -169,10 +169,11 @@ class TestNode(NodeConnCB):
 
 
 class TestInstance():
-    def __init__(self, objects=None, sync_every_block=True, sync_every_tx=False):
+    def __init__(self, objects=None, sync_every_block=True, sync_every_tx=False, sync_timeout=300):
         self.blocks_and_transactions = objects if objects else []
         self.sync_every_block = sync_every_block
         self.sync_every_tx = sync_every_tx
+        self.sync_timeout = sync_timeout
 
 
 class TestManager():
@@ -365,7 +366,7 @@ class TestManager():
                         # if we expect failure, just push the block and see what happens.
                         if outcome == True:
                             [c.cb.send_inv(block) for c in self.connections]
-                            self.sync_blocks(block.sha256, 1, timeout=300)
+                            self.sync_blocks(block.sha256, 1, timeout=test_instance.sync_timeout)
                         else:
                             [c.send_message(msg_block(block))
                              for c in self.connections]
@@ -413,8 +414,7 @@ class TestManager():
                     [c.send_message(msg_inv(invqueue))
                      for c in self.connections]
                     invqueue = []
-                self.sync_blocks(block.sha256, len(
-                    test_instance.blocks_and_transactions))
+                self.sync_blocks(block.sha256, len(test_instance.blocks_and_transactions), timeout=test_instance.sync_timeout)
                 if (not self.check_results(tip, block_outcome)):
                     raise AssertionError(
                         "Block test failed at test %d" % test_number)
