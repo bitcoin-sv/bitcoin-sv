@@ -812,6 +812,13 @@ void CTxMemPool::clearNL() {
     }
 }
 
+void CTxMemPool::trackPackageRemovedNL(const CFeeRate &rate) {
+    if (rate.GetFeePerK().GetSatoshis() > rollingMinimumFeeRate) {
+        rollingMinimumFeeRate = rate.GetFeePerK().GetSatoshis();
+        blockSinceLastRollingFeeBump = false;
+    }
+}
+
 void CTxMemPool::Clear() {
     std::unique_lock lock(smtx);
     clearNL();
@@ -1468,13 +1475,6 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
     return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
 }
 
-void CTxMemPool::trackPackageRemoved(const CFeeRate &rate) {
-    if (rate.GetFeePerK().GetSatoshis() > rollingMinimumFeeRate) {
-        rollingMinimumFeeRate = rate.GetFeePerK().GetSatoshis();
-        blockSinceLastRollingFeeBump = false;
-    }
-}
-
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     mining::CJournalChangeSetPtr& changeSet,
@@ -1498,7 +1498,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
                          it->GetSizeWithDescendants());
         removed += MEMPOOL_FULL_FEE_INCREMENT;
 
-        trackPackageRemoved(removed);
+        trackPackageRemovedNL(removed);
         maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
         setEntries stage;

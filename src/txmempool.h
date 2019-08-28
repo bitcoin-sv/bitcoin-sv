@@ -517,8 +517,6 @@ private:
     // Our journal builder
     mining::CJournalBuilderPtr mJournalBuilder;
 
-    void trackPackageRemoved(const CFeeRate &rate);
-
 public:
     // public only for testing
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
@@ -897,6 +895,8 @@ private:
             mining::CJournalChangeSetPtr& changeSet);
 
     void clearNL();
+
+    void trackPackageRemovedNL(const CFeeRate &rate);
 
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
