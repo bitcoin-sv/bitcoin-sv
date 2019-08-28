@@ -137,7 +137,7 @@ CJournal::Index::Index(const CJournal* journal, const Underlying& begin)
 bool CJournal::Index::valid() const
 {
     // We're valid if we were initialised after the last invalidating time
-    return { mJournal && mValidTime > mJournal->getLastInvalidatingTime() };
+    return ( mJournal && mValidTime > mJournal->getLastInvalidatingTime() );
 }
 
 // Increment

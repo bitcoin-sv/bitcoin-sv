@@ -31,7 +31,7 @@ class CTask
     // integer type.
     static typename std::underlying_type<Priority>::type convertPriority(Priority priority)
     {
-        return { static_cast<typename std::underlying_type<Priority>::type>(priority) };
+        return static_cast<typename std::underlying_type<Priority>::type>(priority);
     }
 
   public:
@@ -97,7 +97,7 @@ namespace std
     {
         bool operator()(const CTask& a, const CTask& b) const
         {
-            return { a.getPriority() < b.getPriority() };
+            return ( a.getPriority() < b.getPriority() );
         }
     };
 }
