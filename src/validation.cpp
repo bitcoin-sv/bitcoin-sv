@@ -2442,9 +2442,6 @@ void PruneAndFlush() {
  * block to the chain tip.
  */
 static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
-    const Consensus::Params &consensusParams =
-        config.GetChainParams().GetConsensus();
-
     chainActive.SetTip(pindexNew);
 
     // New best block

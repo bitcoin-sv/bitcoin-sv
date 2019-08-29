@@ -16,11 +16,11 @@ BlockAssemblerRef CMiningFactory::GetAssembler(const Config& config)
     {
         case(CMiningFactory::BlockAssemblerType::LEGACY):
             return std::make_shared<LegacyBlockAssembler>(config);
-            break;
         case(CMiningFactory::BlockAssemblerType::JOURNALING):
-            static BlockAssemblerRef journalingAssembler { std::make_shared<JournalingBlockAssembler>(config) };
-            return journalingAssembler;
-            break;
+		{
+			static BlockAssemblerRef journalingAssembler{ std::make_shared<JournalingBlockAssembler>(config) };
+			return journalingAssembler;
+		}
         default:
             break;
     }
