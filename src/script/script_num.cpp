@@ -6,6 +6,18 @@
 
 #include "script_num.h"
 
+#include "int_serialization.h"
+#include <iterator>
+
+using namespace std;
+
+vector<uint8_t> CScriptNum::getvch() const {
+    vector<uint8_t> v;
+    v.reserve(sizeof(m_value));
+    bsv::serialize(m_value, back_inserter(v));
+    return v;
+}
+
 bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch,
                                     const size_t nMaxNumSize) {
     if (vch.size() > nMaxNumSize) {

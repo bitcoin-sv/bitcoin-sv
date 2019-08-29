@@ -173,36 +173,7 @@ public:
         return m_value;
     }
 
-    std::vector<uint8_t> getvch() const { return serialize(m_value); }
-
-    static std::vector<uint8_t> serialize(const int64_t &value) {
-        if (value == 0) return std::vector<uint8_t>();
-
-        std::vector<uint8_t> result;
-        const bool neg = value < 0;
-        uint64_t absvalue = neg ? -(static_cast<uint64_t>(value)) : value;
-
-        while (absvalue) {
-            result.push_back(absvalue & 0xff);
-            absvalue >>= 8;
-        }
-
-        // - If the most significant byte is >= 0x80 and the value is positive,
-        // push a new zero-byte to make the significant byte < 0x80 again.
-        // - If the most significant byte is >= 0x80 and the value is negative,
-        // push a new 0x80 byte that will be popped off when converting to an
-        // integral.
-        // - If the most significant byte is < 0x80 and the value is negative,
-        // add 0x80 to it, since it will be subtracted and interpreted as a
-        // negative when converting to an integral.
-        if (result.back() & 0x80) {
-            result.push_back(neg ? 0x80 : 0);
-        } else if (neg) {
-            result.back() |= 0x80;
-        }
-
-        return result;
-    }
+    std::vector<uint8_t> getvch() const;
 
 private:
     static int64_t set_vch(const std::vector<uint8_t> &vch) {

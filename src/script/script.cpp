@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script.h"
+#include "int_serialization.h"
 #include "script_num.h"
 
 #include "tinyformat.h"
@@ -352,7 +353,10 @@ CScript &CScript::push_int64(int64_t n) {
     } else if (n == 0) {
         push_back(OP_0);
     } else {
-        *this << CScriptNum::serialize(n);
+        std::vector<uint8_t> v;
+        v.reserve(sizeof(n));
+        bsv::serialize(n, back_inserter(v));
+        *this << v;
     }
     return *this;
 }
