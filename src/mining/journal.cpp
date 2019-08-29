@@ -259,7 +259,7 @@ CJournalTester::TxnOrder CJournalTester::checkTxnOrdering(const CJournalEntry& t
     }
     else if(it1 == it2)
     {
-        return CJournalTester::TxnOrder::DUPLICATE;
+        return CJournalTester::TxnOrder::DUPLICATETX;
     }
 
     // Project onto index 1 to find them in the ordered view
@@ -294,11 +294,11 @@ const enumTableT<CJournalTester::TxnOrder>& mining::enumTable(CJournalTester::Tx
 {   
     static enumTableT<CJournalTester::TxnOrder> table
     {   
-        { CJournalTester::TxnOrder::UNKNOWN,   "UNKNOWN" },
-        { CJournalTester::TxnOrder::BEFORE,    "BEFORE" },
-        { CJournalTester::TxnOrder::AFTER,     "AFTER" },
-        { CJournalTester::TxnOrder::NOTFOUND,  "NOTFOUND" },
-        { CJournalTester::TxnOrder::DUPLICATE, "DUPLICATE" }
+        { CJournalTester::TxnOrder::UNKNOWN,     "UNKNOWN" },
+        { CJournalTester::TxnOrder::BEFORE,      "BEFORE" },
+        { CJournalTester::TxnOrder::AFTER,       "AFTER" },
+        { CJournalTester::TxnOrder::NOTFOUND,    "NOTFOUND" },
+        { CJournalTester::TxnOrder::DUPLICATETX, "DUPLICATETX" }
     };
     return table;
 }

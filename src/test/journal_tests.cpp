@@ -63,7 +63,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     changeSet.reset();
     BOOST_CHECK_EQUAL(journal->size(), 1);
     BOOST_CHECK(CJournalTester{journal}.checkTxnExists(singletxn));
-    BOOST_CHECK_EQUAL(CJournalTester{journal}.checkTxnOrdering(singletxn, singletxn), CJournalTester::TxnOrder::DUPLICATE);
+    BOOST_CHECK_EQUAL(CJournalTester{journal}.checkTxnOrdering(singletxn, singletxn), CJournalTester::TxnOrder::DUPLICATETX);
 
     // begin() now points to this first txn
     index.reset();

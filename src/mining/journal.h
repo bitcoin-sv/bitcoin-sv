@@ -181,12 +181,12 @@ class CJournalTester final
     bool checkTxnExists(const CJournalEntry& txn) const;
 
     // Enumeration for txn order checking
-    enum class TxnOrder { UNKNOWN, BEFORE, AFTER, NOTFOUND, DUPLICATE };
+    enum class TxnOrder { UNKNOWN, BEFORE, AFTER, NOTFOUND, DUPLICATETX };
 
     // Report on the relative ordering within the journal of txn1 compared to txn2.
     // If txn1 comes first it will return BEFORE, if txn1 comes later it will return AFTER,
     // if either txn1 or txn2 are not found it will return NOTFOUND,
-    // if txn1 and txn2 are the same it will return DUPLICATE.
+    // if txn1 and txn2 are the same it will return DUPLICATETX.
     TxnOrder checkTxnOrdering(const CJournalEntry& txn1, const CJournalEntry& txn2) const;
 
     // Dump out the contents of the journal
