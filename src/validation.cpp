@@ -868,8 +868,6 @@ void CommitTxToMempool(
             return;
         }
     }
-    // Notify subscribers that a new txn was added to the mempool.
-    GetMainSignals().TransactionAddedToMempool(ptx);
 }
 
 CTxnValResult TxnValidation(
@@ -1179,14 +1177,18 @@ std::vector<CTxnValResult> TxnValidationBatchProcessing(
     std::vector<CTxnValResult> results {};
     results.reserve(vTxInputData.size());
     for (const auto& elem : vTxInputData) {
-        // Forward results to the next processing stage
-        results.emplace_back(
-            // Execute validation for the given txn
+        // Execute validation for the given txn
+        CTxnValResult result {
             TxnValidation(
                     elem,
                     config,
                     pool,
-                    handlers.mpTxnDoubleSpendDetector));
+                    handlers.mpTxnDoubleSpendDetector)
+        };
+        // Process validated results
+        ProcessValidatedTxn(pool, result, handlers, false);
+        // Forward results to the next processing stage
+        results.emplace_back(std::move(result));
     }
     return results;
 }
@@ -1439,8 +1441,6 @@ static void HandleInvalidP2POrphanTxn(
     if (!state.IsMissingInputs()) {
         int nDoS = 0;
         if (state.IsInvalid(nDoS) && nDoS > 0) {
-            // Punish peer that gave us an invalid orphan tx
-            Misbehaving(pNode->GetId(), nDoS, "invalid-orphan-tx");
             // Remove all orphan txns queued from the punished peer
             handlers.mpOrphanTxnsP2PQ->eraseTxnsFromPeer(pNode->GetId());
         } else {
@@ -1545,10 +1545,6 @@ static void HandleInvalidStateForP2PNonOrphanTxn(
         txStatus.mTxInputData,
         state.GetRejectCode(),
         state.GetRejectReason());
-    if (nDoS > 0) {
-        // Punish peer that gave us an invalid tx
-        Misbehaving(pNode->GetId(), nDoS, state.GetRejectReason());
-    }
 }
 
 static void PostValidationStepsForP2PTxn(

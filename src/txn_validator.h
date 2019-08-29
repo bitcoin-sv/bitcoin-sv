@@ -88,14 +88,19 @@ class CTxnValidator final
     /** Thread entry point for new transaction queue handling */
     void threadNewTxnHandler() noexcept;
 
-    /** Process all newly arrived transactions */
-    void processNewTransactionsNL(
+    /** Process all newly arrived transactions. Return txns accepted by the mempool */
+    std::vector<TxInputDataSPtr> processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
         mining::CJournalChangeSetPtr& journalChangeSet);
 
+    /** Post validation step for p2p txns before limit mempool size is done*/
+    void postValidationP2PStepsNL(
+        const CTxnValResult& txStatus,
+        std::vector<TxInputDataSPtr>& vAcceptedTxns) const;
+
     /** Post processing step for p2p txns when limit mempool size is done */
     void postProcessingP2PStepsNL(
-        const std::vector<TxInputDataSPtr>& vCurrentTxns,
+        const std::vector<TxInputDataSPtr>& vAcceptedTxns,
         const std::vector<TxId>& vRemovedTxIds);
 
     /** Schedule orphan p2p txns for retry into the main queue */

@@ -5,6 +5,7 @@
 #include "txn_validator.h"
 #include "txn_validation_config.h"
 #include "config.h"
+#include "net_processing.h"
 
 /** Constructor */
 CTxnValidator::CTxnValidator(
@@ -148,6 +149,11 @@ CValidationState CTxnValidator::processValidation(
         };
         // Process validated results for the given txn
         ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
+        // Notify subscribers that a new txn was added to the mempool and not
+        // removed from there due to LimitMempoolSize.
+        if (result.mState.IsValid()) {
+            GetMainSignals().TransactionAddedToMempool(result.mTxInputData->mpTx);
+        }
         // After we've (potentially) uncached entries, ensure our coins cache is
         // still within its size limits
         CValidationState dummyState;
@@ -190,7 +196,9 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::NEW_TXN)
                             };
                             // Validate txns and try to submit them to the mempool
-                            processNewTransactionsNL(mProcessingQueue, changeSet);
+                            std::vector<TxInputDataSPtr> vAcceptedTxns {
+                                processNewTransactionsNL(mProcessingQueue, changeSet)
+                            };
                             // Trim mempool if it's size exceeds the limit.
                             std::vector<TxId> vRemovedTxIds {
                                 LimitMempoolSize(
@@ -200,7 +208,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60)
                             };
                             // Execute post processing steps.
-                            postProcessingP2PStepsNL(mProcessingQueue, vRemovedTxIds);
+                            postProcessingP2PStepsNL(vAcceptedTxns, vRemovedTxIds);
                             // After we've (potentially) uncached entries, ensure our coins cache is
                             // still within its size limits
                             CValidationState dummyState;
@@ -241,7 +249,8 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
 /**
 * Process all new transactions.
 */
-void CTxnValidator::processNewTransactionsNL(
+std::vector<TxInputDataSPtr>
+CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
     mining::CJournalChangeSetPtr& journalChangeSet) {
 
@@ -277,36 +286,79 @@ void CTxnValidator::processNewTransactionsNL(
                         handlers)
     };
     // Process validation results for transactions.
+    std::vector<TxInputDataSPtr> vAcceptedTxns {};
     for(auto& task_result : results) {
         auto vBatchResults = task_result.get();
         for (auto& result : vBatchResults) {
-            ProcessValidatedTxn(mMempool, result, handlers, false);
+            postValidationP2PStepsNL(result, vAcceptedTxns);
+        }
+    }
+    return vAcceptedTxns;
+}
+
+void CTxnValidator::postValidationP2PStepsNL(
+    const CTxnValResult& txStatus,
+    std::vector<TxInputDataSPtr>& vAcceptedTxns) const {
+
+    const CValidationState& state = txStatus.mState;
+    if (state.IsValid()) {
+        // Txns accepted by the mempool
+        vAcceptedTxns.emplace_back(txStatus.mTxInputData);
+    } else {
+        // Misbehaving needs to be called by the Validator thread due to cs_main lock.
+        // It is used internally by the method to protect an access to mapNodeState.
+        // mapNodeState needs to be decoupled from cs_main, then we can move it back to p2p hadling methods.
+        if (TxSource::p2p == txStatus.mTxInputData->mTxSource) {
+            if (!state.IsMissingInputs()) {
+                int nDoS = 0;
+                if (state.IsInvalid(nDoS) && nDoS > 0) {
+                    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
+                    // Punish the peer that gave us an invalid orphan tx
+                    if (pNode) {
+                        Misbehaving(
+                            pNode->GetId(),
+                            nDoS,
+                            txStatus.mTxInputData->mfOrphan ? "invalid-orphan-tx" : state.GetRejectReason());
+                    } else {
+                        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
+                    }
+                }
+            }
         }
     }
 }
 
 void CTxnValidator::postProcessingP2PStepsNL(
-    const std::vector<TxInputDataSPtr>& vCurrentTxns,
+    const std::vector<TxInputDataSPtr>& vAcceptedTxns,
     const std::vector<TxId>& vRemovedTxIds) {
 
     /**
-     * Send tx reject message if txn was accepted to the mempool
-     * and then removed by LimitMempoolSize because of insufficient fee.
+     * 1. Send tx reject message if txn was accepted by the mempool
+     * and then removed from there because of insufficient fee.
+     *
+     * 2. Notify subscribers if a new txn is accepted and not removed.
      */
-    for (const auto& txid : vRemovedTxIds) {
-        const auto& txIter = findIfTxnIsInSetNL(txid, vCurrentTxns);
-        if (txIter != vCurrentTxns.end()) {
-            // Create a reject message
+    for (const auto& pTxInputDataSPtr: vAcceptedTxns) {
+        if (std::find(
+                vRemovedTxIds.begin(),
+                vRemovedTxIds.end(),
+                pTxInputDataSPtr->mpTx->GetId()) != vRemovedTxIds.end()) {
+            // Create a reject message for the removed txn
             CreateTxRejectMsgForP2PTxn(
-               *txIter,
+                pTxInputDataSPtr,
                 REJECT_INSUFFICIENTFEE,
                 std::string("mempool full"));
+        } else {
+            // Notify subscribers that a new txn was added to the mempool.
+            // At this stage we do know that the signal won't be triggered for removed txns.
+            // This needs to be here due to cs_main lock held by wallet's implementation of the signal
+            GetMainSignals().TransactionAddedToMempool(pTxInputDataSPtr->mpTx);
         }
     }
     /**
      * We don't want to keep outpoints from txns which were
-     * removed from the mempool (because of insufficient).
-     * It could produce false-possitive orphans to be scheduled for re-try.
+     * removed from the mempool (because of insufficient fee).
+     * It could schedule false-possitive orphans for re-try.
      */
     mpOrphanTxnsP2PQ->eraseCollectedOutpointsFromTxns(vRemovedTxIds);
 }
