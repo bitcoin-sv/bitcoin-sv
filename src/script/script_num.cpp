@@ -11,6 +11,17 @@
 
 using namespace std;
 
+CScriptNum::CScriptNum(const vector<uint8_t> &vch, bool fRequireMinimal,
+                       const size_t nMaxNumSize) {
+    if (vch.size() > nMaxNumSize) {
+        throw scriptnum_overflow_error("script number overflow");
+    }
+    if (fRequireMinimal && !IsMinimallyEncoded(vch, nMaxNumSize)) {
+        throw scriptnum_minencode_error("non-minimally encoded script number");
+    }
+    m_value = vch.empty() ? 0 : bsv::deserialize<int64_t>(begin(vch), end(vch));
+}
+
 vector<uint8_t> CScriptNum::getvch() const {
     vector<uint8_t> v;
     v.reserve(sizeof(m_value));

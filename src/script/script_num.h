@@ -3,11 +3,11 @@
 // Copyright (c) 2018-2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#pragma once
+
 #include <cassert>
 #include <stdexcept>
 #include <vector>
-
-#pragma once
 
 class scriptnum_overflow_error : public std::overflow_error {
 public:
@@ -35,18 +35,8 @@ public:
     static const size_t MAXIMUM_ELEMENT_SIZE = 4;
 
     explicit CScriptNum(const int64_t &n) { m_value = n; }
-
     explicit CScriptNum(const std::vector<uint8_t> &vch, bool fRequireMinimal,
-                        const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE) {
-        if (vch.size() > nMaxNumSize) {
-            throw scriptnum_overflow_error("script number overflow");
-        }
-        if (fRequireMinimal && !IsMinimallyEncoded(vch, nMaxNumSize)) {
-            throw scriptnum_minencode_error(
-                "non-minimally encoded script number");
-        }
-        m_value = set_vch(vch);
-    }
+                        const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE);
 
     static bool IsMinimallyEncoded(
         const std::vector<uint8_t> &vch,
@@ -176,20 +166,5 @@ public:
     std::vector<uint8_t> getvch() const;
 
 private:
-    static int64_t set_vch(const std::vector<uint8_t> &vch) {
-        if (vch.empty()) return 0;
-
-        int64_t result = 0;
-        for (size_t i = 0; i != vch.size(); ++i)
-            result |= static_cast<int64_t>(vch[i]) << 8 * i;
-
-        // If the input vector's most significant byte is 0x80, remove it from
-        // the result's msb and return a negative.
-        if (vch.back() & 0x80)
-            return -((int64_t)(result & ~(0x80ULL << (8 * (vch.size() - 1)))));
-
-        return result;
-    }
-
     int64_t m_value;
 };
