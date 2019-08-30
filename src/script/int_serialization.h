@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iterator>
+#include <vector>
 
 namespace bsv
 {
@@ -34,14 +35,15 @@ namespace bsv
                 *o = tmp;
             else
             {
-                // - If the most significant byte is >= 0x80 and the value is positive,
-                // push a new zero-byte to make the significant byte < 0x80 again.
-                // - If the most significant byte is >= 0x80 and the value is negative,
-                // push a new 0x80 byte that will be popped off when converting to an
-                // integral.
-                // - If the most significant byte is < 0x80 and the value is negative,
-                // add 0x80 to it, since it will be subtracted and interpreted as a
-                // negative when converting to an integral.
+                // - If the most significant byte is >= 0x80 and the value is
+                // positive, push a new zero-byte to make the significant byte <
+                // 0x80 again.
+                // - If the most significant byte is >= 0x80 and the value is
+                // negative, push a new 0x80 byte that will be popped off when
+                // converting to an integral.
+                // - If the most significant byte is < 0x80 and the value is
+                // negative, add 0x80 to it, since it will be subtracted and
+                // interpreted as a negative when converting to an integral.
                 if((tmp & 0x80) != 0)
                 {
                     *o = tmp;
@@ -161,7 +163,41 @@ namespace bsv
     {
         // pre-condition: bounded_range(f, l) and f < l
         assert(f != l);
-        return deserialize<T>(f, l, typename std::iterator_traits<I>::iterator_category());
+        return deserialize<T>(
+            f, l, typename std::iterator_traits<I>::iterator_category());
+    }
+
+    inline bool IsMinimallyEncoded(const std::vector<uint8_t>& vch,
+                                   size_t nMaxNumSize)
+    {
+        if(vch.size() > nMaxNumSize)
+        {
+            return false;
+        }
+
+        if(vch.size() > 0)
+        {
+            // Check that the number is encoded with the minimum possible number
+            // of bytes.
+            //
+            // If the most-significant-byte - excluding the sign bit - is zero
+            // then we're not minimal. Note how this test also rejects the
+            // negative-zero encoding, 0x80.
+            if((vch.back() & 0x7f) == 0)
+            {
+                // One exception: if there's more than one byte and the most
+                // significant bit of the second-most-significant-byte is set it
+                // would conflict with the sign bit. An example of this case is
+                // +-255, which encode to 0xff00 and 0xff80 respectively.
+                // (big-endian).
+                if(vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }
 

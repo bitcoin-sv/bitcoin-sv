@@ -143,5 +143,29 @@ BOOST_AUTO_TEST_CASE(very_big_number)
     BOOST_CHECK_EQUAL(n, ip);
 }
 
+BOOST_AUTO_TEST_CASE(is_minimal_encoding)
+{
+    // clang-format off
+    vector<pair<bool, vector<uint8_t>>> test_data = {
+        {true, {}},
+        {true, {0x1}},            // +1
+        {true, {0x7f}},           // +127 
+        {true, {0x80, 0x0}},      // +128
+        {true, {0xff, 0x0}},      // 255
+        {true, {0x81}},           // -1
+        {true, {0xff}},           // -127 
+        {true, {0x80, 0x80}},     // -128
+        {true, {0xff, 0x80}},     // -255
+        {false, {0x1, 0x0}},      // should be 0x1 for +1
+        {false, {0x7f, 0x80}},    // should be 0xff for -127
+        {false, {1, 2, 3, 4, 5}}, // too long
+    };
+    // clang-format on
+    for(const auto& [expected, ip] : test_data)
+    {
+        BOOST_CHECK_EQUAL(expected, IsMinimallyEncoded(ip, 4));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 

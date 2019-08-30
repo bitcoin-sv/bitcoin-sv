@@ -11,6 +11,7 @@
 #include "crypto/sha256.h"
 #include "primitives/transaction.h"
 #include "pubkey.h"
+#include "script/int_serialization.h"
 #include "script/script.h"
 #include "script/script_num.h"
 #include "uint256.h"
@@ -1468,7 +1469,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         CScriptNum::MinimallyEncode(n);
 
                         // The resulting number must be a valid number.
-                        if (!CScriptNum::IsMinimallyEncoded(n)) {
+                        if (!bsv::IsMinimallyEncoded(
+                                n, CScriptNum::MAXIMUM_ELEMENT_SIZE)) {
                             return set_error(serror,
                                              SCRIPT_ERR_INVALID_NUMBER_RANGE);
                         }

@@ -16,7 +16,7 @@ CScriptNum::CScriptNum(const vector<uint8_t> &vch, bool fRequireMinimal,
     if (vch.size() > nMaxNumSize) {
         throw scriptnum_overflow_error("script number overflow");
     }
-    if (fRequireMinimal && !IsMinimallyEncoded(vch, nMaxNumSize)) {
+    if (fRequireMinimal && !bsv::IsMinimallyEncoded(vch, nMaxNumSize)) {
         throw scriptnum_minencode_error("non-minimally encoded script number");
     }
     m_value = vch.empty() ? 0 : bsv::deserialize<int64_t>(begin(vch), end(vch));
@@ -27,34 +27,6 @@ vector<uint8_t> CScriptNum::getvch() const {
     v.reserve(sizeof(m_value));
     bsv::serialize(m_value, back_inserter(v));
     return v;
-}
-
-bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch,
-                                    const size_t nMaxNumSize) {
-    if (vch.size() > nMaxNumSize) {
-        return false;
-    }
-
-    if (vch.size() > 0) {
-        // Check that the number is encoded with the minimum possible number
-        // of bytes.
-        //
-        // If the most-significant-byte - excluding the sign bit - is zero
-        // then we're not minimal. Note how this test also rejects the
-        // negative-zero encoding, 0x80.
-        if ((vch.back() & 0x7f) == 0) {
-            // One exception: if there's more than one byte and the most
-            // significant bit of the second-most-significant-byte is set it
-            // would conflict with the sign bit. An example of this case is
-            // +-255, which encode to 0xff00 and 0xff80 respectively.
-            // (big-endian).
-            if (vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0) {
-                return false;
-            }
-        }
-    }
-
-    return true;
 }
 
 bool CScriptNum::MinimallyEncode(std::vector<uint8_t> &data) {

@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "script/int_serialization.h"
 #include "script/script.h"
 #include "script/script_num.h"
 #include "scriptnum10.h"
@@ -205,7 +206,7 @@ BOOST_AUTO_TEST_CASE(operators) {
 
 static void CheckMinimalyEncode(std::vector<uint8_t> data,
                                 const std::vector<uint8_t> &expected) {
-    bool alreadyEncoded = CScriptNum::IsMinimallyEncoded(data, data.size());
+    bool alreadyEncoded = bsv::IsMinimallyEncoded(data, data.size());
     bool hasEncoded = CScriptNum::MinimallyEncode(data);
     BOOST_CHECK_EQUAL(hasEncoded, !alreadyEncoded);
     BOOST_CHECK(data == expected);
