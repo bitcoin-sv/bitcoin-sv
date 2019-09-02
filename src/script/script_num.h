@@ -42,23 +42,9 @@ public:
     friend bool operator==(const CScriptNum&, int64_t);
     friend bool operator==(int64_t, const CScriptNum&);
 
-    inline bool operator<=(const int64_t &rhs) const { return m_value <= rhs; }
-    inline bool operator<(const int64_t &rhs) const { return m_value < rhs; }
-    inline bool operator>=(const int64_t &rhs) const { return m_value >= rhs; }
-    inline bool operator>(const int64_t &rhs) const { return m_value > rhs; }
-
-    inline bool operator<=(const CScriptNum &rhs) const {
-        return operator<=(rhs.m_value);
-    }
-    inline bool operator<(const CScriptNum &rhs) const {
-        return operator<(rhs.m_value);
-    }
-    inline bool operator>=(const CScriptNum &rhs) const {
-        return operator>=(rhs.m_value);
-    }
-    inline bool operator>(const CScriptNum &rhs) const {
-        return operator>(rhs.m_value);
-    }
+    friend bool operator<(const CScriptNum&, const CScriptNum&);
+    friend bool operator<(const CScriptNum&, int64_t);
+    friend bool operator<(int64_t, const CScriptNum&);
 
     inline CScriptNum operator+(const int64_t &rhs) const {
         return CScriptNum(m_value + rhs);
@@ -159,6 +145,7 @@ private:
     int64_t m_value;
 };
 
+// Equality operators
 inline bool operator==(const CScriptNum& a, const CScriptNum& b) { return a.m_value == b.m_value; }
 inline bool operator==(const CScriptNum& a, int64_t b) { return a.m_value == b; }
 inline bool operator==(int64_t a, const CScriptNum& b) { return a == b.m_value; }
@@ -166,4 +153,22 @@ inline bool operator==(int64_t a, const CScriptNum& b) { return a == b.m_value; 
 inline bool operator!=(const CScriptNum& a, const CScriptNum& b) { return !(a == b); }
 inline bool operator!=(const CScriptNum& a, int64_t b) { return !(a == b); }
 inline bool operator!=(int64_t a, const CScriptNum& b) { return !(a == b); }
+
+// Relational operators
+inline bool operator<(const CScriptNum& a, const CScriptNum& b){ return a.m_value < b.m_value; }
+inline bool operator<(const CScriptNum& a, int64_t b){ return a.m_value < b; }
+inline bool operator<(int64_t a, const CScriptNum& b){ return a < b.m_value; }
+
+inline bool operator>=(const CScriptNum& a, const CScriptNum& b){ return !(a < b); }
+inline bool operator>(const CScriptNum& a, const CScriptNum& b){ return b < a; }
+inline bool operator<=(const CScriptNum& a, const CScriptNum& b){ return !(b < a); }
+
+inline bool operator>=(const CScriptNum& a, int64_t b){ return !(a < b); }
+inline bool operator>(const CScriptNum& a, int64_t b){ return b < a; }
+inline bool operator<=(const CScriptNum& a, int64_t b){ return !(b < a); }
+
+inline bool operator>=(int64_t a, const CScriptNum& b){ return !(a < b); }
+inline bool operator>(int64_t a, const CScriptNum& b){ return b < a; }
+inline bool operator<=(int64_t a, const CScriptNum& b){ return !(b < a); }
+
 
