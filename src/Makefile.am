@@ -87,6 +87,7 @@ endif
 BITCOIN_CORE_H = \
   addrdb.h \
   addrman.h \
+  async_file_reader.h \
   base58.h \
   bloom.h \
   blockencodings.h \
