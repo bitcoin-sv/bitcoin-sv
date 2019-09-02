@@ -84,8 +84,8 @@ static void CheckAdd(const int64_t &num1, const int64_t &num2) {
          ((num2 < 0) && (num1 < (std::numeric_limits<int64_t>::min() - num2))));
     if (!invalid) {
         BOOST_CHECK(verify(bignum1 + bignum2, scriptnum1 + scriptnum2));
-        BOOST_CHECK(verify(bignum1 + bignum2, scriptnum1 + num2));
-        BOOST_CHECK(verify(bignum1 + bignum2, scriptnum2 + num1));
+        BOOST_CHECK(verify(bignum1 + bignum2, scriptnum1 + scriptnum2));
+        BOOST_CHECK(verify(bignum1 + bignum2, scriptnum2 + scriptnum1));
     }
 }
 
@@ -111,7 +111,7 @@ static void CheckSubtract(const int64_t &num1, const int64_t &num2) {
          (num2 < 0 && num1 > std::numeric_limits<int64_t>::max() + num2));
     if (!invalid) {
         BOOST_CHECK(verify(bignum1 - bignum2, scriptnum1 - scriptnum2));
-        BOOST_CHECK(verify(bignum1 - bignum2, scriptnum1 - num2));
+        BOOST_CHECK(verify(bignum1 - bignum2, scriptnum1 - scriptnum2));
     }
 
     invalid =
@@ -119,7 +119,7 @@ static void CheckSubtract(const int64_t &num1, const int64_t &num2) {
          (num1 < 0 && num2 > std::numeric_limits<int64_t>::max() + num1));
     if (!invalid) {
         BOOST_CHECK(verify(bignum2 - bignum1, scriptnum2 - scriptnum1));
-        BOOST_CHECK(verify(bignum2 - bignum1, scriptnum2 - num1));
+        BOOST_CHECK(verify(bignum2 - bignum1, scriptnum2 - scriptnum1));
     }
 }
 
@@ -136,8 +136,6 @@ static void CheckCompare(const int64_t &num1, const int64_t &num2) {
     BOOST_CHECK((bignum1 >= bignum1) == (scriptnum1 >= scriptnum1));
     BOOST_CHECK((bignum1 <= bignum1) == (scriptnum1 <= scriptnum1));
 
-    BOOST_CHECK((bignum1 == bignum1) == (scriptnum1 == num1));
-    BOOST_CHECK((bignum1 != bignum1) == (scriptnum1 != num1));
     BOOST_CHECK((bignum1 < bignum1) == (scriptnum1 < num1));
     BOOST_CHECK((bignum1 > bignum1) == (scriptnum1 > num1));
     BOOST_CHECK((bignum1 >= bignum1) == (scriptnum1 >= num1));
@@ -150,8 +148,6 @@ static void CheckCompare(const int64_t &num1, const int64_t &num2) {
     BOOST_CHECK((bignum1 >= bignum2) == (scriptnum1 >= scriptnum2));
     BOOST_CHECK((bignum1 <= bignum2) == (scriptnum1 <= scriptnum2));
 
-    BOOST_CHECK((bignum1 == bignum2) == (scriptnum1 == num2));
-    BOOST_CHECK((bignum1 != bignum2) == (scriptnum1 != num2));
     BOOST_CHECK((bignum1 < bignum2) == (scriptnum1 < num2));
     BOOST_CHECK((bignum1 > bignum2) == (scriptnum1 > num2));
     BOOST_CHECK((bignum1 >= bignum2) == (scriptnum1 >= num2));

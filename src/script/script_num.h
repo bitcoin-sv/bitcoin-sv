@@ -37,98 +37,76 @@ public:
     explicit CScriptNum(const int64_t &n) : m_value(n) {}
     explicit CScriptNum(const std::vector<uint8_t> &vch, bool fRequireMinimal,
                         const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE);
+    
+    CScriptNum& operator=(int64_t rhs)
+    {
+        m_value = rhs;
+        return *this;
+    }
 
     friend bool operator==(const CScriptNum&, const CScriptNum&);
-    friend bool operator==(const CScriptNum&, int64_t);
-    friend bool operator==(int64_t, const CScriptNum&);
 
     friend bool operator<(const CScriptNum&, const CScriptNum&);
     friend bool operator<(const CScriptNum&, int64_t);
     friend bool operator<(int64_t, const CScriptNum&);
 
-    inline CScriptNum operator+(const int64_t &rhs) const {
-        return CScriptNum(m_value + rhs);
-    }
-    inline CScriptNum operator-(const int64_t &rhs) const {
-        return CScriptNum(m_value - rhs);
-    }
-    inline CScriptNum operator+(const CScriptNum &rhs) const {
-        return operator+(rhs.m_value);
-    }
-    inline CScriptNum operator-(const CScriptNum &rhs) const {
-        return operator-(rhs.m_value);
-    }
-
-    inline CScriptNum operator/(const int64_t &rhs) const {
-        return CScriptNum(m_value / rhs);
-    }
-    inline CScriptNum operator/(const CScriptNum &rhs) const {
-        return operator/(rhs.m_value);
+    CScriptNum& operator+=(const CScriptNum& other)
+    {
+        assert(
+            other.m_value == 0 ||
+            (other.m_value > 0 &&
+             m_value <= std::numeric_limits<int64_t>::max() - other.m_value) ||
+            (other.m_value < 0 &&
+             m_value >= std::numeric_limits<int64_t>::min() - other.m_value));
+        m_value += other.m_value;
+        return *this;
     }
 
-    inline CScriptNum operator*(const int64_t &rhs) const {
-        return CScriptNum(m_value * rhs);
-    }
-    inline CScriptNum operator*(const CScriptNum &rhs) const {
-        return operator*(rhs.m_value);
-    }
-
-    inline CScriptNum operator%(const int64_t &rhs) const {
-        return CScriptNum(m_value % rhs);
-    }
-    inline CScriptNum operator%(const CScriptNum &rhs) const {
-        return operator%(rhs.m_value);
+    CScriptNum& operator-=(const CScriptNum& other)
+    {
+        assert(
+            other.m_value == 0 ||
+            (other.m_value > 0 &&
+             m_value >= std::numeric_limits<int64_t>::min() + other.m_value) ||
+            (other.m_value < 0 &&
+             m_value <= std::numeric_limits<int64_t>::max() + other.m_value));
+        m_value -= other.m_value;
+        return *this;
     }
 
-    inline CScriptNum &operator+=(const CScriptNum &rhs) {
-        return operator+=(rhs.m_value);
+    CScriptNum& operator*=(const CScriptNum& other) 
+    {
+        m_value *= other.m_value;
+        return *this;
     }
-    inline CScriptNum &operator-=(const CScriptNum &rhs) {
-        return operator-=(rhs.m_value);
-    }
-
-    inline CScriptNum operator&(const int64_t &rhs) const {
-        return CScriptNum(m_value & rhs);
-    }
-    inline CScriptNum operator&(const CScriptNum &rhs) const {
-        return operator&(rhs.m_value);
+    
+    CScriptNum& operator/=(const CScriptNum& other) 
+    {
+        m_value /= other.m_value;
+        return *this;
     }
 
-    inline CScriptNum &operator&=(const CScriptNum &rhs) {
-        return operator&=(rhs.m_value);
+    CScriptNum& operator%=(const CScriptNum& other) 
+    {
+        m_value %= other.m_value;
+        return *this;
     }
 
-    inline CScriptNum operator-() const {
+    CScriptNum& operator&=(const CScriptNum& other)
+    {
+        return operator&=(other.m_value);
+    }
+
+    CScriptNum& operator&=(int64_t other)
+    {
+        m_value &= other;
+        return *this;
+    }
+
+    CScriptNum operator-() const
+    {
         assert(m_value != std::numeric_limits<int64_t>::min());
         return CScriptNum(-m_value);
-    }
-
-    inline CScriptNum &operator=(const int64_t &rhs) {
-        m_value = rhs;
-        return *this;
-    }
-
-    inline CScriptNum &operator+=(const int64_t &rhs) {
-        assert(
-            rhs == 0 ||
-            (rhs > 0 && m_value <= std::numeric_limits<int64_t>::max() - rhs) ||
-            (rhs < 0 && m_value >= std::numeric_limits<int64_t>::min() - rhs));
-        m_value += rhs;
-        return *this;
-    }
-
-    inline CScriptNum &operator-=(const int64_t &rhs) {
-        assert(
-            rhs == 0 ||
-            (rhs > 0 && m_value >= std::numeric_limits<int64_t>::min() + rhs) ||
-            (rhs < 0 && m_value <= std::numeric_limits<int64_t>::max() + rhs));
-        m_value -= rhs;
-        return *this;
-    }
-
-    inline CScriptNum &operator&=(const int64_t &rhs) {
-        m_value &= rhs;
-        return *this;
     }
 
     int getint() const {
@@ -146,29 +124,86 @@ private:
 };
 
 // Equality operators
-inline bool operator==(const CScriptNum& a, const CScriptNum& b) { return a.m_value == b.m_value; }
-inline bool operator==(const CScriptNum& a, int64_t b) { return a.m_value == b; }
-inline bool operator==(int64_t a, const CScriptNum& b) { return a == b.m_value; }
+inline bool operator==(const CScriptNum& a, const CScriptNum& b)
+{
+    return a.m_value == b.m_value;
+}
 
-inline bool operator!=(const CScriptNum& a, const CScriptNum& b) { return !(a == b); }
-inline bool operator!=(const CScriptNum& a, int64_t b) { return !(a == b); }
-inline bool operator!=(int64_t a, const CScriptNum& b) { return !(a == b); }
+inline bool operator!=(const CScriptNum& a, const CScriptNum& b)
+{
+    return !(a == b);
+}
 
 // Relational operators
-inline bool operator<(const CScriptNum& a, const CScriptNum& b){ return a.m_value < b.m_value; }
-inline bool operator<(const CScriptNum& a, int64_t b){ return a.m_value < b; }
-inline bool operator<(int64_t a, const CScriptNum& b){ return a < b.m_value; }
+inline bool operator<(const CScriptNum& a, const CScriptNum& b)
+{
+    return a.m_value < b.m_value;
+}
+inline bool operator<(const CScriptNum& a, int64_t b) { return a.m_value < b; }
+inline bool operator<(int64_t a, const CScriptNum& b) { return a < b.m_value; }
 
-inline bool operator>=(const CScriptNum& a, const CScriptNum& b){ return !(a < b); }
-inline bool operator>(const CScriptNum& a, const CScriptNum& b){ return b < a; }
-inline bool operator<=(const CScriptNum& a, const CScriptNum& b){ return !(b < a); }
+inline bool operator>=(const CScriptNum& a, const CScriptNum& b)
+{
+    return !(a < b);
+}
+inline bool operator>(const CScriptNum& a, const CScriptNum& b)
+{
+    return b < a;
+}
+inline bool operator<=(const CScriptNum& a, const CScriptNum& b)
+{
+    return !(b < a);
+}
 
-inline bool operator>=(const CScriptNum& a, int64_t b){ return !(a < b); }
-inline bool operator>(const CScriptNum& a, int64_t b){ return b < a; }
-inline bool operator<=(const CScriptNum& a, int64_t b){ return !(b < a); }
+inline bool operator>=(const CScriptNum& a, int64_t b) { return !(a < b); }
+inline bool operator>(const CScriptNum& a, int64_t b) { return b < a; }
+inline bool operator<=(const CScriptNum& a, int64_t b) { return !(b < a); }
 
-inline bool operator>=(int64_t a, const CScriptNum& b){ return !(a < b); }
-inline bool operator>(int64_t a, const CScriptNum& b){ return b < a; }
-inline bool operator<=(int64_t a, const CScriptNum& b){ return !(b < a); }
+inline bool operator>=(int64_t a, const CScriptNum& b) { return !(a < b); }
+inline bool operator>(int64_t a, const CScriptNum& b) { return b < a; }
+inline bool operator<=(int64_t a, const CScriptNum& b) { return !(b < a); }
+
+// Arithmetic operators
+inline CScriptNum operator+(CScriptNum a, const CScriptNum& b)
+{
+    a += b;
+    return a;
+}
+
+inline CScriptNum operator-(CScriptNum a, const CScriptNum& b) 
+{
+    a -= b;
+    return a;
+}
+    
+inline CScriptNum operator*(CScriptNum a, const CScriptNum& b) 
+{
+    a *= b;
+    return a; 
+}
+    
+inline CScriptNum operator/(CScriptNum a, const CScriptNum& b)
+{
+    a /= b;
+    return a;
+}
+
+inline CScriptNum operator%(CScriptNum a, const CScriptNum& b)
+{
+    a %= b;
+    return a;
+}
+    
+inline CScriptNum operator&(CScriptNum a, const CScriptNum& b) 
+{
+    a &= b;
+    return a;
+}
+
+inline CScriptNum operator&(CScriptNum a, int64_t b) 
+{
+    a &= b;
+    return a; 
+}
 
 

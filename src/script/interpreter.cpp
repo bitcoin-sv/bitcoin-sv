@@ -543,7 +543,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         // operand has the disabled lock-time flag set,
                         // CHECKSEQUENCEVERIFY behaves as a NOP.
                         if ((nSequence &
-                             CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG) != 0) {
+                             CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG) != bnZero) {
                             break;
                         }
 
@@ -1054,7 +1054,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                             case OP_DIV:
                                 // denominator must not be 0
-                                if (bn2 == 0) {
+                                if (bn2 == bnZero) {
                                     return set_error(serror,
                                                      SCRIPT_ERR_DIV_BY_ZERO);
                                 }
@@ -1063,7 +1063,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                             case OP_MOD:
                                 // divisor must not be 0
-                                if (bn2 == 0) {
+                                if (bn2 == bnZero) {
                                     return set_error(serror,
                                                      SCRIPT_ERR_MOD_BY_ZERO);
                                 }
