@@ -167,5 +167,33 @@ BOOST_AUTO_TEST_CASE(is_minimal_encoding)
     }
 }
 
+BOOST_AUTO_TEST_CASE(minimally_encode)
+{
+    vector<uint8_t> v;
+    BOOST_CHECK_EQUAL(false, MinimallyEncode(v));
+
+    // clang-format off
+    vector<tuple<bool, vector<uint8_t>, vector<uint8_t>>> test_data = {
+        {false, {}, {}},
+        {false, {0x1}, {0x1}},               // +1
+        {false, {0x7f}, {0x7f}},             // +127 
+        {false, {0x80, 0x0}, {0x80, 0x0}},   // +128
+        {false, {0xff, 0x0}, {0xff, 0x0}},   // 255
+        {false, {0x81}, {0x81}},             // -1
+        {false, {0xff}, {0xff}},             // -127 
+        {false, {0x80, 0x80}, {0x80, 0x80}}, // -128
+        {false, {0xff, 0x80}, {0xff, 0x80}}, // -255
+        {true, {0x1, 0x0}, {0x1}},           // should be 0x1 for +1
+        {true, {0x7f, 0x80}, {0xff}},        // should be 0xff for -127
+    };
+    // clang-format on
+    for(auto& [status, ip, op] : test_data)
+    {
+        BOOST_CHECK_EQUAL(status, MinimallyEncode(ip));
+        BOOST_CHECK_EQUAL(ip.size(), op.size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(ip), end(ip), begin(op), end(op));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 

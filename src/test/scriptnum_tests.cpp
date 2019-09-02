@@ -207,7 +207,7 @@ BOOST_AUTO_TEST_CASE(operators) {
 static void CheckMinimalyEncode(std::vector<uint8_t> data,
                                 const std::vector<uint8_t> &expected) {
     bool alreadyEncoded = bsv::IsMinimallyEncoded(data, data.size());
-    bool hasEncoded = CScriptNum::MinimallyEncode(data);
+    bool hasEncoded = bsv::MinimallyEncode(data);
     BOOST_CHECK_EQUAL(hasEncoded, !alreadyEncoded);
     BOOST_CHECK(data == expected);
 }

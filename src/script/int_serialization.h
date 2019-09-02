@@ -199,5 +199,61 @@ namespace bsv
 
         return true;
     }
+
+    inline bool MinimallyEncode(std::vector<uint8_t>& data)
+    {
+        if(data.size() == 0)
+        {
+            return false;
+        }
+
+        // If the last byte is not 0x00 or 0x80, we are minimally encoded.
+        uint8_t last = data.back();
+        if(last & 0x7f)
+        {
+            return false;
+        }
+
+        // If the script is one byte long, then we have a zero, which encodes as
+        // an empty array.
+        if(data.size() == 1)
+        {
+            data = {};
+            return true;
+        }
+
+        // If the next byte has it sign bit set, then we are minimaly encoded.
+        if(data[data.size() - 2] & 0x80)
+        {
+            return false;
+        }
+
+        // We are not minimally encoded, we need to figure out how much to trim.
+        for(size_t i = data.size() - 1; i > 0; i--)
+        {
+            // We found a non zero byte, time to encode.
+            if(data[i - 1] != 0)
+            {
+                if(data[i - 1] & 0x80)
+                {
+                    // We found a byte with it sign bit set so we need one more
+                    // byte.
+                    data[i++] = last;
+                }
+                else
+                {
+                    // the sign bit is clear, we can use it.
+                    data[i - 1] |= last;
+                }
+
+                data.resize(i);
+                return true;
+            }
+        }
+
+        // If we the whole thing is zeros, then we have a zero.
+        data = {};
+        return true;
+    }
 }
 

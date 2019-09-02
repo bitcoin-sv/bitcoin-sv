@@ -38,8 +38,6 @@ public:
     explicit CScriptNum(const std::vector<uint8_t> &vch, bool fRequireMinimal,
                         const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE);
 
-    static bool MinimallyEncode(std::vector<uint8_t> &data);
-
     inline bool operator==(const int64_t &rhs) const { return m_value == rhs; }
     inline bool operator!=(const int64_t &rhs) const { return m_value != rhs; }
     inline bool operator<=(const int64_t &rhs) const { return m_value <= rhs; }

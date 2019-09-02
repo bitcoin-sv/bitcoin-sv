@@ -1431,7 +1431,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                         // Try to see if we can fit that number in the number of
                         // byte requested.
-                        CScriptNum::MinimallyEncode(rawnum);
+                        bsv::MinimallyEncode(rawnum);
                         if (rawnum.size() > size) {
                             // We definitively cannot.
                             return set_error(serror,
@@ -1466,7 +1466,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
 
                         valtype &n = stacktop(-1);
-                        CScriptNum::MinimallyEncode(n);
+                        bsv::MinimallyEncode(n);
 
                         // The resulting number must be a valid number.
                         if (!bsv::IsMinimallyEncoded(
