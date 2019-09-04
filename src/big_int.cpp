@@ -302,7 +302,7 @@ namespace
     {
         void operator()(const char* p) const { ::OPENSSL_free((void*)p); }
     };
-    using unique_str_ptr = std::unique_ptr<const char, empty_str_deleter>;
+    using unique_str_ptr = std::unique_ptr<const char[], empty_str_deleter>;
     static_assert(sizeof(unique_str_ptr) == sizeof(const char*));
 
     unique_str_ptr to_str(bignum_st* bn)
@@ -314,7 +314,7 @@ namespace
 std::ostream& bsv::operator<<(std::ostream& os, const bint& n)
 {
     const auto s{to_str(n.value_.get())};
-    os << *s;
+    os << s.get();
     return os;
 }
 

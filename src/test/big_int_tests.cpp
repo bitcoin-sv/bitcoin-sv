@@ -116,10 +116,10 @@ BOOST_AUTO_TEST_CASE(swap)
 
 BOOST_AUTO_TEST_CASE(output_streamable)
 {
-    bint a{1};
+    bint a{123};
     ostringstream oss;
     oss << a;
-    BOOST_CHECK_EQUAL("1", oss.str());
+    BOOST_CHECK_EQUAL("123", oss.str());
 }
 
 BOOST_AUTO_TEST_CASE(add)
