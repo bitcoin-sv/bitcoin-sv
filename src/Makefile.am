@@ -224,7 +224,6 @@ libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   addrman.cpp \
   addrdb.cpp \
-  big_int.cpp \
   bloom.cpp \
   blockencodings.cpp \
   blockfileinfostore.cpp \
@@ -334,6 +333,7 @@ libbitcoin_consensus_a_SOURCES = \
   amount.h \
   arith_uint256.cpp \
   arith_uint256.h \
+  big_int.cpp \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
