@@ -116,8 +116,11 @@ BOOST_AUTO_TEST_CASE(swap)
 
 BOOST_AUTO_TEST_CASE(output_streamable)
 {
-    bint a{123};
     ostringstream oss;
+    oss << bint{};
+    BOOST_CHECK_EQUAL("", oss.str());
+
+    bint a{123};
     oss << a;
     BOOST_CHECK_EQUAL("123", oss.str());
 }
@@ -383,6 +386,19 @@ BOOST_AUTO_TEST_CASE(absolute_value)
 
     BOOST_TEST(aa == abs(aa));
     BOOST_TEST(bint("85070591730234615847396907784232501249") == abs(-aa));
+}
+
+BOOST_AUTO_TEST_CASE(to_string)
+{
+    BOOST_TEST("" == bsv::to_string(bint()));
+
+    constexpr int64_t min64{numeric_limits<int64_t>::min()};
+    constexpr int64_t max64{numeric_limits<int64_t>::max()};
+    vector<int64_t> test_data{0, 1, -1, min64, max64};
+    for(const auto n : test_data)
+    {
+        BOOST_TEST(std::to_string(n) == bsv::to_string(bint{n}));
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

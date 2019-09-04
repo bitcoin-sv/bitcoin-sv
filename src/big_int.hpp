@@ -16,7 +16,7 @@ namespace bsv
     {
     public:
         bint();
-        explicit bint(int64_t); 
+        bint(int64_t); 
         explicit bint(const std::string&);
 
         // special members
@@ -151,6 +151,7 @@ namespace bsv
     
     bool is_negative(const bint&);
     bint abs(const bint&);
+    std::string to_string(const bint&);
 }
 
 namespace std

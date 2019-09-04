@@ -8,6 +8,7 @@
 #include <cassert>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <utility>
 
 #include <openssl/asn1.h>
@@ -313,6 +314,9 @@ namespace
 
 std::ostream& bsv::operator<<(std::ostream& os, const bint& n)
 {
+    if(n.value_ == nullptr)
+        return os;
+
     const auto s{to_str(n.value_.get())};
     os << s.get();
     return os;
@@ -325,6 +329,13 @@ bool bsv::is_negative(const bint& n)
 }
 
 bsv::bint bsv::abs(const bint& n) { return is_negative(n) ? -n : n; }
+
+std::string bsv::to_string(const bint& n) // used in gdb pretty-printer
+{
+    std::ostringstream oss;
+    oss << n;
+    return oss.str();
+}
 
 // Notes
 // -----

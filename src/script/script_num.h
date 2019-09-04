@@ -1,27 +1,39 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2018-2019 Bitcoin Association
-// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+// Distributed under the Open BSV software license, see the accompanying file
+// LICENSE.
 
 #pragma once
 
 #include <cassert>
+#include <iosfwd>
 #include <stdexcept>
+#include <variant>
 #include <vector>
 
-class scriptnum_overflow_error : public std::overflow_error {
+#include "big_int.hpp"
+
+class scriptnum_overflow_error : public std::overflow_error
+{
 public:
-    explicit scriptnum_overflow_error(const std::string &str)
-        : std::overflow_error(str) {}
+    explicit scriptnum_overflow_error(const std::string& str)
+        : std::overflow_error(str)
+    {
+    }
 };
 
-class scriptnum_minencode_error : public std::runtime_error {
+class scriptnum_minencode_error : public std::runtime_error
+{
 public:
-    explicit scriptnum_minencode_error(const std::string &str)
-        : std::runtime_error(str) {}
+    explicit scriptnum_minencode_error(const std::string& str)
+        : std::runtime_error(str)
+    {
+    }
 };
 
-class CScriptNum {
+class CScriptNum
+{
     /**
      * Numeric opcodes (OP_1ADD, etc) are restricted to operating on 4-byte
      * integers. The semantics are subtle, though: operands must be in the range
@@ -34,10 +46,12 @@ class CScriptNum {
 public:
     static const size_t MAXIMUM_ELEMENT_SIZE = 4;
 
-    explicit CScriptNum(const int64_t &n) : m_value(n) {}
-    explicit CScriptNum(const std::vector<uint8_t> &vch, bool fRequireMinimal,
+    explicit CScriptNum(const int64_t& n) : m_value(n) {}
+    explicit CScriptNum(const bsv::bint& n) : m_value(n) {}
+    explicit CScriptNum(const std::vector<uint8_t>& vch,
+                        bool fRequireMinimal,
                         const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE);
-    
+
     CScriptNum& operator=(int64_t rhs)
     {
         m_value = rhs;
@@ -50,97 +64,47 @@ public:
     friend bool operator<(const CScriptNum&, int64_t);
     friend bool operator<(int64_t, const CScriptNum&);
 
-    CScriptNum& operator+=(const CScriptNum& other)
-    {
-        assert(
-            other.m_value == 0 ||
-            (other.m_value > 0 &&
-             m_value <= std::numeric_limits<int64_t>::max() - other.m_value) ||
-            (other.m_value < 0 &&
-             m_value >= std::numeric_limits<int64_t>::min() - other.m_value));
-        m_value += other.m_value;
-        return *this;
-    }
+    CScriptNum& operator+=(const CScriptNum&);
+    CScriptNum& operator-=(const CScriptNum&);
+    CScriptNum& operator*=(const CScriptNum&);
+    CScriptNum& operator/=(const CScriptNum&);
+    CScriptNum& operator%=(const CScriptNum&);
 
-    CScriptNum& operator-=(const CScriptNum& other)
-    {
-        assert(
-            other.m_value == 0 ||
-            (other.m_value > 0 &&
-             m_value >= std::numeric_limits<int64_t>::min() + other.m_value) ||
-            (other.m_value < 0 &&
-             m_value <= std::numeric_limits<int64_t>::max() + other.m_value));
-        m_value -= other.m_value;
-        return *this;
-    }
+    CScriptNum& operator&=(const CScriptNum&);
+    CScriptNum& operator&=(int64_t);
 
-    CScriptNum& operator*=(const CScriptNum& other) 
-    {
-        m_value *= other.m_value;
-        return *this;
-    }
-    
-    CScriptNum& operator/=(const CScriptNum& other) 
-    {
-        m_value /= other.m_value;
-        return *this;
-    }
+    CScriptNum operator-() const;
 
-    CScriptNum& operator%=(const CScriptNum& other) 
-    {
-        m_value %= other.m_value;
-        return *this;
-    }
+    friend std::ostream& operator<<(std::ostream&, const CScriptNum&);
 
-    CScriptNum& operator&=(const CScriptNum& other)
-    {
-        return operator&=(other.m_value);
-    }
-
-    CScriptNum& operator&=(int64_t other)
-    {
-        m_value &= other;
-        return *this;
-    }
-
-    CScriptNum operator-() const
-    {
-        assert(m_value != std::numeric_limits<int64_t>::min());
-        return CScriptNum(-m_value);
-    }
-
-    int getint() const {
-        if (m_value > std::numeric_limits<int>::max())
-            return std::numeric_limits<int>::max();
-        else if (m_value < std::numeric_limits<int>::min())
-            return std::numeric_limits<int>::min();
-        return m_value;
-    }
-
+    int getint() const;
     std::vector<uint8_t> getvch() const;
 
 private:
-    int64_t m_value;
+    bool equal_index(const CScriptNum&) const;
+
+    using value_type = std::variant<int64_t, bsv::bint>;
+    value_type m_value;
 };
 
 // Equality operators
-inline bool operator==(const CScriptNum& a, const CScriptNum& b)
-{
-    return a.m_value == b.m_value;
-}
-
+bool operator==(const CScriptNum&, const CScriptNum&);
 inline bool operator!=(const CScriptNum& a, const CScriptNum& b)
 {
     return !(a == b);
 }
 
 // Relational operators
-inline bool operator<(const CScriptNum& a, const CScriptNum& b)
+bool operator<(const CScriptNum&, const CScriptNum&);
+inline bool operator<(const CScriptNum& a, int64_t b)
 {
-    return a.m_value < b.m_value;
+    return std::visit([b](const auto& a) { return a < b; }, a.m_value);
 }
-inline bool operator<(const CScriptNum& a, int64_t b) { return a.m_value < b; }
-inline bool operator<(int64_t a, const CScriptNum& b) { return a < b.m_value; }
+
+inline bool operator<(int64_t a, const CScriptNum& b)
+{
+    return std::visit([a](const auto& b) { return a < b; }, b.m_value);
+}
 
 inline bool operator>=(const CScriptNum& a, const CScriptNum& b)
 {
@@ -170,18 +134,18 @@ inline CScriptNum operator+(CScriptNum a, const CScriptNum& b)
     return a;
 }
 
-inline CScriptNum operator-(CScriptNum a, const CScriptNum& b) 
+inline CScriptNum operator-(CScriptNum a, const CScriptNum& b)
 {
     a -= b;
     return a;
 }
-    
-inline CScriptNum operator*(CScriptNum a, const CScriptNum& b) 
+
+inline CScriptNum operator*(CScriptNum a, const CScriptNum& b)
 {
     a *= b;
-    return a; 
+    return a;
 }
-    
+
 inline CScriptNum operator/(CScriptNum a, const CScriptNum& b)
 {
     a /= b;
@@ -193,17 +157,18 @@ inline CScriptNum operator%(CScriptNum a, const CScriptNum& b)
     a %= b;
     return a;
 }
-    
-inline CScriptNum operator&(CScriptNum a, const CScriptNum& b) 
+
+inline CScriptNum operator&(CScriptNum a, const CScriptNum& b)
 {
     a &= b;
     return a;
 }
 
-inline CScriptNum operator&(CScriptNum a, int64_t b) 
+inline CScriptNum operator&(CScriptNum a, int64_t b)
 {
     a &= b;
-    return a; 
+    return a;
 }
 
+std::ostream& operator<<(std::ostream&, const CScriptNum&);
 
