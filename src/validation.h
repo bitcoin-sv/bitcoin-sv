@@ -637,11 +637,12 @@ bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CDiskBlockPos& pos);
+    const CDiskBlockPos& pos, bool calculateDiskBlockMetadata=false);
 std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
     CBlockIndex& index,
     int networkVersion);
-
+std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& index);
+void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata);
 /** Functions for validating blocks and updating the block tree */
 
 /**

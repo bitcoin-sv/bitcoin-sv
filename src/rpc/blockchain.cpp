@@ -25,6 +25,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
+#include "blockfileinfostore.h"
 
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
@@ -88,52 +89,6 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
         Pair("mediantime", int64_t(blockindex->GetMedianTimePast())));
     result.push_back(Pair("nonce", uint64_t(blockindex->nNonce)));
     result.push_back(Pair("bits", strprintf("%08x", blockindex->nBits)));
-    result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
-    result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
-
-    if (blockindex->pprev) {
-        result.push_back(Pair("previousblockhash",
-                              blockindex->pprev->GetBlockHash().GetHex()));
-    }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
-    if (pnext) {
-        result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
-    }
-    return result;
-}
-
-UniValue blockToJSON(const Config &config, const CBlock &block,
-                     const CBlockIndex *blockindex, bool txDetails) {
-    UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
-    int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
-    }
-    result.push_back(Pair("confirmations", confirmations));
-    result.push_back(Pair(
-        "size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
-    result.push_back(Pair("height", blockindex->nHeight));
-    result.push_back(Pair("version", block.nVersion));
-    result.push_back(Pair("versionHex", strprintf("%08x", block.nVersion)));
-    result.push_back(Pair("merkleroot", block.hashMerkleRoot.GetHex()));
-    UniValue txs(UniValue::VARR);
-    for (const auto &tx : block.vtx) {
-        if (txDetails) {
-            UniValue objTx(UniValue::VOBJ);
-            TxToUniv(*tx, uint256(), objTx);
-            txs.push_back(objTx);
-        } else {
-            txs.push_back(tx->GetId().GetHex());
-        }
-    }
-    result.push_back(Pair("tx", txs));
-    result.push_back(Pair("time", block.GetBlockTime()));
-    result.push_back(
-        Pair("mediantime", int64_t(blockindex->GetMedianTimePast())));
-    result.push_back(Pair("nonce", uint64_t(block.nNonce)));
-    result.push_back(Pair("bits", strprintf("%08x", block.nBits)));
     result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
     result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
 
@@ -795,9 +750,9 @@ static void parseGetBlockVerbosity(const UniValue& verbosityParam, GetBlockVerbo
     }
 }
 
-UniValue getblock(const Config &config, const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() < 1 ||
-        request.params.size() > 2) {
+void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq, HTTPRequest *httpReq, bool processedInBatch) {
+    if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
+        jsonRPCReq.params.size() > 2) {
         throw std::runtime_error(
                 "getblock \"blockhash\" ( verbosity ) \n"
                 "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is serialized, "
@@ -857,14 +812,15 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
 
     LOCK(cs_main);
 
-    std::string strHash = request.params[0].get_str();
+    std::string strHash = jsonRPCReq.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
     // previously, false and true were accepted for verbosity 0 and 1 respectively. this code maintains
     // backward compatibility.
     GetBlockVerbosity verbosity = GetBlockVerbosity::DECODE_HEADER;
-    if (request.params.size() > 1) {
-        parseGetBlockVerbosity(request.params[1], verbosity);
+
+    if (jsonRPCReq.params.size() > 1) {
+        parseGetBlockVerbosity(jsonRPCReq.params[1], verbosity);
     }
 
     if (mapBlockIndex.count(hash) == 0) {
@@ -879,7 +835,8 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
     }
 
-    if (!ReadBlockFromDisk(block, pblockindex, config)) {
+    auto stream = StreamSyncBlockFromDisk(*pblockindex);
+    if (!stream) {
         // Block not found on disk. This could be because we have the block
         // header in our index but don't have the block (for example if a
         // non-whitelisted node sends us an unrequested long chain of valid
@@ -887,15 +844,145 @@ UniValue getblock(const Config &config, const JSONRPCRequest &request) {
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
 
-    if (verbosity == GetBlockVerbosity::RAW_BLOCK) {
-        CDataStream ssBlock(SER_NETWORK,
-                            PROTOCOL_VERSION | RPCSerializationFlags());
-        ssBlock << block;
-        std::string strHex = HexStr(ssBlock.begin(), ssBlock.end());
-        return strHex;
+    if (!processedInBatch) {
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
-    return blockToJSON(config, block, pblockindex, verbosity == GetBlockVerbosity::DECODE_TRANSACTIONS);
+    if (verbosity == GetBlockVerbosity::RAW_BLOCK) {
+        httpReq->WriteReplyChunk("{\"result\": \"");
+        writeBlockChunksAndUpdateMetadata(true, *httpReq, *stream, *pblockindex);
+        httpReq->WriteReplyChunk("\", \"error\": "+NullUniValue.write()+", \"id\": "+jsonRPCReq.id.write()+"}");
+    } else {
+        httpReq->WriteReplyChunk("{\"result\":");
+        writeBlockJsonChunksAndUpdateMetadata(config, *httpReq, verbosity == GetBlockVerbosity::DECODE_TRANSACTIONS, *pblockindex);
+        httpReq->WriteReplyChunk(", \"error\": "+NullUniValue.write()+", \"id\": "+jsonRPCReq.id.write()+"}");
+    }
+
+    if (!processedInBatch) {
+        httpReq->StopWritingChunks();
+    }
+}
+
+void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
+    CForwardReadonlyStream& stream, CBlockIndex& blockIndex) {
+
+    CHash256 hasher;
+    CDiskBlockMetaData metadata;
+
+    bool hasDiskBlockMetaData;
+    {
+        LOCK(cs_main);
+        hasDiskBlockMetaData = blockIndex.nStatus.hasDiskBlockMetaData();
+    }
+
+    do
+    {
+        auto chunk = stream.Read(4096);
+        auto begin = reinterpret_cast<const char*>(chunk.Begin());
+        if (!isHexEncoded) {
+            req.WriteReplyChunk({begin, chunk.Size()});
+        } else {
+            req.WriteReplyChunk(HexStr(begin, begin + chunk.Size()));
+        }
+
+        if (!hasDiskBlockMetaData) {
+            hasher.Write(chunk.Begin(), chunk.Size());
+            metadata.diskDataSize += chunk.Size();
+        }
+    } while(!stream.EndOfStream());
+
+    if (!hasDiskBlockMetaData) {
+        hasher.Finalize(reinterpret_cast<uint8_t*>(&metadata.diskDataHash));
+        SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);
+    }
+}
+
+void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &req,
+                        bool showTxDetails, CBlockIndex& blockIndex) {
+
+    bool hasDiskBlockMetaData;
+    {
+        LOCK(cs_main);
+        hasDiskBlockMetaData = blockIndex.nStatus.hasDiskBlockMetaData();
+    }
+
+    auto reader = GetDiskBlockStreamReader(blockIndex.GetBlockPos(), !hasDiskBlockMetaData);
+    if (!reader) {
+        assert(!"cannot load block from disk");
+    }
+
+    std::string delimiter;
+
+    req.WriteReplyChunk("{\"tx\":[");
+    do
+    {
+        const CTransaction& transaction = reader->ReadTransaction();
+        UniValue objBlockTx = blockTxToJSON(config, transaction, showTxDetails);
+        std::string strJSON = delimiter + objBlockTx.write();
+        req.WriteReplyChunk(strJSON);
+        delimiter = ",";  
+    } while(!reader->EndOfStream());
+
+    CBlockHeader header = reader->GetBlockHeader();
+
+    // set metadata so it is available when setting header in the next step
+    if (!hasDiskBlockMetaData) {
+        CDiskBlockMetaData metadata = reader->getDiskBlockMetadata();
+        SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);
+    }
+
+    req.WriteReplyChunk("]," + headerBlockToJSON(config, header, &blockIndex) + "}");
+}
+
+std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHeader,
+                     const CBlockIndex *blockindex) {
+
+    UniValue result(UniValue::VOBJ);
+
+    result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
+    int confirmations = -1;
+    // Only report confirmations if the block is on the main chain
+    if (chainActive.Contains(blockindex)) {
+        confirmations = chainActive.Height() - blockindex->nHeight + 1;
+    }
+    result.push_back(Pair("confirmations", confirmations));
+    if (blockindex->nStatus.hasDiskBlockMetaData()) {
+        result.push_back(Pair("size", blockindex->GetDiskBlockMetaData().diskDataSize));
+    }
+    result.push_back(Pair("height", blockindex->nHeight));
+    result.push_back(Pair("version", blockHeader.nVersion));
+    result.push_back(Pair("versionHex", strprintf("%08x", blockHeader.nVersion)));
+    result.push_back(Pair("merkleroot", blockHeader.hashMerkleRoot.GetHex()));
+    result.push_back(Pair("time", blockHeader.GetBlockTime()));
+    result.push_back(
+        Pair("mediantime", int64_t(blockindex->GetMedianTimePast())));
+    result.push_back(Pair("nonce", uint64_t(blockHeader.nNonce)));
+    result.push_back(Pair("bits", strprintf("%08x", blockHeader.nBits)));
+    result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
+    result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
+
+    if (blockindex->pprev) {
+        result.push_back(Pair("previousblockhash",
+                              blockindex->pprev->GetBlockHash().GetHex()));
+    }
+    CBlockIndex *pnext = chainActive.Next(blockindex);
+    if (pnext) {
+        result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
+    }
+
+    std::string headerJSON = result.write();
+    return headerJSON.substr(1, headerJSON.size() - 2);
+}
+
+UniValue blockTxToJSON(const Config &config, const CTransaction& tx, bool txDetails) {
+    if (txDetails) {
+        UniValue objTx(UniValue::VOBJ);
+        TxToUniv(tx, uint256(), objTx);
+        return objTx;
+    } 
+
+    return tx.GetId().GetHex();
 }
 
 struct CCoinsStats {
@@ -1764,7 +1851,8 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "getchaintxstats",        &getchaintxstats,       true,  {"nblocks", "blockhash"} },
     { "blockchain",         "getbestblockhash",       getbestblockhash,       true,  {} },
     { "blockchain",         "getblockcount",          getblockcount,          true,  {} },
-    { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
+    // getblock command is processed in a special way, because it uses streaming
+    // { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           getblockhash,           true,  {"height"} },
     { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbose"} },
     { "blockchain",         "getchaintips",           getchaintips,           true,  {} },

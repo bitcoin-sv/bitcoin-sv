@@ -2225,14 +2225,17 @@ void CConnman::ThreadMessageHandler() {
 
             using namespace std::literals::chrono_literals;
 
-            if(!pnode->vProcessMsg.empty() &&
-                mDebugP2PTheadStallsThreshold > 0ms)
+            if(mDebugP2PTheadStallsThreshold > 0ms)
             {
-                durationLog =
-                    {
-                        pnode->vProcessMsg.begin()->hdr.GetCommand(),
-                        mDebugP2PTheadStallsThreshold
-                    };
+                LOCK(pnode->cs_vProcessMsg);
+                if(!pnode->vProcessMsg.empty())
+                {
+                    durationLog =
+                        {
+                            pnode->vProcessMsg.begin()->hdr.GetCommand(),
+                            mDebugP2PTheadStallsThreshold
+                        };
+                }
             }
 
             // Receive messages

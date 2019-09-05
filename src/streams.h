@@ -816,6 +816,51 @@ private:
  * much data we want to read from it.
  */
 template<typename Reader>
+class CSyncFixedSizeStream : public CForwardReadonlyStream, private Reader
+{
+public:
+    CSyncFixedSizeStream(size_t size, Reader&& reader)
+        : Reader{std::move(reader)}
+        , mSize{size}
+    {/**/}
+
+    bool EndOfStream() const override {return mSize == mConsumed;}
+    CSpan Read(size_t maxSize) override
+    {
+        // it's not feasible to try and read 0 bytes
+        assert(maxSize > 0);
+
+        if(EndOfStream())
+        {
+            return {};
+        }
+
+        size_t maxConsumable = std::min(mSize - mConsumed, maxSize);
+
+        mBuffer.resize(maxSize);
+
+        size_t read =
+            Reader::Read(
+                reinterpret_cast<char*>(mBuffer.data()),
+                maxConsumable);
+
+        mConsumed += read;
+
+        return {mBuffer.data(), read};
+    }
+
+private:
+    size_t mSize;
+    std::vector<uint8_t> mBuffer;
+    size_t mConsumed = 0u;
+};
+
+
+/**
+ * Stream wrapper for cases where we have a data Reader and know exactly how
+ * much data we want to read from it.
+ */
+template<typename Reader>
 class CFixedSizeStream : public CForwardAsyncReadonlyStream, private Reader
 {
 public:
