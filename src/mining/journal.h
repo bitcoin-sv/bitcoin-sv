@@ -152,6 +152,11 @@ class CJournal final
         Index begin() const;
         Index end() const;
 
+        bool IsSame(const std::shared_ptr<CJournal>& journal)
+        {
+            return mJournal == journal;
+        }
+
       private:
         // Order of declaration is important; we need the lock to be destroyed
         // and the mutex unlocked before the journal that owns it.
