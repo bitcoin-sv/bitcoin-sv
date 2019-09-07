@@ -250,7 +250,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         CScript s;
         s << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
         for(bool genesisEnabled : {true, false}){
-            BOOST_CHECK(SolverNoData(s, genesisEnabled, whichType, solutions));
+            BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK(solutions.size() == 1);
             CTxDestination addr;
             BOOST_CHECK(ExtractDestination(s, genesisEnabled, addr));
@@ -266,7 +266,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         s << OP_DUP << OP_HASH160 << ToByteVector(key[0].GetPubKey().GetID())
           << OP_EQUALVERIFY << OP_CHECKSIG;
         for(bool genesisEnabled : {true, false}){
-            BOOST_CHECK(SolverNoData(s, genesisEnabled, whichType, solutions));
+            BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK(solutions.size() == 1);
             CTxDestination addr;        
             BOOST_CHECK(ExtractDestination(s, genesisEnabled, addr));
@@ -298,7 +298,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
         for(bool genesisEnabled : {true, false}){
-            BOOST_CHECK(SolverNoData(s, genesisEnabled, whichType, solutions));
+            BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK_EQUAL(solutions.size(), 4U);
             CTxDestination addr;
             BOOST_CHECK(!ExtractDestination(s, genesisEnabled, addr));
@@ -315,7 +315,7 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
 
         for(bool genesisEnabled : {true, false}){
-            BOOST_CHECK(SolverNoData(s, genesisEnabled, whichType, solutions));
+            BOOST_CHECK(Solver(s, genesisEnabled, whichType, solutions));
             BOOST_CHECK_EQUAL(solutions.size(), 4U);
             
             std::vector<CTxDestination> addrs;
@@ -338,9 +338,9 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey())
           << ToByteVector(key[2].GetPubKey()) << OP_3 << OP_CHECKMULTISIG;
-        BOOST_CHECK(SolverNoData(s, true, whichType, solutions));
+        BOOST_CHECK(Solver(s, true, whichType, solutions));
         BOOST_CHECK(solutions.size() == 5);
-        BOOST_CHECK(SolverNoData(s, false, whichType, solutions));
+        BOOST_CHECK(Solver(s, false, whichType, solutions));
         BOOST_CHECK(solutions.size() == 5);
 
     }

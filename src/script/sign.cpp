@@ -84,7 +84,7 @@ static bool SignStep(const BaseSignatureCreator &creator,
     ret.clear();
 
     std::vector<valtype> vSolutions;
-    if (!SolverNoData(scriptPubKey, utxoAfterGenesis, whichTypeRet, vSolutions)) {
+    if (!Solver(scriptPubKey, utxoAfterGenesis, whichTypeRet, vSolutions)) {
         return false;
     }
 
@@ -330,7 +330,8 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
 
             txnouttype txType2;
             std::vector<std::vector<uint8_t>> vSolutions2;
-            SolverNoData(pubKey2, false, txType2, vSolutions2); // if we are here than genesis is not enables
+
+            Solver(pubKey2, false, txType2, vSolutions2); // if we are here than genesis is not enables
             sigs1.script.pop_back();
             sigs2.script.pop_back();
             Stacks result = CombineSignatures(pubKey2, checker, txType2,
@@ -353,7 +354,7 @@ SignatureData CombineSignatures(const CScript &scriptPubKey,
                                 bool utxoAfterGenesis) {
     txnouttype txType;
     std::vector<std::vector<uint8_t>> vSolutions;
-    SolverNoData(scriptPubKey, utxoAfterGenesis, txType, vSolutions);
+    Solver(scriptPubKey, utxoAfterGenesis, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
                              Stacks(scriptSig1), Stacks(scriptSig2))

@@ -165,7 +165,7 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
 
                     // called as script is before genesis, should be the same as after genesis
                     // because we don't deal with  P2SH or data carrier
-                    if (SolverNoData(txout.scriptPubKey, false, type, vSolutions) &&
+                    if (Solver(txout.scriptPubKey, false, type, vSolutions) &&
                         (type == TX_PUBKEY || type == TX_MULTISIG)) {
                         insert(COutPoint(txid, i));
                     }

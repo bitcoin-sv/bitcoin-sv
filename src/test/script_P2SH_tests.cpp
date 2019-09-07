@@ -487,11 +487,11 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     auto deactivateGenesis = [&config, coinHeight]() {config.SetGenesisActivationHeight(coinHeight + 1);}; // set genesis at mempool height + 1
 
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txTo), coins));
+    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txTo), coins, 0));
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txTo), coins), 0U);
     
     deactivateGenesis();
-    BOOST_CHECK(::AreInputsStandard(config, CTransaction(txTo), coins));
+    BOOST_CHECK(::AreInputsStandard(config, CTransaction(txTo), coins, 0));
     // 22 P2SH sigops for all inputs (1 for vin[0], 6 for vin[3], 15 for vin[4]
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txTo), coins), 22U);
 
@@ -506,11 +506,11 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         << std::vector<uint8_t>(sixteenSigops.begin(), sixteenSigops.end());
 
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd1), coins));
+    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd1), coins, 0));
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txToNonStd1), coins), 0U);
     
     deactivateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd1), coins));
+    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd1), coins, 0));
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txToNonStd1), coins), 16U);
 
     CMutableTransaction txToNonStd2;
@@ -524,11 +524,11 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         << std::vector<uint8_t>(twentySigops.begin(), twentySigops.end());
 
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd2), coins));
+    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd2), coins, 0));
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txToNonStd2), coins), 0U);
 
     deactivateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd2), coins));
+    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd2), coins, 0));
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txToNonStd2), coins), 20U);
 }
 

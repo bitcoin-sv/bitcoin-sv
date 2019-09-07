@@ -39,8 +39,7 @@ const char *GetTxnOutputType(txnouttype t) {
  * Return public keys or hashes from scriptPubKey, for 'standard' transaction
  * types.
  */
-bool SolverInternal(const CScript &scriptPubKey, 
-    bool identifyData,
+bool Solver(const CScript &scriptPubKey, 
     bool genesisEnabled,
     txnouttype &typeRet,
     std::vector<std::vector<uint8_t>> &vSolutionsRet) {
@@ -82,11 +81,6 @@ bool SolverInternal(const CScript &scriptPubKey,
             return true;
         }
     }
-
-    // Even when we do NOT need to identify TX_NULL_DATA, we still check if it looks like data to avoid 
-    // comparing against the templates. We do not have height information available in this case, 
-    // but we know that neither "OP_FALSE OP_RETURN" nor "OP_RETURN" will match any other templates,
-    // so we can return TX_NONSTANDARD in this case.
     
     bool isOpReturn = false;
     int offset = 0;
@@ -106,17 +100,8 @@ bool SolverInternal(const CScript &scriptPubKey,
     // byte passes the IsPushOnly() test we don't care what exactly is in the
     // script.
     if (isOpReturn && scriptPubKey.IsPushOnly(scriptPubKey.begin() + offset)) {
-        if (identifyData)
-        {
-            typeRet = TX_NULL_DATA;
-            return true;
-        }
-        else
-        {
-            // Return TX_NONSTANDARD instead of TX_NULL_DATA if we were not asked to identify data 
-            typeRet = TX_NONSTANDARD;
-            return false;
-        }
+        typeRet = TX_NULL_DATA;
+        return true;
     }
 
 
@@ -199,16 +184,6 @@ bool SolverInternal(const CScript &scriptPubKey,
     return false;
 }
 
-bool SolverNoData(const CScript& scriptPubKey, bool genesisEnabled, txnouttype& typeRet,
-    std::vector<std::vector<uint8_t>>& vSolutionsRet) {
-    return SolverInternal(scriptPubKey, false, genesisEnabled, typeRet, vSolutionsRet);
-}
-
-bool SolverWithData(const CScript& scriptPubKey, bool isGenesisEnabled, txnouttype& typeRet,
-    std::vector<std::vector<uint8_t>>& vSolutionsRet) {
-    return SolverInternal(scriptPubKey, true, isGenesisEnabled, typeRet, vSolutionsRet);
-}
-
 bool ExtractDestination(const CScript &scriptPubKey, bool isGenesisEnabled,
                         CTxDestination &addressRet) {
     std::vector<valtype> vSolutions;
@@ -244,7 +219,7 @@ bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txn
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
     std::vector<valtype> vSolutions;
-    if (!SolverWithData(scriptPubKey, isGenesisEnabled, typeRet, vSolutions)) {
+    if (!Solver(scriptPubKey, isGenesisEnabled, typeRet, vSolutions)) {
         return false;
     }
 

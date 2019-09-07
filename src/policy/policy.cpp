@@ -30,7 +30,7 @@
  */
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType) {
     std::vector<std::vector<uint8_t>> vSolutions;
-    if (!SolverWithData(scriptPubKey, IsGenesisEnabled(config, nScriptPubKeyHeight), whichType, vSolutions)) {
+    if (!Solver(scriptPubKey, IsGenesisEnabled(config, nScriptPubKeyHeight), whichType, vSolutions)) {
         return false;
     }
 
@@ -132,7 +132,7 @@ bool AreInputsStandard(const Config& config,
         // get the scriptPubKey corresponding to this input:
         const CScript &prevScript = prev.scriptPubKey;
         
-        if (!SolverNoData(prevScript, IsGenesisEnabled(config, coin, mempoolHeight),
+        if (!Solver(prevScript, IsGenesisEnabled(config, coin, mempoolHeight),
                     whichType, vSolutions)) {
             return false;
         }
