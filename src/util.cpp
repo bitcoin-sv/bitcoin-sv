@@ -600,7 +600,11 @@ void RenameThread(const char *name)
 std::string GetThreadName()
 {
     if (threadName.empty()) {
+#ifdef WIN32
+        return strprintf("thread-%d", GetCurrentThreadId());
+#else
         return strprintf("thread-%d", std::this_thread::get_id());
+#endif
     }
     return threadName;
 }
