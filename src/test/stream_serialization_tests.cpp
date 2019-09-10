@@ -82,7 +82,7 @@ BOOST_AUTO_TEST_CASE(exception)
             {
                 auto chunk = stream.Read(5);
 
-                BOOST_REQUIRE_EQUAL(chunk.Begin(), nullptr);
+                BOOST_REQUIRE_EQUAL(chunk.Begin(), static_cast<decltype(chunk.Begin())>(nullptr));
                 BOOST_REQUIRE_EQUAL(chunk.Size(), 0);
                 BOOST_REQUIRE_EQUAL(stream.EndOfStream(), false);
             }
