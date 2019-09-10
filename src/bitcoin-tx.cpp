@@ -677,12 +677,16 @@ static void MutateTxSign(CMutableTransaction &tx, const std::string &flagStr) {
         const CScript &prevPubKey = coin.GetTxOut().scriptPubKey;
         const Amount amount = coin.GetTxOut().nValue;
 
+        // we will assume that script is after genesis for every script type except p2sh
+        bool assumeUtxoAfterGenesis = prevPubKey.IsPayToScriptHash() ? false : true;
+
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
             (i < mergedTx.vout.size())) {
             ProduceSignature(MutableTransactionSignatureCreator(
                                  &keystore, &mergedTx, i, amount, sigHashType),
+                             true, assumeUtxoAfterGenesis, 
                              prevPubKey, sigdata);
         }
 
@@ -691,14 +695,16 @@ static void MutateTxSign(CMutableTransaction &tx, const std::string &flagStr) {
             sigdata = CombineSignatures(
                 prevPubKey,
                 MutableTransactionSignatureChecker(&mergedTx, i, amount),
-                sigdata, DataFromTransaction(txv, i));
+                sigdata, 
+                DataFromTransaction(txv, i),
+                assumeUtxoAfterGenesis);
         }
 
         UpdateTransaction(mergedTx, i, sigdata);
 
         if (!VerifyScript(
                 txin.scriptSig, prevPubKey,
-                StandardScriptVerifyFlags(true, false),
+                StandardScriptVerifyFlags(true, assumeUtxoAfterGenesis),
                 MutableTransactionSignatureChecker(&mergedTx, i, amount))) {
             fComplete = false;
         }

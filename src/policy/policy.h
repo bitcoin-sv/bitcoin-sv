@@ -134,8 +134,10 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
  * spending
  * @return True if all inputs (scriptSigs) use only standard transaction forms
  */
-bool AreInputsStandard(const CTransaction &tx,
-                       const CCoinsViewCache &mapInputs);
+bool AreInputsStandard(const Config& config,
+                       const CTransaction &tx,
+                       const CCoinsViewCache &mapInputs,
+                       const int mempoolHeight);
 
 extern CFeeRate incrementalRelayFee;
 extern CFeeRate dustRelayFee;

@@ -41,7 +41,7 @@ const char *GetTxnOutputType(txnouttype t) {
  */
 bool SolverInternal(const CScript &scriptPubKey, 
     bool identifyData,
-    bool isGenesisEnabled, // used only when identifyData == true
+    bool genesisEnabled,
     txnouttype &typeRet,
     std::vector<std::vector<uint8_t>> &vSolutionsRet) {
     // Templates
@@ -71,27 +71,27 @@ bool SolverInternal(const CScript &scriptPubKey,
     // other types:
     // it is always OP_HASH160 20 [20 byte hash] OP_EQUAL
     if (scriptPubKey.IsPayToScriptHash()) {
-        typeRet = TX_SCRIPTHASH;
-        std::vector<uint8_t> hashBytes(scriptPubKey.begin() + 2,
-                                       scriptPubKey.begin() + 22);
-        vSolutionsRet.push_back(hashBytes);
-        return true;
+        if (genesisEnabled) {
+            typeRet = TX_NONSTANDARD;
+            return false;
+        } else {
+            typeRet = TX_SCRIPTHASH;
+            std::vector<uint8_t> hashBytes(scriptPubKey.begin() + 2,
+                                           scriptPubKey.begin() + 22);
+            vSolutionsRet.push_back(hashBytes);
+            return true;
+        }
     }
 
     // Even when we do NOT need to identify TX_NULL_DATA, we still check if it looks like data to avoid 
     // comparing against the templates. We do not have height information available in this case, 
     // but we know that neither "OP_FALSE OP_RETURN" nor "OP_RETURN" will match any other templates,
     // so we can return TX_NONSTANDARD in this case.
-
-    if (!identifyData)
-    {
-        isGenesisEnabled = false; // try to identify both OP_RETURN patterns and bail out with TX_NONSTANDARD
-    }
     
     bool isOpReturn = false;
     int offset = 0;
     //check if starts with OP_RETURN (only before Genesis upgrade) or OP_FALSE, OP_RETURN (both pre and post Genesis upgrade)
-    if (!isGenesisEnabled && scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN) {
+    if (!genesisEnabled && scriptPubKey.size() > 0 && scriptPubKey[0] == OP_RETURN) {
         isOpReturn = true;
         offset = 1;
     }
@@ -199,9 +199,9 @@ bool SolverInternal(const CScript &scriptPubKey,
     return false;
 }
 
-bool SolverNoData(const CScript& scriptPubKey, txnouttype& typeRet,
+bool SolverNoData(const CScript& scriptPubKey, bool genesisEnabled, txnouttype& typeRet,
     std::vector<std::vector<uint8_t>>& vSolutionsRet) {
-    return SolverInternal(scriptPubKey, false, false /* not used*/, typeRet, vSolutionsRet);
+    return SolverInternal(scriptPubKey, false, genesisEnabled, typeRet, vSolutionsRet);
 }
 
 bool SolverWithData(const CScript& scriptPubKey, bool isGenesisEnabled, txnouttype& typeRet,
@@ -213,7 +213,7 @@ bool ExtractDestination(const CScript &scriptPubKey,
                         CTxDestination &addressRet) {
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!SolverNoData(scriptPubKey, whichType, vSolutions)) {
+    if (!SolverNoData(scriptPubKey, false, whichType, vSolutions)) { // TODO: deliver flag here
         return false;
     }
 

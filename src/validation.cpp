@@ -1032,7 +1032,7 @@ CTxnValResult TxnValidation(
         }
     }
     // Check for non-standard pay-to-script-hash in inputs
-    if (fRequireStandard && !AreInputsStandard(tx, view)) {
+    if (fRequireStandard && !AreInputsStandard(config, tx, view, chainActive.Height() + 1)) {
         state.Invalid(false, REJECT_NONSTANDARD,
                      "bad-txns-nonstandard-inputs");
         return Result{state, pTxInputData, vCoinsToUncache};

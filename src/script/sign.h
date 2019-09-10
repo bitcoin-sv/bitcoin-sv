@@ -98,7 +98,8 @@ bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
 SignatureData CombineSignatures(const CScript &scriptPubKey,
                                 const BaseSignatureChecker &checker,
                                 const SignatureData &scriptSig1,
-                                const SignatureData &scriptSig2);
+                                const SignatureData &scriptSig2,
+                                bool utxoAfterGenesis);
 
 /** Extract signature data from a transaction, and insert it. */
 SignatureData DataFromTransaction(const CMutableTransaction &tx,

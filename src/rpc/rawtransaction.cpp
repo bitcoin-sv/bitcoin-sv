@@ -1017,7 +1017,8 @@ static UniValue signrawtransaction(const Config &config,
                 sigdata = CombineSignatures(
                     prevPubKey,
                     TransactionSignatureChecker(&txConst, i, amount), sigdata,
-                    DataFromTransaction(txv, i));
+                    DataFromTransaction(txv, i),
+                    utxoAfterGenesis);
             }
         }
 

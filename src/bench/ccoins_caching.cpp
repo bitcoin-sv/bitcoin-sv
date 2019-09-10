@@ -6,6 +6,7 @@
 #include "coins.h"
 #include "policy/policy.h"
 #include "wallet/crypter.h"
+#include "config.h"
 
 #include <vector>
 
@@ -80,7 +81,7 @@ static void CCoinsCaching(benchmark::State &state) {
     // Benchmark.
     while (state.KeepRunning()) {
         CTransaction t(t1);
-        bool success = AreInputsStandard(t, coins);
+        bool success = AreInputsStandard(GlobalConfig::GetConfig(), t, coins, 0);
         assert(success);
         Amount value = coins.GetValueIn(t);
         assert(value == (50 + 21 + 22) * CENT);

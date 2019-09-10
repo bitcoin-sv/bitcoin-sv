@@ -162,7 +162,10 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
                            BLOOM_UPDATE_P2PUBKEY_ONLY) {
                     txnouttype type;
                     std::vector<std::vector<uint8_t>> vSolutions;
-                    if (SolverNoData(txout.scriptPubKey, type, vSolutions) &&
+
+                    // called as script is before genesis, should be the same as after genesis
+                    // because we don't deal with  P2SH or data carrier
+                    if (SolverNoData(txout.scriptPubKey, false, type, vSolutions) &&
                         (type == TX_PUBKEY || type == TX_MULTISIG)) {
                         insert(COutPoint(txid, i));
                     }

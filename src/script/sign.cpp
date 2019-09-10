@@ -75,14 +75,16 @@ static bool SignN(const std::vector<valtype> &multisigdata,
  * Returns false if scriptPubKey could not be completely satisfied.
  */
 static bool SignStep(const BaseSignatureCreator &creator,
-                     const CScript &scriptPubKey, std::vector<valtype> &ret,
+                     bool utxoAfterGenesis,
+                     const CScript &scriptPubKey,
+                     std::vector<valtype> &ret,
                      txnouttype &whichTypeRet) {
     CScript scriptRet;
     uint160 h160;
     ret.clear();
 
     std::vector<valtype> vSolutions;
-    if (!SolverNoData(scriptPubKey, whichTypeRet, vSolutions)) {
+    if (!SolverNoData(scriptPubKey, utxoAfterGenesis, whichTypeRet, vSolutions)) {
         return false;
     }
 
@@ -145,7 +147,7 @@ bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, 
     bool solved = true;
     std::vector<valtype> result;
     txnouttype whichType;
-    solved = SignStep(creator, script, result, whichType);
+    solved = SignStep(creator, utxoAfterGenesis, script, result, whichType);
     CScript subscript;
 
     if (solved && whichType == TX_SCRIPTHASH) {
@@ -153,7 +155,8 @@ bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, 
         // scriptSig is the signatures from that and then the serialized
         // subscript:
         script = subscript = CScript(result[0].begin(), result[0].end());
-        solved = solved && SignStep(creator, script, result, whichType) &&
+        solved = solved &&
+                 SignStep(creator, utxoAfterGenesis, script, result, whichType) &&
                  whichType != TX_SCRIPTHASH;
         result.push_back(
             std::vector<uint8_t>(subscript.begin(), subscript.end()));
@@ -163,7 +166,7 @@ bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, 
 
     // Test solution
 
-    uint32_t flags = StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis); //genesis enabled
+    uint32_t flags = StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis);
     return solved &&
            VerifyScript(sigdata.scriptSig, fromPubKey,
                         flags, creator.Checker());
@@ -327,7 +330,7 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
 
             txnouttype txType2;
             std::vector<std::vector<uint8_t>> vSolutions2;
-            SolverNoData(pubKey2, txType2, vSolutions2);
+            SolverNoData(pubKey2, false, txType2, vSolutions2); // if we are here than genesis is not enables
             sigs1.script.pop_back();
             sigs2.script.pop_back();
             Stacks result = CombineSignatures(pubKey2, checker, txType2,
@@ -346,10 +349,11 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
 SignatureData CombineSignatures(const CScript &scriptPubKey,
                                 const BaseSignatureChecker &checker,
                                 const SignatureData &scriptSig1,
-                                const SignatureData &scriptSig2) {
+                                const SignatureData &scriptSig2,
+                                bool utxoAfterGenesis) {
     txnouttype txType;
     std::vector<std::vector<uint8_t>> vSolutions;
-    SolverNoData(scriptPubKey, txType, vSolutions);
+    SolverNoData(scriptPubKey, utxoAfterGenesis, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
                              Stacks(scriptSig1), Stacks(scriptSig2))

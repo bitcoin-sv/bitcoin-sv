@@ -94,7 +94,7 @@ bool SolverWithData(const CScript& scriptPubKey, bool isGenesisEnabled, txnoutty
  * The meaning of OP_RETURN has changed in the Genesis upgrade and to correctly
  * identify them  you need to provide height of the output - use SolverWithData() to do so.
  */
-bool SolverNoData(const CScript& scriptPubKey, txnouttype& typeRet,
+bool SolverNoData(const CScript& scriptPubKey, bool genesisEnabled, txnouttype& typeRet,
     std::vector<std::vector<uint8_t>>& vSolutionsRet);
 
 bool ExtractDestination(const CScript &scriptPubKey,
