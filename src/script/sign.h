@@ -80,14 +80,16 @@ struct SignatureData {
 };
 
 /** Produce a script signature using a generic signature creator. */
-bool ProduceSignature(const BaseSignatureCreator &creator,
+bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, bool utxoAfterGenesis,
                       const CScript &scriptPubKey, SignatureData &sigdata);
 
 /** Produce a script signature for a transaction. */
-bool SignSignature(const CKeyStore &keystore, const CScript &fromPubKey,
+bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
+                   bool utxoAfterGenesis, const CScript &fromPubKey,
                    CMutableTransaction &txTo, unsigned int nIn,
                    const Amount amount, SigHashType sigHashType);
-bool SignSignature(const CKeyStore &keystore, const CTransaction &txFrom,
+bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
+                   bool utxoAfterGenesis, const CTransaction &txFrom,
                    CMutableTransaction &txTo, unsigned int nIn,
                    SigHashType sigHashType);
 

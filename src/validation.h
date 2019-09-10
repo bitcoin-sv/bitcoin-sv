@@ -496,7 +496,19 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /** Check if Genesis has activated. */
+bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
+/** Check if Genesis has activated.
+ * Do not call this overload with height of coin. If the coin was created in mempool, 
+ * this function will throw exception.
+ */
 bool IsGenesisEnabled(const Config& config, int nHeight);
+/**  Check if Genesis has activated.
+ * When a coins is present in mempool, it will have height MEMPOOL_HEIGHT. 
+ * In this case, you should call this overload and specify the mempool height (chainActive.Height()+1) 
+ *as parameter to correctly determine if genesis is enabled for this coin.
+ */
+bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight  );
+int GetGenesisActivationHeight(const Config& config);
 
 /**
  * Limit mempool size.

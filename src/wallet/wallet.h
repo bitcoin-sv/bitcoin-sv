@@ -1204,7 +1204,8 @@ bool CWallet::DummySignTx(CMutableTransaction &txNew,
             coin.first->tx->vout[coin.second].scriptPubKey;
         SignatureData sigdata;
 
-        if (!ProduceSignature(DummySignatureCreator(this), scriptPubKey,
+        // just for compiler to pass, fixing in subsequent commits
+        if (!ProduceSignature(DummySignatureCreator(this), true, false, scriptPubKey,
                               sigdata)) {
             return false;
         } else {

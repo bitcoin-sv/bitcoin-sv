@@ -595,10 +595,29 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
 
 bool IsGenesisEnabled(const Config &config, int nHeight) {
     if (nHeight == MEMPOOL_HEIGHT) {
-        throw std::runtime_error("Checking if genesis is enabled with height == MEMPOOL_HEIGHT.");
+        throw std::runtime_error("A coin with height == MEMPOOL_HEIGHT was passed "
+            "to IsGenesisEnabled() overload that does not handle this case. "
+            "Use the overload that takes Coin as parameter");
     }
 
     return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
+}
+
+bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight) {
+    auto height = coin.GetHeight();
+    if (height == MEMPOOL_HEIGHT) {
+        return (uint32_t)mempoolHeight >= config.GetGenesisActivationHeight();
+    }
+    return height >= config.GetGenesisActivationHeight();
+}
+
+bool IsGenesisEnabled(const Config &config, const CBlockIndex* pindexPrev) {
+    if (pindexPrev == nullptr) {
+        return false;
+    }
+
+    // Genesis is enabled on the currently processed block, not on the current tip.
+    return IsGenesisEnabled(config, pindexPrev->nHeight + 1);
 }
 
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
@@ -819,9 +838,9 @@ static bool CalculateMempoolAncestors(
     return true;
 }
 
-static uint32_t GetScriptVerifyFlags(const Config &config) {
+static uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) {
     // Check inputs based on the set of flags we activate.
-    uint32_t scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+    uint32_t scriptVerifyFlags = StandardScriptVerifyFlags(genesisEnabled, false);
     if (!config.GetChainParams().RequireStandard()) {
         scriptVerifyFlags =
             SCRIPT_ENABLE_SIGHASH_FORKID |
@@ -1111,7 +1130,9 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData, vCoinsToUncache};
     }
 
-    uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config);
+    // We are getting flags as they would be if the utxos are before genesis. 
+    // "CheckInputs" is adding specific flags for each input based on its height in the main chain
+    uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, IsGenesisEnabled(config, chainActive.Height() + 1));
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
@@ -1722,7 +1743,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
     CTransactionRef ptx = mempool.Get(txid);
     if (ptx) {
         txOut = ptx;
-        isGenesisEnabled = IsGenesisEnabled(config, chainActive.Tip()->nHeight + 1); // assume that the transaction from mempool will be mined in next block
+        isGenesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1); // assume that the transaction from mempool will be mined in next block
         return true;
     }
 

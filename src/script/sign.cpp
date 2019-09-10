@@ -11,6 +11,7 @@
 #include "primitives/transaction.h"
 #include "script/standard.h"
 #include "uint256.h"
+#include "validation.h"
 
 typedef std::vector<uint8_t> valtype;
 
@@ -138,7 +139,7 @@ static CScript PushAll(const std::vector<valtype> &values) {
     return result;
 }
 
-bool ProduceSignature(const BaseSignatureCreator &creator,
+bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, bool utxoAfterGenesis,
                       const CScript &fromPubKey, SignatureData &sigdata) {
     CScript script = fromPubKey;
     bool solved = true;
@@ -161,9 +162,11 @@ bool ProduceSignature(const BaseSignatureCreator &creator,
     sigdata.scriptSig = PushAll(result);
 
     // Test solution
+
+    uint32_t flags = StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis); //genesis enabled
     return solved &&
            VerifyScript(sigdata.scriptSig, fromPubKey,
-                        STANDARD_SCRIPT_VERIFY_FLAGS, creator.Checker());
+                        flags, creator.Checker());
 }
 
 SignatureData DataFromTransaction(const CMutableTransaction &tx,
@@ -180,7 +183,8 @@ void UpdateTransaction(CMutableTransaction &tx, unsigned int nIn,
     tx.vin[nIn].scriptSig = data.scriptSig;
 }
 
-bool SignSignature(const CKeyStore &keystore, const CScript &fromPubKey,
+bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
+                   bool utxoAfterGenesis, const CScript &fromPubKey,
                    CMutableTransaction &txTo, unsigned int nIn,
                    const Amount amount, SigHashType sigHashType) {
     assert(nIn < txTo.vin.size());
@@ -190,12 +194,13 @@ bool SignSignature(const CKeyStore &keystore, const CScript &fromPubKey,
                                         sigHashType);
 
     SignatureData sigdata;
-    bool ret = ProduceSignature(creator, fromPubKey, sigdata);
+    bool ret = ProduceSignature(creator, genesisEnabled, utxoAfterGenesis, fromPubKey, sigdata);
     UpdateTransaction(txTo, nIn, sigdata);
     return ret;
 }
 
-bool SignSignature(const CKeyStore &keystore, const CTransaction &txFrom,
+bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
+                   bool utxoAfterGenesis, const CTransaction &txFrom,
                    CMutableTransaction &txTo, unsigned int nIn,
                    SigHashType sigHashType) {
     assert(nIn < txTo.vin.size());
@@ -203,7 +208,8 @@ bool SignSignature(const CKeyStore &keystore, const CTransaction &txFrom,
     assert(txin.prevout.GetN() < txFrom.vout.size());
     const CTxOut &txout = txFrom.vout[txin.prevout.GetN()];
 
-    return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, txout.nValue,
+    return SignSignature(keystore, genesisEnabled, utxoAfterGenesis,
+                         txout.scriptPubKey, txTo, nIn, txout.nValue,
                          sigHashType);
 }
 
@@ -238,8 +244,7 @@ static std::vector<valtype> CombineMultisig(
                 continue;
             }
 
-            if (checker.CheckSig(sig, pubkey, scriptPubKey,
-                                 STANDARD_SCRIPT_VERIFY_FLAGS)) {
+            if (checker.CheckSig(sig, pubkey, scriptPubKey, true)) {
                 sigs[pubkey] = sig;
                 break;
             }
@@ -359,7 +364,7 @@ public:
 
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
                   const std::vector<uint8_t> &vchPubKey,
-                  const CScript &scriptCode, uint32_t flags) const override {
+                  const CScript &scriptCode, bool enabledSighashForkid) const override {
         return true;
     }
 };

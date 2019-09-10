@@ -92,8 +92,8 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
         // TODO: This could be optimized some by doing some work after the above
         // solver
         SignatureData sigs;
-        return ProduceSignature(DummySignatureCreator(&keystore), scriptPubKey,
-                                sigs)
+        return ProduceSignature(DummySignatureCreator(&keystore),  true, false,
+                                scriptPubKey, sigs) // just for compiler to pass, fixing in subsequent commits
                    ? ISMINE_WATCH_SOLVABLE
                    : ISMINE_WATCH_UNSOLVABLE;
     }

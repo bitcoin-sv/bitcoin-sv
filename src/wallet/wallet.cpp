@@ -3007,6 +3007,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                             this, &txNewConst, nIn,
                             coin.first->tx->vout[coin.second].nValue,
                             sigHashType),
+                        true, false, // // just for compiler to pass, fixing in subsequent commits
                         scriptPubKey, sigdata)) {
                     strFailReason = _("Signing transaction failed");
                     return false;
