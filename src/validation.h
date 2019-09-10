@@ -634,7 +634,8 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx);
  * inputs
  * @see CTransaction::FetchInputs
  */
-uint64_t GetP2SHSigOpCount(const CTransaction &tx,
+uint64_t GetP2SHSigOpCount(const Config &config, 
+                           const CTransaction &tx,
                            const CCoinsViewCache &mapInputs);
 
 /**
@@ -642,11 +643,12 @@ uint64_t GetP2SHSigOpCount(const CTransaction &tx,
  * @param[in] tx     Transaction for which we are computing the cost
  * @param[in] inputs Map of previous transactions that have outputs we're
  * spending
- * @param[out] flags Script verification flags
+ * @param[in] checkP2SH  check if it is P2SH and include signature operation of the redeem scripts
  * @return Total signature operation cost of tx
  */
-uint64_t GetTransactionSigOpCount(const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, int flags);
+uint64_t GetTransactionSigOpCount(const Config &config, 
+                                  const CTransaction &tx,
+                                  const CCoinsViewCache &inputs, bool checkP2SH);
 
 /**
  * Check whether all inputs of this transaction are valid (no double spends,
