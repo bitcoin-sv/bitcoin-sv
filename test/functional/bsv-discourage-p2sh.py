@@ -51,6 +51,7 @@ class BSVDiscourageP2SH(BitcoinTestFramework):
             p2sh_tx = self.makeP2SHTransaction()
             connections[0].cb.send_message(msg_tx(p2sh_tx))
             connections[0].cb.sync_with_ping()
+            wait_until(lambda: len(self.nodes[0].getrawmempool()) == 1)
             assert_equal(set(self.nodes[0].getrawmempool()), {p2sh_tx.hash})
 
 if __name__ == '__main__':
