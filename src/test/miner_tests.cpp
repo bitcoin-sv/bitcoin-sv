@@ -92,8 +92,8 @@ CBlockIndex CreateBlockIndex(int nHeight) {
 }
 
 bool TestSequenceLocks(const CTransaction &tx, int flags) {
-    LOCK(mempool.cs);
-    return CheckSequenceLocks(tx, flags);
+    std::shared_lock lock(mempool.smtx);
+    return CheckSequenceLocks(tx, mempool, flags);
 }
 
 // Test suite for ancestor feerate transaction selection.
@@ -119,7 +119,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     // This tx has a low fee: 1000 satoshis.
     // Save this txid for later use.
     TxId parentTxId = tx.GetId();
-    mempool.addUnchecked(parentTxId,
+    mempool.AddUnchecked(parentTxId,
                          entry.Fee(Amount(1000))
                              .Time(GetTime())
                              .SpendsCoinbase(true)
@@ -130,7 +130,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     tx.vin[0].prevout = COutPoint(txFirst[1]->GetId(), 0);
     tx.vout[0].nValue = Amount(5000000000LL - 10000);
     TxId mediumFeeTxId = tx.GetId();
-    mempool.addUnchecked(mediumFeeTxId,
+    mempool.AddUnchecked(mediumFeeTxId,
                          entry.Fee(Amount(10000))
                              .Time(GetTime())
                              .SpendsCoinbase(true)
@@ -142,7 +142,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     // 50k satoshi fee.
     tx.vout[0].nValue = Amount(5000000000LL - 1000 - 50000);
     TxId highFeeTxId = tx.GetId();
-    mempool.addUnchecked(highFeeTxId,
+    mempool.AddUnchecked(highFeeTxId,
                          entry.Fee(Amount(50000))
                              .Time(GetTime())
                              .SpendsCoinbase(false)
@@ -161,7 +161,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     // 0 fee.
     tx.vout[0].nValue = Amount(5000000000LL - 1000 - 50000);
     TxId freeTxId = tx.GetId();
-    mempool.addUnchecked(freeTxId, entry.Fee(Amount(0)).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(freeTxId, entry.Fee(Amount(0)).FromTx(tx), nullChangeSet);
     size_t freeTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
 
     // Calculate a fee on child transaction that will put the package just
@@ -171,7 +171,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     tx.vin[0].prevout = COutPoint(freeTxId, 0);
     tx.vout[0].nValue = Amount(5000000000LL - 1000 - 50000) - feeToUse;
     TxId lowFeeTxId = tx.GetId();
-    mempool.addUnchecked(lowFeeTxId, entry.Fee(feeToUse).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(lowFeeTxId, entry.Fee(feeToUse).FromTx(tx), nullChangeSet);
     pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
     // Verify that the free tx and the low fee tx didn't get selected.
     for (const auto &txn : pblocktemplate->GetBlockRef()->vtx) {
@@ -182,11 +182,11 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     // Test that packages above the min relay fee do get included, even if one
     // of the transactions is below the min relay fee. Remove the low fee
     // transaction and replace with a higher fee transaction
-    mempool.removeRecursive(CTransaction(tx), nullChangeSet);
+    mempool.RemoveRecursive(CTransaction(tx), nullChangeSet);
     // Now we should be just over the min relay fee.
     tx.vout[0].nValue -= Amount(2);
     lowFeeTxId = tx.GetId();
-    mempool.addUnchecked(lowFeeTxId,
+    mempool.AddUnchecked(lowFeeTxId,
                          entry.Fee(feeToUse + Amount(2)).FromTx(tx), nullChangeSet);
     pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
     BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[4]->GetId() == freeTxId);
@@ -201,7 +201,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     // 1BCC output.
     tx.vout[1].nValue = Amount(100000000);
     TxId freeTxId2 = tx.GetId();
-    mempool.addUnchecked(freeTxId2,
+    mempool.AddUnchecked(freeTxId2,
                          entry.Fee(Amount(0)).SpendsCoinbase(true).FromTx(tx), nullChangeSet);
 
     // This tx can't be mined by itself.
@@ -210,7 +210,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     feeToUse = blockMinFeeRate.GetFee(freeTxSize);
     tx.vout[0].nValue = Amount(5000000000LL) - Amount(100000000) - feeToUse;
     TxId lowFeeTxId2 = tx.GetId();
-    mempool.addUnchecked(lowFeeTxId2,
+    mempool.AddUnchecked(lowFeeTxId2,
                          entry.Fee(feeToUse).SpendsCoinbase(false).FromTx(tx), nullChangeSet);
     pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
 
@@ -225,7 +225,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     tx.vin[0].prevout = COutPoint(freeTxId2, 1);
     // 10k satoshi fee.
     tx.vout[0].nValue = Amount(100000000 - 10000);
-    mempool.addUnchecked(tx.GetId(), entry.Fee(Amount(10000)).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(tx.GetId(), entry.Fee(Amount(10000)).FromTx(tx), nullChangeSet);
     pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
     BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[8]->GetId() == lowFeeTxId2);
 }
@@ -364,7 +364,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         bool spendsCoinbase = (i == 0) ? true : false;
         // If we don't set the # of sig ops in the CTxMemPoolEntry, template
         // creation fails when validating.
-        mempool.addUnchecked(hash,
+        mempool.AddUnchecked(hash,
                              entry.Fee(LOWFEE)
                                  .Time(GetTime())
                                  .SpendsCoinbase(spendsCoinbase)
@@ -381,7 +381,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(configJournal)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
-    mempool.clear();
+    mempool.Clear();
 
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
     tx.vout[0].nValue = BLOCKSUBSIDY;
@@ -392,7 +392,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         bool spendsCoinbase = (i == 0) ? true : false;
         // If we do set the # of sig ops in the CTxMemPoolEntry, template
         // creation passes.
-        mempool.addUnchecked(hash,
+        mempool.AddUnchecked(hash,
                              entry.Fee(LOWFEE)
                                  .Time(GetTime())
                                  .SpendsCoinbase(spendsCoinbase)
@@ -403,7 +403,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     }
     BOOST_CHECK(pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK(pblocktemplateJournal = mining::CMiningFactory::GetAssembler(configJournal)->CreateNewBlock(scriptPubKey, pindexPrev));
-    mempool.clear();
+    mempool.Clear();
 
     // block size > limit
     tx.vin[0].scriptSig = CScript();
@@ -421,7 +421,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         hash = tx.GetId();
         // Only first tx spends coinbase.
         bool spendsCoinbase = (i == 0) ? true : false;
-        mempool.addUnchecked(hash,
+        mempool.AddUnchecked(hash,
                              entry.Fee(LOWFEE)
                                  .Time(GetTime())
                                  .SpendsCoinbase(spendsCoinbase)
@@ -431,11 +431,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     }
     BOOST_CHECK(pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK(pblocktemplateJournal = mining::CMiningFactory::GetAssembler(configJournal)->CreateNewBlock(scriptPubKey, pindexPrev));
-    mempool.clear();
+    mempool.Clear();
 
     // Orphan in mempool, template creation fails.
     hash = tx.GetId();
-    mempool.addUnchecked(hash, entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(hash, entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx), nullChangeSet);
     config.SetTestBlockCandidateValidity(false);
     configJournal.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
@@ -445,14 +445,14 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(configJournal)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
-    mempool.clear();
+    mempool.Clear();
 
     // Child with higher priority than parent.
     tx.vin[0].scriptSig = CScript() << OP_1;
     tx.vin[0].prevout = COutPoint(txFirst[1]->GetId(), 0);
     tx.vout[0].nValue = BLOCKSUBSIDY - HIGHFEE;
     hash = tx.GetId();
-    mempool.addUnchecked(
+    mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         nullChangeSet);
@@ -463,13 +463,13 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     // First txn output + fresh coinbase - new txn fee.
     tx.vout[0].nValue = tx.vout[0].nValue + BLOCKSUBSIDY - HIGHERFEE;
     hash = tx.GetId();
-    mempool.addUnchecked(
+    mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHERFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         nullChangeSet);
     BOOST_CHECK(pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK(pblocktemplateJournal = mining::CMiningFactory::GetAssembler(configJournal)->CreateNewBlock(scriptPubKey, pindexPrev));
-    mempool.clear();
+    mempool.Clear();
 
     // Coinbase in mempool, template creation fails.
     tx.vin.resize(1);
@@ -478,7 +478,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     tx.vout[0].nValue = Amount(0);
     hash = tx.GetId();
     // Give it a fee so it'll get mined.
-    mempool.addUnchecked(
+    mempool.AddUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx),
         nullChangeSet);
@@ -491,7 +491,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(configJournal)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
-    mempool.clear();
+    mempool.Clear();
 
     // Invalid (pre-p2sh) txn in mempool, template creation fails.
     std::array<int64_t, CBlockIndex::nMedianTimeSpan> times;
@@ -510,7 +510,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     script = CScript() << OP_0;
     tx.vout[0].scriptPubKey = GetScriptForDestination(CScriptID(script));
     hash = tx.GetId();
-    mempool.addUnchecked(
+    mempool.AddUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         nullChangeSet);
@@ -519,7 +519,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                           << std::vector<uint8_t>(script.begin(), script.end());
     tx.vout[0].nValue -= LOWFEE;
     hash = tx.GetId();
-    mempool.addUnchecked(
+    mempool.AddUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx),
         nullChangeSet);
@@ -532,7 +532,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(configJournal)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
-    mempool.clear();
+    mempool.Clear();
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Restore the MedianTimePast.
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime =
@@ -545,13 +545,13 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     tx.vout[0].nValue = BLOCKSUBSIDY - HIGHFEE;
     tx.vout[0].scriptPubKey = CScript() << OP_1;
     hash = tx.GetId();
-    mempool.addUnchecked(
+    mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         nullChangeSet);
     tx.vout[0].scriptPubKey = CScript() << OP_2;
     hash = tx.GetId();
-    mempool.addUnchecked(
+    mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         nullChangeSet);
@@ -563,7 +563,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     configJournal.SetTestBlockCandidateValidity(true);
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     BOOST_CHECK_THROW(mining::CMiningFactory::GetAssembler(configJournal)->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
-    mempool.clear();
+    mempool.Clear();
 
     // Subsidy changing.
     int nHeight = chainActive.Height();
@@ -623,7 +623,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     tx.vout[0].scriptPubKey = CScript() << OP_1;
     tx.nLockTime = 0;
     hash = tx.GetId();
-    mempool.addUnchecked(
+    mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         nullChangeSet);
@@ -633,7 +633,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
     }
 
     // Sequence locks fail.
@@ -653,14 +658,19 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                            1);
     prevheights[0] = baseheight + 2;
     hash = tx.GetId();
-    mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
 
     {
         // Locktime passes.
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
     }
 
     // Sequence locks fail.
@@ -687,14 +697,19 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     prevheights[0] = baseheight + 3;
     tx.nLockTime = chainActive.Tip()->nHeight + 1;
     hash = tx.GetId();
-    mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
 
     {
         // Locktime fails.
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(!ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-nonfinal");
     }
 
@@ -716,14 +731,19 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     prevheights.resize(1);
     prevheights[0] = baseheight + 4;
     hash = tx.GetId();
-    mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
 
     {
         // Locktime fails.
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(!ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-nonfinal");
     }
 
@@ -750,7 +770,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransactionForCurrentBlock(
-            config, CTransaction(tx), state, flags));
+                        config,
+                        CTransaction(tx),
+                        chainActive.Height(),
+                        chainActive.Tip()->GetMedianTimePast(),
+                        state,
+                        flags));
     }
 
     // Sequence locks pass.
@@ -791,7 +816,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     chainActive.Tip()->nHeight--;
     SetMockTime(0);
-    mempool.clear();
+    mempool.Clear();
 
     TestPackageSelection(config, scriptPubKey, txFirst);
 

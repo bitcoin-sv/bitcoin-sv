@@ -141,6 +141,7 @@ BITCOIN_CORE_H = \
   netbase.h \
   netmessagemaker.h \
   noui.h \
+  orphan_txns.h \
   policy/fees.h \
   policy/policy.h \
   pow.h \
@@ -178,8 +179,15 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txdb.h \
   txmempool.h \
+  txn_double_spend_detector.h \
+  txn_handlers.h \
   txn_propagator.h \
+  txn_recent_rejects.h \
   txn_sending_details.h \
+  txn_validation_config.h \
+  txn_validation_data.h \
+  txn_validation_result.h \
+  txn_validator.h \
   ui_interface.h \
   undo.h \
   util.h \
@@ -238,6 +246,7 @@ libbitcoin_server_a_SOURCES = \
   net.cpp \
   net_processing.cpp \
   noui.cpp \
+  orphan_txns.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
   pow.cpp \
@@ -257,7 +266,11 @@ libbitcoin_server_a_SOURCES = \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
+  txn_double_spend_detector.cpp \
   txn_propagator.cpp \
+  txn_validation_data.cpp \
+  txn_recent_rejects.cpp \
+  txn_validator.cpp \
   ui_interface.cpp \
   validation.cpp \
   validationinterface.cpp \

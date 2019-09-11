@@ -49,6 +49,7 @@ class Config;
 class CNode;
 class CScheduler;
 class CTxnPropagator;
+class CTxnValidator;
 
 using CNodePtr = std::shared_ptr<CNode>;
 
@@ -243,6 +244,100 @@ public:
 
         return results;
     };
+
+    /** Call the specified function for parallel validation (batch processing) */
+    template <typename Callable>
+    auto ParallelTxValidationBatchProcessing(
+            Callable&& func,
+            size_t nTxnsPerTaskThreshold,
+            const Config* config,
+            CTxMemPool *pool,
+            TxInputDataSPtrVec& vNewTxns,
+            CTxnHandlers& handlers)
+        -> std::vector<std::future<typename std::result_of<
+            Callable(const TxInputDataSPtrRefVec&,
+                const Config*,
+                CTxMemPool*,
+                CTxnHandlers&)>::type>> {
+        using resultType = typename std::result_of<
+            Callable(const TxInputDataSPtrRefVec&,
+                const Config*,
+                CTxMemPool*,
+                CTxnHandlers&)>::type;
+        // A variable which stors results
+        std::vector<std::future<resultType>> results {};
+        size_t numThreads = mValidatorThreadPool.getPoolSize();
+        // Calculate txns per thread ratio.
+        size_t nTxnsPerTaskRatio {vNewTxns.size() / numThreads};
+        // Calculate number of txns for batch processing (per thread)
+        size_t nBatchSize {0};
+        if (nTxnsPerTaskRatio < nTxnsPerTaskThreshold) {
+            nBatchSize = vNewTxns.size();
+        } else {
+            nBatchSize = vNewTxns.size() / numThreads;
+            if (vNewTxns.size() % numThreads) {
+                ++nBatchSize;
+            }
+        }
+        // Allocate a buffer for results
+        size_t nNumOfBatches = (nTxnsPerTaskRatio < nTxnsPerTaskThreshold) ? 1 : numThreads;
+        results.reserve(nNumOfBatches);
+        auto chunkBeginIter = vNewTxns.begin();
+        auto chunkEndIter = vNewTxns.begin();
+        size_t currChunkBeginPos {0};
+        // Lambda function which creats a task with batch txns
+        auto create_batch_task {
+            [&](const TxInputDataSPtrRefVec& vBatchTxns) {
+                results.emplace_back(
+                        make_task(mValidatorThreadPool, func,
+                            vBatchTxns,
+                            config,
+                            pool,
+                            handlers));
+                }
+        };
+        // Calculate a chunk of txns & create a task which executes a batch processing.
+        while (currChunkBeginPos + nBatchSize <= vNewTxns.size()) {
+            std::advance(chunkEndIter, nBatchSize);
+            const TxInputDataSPtrRefVec vBatchTxns(chunkBeginIter, chunkEndIter);
+            create_batch_task(vBatchTxns);
+            chunkBeginIter = chunkEndIter;
+            currChunkBeginPos += nBatchSize;
+        }
+        // Last chunk
+        size_t nLastChunkSize = vNewTxns.size() - currChunkBeginPos;
+        if (nLastChunkSize) {
+            const TxInputDataSPtrRefVec vBatchTxns(chunkBeginIter, vNewTxns.end());
+            create_batch_task(vBatchTxns);
+        }
+        return results;
+    };
+
+    /** Get a handle to our transaction validator */
+    std::shared_ptr<CTxnValidator> getTxnValidator();
+    /** Enqueue a new transaction for validation */
+    void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
+    void EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData);
+    /** Check if the given txn is already known by the Validator */
+    bool CheckTxnExistsInValidatorsQueue(const uint256& txHash) const;
+    /* Find node by it's id */
+    CNodePtr FindNodeById(int64_t nodeId);
+    /* Erase transaction from the given peer */
+    void EraseOrphanTxnsFromPeer(NodeId peer);
+    /* Erase transaction by it's hash */
+    int EraseOrphanTxn(const uint256& txHash);
+    /* Check if orphan transaction exists by prevout */
+    bool CheckOrphanTxnExists(const COutPoint& prevout) const;
+    /* Check if orphan transaction exists by txn hash */
+    bool CheckOrphanTxnExists(const uint256& txHash) const;
+    /* Get transaction's hash for orphan transactions (by prevout) */
+    std::vector<uint256> GetOrphanTxnsHash(const COutPoint& prevout) const;
+    /* Check if transaction exists in recent rejects */
+    bool CheckTxnInRecentRejects(const uint256& txHash) const;
+    /* Reset recent rejects */
+    void ResetRecentRejects();
+    /* Get extra txns for block reconstruction */
+    std::vector<std::pair<uint256, CTransactionRef>> GetCompactExtraTxns() const;
 
     // Addrman functions
     size_t GetAddressCount() const;
@@ -448,6 +543,10 @@ private:
 
     CThreadPool<CQueueAdaptor> mThreadPool { "ConnmanPool" };
 
+    /** Transaction validator */
+    std::shared_ptr<CTxnValidator> mTxnValidator {};
+    CThreadPool<CQueueAdaptor> mValidatorThreadPool { "ValidatorPool" };
+
     CThreadInterrupt interruptNet;
 
     std::thread threadDNSAddressSeed;
@@ -531,6 +630,7 @@ extern bool fDiscover;
 extern bool fListen;
 extern bool fRelayTxes;
 
+extern CCriticalSection cs_invQueries;
 extern limitedmap<uint256, int64_t> mapAlreadyAskedFor;
 
 struct LocalServiceInfo {
@@ -712,7 +812,7 @@ public:
     // Used for both cleanSubVer and strSubVer.
     CCriticalSection cs_SubVer {};
     // This peer can bypass DoS banning.
-    bool fWhitelisted {false};
+    std::atomic_bool fWhitelisted {false};
     // If true this node is being used as a short lived feeler.
     bool fFeeler {false};
     bool fOneShot {false};

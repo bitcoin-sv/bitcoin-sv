@@ -355,9 +355,7 @@ std::string EntryDescriptionString() {
            "       ... ]\n";
 }
 
-void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) {
-    AssertLockHeld(mempool.cs);
-
+void entryToJSONNL(UniValue &info, const CTxMemPoolEntry &e) {
     info.push_back(Pair("size", (int)e.GetTxSize()));
     info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
     info.push_back(Pair("modifiedfee", ValueFromAmount(e.GetModifiedFee())));
@@ -377,7 +375,7 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) {
     const CTransaction &tx = e.GetTx();
     std::set<std::string> setDepends;
     for (const CTxIn &txin : tx.vin) {
-        if (mempool.exists(txin.prevout.GetTxId())) {
+        if (mempool.ExistsNL(txin.prevout.GetTxId())) {
             setDepends.insert(txin.prevout.GetTxId().ToString());
         }
     }
@@ -392,18 +390,18 @@ void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) {
 
 UniValue mempoolToJSON(bool fVerbose = false) {
     if (fVerbose) {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         UniValue o(UniValue::VOBJ);
         for (const CTxMemPoolEntry &e : mempool.mapTx) {
             const uint256 &txid = e.GetTx().GetId();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSONNL(info, e);
             o.push_back(Pair(txid.ToString(), info));
         }
         return o;
     } else {
         std::vector<uint256> vtxids;
-        mempool.queryHashes(vtxids);
+        mempool.QueryHashes(vtxids);
 
         UniValue a(UniValue::VARR);
         for (const uint256 &txid : vtxids) {
@@ -481,26 +479,30 @@ UniValue getmempoolancestors(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    LOCK(mempool.cs);
+    std::shared_lock lock(mempool.smtx);
 
-    CTxMemPool::txiter it = mempool.mapTx.find(hash);
-    if (it == mempool.mapTx.end()) {
+    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
+    if (txIter == mempool.mapTx.end()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-
     CTxMemPool::setEntries setAncestors;
     uint64_t noLimit = std::numeric_limits<uint64_t>::max();
     std::string dummy;
-    mempool.CalculateMemPoolAncestors(*it, setAncestors, noLimit, noLimit,
-                                      noLimit, noLimit, dummy, false);
-
+    mempool.CalculateMemPoolAncestorsNL(
+                *txIter,
+                setAncestors,
+                noLimit,
+                noLimit,
+                noLimit,
+                noLimit,
+                dummy,
+                false);
     if (!fVerbose) {
         UniValue o(UniValue::VARR);
         for (CTxMemPool::txiter ancestorIt : setAncestors) {
             o.push_back(ancestorIt->GetTx().GetId().ToString());
         }
-
         return o;
     } else {
         UniValue o(UniValue::VOBJ);
@@ -508,7 +510,7 @@ UniValue getmempoolancestors(const Config &config,
             const CTxMemPoolEntry &e = *ancestorIt;
             const uint256 &_hash = e.GetTx().GetId();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSONNL(info, e);
             o.push_back(Pair(_hash.ToString(), info));
         }
         return o;
@@ -548,25 +550,26 @@ UniValue getmempooldescendants(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    LOCK(mempool.cs);
+    std::shared_lock lock(mempool.smtx);
 
-    CTxMemPool::txiter it = mempool.mapTx.find(hash);
-    if (it == mempool.mapTx.end()) {
+    // Check if tx is present in the mempool
+    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
+    if (txIter == mempool.mapTx.end()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-
     CTxMemPool::setEntries setDescendants;
-    mempool.CalculateDescendants(it, setDescendants);
-    // CTxMemPool::CalculateDescendants will include the given tx
-    setDescendants.erase(it);
-
+    // Calculate descendants
+    mempool.CalculateDescendantsNL(
+                txIter,
+                setDescendants);
+    // Exclude the given tx from the output
+    setDescendants.erase(txIter);
     if (!fVerbose) {
         UniValue o(UniValue::VARR);
         for (CTxMemPool::txiter descendantIt : setDescendants) {
             o.push_back(descendantIt->GetTx().GetId().ToString());
         }
-
         return o;
     } else {
         UniValue o(UniValue::VOBJ);
@@ -574,7 +577,7 @@ UniValue getmempooldescendants(const Config &config,
             const CTxMemPoolEntry &e = *descendantIt;
             const uint256 &_hash = e.GetTx().GetId();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSONNL(info, e);
             o.push_back(Pair(_hash.ToString(), info));
         }
         return o;
@@ -599,17 +602,16 @@ UniValue getmempoolentry(const Config &config, const JSONRPCRequest &request) {
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    LOCK(mempool.cs);
+    std::shared_lock lock(mempool.smtx);
 
-    CTxMemPool::txiter it = mempool.mapTx.find(hash);
-    if (it == mempool.mapTx.end()) {
+    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
+    if (txIter == mempool.mapTx.end()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-
-    const CTxMemPoolEntry &e = *it;
+    const CTxMemPoolEntry &e = *txIter;
     UniValue info(UniValue::VOBJ);
-    entryToJSON(info, e);
+    entryToJSONNL(info, e);
     return info;
 }
 
@@ -1226,9 +1228,9 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
 
     Coin coin;
     if (fMempool) {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         CCoinsViewMemPool view(pcoinsTip, mempool);
-        if (!view.GetCoin(out, coin) || mempool.isSpent(out)) {
+        if (!view.GetCoin(out, coin) || mempool.IsSpentNL(out)) {
             // TODO: this should be done by the CCoinsViewMemPool
             return NullUniValue;
         }
@@ -1541,7 +1543,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
 
 UniValue mempoolInfoToJSON() {
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("size", (int64_t)mempool.size()));
+    ret.push_back(Pair("size", (int64_t)mempool.Size()));
     ret.push_back(Pair("journalsize", (int64_t)mempool.getJournalBuilder()->getCurrentJournal()->size()));
     ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t)mempool.DynamicMemoryUsage()));
@@ -1812,7 +1814,7 @@ UniValue checkjournal(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("checkjournal", ""));
     }
 
-    std::string checkResult { mempool.checkJournal() };
+    std::string checkResult { mempool.CheckJournal() };
 
     UniValue result { UniValue::VOBJ };
     if(checkResult.empty())
@@ -1839,7 +1841,7 @@ UniValue rebuildjournal(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("rebuildjournal", ""));
     }
 
-    mempool.rebuildJournal();
+    mempool.RebuildJournal();
     return NullUniValue;
 }
 

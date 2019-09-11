@@ -135,7 +135,8 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
     // updated at end
     pblocktemplate->vTxSigOpsCount.push_back(-1);
 
-    LOCK2(cs_main, mempool.cs);
+    LOCK(cs_main);
+    std::unique_lock lock(mempool.smtx);
     CBlockIndex* pindexPrevNew = chainActive.Tip();
     nHeight = pindexPrevNew->nHeight + 1;
 
@@ -190,7 +191,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
 }
 
 bool LegacyBlockAssembler::isStillDependent(CTxMemPool::txiter iter) {
-    for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter)) {
+    for (CTxMemPool::txiter parent : mempool.GetMemPoolParentsNL(iter)) {
         if (!inBlock.count(parent)) {
             return true;
         }
@@ -305,7 +306,9 @@ void LegacyBlockAssembler::AddToBlock(CTxMemPool::txiter iter) {
     if (fPrintPriority) {
         double dPriority = iter->GetPriority(nHeight);
         Amount dummy;
-        mempool.ApplyDeltas(iter->GetTx().GetId(), dPriority, dummy);
+        mempool.ApplyDeltasNL(iter->GetTx().GetId(),
+                              dPriority,
+                              dummy);
         LogPrintf(
             "priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString(),
@@ -319,7 +322,7 @@ int LegacyBlockAssembler::UpdatePackagesForAdded(
     int nDescendantsUpdated = 0;
     for (const CTxMemPool::txiter it : alreadyAdded) {
         CTxMemPool::setEntries descendants;
-        mempool.CalculateDescendants(it, descendants);
+        mempool.CalculateDescendantsNL(it, descendants);
         // Insert all descendants (not yet in block) into the modified set.
         for (CTxMemPool::txiter desc : descendants) {
             if (alreadyAdded.count(desc)) {
@@ -485,8 +488,14 @@ void LegacyBlockAssembler::addPackageTxs(int &nPackagesSelected,
         CTxMemPool::setEntries ancestors;
         uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
         std::string dummy;
-        mempool.CalculateMemPoolAncestors(*iter, ancestors, nNoLimit, nNoLimit,
-                                          nNoLimit, nNoLimit, dummy, false);
+        mempool.CalculateMemPoolAncestorsNL(*iter,
+                                            ancestors,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            dummy,
+                                            false);
 
         onlyUnconfirmed(ancestors);
         ancestors.insert(iter);
@@ -545,7 +554,9 @@ void LegacyBlockAssembler::addPriorityTxs() {
          mi != mempool.mapTx.end(); ++mi) {
         double dPriority = mi->GetPriority(nHeight);
         Amount dummy;
-        mempool.ApplyDeltas(mi->GetTx().GetId(), dPriority, dummy);
+        mempool.ApplyDeltasNL(mi->GetTx().GetId(),
+                              dPriority,
+                              dummy);
         vecPriority.push_back(TxCoinAgePriority(dPriority, mi));
     }
     std::make_heap(vecPriority.begin(), vecPriority.end(), pricomparer);
@@ -588,7 +599,7 @@ void LegacyBlockAssembler::addPriorityTxs() {
 
             // This tx was successfully added, so add transactions that depend
             // on this one to the priority queue to try again.
-            for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter)) {
+            for (CTxMemPool::txiter child : mempool.GetMemPoolChildrenNL(iter)) {
                 waitPriIter wpiter = waitPriMap.find(child);
                 if (wpiter != waitPriMap.end()) {
                     vecPriority.push_back(

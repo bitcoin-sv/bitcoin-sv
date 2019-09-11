@@ -579,7 +579,8 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
     std::vector<bool> hits;
     bitmap.resize((vOutPoints.size() + 7) / 8);
     {
-        LOCK2(cs_main, mempool.cs);
+        LOCK(cs_main);
+        std::shared_lock lock(mempool.smtx);
 
         CCoinsView viewDummy;
         CCoinsViewCache view(&viewDummy);
@@ -597,7 +598,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
             Coin coin;
             bool hit = false;
             if (view.GetCoin(vOutPoints[i], coin) &&
-                !mempool.isSpent(vOutPoints[i])) {
+                !mempool.IsSpentNL(vOutPoints[i])) {
                 hit = true;
                 outs.emplace_back(std::move(coin));
             }

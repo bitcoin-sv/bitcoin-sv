@@ -232,6 +232,7 @@ add_library(server
 	net.cpp
 	net_processing.cpp
 	noui.cpp
+	orphan_txns.cpp
 	policy/fees.cpp
 	policy/policy.cpp
 	pow.cpp
@@ -251,7 +252,11 @@ add_library(server
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+	txn_double_spend_detector.cpp
 	txn_propagator.cpp
+	txn_validation_data.cpp
+	txn_validator.cpp
+	txn_recent_rejects.cpp
 	ui_interface.cpp
 	validation.cpp
 	validationinterface.cpp

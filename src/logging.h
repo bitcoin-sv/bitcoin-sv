@@ -48,6 +48,7 @@ enum LogFlags : uint32_t {
     TXNPROP = (1 << 21),
     TXNSRC = (1 << 22),
     JOURNAL = (1 << 23),
+    TXNVAL = (1 << 24),
     ALL = ~uint32_t(0),
 };
 
