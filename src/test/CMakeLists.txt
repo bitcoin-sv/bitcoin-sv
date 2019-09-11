@@ -64,6 +64,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	blockfile_reading_tests.cpp
 	blockstatus_tests.cpp
 	bloom_tests.cpp
+    bn_op_tests.cpp
 	bswap_tests.cpp
 	checkpoints_tests.cpp
 	coins_tests.cpp

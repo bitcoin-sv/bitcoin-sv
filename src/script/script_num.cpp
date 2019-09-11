@@ -25,7 +25,12 @@ CScriptNum::CScriptNum(const vector<uint8_t>& vch,
     {
         throw scriptnum_minencode_error("non-minimally encoded script number");
     }
-    m_value = vch.empty() ? 0 : bsv::deserialize<int64_t>(begin(vch), end(vch));
+    if(vch.empty())
+        m_value = 0;
+    else if(vch.size() <= MAXIMUM_ELEMENT_SIZE)
+        m_value = bsv::deserialize<int64_t>(begin(vch), end(vch));
+    else
+        m_value = bsv::deserialize<bint>(begin(vch), end(vch));
 }
 
 namespace
@@ -35,7 +40,6 @@ namespace
     {
         using Ts::operator()...;
     };
-
     template<typename... Ts>
     overload(Ts...)->overload<Ts...>;
 }

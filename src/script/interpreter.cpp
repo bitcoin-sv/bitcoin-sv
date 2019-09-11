@@ -383,7 +383,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     }
     int nOpCount = 0;
-    bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+    const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+    const bool big_ints_enabled = (flags & SCRIPT_ENABLE_BIG_INTS) != 0;
 
     try {
         while (pc < pend) {
@@ -1036,8 +1037,14 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        CScriptNum bn1(stacktop(-2), fRequireMinimal);
-                        CScriptNum bn2(stacktop(-1), fRequireMinimal);
+                        CScriptNum bn1(stacktop(-2), fRequireMinimal,
+                                       big_ints_enabled
+                                           ? stacktop(-2).size()
+                                           : CScriptNum::MAXIMUM_ELEMENT_SIZE);
+                        CScriptNum bn2(stacktop(-1), fRequireMinimal,
+                                       big_ints_enabled
+                                           ? stacktop(-1).size()
+                                           : CScriptNum::MAXIMUM_ELEMENT_SIZE);
                         CScriptNum bn(0);
                         switch (opcode) {
                             case OP_ADD:
