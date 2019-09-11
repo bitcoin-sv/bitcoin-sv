@@ -131,7 +131,9 @@ std::string BCLog::Logger::LogTimestampStr(const std::string &str) {
             DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
         if (fLogTimeMicros)
             strStamped += strprintf(".%06d", nTimeMicros % 1000000);
-        strStamped += ' ' + str;
+
+        std::string strThreadName = "["+GetThreadName()+"]";
+        strStamped += ' ' + strThreadName + ' ' + str;
     } else
         strStamped = str;
 
@@ -147,8 +149,7 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
     // Returns total number of characters written.
     int ret = 0;
 
-    std::string strThreadName = "["+GetThreadName()+"] ";
-    std::string strTimestamped = LogTimestampStr(strThreadName+str);
+    std::string strTimestamped = LogTimestampStr(str);
 
     if (fPrintToConsole) {
         // Print to console.
