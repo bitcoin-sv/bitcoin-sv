@@ -188,6 +188,7 @@ enum opcodetype {
 };
 
 const char *GetOpName(opcodetype opcode);
+std::ostream& operator<<(std::ostream&, const opcodetype&);
 
 class CScriptNum;
 
@@ -416,6 +417,9 @@ public:
         CScriptBase().swap(*this);
     }
 };
+
+std::ostream &operator<<(std::ostream &, const CScript &);
+std::string to_string(const CScript&);
 
 struct CScriptWitness {
     // Note that this encodes the data elements being pushed, rather than

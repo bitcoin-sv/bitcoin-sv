@@ -11,6 +11,13 @@
 #include "utilstrencodings.h"
 
 #include <algorithm>
+#include <sstream>
+
+std::ostream& operator<<(std::ostream& os, const opcodetype& opcode)
+{
+    os << GetOpName(opcode);
+    return os;
+}
 
 const char *GetOpName(opcodetype opcode) {
     switch (opcode) {
@@ -376,3 +383,19 @@ std::string CScriptWitness::ToString() const {
     }
     return ret + ")";
 }
+
+std::ostream& operator<<(std::ostream& os, const CScript& script)
+{
+    for(const auto opcode : script)
+        os << static_cast<opcodetype>(opcode) << ' ';
+    return os;
+}
+
+// used for debugging and pretty-printing in gdb
+std::string to_string(const CScript& s)
+{
+    std::ostringstream oss;
+    oss << s;
+    return oss.str();
+}
+
