@@ -272,7 +272,7 @@ static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
 
 /** Default for treating transactions with P2SH in output as non-standard */
-static const bool DEFAULT_ACCEPT_P2SH = false;
+static const bool DEFAULT_ACCEPT_P2SH = true;
 
 // Flush modes to update on-disk chain state
 enum FlushStateMode {

@@ -1,11 +1,9 @@
 # Bitcoin SV version x.y.z Release Notes
 
 ## Important Changes
-* [P2SH Sunset Changes](p2sh-sunset.md) - Transactions with P2SH outputs will not be propagated or mined by the node by default.
 
 ## List of Changes
 * Do not load whole block into memory when responding to getblock request
-* Discourage use of P2SH by not relaying or mining transactions containing outputs using P2SH
 * Windows build errors
 * add bitcoin-miner to CMakeLists && Add Visual Studio 2017 Linux remote debug support
 * Mempool journal for mining candidates.

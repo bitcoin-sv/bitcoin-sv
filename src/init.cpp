@@ -838,11 +838,6 @@ std::string HelpMessage(HelpMessageMode mode) {
                                     DateTimeStrFormat("%Y-%m-%d %H:%M:%S", testnetChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
                                     testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfter
                                  ));
-    strUsage += HelpMessageOpt(
-    "-acceptP2SH", strprintf(_("Relay and mine transactions with P2SH outputs. "
-                            "When the value is 0 such transactions are treated as non-standard. "
-                            " (default: %d)"),
-                          DEFAULT_ACCEPT_P2SH));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
