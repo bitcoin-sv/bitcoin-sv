@@ -153,7 +153,12 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
         while(!mJournal->getCurrent() || !mJournalPos.valid())
         {
             newBlock();
-            journalLock = CJournal::ReadLock { mJournal };
+            // make sure that we don't lock the same journal twice as that is
+            // not allowed by the standard and can cause a deadlock
+            if(!journalLock.IsSame(mJournal))
+            {
+                journalLock = CJournal::ReadLock { mJournal };
+            }
             mJournalPos = journalLock.begin();
         }
 
