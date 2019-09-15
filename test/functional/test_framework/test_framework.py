@@ -310,7 +310,7 @@ class BitcoinTestFramework():
             connCb.wait_for_verack()
 
         logger.debug("before %s", title)
-        yield connections
+        yield tuple(connections)
         logger.debug("after %s", title)
 
         for connection in connections:
