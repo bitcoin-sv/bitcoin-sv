@@ -1707,11 +1707,14 @@ static void UpdateMempoolForReorg(const Config &config,
 
 /**
  * Return transaction in txOut, and if it was found inside a block, its hash is
- * placed in hashBlock.
+ * placed in hashBlock and info about if this is post-Genesis transactions is placed into isGenesisEnabled
  */
 bool GetTransaction(const Config &config, const TxId &txid,
-                    CTransactionRef &txOut, uint256 &hashBlock,
-                    bool fAllowSlow) {
+                    CTransactionRef &txOut,
+                    bool fAllowSlow,
+                    uint256 &hashBlock,
+                    bool& isGenesisEnabled
+                    ) {
     CBlockIndex *pindexSlow = nullptr;
 
     LOCK(cs_main);
@@ -1719,6 +1722,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
     CTransactionRef ptx = mempool.Get(txid);
     if (ptx) {
         txOut = ptx;
+        isGenesisEnabled = IsGenesisEnabled(config, chainActive.Tip()->nHeight + 1); // assume that the transaction from mempool will be mined in next block
         return true;
     }
 
@@ -1743,6 +1747,12 @@ bool GetTransaction(const Config &config, const TxId &txid,
             if (txOut->GetId() != txid) {
                 return error("%s: txid mismatch", __func__);
             }
+            auto foundBlockIndex = mapBlockIndex.find(hashBlock);
+            if (foundBlockIndex == mapBlockIndex.end() || foundBlockIndex->second == nullptr)
+            {
+                return error("%s: mapBlockIndex mismatch  ", __func__);
+            }
+            isGenesisEnabled = IsGenesisEnabled(config, foundBlockIndex->second->nHeight);
             return true;
         }
     }
@@ -1762,6 +1772,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
                 if (tx->GetId() == txid) {
                     txOut = tx;
                     hashBlock = pindexSlow->GetBlockHash();
+                    isGenesisEnabled = IsGenesisEnabled(config, pindexSlow->nHeight);
                     return true;
                 }
             }

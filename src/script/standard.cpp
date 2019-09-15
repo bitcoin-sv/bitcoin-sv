@@ -238,15 +238,16 @@ bool ExtractDestination(const CScript &scriptPubKey,
     return false;
 }
 
-bool ExtractDestinations(const CScript &scriptPubKey, txnouttype &typeRet,
+bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txnouttype &typeRet,
                          std::vector<CTxDestination> &addressRet,
                          int &nRequiredRet) {
     addressRet.clear();
     typeRet = TX_NONSTANDARD;
     std::vector<valtype> vSolutions;
-    if (!SolverNoData(scriptPubKey, typeRet, vSolutions)) { // TODO: We need to correctly identify data here. This will be solved in next commit
+    if (!SolverWithData(scriptPubKey, isGenesisEnabled, typeRet, vSolutions)) {
         return false;
     }
+
     if (typeRet == TX_NULL_DATA) {
         // This is data, not addresses
         return false;

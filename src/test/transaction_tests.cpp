@@ -833,4 +833,39 @@ BOOST_AUTO_TEST_CASE(test_IsStandard_OP_FALSE_OP_RETURN) {
     TestIsStandardWithScriptFactory([]() { return CScript() << OP_FALSE << OP_RETURN; }, 2);
 }
 
+// Create a transaction with given ouputput script, convert it to JSON and return vout/scriptpubkey/type
+std::string getVoutTypeForScriptPubKey(const CScript& scriptPubKey, bool isGenesisEnabled)
+{
+    CMutableTransaction t;
+    t.vin.resize(1);
+    t.vin[0].prevout = COutPoint(uint256(), 1);
+    t.vin[0].scriptSig << std::vector<uint8_t>(65, 0);
+    t.vout.resize(1);
+    t.vout[0].nValue = 90 * CENT;
+
+    std::string reason;    
+    t.vout[0].scriptPubKey = scriptPubKey;
+    CTransaction t2 { t };
+    
+    UniValue entry(UniValue::VOBJ);
+    TxToUniv(t2, uint256(), isGenesisEnabled, entry);
+    
+    //std::string jsonOutput = entry.write(4); // for debugging;
+
+    return  entry["vout"][0]["scriptPubKey"]["type"].getValStr();
+
+    
+}
+
+BOOST_AUTO_TEST_CASE(tst_tx_toJson_OP_RETURN) {
+
+    // Check if converting transaction to JSON properly decodes type of scriptPubKey
+
+    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_RETURN << ParseHex("1234"), false), "nulldata");
+    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_RETURN << ParseHex("1234"), true), "nonstandard"); // after Genesis single OP_RETURN is nonstantard
+
+    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_FALSE << OP_RETURN << ParseHex("1234"), true), "nulldata");
+    BOOST_CHECK_EQUAL(getVoutTypeForScriptPubKey(CScript() << OP_FALSE << OP_RETURN << ParseHex("1234"), true), "nulldata"); // ... but OP_FALSE OP_RETURN is still nulldata
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -920,7 +920,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     do
     {
         const CTransaction& transaction = reader->ReadTransaction();
-        UniValue objBlockTx = blockTxToJSON(config, transaction, showTxDetails);
+        UniValue objBlockTx = blockTxToJSON(config, transaction, showTxDetails, IsGenesisEnabled(config, blockIndex.nHeight));
         std::string strJSON = delimiter + objBlockTx.write();
         req.WriteReplyChunk(strJSON);
         delimiter = ",";  
@@ -977,10 +977,10 @@ std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHea
     return headerJSON.substr(1, headerJSON.size() - 2);
 }
 
-UniValue blockTxToJSON(const Config &config, const CTransaction& tx, bool txDetails) {
+UniValue blockTxToJSON(const Config &config, const CTransaction& tx, bool txDetails, bool isGenesisEnabled) {
     if (txDetails) {
         UniValue objTx(UniValue::VOBJ);
-        TxToUniv(tx, uint256(), objTx);
+        TxToUniv(tx, uint256(), isGenesisEnabled, objTx);
         return objTx;
     } 
 
@@ -1251,7 +1251,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     }
     ret.push_back(Pair("value", ValueFromAmount(coin.GetTxOut().nValue)));
     UniValue o(UniValue::VOBJ);
-    ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, o, true);
+    ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true, IsGenesisEnabled(config, coin.GetHeight()), o);
     ret.push_back(Pair("scriptPubKey", o));
     ret.push_back(Pair("coinbase", coin.IsCoinBase()));
 

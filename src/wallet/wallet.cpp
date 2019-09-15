@@ -101,7 +101,8 @@ public:
         txnouttype type;
         std::vector<CTxDestination> vDest;
         int nRequired;
-        if (ExtractDestinations(script, type, vDest, nRequired)) {
+        bool isGenesisEnabled = false; // CAffectedKeysVisitor does not care about data/non standard transactions. When sunsetting P2SH, we will need the real value here
+        if (ExtractDestinations(script, isGenesisEnabled, type, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest) {
                 boost::apply_visitor(*this, dest);
             }

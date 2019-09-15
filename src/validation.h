@@ -441,7 +441,7 @@ std::string GetWarnings(const std::string &strFor);
  * Retrieve a transaction (from memory pool, or from disk, if possible).
  */
 bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
-                    uint256 &hashBlock, bool fAllowSlow = false);
+    bool fAllowSlow, uint256 &hashBlock, bool& isGenesisEnabled);
 
 /**
  * Find the best known block, and make it the active tip of the block chain.

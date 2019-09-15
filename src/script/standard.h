@@ -99,7 +99,7 @@ bool SolverNoData(const CScript& scriptPubKey, txnouttype& typeRet,
 
 bool ExtractDestination(const CScript &scriptPubKey,
                         CTxDestination &addressRet);
-bool ExtractDestinations(const CScript &scriptPubKey, txnouttype &typeRet,
+bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txnouttype &typeRet,
                          std::vector<CTxDestination> &addressRet,
                          int &nRequiredRet);
 

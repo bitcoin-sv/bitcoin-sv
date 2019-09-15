@@ -759,9 +759,9 @@ static void MutateTx(CMutableTransaction &tx, const std::string &command,
     }
 }
 
-static void OutputTxJSON(const CTransaction &tx) {
+static void OutputTxJSON(const CTransaction &tx, bool isGenesisEnabled) {
     UniValue entry(UniValue::VOBJ);
-    TxToUniv(tx, uint256(), entry);
+    TxToUniv(tx, uint256(), isGenesisEnabled, entry);
 
     std::string jsonOutput = entry.write(4);
     fprintf(stdout, "%s\n", jsonOutput.c_str());
@@ -780,9 +780,9 @@ static void OutputTxHex(const CTransaction &tx) {
     fprintf(stdout, "%s\n", strHex.c_str());
 }
 
-static void OutputTx(const CTransaction &tx) {
+static void OutputTx(const CTransaction &tx, bool isGenesisEnabled) {
     if (gArgs.GetBoolArg("-json", false)) {
-        OutputTxJSON(tx);
+        OutputTxJSON(tx, isGenesisEnabled);
     } else if (gArgs.GetBoolArg("-txid", false)) {
         OutputTxHash(tx);
     } else {
@@ -862,7 +862,7 @@ static int CommandLineRawTx(int argc, char *argv[],
             MutateTx(tx, key, value, chainParams);
         }
 
-        OutputTx(CTransaction(tx));
+        OutputTx(CTransaction(tx), true /* we have no block height available - treat all transactions as post-genesis */ );
     }
 
     catch (const boost::thread_interrupted &) {
