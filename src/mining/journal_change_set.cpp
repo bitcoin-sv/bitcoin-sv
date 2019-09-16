@@ -62,11 +62,33 @@ void CJournalChangeSet::addOperation(Operation op, const CJournalEntry& txn)
     addOperationCommon(op);
 }
 
+// Is our reason for the update a basic one? By "basic", we mean a change that
+// can be applied immediately to the journal without having to wait fo the full
+// change set to be compiled. So, NEW_TXN and INIT for example are basic, whereas
+// NEW_BLOCK and REORG are not.
+bool CJournalChangeSet::isUpdateReasonBasic() const
+{
+    switch(mUpdateReason)
+    {
+        case(JournalUpdateReason::NEW_BLOCK):
+        case(JournalUpdateReason::REORG):
+        case(JournalUpdateReason::RESET):
+            return false;
+        default:
+            return true;
+    }
+}
+
 // Apply our changes to the journal
 void CJournalChangeSet::apply()
 {
     std::unique_lock<std::mutex> lock { mMtx };
+    applyNL();
+}
 
+// Apply our changes to the journal - Caller holds mutex
+void CJournalChangeSet::applyNL()
+{
     if(!mChangeSet.empty())
     {
         // There are a lot of corner cases that can happen with REORG change sets,
@@ -98,6 +120,7 @@ void CJournalChangeSet::apply()
     }
 }
 
+
 // Common post operation addition steps - caller holds mutex
 void CJournalChangeSet::addOperationCommon(Operation op)
 {
@@ -105,6 +128,12 @@ void CJournalChangeSet::addOperationCommon(Operation op)
     if(op != Operation::ADD)
     {
         mTailAppendOnly = false;
+    }
+
+    // If it's safe to do so, immediately apply this change to the journal
+    if(isUpdateReasonBasic())
+    {
+        applyNL();
     }
 }
 

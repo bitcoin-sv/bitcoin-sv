@@ -67,6 +67,9 @@ class CJournalChangeSet final
     // Get why we were created
     JournalUpdateReason getUpdateReason() const { return mUpdateReason; }
 
+    // Is our reason for the update a basic one?
+    bool isUpdateReasonBasic() const;
+
     // Get reference to our change set
     const ChangeSet& getChangeSet() const { return mChangeSet; }
 
@@ -80,6 +83,9 @@ class CJournalChangeSet final
 
     // Common post operation addition steps
     void addOperationCommon(Operation op);
+
+    // Apply our changes (caller holds mutex)
+    void applyNL();
 
     mutable std::mutex mMtx {};
 
