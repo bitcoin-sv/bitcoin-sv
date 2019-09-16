@@ -742,12 +742,8 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
 
     if(!fRelayTxes)
     {
-        // Peer has requested we not relay txns
-        if(!mInvList.empty())
-        {
-            // Clear any txns we have queued for this peer
-            mInvList = InvList{ CompareTxnSendingDetails{&mempool} };
-        }
+        // Clear any txns we have queued for this peer
+        mInvList.clear();
     }
     else
     {
@@ -763,7 +759,7 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
             if(pfilter && !pfilter->IsRelevantAndUpdate(*(txn.getTxnRef())))
                 continue;
 
-            mInvList.emplace(txn);
+            mInvList.emplace_back(txn);
             filterInventoryKnown.insert(txn.getInv().hash);
         }
     }
@@ -778,7 +774,12 @@ void CNode::RemoveTxnsFromInventory(const std::vector<CTxnSendingDetails>& txns)
 {
     // Remove them
     LOCK(cs_mInvList);
-    mInvList.erase(txns);
+    for (const auto& el : txns)
+    {
+         mInvList.erase(std::remove_if(mInvList.begin(), mInvList.end(), [&el](const CTxnSendingDetails& i) {
+             return i.getInv() == el.getInv(); }),
+                mInvList.end());
+      }
 }
 
 /** Fetch the next N items from our inventory */
@@ -786,24 +787,20 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
 {
     std::vector<CTxnSendingDetails> results {};
 
-    // Try and lock the mempool (for txn ordering) and our inventory list,
-    // if we fail to take either then don't hold up the caller by waiting.
-    std::shared_lock lock(mempool.smtx, std::defer_lock);
-    bool mempoolLocked {false};
-    if (lock.try_lock()) {
-        mempoolLocked = true;
-    }
     TRY_LOCK(cs_mInvList, invLocked);
-    if(!mempoolLocked || !invLocked)
-        return results;
-
-    for(size_t i = 0; i < n; ++i)
+    if(!invLocked)
     {
-        if(mInvList.empty())
-            break;
+        return results;
+    }
+ 
+    if (n > mInvList.size())
+    {
+        n = mInvList.size();
+    }
 
-        results.emplace_back(std::move(mInvList.top()));
-        mInvList.pop();
+    for (int i = 0; i < n; i++) {
+        results.push_back(std::move(mInvList.front()));
+        mInvList.pop_front();
     }
 
     return results;

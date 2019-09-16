@@ -1362,7 +1362,7 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
     // Estimate the overhead of mapTx to be 15 pointers + an allocation, as no
     // exact formula for boost::multi_index_contained is implemented.
     return memusage::MallocUsage(sizeof(CTxMemPoolEntry) +
-                                 15 * sizeof(void *)) *
+                                 12 * sizeof(void *)) *
                mapTx.size() +
            memusage::DynamicUsage(mapNextTx) +
            memusage::DynamicUsage(mapDeltas) +

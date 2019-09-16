@@ -16,7 +16,6 @@
 #include "fs.h"
 #include "hash.h"
 #include "limitedmap.h"
-#include "mod_pri_queue.h"
 #include "netaddress.h"
 #include "protocol.h"
 #include "random.h"
@@ -944,9 +943,8 @@ private:
     CService addrLocal {};
     mutable CCriticalSection cs_addrLocal {};
 
-    /** List of priority sorted inventory msgs for transactions to send */
-    using InvList = CModPriQueue<CTxnSendingDetails, std::vector<CTxnSendingDetails>, CompareTxnSendingDetails>;
-    InvList mInvList { CompareTxnSendingDetails{&mempool} };
+    /** Deque of inventory msgs for transactions to send */
+    std::deque<CTxnSendingDetails> mInvList;
     CCriticalSection cs_mInvList {};
 
 

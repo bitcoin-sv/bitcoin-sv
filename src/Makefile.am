@@ -134,7 +134,6 @@ BITCOIN_CORE_H = \
   mining/journal_entry.h \
   mining/journaling_block_assembler.h \
   mining/legacy.h \
-  mod_pri_queue.h \
   net.h \
   net_processing.h \
   netaddress.h \
