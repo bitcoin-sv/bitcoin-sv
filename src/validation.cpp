@@ -823,7 +823,7 @@ static uint32_t GetScriptVerifyFlags(const Config &config) {
 
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     size_t limit,
     unsigned long age) {
 
@@ -849,7 +849,7 @@ void CommitTxToMempool(
     CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
     CValidationState& state,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
@@ -1618,7 +1618,7 @@ static void PostValidationStepsForP2PTxn(
 static void UpdateMempoolForReorg(const Config &config,
                                   DisconnectedBlockTransactions &disconnectpool,
                                   bool fAddToMempool,
-                                  CJournalChangeSetPtr& changeSet)
+                                  const CJournalChangeSetPtr& changeSet)
 {
     AssertLockHeld(cs_main);
     std::vector<uint256> vHashUpdate;
@@ -3143,7 +3143,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
  */
 static bool DisconnectTip(const Config &config, CValidationState &state,
                           DisconnectedBlockTransactions *disconnectpool,
-                          CJournalChangeSetPtr& changeSet)
+                          const CJournalChangeSetPtr& changeSet)
 {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
@@ -3295,7 +3295,7 @@ static bool ConnectTip(const Config &config, CValidationState &state,
                        const std::shared_ptr<const CBlock> &pblock,
                        ConnectTrace &connectTrace,
                        DisconnectedBlockTransactions &disconnectpool,
-                       CJournalChangeSetPtr& changeSet)
+                       const CJournalChangeSetPtr& changeSet)
 {
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
@@ -3468,7 +3468,7 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
                                   const std::shared_ptr<const CBlock> &pblock,
                                   bool &fInvalidFound,
                                   ConnectTrace &connectTrace,
-                                  CJournalChangeSetPtr& changeSet)
+                                  const CJournalChangeSetPtr& changeSet)
 {
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
@@ -3591,7 +3591,7 @@ static void NotifyHeaderTip() {
 }
 
 bool ActivateBestChain(const Config &config, CValidationState &state,
-                       CJournalChangeSetPtr& changeSet,
+                       const CJournalChangeSetPtr& changeSet,
                        std::shared_ptr<const CBlock> pblock) {
     // Note that while we're often called here from ProcessNewBlock, this is
     // far from a guarantee. Things in the P2P/RPC will often end up calling

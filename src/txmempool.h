@@ -600,7 +600,7 @@ public:
     void Check(
         const int64_t nSpendHeight,
         const CCoinsViewCache *pcoins,
-        mining::CJournalChangeSetPtr& changeSet) const;
+        const mining::CJournalChangeSetPtr& changeSet) const;
 
     std::string CheckJournal() const;
 
@@ -616,7 +616,7 @@ public:
     void AddUnchecked(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
-            mining::CJournalChangeSetPtr& changeSet,
+            const mining::CJournalChangeSetPtr& changeSet,
             bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
@@ -625,7 +625,7 @@ public:
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
-            mining::CJournalChangeSetPtr& changeSet,
+            const mining::CJournalChangeSetPtr& changeSet,
             bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
@@ -636,20 +636,20 @@ public:
             const uint256& hash,
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
-            mining::CJournalChangeSetPtr& changeSet,
+            const mining::CJournalChangeSetPtr& changeSet,
             bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
     void RemoveRecursive(
         const CTransaction &tx,
-        mining::CJournalChangeSetPtr& changeSet,
+        const mining::CJournalChangeSetPtr& changeSet,
         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     void RemoveForReorg(
             const Config &config,
             const CCoinsViewCache *pcoins,
-            mining::CJournalChangeSetPtr& changeSet,
+            const mining::CJournalChangeSetPtr& changeSet,
             int nChainActiveHeight,
             int nMedianTimePast,
             int flags);
@@ -657,7 +657,7 @@ public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             unsigned int nBlockHeight,
-            mining::CJournalChangeSetPtr& changeSet);
+            const mining::CJournalChangeSetPtr& changeSet);
 
     void Clear();
 
@@ -714,7 +714,7 @@ public:
     RemoveStaged(
         setEntries &stage,
         bool updateDescendants,
-        mining::CJournalChangeSetPtr& changeSet,
+        const mining::CJournalChangeSetPtr& changeSet,
         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     /**
@@ -791,12 +791,12 @@ public:
      */
     std::vector<TxId> TrimToSize(
         size_t sizelimit,
-        mining::CJournalChangeSetPtr& changeSet,
+        const mining::CJournalChangeSetPtr& changeSet,
         std::vector<COutPoint> *pvNoSpendsRemaining = nullptr);
 
     /** Expire all transaction (and their dependencies) in the mempool older
      * than time. Return the number of removed transactions. */
-    int Expire(int64_t time, mining::CJournalChangeSetPtr& changeSet);
+    int Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet);
 
     /**
      * Check for conflicts with in-mempool transactions.
@@ -914,12 +914,12 @@ private:
      */
     void removeUncheckedNL(
             txiter entry,
-            mining::CJournalChangeSetPtr& changeSet,
+            const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     void removeConflictsNL(
             const CTransaction &tx,
-            mining::CJournalChangeSetPtr& changeSet);
+            const mining::CJournalChangeSetPtr& changeSet);
 
     void clearNL();
 
@@ -935,7 +935,7 @@ private:
     void removeStagedNL(
             setEntries &stage,
             bool updateDescendants,
-            mining::CJournalChangeSetPtr& changeSet,
+            const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     void clearPrioritisationNL(const uint256& hash);
@@ -943,7 +943,7 @@ private:
     // A non-locking version of RemoveRecursive
     void removeRecursiveNL(
             const CTransaction &tx,
-            mining::CJournalChangeSetPtr& changeSet,
+            const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     // A non-locking version of checkJournal

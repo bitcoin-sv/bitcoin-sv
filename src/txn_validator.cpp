@@ -118,7 +118,7 @@ void CTxnValidator::newTransaction(std::vector<TxInputDataSPtr> vTxInputData) {
 /** Process a new txn in synchronous mode */
 CValidationState CTxnValidator::processValidation(
     const TxInputDataSPtr& pTxInputData,
-    mining::CJournalChangeSetPtr& changeSet,
+    const mining::CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize) {
 
     const CTransactionRef& ptx = pTxInputData->mpTx;
