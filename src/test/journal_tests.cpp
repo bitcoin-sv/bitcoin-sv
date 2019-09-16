@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     CJournalChangeSetPtr changeSet { builder->getNewChangeSet(JournalUpdateReason::NEW_TXN) };
     CJournalEntry singletxn { NewTxn() };
     changeSet->addOperation(CJournalChangeSet::Operation::ADD, singletxn);
-    BOOST_CHECK(changeSet->getSimple());
+    BOOST_CHECK(changeSet->getTailAppendOnly());
     changeSet.reset();
     BOOST_CHECK_EQUAL(journal->size(), 1);
     BOOST_CHECK(CJournalTester{journal}.checkTxnExists(singletxn));
@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     {
         changeSet->addOperation(op, txn);
     }
-    BOOST_CHECK(changeSet->getSimple());
+    BOOST_CHECK(changeSet->getTailAppendOnly());
     changeSet.reset();
     BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 4);
     for(const auto& [ op, txn ] : ops)
@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     {
         changeSet->addOperation(op, txn);
     }
-    BOOST_CHECK(!changeSet->getSimple());
+    BOOST_CHECK(!changeSet->getTailAppendOnly());
     changeSet.reset();
     BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 2);
     BOOST_CHECK(CJournalTester{journal}.checkTxnExists(singletxn));
@@ -171,7 +171,7 @@ BOOST_AUTO_TEST_CASE(TestJournalReorg)
     {
         changeSet->addOperation(op, txn);
     }
-    BOOST_CHECK(!changeSet->getSimple());
+    BOOST_CHECK(!changeSet->getTailAppendOnly());
     changeSet.reset();
     BOOST_CHECK(!journal->getCurrent());
     journal = builder->getCurrentJournal();

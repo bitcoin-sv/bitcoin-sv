@@ -81,7 +81,7 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
     }
 
     // Do we need to invalidate any observers after this change?
-    if(!changeSet.getSimple())
+    if(!changeSet.getTailAppendOnly())
     {
         mInvalidatingTime = GetTimeMicros();
     }

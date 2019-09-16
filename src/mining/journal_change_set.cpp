@@ -32,10 +32,10 @@ const enumTableT<JournalUpdateReason>& mining::enumTable(JournalUpdateReason)
 CJournalChangeSet::CJournalChangeSet(CJournalBuilder& builder, JournalUpdateReason reason)
 : mBuilder{builder}, mUpdateReason{reason}
 {
-    // Reorgs can never be described as simple
+    // Reorgs can remove as well as add, and they add to the front not the tail
     if(mUpdateReason == JournalUpdateReason::REORG)
     {
-        mSimple = false;
+        mTailAppendOnly = false;
     }
 }
 
@@ -101,10 +101,10 @@ void CJournalChangeSet::apply()
 // Common post operation addition steps - caller holds mutex
 void CJournalChangeSet::addOperationCommon(Operation op)
 {
-    // If this was a remove operation then we're no longer a simple change
+    // If this was a remove operation then we're no longer a simply appending
     if(op != Operation::ADD)
     {
-        mSimple = false;
+        mTailAppendOnly = false;
     }
 }
 
