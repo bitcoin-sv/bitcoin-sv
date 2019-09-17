@@ -1017,6 +1017,13 @@ std::string CTxMemPool::checkJournalNL() const
     if(mapTx.size() != tester.journalSize())
     {
         res << "Mempool size = " << mapTx.size() << ", journal size = " << tester.journalSize() << std::endl;
+        res << "Mempool contents:" << std::endl;
+        for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
+        {
+            res << it->GetTx().GetId().ToString() << std::endl;
+        }
+        res << "Journal contents:" << std::endl;
+        tester.dumpJournalContents(res);
     }
 
     // Check mempool & journal agree on contents

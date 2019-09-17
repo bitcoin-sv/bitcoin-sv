@@ -4,6 +4,7 @@
 #include <mining/journal.h>
 #include <mining/journal_change_set.h>
 #include <utiltime.h>
+#include <logging.h>
 
 using mining::CJournal;
 using mining::CJournalTester;
@@ -76,6 +77,11 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
 
                 // Remove txn
                 index0.erase(txnit);
+            }
+            else
+            {
+                LogPrint(BCLog::JOURNAL, "ERROR: Failed to find and remove txn %s from journal\n",
+                    txn.getTxn()->GetId().ToString().c_str());
             }
         }
     }
