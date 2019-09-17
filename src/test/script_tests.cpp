@@ -260,6 +260,32 @@ private:
         havePush = true;
     }
 
+    std::vector<uint8_t> MakeSig(CScript& script, const CKey &key,
+                         SigHashType sigHashType = SigHashType(),
+                         unsigned int lenR = 32, unsigned int lenS = 32,
+                         Amount amount = Amount(0),
+                         uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
+        uint256 hash = SignatureHash(script, CTransaction(spendTx), 0,
+                                     sigHashType, amount, nullptr, flags);
+        std::vector<uint8_t> vchSig, r, s;
+        uint32_t iter = 0;
+        do {
+            key.Sign(hash, vchSig, iter++);
+            if ((lenS == 33) != (vchSig[5 + vchSig[3]] == 33)) {
+                NegateSignatureS(vchSig);
+            }
+
+            r = std::vector<uint8_t>(vchSig.begin() + 4,
+                                     vchSig.begin() + 4 + vchSig[3]);
+            s = std::vector<uint8_t>(vchSig.begin() + 6 + vchSig[3],
+                                     vchSig.begin() + 6 + vchSig[3] +
+                                         vchSig[5 + vchSig[3]]);
+        } while (lenR != r.size() || lenS != s.size());
+
+        vchSig.push_back(static_cast<uint8_t>(sigHashType.getRawSigHashType()));
+        return vchSig;
+    }
+
 public:
     TestBuilder(const CScript &script_, const std::string &comment_, int flags_,
                 bool P2SH = false, Amount nValue_ = Amount(0))
@@ -309,25 +335,66 @@ public:
                          unsigned int lenR = 32, unsigned int lenS = 32,
                          Amount amount = Amount(0),
                          uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
-        uint256 hash = SignatureHash(script, CTransaction(spendTx), 0,
-                                     sigHashType, amount, nullptr, flags);
-        std::vector<uint8_t> vchSig, r, s;
-        uint32_t iter = 0;
-        do {
-            key.Sign(hash, vchSig, iter++);
-            if ((lenS == 33) != (vchSig[5 + vchSig[3]] == 33)) {
-                NegateSignatureS(vchSig);
+
+        DoPush(MakeSig(script, key, sigHashType, lenR, lenS, amount, flags));
+        return *this;
+    }
+
+    // Signing tranaction that spends this kind of the scriptPubKey:
+    // <PubKey1> OP_CHECKSIGVERIFY OP_CODESEPARATOR <PubKey2> OP_CHECKSIGVERIFY OP_CODESEPARATOR .... <PubKeyN> OP_CHECKSIG
+    // Using vector of keys:  keyN ... key2, key1
+    TestBuilder &PushSeparatorSigs(std::vector<const CKey*> keys,
+                                   SigHashType sigHashType = SigHashType(),
+                                   unsigned int lenR = 32, unsigned int lenS = 32,
+                                   Amount amount = Amount(0),
+                                   uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
+
+        // splitting script of the form: 
+        // <script1> OP_CODESEPARATOR <script2> OP_CODESEPARATOR ... <scriptN-1> OP_CODESEPARATOR <scriptN>
+        //
+        // to the
+        //
+        // <scriptN>
+        // <scriptN-1> OP_CODESEPARATOR <scriptN>
+        // ...
+        // <script2> OP_CODESEPARATOR ... <scriptN-1> OP_CODESEPARATOR <scriptN>
+        // <script1> OP_CODESEPARATOR <script2> OP_CODESEPARATOR ... <scriptN-1> OP_CODESEPARATOR <scriptN>
+
+        std::vector<CScript> separatedScripts;
+        separatedScripts.emplace_back();
+        
+        CScript::const_iterator pc = script.begin();
+        std::vector<uint8_t> data;
+        
+        while (pc < script.end()) {
+            opcodetype opcode;
+            if (!script.GetOp(pc, opcode, data)){
+                break;
             }
+            for(auto& sc : separatedScripts) {
+                if(!data.empty()){
+                    sc << data;
+                } else {
+                    sc << opcode;
+                }   
+            }
+            if (opcode == OP_CODESEPARATOR) {
+                separatedScripts.insert(separatedScripts.begin(), CScript());
+            }
+        }
 
-            r = std::vector<uint8_t>(vchSig.begin() + 4,
-                                     vchSig.begin() + 4 + vchSig[3]);
-            s = std::vector<uint8_t>(vchSig.begin() + 6 + vchSig[3],
-                                     vchSig.begin() + 6 + vchSig[3] +
-                                         vchSig[5 + vchSig[3]]);
-        } while (lenR != r.size() || lenS != s.size());
+        assert(separatedScripts.size() == keys.size());
+        auto keysIterator = keys.begin();
 
-        vchSig.push_back(static_cast<uint8_t>(sigHashType.getRawSigHashType()));
-        DoPush(vchSig);
+        for(auto& s : separatedScripts)
+        {
+            if(*keysIterator != nullptr){
+                auto sig = MakeSig(s, **keysIterator, sigHashType, lenR, lenS, amount, flags);
+                DoPush(sig);
+            }
+            keysIterator++;
+        }
+
         return *this;
     }
 
@@ -1087,6 +1154,47 @@ BOOST_AUTO_TEST_CASE(script_build) {
                     TEST_AMOUNT)
             .PushSig(keys.key0, SigHashType().withForkId(), 32, 32, TEST_AMOUNT)
             .ScriptError(SCRIPT_ERR_ILLEGAL_FORKID));
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey2) << OP_CHECKSIG,
+                    "OP_CODESEPARATOR tests, three separate p2pk scripts", 0)
+        .PushSeparatorSigs({&keys.key2, &keys.key1, &keys.key0}));
+    tests.push_back(
+        TestBuilder(CScript() << OP_TRUE << OP_VERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey0) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey2) << OP_CHECKSIG,
+                    "OP_CODESEPARATOR tests, three separate p2pk scripts, first part is not involved in signing", 0)
+        .PushSeparatorSigs({&keys.key2, &keys.key1, &keys.key0, nullptr}));
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << OP_TRUE << OP_VERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey2) << OP_CHECKSIG,
+                    "OP_CODESEPARATOR tests, three separate p2pk scripts, second part is signed only by last sign", 0)
+        .PushSeparatorSigs({&keys.key2, &keys.key1, nullptr, &keys.key0}));
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey2) << OP_CHECKSIG,
+                    "OP_CODESEPARATOR tests, three separate p2pk scripts, first sign wrong", 0)
+        .PushSeparatorSigs({&keys.key1, &keys.key1, &keys.key0})
+        .ScriptError(SCRIPT_ERR_EVAL_FALSE));
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey2) << OP_CHECKSIG,
+                    "OP_CODESEPARATOR tests, three separate p2pk scripts, second sign wrong", 0)
+        .PushSeparatorSigs({&keys.key2, &keys.key0, &keys.key0})
+        .ScriptError(SCRIPT_ERR_CHECKSIGVERIFY));
+   tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey1) << OP_CHECKSIGVERIFY << OP_CODESEPARATOR
+                              << ToByteVector(keys.pubkey2) << OP_CHECKSIG,
+                    "OP_CODESEPARATOR tests, three separate p2pk scripts, third sign wrong", 0)
+        .PushSeparatorSigs({&keys.key2, &keys.key1, &keys.key1})
+        .ScriptError(SCRIPT_ERR_CHECKSIGVERIFY));
 
     std::set<std::string> tests_set;
 
