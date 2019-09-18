@@ -851,6 +851,8 @@ void CTxMemPool::Check(
         return;
     }
 
+    std::shared_lock lock(smtx);
+
     LogPrint(BCLog::MEMPOOL,
              "Checking mempool with %u transactions and %u inputs\n",
              (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
@@ -860,7 +862,6 @@ void CTxMemPool::Check(
 
     CCoinsViewCache mempoolDuplicate(const_cast<CCoinsViewCache *>(pcoins));
 
-    std::shared_lock lock(smtx);
     std::list<const CTxMemPoolEntry *> waitingOnDependants;
     for (indexed_transaction_set::const_iterator it = mapTx.begin();
          it != mapTx.end(); it++) {
@@ -1054,7 +1055,7 @@ std::string CTxMemPool::checkJournalNL() const
         }
     }
 
-    LogPrint(BCLog::JOURNAL, "Result of journal check: %s\n", res.str().c_str());
+    LogPrint(BCLog::JOURNAL, "Result of journal check: %s\n", res.str().empty()? "Ok" : res.str().c_str());
     return res.str();
 }
 
