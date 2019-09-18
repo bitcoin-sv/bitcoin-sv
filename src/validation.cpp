@@ -101,6 +101,10 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams);
 CScript COINBASE_FLAGS;
 
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
+// A message to identify reject reason when double-spending issue is detected.
+// It is also used (as an additional condition) to check
+// when inputs from the double spend detector can be safely removed.
+const std::string sDoubleSpendRejectMsg = "bad-txn-double-spend-detected";
 
 // Internal stuff
 namespace {
@@ -891,7 +895,7 @@ CTxnValResult TxnValidation(
     // Check double spend attempt for the given txn
     if(!dsDetector->insertTxnInputs(tx)) {
        state.Invalid(false, REJECT_DUPLICATE,
-                    "bad-txn-double-spent-detected");
+                     sDoubleSpendRejectMsg);
        return Result{state, pTxInputData, vCoinsToUncache};
     }
     // Coinbase is only valid in a block, not as a loose transaction.
@@ -1341,7 +1345,14 @@ void ProcessValidatedTxn(
     // This needs to be done in all cases:
     // - txn validation has failed
     // - txn committed to the mempool or rejected
-    handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
+    // By checking reject code and reject reason we only allow to remove inputs
+    // from the detector by the thread which added them.
+    // Due to backward compatibility support it is risky to define a new reject code
+    // as it could not be interpreted by old clients.
+    if (!(state.GetRejectCode() == REJECT_DUPLICATE &&
+          state.GetRejectReason() == sDoubleSpendRejectMsg)) {
+        handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
+    }
 }
 
 static void AskForMissingParents(
