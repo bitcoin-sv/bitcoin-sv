@@ -10,6 +10,7 @@
 #include "config.h"
 #include "chainparams.h"
 #include "validation.h"
+#include "hash.h"
 
 #include <boost/test/unit_test.hpp>
 #include <boost/filesystem.hpp>
@@ -118,6 +119,8 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     auto block = BuildRandomTestBlock();
     CBlockIndex index{block};
+    std::unique_ptr<uint256> randomHash(new uint256(InsecureRand256()));
+    index.phashBlock = randomHash.get();
 
     CBlockFileInfoStore blockFileInfoStore;
     WriteBlockToDisk(config, block, index, blockFileInfoStore);
@@ -172,6 +175,8 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
 
     auto block = BuildRandomTestBlock();
     CBlockIndex index{block};
+    std::unique_ptr<uint256> randomHash(new uint256(InsecureRand256()));
+    index.phashBlock = randomHash.get();
 
     WriteBlockToDisk(config, block, index, *pBlockFileInfoStore);
 
