@@ -832,43 +832,8 @@ static UniValue submitblock(const Config &config,
 
 static UniValue estimatefee(const Config &config,
                             const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() != 1) {
-        throw std::runtime_error(
-            "estimatefee nblocks\n"
-            "\nEstimates the approximate fee per kilobyte needed for a "
-            "transaction to begin\n"
-            "confirmation within nblocks blocks.\n"
-            "\nArguments:\n"
-            "1. nblocks     (numeric, required)\n"
-            "\nResult:\n"
-            "n              (numeric) estimated fee-per-kilobyte\n"
-            "\n"
-            "A negative value is returned if not enough transactions and "
-            "blocks\n"
-            "have been observed to make an estimate.\n"
-            "-1 is always returned for nblocks == 1 as it is impossible to "
-            "calculate\n"
-            "a fee that is high enough to get reliably included in the next "
-            "block.\n"
-            "\nExample:\n" +
-            HelpExampleCli("estimatefee", "6"));
-    }
-
-    RPCTypeCheck(request.params, {UniValue::VNUM});
-
-    int nBlocks = request.params[0].get_int();
-    if (nBlocks < 1) {
-        nBlocks = 1;
-    }
-
-    CFeeRate feeRate = mempool.EstimateFee(nBlocks);
-    if (feeRate == CFeeRate(Amount(0))) {
-        return -1.0;
-    }
-
-    return ValueFromAmount(feeRate.GetFeePerK());
+    throw std::runtime_error("Estimatefee() RPC temporary not implemented"); // TODO: will be fix in next commit
 }
-
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category   name                     actor (function)       okSafeMode

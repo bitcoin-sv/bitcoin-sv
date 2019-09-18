@@ -2930,15 +2930,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 vin.scriptSig = CScript();
             }
 
-            // Allow to override the default confirmation target over the
-            // CoinControl instance.
-            int currentConfirmationTarget = nTxConfirmTarget;
-            if (coinControl && coinControl->nConfirmTarget > 0) {
-                currentConfirmationTarget = coinControl->nConfirmTarget;
-            }
-
             Amount nFeeNeeded =
-                GetMinimumFee(nBytes, currentConfirmationTarget, mempool);
+                GetMinimumFee(nBytes, 0 /*TODO: confirmTarget will be removed in next commit */, mempool);
             if (coinControl && nFeeNeeded > Amount(0) &&
                 coinControl->nMinimumTotalFee > nFeeNeeded) {
                 nFeeNeeded = coinControl->nMinimumTotalFee;
@@ -3149,14 +3142,7 @@ Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
     Amount nFeeNeeded = targetFee;
     // User didn't set: use -txconfirmtarget to estimate...
     if (nFeeNeeded == Amount(0)) {
-        int estimateFoundTarget = nConfirmTarget;
-        nFeeNeeded = pool.EstimateSmartFee(nConfirmTarget, &estimateFoundTarget)
-                         .GetFee(nTxBytes);
-        // ... unless we don't have enough mempool data for estimatefee, then
-        // use fallbackFee.
-        if (nFeeNeeded == Amount(0)) {
-            nFeeNeeded = fallbackFee.GetFee(nTxBytes);
-        }
+        nFeeNeeded = fallbackFee.GetFee(nTxBytes);      
     }
 
     // Prevent user from paying a fee below minRelayTxFee or minTxFee.

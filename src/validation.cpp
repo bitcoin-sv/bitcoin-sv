@@ -679,21 +679,6 @@ std::string FormatStateMessage(const CValidationState &state) {
         state.GetRejectCode());
 }
 
-bool IsCurrentForFeeEstimation() {
-    AssertLockHeld(cs_main);
-    if (IsInitialBlockDownload()) {
-        return false;
-    }
-    if (chainActive.Tip()->GetBlockTime() <
-        (GetTime() - MAX_FEE_ESTIMATION_TIP_AGE)) {
-        return false;
-    }
-    if (chainActive.Height() < pindexBestHeader->nHeight - 1) {
-        return false;
-    }
-    return true;
-}
-
 static bool IsUAHFenabled(const Config &config, int nHeight) {
     return nHeight >= config.GetChainParams().GetConsensus().uahfHeight;
 }
@@ -1036,7 +1021,6 @@ std::vector<TxId> LimitMempoolSize(
 void CommitTxToMempool(
     const CTransactionRef &ptx,
     const CTxMemPoolEntry& pMempoolEntry,
-    bool fTxValidForFeeEstimation,
     CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
     CValidationState& state,
@@ -1063,7 +1047,6 @@ void CommitTxToMempool(
             pMempoolEntry,
             setAncestors,
             changeSet,
-            fTxValidForFeeEstimation,
             pnMempoolSize,
             pnDynamicMemoryUsage);
     // Check if the mempool size needs to be limited.
@@ -1112,7 +1095,6 @@ CTxnValResult TxnValidation(
     const Config& config,
     CTxMemPool& pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fReadyForFeeEstimation,
     bool fUseLimits) {
 
     using Result = CTxnValResult;
@@ -1553,14 +1535,12 @@ CTxnValResult TxnValidation(
     // This transaction should only count for fee estimation if
     // the node is not behind and it is not dependent on any other
     // transactions in the Mempool.
-    bool fTxValidForFeeEstimation = fReadyForFeeEstimation && pool.HasNoInputsOf(tx);
     // Transaction is validated successfully. Return valid results.
     return Result{state,
                   pTxInputData,
                   vCoinsToUncache,
                   std::move(pMempoolEntry),
-                  std::move(setAncestors),
-                  fTxValidForFeeEstimation};
+                  std::move(setAncestors)};
 }
 
 CValidationState HandleTxnProcessingException(
@@ -1598,10 +1578,8 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     const Config& config,
     CTxMemPool& pool,
     CTxnHandlers& handlers,
-    bool fReadyForFeeEstimation,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
-
     // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
     if (!(std::chrono::steady_clock::time_point(std::chrono::milliseconds(0)) == end_time_point) &&
         !(std::chrono::steady_clock::now() < end_time_point)) {
@@ -1617,7 +1595,6 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
                 config,
                 pool,
                 handlers.mpTxnDoubleSpendDetector,
-                fReadyForFeeEstimation,
                 fUseLimits);
         // Process validated results
         ProcessValidatedTxn(pool, result, handlers, false);
@@ -1779,7 +1756,6 @@ void ProcessValidatedTxn(
         CommitTxToMempool(
             ptx,
             *(txStatus.mpEntry),
-            txStatus.mfTxValidForFeeEstimation,
             txStatus.mSetAncestors,
             pool,
             state,
