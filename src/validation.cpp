@@ -1225,8 +1225,6 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
         sTxnStatusMsg = "invalid orphan";
     } else if (!fOrphanTxn) {
         sTxnStatusMsg = "rejected " + FormatStateMessage(state);
-    } else {
-        sTxnStatusMsg = "rejected orphan";
     }
     LogPrint(BCLog::TXNVAL,
             "%s: txn= %s %s\n",
