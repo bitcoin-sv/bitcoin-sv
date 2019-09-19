@@ -5790,19 +5790,17 @@ bool LoadMempool(const Config &config) {
                 CJournalChangeSetPtr changeSet {
                     mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT)
                 };
-                CValidationState state {};
-                {
-                    LOCK(cs_main);
+                const CValidationState& state {
                     // Execute txn validation synchronously.
-                    state = txValidator->processValidation(
+                    txValidator->processValidation(
                                         std::make_shared<CTxInputData>(
                                                             TxSource::file, // tx source
                                                             tx,    // a pointer to the tx
                                                             nTime, // nAcceptTime
                                                             true),  // fLimitFree
                                         changeSet, // an instance of the mempool journal
-                                        true); // fLimitMempoolSize
-                }
+                                        true) // fLimitMempoolSize
+                };
                 // Check results
                 if (state.IsValid()) {
                     ++count;
