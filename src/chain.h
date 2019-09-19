@@ -12,6 +12,7 @@
 #include "primitives/block.h"
 #include "tinyformat.h"
 #include "uint256.h"
+#include "logging.h"
 
 #include <unordered_map>
 #include <vector>
@@ -607,10 +608,6 @@ public:
         if (nStatus.hasUndo()) {
             READWRITE(VARINT(nUndoPos));
         }
-        if (nStatus.hasDiskBlockMetaData())
-        {
-            READWRITE(mDiskBlockMetaData);
-        }
 
         // block header
         READWRITE(this->nVersion);
@@ -619,6 +616,15 @@ public:
         READWRITE(nTime);
         READWRITE(nBits);
         READWRITE(nNonce);
+        if (nStatus.hasDiskBlockMetaData())
+        {
+            try {
+                READWRITE(mDiskBlockMetaData);
+            } catch (std::ios_base::failure &) {
+                nStatus = nStatus.withDiskBlockMetaData(false);
+                LogPrintf("Can not read metadata from block %s. Probably upgrading from downgraded version. \n", GetBlockHash().ToString());
+            }
+        }
     }
 
     uint256 GetBlockHash() const {
