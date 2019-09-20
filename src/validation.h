@@ -521,15 +521,20 @@ std::vector<TxId> LimitMempoolSize(
  * @param state A reference to a state variable
  * @param changeSet A reference to the Jorunal ChangeSet
  * @param fLimitMempoolSize A flag to limit a mempool size
+ * @param pnMempoolSize If not null store mempool size after txn is commited
+ * @param pnDynamicMemoryUsage If not null store dynamic memory usage after txn is commited
  */
-void CommitTxToMempool(const CTransactionRef &ptx,
-                       const CTxMemPoolEntry& entry,
-                       bool fTxValidForFeeEstimation,
-                       CTxMemPool::setEntries& setAncestors,
-                       CTxMemPool& pool,
-                       CValidationState& state,
-                       mining::CJournalChangeSetPtr& changeSet,
-                       bool fLimitMempoolSize=true);
+void CommitTxToMempool(
+    const CTransactionRef &ptx,
+    const CTxMemPoolEntry& entry,
+    bool fTxValidForFeeEstimation,
+    CTxMemPool::setEntries& setAncestors,
+    CTxMemPool& pool,
+    CValidationState& state,
+    mining::CJournalChangeSetPtr& changeSet,
+    bool fLimitMempoolSize=true,
+    size_t* pnMempoolSize=nullptr,
+    size_t* pnDynamicMemoryUsage=nullptr);
 
 /**
  * The function performs essential checks which need to be fulfilled by a transaction

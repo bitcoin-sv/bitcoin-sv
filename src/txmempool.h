@@ -617,14 +617,18 @@ public:
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
             mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true);
+            bool validFeeEstimate = true,
+            size_t* pnMempoolSize = nullptr,
+            size_t* pnDynamicMemoryUsage = nullptr);
 
     void AddUnchecked(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true);
+            bool validFeeEstimate = true,
+            size_t* pnMempoolSize = nullptr,
+            size_t* pnDynamicMemoryUsage = nullptr);
     // A non-locking version of AddUnchecked
     // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
     // It needs to be called explicitly by a user if AddUncheckedNL is used.
@@ -633,7 +637,9 @@ public:
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true);
+            bool validFeeEstimate = true,
+            size_t* pnMempoolSize = nullptr,
+            size_t* pnDynamicMemoryUsage = nullptr);
 
     void RemoveRecursive(
         const CTransaction &tx,
