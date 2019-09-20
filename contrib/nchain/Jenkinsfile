@@ -47,7 +47,7 @@ pipeline {
         }
         stage('leveldb Tests') {
             steps {
-                sh 'cd src/leveldb && make check'
+                sh 'cd src/leveldb && make -j$(nproc --all) check'
             }
         }
         stage('Util Tests') {
@@ -57,7 +57,7 @@ pipeline {
         }
         stage('Functional Tests') {
             steps {
-                sh 'test/functional/test_runner.py --junitouput=build/reports/func-tests.xml'
+                sh 'test/functional/test_runner.py --jobs $(nproc --all) --junitouput=build/reports/func-tests.xml'
             }
         }
     }
