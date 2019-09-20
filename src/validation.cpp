@@ -101,6 +101,10 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams);
 CScript COINBASE_FLAGS;
 
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
+// A message to identify reject reason when double-spending issue is detected.
+// It is also used (as an additional condition) to check
+// when inputs from the double spend detector can be safely removed.
+const std::string sDoubleSpendRejectMsg = "bad-txn-double-spend-detected";
 
 // Internal stuff
 namespace {
@@ -819,7 +823,7 @@ static uint32_t GetScriptVerifyFlags(const Config &config) {
 
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     size_t limit,
     unsigned long age) {
 
@@ -830,7 +834,10 @@ std::vector<TxId> LimitMempoolSize(
     }
 
     std::vector<COutPoint> vNoSpendsRemaining;
-    std::vector<TxId> vRemovedTxIds = pool.TrimToSize(limit, changeSet, &vNoSpendsRemaining);
+    std::vector<TxId> vRemovedTxIds = pool.TrimToSize(
+                                                limit,
+                                                changeSet,
+                                                &vNoSpendsRemaining);
     pcoinsTip->Uncache(vNoSpendsRemaining);
     return vRemovedTxIds;
 }
@@ -842,8 +849,10 @@ void CommitTxToMempool(
     CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
     CValidationState& state,
-    CJournalChangeSetPtr& changeSet,
-    bool fLimitMempoolSize) {
+    const CJournalChangeSetPtr& changeSet,
+    bool fLimitMempoolSize,
+    size_t* pnMempoolSize,
+    size_t* pnDynamicMemoryUsage) {
 
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
@@ -853,7 +862,9 @@ void CommitTxToMempool(
             pMempoolEntry,
             setAncestors,
             changeSet,
-            fTxValidForFeeEstimation);
+            fTxValidForFeeEstimation,
+            pnMempoolSize,
+            pnDynamicMemoryUsage);
     // Check if the mempool size needs to be limited.
     if (fLimitMempoolSize) {
         // Trim mempool and check if tx was trimmed.
@@ -891,7 +902,7 @@ CTxnValResult TxnValidation(
     // Check double spend attempt for the given txn
     if(!dsDetector->insertTxnInputs(tx)) {
        state.Invalid(false, REJECT_DUPLICATE,
-                    "bad-txn-double-spent-detected");
+                     sDoubleSpendRejectMsg);
        return Result{state, pTxInputData, vCoinsToUncache};
     }
     // Coinbase is only valid in a block, not as a loose transaction.
@@ -1219,14 +1230,12 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     const CValidationState& state = txStatus.mState;
     const TxSource source = txStatus.mTxInputData->mTxSource;
     std::string sTxnStatusMsg;
-    if (!fOrphanTxn && state.IsMissingInputs()) {
+    if (state.IsMissingInputs()) {
         sTxnStatusMsg = "detected orphan";
     } else if (fOrphanTxn && !state.IsMissingInputs()) {
-        sTxnStatusMsg = "invalid orphan";
+        sTxnStatusMsg = "invalid orphan " + FormatStateMessage(state);
     } else if (!fOrphanTxn) {
         sTxnStatusMsg = "rejected " + FormatStateMessage(state);
-    } else {
-        sTxnStatusMsg = "rejected orphan";
     }
     LogPrint(BCLog::TXNVAL,
             "%s: txn= %s %s\n",
@@ -1237,7 +1246,8 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
 
 static void LogTxnCommitStatus(
     const CTxnValResult& txStatus,
-    CTxMemPool& pool) {
+    const size_t& nMempoolSize,
+    const size_t& nDynamicMemoryUsage) {
 
     const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
@@ -1268,8 +1278,8 @@ static void LogTxnCommitStatus(
              enum_cast<std::string>(source),
              tx.GetId().ToString(),
              sTxnStatusMsg,
-             pool.Size(),
-             pool.DynamicMemoryUsage() / 1000,
+             nMempoolSize,
+             nDynamicMemoryUsage / 1000,
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
 }
 
@@ -1316,6 +1326,11 @@ void ProcessValidatedTxn(
         /**
          * Send transaction to the mempool
          */
+        size_t nMempoolSize {};
+        size_t nDynamicMemoryUsage {};
+        // Check if required log categories are enabled
+        bool fMempoolLogs = LogAcceptCategory(BCLog::MEMPOOL) || LogAcceptCategory(BCLog::MEMPOOLREJ);
+        // Commit transaction
         CommitTxToMempool(
             ptx,
             *(txStatus.mpEntry),
@@ -1324,13 +1339,15 @@ void ProcessValidatedTxn(
             pool,
             state,
             handlers.mJournalChangeSet,
-            fLimitMempoolSize);
+            fLimitMempoolSize,
+            fMempoolLogs ? &nMempoolSize : nullptr,
+            fMempoolLogs ? &nDynamicMemoryUsage : nullptr);
         // Check txn's commit status and do all required actions.
         if (TxSource::p2p == source) {
             PostValidationStepsForP2PTxn(txStatus, pool, handlers);
         }
         // Logging txn commit status
-        LogTxnCommitStatus(txStatus, pool);
+        LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
     }
     // Check if we need to uncache coins if validation or commit has failed
     if (!state.IsValid()) {
@@ -1341,7 +1358,14 @@ void ProcessValidatedTxn(
     // This needs to be done in all cases:
     // - txn validation has failed
     // - txn committed to the mempool or rejected
-    handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
+    // By checking reject code and reject reason we only allow to remove inputs
+    // from the detector by the thread which added them.
+    // Due to backward compatibility support it is risky to define a new reject code
+    // as it could not be interpreted by old clients.
+    if (!(state.GetRejectCode() == REJECT_DUPLICATE &&
+          state.GetRejectReason() == sDoubleSpendRejectMsg)) {
+        handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
+    }
 }
 
 static void AskForMissingParents(
@@ -1594,7 +1618,7 @@ static void PostValidationStepsForP2PTxn(
 static void UpdateMempoolForReorg(const Config &config,
                                   DisconnectedBlockTransactions &disconnectpool,
                                   bool fAddToMempool,
-                                  CJournalChangeSetPtr& changeSet)
+                                  const CJournalChangeSetPtr& changeSet)
 {
     AssertLockHeld(cs_main);
     std::vector<uint256> vHashUpdate;
@@ -3119,7 +3143,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
  */
 static bool DisconnectTip(const Config &config, CValidationState &state,
                           DisconnectedBlockTransactions *disconnectpool,
-                          CJournalChangeSetPtr& changeSet)
+                          const CJournalChangeSetPtr& changeSet)
 {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
@@ -3271,7 +3295,7 @@ static bool ConnectTip(const Config &config, CValidationState &state,
                        const std::shared_ptr<const CBlock> &pblock,
                        ConnectTrace &connectTrace,
                        DisconnectedBlockTransactions &disconnectpool,
-                       CJournalChangeSetPtr& changeSet)
+                       const CJournalChangeSetPtr& changeSet)
 {
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
@@ -3444,7 +3468,7 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
                                   const std::shared_ptr<const CBlock> &pblock,
                                   bool &fInvalidFound,
                                   ConnectTrace &connectTrace,
-                                  CJournalChangeSetPtr& changeSet)
+                                  const CJournalChangeSetPtr& changeSet)
 {
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
@@ -3567,7 +3591,7 @@ static void NotifyHeaderTip() {
 }
 
 bool ActivateBestChain(const Config &config, CValidationState &state,
-                       CJournalChangeSetPtr& changeSet,
+                       const CJournalChangeSetPtr& changeSet,
                        std::shared_ptr<const CBlock> pblock) {
     // Note that while we're often called here from ProcessNewBlock, this is
     // far from a guarantee. Things in the P2P/RPC will often end up calling
@@ -5790,19 +5814,17 @@ bool LoadMempool(const Config &config) {
                 CJournalChangeSetPtr changeSet {
                     mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT)
                 };
-                CValidationState state {};
-                {
-                    LOCK(cs_main);
+                const CValidationState& state {
                     // Execute txn validation synchronously.
-                    state = txValidator->processValidation(
+                    txValidator->processValidation(
                                         std::make_shared<CTxInputData>(
                                                             TxSource::file, // tx source
                                                             tx,    // a pointer to the tx
                                                             nTime, // nAcceptTime
                                                             true),  // fLimitFree
                                         changeSet, // an instance of the mempool journal
-                                        true); // fLimitMempoolSize
-                }
+                                        true) // fLimitMempoolSize
+                };
                 // Check results
                 if (state.IsValid()) {
                     ++count;
