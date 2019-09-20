@@ -334,7 +334,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 # Sync node scenario
                 nodoublespends(),
                 # Test case description
-                "P2P-Scenario2 [nodoublespends]: "
+                "P2P-Scenario3 [nodoublespends]: "
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq=200 " # txn validator config
@@ -420,7 +420,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 # A number of peers connected to the node
                 5,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
-                360
+                720
             ],
             
             # P2P-Scenario3
@@ -434,7 +434,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 # Sync node scenario
                 doublespends(),
                 # Test case description
-                "P2P-Scenario2 [doublespends]: "
+                "P2P-Scenario3 [doublespends]: "
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq=10"         # txn validator congig
@@ -449,7 +449,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 # A number of peers connected to the node
                 20,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
-                720
+                920
             ]
         ]
         # Execute test cases.
