@@ -67,11 +67,14 @@ class CJournalChangeSet final
     // Get why we were created
     JournalUpdateReason getUpdateReason() const { return mUpdateReason; }
 
+    // Is our reason for the update a basic one?
+    bool isUpdateReasonBasic() const;
+
     // Get reference to our change set
     const ChangeSet& getChangeSet() const { return mChangeSet; }
 
-    // Is this a simple additative only change set?
-    bool getSimple() const { return mSimple; }
+    // Is this a simple tail additative only change set?
+    bool getTailAppendOnly() const { return mTailAppendOnly; }
 
     // Apply our changes to the journal
     void apply();
@@ -80,6 +83,9 @@ class CJournalChangeSet final
 
     // Common post operation addition steps
     void addOperationCommon(Operation op);
+
+    // Apply our changes (caller holds mutex)
+    void applyNL();
 
     mutable std::mutex mMtx {};
 
@@ -94,7 +100,7 @@ class CJournalChangeSet final
 
     // Is this change set a simple one that just appends to the end, or is a more
     // complicated one that removes as well or does something else complicated?
-    std::atomic_bool mSimple {true};
+    std::atomic_bool mTailAppendOnly {true};
 
 };
 
