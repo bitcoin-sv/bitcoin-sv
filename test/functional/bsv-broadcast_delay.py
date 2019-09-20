@@ -131,7 +131,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
                 propagation_delay = average_roundtrip - average_overhead
                 self.log.info("Propagation delay, expected 150ms: %s", propagation_delay)
                 assert(propagation_delay < datetime.timedelta(milliseconds=300))
-                assert(propagation_delay > datetime.timedelta(milliseconds=30))
+                assert(propagation_delay > datetime.timedelta(milliseconds=10))
 
         # 3. Send 15 transactions with broadcast delay 1s
         with self.run_node_with_connections("calculating propagation delay (1000ms)", 0, ['-broadcastdelay=1000'], self.num_peers) as connections:
