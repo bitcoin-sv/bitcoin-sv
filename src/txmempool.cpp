@@ -456,7 +456,9 @@ void CTxMemPool::AddUnchecked(
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
     CJournalChangeSetPtr& changeSet,
-    bool validFeeEstimate) {
+    bool validFeeEstimate,
+    size_t* pnMempoolSize,
+    size_t* pnDynamicMemoryUsage) {
 
     {
         std::unique_lock lock(smtx);
@@ -466,7 +468,9 @@ void CTxMemPool::AddUnchecked(
              entry,
              setAncestors,
              changeSet,
-             validFeeEstimate);
+             validFeeEstimate,
+             pnMempoolSize,
+             pnDynamicMemoryUsage);
     }
     // Notify entry added without holding the mempool's lock
     NotifyEntryAdded(entry.GetSharedTx());
@@ -477,7 +481,9 @@ void CTxMemPool::AddUncheckedNL(
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
     CJournalChangeSetPtr& changeSet,
-    bool validFeeEstimate) {
+    bool validFeeEstimate,
+    size_t* pnMempoolSize,
+    size_t* pnDynamicMemoryUsage) {
 
     indexed_transaction_set::iterator newit = mapTx.insert(entry).first;
     mapLinks.insert(make_pair(newit, TxLinks()));
@@ -539,6 +545,14 @@ void CTxMemPool::AddUncheckedNL(
 
     vTxHashes.emplace_back(tx.GetHash(), newit);
     newit->vTxHashesIdx = vTxHashes.size() - 1;
+
+    // If it is required calculate mempool size & dynamic memory usage.
+    if (pnMempoolSize) {
+        *pnMempoolSize = mapTx.size();
+    }
+    if (pnDynamicMemoryUsage) {
+        *pnDynamicMemoryUsage = DynamicMemoryUsageNL();
+    }
 }
 
 void CTxMemPool::removeUncheckedNL(
@@ -1394,7 +1408,9 @@ void CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     CJournalChangeSetPtr& changeSet,
-    bool validFeeEstimate) {
+    bool validFeeEstimate,
+    size_t* pnMempoolSize,
+    size_t* pnDynamicMemoryUsage) {
 
     {
         std::unique_lock lock(smtx);
@@ -1415,7 +1431,9 @@ void CTxMemPool::AddUnchecked(
              entry,
              setAncestors,
              changeSet,
-             validFeeEstimate);
+             validFeeEstimate,
+             pnMempoolSize,
+             pnDynamicMemoryUsage);
     }
     // Notify entry added without holding the mempool's lock
     NotifyEntryAdded(entry.GetSharedTx());
@@ -1481,7 +1499,7 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     mining::CJournalChangeSetPtr& changeSet,
-    std::vector<COutPoint> *pvNoSpendsRemaining) {
+    std::vector<COutPoint>* pvNoSpendsRemaining) {
 
     std::unique_lock lock(smtx);
 

@@ -834,7 +834,10 @@ std::vector<TxId> LimitMempoolSize(
     }
 
     std::vector<COutPoint> vNoSpendsRemaining;
-    std::vector<TxId> vRemovedTxIds = pool.TrimToSize(limit, changeSet, &vNoSpendsRemaining);
+    std::vector<TxId> vRemovedTxIds = pool.TrimToSize(
+                                                limit,
+                                                changeSet,
+                                                &vNoSpendsRemaining);
     pcoinsTip->Uncache(vNoSpendsRemaining);
     return vRemovedTxIds;
 }
@@ -847,7 +850,9 @@ void CommitTxToMempool(
     CTxMemPool& pool,
     CValidationState& state,
     CJournalChangeSetPtr& changeSet,
-    bool fLimitMempoolSize) {
+    bool fLimitMempoolSize,
+    size_t* pnMempoolSize,
+    size_t* pnDynamicMemoryUsage) {
 
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
@@ -857,7 +862,9 @@ void CommitTxToMempool(
             pMempoolEntry,
             setAncestors,
             changeSet,
-            fTxValidForFeeEstimation);
+            fTxValidForFeeEstimation,
+            pnMempoolSize,
+            pnDynamicMemoryUsage);
     // Check if the mempool size needs to be limited.
     if (fLimitMempoolSize) {
         // Trim mempool and check if tx was trimmed.
@@ -1239,7 +1246,8 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
 
 static void LogTxnCommitStatus(
     const CTxnValResult& txStatus,
-    CTxMemPool& pool) {
+    const size_t& nMempoolSize,
+    const size_t& nDynamicMemoryUsage) {
 
     const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
@@ -1270,8 +1278,8 @@ static void LogTxnCommitStatus(
              enum_cast<std::string>(source),
              tx.GetId().ToString(),
              sTxnStatusMsg,
-             pool.Size(),
-             pool.DynamicMemoryUsage() / 1000,
+             nMempoolSize,
+             nDynamicMemoryUsage / 1000,
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
 }
 
@@ -1318,6 +1326,11 @@ void ProcessValidatedTxn(
         /**
          * Send transaction to the mempool
          */
+        size_t nMempoolSize {};
+        size_t nDynamicMemoryUsage {};
+        // Check if required log categories are enabled
+        bool fMempoolLogs = LogAcceptCategory(BCLog::MEMPOOL) || LogAcceptCategory(BCLog::MEMPOOLREJ);
+        // Commit transaction
         CommitTxToMempool(
             ptx,
             *(txStatus.mpEntry),
@@ -1326,13 +1339,15 @@ void ProcessValidatedTxn(
             pool,
             state,
             handlers.mJournalChangeSet,
-            fLimitMempoolSize);
+            fLimitMempoolSize,
+            fMempoolLogs ? &nMempoolSize : nullptr,
+            fMempoolLogs ? &nDynamicMemoryUsage : nullptr);
         // Check txn's commit status and do all required actions.
         if (TxSource::p2p == source) {
             PostValidationStepsForP2PTxn(txStatus, pool, handlers);
         }
         // Logging txn commit status
-        LogTxnCommitStatus(txStatus, pool);
+        LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
     }
     // Check if we need to uncache coins if validation or commit has failed
     if (!state.IsValid()) {
