@@ -2,8 +2,8 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
-Check -acceptP2SH=0 flag which treats transactions with P2SH in output as non-standard (but does not cause disconnection).
-Check -acceptP2SH=1 flag which treats transactions with P2SH in output as standard. 
+Check -acceptp2sh=0 flag which treats transactions with P2SH in output as non-standard (but does not cause disconnection).
+Check -acceptp2sh=1 flag which treats transactions with P2SH in output as standard. 
 """
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
@@ -41,13 +41,13 @@ class BSVDiscourageP2SH(BitcoinTestFramework):
         self.nodes[0].generate(101)
         self.stop_node(0)
         
-        with self.run_node_with_connections("treat P2SH as non-standard", 0, ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptP2SH=0'], 1) as connections:
+        with self.run_node_with_connections("treat P2SH as non-standard", 0, ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptp2sh=0'], 1) as connections:
             p2sh_tx = self.makeP2SHTransaction()
             self.assert_rejected_transaction(p2sh_tx, connections[0].cb, b'scriptpubkey')
             # check that rejected transaction did not cause disconnection
             connections[0].cb.sync_with_ping()
 
-        with self.run_node_with_connections("treat P2SH as standard", 0, ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptP2SH=1'], 1) as connections:
+        with self.run_node_with_connections("treat P2SH as standard", 0, ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptp2sh=1'], 1) as connections:
             p2sh_tx = self.makeP2SHTransaction()
             connections[0].cb.send_message(msg_tx(p2sh_tx))
             connections[0].cb.sync_with_ping()
