@@ -1222,7 +1222,7 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     if (state.IsMissingInputs()) {
         sTxnStatusMsg = "detected orphan";
     } else if (fOrphanTxn && !state.IsMissingInputs()) {
-        sTxnStatusMsg = "invalid orphan";
+        sTxnStatusMsg = "invalid orphan " + FormatStateMessage(state);
     } else if (!fOrphanTxn) {
         sTxnStatusMsg = "rejected " + FormatStateMessage(state);
     }
