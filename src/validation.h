@@ -454,7 +454,7 @@ bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
  */
 bool ActivateBestChain(
     const Config &config, CValidationState &state,
-    mining::CJournalChangeSetPtr& changeSet,
+    const mining::CJournalChangeSetPtr& changeSet,
     std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
@@ -506,7 +506,7 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
  */
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
-    mining::CJournalChangeSetPtr& changeSet,
+    const mining::CJournalChangeSetPtr& changeSet,
     size_t limit,
     unsigned long age);
 
@@ -531,7 +531,7 @@ void CommitTxToMempool(
     CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
     CValidationState& state,
-    mining::CJournalChangeSetPtr& changeSet,
+    const mining::CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize=true,
     size_t* pnMempoolSize=nullptr,
     size_t* pnDynamicMemoryUsage=nullptr);

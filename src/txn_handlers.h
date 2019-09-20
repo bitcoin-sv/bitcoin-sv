@@ -18,7 +18,7 @@ class CTxnHandlers {
     ~CTxnHandlers() = default;
 
     /** Mempool Journal ChangeSet */
-    mining::CJournalChangeSetPtr& mJournalChangeSet;
+    const mining::CJournalChangeSetPtr& mJournalChangeSet;
     /** Double Spend Detector */
     TxnDoubleSpendDetectorSPtr mpTxnDoubleSpendDetector {nullptr};
     /** Handle orphan transactions */

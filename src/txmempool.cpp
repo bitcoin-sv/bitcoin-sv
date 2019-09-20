@@ -455,7 +455,7 @@ void CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     bool validFeeEstimate,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
@@ -480,7 +480,7 @@ void CTxMemPool::AddUncheckedNL(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     bool validFeeEstimate,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
@@ -557,7 +557,7 @@ void CTxMemPool::AddUncheckedNL(
 
 void CTxMemPool::removeUncheckedNL(
     txiter it,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason) {
 
     CTransactionRef txn { it->GetSharedTx() };
@@ -636,7 +636,7 @@ void CTxMemPool::CalculateDescendantsNL(txiter entryit,
 
 void CTxMemPool::RemoveRecursive(
     const CTransaction &origTx,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason) {
 
     {
@@ -651,7 +651,7 @@ void CTxMemPool::RemoveRecursive(
 
 void CTxMemPool::removeRecursiveNL(
     const CTransaction &origTx,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason) {
 
     setEntries txToRemove;
@@ -686,7 +686,7 @@ void CTxMemPool::removeRecursiveNL(
 void CTxMemPool::RemoveForReorg(
     const Config &config,
     const CCoinsViewCache *pcoins,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     int nChainActiveHeight,
     int nMedianTimePast,
     int flags) {
@@ -755,7 +755,7 @@ void CTxMemPool::RemoveForReorg(
 
 void CTxMemPool::removeConflictsNL(
     const CTransaction &tx,
-    CJournalChangeSetPtr& changeSet) {
+    const CJournalChangeSetPtr& changeSet) {
 
     // Remove transactions which depend on inputs of tx, recursively
     for (const CTxIn &txin : tx.vin) {
@@ -777,7 +777,7 @@ void CTxMemPool::removeConflictsNL(
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     unsigned int nBlockHeight,
-    CJournalChangeSetPtr& changeSet) {
+    const CJournalChangeSetPtr& changeSet) {
 
     std::unique_lock lock(smtx);
     std::vector<const CTxMemPoolEntry *> entries;
@@ -841,7 +841,7 @@ void CTxMemPool::Clear() {
 void CTxMemPool::Check(
     const int64_t nSpendHeight,
     const CCoinsViewCache *pcoins,
-    mining::CJournalChangeSetPtr& changeSet) const {
+    const mining::CJournalChangeSetPtr& changeSet) const {
 
     if (nCheckFrequency == 0) {
         return;
@@ -850,6 +850,8 @@ void CTxMemPool::Check(
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency) {
         return;
     }
+
+    std::shared_lock lock(smtx);
 
     LogPrint(BCLog::MEMPOOL,
              "Checking mempool with %u transactions and %u inputs\n",
@@ -860,7 +862,6 @@ void CTxMemPool::Check(
 
     CCoinsViewCache mempoolDuplicate(const_cast<CCoinsViewCache *>(pcoins));
 
-    std::shared_lock lock(smtx);
     std::list<const CTxMemPoolEntry *> waitingOnDependants;
     for (indexed_transaction_set::const_iterator it = mapTx.begin();
          it != mapTx.end(); it++) {
@@ -1017,6 +1018,13 @@ std::string CTxMemPool::checkJournalNL() const
     if(mapTx.size() != tester.journalSize())
     {
         res << "Mempool size = " << mapTx.size() << ", journal size = " << tester.journalSize() << std::endl;
+        res << "Mempool contents:" << std::endl;
+        for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
+        {
+            res << it->GetTx().GetId().ToString() << std::endl;
+        }
+        res << "Journal contents:" << std::endl;
+        tester.dumpJournalContents(res);
     }
 
     // Check mempool & journal agree on contents
@@ -1047,7 +1055,7 @@ std::string CTxMemPool::checkJournalNL() const
         }
     }
 
-    LogPrint(BCLog::JOURNAL, "Result of journal check: %s\n", res.str().c_str());
+    LogPrint(BCLog::JOURNAL, "Result of journal check: %s\n", res.str().empty()? "Ok" : res.str().c_str());
     return res.str();
 }
 
@@ -1365,7 +1373,7 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
 void CTxMemPool::removeStagedNL(
     setEntries &stage,
     bool updateDescendants,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason) {
 
     updateForRemoveFromMempoolNL(stage, updateDescendants);
@@ -1374,7 +1382,7 @@ void CTxMemPool::removeStagedNL(
     }
 }
 
-int CTxMemPool::Expire(int64_t time, mining::CJournalChangeSetPtr& changeSet)
+int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)
 {
     std::unique_lock lock(smtx);
     indexed_transaction_set::index<entry_time>::type::iterator it =
@@ -1407,7 +1415,7 @@ bool CTxMemPool::CheckTxConflicts(const CTransaction &tx) const {
 void CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
-    CJournalChangeSetPtr& changeSet,
+    const CJournalChangeSetPtr& changeSet,
     bool validFeeEstimate,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
@@ -1498,7 +1506,7 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
 
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
-    mining::CJournalChangeSetPtr& changeSet,
+    const mining::CJournalChangeSetPtr& changeSet,
     std::vector<COutPoint>* pvNoSpendsRemaining) {
 
     std::unique_lock lock(smtx);

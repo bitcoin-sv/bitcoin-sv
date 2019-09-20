@@ -65,7 +65,7 @@ class CTxnValidator final
     /** Process a new txn with wait */
     CValidationState processValidation(
         const TxInputDataSPtr& txInputData,
-        mining::CJournalChangeSetPtr& changeSet,
+        const mining::CJournalChangeSetPtr& changeSet,
         bool fLimitMempoolSize=false);
 
     /**
