@@ -1219,14 +1219,12 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     const CValidationState& state = txStatus.mState;
     const TxSource source = txStatus.mTxInputData->mTxSource;
     std::string sTxnStatusMsg;
-    if (!fOrphanTxn && state.IsMissingInputs()) {
+    if (state.IsMissingInputs()) {
         sTxnStatusMsg = "detected orphan";
     } else if (fOrphanTxn && !state.IsMissingInputs()) {
-        sTxnStatusMsg = "invalid orphan";
+        sTxnStatusMsg = "invalid orphan " + FormatStateMessage(state);
     } else if (!fOrphanTxn) {
         sTxnStatusMsg = "rejected " + FormatStateMessage(state);
-    } else {
-        sTxnStatusMsg = "rejected orphan";
     }
     LogPrint(BCLog::TXNVAL,
             "%s: txn= %s %s\n",
