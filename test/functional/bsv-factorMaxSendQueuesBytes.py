@@ -11,16 +11,17 @@ from test_framework.blocktools import ChainManager
 
 # This test checks input parameter factormaxsendqueuesbytes, which is setting maxSendQueuesBytes.
 # Scenario:
-#  Prepare chain with 100 blocks, then add 2 big blocks of size 3MB (oldBlock and newBlock).
-#  Create 15 peers. Each of them sends GetData for a block which is 3 MB.
+#  Prepare chain with 100 blocks, then add 2 big blocks of size 5MB (oldBlock and newBlock).
+#  Create 15 peers. Each of them sends GetData for a block which is 5 MB.
 #  Count received BLOCK messages.
 # Run this scenario with 3 different cases:
-# 1. Run bitcoind with -factormaxsendqueuesbytes set to 15. Peers are requesting oldBlock.
-# 2. Run bitcoind with -factormaxsendqueuesbytes set to 1. Peers are requesting oldBlock.
-# 3. Run bitcoind with -factormaxsendqueuesbytes set to 1. Peers are requesting newBlock (tip of the chain).
-# In cases 1. and 3., all peers should receive the block, in case 2., some peers receive blocks and other receive reject messages.
-# In case 2, downloads are in series, while in cases 1. and 3., downloads are in parallel.
-# Third case is special because we are requesting the newest block. Limitations for downloading do not apply here.
+# 1. Run bitcoind with -factormaxsendqueuesbytes=15. Peers are requesting oldBlock.
+# 2. Run bitcoind with -factormaxsendqueuesbytes=1. Peers are requesting oldBlock.
+# 3. Run bitcoind with -factormaxsendqueuesbytes=1. Peers are requesting newBlock (tip of the chain).
+# 4. Run bitcoind with -factormaxsendqueuesbytes=1. Whitelisted peers are requesting newBlock (tip of the chain).
+# In cases 1. and 4., all peers should receive the block, in case 2. and 3., some peers receive blocks and other receive reject messages.
+# In case 2, downloads are in series, while in cases 1. and 4., downloads are in parallel.
+# Forth case is special because we are requesting the newest block. Download limitations for whitelisted peers do not apply.
 
 class MaxSendQueuesBytesTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -85,7 +86,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
             self.chain.save_spendable_output()
             node.send_message(msg_block(block))
 
-        return node  
+        return node
 
     def mineBigBlock(self, node):
         block = self.chain.next_block(self.next_block, spend=self.chain.get_spendable_output(), block_size=self.excessiveblocksize)
@@ -110,7 +111,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
         self.stop_node(0)
 
         # Scenario 1: Blocks from bitcoind should be sent in parallel as factormaxsendqueuesbytes=num_peers.
-        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize), 
+        args = ["-excessiveblocksize={}".format(self.excessiveblocksize + self.headerSize),
                 "-blockmaxsize={}".format(self.excessiveblocksize + self.headerSize)]
         with self.run_node_with_connections("should be sent in parallel as factormaxsendqueuesbytes=num_peers", 0,
             args+["-factormaxsendqueuesbytes={}".format(self.num_peers)], self.num_peers) as connections:
@@ -122,7 +123,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
             assert_equal(0, numberOfRejectedMsgs)
 
         # Scenario 2: Blocks from bitcoind should not be sent in parallel because factormaxsendqueuesbytes=1
-        # only allows one 3MB to be downloaded at once.
+        # only allows one 5MB to be downloaded at once.
         with self.run_node_with_connections("should not be sent in parallel because factormaxsendqueuesbytes=1", 0,
             args+["-factormaxsendqueuesbytes=1"], self.num_peers) as connections:
 
@@ -136,9 +137,22 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
             assert_greater_than(numberOfRejectedMsgs, 0)
             assert_equal(numberOfReceivedBlocksSeries+numberOfRejectedMsgs, 15)
 
-        # Scenario 3: Blocks from bitcoind should be sent in parallel, because we are requesting the most recent block.
+        # Scenario 3: Blocks from bitcoind should not be sent in parallel if we reached rate limit,
+        # because we are requesting the most recent block from non whitelisted peer.
+        with self.run_node_with_connections(
+                "some blocks should be rejected because non whitelisted peer are requesting most recent block", 0,
+                args + ["-factormaxsendqueuesbytes=1"], self.num_peers) as connections:
+            start = time.time()
+            numberOfReceivedBlocksNewBlock, numberOfRejectedMsgs = self.requestBlocks(connections, newBlock)
+            logger.info("finished requestBlock duration %s s", time.time() - start)
+            logger.info("%d blocks received when running with factormaxsendqueuesbytes=%d.", numberOfReceivedBlocksNewBlock, 1)
+            assert_greater_than(self.num_peers, numberOfReceivedBlocksNewBlock)
+            assert_greater_than(numberOfRejectedMsgs, 0)
+
+        # Scenario 4: Blocks from bitcoind should be sent in parallel, because there is no limit on whitelisted peers
+        # requesting most recent block even if queue is full.
         with self.run_node_with_connections("should be sent in parallel, because we are requesting the most recent block", 0,
-            args+["-factormaxsendqueuesbytes=1"], self.num_peers) as connections:
+            args+["-factormaxsendqueuesbytes=1", "-whitelist=127.0.0.1"], self.num_peers) as connections:
 
             start = time.time()
             numberOfReceivedBlocksNewBlock, numberOfRejectedMsgs = self.requestBlocks(connections, newBlock)
