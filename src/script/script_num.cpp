@@ -15,8 +15,12 @@ using namespace std;
 
 CScriptNum::CScriptNum(const vector<uint8_t>& vch,
                        bool fRequireMinimal,
-                       const size_t nMaxNumSize)
+                       const size_t nMaxNumSize,
+                       const bool big_int)
 {
+    assert(m_value.index() == 0);
+    assert(get<0>(m_value) == 0);
+
     if(vch.size() > nMaxNumSize)
     {
         throw scriptnum_overflow_error("script number overflow");
@@ -26,63 +30,35 @@ CScriptNum::CScriptNum(const vector<uint8_t>& vch,
         throw scriptnum_minencode_error("non-minimally encoded script number");
     }
     if(vch.empty())
-        m_value = 0;
-    else if(vch.size() <= MAXIMUM_ELEMENT_SIZE)
-        m_value = bsv::deserialize<int64_t>(begin(vch), end(vch));
-    else
-        m_value = bsv::deserialize<bint>(begin(vch), end(vch));
-}
-
-namespace
-{
-    // overload is expected to be standardized in C++23
-    // see C++17 The Complete Guide, Chapter 14.1, Nico Josuttis 
-    // or  Functional Programming in C++, Chapter 9.3, Ivan Cukic
-    template<typename... Ts>
-    struct overload : Ts...         // inherit from variadic template arguments
     {
-        using Ts::operator()...;    // 'use' all base type function call operators 
-    };
-    // Deduction guide so base types are deduced from passed arguments
-    template<typename... Ts>
-    overload(Ts...)->overload<Ts...>;
+        if(big_int)
+        {
+            m_value = bint{0};
+            assert(m_value.index() == 1);
+        }
+    }
+    else if(vch.size() <= nMaxNumSize)
+    {
+        if(big_int)
+            m_value = bsv::deserialize<bint>(begin(vch), end(vch));
+        else
+            m_value = bsv::deserialize<int64_t>(begin(vch), end(vch));
+    }
+
+    assert(big_int ? m_value.index() == 1 : m_value.index() == 0);
 }
 
 CScriptNum& CScriptNum::operator&=(const CScriptNum& other)
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(equal_index(other));
 
-    // clang-format off
-    std::visit(overload{[&other](int64_t& n) 
-                        {
-                            visit(overload{[&n](const int64_t m)
-                            {
-                                // little int & little int
-                                n &= m;
-                            },
-                            [/*&n*/](const auto& /*m*/)
-                            {
-                                // little int & big int
-                                assert(false); 
-                            }},
-                            other.m_value);
-                        },
-                        [&other](auto& n) 
-                        {
-                            visit(overload{[&n](const int64_t m)
-                            {
-                                // big int & little int
-                                n &= m;
-                            },
-                            [&n](const bint& m)
-                            {
-                                // big int & big int
-                                n &= m;
-                            }},
-                            other.m_value);
-                        }},
-               m_value);
-    // clang-format on
+    if(m_value.index() == 0)
+        get<0>(m_value) &= get<0>(other.m_value);
+    else
+        get<1>(m_value) &= get<1>(other.m_value);
+
+    assert(equal_index(other));
     return *this;
 }
 
@@ -141,204 +117,90 @@ bool operator<(const CScriptNum& a, const CScriptNum& b)
 CScriptNum& CScriptNum::operator+=(const CScriptNum& other)
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(equal_index(other));
 
-    // clang-format off
-    std::visit(overload{[&other](int64_t& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // little int + little int
-                                assert(
-                                    m == 0 ||
-                                    (m > 0 &&
-                                    n <=
-                                        std::numeric_limits<int64_t>::max() - m) ||
-                                    (m < 0 &&
-                                    n >= std::numeric_limits<int64_t>::min() - m));
-                                n += m;
-                            },
-                            [/*&n*/](const auto& /*m*/)
-                            {
-                                // little int + big int
-                                // assert(false); 
-                            }},
-                            other.m_value);
-                        },
-                        [&other](auto& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // big int + little int
-                                n += m;
-                            },
-                            [&n](const bint& m)
-                            {
-                                // big int + big int
-                                n += m;
-                            }},
-                            other.m_value);
-                        }},
-               m_value);
-    // clang-format on
+    if(m_value.index() == 0)
+    {
+        // little int - little int
+        assert(get<0>(other.m_value) == 0 ||
+               (get<0>(other.m_value) > 0 &&
+                get<0>(m_value) <= std::numeric_limits<int64_t>::max() -
+                                       get<0>(other.m_value)) ||
+               (get<0>(other.m_value) < 0 &&
+                get<0>(m_value) >= std::numeric_limits<int64_t>::min() -
+                                       get<0>(other.m_value)));
+        get<0>(m_value) += get<0>(other.m_value);
+    }
+    else
+        get<1>(m_value) += get<1>(other.m_value);
+
+    assert(equal_index(other));
     return *this;
 }
 
 CScriptNum& CScriptNum::operator-=(const CScriptNum& other)
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(equal_index(other));
 
-    // clang-format off
-    std::visit(overload{[&other](int64_t& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // little int - little int
-                                assert(
-                                    m == 0 ||
-                                    (m > 0 &&
-                                    n >= std::numeric_limits<int64_t>::min() + m)
-                                    || (m < 0 && n <=
-                                    std::numeric_limits<int64_t>::max() + m));
-                                n -= m;
-                            },
-                            [/*&n*/](const auto& /*m*/)
-                            {
-                                // little int - big int
-                                // assert(false); 
-                            }},
-                            other.m_value);
-                        },
-                        [&other](auto& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // big int - little int
-                                n -= m;
-                            },
-                            [&n](const bint& m)
-                            {
-                                // big int - big int
-                                n -= m;
-                            }},
-                            other.m_value);
-                        }},
-               m_value);
-    // clang-format on
+    if(m_value.index() == 0)
+    {
+        // little int - little int
+        assert(get<0>(other.m_value) == 0 ||
+               (get<0>(other.m_value) > 0 &&
+                get<0>(m_value) >= std::numeric_limits<int64_t>::min() +
+                                       get<0>(other.m_value)) ||
+               (get<0>(other.m_value) < 0 &&
+                get<0>(m_value) <= std::numeric_limits<int64_t>::max() +
+                                       get<0>(other.m_value)));
+        get<0>(m_value) -= get<0>(other.m_value);
+    }
+    else
+        get<1>(m_value) -= get<1>(other.m_value);
+
+    assert(equal_index(other));
     return *this;
 }
 
 CScriptNum& CScriptNum::operator*=(const CScriptNum& other)
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(equal_index(other));
 
-    // clang-format off
-    std::visit(overload{[&other](int64_t& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // little int * little int
-                                n *= m;
-                            },
-                            [/*&n*/](const auto& /*m*/)
-                            {
-                                // little int * big int
-                                // assert(false); 
-                            }},
-                            other.m_value);
-                        },
-                        [&other](auto& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // big int * little int
-                                n *= m;
-                            },
-                            [&n](const bint& m)
-                            {
-                                // big int * big int
-                                n *= m;
-                            }},
-                            other.m_value);
-                        }},
-               m_value);
-    // clang-format on
+    if(m_value.index() == 0)
+        get<0>(m_value) *= get<0>(other.m_value);
+    else
+        get<1>(m_value) *= get<1>(other.m_value);
 
+    assert(equal_index(other));
     return *this;
 }
 
 CScriptNum& CScriptNum::operator/=(const CScriptNum& other)
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(equal_index(other));
+    
+    if(m_value.index() == 0)
+        get<0>(m_value) /= get<0>(other.m_value);
+    else
+        get<1>(m_value) /= get<1>(other.m_value);
 
-    // clang-format off
-    std::visit(overload{[&other](int64_t& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // little int / little int
-                                n /= m;
-                            },
-                            [/*&n*/](const auto& /*m*/)
-                            {
-                                // little int / big int
-                                // assert(false); 
-                            }},
-                            other.m_value);
-                        },
-                        [&other](auto& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // big int / little int
-                                n /= m;
-                            },
-                            [&n](const bint& m)
-                            {
-                                // big int / big int
-                                n /= m;
-                            }},
-                            other.m_value);
-                        }},
-               m_value);
-    // clang-format on
+    assert(equal_index(other));
     return *this;
 }
 
 CScriptNum& CScriptNum::operator%=(const CScriptNum& other)
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(equal_index(other));
+    
+    if(m_value.index() == 0)
+        get<0>(m_value) %= get<0>(other.m_value);
+    else
+        get<1>(m_value) %= get<1>(other.m_value);
 
-    // clang-format off
-    std::visit(overload{[&other](int64_t& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // little int % little int
-                                n %= m;
-                            },
-                            [/*&n*/](const auto& /*m*/)
-                            {
-                                // little int % big int
-                                // assert(false); 
-                            }},
-                            other.m_value);
-                        },
-                        [&other](auto& n) 
-                        {
-                            visit(overload{[&n](const int64_t& m)
-                            {
-                                // big int % little int
-                                n %= m;
-                            },
-                            [&n](const bint& m)
-                            {
-                                // big int % big int
-                                n %= m;
-                            }},
-                            other.m_value);
-                        }},
-               m_value);
-    // clang-format on
+    assert(equal_index(other));
     return *this;
 }
 
@@ -357,25 +219,32 @@ std::ostream& operator<<(std::ostream& os, const CScriptNum& n)
 int CScriptNum::getint() const
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
+    assert(m_value.index() == 0);
 
-    // clang-format off
-    return visit(overload{[](const int64_t n) -> int 
-                 {
-                     if(n > std::numeric_limits<int>::max())
-                         return std::numeric_limits<int>::max();
-                     else if(n < std::numeric_limits<int>::min())
-                         return std::numeric_limits<int>::min();
-                     else
-                         return n;
-                 },
-                 [](const bsv::bint& n) -> int
-                 {
-                     assert(false);
-                     return 0;
-                 }}, 
-                 m_value);
-    // clang-format on
+    const int64_t n = get<0>(m_value);
+    if(n > std::numeric_limits<int>::max())
+        return std::numeric_limits<int>::max();
+    else if(n < std::numeric_limits<int>::min())
+        return std::numeric_limits<int>::min();
+    else
+        return n;
 }
+
+namespace
+{
+    // overload is expected to be standardized in C++23
+    // see C++17 The Complete Guide, Chapter 14.1, Nico Josuttis 
+    // or  Functional Programming in C++, Chapter 9.3, Ivan Cukic
+    template<typename... Ts>
+    struct overload : Ts...         // inherit from variadic template arguments
+    {
+        using Ts::operator()...;    // 'use' all base type function call operators 
+    };
+    // Deduction guide so base types are deduced from passed arguments
+    template<typename... Ts>
+    overload(Ts...)->overload<Ts...>;
+}
+
 
 vector<uint8_t> CScriptNum::getvch() const
 {

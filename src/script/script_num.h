@@ -50,7 +50,8 @@ public:
     explicit CScriptNum(const bsv::bint& n) : m_value(n) {}
     explicit CScriptNum(const std::vector<uint8_t>& vch,
                         bool fRequireMinimal,
-                        const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE);
+                        const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE,
+                        bool big_int = false);
 
     CScriptNum& operator=(int64_t rhs)
     {

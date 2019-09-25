@@ -6,12 +6,8 @@
 #include "script/script.h"
 #include "script/script_num.h"
 #include "scriptnum10.h"
-#include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
-#include <climits>
-#include <cstdint>
-#include <limits>
 
 #include "big_int.hpp"
 
@@ -26,7 +22,65 @@ namespace
     vector<int64_t> test_data{min64, -1, 0, 1, max64};
 }
 
-BOOST_FIXTURE_TEST_SUITE(scriptnum_tests, BasicTestingSetup)
+BOOST_AUTO_TEST_SUITE(scriptnum_tests)
+
+BOOST_AUTO_TEST_CASE(construction)
+{
+    using script_data = vector<uint8_t>;
+    using test_args = tuple<script_data, size_t, bool>;
+    vector<test_args> valid_constructions = {
+        {{}, 0, false},
+        {{}, 0, true},
+        {{}, 1, false},
+        {{}, 1, true},
+        {{1}, 1, false},
+        {{1}, 1, true},
+        {{1}, 2, false},
+        {{1}, 2, true},
+        {{1, 2, 3}, 4, false},
+        {{1, 2, 3}, 4, true},
+        {{1, 2, 3, 4}, 4, false},
+        {{1, 2, 3, 4}, 4, true},
+        {{1, 2, 3, 4}, 5, false},
+        {{1, 2, 3, 4}, 5, true},
+        {{1, 2, 3, 4, 5}, 5, false},
+        {{2, 2, 3, 4, 5}, 5, true},
+        {{1, 2, 3, 4, 5}, 6, false},
+        {{1, 2, 3, 4, 5}, 6, true},
+    };
+
+    for(const auto [v, max_size, big_int] : valid_constructions)
+    {
+        try
+        {
+            CScriptNum actual{v, false, max_size, big_int};
+        }
+        catch(...)
+        {
+            BOOST_FAIL("should not throw");
+        }
+    }
+
+    vector<test_args> invalid_constructions = {
+        {{1}, 0, false},
+        {{1}, 0, true},
+        {{1, 2, 3, 4}, 3, false},
+        {{1, 2, 3, 4}, 3, true},
+        {{1, 2, 3, 4, 5}, 4, false},
+        {{1, 2, 3, 4, 5}, 4, true},
+    };
+    for(const auto [v, max_size, big_int] : invalid_constructions)
+    {
+        try
+        {
+            CScriptNum actual{v, false, max_size, big_int};
+            BOOST_FAIL("should throw");
+        }
+        catch(...)
+        {
+        }
+    }
+}
 
 BOOST_AUTO_TEST_CASE(insertion_op)
 {
@@ -70,14 +124,6 @@ BOOST_AUTO_TEST_CASE(equality)
         CScriptNum a{n};
         CScriptNum b{n};
         BOOST_CHECK_EQUAL(a, a);
-        BOOST_CHECK_EQUAL(a, b);
-        BOOST_CHECK_EQUAL(b, a);
-    }
-
-    for(const int64_t n : test_data)
-    {
-        CScriptNum a{n};
-        CScriptNum b{bint{n}};
         BOOST_CHECK_EQUAL(a, b);
         BOOST_CHECK_EQUAL(b, a);
     }
@@ -145,28 +191,9 @@ BOOST_AUTO_TEST_CASE(addition)
         // big int + big int
         CScriptNum a{bint{n}};
         CScriptNum b{bint{m}};
-        CScriptNum c{o};
+        CScriptNum c{bint{o}};
         BOOST_CHECK_EQUAL(c, a + b);
     }
-
-    for(const auto& [n, m, o] : test_data)
-    {
-        // big int + little int
-        CScriptNum a{bint{n}};
-        CScriptNum b{m};
-        CScriptNum c{o};
-        BOOST_CHECK_EQUAL(c, a + b);
-    }
-
-    // little int + big int not supported
-    //    for(const auto& [n, m, o] : test_data)
-    //    {
-    //        // little int + big int
-    //        CScriptNum a{n};
-    //        CScriptNum b{bint{m}};
-    //        CScriptNum c{o};
-    //        BOOST_CHECK_EQUAL(c, a + b);
-    //    }
 }
 
 BOOST_AUTO_TEST_CASE(subtraction)
@@ -195,28 +222,9 @@ BOOST_AUTO_TEST_CASE(subtraction)
         // big int - big int
         CScriptNum a{bint{n}};
         CScriptNum b{bint{m}};
-        CScriptNum c{o};
+        CScriptNum c{bint{o}};
         BOOST_CHECK_EQUAL(c, a - b);
     }
-
-    for(const auto& [n, m, o] : test_data)
-    {
-        // big int - little int
-        CScriptNum a{bint{n}};
-        CScriptNum b{m};
-        CScriptNum c{o};
-        BOOST_CHECK_EQUAL(c, a - b);
-    }
-
-    // little int - big int not supported
-    //    for(const auto& [n, m, o] : test_data)
-    //    {
-    //        // little int - big int
-    //        CScriptNum a{n};
-    //        CScriptNum b{bint{m}};
-    //        CScriptNum c{o};
-    //        BOOST_CHECK_EQUAL(c, a - b);
-    //    }
 }
 
 BOOST_AUTO_TEST_CASE(multiplication)
@@ -247,28 +255,9 @@ BOOST_AUTO_TEST_CASE(multiplication)
         // big int * big int
         CScriptNum a{bint{n}};
         CScriptNum b{bint{m}};
-        CScriptNum c{o};
+        CScriptNum c{bint{o}};
         BOOST_CHECK_EQUAL(c, a * b);
     }
-
-    for(const auto& [n, m, o] : test_data)
-    {
-        // big int * little int
-        CScriptNum a{bint{n}};
-        CScriptNum b{m};
-        CScriptNum c{o};
-        BOOST_CHECK_EQUAL(c, a * b);
-    }
-
-    // little int * big int not supported
-    //    for(const auto& [n, m, o] : test_data)
-    //    {
-    //        // little int * big int
-    //        CScriptNum a{n};
-    //        CScriptNum b{bint{m}};
-    //        CScriptNum c{o};
-    //        BOOST_CHECK_EQUAL(c, a * b);
-    //    }
 }
 
 BOOST_AUTO_TEST_CASE(division)
@@ -299,28 +288,9 @@ BOOST_AUTO_TEST_CASE(division)
         // big int / big int
         CScriptNum a{bint{n}};
         CScriptNum b{bint{m}};
-        CScriptNum c{o};
+        CScriptNum c{bint{o}};
         BOOST_CHECK_EQUAL(c, a / b);
     }
-
-    for(const auto& [n, m, o] : test_data)
-    {
-        // big int / little int
-        CScriptNum a{bint{n}};
-        CScriptNum b{m};
-        CScriptNum c{o};
-        BOOST_CHECK_EQUAL(c, a / b);
-    }
-
-    // little int / big int not supported
-    //    for(const auto& [n, m, o] : test_data)
-    //    {
-    //        // little int / big int
-    //        CScriptNum a{n};
-    //        CScriptNum b{bint{m}};
-    //        CScriptNum c{o};
-    //        BOOST_CHECK_EQUAL(c, a / b);
-    //    }
 }
 
 BOOST_AUTO_TEST_CASE(modular)
@@ -346,28 +316,9 @@ BOOST_AUTO_TEST_CASE(modular)
         // big int % big int
         CScriptNum a{bint{n}};
         CScriptNum b{bint{m}};
-        CScriptNum c{o};
+        CScriptNum c{bint{o}};
         BOOST_CHECK_EQUAL(c, a % b);
     }
-
-    for(const auto& [n, m, o] : test_data)
-    {
-        // big int % little int
-        CScriptNum a{bint{n}};
-        CScriptNum b{m};
-        CScriptNum c{o};
-        BOOST_CHECK_EQUAL(c, a % b);
-    }
-
-    // little int % big int not supported
-    //    for(const auto& [n, m, o] : test_data)
-    //    {
-    //        // little int % big int
-    //        CScriptNum a{n};
-    //        CScriptNum b{bint{m}};
-    //        CScriptNum c{o};
-    //        BOOST_CHECK_EQUAL(c, a % b);
-    //    }
 }
 
 BOOST_AUTO_TEST_CASE(and_)
@@ -395,28 +346,9 @@ BOOST_AUTO_TEST_CASE(and_)
         // big int & big int
         CScriptNum a{bint{n}};
         CScriptNum b{bint{m}};
-        CScriptNum c{o};
+        CScriptNum c{bint{o}};
         BOOST_CHECK_EQUAL(c, a & b);
     }
-
-    for(const auto& [n, m, o] : test_data)
-    {
-        // big int & little int
-        CScriptNum a{bint{n}};
-        CScriptNum b{m};
-        CScriptNum c{o};
-        BOOST_CHECK_EQUAL(c, a & b);
-    }
-
-    // little int & big int not supported
-    //    for(const auto& [n, m, o] : test_data)
-    //    {
-    //        // little int & big int
-    //        CScriptNum a{n};
-    //        CScriptNum b{bint{m}};
-    //        CScriptNum c{o};
-    //        BOOST_CHECK_EQUAL(c, a & b);
-    //    }
 }
 
 BOOST_AUTO_TEST_CASE(negation)
