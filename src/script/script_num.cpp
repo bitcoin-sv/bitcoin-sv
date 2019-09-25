@@ -35,11 +35,15 @@ CScriptNum::CScriptNum(const vector<uint8_t>& vch,
 
 namespace
 {
+    // overload is expected to be standardized in C++23
+    // see C++17 The Complete Guide, Chapter 14.1, Nico Josuttis 
+    // or  Functional Programming in C++, Chapter 9.3, Ivan Cukic
     template<typename... Ts>
-    struct overload : Ts...
+    struct overload : Ts...         // inherit from variadic template arguments
     {
-        using Ts::operator()...;
+        using Ts::operator()...;    // 'use' all base type function call operators 
     };
+    // Deduction guide so base types are deduced from passed arguments
     template<typename... Ts>
     overload(Ts...)->overload<Ts...>;
 }
