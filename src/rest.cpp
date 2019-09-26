@@ -661,7 +661,8 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
                 // include the script in a json output
                 UniValue o(UniValue::VOBJ);
-                ScriptPubKeyToUniv(coin.out.scriptPubKey, true, IsGenesisEnabled(config, coin.nHeight), o);
+                int height = (coin.nHeight == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.nHeight;
+                ScriptPubKeyToUniv(coin.out.scriptPubKey, true, IsGenesisEnabled(config, height), o);
                 utxo.push_back(Pair("scriptPubKey", o));
                 utxos.push_back(utxo);
             }

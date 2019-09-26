@@ -1251,7 +1251,8 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     }
     ret.push_back(Pair("value", ValueFromAmount(coin.GetTxOut().nValue)));
     UniValue o(UniValue::VOBJ);
-    ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true, IsGenesisEnabled(config, coin.GetHeight()), o);
+    int height = (coin.GetHeight() == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.GetHeight();
+    ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true, IsGenesisEnabled(config, height), o);
     ret.push_back(Pair("scriptPubKey", o));
     ret.push_back(Pair("coinbase", coin.IsCoinBase()));
 
