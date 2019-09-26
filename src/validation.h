@@ -45,7 +45,7 @@ class CInv;
 class Config;
 class CScriptCheck;
 class CTxMemPool;
-class CTxnHandlers;
+struct CTxnHandlers;
 class CTxUndo;
 class CValidationInterface;
 class CValidationState;
