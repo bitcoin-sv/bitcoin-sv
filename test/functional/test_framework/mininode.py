@@ -77,8 +77,15 @@ mininode_socket_map = dict()
 # access to any data shared with the NodeConnCB or NodeConn.
 mininode_lock = RLock()
 
-# Serialization/deserialization tools
+# ports used by chain type
+NETWORK_PORTS = {
+    "mainnet" : 8333,
+    "testnet3" : 18333,
+    "stn" : 9333,
+    "regtest" : 18444
+}
 
+# Serialization/deserialization tools
 
 def sha256(s):
     return hashlib.new('sha256', s).digest()
@@ -1624,6 +1631,7 @@ class NodeConn(asyncore.dispatcher):
     MAGIC_BYTES = {
         "mainnet": b"\xe3\xe1\xf3\xe8",
         "testnet3": b"\xf4\xe5\xf3\xf4",
+        "stn": b"\xfb\xce\xc4\xf9",
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
