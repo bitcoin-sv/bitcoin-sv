@@ -841,7 +841,7 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
             // Check and update bloom filters
             if(filterInventoryKnown.contains(txn.getInv().hash))
                 continue;
-            if(pfilter && !pfilter->IsRelevantAndUpdate(*(txn.getTxnRef())))
+            if(!mFilter.IsRelevantAndUpdate(*(txn.getTxnRef())))
                 continue;
 
             mInvList.emplace_back(txn);
@@ -1077,7 +1077,6 @@ struct NodeEvictionCandidate {
     int64_t nLastTXTime;
     bool fRelevantServices;
     bool fRelayTxes;
-    bool fBloomFilter;
     CAddress addr;
     uint64_t nKeyedNetGroup;
 };
@@ -1124,10 +1123,6 @@ static bool CompareNodeTXTime(const NodeEvictionCandidate &a,
         return b.fRelayTxes;
     }
 
-    if (a.fBloomFilter != b.fBloomFilter) {
-        return a.fBloomFilter;
-    }
-
     return a.nTimeConnected > b.nTimeConnected;
 }
 
@@ -1156,7 +1151,6 @@ bool CConnman::AttemptToEvictConnection() {
                 node->nLastTXTime,
                 (node->nServices & nRelevantServices) == nRelevantServices,
                 node->fRelayTxes,
-                node->pfilter != nullptr,
                 node->addr,
                 node->nKeyedNetGroup};
             vEvictionCandidates.push_back(candidate);
@@ -3073,7 +3067,6 @@ CNode::CNode(
     , mAsyncTaskPool{asyncTaskPool}
 {
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
-    pfilter = new CBloomFilter();
 
     for (const std::string &msg : getAllNetMessageTypes()) {
         mapRecvBytesPerMsgCmd[msg] = 0;
@@ -3090,11 +3083,6 @@ CNode::CNode(
 CNode::~CNode()
 {
     CloseSocket(hSocket);
-
-    LOCK(cs_filter);
-    if (pfilter) {
-        delete pfilter;
-    }
 }
 
 auto CNode::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)

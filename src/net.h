@@ -930,7 +930,7 @@ public:
     bool fSentAddr {false};
     CSemaphoreGrant grantOutbound {};
     CCriticalSection cs_filter {};
-    CBloomFilter *pfilter {nullptr};
+    CBloomFilter mFilter;
     const NodeId id {};
 
     const uint64_t nKeyedNetGroup {0};

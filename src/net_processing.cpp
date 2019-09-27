@@ -1371,11 +1371,9 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         CMerkleBlock merkleBlock;
                         {
                             LOCK(pfrom->cs_filter);
-                            if (pfrom->pfilter) {
-                                sendMerkleBlock = true;
-                                merkleBlock =
-                                    CMerkleBlock(*stream, *pfrom->pfilter);
-                            }
+                            sendMerkleBlock = true;
+                            merkleBlock =
+                                CMerkleBlock(*stream, pfrom->mFilter);
                         }
                         if (sendMerkleBlock) {
                             CSerializedNetMsg merkleBlockMsg = msgMaker.Make(NetMsgType::MERKLEBLOCK, merkleBlock);
@@ -3130,9 +3128,8 @@ static void ProcessFilterLoadMessage(const CNodePtr& pfrom, CDataStream& vRecv)
     }
     else {
         LOCK(pfrom->cs_filter);
-        delete pfrom->pfilter;
-        pfrom->pfilter = new CBloomFilter(filter);
-        pfrom->pfilter->UpdateEmptyFull();
+        pfrom->mFilter = std::move(filter);
+        pfrom->mFilter.UpdateEmptyFull();
         pfrom->fRelayTxes = true;
     }
 }
@@ -3148,24 +3145,12 @@ static void ProcessFilterAddMessage(const CNodePtr& pfrom, CDataStream& vRecv)
     // Nodes must NEVER send a data item > 520 bytes (the max size for a
     // script data object, and thus, the maximum size any matched object can
     // have) in a filteradd message.
-    bool bad = false;
     if(vData.size() > MAX_SCRIPT_ELEMENT_SIZE) {
-        bad = true;
+        Misbehaving(pfrom, 100, "invalid-filteradd");
     }
     else {
         LOCK(pfrom->cs_filter);
-        if(pfrom->pfilter) {
-            pfrom->pfilter->insert(vData);
-        }
-        else {
-            bad = true;
-        }
-    }
-
-    if(bad) {
-        // The structure of this code doesn't really allow for a good error
-        // code. We'll go generic.
-        Misbehaving(pfrom, 100, "invalid-filteradd");
+        pfrom->mFilter.insert(vData);
     }
 }
 
@@ -3176,8 +3161,7 @@ static void ProcessFilterClearMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 {
     LOCK(pfrom->cs_filter);
     if(pfrom->GetLocalServices() & NODE_BLOOM) {
-        delete pfrom->pfilter;
-        pfrom->pfilter = new CBloomFilter();
+        pfrom->mFilter = {};
     }
     pfrom->fRelayTxes = true;
 }
@@ -4046,10 +4030,8 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
                     continue;
                 }
             }
-            if (pto->pfilter) {
-                if (!pto->pfilter->IsRelevantAndUpdate(*txinfo.tx)) {
-                    continue;
-                }
+            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.tx)) {
+                continue;
             }
             pto->filterInventoryKnown.insert(txid);
             vInv.push_back(inv);
