@@ -82,8 +82,8 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
         std::vector<CTxnSendingDetails> filteredNewTxns {};
 
         // Ensure we always take our lock first, then the mempool lock
-        std::unique_lock<std::mutex> lock { mNewTxnsMtx };
-        std::shared_lock(mempool.smtx);
+        std::unique_lock<std::mutex> lock1 { mNewTxnsMtx };
+        std::shared_lock lock2(mempool.smtx);
 
         std::sort(mNewTxns.begin(), mNewTxns.end(), comp);
         std::set_difference(mNewTxns.begin(), mNewTxns.end(), txnDetails.begin(), txnDetails.end(),
