@@ -22,7 +22,9 @@ static const char *MSG_RAWTX = "rawtx";
 // Internal function to send multipart message
 static int zmq_send_multipart(void *sock, const void *data, size_t size, ...) {
     va_list args;
+    auto closeVaList = [](va_list* args) {va_end(*args);};
     va_start(args, size);
+    std::unique_ptr<va_list, decltype(closeVaList)> guard{&args, closeVaList};
 
     while (1) {
         zmq_msg_t msg;
