@@ -1802,7 +1802,7 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
 /**
 * Process peer address message.
 */
-static OptBool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& interruptMsgProc,
+static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& interruptMsgProc,
     CDataStream& vRecv, CConnman& connman)
 {
     std::vector<CAddress> vAddr;
@@ -1902,7 +1902,7 @@ static OptBool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>
         pfrom->fDisconnect = true;
     }
 
-    return {};
+    return true;
 }
 
 /**
@@ -3285,10 +3285,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::ADDR) {
-        if(OptBool res { ProcessAddrMessage(pfrom, interruptMsgProc, vRecv, connman) }) {
-            // If ProcessAddr returned a definite true/false, return that to our caller.
-            return res.get();
-        }
+        return ProcessAddrMessage(pfrom, interruptMsgProc, vRecv, connman);
     }
 
     else if (strCommand == NetMsgType::SENDHEADERS) {
