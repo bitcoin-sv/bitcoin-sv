@@ -82,6 +82,11 @@ struct CompareValueOnly {
     }
 };
 
+bool CWallet::ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet) {
+    bool isGenesisEnabled = scriptPubKey.IsPayToScriptHash() ? false : true;
+    return ::ExtractDestination(scriptPubKey, isGenesisEnabled, addressRet);
+}
+
 std::string COutput::ToString() const {
     return strprintf("COutput(%s, %d, %d) [%s]", tx->GetId().ToString(), i,
                      nDepth, FormatMoney(tx->tx->vout[i].nValue));
@@ -101,7 +106,8 @@ public:
         txnouttype type;
         std::vector<CTxDestination> vDest;
         int nRequired;
-        bool isGenesisEnabled = false; // CAffectedKeysVisitor does not care about data/non standard transactions. When sunsetting P2SH, we will need the real value here
+        // We will treat all scripts as after genesis except P2SH.
+        bool isGenesisEnabled = script.IsPayToScriptHash() ? false : true;
         if (ExtractDestinations(script, isGenesisEnabled, type, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest) {
                 boost::apply_visitor(*this, dest);
@@ -1433,7 +1439,7 @@ bool CWallet::IsChange(const CTxOut &txout) const {
     // change).
     if (::IsMine(*this, txout.scriptPubKey)) {
         CTxDestination address;
-        if (!ExtractDestination(txout.scriptPubKey, address)) {
+        if (!CWallet::ExtractDestination(txout.scriptPubKey, address)) {
             return true;
         }
 
@@ -1677,7 +1683,7 @@ void CWalletTx::GetAmounts(std::list<COutputEntry> &listReceived,
         // In either case, we need to get the destination address.
         CTxDestination address;
 
-        if (!ExtractDestination(txout.scriptPubKey, address) &&
+        if (!CWallet::ExtractDestination(txout.scriptPubKey, address) &&
             !txout.scriptPubKey.IsKnownOpReturn()) {
             LogPrintf("CWalletTx::GetAmounts: Unknown transaction type found, "
                       "txid %s\n",
@@ -3295,7 +3301,7 @@ bool CWallet::DelAddressBook(const CTxDestination &address) {
 
 const std::string &CWallet::GetAccountName(const CScript &scriptPubKey) const {
     CTxDestination address;
-    if (ExtractDestination(scriptPubKey, address) &&
+    if (CWallet::ExtractDestination(scriptPubKey, address) &&
         !scriptPubKey.IsKnownOpReturn()) { // we do not know how to spend coins containing OP_RETURN (for both pre and post Genesis OP_RETURNs)
         auto mi = mapAddressBook.find(address);
         if (mi != mapAddressBook.end()) {
@@ -3567,7 +3573,7 @@ std::map<CTxDestination, Amount> CWallet::GetAddressBalances() {
                 continue;
             }
 
-            if (!ExtractDestination(pcoin->tx->vout[i].scriptPubKey, addr)) {
+            if (!CWallet::ExtractDestination(pcoin->tx->vout[i].scriptPubKey, addr)) {
                 continue;
             }
 
@@ -3602,7 +3608,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
                     continue;
                 }
 
-                if (!ExtractDestination(mapWallet[txin.prevout.GetTxId()]
+                if (!CWallet::ExtractDestination(mapWallet[txin.prevout.GetTxId()]
                                             .tx->vout[txin.prevout.GetN()]
                                             .scriptPubKey,
                                         address)) {
@@ -3618,7 +3624,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
                 for (CTxOut txout : pcoin->tx->vout) {
                     if (IsChange(txout)) {
                         CTxDestination txoutAddr;
-                        if (!ExtractDestination(txout.scriptPubKey,
+                        if (!CWallet::ExtractDestination(txout.scriptPubKey,
                                                 txoutAddr)) {
                             continue;
                         }
@@ -3638,7 +3644,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
         for (unsigned int i = 0; i < pcoin->tx->vout.size(); i++)
             if (IsMine(pcoin->tx->vout[i])) {
                 CTxDestination address;
-                if (!ExtractDestination(pcoin->tx->vout[i].scriptPubKey,
+                if (!CWallet::ExtractDestination(pcoin->tx->vout[i].scriptPubKey,
                                         address)) {
                     continue;
                 }

@@ -209,11 +209,11 @@ bool SolverWithData(const CScript& scriptPubKey, bool isGenesisEnabled, txnoutty
     return SolverInternal(scriptPubKey, true, isGenesisEnabled, typeRet, vSolutionsRet);
 }
 
-bool ExtractDestination(const CScript &scriptPubKey,
+bool ExtractDestination(const CScript &scriptPubKey, bool isGenesisEnabled,
                         CTxDestination &addressRet) {
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!SolverNoData(scriptPubKey, false, whichType, vSolutions)) { // TODO: deliver flag here
+    if (!Solver(scriptPubKey, isGenesisEnabled, whichType, vSolutions)) {
         return false;
     }
 
@@ -271,7 +271,7 @@ bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txn
     } else {
         nRequiredRet = 1;
         CTxDestination address;
-        if (!ExtractDestination(scriptPubKey, address)) {
+        if (!ExtractDestination(scriptPubKey, isGenesisEnabled, address)) {
             return false;
         }
         addressRet.push_back(address);

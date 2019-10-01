@@ -850,7 +850,7 @@ static UniValue getreceivedbyaccount(const Config &config,
 
         for (const CTxOut &txout : wtx.tx->vout) {
             CTxDestination address;
-            if (ExtractDestination(txout.scriptPubKey, address) &&
+            if (CWallet::ExtractDestination(txout.scriptPubKey, address) &&
                 IsMine(*pwallet, address) && setAddress.count(address)) {
                 if (wtx.GetDepthInMainChain() >= nMinDepth) {
                     nAmount += txout.nValue;
@@ -1433,7 +1433,7 @@ static UniValue ListReceived(
 
         for (const CTxOut &txout : wtx.tx->vout) {
             CTxDestination address;
-            if (!ExtractDestination(txout.scriptPubKey, address)) {
+            if (!CWallet::ExtractDestination(txout.scriptPubKey, address)) {
                 continue;
             }
 
@@ -3191,7 +3191,7 @@ static UniValue listunspent(const Config &config,
 
         CTxDestination address;
         const CScript &scriptPubKey = out.tx->tx->vout[out.i].scriptPubKey;
-        bool fValidAddress = ExtractDestination(scriptPubKey, address);
+        bool fValidAddress = CWallet::ExtractDestination(scriptPubKey, address);
 
         if (destinations.size() &&
             (!fValidAddress || !destinations.count(address))) {

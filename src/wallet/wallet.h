@@ -1147,6 +1147,11 @@ public:
      */
     bool SetHDMasterKey(const CPubKey &key,
                         CHDChain *possibleOldChain = nullptr);
+
+    /**
+     * Extract single destination from script even if it is p2sh (multisig not supported)
+     */
+    static bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet);
 };
 
 /** A key allocated from the key pool. */

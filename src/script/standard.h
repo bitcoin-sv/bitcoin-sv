@@ -97,8 +97,13 @@ bool SolverWithData(const CScript& scriptPubKey, bool isGenesisEnabled, txnoutty
 bool SolverNoData(const CScript& scriptPubKey, bool genesisEnabled, txnouttype& typeRet,
     std::vector<std::vector<uint8_t>>& vSolutionsRet);
 
-bool ExtractDestination(const CScript &scriptPubKey,
-                        CTxDestination &addressRet);
+/*
+ * Extract a single destination from P2PK, P2PKH, P2SH
+ */
+bool ExtractDestination(const CScript &scriptPubKey, bool isGenesisEnabled, CTxDestination &addressRet);
+/**
+ * Extracts all destinations from the script. P2PK, P2PKH, P2SH and MULTISIG.
+ */
 bool ExtractDestinations(const CScript &scriptPubKey, bool isGenesisEnabled, txnouttype &typeRet,
                          std::vector<CTxDestination> &addressRet,
                          int &nRequiredRet);

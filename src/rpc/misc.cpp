@@ -176,11 +176,8 @@ public:
             txnouttype whichType;
             int nRequired;
             // DescribeAddressVisitor is used by RPC call validateaddress, which only takes address as input. 
-            // We have no block height available - treat all transactions as post-Genesis.
-            // An OP_RETURN output has no address, so this should be no problem
-            // TODO: We might revisit this when sunsetting P2SH, but it probably doesn't matter really much, since 
-            //       it would only incorrectly decode redeem scripts which are P2SH scripts by itself.
-            bool isGenesisEnabled = true; 
+            // We have no block height available - treat all transactions as post-Genesis except P2SH to be able to spend them.
+            bool isGenesisEnabled = subscript.IsPayToScriptHash() ? false : true; 
             ExtractDestinations(subscript, isGenesisEnabled, whichType, addresses, nRequired);
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(
