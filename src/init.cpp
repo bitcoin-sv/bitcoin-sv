@@ -532,7 +532,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                                           "<n>*1000 bytes (default: %u)"),
                                         DEFAULT_MAXSENDBUFFER));
     strUsage += HelpMessageOpt(
-        "-factorMaxSendQueuesBytes=<n>",
+        "-factormaxsendqueuesbytes=<n>",
         strprintf(_("Factor that will be multiplied with excessiveBlockSize"
             " to limit the maximum bytes in all sending queues. If this"
             " size is exceeded, no response to block related P2P messages is sent."
@@ -1593,8 +1593,8 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
-    if(gArgs.IsArgSet("-factorMaxSendQueuesBytes")) {
-        const uint64_t factorMaxSendQueuesBytes = gArgs.GetArg("-factorMaxSendQueuesBytes", DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES);
+    if(gArgs.IsArgSet("-factormaxsendqueuesbytes")) {
+        const uint64_t factorMaxSendQueuesBytes = gArgs.GetArg("-factormaxsendqueuesbytes", DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES);
         config.SetFactorMaxSendQueuesBytes(factorMaxSendQueuesBytes);
     }
 
@@ -1630,8 +1630,8 @@ bool AppInitParameterInteraction(Config &config) {
     }
     
     // Configure if transactions with P2SH in pubkey should be treated as non-standard.
-    if(gArgs.IsArgSet("-acceptP2SH")) {
-        config.SetAcceptP2SH(gArgs.GetArg("-acceptP2SH", DEFAULT_ACCEPT_P2SH));
+    if(gArgs.IsArgSet("-acceptp2sh")) {
+        config.SetAcceptP2SH(gArgs.GetArg("-acceptp2sh", DEFAULT_ACCEPT_P2SH));
     }
 
     // Configure data carrier size.
