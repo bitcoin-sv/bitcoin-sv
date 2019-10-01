@@ -387,7 +387,12 @@ std::string CScriptWitness::ToString() const {
 std::ostream& operator<<(std::ostream& os, const CScript& script)
 {
     for(const auto opcode : script)
-        os << static_cast<opcodetype>(opcode) << ' ';
+    {
+        if (opcode > OP_0 && opcode < OP_PUSHDATA1)
+            os << static_cast<int>(opcode) << ' ';
+        else
+            os << static_cast<opcodetype>(opcode) << ' ';
+    }
     return os;
 }
 
