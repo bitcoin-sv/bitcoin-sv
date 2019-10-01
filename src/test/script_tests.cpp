@@ -9,6 +9,7 @@
 #include "keystore.h"
 #include "rpc/server.h"
 #include "script/script.h"
+#include "script/script_num.h"
 #include "script/script_error.h"
 #include "script/sighashtype.h"
 #include "script/sign.h"

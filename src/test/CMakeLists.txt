@@ -56,6 +56,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	base32_tests.cpp
 	base58_tests.cpp
 	base64_tests.cpp
+    big_int_tests.cpp
 	bip32_tests.cpp
 	blockcheck_tests.cpp
 	blockencodings_tests.cpp
@@ -63,6 +64,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	blockfile_reading_tests.cpp
 	blockstatus_tests.cpp
 	bloom_tests.cpp
+    bn_op_tests.cpp
 	bswap_tests.cpp
 	checkpoints_tests.cpp
 	coins_tests.cpp
@@ -79,6 +81,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	getarg_tests.cpp
 	hash_tests.cpp
 	inv_tests.cpp
+    int_serialization_tests.cpp
 	journal_tests.cpp
 	jsonutil.cpp
 	key_tests.cpp

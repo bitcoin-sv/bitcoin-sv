@@ -193,12 +193,14 @@ target_link_libraries(common util secp256k1)
 # libbitcoinconsensus
 add_library(bitcoinconsensus
 	arith_uint256.cpp
+    big_int.cpp
 	hash.cpp
 	primitives/transaction.cpp
 	pubkey.cpp
 	script/bitcoinconsensus.cpp
 	script/interpreter.cpp
 	script/script.cpp
+	script/script_num.cpp
 	script/script_error.cpp
 	uint256.cpp
 	utilstrencodings.cpp
