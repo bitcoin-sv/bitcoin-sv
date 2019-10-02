@@ -13,6 +13,8 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 
+#include <memory>
+
 /////////////////////////////////////////////////
 //                                             //
 // THE SIMPLE DEFINITION, EXCLUDING DEBUG CODE //
@@ -216,8 +218,8 @@ public:
 /** RAII-style semaphore lock */
 class CSemaphoreGrant {
 private:
-    CSemaphore *sem;
-    bool fHaveGrant;
+    std::shared_ptr<CSemaphore> sem {nullptr};
+    bool fHaveGrant {false};
 
 public:
     void Acquire() {
@@ -244,10 +246,10 @@ public:
         fHaveGrant = false;
     }
 
-    CSemaphoreGrant() : sem(nullptr), fHaveGrant(false) {}
+    CSemaphoreGrant() = default;
 
-    CSemaphoreGrant(CSemaphore &sema, bool fTry = false)
-        : sem(&sema), fHaveGrant(false) {
+    CSemaphoreGrant(const std::shared_ptr<CSemaphore>& sema, bool fTry = false)
+        : sem(sema), fHaveGrant(false) {
         if (fTry)
             TryAcquire();
         else
