@@ -46,7 +46,7 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
                          txid.ToString());
                 return;
             }
-            addToCompactExtraTxnsNL(ptx);
+            addToCompactExtraTxns(ptx);
         }
         auto ret = mOrphanTxns.emplace(
             txid, COrphanTxnEntry{pTxInputData, GetTime() + ORPHAN_TX_EXPIRE_TIME});
