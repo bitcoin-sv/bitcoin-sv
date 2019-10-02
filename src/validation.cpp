@@ -2691,10 +2691,9 @@ std::optional<bool> CheckInputs(
         {
             perInputScriptFlags = SCRIPT_UTXO_AFTER_GENESIS;
         }
-        // TODO: Currently, scriptExecutionCache does NOT contain per-input flags. 
-        //       This means that it can contain wrong cached result when Genesis activation line is crossed in either
-        //       direction (when  a block is mined or when there is a reorg). This will be fixed as part of CORE-204)
-        
+
+        // ScriptExecutionCache does NOT contain per-input flags. That's why we clear the
+        // cache when we are about to cross genesis activation line (see function FinalizeGenesisCrossing).
         // Verify signature
         CScriptCheck check(config, consensus, scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
                            txdata);
@@ -3686,6 +3685,16 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
 
 }
 
+void FinalizeGenesisCrossing(const Config &config, int height)
+{
+    if ((IsGenesisEnabled(config, height + 1)) &&
+        (!IsGenesisEnabled(config, height)))
+    {
+        mempool.Clear();
+        ClearCache();
+    }
+}
+
 /**
  * Disconnect chainActive's tip.
  * After calling, the mempool will be in an inconsistent state, with
@@ -3703,6 +3712,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
 {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
+
+    FinalizeGenesisCrossing(config, pindexDelete->nHeight);
 
     // Read block from disk.
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
@@ -3732,18 +3743,6 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     if (!FlushStateToDisk(config.GetChainParams(), state,
                           FLUSH_STATE_IF_NEEDED)) {
         return false;
-    }
-
-    if ((IsGenesisEnabled(config, pindexDelete->nHeight + 1)) &&
-        (!IsGenesisEnabled(config, pindexDelete->nHeight)))
-    {
-        mempool.Clear();
-        // While not strictly necessary, clearing the disconnect pool is also
-        // beneficial so we don't try to reuse its content at the end of the
-        // reorg, which we know will fail.
-        if (disconnectpool) {
-            disconnectpool->clear();
-        }
     }
 
     if (disconnectpool) {
@@ -3991,11 +3990,7 @@ static bool ConnectTip(
 
     connectTrace.BlockConnected(pindexNew, std::move(pthisBlock));
 
-    if ((IsGenesisEnabled(config, pindexNew->nHeight + 1)) &&
-        (!IsGenesisEnabled(config, pindexNew->nHeight)))
-    {
-        mempool.Clear();
-    }
+    FinalizeGenesisCrossing(config, pindexNew->nHeight);
 
     return true;
 }
