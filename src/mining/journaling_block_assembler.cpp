@@ -1,12 +1,12 @@
 // Copyright (c) 2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
+#include <mining/journaling_block_assembler.h>
 
 #include <chainparams.h>
 #include <config.h>
 #include <consensus/validation.h>
 #include <logging.h>
 #include <mining/journal_builder.h>
-#include <mining/journaling_block_assembler.h>
 #include <timedata.h>
 #include <txmempool.h>
 #include <util.h>
@@ -21,25 +21,21 @@ JournalingBlockAssembler::JournalingBlockAssembler(const Config& config)
 {
     // Create a new starting block
     newBlock();
-
     // Initialise our starting position
     mJournalPos = CJournal::ReadLock{mJournal}.begin();
 
     // Launch our main worker thread
-    mThread = std::thread(&JournalingBlockAssembler::threadBlockUpdate, this);
+    future_ = std::async(std::launch::async,
+                         &JournalingBlockAssembler::threadBlockUpdate, this);
 }
 
 // Destruction
 JournalingBlockAssembler::~JournalingBlockAssembler()
 {
-    // Shutdown thread
-    {
-        std::unique_lock<std::mutex> lock { mRunningMtx };
-        mRunning = false;
-        mCV.notify_one();
-    }
-    mThread.join();
+    promise_.set_value(); // Tell worker to finish
+    future_.wait();       // Wait for worker to finish
 }
+
 
 // Construct a new block template with coinbase to scriptPubKeyIn
 std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev)
@@ -105,13 +101,12 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
     try
     {
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler thread starting\n");
-
-        while(mRunning)
+        const auto future{promise_.get_future()};
+        while(true)
         {
             // Run every few seconds or until stopping
-            std::unique_lock<std::mutex> lock { mRunningMtx };
-            mCV.wait_for(lock, mRunFrequency);
-            if(mRunning)
+            const auto status = future.wait_for(mRunFrequency);
+            if(status == std::future_status::timeout)
             {
                 // Get chain tip
                 const CBlockIndex* pindex {nullptr};
@@ -124,6 +119,8 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
                 std::unique_lock<std::mutex> lock { mMtx };
                 updateBlock(pindex);
             }
+            else if(status == std::future_status::ready)
+                break;
         }
 
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler thread stopping\n");

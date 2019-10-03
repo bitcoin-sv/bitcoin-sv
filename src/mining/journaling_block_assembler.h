@@ -6,10 +6,8 @@
 #include <mining/assembler.h>
 #include <mining/journal.h>
 
-#include <chrono>
-#include <condition_variable>
+#include <future>
 #include <mutex>
-#include <thread>
 
 namespace mining
 {
@@ -48,14 +46,8 @@ class JournalingBlockAssembler : public BlockAssembler
     // Test whether we can add another transaction to the next block and if so do it
     bool addTransaction(const CBlockIndex* pindex);
 
-
-    // Our internal mutex & condition variable
+    // Our internal mutex
     mutable std::mutex mMtx {};
-    std::mutex mRunningMtx {};
-    std::condition_variable mCV {};
-
-    // Our main thread
-    std::thread mThread {};
 
     // All details for the block we are currently building
     static constexpr uint64_t COINBASE_SIG_OPS {100};
@@ -69,8 +61,9 @@ class JournalingBlockAssembler : public BlockAssembler
     // Chain context for the block
     int64_t mLockTimeCutoff {0};
 
-    // Flag to indicate if we are still needed
-    bool mRunning {true};
+    // Worker thread management
+    std::future<void> future_;
+    std::promise<void> promise_;
 
     // Frequency we run
     static constexpr unsigned DEFAULT_RUN_FREQUENCY_MILLIS {100};
@@ -86,7 +79,5 @@ class JournalingBlockAssembler : public BlockAssembler
 
     // Flag to indicate whether we have been updated
     std::atomic_bool mRecentlyUpdated {false};
-
 };
-
 }
