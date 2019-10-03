@@ -23,6 +23,7 @@
 #include "validation.h"
 #include "wallet.h"
 #include "walletdb.h"
+#include "coincontrol.h"
 
 #include <univalue.h>
 
@@ -462,8 +463,9 @@ static void SendMoney(CWallet *const pwallet, const CTxDestination &address,
     CRecipient recipient = {scriptPubKey, nValue, fSubtractFeeFromAmount};
     vecSend.push_back(recipient);
 
+    CCoinControl coinControl;
     if (!pwallet->CreateTransaction(vecSend, wtxNew, reservekey, nFeeRequired,
-                                    nChangePosRet, strError)) {
+                                    nChangePosRet, strError, coinControl)) {
         if (!fSubtractFeeFromAmount && nValue + nFeeRequired > curBalance) {
             strError = strprintf("Error: This transaction requires a "
                                  "transaction fee of at least %s",
@@ -1295,8 +1297,9 @@ static UniValue sendmany(const Config &config, const JSONRPCRequest &request) {
     Amount nFeeRequired(0);
     int nChangePosRet = -1;
     std::string strFailReason;
+    CCoinControl coinControl;
     bool fCreated = pwallet->CreateTransaction(
-        vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason);
+        vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, coinControl);
     if (!fCreated) {
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strFailReason);
     }

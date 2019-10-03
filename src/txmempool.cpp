@@ -20,6 +20,7 @@
 #include "validation.h"
 #include "version.h"
 #include <boost/range/adaptor/reversed.hpp>
+#include <config.h>
 
 using namespace mining;
 
@@ -1190,6 +1191,16 @@ TxMempoolInfo CTxMemPool::Info(const uint256 &txid) const {
 
     return { *i };
 }
+
+CFeeRate CTxMemPool::estimateFee() const {
+    uint64_t maxMempoolSize =
+        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
+
+    // return maximum of min fee per KB from config, min fee calculated from mempool 
+    return std::max(GlobalConfig::GetConfig().GetMinFeePerKB(), GetMinFee(maxMempoolSize));
+
+  }
+
 
 void CTxMemPool::PrioritiseTransaction(const uint256& hash,
                                        const std::string& strHash,

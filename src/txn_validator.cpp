@@ -270,8 +270,6 @@ void CTxnValidator::processValidation(
     std::unique_lock lock { mMainMtx };
     // A vector of accepted txns
     std::vector<TxInputDataSPtr> vAcceptedTxns {};
-    // Check fee estimation requirements
-    bool fReadyForFeeEstimation = IsCurrentForFeeEstimation();
     // Special handlers
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
@@ -293,7 +291,6 @@ void CTxnValidator::processValidation(
             processNewTransactionsNL(
                 vTxInputData,
                 handlers,
-                fReadyForFeeEstimation,
                 false,
                 std::chrono::milliseconds(0))
         };

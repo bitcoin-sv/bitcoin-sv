@@ -103,7 +103,6 @@ add_test_to_suite(bitcoin test_bitcoin
 	net_tests.cpp
 	netbase_tests.cpp
 	pmt_tests.cpp
-	policyestimator_tests.cpp
 	pow_tests.cpp
 	prevector_tests.cpp
 	protocol_tests.cpp

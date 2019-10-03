@@ -831,6 +831,8 @@ public:
 
     size_t DynamicMemoryUsage() const;
 
+    CFeeRate estimateFee() const;
+
     boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
         NotifyEntryRemoved;
@@ -864,7 +866,6 @@ private:
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
@@ -888,6 +889,7 @@ private:
      * children. If updateDescendants is true, then also update in-mempool
      * descendants' ancestor state.
      */
+
     void updateForRemoveFromMempoolNL(
             const setEntries &entriesToRemove,
             bool updateDescendants);

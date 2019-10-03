@@ -45,7 +45,6 @@ std::vector<CWalletRef> vpwallets;
 
 /** Transaction fee set by the user */
 CFeeRate payTxFee(DEFAULT_TRANSACTION_FEE);
-unsigned int nTxConfirmTarget = DEFAULT_TX_CONFIRM_TARGET;
 bool bSpendZeroConfChange = DEFAULT_SPEND_ZEROCONF_CHANGE;
 
 const char *DEFAULT_WALLET_DAT = "wallet.dat";
@@ -2632,7 +2631,7 @@ bool CWallet::FundTransaction(CMutableTransaction &tx, Amount &nFeeRet,
     CReserveKey reservekey(this);
     CWalletTx wtx;
     if (!CreateTransaction(vecSend, wtx, reservekey, nFeeRet, nChangePosInOut,
-                           strFailReason, &coinControl, false)) {
+                           strFailReason, coinControl, false)) {
         return false;
     }
 
@@ -2671,7 +2670,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                                 CWalletTx &wtxNew, CReserveKey &reservekey,
                                 Amount &nFeeRet, int &nChangePosInOut,
                                 std::string &strFailReason,
-                                const CCoinControl *coinControl, bool sign) {
+                                const CCoinControl& coinControl, bool sign) {
     Amount nValue(0);
     int nChangePosRequest = nChangePosInOut;
     unsigned int nSubtractFeeFromAmount = 0;
@@ -2735,7 +2734,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         LOCK2(cs_main, cs_wallet);
 
         std::vector<COutput> vAvailableCoins;
-        AvailableCoins(vAvailableCoins, true, coinControl);
+        AvailableCoins(vAvailableCoins, true, &coinControl);
 
         Config &config = GlobalConfig::GetConfig();
 
@@ -2795,7 +2794,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             Amount nValueIn(0);
             setCoins.clear();
             if (!SelectCoins(vAvailableCoins, nValueToSelect, setCoins,
-                             nValueIn, coinControl)) {
+                             nValueIn, &coinControl)) {
                 strFailReason = _("Insufficient funds");
                 return false;
             }
@@ -2821,10 +2820,9 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 CScript scriptChange;
 
                 // Coin control: send change to custom address.
-                if (coinControl &&
-                    !boost::get<CNoDestination>(&coinControl->destChange)) {
+                if (!boost::get<CNoDestination>(&coinControl.destChange)) {
                     scriptChange =
-                        GetScriptForDestination(coinControl->destChange);
+                        GetScriptForDestination(coinControl.destChange);
 
                     // No coin control: send change to newly generated address.
                 } else {
@@ -2931,14 +2929,15 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             }
 
             Amount nFeeNeeded =
-                GetMinimumFee(nBytes, 0 /*TODO: confirmTarget will be removed in next commit */, mempool);
-            if (coinControl && nFeeNeeded > Amount(0) &&
-                coinControl->nMinimumTotalFee > nFeeNeeded) {
-                nFeeNeeded = coinControl->nMinimumTotalFee;
+                GetMinimumFee(nBytes, coinControl, mempool);
+
+            if (nFeeNeeded > Amount(0) &&
+                coinControl.nMinimumTotalFee > nFeeNeeded) {
+                nFeeNeeded = coinControl.nMinimumTotalFee;
             }
 
-            if (coinControl && coinControl->fOverrideFeeRate) {
-                nFeeNeeded = coinControl->nFeeRate.GetFee(nBytes);
+            if (coinControl.fOverrideFeeRate) {
+                nFeeNeeded = coinControl.nFeeRate.GetFee(nBytes);
             }
 
             // If we made it here and we aren't even able to meet the relay fee
@@ -3123,30 +3122,9 @@ bool CWallet::AddAccountingEntry(const CAccountingEntry &acentry,
     return true;
 }
 
-Amount CWallet::GetRequiredFee(unsigned int nTxBytes) {
-    return std::max(minTxFee.GetFee(nTxBytes),
-                    GlobalConfig::GetConfig().GetMinFeePerKB().GetFee(nTxBytes));
-}
-
 Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
-                              unsigned int nConfirmTarget,
-                              const CTxMemPool &pool) {
-    // payTxFee is the user-set global for desired feerate.
-    return GetMinimumFee(nTxBytes, nConfirmTarget, pool,
-                         payTxFee.GetFee(nTxBytes));
-}
-
-Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
-                              unsigned int nConfirmTarget,
-                              const CTxMemPool &pool, Amount targetFee) {
-    Amount nFeeNeeded = targetFee;
-    // User didn't set: use -txconfirmtarget to estimate...
-    if (nFeeNeeded == Amount(0)) {
-        nFeeNeeded = fallbackFee.GetFee(nTxBytes);      
-    }
-
-    // Prevent user from paying a fee below minRelayTxFee or minTxFee.
-    nFeeNeeded = std::max(nFeeNeeded, GetRequiredFee(nTxBytes));
+                     const CCoinControl &coin_control, const CTxMemPool &pool) {
+    Amount nFeeNeeded = GetMinimumFeeRate(coin_control, pool).GetFee(nTxBytes);
 
     // But always obey the maximum.
     if (nFeeNeeded > maxTxFee) {
@@ -3155,6 +3133,31 @@ Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
 
     return nFeeNeeded;
 }
+
+CFeeRate CWallet::GetRequiredFeeRate() {
+    return std::max(minTxFee, GlobalConfig::GetConfig().GetMinFeePerKB());
+}
+
+CFeeRate CWallet::GetMinimumFeeRate(
+                                    const CCoinControl &coin_control,
+                                    const CTxMemPool &pool) {
+    CFeeRate neededFeeRate =
+        (coin_control.fOverrideFeeRate && !(coin_control.nFeeRate == CFeeRate()))
+            ? coin_control.nFeeRate
+            : payTxFee;
+
+    if (neededFeeRate == CFeeRate()) {
+        neededFeeRate = pool.estimateFee();
+        // check if we have enough mempool data for estimatefee, otherwise use fallback fee
+        if (neededFeeRate == CFeeRate()) {
+            neededFeeRate = fallbackFee;
+        }
+    }
+
+    // Prevent user from paying a fee below minRelayTxFee or minTxFee.
+    return std::max(neededFeeRate, GetRequiredFeeRate());
+}
+
 
 DBErrors CWallet::LoadWallet(bool &fFirstRunRet) {
     fFirstRunRet = false;
@@ -4025,12 +4028,6 @@ std::string CWallet::GetWalletHelpString(bool showDebug) {
                        strprintf(_("Spend unconfirmed change when sending "
                                    "transactions (default: %d)"),
                                  DEFAULT_SPEND_ZEROCONF_CHANGE));
-    strUsage +=
-        HelpMessageOpt("-txconfirmtarget=<n>",
-                       strprintf(_("If paytxfee is not set, include enough fee "
-                                   "so transactions begin confirmation on "
-                                   "average within n blocks (default: %u)"),
-                                 DEFAULT_TX_CONFIRM_TARGET));
     strUsage += HelpMessageOpt(
         "-usehd",
         _("Use hierarchical deterministic key generation (HD) after BIP32. "
@@ -4475,8 +4472,6 @@ bool CWallet::ParameterInteraction() {
         }
     }
 
-    nTxConfirmTarget =
-        gArgs.GetArg("-txconfirmtarget", DEFAULT_TX_CONFIRM_TARGET);
     bSpendZeroConfChange =
         gArgs.GetBoolArg("-spendzeroconfchange", DEFAULT_SPEND_ZEROCONF_CHANGE);
 
