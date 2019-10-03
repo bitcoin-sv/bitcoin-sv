@@ -74,9 +74,15 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
+    const CBlockIndex* pnext = nullptr;
+    {
+        LOCK(cs_main);
+
+        // Only report confirmations if the block is on the main chain
+        if (chainActive.Contains(blockindex)) {
+            confirmations = chainActive.Height() - blockindex->nHeight + 1;
+            pnext = chainActive.Next(blockindex);
+        }
     }
     result.push_back(Pair("confirmations", confirmations));
     result.push_back(Pair("height", blockindex->nHeight));
@@ -96,7 +102,7 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
         result.push_back(Pair("previousblockhash",
                               blockindex->pprev->GetBlockHash().GetHex()));
     }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
+
     if (pnext) {
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     }
@@ -944,9 +950,15 @@ std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHea
 
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
+    const CBlockIndex* pnext = nullptr;
+    {
+        LOCK(cs_main);
+
+        // Only report confirmations if the block is on the main chain
+        if (chainActive.Contains(blockindex)) {
+            confirmations = chainActive.Height() - blockindex->nHeight + 1;
+            pnext = chainActive.Next(blockindex);
+        }
     }
     result.push_back(Pair("confirmations", confirmations));
     if (blockindex->nStatus.hasDiskBlockMetaData()) {
@@ -968,7 +980,7 @@ std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHea
         result.push_back(Pair("previousblockhash",
                               blockindex->pprev->GetBlockHash().GetHex()));
     }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
+
     if (pnext) {
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     }

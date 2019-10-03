@@ -10,6 +10,9 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include "sync.h"
+extern CCriticalSection cs_main;
+
 #define SKIPLIST_LENGTH 300000
 
 BOOST_FIXTURE_TEST_SUITE(skiplist_tests, BasicTestingSetup)
@@ -81,6 +84,8 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
                         vBlocksSide[i].pprev->nHeight + 1);
     }
 
+    LOCK(cs_main);
+
     // Build a CChain for the main branch.
     CChain chain;
     chain.SetTip(&vBlocksMain.back());
@@ -143,6 +148,8 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
         curTimeMax = std::max(curTimeMax, vBlocksMain[i].nTime);
         BOOST_CHECK(curTimeMax == vBlocksMain[i].nTimeMax);
     }
+
+    LOCK(cs_main);
 
     // Build a CChain for the main branch.
     CChain chain;

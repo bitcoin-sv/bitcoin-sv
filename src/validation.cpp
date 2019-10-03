@@ -938,20 +938,23 @@ CTxnValResult TxnValidation(
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
     CValidationState ctxState;
-    if (!ContextualCheckTransactionForCurrentBlock(
-            config,
-            tx,
-            chainActive.Height(),
-            chainActive.Tip()->GetMedianTimePast(),
-            ctxState,
-            STANDARD_LOCKTIME_VERIFY_FLAGS)) {
-        // We copy the state from a dummy to ensure we don't increase the
-        // ban score of peer for transaction that could be valid in the future.
-        state.DoS(0, false, REJECT_NONSTANDARD,
-                  ctxState.GetRejectReason(),
-                  ctxState.CorruptionPossible(),
-                  ctxState.GetDebugMessage());
-        return Result{state, pTxInputData};
+    {
+        const CBlockIndex* tip = chainActive.Tip();
+        if (!ContextualCheckTransactionForCurrentBlock(
+                config,
+                tx,
+                tip->nHeight,
+                tip->GetMedianTimePast(),
+                ctxState,
+                STANDARD_LOCKTIME_VERIFY_FLAGS)) {
+            // We copy the state from a dummy to ensure we don't increase the
+            // ban score of peer for transaction that could be valid in the future.
+            state.DoS(0, false, REJECT_NONSTANDARD,
+                      ctxState.GetRejectReason(),
+                      ctxState.CorruptionPossible(),
+                      ctxState.GetDebugMessage());
+            return Result{state, pTxInputData};
+        }
     }
     // Is it already in the memory pool?
     if (pool.Exists(txid)) {

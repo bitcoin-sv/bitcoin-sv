@@ -2290,7 +2290,10 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 }
 
                 pcoinsTip = new CCoinsViewCache(pcoinscatcher);
-                LoadChainTip(chainparams);
+                {
+                    LOCK(cs_main);
+                    LoadChainTip(chainparams);
+                }
 
                 if (!fReindex && chainActive.Tip() != nullptr) {
                     uiInterface.InitMessage(_("Rewinding blocks..."));

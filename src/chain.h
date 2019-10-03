@@ -14,6 +14,7 @@
 #include "uint256.h"
 #include "logging.h"
 
+#include <atomic>
 #include <unordered_map>
 #include <vector>
 
@@ -653,6 +654,7 @@ public:
 class CChain {
 private:
     std::vector<CBlockIndex *> vChain;
+    std::atomic<CBlockIndex*> mChainTip = nullptr;
 
 public:
     /**
@@ -666,9 +668,7 @@ public:
     /**
      * Returns the index entry for the tip of this chain, or nullptr if none.
      */
-    CBlockIndex *Tip() const {
-        return vChain.size() > 0 ? vChain[vChain.size() - 1] : nullptr;
-    }
+    CBlockIndex* Tip() const { return mChainTip; }
 
     /**
      * Returns the index entry at a particular height in this chain, or nullptr
@@ -705,10 +705,13 @@ public:
     }
 
     /**
-     * Return the maximal height in the chain. Is equal to chain.Tip() ?
-     * chain.Tip()->nHeight : -1.
+     * Return the maximal height in the chain or -1 if tip is not set.
      */
-    int Height() const { return vChain.size() - 1; }
+    int Height() const
+    {
+        const CBlockIndex* tip = mChainTip;
+        return tip ? tip->nHeight : -1;
+    }
 
     /** Set/initialize a chain with a given tip. */
     void SetTip(CBlockIndex *pindex);
