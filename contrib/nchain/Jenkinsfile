@@ -20,7 +20,8 @@ pipeline {
             steps {
                 slackSend (color: 'good', message: "START: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")
                 sh './autogen.sh'
-                sh './configure'
+                sh './configure --enable-debug'
+                sh 'make clean'
                 sh 'make -j$(nproc --all)'
             }
         }
@@ -53,6 +54,14 @@ pipeline {
         stage('Util Tests') {
             steps {
                 sh 'test/util/bitcoin-util-test.py --verbose > build/reports/util-test.log'
+            }
+        }
+        // functional tests dont work with --enable-debug
+        stage('Rebuild') {
+            steps {
+                sh './configure'
+                sh 'make clean'
+                sh 'make -j$(nproc --all)'
             }
         }
         stage('Functional Tests') {
