@@ -13,6 +13,7 @@
 
 #include "amount.h"
 #include "blockstreams.h"
+#include "blockvalidation.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/consensus.h"
@@ -33,6 +34,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -324,6 +326,11 @@ public:
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
     bool shouldMarkChecked() const { return markChecked; }
 };
+
+/**
+ * Keeping status of currently validating blocks and blocks that we wait after validation
+ */
+extern CBlockValidationStatus blockValidationStatus;
 
 /**
  * Verify block without proof-of-work verification.

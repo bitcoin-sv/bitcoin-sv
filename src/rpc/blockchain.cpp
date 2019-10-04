@@ -1899,6 +1899,86 @@ static UniValue getblockchainactivity(
     return result;
 }
 
+static UniValue waitaftervalidatingblock(const Config &config,
+                                  const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 2) {
+		throw std::runtime_error(
+            "WARNING: For testing purposes only! Can hang a node/create a fork."
+            "\n\n"
+			"waitaftervalidatingblock \"blockhash\" \"action\"\n"
+            "\nMakes specific block to wait before validation completion\n"
+			"\nReturn the information about our action"
+			"\nResult\n"
+			"  blockhash (string) blockhash we added or removed\n"
+			"  action (string) add or remove\n"
+			"\nExamples:\n" +
+			HelpExampleCli("waitaftervalidatingblock", "\"blockhash\" \"add\"") +
+            HelpExampleRpc("waitaftervalidatingblock", "\"blockhash\" \"add\""));
+    }
+
+    std::string strHash = request.params[0].get_str();
+    if (strHash.size() != 64 || !IsHex(strHash)) {
+        return JSONRPCError(RPC_PARSE_ERROR, "Wrong hexdecimal string");
+    }
+
+    std::string strAction = request.params[1].get_str();
+    if (strAction != "add" && strAction != "remove") {
+        return JSONRPCError(RPC_TYPE_ERROR, "Wrong action");
+    }
+
+    uint256 blockHash(uint256S(strHash));
+
+    blockValidationStatus.waitAfterValidation(blockHash, strAction);
+
+    UniValue ret(UniValue::VOBJ);
+    ret.push_back(Pair("blockhash", blockHash.GetHex()));
+    ret.push_back(Pair("action", strAction));
+
+    return ret;
+}
+
+static UniValue getcurrentlyvalidatingblocks(const Config &config,
+                                  const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "getcurrentlyvalidatingblocks\n"
+            "\nReturn the block hashes of blocks that are currently validating"
+            "\nResult\n"
+            "[ blockhashes ]     (array) hashes of blocks\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getcurrentlyvalidatingblocks", "") +
+            HelpExampleRpc("getcurrentlyvalidatingblocks", ""));
+    }
+
+    UniValue blockHashes(UniValue::VARR);
+    for (uint256 hash : blockValidationStatus.getCurrentlyValidatingBlocks()) {
+		blockHashes.push_back(hash.GetHex());
+    }
+
+    return blockHashes;
+}
+
+static UniValue getwaitingblocks(const Config& config,
+    const JSONRPCRequest& request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "getwaitingblocks\n"
+            "\nReturn the block hashes of blocks that are currently waiting validation completion"
+            "\nResult\n"
+            "[ blockhashes ]     (array) hashes of blocks\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getwaitingblocks", "") +
+            HelpExampleRpc("getwaitingblocks", ""));
+    }
+
+    UniValue blockHashes(UniValue::VARR);
+    for (uint256 hash : blockValidationStatus.getWaitingAfterValidationBlocks()) {
+        blockHashes.push_back(hash.GetHex());
+    }
+
+    return blockHashes;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -1932,7 +2012,10 @@ static const CRPCCommand commands[] = {
     { "hidden",             "waitfornewblock",        waitfornewblock,        true,  {"timeout"} },
     { "hidden",             "waitforblock",           waitforblock,           true,  {"blockhash","timeout"} },
     { "hidden",             "waitforblockheight",     waitforblockheight,     true,  {"height","timeout"} },
-    { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} }
+    { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} },
+    { "hidden",             "getcurrentlyvalidatingblocks",     getcurrentlyvalidatingblocks,     true,  {} },
+    { "hidden",             "waitaftervalidatingblock",         waitaftervalidatingblock,         true,  {"blockhash","action"} },
+    { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} }
 };
 // clang-format on
 

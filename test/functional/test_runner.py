@@ -57,6 +57,7 @@ NON_SCRIPTS = [
     "combine_logs.py",
     "create_cache.py",
     "test_runner.py",
+    "bsv_pbv_common.py"
 ]
 
 TEST_PARAMS = {

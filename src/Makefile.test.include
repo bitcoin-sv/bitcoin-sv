@@ -40,6 +40,7 @@ BITCOIN_TESTS =\
   test/blockfile_reading_tests.cpp \
   test/blockmaxsize_tests.cpp \
   test/blockstatus_tests.cpp \
+  test/blockvalidationstatus_tests.cpp \
   test/bloom_tests.cpp \
   test/bn_op_tests.cpp \
   test/bswap_tests.cpp \

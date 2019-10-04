@@ -90,6 +90,7 @@ int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 
 uint256 hashAssumeValid;
 arith_uint256 nMinimumChainWork;
+CBlockValidationStatus blockValidationStatus;
 
 Amount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
 
@@ -2958,9 +2959,19 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
                          REJECT_INVALID, "bad-cb-amount");
     }
 
-    if (!control.Wait()) {
-        return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
-                         "parallel script check failed");
+    {
+        auto guard =
+            blockValidationStatus.getScopedCurrentlyValidatingBlock(
+                pindex->GetBlockHash());
+
+        blockValidationStatus.waitIfRequired(pindex->GetBlockHash());
+        auto controllValidationStatusOK = control.Wait();
+
+        if (!controllValidationStatusOK)
+        {
+            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
+                             "parallel script check failed");
+        }
     }
 
     int64_t nTime4 = GetTimeMicros();
@@ -4726,6 +4737,8 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
 
     CCoinsViewCache viewNew(pcoinsTip);
     CBlockIndex indexDummy(block);
+    uint256 dummyHash;
+    indexDummy.phashBlock = &dummyHash;
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
 
