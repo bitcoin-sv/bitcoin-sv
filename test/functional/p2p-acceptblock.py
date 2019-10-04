@@ -179,7 +179,7 @@ class AcceptBlockTest(BitcoinTestFramework):
                     tips[j].sha256, create_coinbase(i + 4), tips[j].nTime + 1)
                 next_block.solve()
                 if j == 0:
-                    test_node.send_message(msg_block(next_block))
+                    test_node.send_and_ping(msg_block(next_block))
                     all_blocks.append(next_block)
                 else:
                     headers_message.headers.append(CBlockHeader(next_block))

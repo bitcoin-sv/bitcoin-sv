@@ -117,17 +117,21 @@ class ZMQTest (BitcoinTestFramework):
             if topic == b"hashblock":
                 zmqHashes.append(bytes_to_hex_str(body))
                 msgSequence = struct.unpack('<I', msg[-1])[-1]
-                assert_equal(msgSequence, blockcount + 1)
                 blockcount += 1
             if topic == b"rawblock":
                 zmqRawHashed.append(bytes_to_hex_str(hash256(body[:80])))
                 msgSequence = struct.unpack('<I', msg[-1])[-1]
-                assert_equal(msgSequence, blockcount)
 
-        for x in range(n):
-            # blockhash from generate must be equal to the hash received over zmq
-            assert_equal(genhashes[x], zmqHashes[x])
-            assert_equal(genhashes[x], zmqRawHashed[x])
+        # All blocks should trigger messages but they can be interleaved meaning
+        # we receive hashblock message for block 3 while we still havent received
+        # rawblock message for block 2.
+        # For that reason we just check that we got all the messages and not their
+        # order.
+        assert_equal(len(zmqHashes), n)
+        assert_equal(len(zmqRawHashed), n)
+        # blockhash from generate must be equal to the hash received over zmq
+        assert_equal(set(genhashes), set(zmqHashes))
+        assert_equal(set(genhashes), set(zmqRawHashed))
 
         self.log.info("Wait for tx from second node")
         # test tx from a second node

@@ -398,10 +398,18 @@ CNodePtr CConnman::ConnectNode(CAddress addrConnect, const char *pszDest,
             GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE)
                 .Write(id)
                 .Finalize();
-        CNodePtr pnode { std::make_shared<CNode>(
-            id, nLocalServices, GetBestHeight(), hSocket, addrConnect,
-            CalculateKeyedNetGroup(addrConnect), nonce, pszDest ? pszDest : "", false)
-        };
+        CNodePtr pnode =
+            CNode::Make(
+                id,
+                nLocalServices,
+                GetBestHeight(),
+                hSocket,
+                addrConnect,
+                CalculateKeyedNetGroup(addrConnect),
+                nonce,
+                mCNodeAsyncTaskPool,
+                pszDest ? pszDest : "",
+                false);
         pnode->nServicesExpected = ServiceFlags(addrConnect.nServices & nRelevantServices);
 
         return pnode;
@@ -628,6 +636,36 @@ void CNode::MaybeSetAddrName(const std::string &addrNameIn) {
     LOCK(cs_addrName);
     if (addrName.empty()) {
         addrName = addrNameIn;
+    }
+}
+
+void CNode::HandleCompletedAsyncProcessing()
+{
+    using namespace std::literals::chrono_literals;
+
+    for(size_t i=0; i<mAsyncTaskFuture.size();)
+    {
+        if(mAsyncTaskFuture[i].wait_for(1ms) == std::future_status::ready)
+        {
+            try
+            {
+                mAsyncTaskFuture[i].get();
+            }
+            catch(const std::exception& e)
+            {
+                PrintExceptionContinue(&e, "ProcessMessages()");
+            }
+            catch(...)
+            {
+                PrintExceptionContinue(nullptr, "ProcessMessages()");
+            }
+
+            mAsyncTaskFuture.erase(std::next(mAsyncTaskFuture.begin(), i));
+        }
+        else
+        {
+            ++i;
+        }
     }
 }
 
@@ -1266,8 +1304,18 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
                          .Write(id)
                          .Finalize();
 
-    CNodePtr pnode { std::make_shared<CNode>(id, nLocalServices, GetBestHeight(), hSocket, addr,
-        CalculateKeyedNetGroup(addr), nonce, "", true) };
+    CNodePtr pnode =
+        CNode::Make(
+            id,
+            nLocalServices,
+            GetBestHeight(),
+            hSocket,
+            addr,
+            CalculateKeyedNetGroup(addr),
+            nonce,
+            mCNodeAsyncTaskPool,
+            "",
+            true);
     pnode->fWhitelisted = whitelisted;
 
     GetNodeSignals().InitializeNode(*config, pnode, *this);
@@ -2208,9 +2256,14 @@ namespace
     };
 }
 
-void CConnman::ThreadMessageHandler() {
-    while (!flagInterruptMsgProc) {
-        std::vector<CNodePtr> vNodesCopy;
+void CConnman::ThreadMessageHandler()
+{
+    std::vector<CNodePtr> vNodesCopy;
+
+    while (!flagInterruptMsgProc)
+    {
+        vNodesCopy.clear();
+
         {
             LOCK(cs_vNodes);
             vNodesCopy = vNodes;
@@ -2218,8 +2271,12 @@ void CConnman::ThreadMessageHandler() {
 
         bool fMoreWork = false;
 
-        for (const CNodePtr& pnode : vNodesCopy) {
-            if (pnode->fDisconnect) {
+        for (const CNodePtr& pnode : vNodesCopy)
+        {
+            pnode->HandleCompletedAsyncProcessing();
+
+            if (pnode->fDisconnect || pnode->IsAsyncBlocked())
+            {
                 continue;
             }
 
@@ -2244,6 +2301,7 @@ void CConnman::ThreadMessageHandler() {
             bool fMoreNodeWork = GetNodeSignals().ProcessMessages(
                 *config, pnode, *this, flagInterruptMsgProc);
             fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
+
             if (flagInterruptMsgProc) {
                 return;
             }
@@ -2943,14 +3001,27 @@ unsigned int CConnman::GetSendBufferSize() const {
     return nSendBufferMaxSize;
 }
 
-CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn,
-             int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn,
-             uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn,
-             const std::string &addrNameIn, bool fInboundIn)
-    : hSocket(hSocketIn), nTimeConnected(GetSystemTimeInSeconds()), addr(addrIn),
-      fInbound(fInboundIn), id(idIn), nKeyedNetGroup(nKeyedNetGroupIn),
-      nLocalHostNonce(nLocalHostNonceIn), nLocalServices(nLocalServicesIn),
-      nMyStartingHeight(nMyStartingHeightIn)
+CNode::CNode(
+    NodeId idIn,
+    ServiceFlags nLocalServicesIn,
+    int nMyStartingHeightIn,
+    SOCKET hSocketIn,
+    const CAddress& addrIn,
+    uint64_t nKeyedNetGroupIn,
+    uint64_t nLocalHostNonceIn,
+    CThreadPool<CQueueAdaptor>& asyncTaskPool,
+    const std::string& addrNameIn,
+    bool fInboundIn)
+    : hSocket(hSocketIn)
+    , nTimeConnected(GetSystemTimeInSeconds())
+    , addr(addrIn)
+    , fInbound(fInboundIn)
+    , id(idIn)
+    , nKeyedNetGroup(nKeyedNetGroupIn)
+    , nLocalHostNonce(nLocalHostNonceIn)
+    , nLocalServices(nLocalServicesIn)
+    , nMyStartingHeight(nMyStartingHeightIn)
+    , mAsyncTaskPool{asyncTaskPool}
 {
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     pfilter = new CBloomFilter();

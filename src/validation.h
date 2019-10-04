@@ -357,8 +357,22 @@ bool VerifyNewBlock(const Config &config,
  * @return True if the block is accepted as a valid block.
  */
 bool ProcessNewBlock(const Config &config,
-                     const std::shared_ptr<const CBlock> pblock,
+                     const std::shared_ptr<const CBlock>& pblock,
                      bool fForceProcessing, bool *fNewBlock);
+
+/**
+ * Same as ProcessNewBlock but it doesn't activate best chain - it returns a
+ * function that should be called asyncrhonously to activate the best chain.
+ * Reason for this split is that ProcessNewBlock adds block to mapBlockIndex
+ * so we execute that part synchronously as otherwise child blocks that were
+ * sent right after the parent could be missing parent even though we've already
+ * seen it.
+ */
+std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
+    const Config& config,
+    const std::shared_ptr<const CBlock>& pblock,
+    bool fForceProcessing,
+    bool* fNewBlock);
 
 /**
  * Process incoming block headers.

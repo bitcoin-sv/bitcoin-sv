@@ -150,7 +150,7 @@ namespace {
 BOOST_FIXTURE_TEST_SUITE(test_txnvalidator, TestChain100Setup2)
 
 BOOST_AUTO_TEST_CASE(txn_validator_creation) {
-	// Create txn validator
+    // Create txn validator
     std::shared_ptr<CTxnValidator> txnValidator {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
@@ -212,9 +212,19 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
     {
         // Create a dummy address
         CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
-        std::shared_ptr<CNode> pDummyNode {
-            std::make_shared<CNode>(0, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
-        };
+        CThreadPool<CQueueAdaptor> asyncTaskPool{"AsyncNodeTaskPool"};
+        CNodePtr pDummyNode =
+            CNode::Make(
+                0,
+                NODE_NETWORK,
+                0,
+                INVALID_SOCKET,
+                dummy_addr,
+                0u,
+                0u,
+                asyncTaskPool,
+                "",
+                true);
         ProcessTxnsSynchApi(spends2, TxSource::p2p, pDummyNode);
         BOOST_CHECK_EQUAL(mempool.Size(), 1);
     }
@@ -255,9 +265,19 @@ BOOST_AUTO_TEST_CASE(txnvalidator_p2p_doublespend_via_asynch_api) {
     {
         // Create a dummy address
         CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
-        std::shared_ptr<CNode> pDummyNode {
-            std::make_shared<CNode>(0, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
-        };
+        CThreadPool<CQueueAdaptor> asyncTaskPool{"txnvalidator_p2p_doublespend_via_asynch_api_AsyncNodeTaskPool"};
+        CNodePtr pDummyNode =
+            CNode::Make(
+                0,
+                NODE_NETWORK,
+                0,
+                INVALID_SOCKET,
+                dummy_addr,
+                0u,
+                0u,
+                asyncTaskPool,
+                "",
+                true);
         ProcessTxnsAsynchApi(spendsN, TxSource::p2p, pDummyNode);
         BOOST_CHECK_EQUAL(mempool.Size(), 1);
     }

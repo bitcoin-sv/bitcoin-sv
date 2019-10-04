@@ -60,6 +60,8 @@ class RunnerNode(NodeConnCB):
             self.chain.save_spendable_output()
             self.send_message(msg_block(block))
 
+        self.sync_with_ping()
+
         # Create a new block - half of max block file size. Together with above blocks
         # this leaves less than 1MB of free space in the first block file
         self.create_and_send_block(ONE_MEGABYTE)
@@ -72,10 +74,7 @@ class RunnerNode(NodeConnCB):
         block = self.chain.next_block(self.next_block, spend=out, block_size=block_size)
         self.next_block += 1
         self.chain.save_spendable_output()
-        self.send_message(msg_block(block))
-
-        # wait for the test node (bitcoind) to process the sent block
-        self.sync_with_ping()
+        self.send_and_ping(msg_block(block))
 
         return block, self.next_block - 1
 

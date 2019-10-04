@@ -37,9 +37,21 @@ BOOST_AUTO_TEST_CASE(DoS_banning) {
     const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
+    CThreadPool<CQueueAdaptor> asyncTaskPool{"DoS_banning_AsyncNodeTaskPool"};
     connman->ClearBanned();
     CAddress addr1(ip(0xa0b0c001), NODE_NONE);
-    CNodePtr dummyNode1 { std::make_shared<CNode>(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr1, 0, 0, "", true) };
+    CNodePtr dummyNode1 =
+        CNode::Make(
+            id++,
+            NODE_NETWORK,
+            0,
+            INVALID_SOCKET,
+            addr1,
+            0u,
+            0u,
+            asyncTaskPool,
+            "",
+            true);
     dummyNode1->SetSendVersion(PROTOCOL_VERSION);
     GetNodeSignals().InitializeNode(config, dummyNode1, *connman);
     dummyNode1->nVersion = 1;
@@ -52,7 +64,18 @@ BOOST_AUTO_TEST_CASE(DoS_banning) {
     BOOST_CHECK(!connman->IsBanned(ip(0xa0b0c001 | 0x0000ff00)));
 
     CAddress addr2(ip(0xa0b0c002), NODE_NONE);
-    CNodePtr dummyNode2 { std::make_shared<CNode>(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr2, 1, 1, "", true) };
+    CNodePtr dummyNode2 =
+        CNode::Make(
+            id++,
+            NODE_NETWORK,
+            0,
+            INVALID_SOCKET,
+            addr2,
+            1u,
+            1u,
+            asyncTaskPool,
+            "",
+            true);
     dummyNode2->SetSendVersion(PROTOCOL_VERSION);
     GetNodeSignals().InitializeNode(config, dummyNode2, *connman);
     dummyNode2->nVersion = 1;
@@ -72,11 +95,23 @@ BOOST_AUTO_TEST_CASE(DoS_banscore) {
     const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
+    CThreadPool<CQueueAdaptor> asyncTaskPool{"DoS_banscore_AsyncNodeTaskPool"};
     connman->ClearBanned();
     // because 11 is my favorite number.
     gArgs.ForceSetArg("-banscore", "111");
     CAddress addr1(ip(0xa0b0c001), NODE_NONE);
-    CNodePtr dummyNode1 { std::make_shared<CNode>(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr1, 3, 1, "", true) };
+    CNodePtr dummyNode1 =
+        CNode::Make(
+            id++,
+            NODE_NETWORK,
+            0,
+            INVALID_SOCKET,
+            addr1,
+            3u,
+            1u,
+            asyncTaskPool,
+            "",
+            true);
     dummyNode1->SetSendVersion(PROTOCOL_VERSION);
     GetNodeSignals().InitializeNode(config, dummyNode1, *connman);
     dummyNode1->nVersion = 1;
@@ -97,13 +132,25 @@ BOOST_AUTO_TEST_CASE(DoS_bantime) {
     const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
+    CThreadPool<CQueueAdaptor> asyncTaskPool{"DoS_bantime_AsyncNodeTaskPool"};
     connman->ClearBanned();
     int64_t nStartTime = GetTime();
     // Overrides future calls to GetTime()
     SetMockTime(nStartTime);
 
     CAddress addr(ip(0xa0b0c001), NODE_NONE);
-    CNodePtr dummyNode { std::make_shared<CNode>(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr, 4, 4, "", true) };
+    CNodePtr dummyNode =
+        CNode::Make(
+            id++,
+            NODE_NETWORK,
+            0,
+            INVALID_SOCKET,
+            addr,
+            4u,
+            4u,
+            asyncTaskPool,
+            "",
+            true);
     dummyNode->SetSendVersion(PROTOCOL_VERSION);
     GetNodeSignals().InitializeNode(config, dummyNode, *connman);
     dummyNode->nVersion = 1;
@@ -141,6 +188,8 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                             maxExtraTxnsForCompactBlock)
     };
 
+    CThreadPool<CQueueAdaptor> asyncTaskPool{"DoS_mapOrphans_AsyncNodeTaskPool"};
+
     // 50 orphan transactions:
     for (NodeId i = 0; i < 50; i++) {
         CKey key;
@@ -155,9 +204,19 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
-        auto pNode {
-            std::make_shared<CNode>(i, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
-        };
+
+        CNodePtr pNode =
+            CNode::Make(
+                i,
+                NODE_NETWORK,
+                0,
+                INVALID_SOCKET,
+                dummy_addr,
+                0u,
+                0u,
+                asyncTaskPool,
+                "",
+                true);
         // Add txn input data to the queue
         orphanTxns->addTxn(
             std::make_shared<CTxInputData>(

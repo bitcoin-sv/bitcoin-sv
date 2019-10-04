@@ -2296,7 +2296,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
 /**
 * Process headers message.
 */
-static OptBool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
+static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker, const CChainParams& chainparams, CDataStream& vRecv,
     CConnman& connman)
 {
@@ -2486,13 +2486,13 @@ static OptBool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom
         }
     }
 
-    return {};
+    return true;
 }
  
 /**
 * Process block txn message.
 */
-static OptBool ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
+static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker, CDataStream& vRecv, CConnman& connman)
 {
     BlockTransactions resp;
@@ -2509,7 +2509,7 @@ static OptBool ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfro
             LogPrint(BCLog::NET,
                      "Peer %d sent us block transactions for block we weren't expecting\n",
                      pfrom->id);
-            return true;
+            return;
         }
 
         PartiallyDownloadedBlock &partialBlock = *it->second.second->partialBlock;
@@ -2520,7 +2520,7 @@ static OptBool ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfro
             Misbehaving(pfrom, 100, "invalid-cmpctblk-txns");
             LogPrintf("Peer %d sent us invalid compact block/non-matching block transactions\n",
                       pfrom->id);
-            return true;
+            return;
         }
         else if(status == READ_STATUS_FAILED) {
             // Might have collided, fall back to getdata now :(
@@ -2565,19 +2565,37 @@ static OptBool ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfro
         // Since we requested this block (it was in mapBlocksInFlight),
         // force it to be processed, even if it would not be a candidate for
         // new tip (missing previous block, chain not long enough, etc)
-        ProcessNewBlock(config, pblock, true, &fNewBlock);
-        if(fNewBlock) {
-            pfrom->nLastBlockTime = GetTime();
+        auto bestChainActivation =
+            ProcessNewBlockWithAsyncBestChainActivation(
+                config, pblock, true, &fNewBlock);
+        if(!bestChainActivation)
+        {
+            // something went wrong before we need to activate best chain
+            return;
         }
-    }
 
-    return {};
+        pfrom->RunAsyncProcessing(
+            [fNewBlock, bestChainActivation]
+            (std::weak_ptr<CNode> weakFrom)
+            {
+                bestChainActivation();
+
+                if(fNewBlock)
+                {
+                    auto pfrom = weakFrom.lock();
+                    if(pfrom)
+                    {
+                        pfrom->nLastBlockTime = GetTime();
+                    }
+                }
+            });
+    }
 }
  
 /**
 * Process compact block message.
 */
-static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfrom,
+static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker, const std::string& strCommand, const CChainParams& chainparams,
     const std::atomic<bool>& interruptMsgProc, int64_t nTimeReceived, CDataStream& vRecv,
     CConnman& connman)
@@ -2780,7 +2798,8 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
     } // cs_main
 
     if(fProcessBLOCKTXN) {
-        return ProcessBlockTxnMessage(config, pfrom, msgMaker, blockTxnMsg, connman);
+        ProcessBlockTxnMessage(config, pfrom, msgMaker, blockTxnMsg, connman);
+        return true;
     }
 
     if(fRevertToHeaderProcessing) {
@@ -2795,24 +2814,45 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
             mapBlockSource.emplace(pblock->GetHash(),
                                    std::make_pair(pfrom->GetId(), false));
         }
-        bool fNewBlock = false;
-        ProcessNewBlock(config, pblock, true, &fNewBlock);
-        if(fNewBlock) {
-            pfrom->nLastBlockTime = GetTime();
-        }
 
-        // hold cs_main for CBlockIndex::IsValid()
-        LOCK(cs_main);
-        if(pindex->IsValid(BlockValidity::TRANSACTIONS)) {
-            // Clear download state for this block, which is in process from
-            // some other peer. We do this after calling. ProcessNewBlock so
-            // that a malleated cmpctblock announcement can't be used to
-            // interfere with block relay.
-            MarkBlockAsReceived(pblock->GetHash());
+        bool fNewBlock = false;
+        auto bestChainActivation =
+            ProcessNewBlockWithAsyncBestChainActivation(
+                config, pblock, true, &fNewBlock);
+        if(bestChainActivation)
+        {
+            pfrom->RunAsyncProcessing(
+                [pindex, pblock, fNewBlock, bestChainActivation]
+                (std::weak_ptr<CNode> weakFrom)
+                {
+                    bestChainActivation();
+
+                    if(fNewBlock)
+                    {
+                        auto pfrom = weakFrom.lock();
+                        if(pfrom)
+                        {
+                            pfrom->nLastBlockTime = GetTime();
+                        }
+                    }
+
+                    // hold cs_main for CBlockIndex::IsValid()
+                    LOCK(cs_main);
+                    if(pindex->IsValid(BlockValidity::TRANSACTIONS))
+                    {
+                        // Clear download state for this block, which is in process from
+                        // some other peer. We do this after calling. ProcessNewBlock so
+                        // that a malleated cmpctblock announcement can't be used to
+                        // interfere with block relay.
+                        MarkBlockAsReceived(pblock->GetHash());
+                    }
+                });
         }
+        // else something went wrong before we need to activate best chain
+        // so we just skip it
     }
 
-    return {};
+    return true;
 }
  
 /**
@@ -2841,11 +2881,32 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
         // is fine.
         mapBlockSource.emplace(hash, std::make_pair(pfrom->GetId(), true));
     }
+
     bool fNewBlock = false;
-    ProcessNewBlock(config, pblock, forceProcessing, &fNewBlock);
-    if(fNewBlock) {
-        pfrom->nLastBlockTime = GetTime();
+    auto bestChainActivation =
+        ProcessNewBlockWithAsyncBestChainActivation(
+            config, pblock, forceProcessing, &fNewBlock);
+    if(!bestChainActivation)
+    {
+        // something went wrong before we need to activate best chain
+        return;
     }
+
+    pfrom->RunAsyncProcessing(
+        [pblock, fNewBlock, bestChainActivation]
+        (std::weak_ptr<CNode> weakFrom)
+        {
+            bestChainActivation();
+
+            if(fNewBlock)
+            {
+                auto pfrom = weakFrom.lock();
+                if(pfrom)
+                {
+                    pfrom->nLastBlockTime = GetTime();
+                }
+            }
+        });
 }
  
 /**
@@ -3261,18 +3322,12 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex) {
-        if(OptBool res { ProcessCompactBlockMessage(config, pfrom, msgMaker, strCommand, chainparams, interruptMsgProc, nTimeReceived, vRecv, connman) }) {
-            // If ProcessCompactBlock returned a definite true/false, return that to our caller.
-            return res.get();
-        }
+        return ProcessCompactBlockMessage(config, pfrom, msgMaker, strCommand, chainparams, interruptMsgProc, nTimeReceived, vRecv, connman);
     }
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::BLOCKTXN && !fImporting && !fReindex) {
-        if(OptBool res { ProcessBlockTxnMessage(config, pfrom, msgMaker, vRecv, connman) }) {
-            // If ProcessBlockTxn returned a definite true/false, return that to our caller.
-            return res.get();
-        }
+        ProcessBlockTxnMessage(config, pfrom, msgMaker, vRecv, connman);
     }
 
     // Ignore headers received while importing
@@ -3509,24 +3564,24 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     } catch (const std::ios_base::failure &e) {
         connman.PushMessage(pfrom,
                             CNetMsgMaker(INIT_PROTO_VERSION)
-                                .Make(NetMsgType::REJECT, strCommand,
-                                      REJECT_MALFORMED,
-                                      std::string("error parsing message")));
+                            .Make(NetMsgType::REJECT, strCommand,
+                                  REJECT_MALFORMED,
+                                  std::string("error parsing message")));
         if (strstr(e.what(), "end of data")) {
             // Allow exceptions from under-length message on vRecv
             LogPrint(BCLog::NET,
-                "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
-                "message being shorter than its stated length\n",
-                __func__, SanitizeString(strCommand), nPayloadLength, e.what());
+                     "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
+                     "message being shorter than its stated length\n",
+                     __func__, SanitizeString(strCommand), nPayloadLength, e.what());
         } else if (strstr(e.what(), "size too large")) {
             // Allow exceptions from over-long size
             LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
-                      SanitizeString(strCommand), nPayloadLength, e.what());
+                     SanitizeString(strCommand), nPayloadLength, e.what());
             Misbehaving(pfrom, 1, "Over-long size message protection");
         } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
             // Allow exceptions from non-canonical encoding
             LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
-                      SanitizeString(strCommand), nPayloadLength, e.what());
+                     SanitizeString(strCommand), nPayloadLength, e.what());
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
         }

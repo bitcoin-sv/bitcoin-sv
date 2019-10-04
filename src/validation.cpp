@@ -4607,11 +4607,11 @@ bool VerifyNewBlock(const Config &config,
     return true;
 }
 
-bool ProcessNewBlock(
-    const Config &config,
-    const std::shared_ptr<const CBlock> pblock,
+std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
+    const Config& config,
+    const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
-    bool *fNewBlock)
+    bool* fNewBlock)
 {
     auto guard = CBlockProcessing::GetCountGuard();
 
@@ -4638,20 +4638,44 @@ bool ProcessNewBlock(
         CheckBlockIndex(chainparams.GetConsensus());
         if (!ret) {
             GetMainSignals().BlockChecked(*pblock, state);
-            return error("%s: AcceptBlock FAILED", __func__);
+            error("%s: AcceptBlock FAILED", __func__);
+
+            return {};
         }
     }
 
     NotifyHeaderTip();
 
-    // Only used to report errors, not invalidity - ignore it
-    CValidationState state;
-    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
-    if (!ActivateBestChain(config, state, changeSet, pblock)) {
-        return error("%s: ActivateBestChain failed", __func__);
+    auto bestChainActivation =
+        [&config, pblock, guard]
+        {
+            // Only used to report errors, not invalidity - ignore it
+            CValidationState state;
+            CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
+            if (!ActivateBestChain(config, state, changeSet, pblock)) {
+                return error("%s: ActivateBestChain failed", __func__);
+            }
+
+            return true;
+        };
+
+    return bestChainActivation;
+}
+
+bool ProcessNewBlock(const Config &config,
+                     const std::shared_ptr<const CBlock>& pblock,
+                     bool fForceProcessing, bool *fNewBlock)
+{
+    auto bestChainActivation =
+        ProcessNewBlockWithAsyncBestChainActivation(
+            config, pblock, fForceProcessing, fNewBlock);
+
+    if(!bestChainActivation)
+    {
+        return false;
     }
 
-    return true;
+    return bestChainActivation();
 }
 
 int GetProcessingBlocksCount()

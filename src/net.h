@@ -36,6 +36,8 @@
 #include <memory>
 #include <optional>
 #include <thread>
+#include <vector>
+#include <functional>
 
 #ifndef WIN32
 #include <arpa/inet.h>
@@ -559,6 +561,15 @@ private:
     std::thread threadMessageHandler;
 
     std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
+
+    static constexpr size_t NODES_ASYNC_TASK_THREADS_LIMIT = 6;
+    // Task pool for executing async node tasks. Task queue size is implicitly
+    // limited by maximum allowed connections (DEFAULT_MAX_PEER_CONNECTIONS)
+    // times maximum async requests that a node may have active at any given
+    // time.
+    CThreadPool<CQueueAdaptor> mCNodeAsyncTaskPool{
+        "CNodeAsyncTaskPool",
+        NODES_ASYNC_TASK_THREADS_LIMIT};
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);
@@ -761,7 +772,8 @@ public:
 };
 
 /** Information about a peer */
-class CNode {
+class CNode : public std::enable_shared_from_this<CNode>
+{
     friend class CConnman;
 
 public:
@@ -906,10 +918,13 @@ public:
     /** protoconfReceived is false by default and set to true when protoconf is received from peer **/
     bool protoconfReceived {false};
 
-    CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn,
-          SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn,
-          uint64_t nLocalHostNonceIn, const std::string &addrNameIn = "",
-          bool fInboundIn = false);
+    /** Constructor for producing CNode shared pointer instances */
+    template<typename ... Args>
+    static std::shared_ptr<CNode> Make(Args&& ... args)
+    {
+        return std::shared_ptr<CNode>(new CNode{std::forward<Args>(args)...});
+    }
+
     ~CNode();
 
     CNode(CNode&&) = delete;
@@ -918,6 +933,18 @@ public:
     CNode& operator=(const CNode&) = delete;
 
 private:
+    CNode(
+        NodeId id,
+        ServiceFlags nLocalServicesIn,
+        int nMyStartingHeightIn,
+        SOCKET hSocketIn,
+        const CAddress& addrIn,
+        uint64_t nKeyedNetGroupIn,
+        uint64_t nLocalHostNonceIn,
+        CThreadPool<CQueueAdaptor>& asyncTaskPool,
+        const std::string &addrNameIn = "",
+        bool fInboundIn = false);
+
     /**
      * Storage for the last chunk being sent to the peer. This variable contains
      * data for the duration of sending the chunk. Once the chunk is sent it is
@@ -947,6 +974,8 @@ private:
     std::deque<CTxnSendingDetails> mInvList;
     CCriticalSection cs_mInvList {};
 
+    CThreadPool<CQueueAdaptor>& mAsyncTaskPool;
+    std::vector<std::future<void>> mAsyncTaskFuture;
 
 public:
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
@@ -1030,6 +1059,46 @@ public:
     std::string GetAddrName() const;
     //! Sets the addrName only if it was not previously set
     void MaybeSetAddrName(const std::string &addrNameIn);
+
+    /**
+     * Node can be used to execute some code on a different thread to return
+     * controll back to CConnman. Each node stores its pending futures that are
+     * removed once the task is done.
+     */
+    void HandleCompletedAsyncProcessing();
+
+    /**
+     * Run node related task asynchronously.
+     *
+     * NOTE: Function should never capture this node internally as that can lead
+     *       to unwanted lifetime extension:
+     *         - server begins to shut down
+     *         - async task isn't complete
+     *         - current node's destructor isn't called as the async task is
+     *           extending it's lifetime
+     *         - server shuts down without calling terminationFunction or
+     *           waiting for asynchronous tasks to gracefully finish
+     *       For this reason the weak pointer that is provided as call parameter
+     *       should be used instead.
+     */
+    void RunAsyncProcessing(
+        std::function<void(std::weak_ptr<CNode>)> function)
+    {
+        mAsyncTaskFuture.push_back(
+            make_task(
+                mAsyncTaskPool,
+                function,
+                weak_from_this()));
+    }
+
+    bool IsAsyncBlocked() const
+    {
+        constexpr size_t NODE_ASYNC_LIMIT = 3;
+
+        // async limit could be exceeded in the future if a single request would
+        // spawn more than one async task so we check with >=
+        return (mAsyncTaskFuture.size() >= NODE_ASYNC_LIMIT);
+    }
 };
 
 /**
