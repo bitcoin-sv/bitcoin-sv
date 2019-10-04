@@ -141,6 +141,33 @@ struct CBlockIndexWorkComparator {
     }
 };
 
+/**
+ * Class for counting the amount of blocks being processed.
+ */
+class CBlockProcessing
+{
+public:
+    CBlockProcessing() = delete;
+
+    /** Get a scope guard that adds one block to the count. */
+    static std::shared_ptr<std::atomic<int>> GetCountGuard()
+    {
+        ++mCount;
+        return {&mCount, decrement};
+    }
+
+    /** Get the number of blocks being processed/waiting for processing. */
+    static int Count() {return mCount;}
+
+private:
+    static void decrement(std::atomic<int>* counter)
+    {
+        --(*counter);
+    }
+
+    inline static std::atomic<int> mCount{0};
+};
+
 CBlockIndex *pindexBestInvalid;
 
 /**
@@ -4580,9 +4607,14 @@ bool VerifyNewBlock(const Config &config,
     return true;
 }
 
-bool ProcessNewBlock(const Config &config,
-                     const std::shared_ptr<const CBlock> pblock,
-                     bool fForceProcessing, bool *fNewBlock) {
+bool ProcessNewBlock(
+    const Config &config,
+    const std::shared_ptr<const CBlock> pblock,
+    bool fForceProcessing,
+    bool *fNewBlock)
+{
+    auto guard = CBlockProcessing::GetCountGuard();
+
     {
         CBlockIndex *pindex = nullptr;
         if (fNewBlock) {
@@ -4620,6 +4652,11 @@ bool ProcessNewBlock(const Config &config,
     }
 
     return true;
+}
+
+int GetProcessingBlocksCount()
+{
+    return CBlockProcessing::Count();
 }
 
 bool TestBlockValidity(const Config &config, CValidationState &state,

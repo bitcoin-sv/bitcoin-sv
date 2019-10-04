@@ -26,6 +26,7 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "blockfileinfostore.h"
+#include "txn_validator.h"
 
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
@@ -1858,6 +1859,46 @@ UniValue rebuildjournal(const Config &config, const JSONRPCRequest &request) {
     return NullUniValue;
 }
 
+static UniValue getblockchainactivity(
+    const Config& config,
+    const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+    {
+        throw
+            std::runtime_error(
+                "getblockchainactivity\n"
+                "\nReturn number of blocks and transactions being processed/waiting for processing at the moment\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"blocks\": xx,          (integer) Number of blocks\n"
+                "  \"transactions\": xx,    (integer) Number of transactions\n"
+                "}\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getblockchainactivity", "") +
+                HelpExampleRpc("getblockchainactivity", ""));
+    }
+
+    if (!g_connman)
+    {
+        throw JSONRPCError(
+            RPC_CLIENT_P2P_DISABLED,
+            "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    UniValue result{UniValue::VOBJ};
+
+    result.push_back(Pair("blocks", GetProcessingBlocksCount()));
+    static_assert(std::numeric_limits<size_t>::max() <= std::numeric_limits<uint64_t>::max());
+    result.push_back(
+        Pair(
+            "transactions",
+            static_cast<uint64_t>(
+                g_connman->getTxnValidator()->GetTransactionsInQueueCount())));
+
+    return result;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -1891,6 +1932,7 @@ static const CRPCCommand commands[] = {
     { "hidden",             "waitfornewblock",        waitfornewblock,        true,  {"timeout"} },
     { "hidden",             "waitforblock",           waitforblock,           true,  {"blockhash","timeout"} },
     { "hidden",             "waitforblockheight",     waitforblockheight,     true,  {"height","timeout"} },
+    { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} }
 };
 // clang-format on
 

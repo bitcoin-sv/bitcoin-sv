@@ -296,6 +296,9 @@ enum FlushStateMode {
  */
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 
+/** get number of blocks that are currently being processed */
+int GetProcessingBlocksCount();
+
 class BlockValidationOptions {
 private:
     bool checkPoW : 1;

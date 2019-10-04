@@ -211,7 +211,11 @@ class TestManager():
 
     def wait_for_pings(self, counter, timeout=60):
         def received_pongs():
-            return all(node.received_ping_response(counter) for node in self.test_nodes)
+            if all(node.received_ping_response(counter) for node in self.test_nodes):
+                # after we receive pong we need to check that there are no async
+                # block/transaction processes still running
+                return all(sum(c.rpc.getblockchainactivity().values()) for c in self.connections) == 0
+            return False
         wait_until(received_pongs, lock=mininode_lock, timeout=timeout)
 
     # sync_blocks: Wait for all connections to request the blockhash given

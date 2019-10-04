@@ -1588,12 +1588,19 @@ class NodeConnCB():
 
     # Sync up with the node
     def sync_with_ping(self, timeout=60):
+        # use ping to guarantee that previously sent p2p messages were processed
         self.send_message(msg_ping(nonce=self.ping_counter))
 
         def test_function():
             if not self.last_message.get("pong"):
                 return False
-            return self.last_message["pong"].nonce == self.ping_counter
+            if self.last_message["pong"].nonce != self.ping_counter:
+                return False
+            # after we receive pong we need to check that there are no async
+            # block/transaction processes still running
+            activity = self.connection.rpc.getblockchainactivity()
+            return sum(activity.values()) == 0
+
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
         self.ping_counter += 1
 

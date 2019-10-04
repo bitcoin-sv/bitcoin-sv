@@ -92,6 +92,15 @@ void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
                          (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
 }
 
+size_t CTxnValidator::GetTransactionsInQueueCount() const
+{
+    std::unique_lock<std::shared_mutex> lock1{mNewTxnsMtx, std::defer_lock};
+    std::unique_lock<std::shared_mutex> lock2{mProcessingQueueMtx, std::defer_lock};
+    std::lock(lock1, lock2);
+
+    return mNewTxns.size() + mProcessingQueue.size();
+}
+
 /** Handle a new transaction */
 void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
     const TxId& txid = pTxInputData->mpTx->GetId();
