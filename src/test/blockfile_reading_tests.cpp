@@ -127,6 +127,8 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
+    LOCK(cs_main);
+
     // check that blockIndex was updated with disk content size and hash data
     {
         auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
@@ -182,6 +184,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
 
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
+    LOCK(cs_main);
     auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
     std::vector<uint8_t> serializedData;
 
