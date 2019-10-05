@@ -11,7 +11,9 @@
 #include "crypto/sha256.h"
 #include "primitives/transaction.h"
 #include "pubkey.h"
+#include "script/int_serialization.h"
 #include "script/script.h"
+#include "script/script_num.h"
 #include "uint256.h"
 
 typedef std::vector<uint8_t> valtype;
@@ -381,7 +383,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     }
     int nOpCount = 0;
-    bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+    const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
+    const bool big_ints_enabled = (flags & SCRIPT_ENABLE_BIG_INTS) != 0;
 
     try {
         while (pc < pend) {
@@ -541,7 +544,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         // operand has the disabled lock-time flag set,
                         // CHECKSEQUENCEVERIFY behaves as a NOP.
                         if ((nSequence &
-                             CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG) != 0) {
+                             CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG) != bnZero) {
                             break;
                         }
 
@@ -1034,9 +1037,17 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        CScriptNum bn1(stacktop(-2), fRequireMinimal);
-                        CScriptNum bn2(stacktop(-1), fRequireMinimal);
-                        CScriptNum bn(0);
+                        CScriptNum bn1(stacktop(-2), fRequireMinimal,
+                                       big_ints_enabled
+                                           ? stacktop(-2).size()
+                                           : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                                       big_ints_enabled);
+                        CScriptNum bn2(stacktop(-1), fRequireMinimal,
+                                       big_ints_enabled
+                                           ? stacktop(-1).size()
+                                           : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                                       big_ints_enabled);
+                        CScriptNum bn(big_ints_enabled ? bsv::bint{0} : 0);
                         switch (opcode) {
                             case OP_ADD:
                                 bn = bn1 + bn2;
@@ -1052,7 +1063,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                             case OP_DIV:
                                 // denominator must not be 0
-                                if (bn2 == 0) {
+                                if (bn2 == bnZero) {
                                     return set_error(serror,
                                                      SCRIPT_ERR_DIV_BY_ZERO);
                                 }
@@ -1061,7 +1072,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                             case OP_MOD:
                                 // divisor must not be 0
-                                if (bn2 == 0) {
+                                if (bn2 == bnZero) {
                                     return set_error(serror,
                                                      SCRIPT_ERR_MOD_BY_ZERO);
                                 }
@@ -1429,7 +1440,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                         // Try to see if we can fit that number in the number of
                         // byte requested.
-                        CScriptNum::MinimallyEncode(rawnum);
+                        bsv::MinimallyEncode(rawnum);
                         if (rawnum.size() > size) {
                             // We definitively cannot.
                             return set_error(serror,
@@ -1464,10 +1475,11 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
 
                         valtype &n = stacktop(-1);
-                        CScriptNum::MinimallyEncode(n);
+                        bsv::MinimallyEncode(n);
 
                         // The resulting number must be a valid number.
-                        if (!CScriptNum::IsMinimallyEncoded(n)) {
+                        if (!bsv::IsMinimallyEncoded(
+                                n, CScriptNum::MAXIMUM_ELEMENT_SIZE)) {
                             return set_error(serror,
                                              SCRIPT_ERR_INVALID_NUMBER_RANGE);
                         }

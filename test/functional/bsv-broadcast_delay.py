@@ -6,11 +6,10 @@
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import *
 from test_framework.script import CScript, OP_TRUE
-from test_framework.blocktools import create_block, create_coinbase
 import datetime
 import contextlib
 
-# Test the functionality -broadcastdelay if it works as expected. 
+# Test the functionality -broadcastdelay if it works as expected.
 # 2 connections (connection1 and connection2) are created to bitcoind node and test how long it takes for connection2 to receive a transaction that connection1 sends to bitcoind.
 # 1. -broadcastdelay is set to 0 to calculate the overhead that network and bitcoind need for this functionality.
 # 2. Then, -broadcastdelay is not set, which means the default is used which is 150ms. 
@@ -22,7 +21,7 @@ class NetworkThreadPinging(Thread):
     def __init__(self, conn):
         super().__init__()
         self.conn = conn
-        
+
     def run(self):
         while True:
             conn = self.conn
@@ -35,10 +34,10 @@ class NetworkThreadPinging(Thread):
         self.conn = None
 
 class BroadcastDelayTest(BitcoinTestFramework):
-        
+
     # ensure funding and returns  given number of transcations without submitting them
     def make_transactions(self, num_transactions):
-        # Generate some blocks to have enough spendable coins 
+        # Generate some blocks to have enough spendable coins
         node = self.nodes[0]
         node.generate(101)
 
@@ -47,12 +46,12 @@ class BroadcastDelayTest(BitcoinTestFramework):
         ftx = CTransaction()
         for i in range(num_transactions):
             ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        
+
         # fund the transcation:
-        ftxHex = node.fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex'] 
-        ftxHex = node.signrawtransaction(ftxHex)['hex']         
-        ftx = FromHex(CTransaction(), ftxHex)        
-        ftx.rehash()        
+        ftxHex = node.fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = node.signrawtransaction(ftxHex)['hex']
+        ftx = FromHex(CTransaction(), ftxHex)
+        ftx.rehash()
 
         node.sendrawtransaction(ftxHex)
 
@@ -63,10 +62,10 @@ class BroadcastDelayTest(BitcoinTestFramework):
         for i in range(num_transactions):
             tx = CTransaction()
             tx.vin.append(CTxIn(COutPoint(ftx.sha256, i), b''))
-            tx.vout.append(CTxOut(out_value -1000, CScript([OP_TRUE])))
+            tx.vout.append(CTxOut(out_value-1000, CScript([OP_TRUE])))
             tx.rehash()
             txs.append(tx)
-            
+
         return txs
 
 
@@ -82,7 +81,7 @@ class BroadcastDelayTest(BitcoinTestFramework):
         self.start_node(0)
 
     # submits requested number of transactions from txs and returns timings
-    def syncNodesWithTransaction(self, num_transactions, txs, connection1, connection2): 
+    def syncNodesWithTransaction(self, num_transactions, txs, connection1, connection2):
         times = []
         for i in range(num_transactions):
             tx = txs.pop(0)
@@ -103,11 +102,11 @@ class BroadcastDelayTest(BitcoinTestFramework):
     def run_test(self):
         @contextlib.contextmanager
         def run_pinging_connection(connection):
-            # Connection3 is used here only for constantly pinging bitcoind node. 
+            # Connection3 is used here only for constantly pinging bitcoind node.
             # It is needed so that bitcoind is awake all the time (without 100ms sleeps).
             syncThr = NetworkThreadPinging(connection)
             syncThr.start()
-            yield       
+            yield
             syncThr.stop()
             syncThr.join()
 
@@ -117,26 +116,28 @@ class BroadcastDelayTest(BitcoinTestFramework):
 
         num_txns_to_sync = 15
         # 1. Send 15 transactions with broadcast delay of 0 seconds to calculate average overhead.
-        ### txnpropagationfreq is set to 1ms to limit its effect on propagation test. 
+        ### txnpropagationfreq and txnvalidationasynchrunfreq is set to 1ms to limit its effect on propagation test.
         ### Default value 1s is not suitable for this test, since it is much larger than 150ms.
-        with self.run_node_with_connections("calculating overhead", 0, ['-broadcastdelay=0', '-txnpropagationfreq=1'], self.num_peers) as connections:
+        with self.run_node_with_connections("calculating overhead", 0,
+                                            ['-broadcastdelay=0', '-txnpropagationfreq=1', '-txnvalidationasynchrunfreq=1'], self.num_peers) as connections:
             with run_pinging_connection(connections[2]):
-                average_overhead = self.syncNodesWithTransaction(15, txs, connections[0], connections[1])
+                average_overhead = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 self.log.info("Average overhead: %s", average_overhead)
-     
+
         # 2. Send 15 transactions with default broadcast delay (150ms) and calculate average broadcast delay
-        with self.run_node_with_connections("calculating propagation delay (default)", 0, ['-txnpropagationfreq=1'], self.num_peers) as connections:
+        with self.run_node_with_connections("calculating propagation delay (default)", 0,
+                                            ['-txnpropagationfreq=1', '-txnvalidationasynchrunfreq=1'], self.num_peers) as connections:
             with run_pinging_connection(connections[2]):
-                average_roundtrip = self.syncNodesWithTransaction(15, txs, connections[0], connections[1])
+                average_roundtrip = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 propagation_delay = average_roundtrip - average_overhead
                 self.log.info("Propagation delay, expected 150ms: %s", propagation_delay)
                 assert(propagation_delay < datetime.timedelta(milliseconds=300))
-                assert(propagation_delay > datetime.timedelta(milliseconds=30))
+                assert(propagation_delay > datetime.timedelta(milliseconds=10))
 
         # 3. Send 15 transactions with broadcast delay 1s
         with self.run_node_with_connections("calculating propagation delay (1000ms)", 0, ['-broadcastdelay=1000'], self.num_peers) as connections:
             with run_pinging_connection(connections[2]):
-                average_roundtrip_1s_delay = self.syncNodesWithTransaction(15, txs, connections[0], connections[1])
+                average_roundtrip_1s_delay = self.syncNodesWithTransaction(num_txns_to_sync, txs, connections[0], connections[1])
                 propagation_delay = average_roundtrip_1s_delay - average_overhead
                 self.log.info("Propagation delay, expected 1000ms: %s", propagation_delay)
                 assert(propagation_delay < datetime.timedelta(milliseconds=1500))
@@ -144,3 +145,4 @@ class BroadcastDelayTest(BitcoinTestFramework):
 
 if __name__ == '__main__':
     BroadcastDelayTest().main()
+

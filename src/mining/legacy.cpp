@@ -18,6 +18,7 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"
+#include "script/script_num.h"
 #include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"

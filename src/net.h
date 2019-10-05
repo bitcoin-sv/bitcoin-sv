@@ -519,8 +519,8 @@ private:
     /** Services this instance cares about */
     ServiceFlags nRelevantServices;
 
-    CSemaphore *semOutbound;
-    CSemaphore *semAddnode;
+    std::shared_ptr<CSemaphore> semOutbound {nullptr};
+    std::shared_ptr<CSemaphore> semAddnode {nullptr};
     int nMaxConnections;
     int nMaxOutbound;
     int nMaxAddnode;

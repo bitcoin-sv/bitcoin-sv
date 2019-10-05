@@ -4,11 +4,20 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script.h"
+#include "int_serialization.h"
+#include "script_num.h"
 
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
 #include <algorithm>
+#include <sstream>
+
+std::ostream& operator<<(std::ostream& os, const opcodetype& opcode)
+{
+    os << GetOpName(opcode);
+    return os;
+}
 
 const char *GetOpName(opcodetype opcode) {
     switch (opcode) {
@@ -264,80 +273,6 @@ const char *GetOpName(opcodetype opcode) {
     }
 }
 
-bool CScriptNum::IsMinimallyEncoded(const std::vector<uint8_t> &vch,
-                                    const size_t nMaxNumSize) {
-    if (vch.size() > nMaxNumSize) {
-        return false;
-    }
-
-    if (vch.size() > 0) {
-        // Check that the number is encoded with the minimum possible number
-        // of bytes.
-        //
-        // If the most-significant-byte - excluding the sign bit - is zero
-        // then we're not minimal. Note how this test also rejects the
-        // negative-zero encoding, 0x80.
-        if ((vch.back() & 0x7f) == 0) {
-            // One exception: if there's more than one byte and the most
-            // significant bit of the second-most-significant-byte is set it
-            // would conflict with the sign bit. An example of this case is
-            // +-255, which encode to 0xff00 and 0xff80 respectively.
-            // (big-endian).
-            if (vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0) {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-bool CScriptNum::MinimallyEncode(std::vector<uint8_t> &data) {
-    if (data.size() == 0) {
-        return false;
-    }
-
-    // If the last byte is not 0x00 or 0x80, we are minimally encoded.
-    uint8_t last = data.back();
-    if (last & 0x7f) {
-        return false;
-    }
-
-    // If the script is one byte long, then we have a zero, which encodes as an
-    // empty array.
-    if (data.size() == 1) {
-        data = {};
-        return true;
-    }
-
-    // If the next byte has it sign bit set, then we are minimaly encoded.
-    if (data[data.size() - 2] & 0x80) {
-        return false;
-    }
-
-    // We are not minimally encoded, we need to figure out how much to trim.
-    for (size_t i = data.size() - 1; i > 0; i--) {
-        // We found a non zero byte, time to encode.
-        if (data[i - 1] != 0) {
-            if (data[i - 1] & 0x80) {
-                // We found a byte with it sign bit set so we need one more
-                // byte.
-                data[i++] = last;
-            } else {
-                // the sign bit is clear, we can use it.
-                data[i - 1] |= last;
-            }
-
-            data.resize(i);
-            return true;
-        }
-    }
-
-    // If we the whole thing is zeros, then we have a zero.
-    data = {};
-    return true;
-}
-
 unsigned int CScript::GetSigOpCount(bool fAccurate) const {
     unsigned int n = 0;
     const_iterator pc = begin();
@@ -419,6 +354,25 @@ bool CScript::IsPushOnly() const {
     return this->IsPushOnly(begin());
 }
 
+CScript &CScript::push_int64(int64_t n) {
+    if (n == -1 || (n >= 1 && n <= 16)) {
+        push_back(n + (OP_1 - 1));
+    } else if (n == 0) {
+        push_back(OP_0);
+    } else {
+        std::vector<uint8_t> v;
+        v.reserve(sizeof(n));
+        bsv::serialize(n, back_inserter(v));
+        *this << v;
+    }
+    return *this;
+}
+
+CScript &CScript::operator<<(const CScriptNum &b) {
+    *this << b.getvch();
+    return *this;
+}
+
 std::string CScriptWitness::ToString() const {
     std::string ret = "CScriptWitness(";
     for (unsigned int i = 0; i < stack.size(); i++) {
@@ -429,3 +383,19 @@ std::string CScriptWitness::ToString() const {
     }
     return ret + ")";
 }
+
+std::ostream& operator<<(std::ostream& os, const CScript& script)
+{
+    for(const auto opcode : script)
+        os << static_cast<opcodetype>(opcode) << ' ';
+    return os;
+}
+
+// used for debugging and pretty-printing in gdb
+std::string to_string(const CScript& s)
+{
+    std::ostringstream oss;
+    oss << s;
+    return oss.str();
+}
+

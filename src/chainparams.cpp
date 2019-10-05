@@ -7,6 +7,7 @@
 #include "consensus/merkle.h"
 
 #include "policy/policy.h"
+#include "script/script_num.h"
 
 #include "tinyformat.h"
 #include "util.h"

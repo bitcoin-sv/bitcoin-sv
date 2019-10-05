@@ -20,7 +20,7 @@ pipeline {
             steps {
                 slackSend (color: 'good', message: "START: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")
                 sh './autogen.sh'
-                sh './configure'
+                sh './configure --enable-debug'
                 sh 'make clean'
                 sh 'make -j$(nproc --all)'
             }
@@ -48,7 +48,7 @@ pipeline {
         }
         stage('leveldb Tests') {
             steps {
-                sh 'cd src/leveldb && make check'
+                sh 'cd src/leveldb && make -j$(nproc --all) check'
             }
         }
         stage('Util Tests') {
@@ -56,18 +56,17 @@ pipeline {
                 sh 'test/util/bitcoin-util-test.py --verbose > build/reports/util-test.log'
             }
         }
-        stage('Functional Tests') {
+        // functional tests dont work with --enable-debug
+        stage('Rebuild') {
             steps {
-                sh 'test/functional/test_runner.py --extended --junitouput=build/reports/func-tests.xml'
-            }
-        }
-        stage('Code Coverage') {
-            steps {
-                sh './autogen.sh'
-                sh './configure --enable-lcov'
+                sh './configure'
                 sh 'make clean'
                 sh 'make -j$(nproc --all)'
-                sh 'make cov'
+            }
+        }
+        stage('Functional Tests') {
+            steps {
+                sh 'test/functional/test_runner.py --jobs $(nproc --all) --junitouput=build/reports/func-tests.xml'
             }
         }
     }
@@ -76,8 +75,6 @@ pipeline {
         always {
             archiveArtifacts artifacts: 'build/reports/**'
             junit 'build/reports/*.xml'
-            publishHTML([allowMissing: true, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test_bitcoin.coverage', reportFiles: 'index.html', reportName: 'Unit Test Coverage', reportTitles: ''])
-            publishHTML([allowMissing: true, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'total.coverage', reportFiles: 'index.html', reportName: 'Full Test Coverage', reportTitles: ''])
         }
         success {
             slackSend (color: 'good', message: "SUCCESS: Job '${env.JOB_NAME} #${env.BUILD_NUMBER}' (${env.BUILD_URL})")

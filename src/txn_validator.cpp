@@ -118,7 +118,7 @@ void CTxnValidator::newTransaction(std::vector<TxInputDataSPtr> vTxInputData) {
 /** Process a new txn in synchronous mode */
 CValidationState CTxnValidator::processValidation(
     const TxInputDataSPtr& pTxInputData,
-    mining::CJournalChangeSetPtr& changeSet,
+    const mining::CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize) {
 
     const CTransactionRef& ptx = pTxInputData->mpTx;
@@ -126,39 +126,46 @@ CValidationState CTxnValidator::processValidation(
     LogPrint(BCLog::TXNVAL,
             "Txnval-synch: Got a new txn= %s \n",
              tx.GetId().ToString());
+    // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
+    // A synchronous interface locks mtxs in the following order:
+    // - first: cs_main
+    // - second: mMainMtx
+    // It needs to be in that way as the wallet itself (and it's rpc interface) locks
+    // cs_main in many places and holds it (mostly rpc interface) for an entire duration of the call.
+    // A synchronous interface is called from a different threads:
+    // - bitcoin-main, bitcoin-loadblk. bitcoin-httpwor.
+    LOCK(cs_main);
     std::unique_lock lock { mMainMtx };
     CTxnValResult result {};
-    {
-        // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
-        LOCK(cs_main);
-        result = TxnValidation(
-                    pTxInputData,
-                    mConfig,
-                    mMempool,
-                    mpTxnDoubleSpendDetector);
-        // Special handlers
-        CTxnHandlers handlers {
-            // Mempool Journal ChangeSet
-            changeSet,
-            // Double Spend Detector
-            mpTxnDoubleSpendDetector,
-            // Orphan p2p txns queue
-            mpOrphanTxnsP2PQ,
-            // Recent rejects queue
-            mpTxnRecentRejects,
-        };
-        // Process validated results for the given txn
-        ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
-        // Notify subscribers that a new txn was added to the mempool and not
-        // removed from there due to LimitMempoolSize.
-        if (result.mState.IsValid()) {
-            GetMainSignals().TransactionAddedToMempool(result.mTxInputData->mpTx);
-        }
-        // After we've (potentially) uncached entries, ensure our coins cache is
-        // still within its size limits
-        CValidationState dummyState;
-        FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
+    // Execute txn validation
+    result = TxnValidation(
+                pTxInputData,
+                mConfig,
+                mMempool,
+                mpTxnDoubleSpendDetector);
+    // Special handlers
+    CTxnHandlers handlers {
+        // Mempool Journal ChangeSet
+        changeSet,
+        // Double Spend Detector
+        mpTxnDoubleSpendDetector,
+        // Orphan p2p txns queue
+        mpOrphanTxnsP2PQ,
+        // Recent rejects queue
+        mpTxnRecentRejects,
+    };
+    // Process validated results for the given txn
+    ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
+    // Notify subscribers that a new txn was added to the mempool and not
+    // removed from there due to LimitMempoolSize.
+    if (result.mState.IsValid()) {
+        GetMainSignals().TransactionAddedToMempool(result.mTxInputData->mpTx);
     }
+    // After we've (potentially) uncached entries, ensure our coins cache is
+    // still within its size limits
+    CValidationState dummyState;
+    FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
+
     return result.mState;
 }
 
@@ -175,44 +182,56 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
             if(mRunning) {
                 // Catch an exception if it occurs
                 try {
-                    // Lock mNewTxnsMtx & mProcessingQueueMtx for a minimal duration to get all queued txns.
                     {
-                        std::unique_lock<std::shared_mutex> lock1(mNewTxnsMtx, std::defer_lock);
-                        std::unique_lock<std::shared_mutex> lock2(mProcessingQueueMtx, std::defer_lock);
-                        std::lock(lock1, lock2);
-                        mProcessingQueue = std::move_if_noexcept(mNewTxns);
-                    }
-                    // Lock processing queue in a shared mode as it might be queried during processing.
-                    {
-                        std::shared_lock lockPQ { mProcessingQueueMtx };
-                        // Process all new transactions (if any exists)
-                        if(!mProcessingQueue.empty()) {
-                            // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
-                            LOCK(cs_main);
-                            LogPrint(BCLog::TXNVAL, "Txnval-asynch: Got %d new transactions\n",
-                                     mProcessingQueue.size());
-                            // Mempool Journal ChangeSet
-                            mining::CJournalChangeSetPtr changeSet {
-                                mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::NEW_TXN)
-                            };
-                            // Validate txns and try to submit them to the mempool
-                            std::vector<TxInputDataSPtr> vAcceptedTxns {
-                                processNewTransactionsNL(mProcessingQueue, changeSet)
-                            };
-                            // Trim mempool if it's size exceeds the limit.
-                            std::vector<TxId> vRemovedTxIds {
-                                LimitMempoolSize(
-                                    mMempool,
-                                    changeSet,
-                                    gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-                                    gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60)
-                            };
-                            // Execute post processing steps.
-                            postProcessingP2PStepsNL(vAcceptedTxns, vRemovedTxIds);
-                            // After we've (potentially) uncached entries, ensure our coins cache is
-                            // still within its size limits
-                            CValidationState dummyState;
-                            FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
+                        // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
+                        // An asynchronous interface locks mtxs in the following order:
+                        // - first: mMainMtx
+                        // - second: TRY_LOCK(cs_main) (only if cs_main is not used by anyone)
+                        // This approach allows to:
+                        // - avoid race conditions between synchronous and asynchronous interface.
+                        // - it gives priority to synchronous interface.
+                        // - avoid changes in the wallet itself as it strongly relies on cs_main.
+                        TRY_LOCK(cs_main, lockMain);
+                        if (!lockMain) {
+                            continue;
+                        }
+                        // Lock mNewTxnsMtx & mProcessingQueueMtx for a minimal duration to get all queued txns.
+                        {
+                            std::unique_lock<std::shared_mutex> lock1(mNewTxnsMtx, std::defer_lock);
+                            std::unique_lock<std::shared_mutex> lock2(mProcessingQueueMtx, std::defer_lock);
+                            std::lock(lock1, lock2);
+                            mProcessingQueue = std::move_if_noexcept(mNewTxns);
+                        }
+                        // Lock processing queue in a shared mode as it might be queried during processing.
+                        {
+                            std::shared_lock lockPQ { mProcessingQueueMtx };
+                            // Process all new transactions (if any exists)
+                            if(!mProcessingQueue.empty()) {
+                                LogPrint(BCLog::TXNVAL, "Txnval-asynch: Got %d new transactions\n",
+                                         mProcessingQueue.size());
+                                // Mempool Journal ChangeSet
+                                mining::CJournalChangeSetPtr changeSet {
+                                    mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::NEW_TXN)
+                                };
+                                // Validate txns and try to submit them to the mempool
+                                std::vector<TxInputDataSPtr> vAcceptedTxns {
+                                    processNewTransactionsNL(mProcessingQueue, changeSet)
+                                };
+                                // Trim mempool if it's size exceeds the limit.
+                                std::vector<TxId> vRemovedTxIds {
+                                    LimitMempoolSize(
+                                        mMempool,
+                                        changeSet,
+                                        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
+                                        gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60)
+                                };
+                                // Execute post processing steps.
+                                postProcessingP2PStepsNL(vAcceptedTxns, vRemovedTxIds);
+                                // After we've (potentially) uncached entries, ensure our coins cache is
+                                // still within its size limits
+                                CValidationState dummyState;
+                                FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
+                            }
                         }
                     }
                     // Clear processing queue.

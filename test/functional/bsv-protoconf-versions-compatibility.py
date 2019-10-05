@@ -141,11 +141,11 @@ class BsvProtoconfVersionsCompatibility(BitcoinTestFramework):
             wanted_inv_lengths.append(len(message.inv))
         test_node.on_getdata = on_getdata
 
+        # Set MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT to one that is slightly larger than 1MiB
+        # 1MiB -- 29126 elements --> work with 29127 elements
+        # In that way it is sure that bitcoind does not just take default (1MiB value).
+        MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT = 1 * 1024 * 1024 + 4 + 32
         with run_connection(test_node, "2 fields"):
-            # Set MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT to one that is slightly larger than 1MiB
-            # 1MiB -- 29126 elements --> work with 29127 elements
-            # In that way it is sure that bitcoind does not just take default (1MiB value).
-            MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT = 1 * 1024 * 1024 + 4 + 32
             expected_inv_len = mininode.CInv.estimateMaxInvElements(MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT) #29127 elements
             assert_equal(expected_inv_len, ELEMENTS_PER_1MiB + 1)
             logger.info("Our max message size: {} B, which represents {} elements. ".format(MESSAGE_LENGTH_1MiB_PLUS_1_ELEMENT, expected_inv_len))

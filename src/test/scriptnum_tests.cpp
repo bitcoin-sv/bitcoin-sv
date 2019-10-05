@@ -2,16 +2,378 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "script/int_serialization.h"
 #include "script/script.h"
+#include "script/script_num.h"
 #include "scriptnum10.h"
-#include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
-#include <climits>
-#include <cstdint>
 
-BOOST_FIXTURE_TEST_SUITE(scriptnum_tests, BasicTestingSetup)
+#include "big_int.hpp"
 
+using namespace std;
+using bsv::bint;
+
+namespace
+{
+    constexpr auto min64 = numeric_limits<int64_t>::min();
+    constexpr auto max64 = numeric_limits<int64_t>::max();
+
+    vector<int64_t> test_data{min64, -1, 0, 1, max64};
+}
+
+BOOST_AUTO_TEST_SUITE(scriptnum_tests)
+
+BOOST_AUTO_TEST_CASE(construction)
+{
+    using script_data = vector<uint8_t>;
+    using test_args = tuple<script_data, size_t, bool>;
+    vector<test_args> valid_constructions = {
+        {{}, 0, false},
+        {{}, 0, true},
+        {{}, 1, false},
+        {{}, 1, true},
+        {{1}, 1, false},
+        {{1}, 1, true},
+        {{1}, 2, false},
+        {{1}, 2, true},
+        {{1, 2, 3}, 4, false},
+        {{1, 2, 3}, 4, true},
+        {{1, 2, 3, 4}, 4, false},
+        {{1, 2, 3, 4}, 4, true},
+        {{1, 2, 3, 4}, 5, false},
+        {{1, 2, 3, 4}, 5, true},
+        {{1, 2, 3, 4, 5}, 5, false},
+        {{2, 2, 3, 4, 5}, 5, true},
+        {{1, 2, 3, 4, 5}, 6, false},
+        {{1, 2, 3, 4, 5}, 6, true},
+    };
+
+    for(const auto [v, max_size, big_int] : valid_constructions)
+    {
+        try
+        {
+            CScriptNum actual{v, false, max_size, big_int};
+        }
+        catch(...)
+        {
+            BOOST_FAIL("should not throw");
+        }
+    }
+
+    vector<test_args> invalid_constructions = {
+        {{1}, 0, false},
+        {{1}, 0, true},
+        {{1, 2, 3, 4}, 3, false},
+        {{1, 2, 3, 4}, 3, true},
+        {{1, 2, 3, 4, 5}, 4, false},
+        {{1, 2, 3, 4, 5}, 4, true},
+    };
+    for(const auto [v, max_size, big_int] : invalid_constructions)
+    {
+        try
+        {
+            CScriptNum actual{v, false, max_size, big_int};
+            BOOST_FAIL("should throw");
+        }
+        catch(...)
+        {
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(insertion_op)
+{
+    for(const int64_t n : test_data)
+    {
+        CScriptNum a{n};
+        ostringstream actual;
+        actual << a;
+
+        ostringstream expected;
+        expected << n;
+        BOOST_CHECK_EQUAL(expected.str(), actual.str());
+    }
+
+    for(const bint n : test_data)
+    {
+        CScriptNum a{n};
+        ostringstream actual;
+        actual << a;
+
+        ostringstream expected;
+        expected << n;
+        BOOST_CHECK_EQUAL(expected.str(), actual.str());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(equality)
+{
+    for(const int64_t n : test_data)
+    {
+        CScriptNum a{n};
+        CScriptNum b{n};
+        BOOST_CHECK_EQUAL(a, a);
+        BOOST_CHECK_EQUAL(a, b);
+        BOOST_CHECK_EQUAL(b, a);
+    }
+
+    for(bint n : test_data)
+    {
+        n *= 10; // *10 so we are testing outside of range of int64_t
+        CScriptNum a{n};
+        CScriptNum b{n};
+        BOOST_CHECK_EQUAL(a, a);
+        BOOST_CHECK_EQUAL(a, b);
+        BOOST_CHECK_EQUAL(b, a);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(less)
+{
+    vector<pair<int64_t, int64_t>> test_data{
+        {min64, -1}, {-1, 0}, {0, 1}, {min64, max64}, {1, max64}};
+    for(const auto& [n, m] : test_data)
+    {
+        CScriptNum a{n};
+        CScriptNum b{m};
+        BOOST_CHECK_LT(a, b);
+        BOOST_CHECK_LE(a, a);
+        BOOST_CHECK_GE(a, a);
+        BOOST_CHECK_GT(b, a);
+    }
+
+    for(const auto& [n, m] : test_data)
+    {
+        // n *= 10; // *10 so we are testing outside of range of int64_t
+        CScriptNum a{bint{n}};
+        CScriptNum b{bint{m}};
+        BOOST_CHECK_LT(a, b);
+        BOOST_CHECK_LE(a, a);
+        BOOST_CHECK_GE(a, a);
+        BOOST_CHECK_GT(b, a);
+    }
+
+    for(const auto& [n, m] : test_data)
+    {
+        CScriptNum a{n};
+        CScriptNum b{bint{m}};
+        BOOST_CHECK_LT(a, b);
+        BOOST_CHECK_LE(a, a);
+        BOOST_CHECK_GE(a, a);
+        BOOST_CHECK_GT(b, a);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(addition)
+{
+    const vector<tuple<int64_t, int64_t, int64_t>> test_data{
+        {-1, 0, -1},
+        {0, -1, -1},
+        {-1, 1, 0},
+        {1, -1, 0},
+        {0, 1, 1},
+        {1, 0, 1},
+        {min64 + 1, -1, min64},
+        {max64 - 1, +1, max64}};
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // little int + little int
+        CScriptNum a{n};
+        CScriptNum b{m};
+        CScriptNum c{o};
+        BOOST_CHECK_EQUAL(c, a + b);
+    }
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // big int + big int
+        CScriptNum a{bint{n}};
+        CScriptNum b{bint{m}};
+        CScriptNum c{bint{o}};
+        BOOST_CHECK_EQUAL(c, a + b);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(subtraction)
+{
+    const vector<tuple<int64_t, int64_t, int64_t>> test_data{
+        {0, 1, -1},
+        {-1, 0, -1},
+        {1, 1, 0},
+        {-1, -1, 0},
+        {2, 1, 1},
+        {0, -1, 1},
+        {min64 + 1, 1, min64},
+        {max64 - 1, -1, max64}};
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // little int - little int
+        CScriptNum a{n};
+        CScriptNum b{m};
+        CScriptNum c{o};
+        BOOST_CHECK_EQUAL(c, a - b);
+    }
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // big int - big int
+        CScriptNum a{bint{n}};
+        CScriptNum b{bint{m}};
+        CScriptNum c{bint{o}};
+        BOOST_CHECK_EQUAL(c, a - b);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(multiplication)
+{
+    const vector<tuple<int64_t, int64_t, int64_t>> test_data{
+        {1, -1, -1},
+        {-1, 1, -1},
+        {0, 1, 0},
+        {1, 0, 0},
+        {1, 1, 1},
+        {-1, -1, 1},
+        {min64, 1, min64},
+        {min64 + 1, -1, max64},
+        {max64, 1, max64},
+        {max64, -1, min64 + 1}};
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // little int * little int
+        CScriptNum a{n};
+        CScriptNum b{m};
+        CScriptNum c{o};
+        BOOST_CHECK_EQUAL(c, a * b);
+    }
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // big int * big int
+        CScriptNum a{bint{n}};
+        CScriptNum b{bint{m}};
+        CScriptNum c{bint{o}};
+        BOOST_CHECK_EQUAL(c, a * b);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(division)
+{
+    const vector<tuple<int64_t, int64_t, int64_t>> test_data{
+        {1, -1, -1},
+        {-1, 1, -1},
+        {0, 1, 0},
+        //{1, 0, 0},
+        {1, 1, 1},
+        {-1, -1, 1},
+        {min64, 1, min64},
+        {min64 + 1, -1, max64},
+        {max64, 1, max64},
+        {max64, -1, min64 + 1}};
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // little int / little int
+        CScriptNum a{n};
+        CScriptNum b{m};
+        CScriptNum c{o};
+        BOOST_CHECK_EQUAL(c, a / b);
+    }
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // big int / big int
+        CScriptNum a{bint{n}};
+        CScriptNum b{bint{m}};
+        CScriptNum c{bint{o}};
+        BOOST_CHECK_EQUAL(c, a / b);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(modular)
+{
+    const vector<tuple<int64_t, int64_t, int64_t>> test_data{{-3, -2, -1},
+                                                             {1, 1, 0},
+                                                             {-1, -1, 0},
+                                                             {1, -1, 0},
+                                                             {-1, 1, 0},
+                                                             {3, 2, 1}};
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // little int % little int
+        CScriptNum a{n};
+        CScriptNum b{m};
+        CScriptNum c{o};
+        BOOST_CHECK_EQUAL(c, a % b);
+    }
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // big int % big int
+        CScriptNum a{bint{n}};
+        CScriptNum b{bint{m}};
+        CScriptNum c{bint{o}};
+        BOOST_CHECK_EQUAL(c, a % b);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(and_)
+{
+    const vector<tuple<int64_t, int64_t, int64_t>> test_data{
+        {0x0, 0x0, 0x0},
+        {0xffffffffffffffff, 0x0, 0x0},
+        {0x0, 0xffffffffffffffff, 0x0},
+        {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
+        {0x555555555555555, 0xaaaaaaaaaaaaaaa, 0x0},
+        {0xaaaaaaaaaaaaaaa, 0x555555555555555, 0x0},
+    };
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // little int & little int
+        CScriptNum a{n};
+        CScriptNum b{m};
+        CScriptNum c{o};
+        BOOST_CHECK_EQUAL(c, a & b);
+    }
+
+    for(const auto& [n, m, o] : test_data)
+    {
+        // big int & big int
+        CScriptNum a{bint{n}};
+        CScriptNum b{bint{m}};
+        CScriptNum c{bint{o}};
+        BOOST_CHECK_EQUAL(c, a & b);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(negation)
+{
+    const vector<pair<int64_t, int64_t>> test_data{
+        {0, 0}, {1, -1}, {-1, 1}, {max64, min64 + 1}};
+
+    for(const auto [n, m] : test_data)
+    {
+        // little int & little int
+        CScriptNum a{n};
+        CScriptNum b{m};
+        BOOST_CHECK_EQUAL(b, -a);
+    }
+
+    for(const auto [n, m] : test_data)
+    {
+        // big int & big int
+        CScriptNum a{bint{n}};
+        CScriptNum b{bint{m}};
+        BOOST_CHECK_EQUAL(b, -a);
+    }
+}
+
+// clang-format off
 /** A selection of numbers that do not trigger int64_t overflow
  *  when added/subtracted. */
 static const int64_t values[] = {0,
@@ -82,8 +444,8 @@ static void CheckAdd(const int64_t &num1, const int64_t &num2) {
          ((num2 < 0) && (num1 < (std::numeric_limits<int64_t>::min() - num2))));
     if (!invalid) {
         BOOST_CHECK(verify(bignum1 + bignum2, scriptnum1 + scriptnum2));
-        BOOST_CHECK(verify(bignum1 + bignum2, scriptnum1 + num2));
-        BOOST_CHECK(verify(bignum1 + bignum2, scriptnum2 + num1));
+        BOOST_CHECK(verify(bignum1 + bignum2, scriptnum1 + scriptnum2));
+        BOOST_CHECK(verify(bignum1 + bignum2, scriptnum2 + scriptnum1));
     }
 }
 
@@ -109,7 +471,7 @@ static void CheckSubtract(const int64_t &num1, const int64_t &num2) {
          (num2 < 0 && num1 > std::numeric_limits<int64_t>::max() + num2));
     if (!invalid) {
         BOOST_CHECK(verify(bignum1 - bignum2, scriptnum1 - scriptnum2));
-        BOOST_CHECK(verify(bignum1 - bignum2, scriptnum1 - num2));
+        BOOST_CHECK(verify(bignum1 - bignum2, scriptnum1 - scriptnum2));
     }
 
     invalid =
@@ -117,7 +479,7 @@ static void CheckSubtract(const int64_t &num1, const int64_t &num2) {
          (num1 < 0 && num2 > std::numeric_limits<int64_t>::max() + num1));
     if (!invalid) {
         BOOST_CHECK(verify(bignum2 - bignum1, scriptnum2 - scriptnum1));
-        BOOST_CHECK(verify(bignum2 - bignum1, scriptnum2 - num1));
+        BOOST_CHECK(verify(bignum2 - bignum1, scriptnum2 - scriptnum1));
     }
 }
 
@@ -134,8 +496,6 @@ static void CheckCompare(const int64_t &num1, const int64_t &num2) {
     BOOST_CHECK((bignum1 >= bignum1) == (scriptnum1 >= scriptnum1));
     BOOST_CHECK((bignum1 <= bignum1) == (scriptnum1 <= scriptnum1));
 
-    BOOST_CHECK((bignum1 == bignum1) == (scriptnum1 == num1));
-    BOOST_CHECK((bignum1 != bignum1) == (scriptnum1 != num1));
     BOOST_CHECK((bignum1 < bignum1) == (scriptnum1 < num1));
     BOOST_CHECK((bignum1 > bignum1) == (scriptnum1 > num1));
     BOOST_CHECK((bignum1 >= bignum1) == (scriptnum1 >= num1));
@@ -148,8 +508,6 @@ static void CheckCompare(const int64_t &num1, const int64_t &num2) {
     BOOST_CHECK((bignum1 >= bignum2) == (scriptnum1 >= scriptnum2));
     BOOST_CHECK((bignum1 <= bignum2) == (scriptnum1 <= scriptnum2));
 
-    BOOST_CHECK((bignum1 == bignum2) == (scriptnum1 == num2));
-    BOOST_CHECK((bignum1 != bignum2) == (scriptnum1 != num2));
     BOOST_CHECK((bignum1 < bignum2) == (scriptnum1 < num2));
     BOOST_CHECK((bignum1 > bignum2) == (scriptnum1 > num2));
     BOOST_CHECK((bignum1 >= bignum2) == (scriptnum1 >= num2));
@@ -204,8 +562,8 @@ BOOST_AUTO_TEST_CASE(operators) {
 
 static void CheckMinimalyEncode(std::vector<uint8_t> data,
                                 const std::vector<uint8_t> &expected) {
-    bool alreadyEncoded = CScriptNum::IsMinimallyEncoded(data, data.size());
-    bool hasEncoded = CScriptNum::MinimallyEncode(data);
+    bool alreadyEncoded = bsv::IsMinimallyEncoded(data, data.size());
+    bool hasEncoded = bsv::MinimallyEncode(data);
     BOOST_CHECK_EQUAL(hasEncoded, !alreadyEncoded);
     BOOST_CHECK(data == expected);
 }
@@ -250,5 +608,6 @@ BOOST_AUTO_TEST_CASE(minimize_encoding_test) {
         negkpadded.push_back(0x80);
     }
 }
+// clang-format on
 
 BOOST_AUTO_TEST_SUITE_END()

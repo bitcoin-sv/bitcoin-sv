@@ -13,6 +13,7 @@
 #include "consensus/validation.h"
 #include "policy/policy.h"
 #include "pubkey.h"
+#include "script/script_num.h"
 #include "script/standard.h"
 #include "txmempool.h"
 #include "uint256.h"

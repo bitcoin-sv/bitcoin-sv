@@ -571,8 +571,8 @@ class ComparisonTestFramework(BitcoinTestFramework):
         self.restart_network()
 
     # returns a test case that asserts that the current tip was accepted
-    def accepted(self):
-        return TestInstance([[self.chain.tip, True]])
+    def accepted(self, sync_timeout=300):
+        return TestInstance([[self.chain.tip, True]], sync_timeout=sync_timeout)
 
     # returns a test case that asserts that the current tip was rejected
     def rejected(self, reject=None):

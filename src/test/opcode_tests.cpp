@@ -4,10 +4,12 @@
 
 #include "test/test_bitcoin.h"
 
-#include "policy/policy.h"
-#include "script/interpreter.h"
-#include "script/sign.h"
 #include "keystore.h"
+#include "policy/policy.h"
+#include "script/int_serialization.h"
+#include "script/interpreter.h"
+#include "script/script_num.h"
+#include "script/sign.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -92,7 +94,7 @@ static valtype NegativeValtype(const valtype &v) {
     if (r.size() > 0) {
         r[r.size() - 1] ^= 0x80;
     }
-    CScriptNum::MinimallyEncode(r);
+    bsv::MinimallyEncode(r);
     return r;
 }
 

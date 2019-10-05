@@ -10,6 +10,7 @@
 #include "config.h"
 #include "chainparams.h"
 #include "validation.h"
+#include "hash.h"
 
 #include <boost/test/unit_test.hpp>
 #include <boost/filesystem.hpp>
@@ -118,11 +119,15 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     auto block = BuildRandomTestBlock();
     CBlockIndex index{block};
+    std::unique_ptr<uint256> randomHash(new uint256(InsecureRand256()));
+    index.phashBlock = randomHash.get();
 
     CBlockFileInfoStore blockFileInfoStore;
     WriteBlockToDisk(config, block, index, blockFileInfoStore);
 
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
+
+    LOCK(cs_main);
 
     // check that blockIndex was updated with disk content size and hash data
     {
@@ -172,11 +177,14 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
 
     auto block = BuildRandomTestBlock();
     CBlockIndex index{block};
+    std::unique_ptr<uint256> randomHash(new uint256(InsecureRand256()));
+    index.phashBlock = randomHash.get();
 
     WriteBlockToDisk(config, block, index, *pBlockFileInfoStore);
 
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
+    LOCK(cs_main);
     auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
     std::vector<uint8_t> serializedData;
 

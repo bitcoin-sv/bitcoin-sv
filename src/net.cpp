@@ -1823,7 +1823,7 @@ void CConnman::ProcessOneShot() {
         vOneShots.pop_front();
     }
     CAddress addr;
-    CSemaphoreGrant grant(*semOutbound, true);
+    CSemaphoreGrant grant(semOutbound, true);
     if (grant) {
         if (!OpenNetworkConnection(addr, false, &grant, strDest.c_str(),
                                    true)) {
@@ -1866,7 +1866,7 @@ void CConnman::ThreadOpenConnections() {
             return;
         }
 
-        CSemaphoreGrant grant(*semOutbound);
+        CSemaphoreGrant grant(semOutbound);
         if (interruptNet) {
             return;
         }
@@ -2080,7 +2080,7 @@ void CConnman::ThreadOpenAddedConnections() {
     }
 
     while (true) {
-        CSemaphoreGrant grant(*semAddnode);
+        CSemaphoreGrant grant(semAddnode);
         std::vector<AddedNodeInfo> vInfo = GetAddedNodeInfo();
         bool tried = false;
         for (const AddedNodeInfo &info : vInfo) {
@@ -2477,8 +2477,6 @@ CConnman::CConnman(
     nLastNodeId = 0;
     nSendBufferMaxSize = 0;
     nReceiveFloodSize = 0;
-    semOutbound = nullptr;
-    semAddnode = nullptr;
     nMaxConnections = 0;
     nMaxOutbound = 0;
     nMaxAddnode = 0;
@@ -2569,12 +2567,11 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
 
     if (semOutbound == nullptr) {
         // initialize semaphore
-        semOutbound = new CSemaphore(
-            std::min((nMaxOutbound + nMaxFeeler), nMaxConnections));
+        semOutbound = std::make_shared<CSemaphore>(std::min((nMaxOutbound + nMaxFeeler), nMaxConnections));
     }
     if (semAddnode == nullptr) {
         // initialize semaphore
-        semAddnode = new CSemaphore(nMaxAddnode);
+        semAddnode = std::make_shared<CSemaphore>(nMaxAddnode);
     }
 
     //
@@ -2714,9 +2711,7 @@ void CConnman::Stop() {
     vNodes.clear();
     vNodesDisconnected.clear();
     vhListenSocket.clear();
-    delete semOutbound;
     semOutbound = nullptr;
-    delete semAddnode;
     semAddnode = nullptr;
 }
 
