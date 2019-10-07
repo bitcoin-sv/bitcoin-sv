@@ -530,4 +530,18 @@ BOOST_AUTO_TEST_CASE(rpc_convert_values_generatetoaddress) {
     BOOST_CHECK_EQUAL(result[2].get_int(), 9);
 }
 
+BOOST_AUTO_TEST_CASE(getminingcandidate_low_height)
+{
+    // Fake things so that IBD thinks it's completed and we don't care about the lack of peers
+    gArgs.SoftSetBoolArg("-standalone", true);
+    int64_t oldMaxAge {nMaxTipAge};
+    nMaxTipAge = std::numeric_limits<int64_t>::max();
+
+    UniValue json {};
+    BOOST_CHECK_NO_THROW(json = CallRPC(std::string("getminingcandidate")));
+    BOOST_CHECK_EQUAL(find_value(json.get_obj(), "height").get_int(), 1);
+
+    nMaxTipAge = oldMaxAge;
+}
+
 BOOST_AUTO_TEST_SUITE_END()

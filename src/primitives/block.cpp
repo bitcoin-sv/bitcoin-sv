@@ -36,12 +36,15 @@ uint64_t CBlock::GetHeightFromCoinbase()
     // Get length of height number
     if (sig.empty()) throw std::runtime_error("Empty coinbase scriptSig");
     uint8_t numlen = sig[0];
-    if (sig.size() - 1 < numlen)
-        throw std::runtime_error("Badly formated hight in coinbase");
 
     // Parse height as CScriptNum
-    if (numlen == OP_0) return 0;
-    if ((numlen >= OP_1) && (numlen <= OP_16)) return numlen - OP_1 + 1;
+    if (numlen == OP_0)
+        return 0;
+    if ((numlen >= OP_1) && (numlen <= OP_16))
+        return numlen - OP_1 + 1;
+
+    if (sig.size() - 1 < numlen)
+        throw std::runtime_error("Badly formatted height in coinbase");
     std::vector<unsigned char> heightScript(numlen);
     copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());
     CScriptNum coinbaseHeight(heightScript, false, numlen);
