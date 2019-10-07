@@ -101,6 +101,9 @@ enum {
     // has been activated. This activates new rules (such as original meaning of OP_RETURN)
     // This is per (input!) UTXO flag
     SCRIPT_UTXO_AFTER_GENESIS = (1U << 19),
+
+    // Not actual flag. Used for marking largest flag value.
+    SCRIPT_FLAG_LAST = (1U << 20)
 };
 
 #endif // BITCOIN_SCRIPT_SCRIPTFLAGS_H
