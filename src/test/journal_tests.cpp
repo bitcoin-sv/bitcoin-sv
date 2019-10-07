@@ -89,6 +89,8 @@ BOOST_AUTO_TEST_CASE(TestJournalAddRemove)
     BOOST_CHECK_EQUAL(CJournalTester{journal}.journalSize(), 4);
     for(const auto& [ op, txn ] : ops)
     {
+        // supresses unused parameter warning
+        (void)op;
         BOOST_CHECK(CJournalTester{journal}.checkTxnExists(txn));
     }
     BOOST_CHECK_EQUAL(CJournalTester{journal}.checkTxnOrdering(ops[0].second, ops[1].second), CJournalTester::TxnOrder::BEFORE);

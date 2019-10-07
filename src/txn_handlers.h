@@ -12,11 +12,7 @@
 /**
  * A class used to share txn handlers during validation.
  */
-class CTxnHandlers {
- public:
-    CTxnHandlers() = default;
-    ~CTxnHandlers() = default;
-
+struct CTxnHandlers {
     /** Mempool Journal ChangeSet */
     const mining::CJournalChangeSetPtr& mJournalChangeSet;
     /** Double Spend Detector */
