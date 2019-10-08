@@ -601,15 +601,6 @@ bool IsGenesisEnabled(const Config &config, int nHeight) {
     return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
 }
 
-bool IsGenesisEnabled(const Config& config, const CBlockIndex* pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
-    }
-
-    // Genesis is enabled on the currently processed block, not on the current tip.
-    return IsGenesisEnabled(config, pindexPrev->nHeight + 1);
-}
-
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
 // were somehow broken and returning the wrong scriptPubKeys.
 //
@@ -2643,7 +2634,7 @@ static uint32_t GetBlockScriptFlags(const Config &config,
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    if (IsGenesisEnabled(config, pChainTip)) {
+    if (IsGenesisEnabled(config, pChainTip->nHeight + 1)) {
         flags |= SCRIPT_GENESIS;
     }
 
@@ -3250,8 +3241,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         return false;
     }
 
-    if ((IsGenesisEnabled(config, pindexDelete)) &&
-        (!IsGenesisEnabled(config, pindexDelete->pprev)))
+    if ((IsGenesisEnabled(config, pindexDelete->nHeight)) &&
+        (!IsGenesisEnabled(config, pindexDelete->nHeight - 1)))
     {
         mempool.Clear();
         // While not strictly necessary, clearing the disconnect pool is also

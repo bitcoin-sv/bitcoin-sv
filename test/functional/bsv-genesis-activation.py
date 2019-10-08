@@ -19,18 +19,14 @@ Genesis height is 109.
 7. Create block on height 109 with tx0 that has OP_RETURN in the locking script and tx1 that
    has OP_TRUE in the unlocking script. Block is accepted.
 
-8. Rewind to the state before genesis (height 107). Send tx0 (OP_RETURN in locking script). Generate new block with tx0.
-9. Generate few blocks to activate genesis.
-10. Send tx1 (spends tx0). It is recognized as an orphan and therefore not included in the next block.
-    One may expect that it would be accepted because it is saved in script cache as valid transaction 
-    (even though OP_RETURN belongs to tx0 which is now unspendable).
-    But checking inputs is checked before checking script cache and tx0 is not found as spendable.
+8. Rewind to the state before genesis (height 107). tx0 and tx1 are back in the mempool.
+9. Try to generate new block (height 108). It will not be successful as tx1 spends tx0 before genesis now.
 
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_RETURN, OP_TRUE
 from test_framework.blocktools import create_transaction
-from test_framework.util import assert_equal
+from test_framework.util import assert_equal, assert_raises_rpc_error
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import msg_tx
 from time import sleep
@@ -131,31 +127,12 @@ class BSVGenesisActivation(ComparisonTestFramework):
         # So we are at height 107.
         assert_equal(node.getblock(node.getbestblockhash())['height'], 107)
 
-        # Send tx0.
-        self.test.connections[0].send_message(msg_tx(tx0))
-        # wait for transaction processing
-        sleep(1)
+        # tx0 and tx1 are in mempool (currently valid because it was sent after genesis)
+        assert_equal(True, tx0.hash in node.getrawmempool())
+        assert_equal(True, tx1.hash in node.getrawmempool())
 
-        # Mine block (height 108) with new transactions.
-        self.nodes[0].generate(1)
-        tx = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['tx']
-
-        # Generate few blocks to activate genesis.
-        self.nodes[0].generate(1)
-        self.nodes[0].generate(1)
-        self.nodes[0].generate(1)
-
-        self.test.connections[0].send_message(msg_tx(tx1))
-        # wait for transaction processing
-        sleep(1)
-
-        # Generate new block.
-        self.nodes[0].generate(1)
-        tx = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['tx']
-
-        # Tx1 should not be in the newly generated block because checking inputs is before checking if script is in cache.
-        assert_equal(len(tx), 1)
-        assert_equal(tx1.hash not in tx, True)
+        # tx1 will not be mined in the next block, because genesis is not activated
+        assert_raises_rpc_error(-1, "bad-txns-inputs-missingorspent", self.nodes[0].generate, 1)
 
 if __name__ == '__main__':
     BSVGenesisActivation().main()

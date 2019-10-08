@@ -496,7 +496,6 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /** Check if Genesis has activated. */
-bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
 bool IsGenesisEnabled(const Config& config, int nHeight);
 
 /**
