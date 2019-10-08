@@ -41,9 +41,11 @@ namespace
     {
         config.Reset();
         config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+        config.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);
         configJournal.Reset();
         configJournal.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
         configJournal.SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType::JOURNALING);
+        configJournal.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);
     }
 }
 

@@ -25,6 +25,7 @@ UniValue CallRPC(std::string args) {
     vArgs.erase(vArgs.begin());
     GlobalConfig config;
     config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    config.SetGenesisActivationHeight(1);
     JSONRPCRequest request;
     request.strMethod = strMethod;
     request.params = RPCConvertValues(strMethod, vArgs);
