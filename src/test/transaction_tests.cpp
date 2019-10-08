@@ -36,6 +36,123 @@ typedef std::vector<uint8_t> valtype;
 
 BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
 
+void RunTests(UniValue& tests, bool should_be_valid){
+    for (size_t idx = 0; idx < tests.size(); idx++) {
+        UniValue test = tests[idx];
+        std::string strTest = test.write();
+        if (test[0].isArray()) {
+            
+            if(test.size() != 3){
+                BOOST_ERROR("Bad test (invalid number of elements): " << strTest);
+                continue;
+            }
+
+            if(!test[1].isStr()){
+                BOOST_ERROR("Bad test (second element should be string): " << strTest);
+                continue;
+            }
+
+            std::vector<uint32_t> flags_to_check;
+            std::map<uint32_t, std::string> flags_to_string;
+
+            if(test[2].isStr()){
+                auto flags = ParseScriptFlags(test[2].get_str());
+                flags_to_check.push_back(flags); 
+                flags_to_string[flags] = test[2].get_str();
+            }else if(test[2].isArray() && test[2].size()){
+                for (size_t idx = 0; idx < test[2].size(); idx++){
+                    auto flags = ParseScriptFlags(test[2][idx].get_str());
+                    flags_to_check.push_back(flags); 
+                    flags_to_string[flags] = test[2][idx].get_str();
+                }
+            } else {
+                BOOST_ERROR("Bad test (third element should be string or an non-empty array of strings): " << strTest);
+                continue;
+            }
+
+            std::map<COutPoint, CScript> mapprevOutScriptPubKeys;
+            std::map<COutPoint, Amount> mapprevOutValues;
+            UniValue inputs = test[0].get_array();
+            bool fValid = true;
+            for (size_t inpIdx = 0; inpIdx < inputs.size(); inpIdx++) {
+                const UniValue &input = inputs[inpIdx];
+                if (!input.isArray()) {
+                    fValid = false;
+                    break;
+                }
+                UniValue vinput = input.get_array();
+                if (vinput.size() < 3 || vinput.size() > 4) {
+                    fValid = false;
+                    break;
+                }
+                COutPoint outpoint(uint256S(vinput[0].get_str()),
+                                   vinput[1].get_int());
+                mapprevOutScriptPubKeys[outpoint] =
+                    ParseScript(vinput[2].get_str());
+                if (vinput.size() >= 4) {
+                    mapprevOutValues[outpoint] = Amount(vinput[3].get_int64());
+                }
+            }
+            if (!fValid) {
+                BOOST_ERROR("Bad test: " << strTest);
+                continue;
+            }
+
+            std::string transaction = test[1].get_str();
+            CDataStream stream(ParseHex(transaction), SER_NETWORK,
+                               PROTOCOL_VERSION);
+            CTransaction tx(deserialize, stream);
+
+            CValidationState state;
+
+            fValid = tx.IsCoinBase() 
+                                    ? CheckCoinbase(tx, state) 
+                                    : CheckRegularTransaction(tx, state);
+
+            if(!(fValid && state.IsValid())) {
+                if(should_be_valid) {
+                    BOOST_ERROR(strTest);
+                } else {
+                    continue; // it is invalid as it should be
+                }
+            }
+
+            for (auto verify_flags: flags_to_check)
+            {
+                bool is_valid = true;
+                PrecomputedTransactionData txdata(tx);
+                size_t i = 0;
+                ScriptError err;
+
+                for (i = 0; i < tx.vin.size() && is_valid; i++) {
+                    if (!mapprevOutScriptPubKeys.count(tx.vin[i].prevout)) {
+                        BOOST_ERROR("Bad test: " << strTest);
+                        break;
+                    }
+
+                    Amount amount(0);
+                    if (mapprevOutValues.count(tx.vin[i].prevout)) {
+                        amount = Amount(mapprevOutValues[tx.vin[i].prevout]);
+                    }
+
+                    is_valid = VerifyScript(tx.vin[i].scriptSig,
+                                            mapprevOutScriptPubKeys[tx.vin[i].prevout],
+                                            verify_flags, 
+                                            TransactionSignatureChecker(&tx, i, amount, txdata),
+                                            &err);
+                }
+                if (is_valid != should_be_valid){
+                    BOOST_ERROR("Bad test: " << strTest << 
+                                "\nFailing flags: " << flags_to_string[verify_flags] << 
+                                "\nOn input index: " << i);
+                    
+                }
+                BOOST_CHECK_MESSAGE((err == SCRIPT_ERR_OK) == should_be_valid, ScriptErrorString(err));
+            }
+        }
+    }
+}
+
 BOOST_AUTO_TEST_CASE(tx_valid) {
     // Read tests from test/data/tx_valid.json
     // Format is an array of arrays
@@ -44,87 +161,14 @@ BOOST_AUTO_TEST_CASE(tx_valid) {
     // ...],"], serializedTransaction, verifyFlags
     // ... where all scripts are stringified scripts.
     //
-    // verifyFlags is a comma separated list of script verification flags to
-    // apply, or "NONE"
+    // verifyFlags is a a single string or an array of strings where each string is comma-separated 
+    // list of script verification flags to apply, or "NONE"
+    // 
     UniValue tests = read_json(
         std::string(json_tests::tx_valid,
                     json_tests::tx_valid + sizeof(json_tests::tx_valid)));
 
-    ScriptError err;
-    for (size_t idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
-        std::string strTest = test.write();
-        if (test[0].isArray()) {
-            if (test.size() != 3 || !test[1].isStr() || !test[2].isStr()) {
-                BOOST_ERROR("Bad test: " << strTest);
-                continue;
-            }
-
-            std::map<COutPoint, CScript> mapprevOutScriptPubKeys;
-            std::map<COutPoint, Amount> mapprevOutValues;
-            UniValue inputs = test[0].get_array();
-            bool fValid = true;
-            for (size_t inpIdx = 0; inpIdx < inputs.size(); inpIdx++) {
-                const UniValue &input = inputs[inpIdx];
-                if (!input.isArray()) {
-                    fValid = false;
-                    break;
-                }
-                UniValue vinput = input.get_array();
-                if (vinput.size() < 3 || vinput.size() > 4) {
-                    fValid = false;
-                    break;
-                }
-                COutPoint outpoint(uint256S(vinput[0].get_str()),
-                                   vinput[1].get_int());
-                mapprevOutScriptPubKeys[outpoint] =
-                    ParseScript(vinput[2].get_str());
-                if (vinput.size() >= 4) {
-                    mapprevOutValues[outpoint] = Amount(vinput[3].get_int64());
-                }
-            }
-            if (!fValid) {
-                BOOST_ERROR("Bad test: " << strTest);
-                continue;
-            }
-
-            std::string transaction = test[1].get_str();
-            CDataStream stream(ParseHex(transaction), SER_NETWORK,
-                               PROTOCOL_VERSION);
-            CTransaction tx(deserialize, stream);
-
-            CValidationState state;
-            BOOST_CHECK_MESSAGE(tx.IsCoinBase()
-                                    ? CheckCoinbase(tx, state)
-                                    : CheckRegularTransaction(tx, state),
-                                strTest);
-            BOOST_CHECK(state.IsValid());
-
-            PrecomputedTransactionData txdata(tx);
-            for (size_t i = 0; i < tx.vin.size(); i++) {
-                if (!mapprevOutScriptPubKeys.count(tx.vin[i].prevout)) {
-                    BOOST_ERROR("Bad test: " << strTest);
-                    break;
-                }
-
-                Amount amount(0);
-                if (mapprevOutValues.count(tx.vin[i].prevout)) {
-                    amount = Amount(mapprevOutValues[tx.vin[i].prevout]);
-                }
-
-                uint32_t verify_flags = ParseScriptFlags(test[2].get_str());
-                BOOST_CHECK_MESSAGE(
-                    VerifyScript(tx.vin[i].scriptSig,
-                                 mapprevOutScriptPubKeys[tx.vin[i].prevout],
-                                 verify_flags, TransactionSignatureChecker(
-                                                   &tx, i, amount, txdata),
-                                 &err),
-                    strTest);
-                BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK,
-                                    ScriptErrorString(err));
-            }
-        }
-    }
+    RunTests(tests, true);
 }
 
 BOOST_AUTO_TEST_CASE(tx_invalid) {
@@ -132,83 +176,17 @@ BOOST_AUTO_TEST_CASE(tx_invalid) {
     // Format is an array of arrays
     // Inner arrays are either [ "comment" ]
     // or [[[prevout hash, prevout index, prevout scriptPubKey], [input 2],
-    // ...],"], serializedTransaction, verifyFlags
+    // ...],"], serializedTransaction, verifyFlags (as a single string or an array of strngs)
     // ... where all scripts are stringified scripts.
     //
-    // verifyFlags is a comma separated list of script verification flags to
-    // apply, or "NONE"
+    // verifyFlags is a a single string or an array of strings where each string is comma-separated 
+    // list of script verification flags to apply, or "NONE"
+    // 
     UniValue tests = read_json(
         std::string(json_tests::tx_invalid,
                     json_tests::tx_invalid + sizeof(json_tests::tx_invalid)));
 
-    ScriptError err;
-    for (size_t idx = 0; idx < tests.size(); idx++) {
-        UniValue test = tests[idx];
-        std::string strTest = test.write();
-        if (test[0].isArray()) {
-            if (test.size() != 3 || !test[1].isStr() || !test[2].isStr()) {
-                BOOST_ERROR("Bad test: " << strTest);
-                continue;
-            }
-
-            std::map<COutPoint, CScript> mapprevOutScriptPubKeys;
-            std::map<COutPoint, Amount> mapprevOutValues;
-            UniValue inputs = test[0].get_array();
-            bool fValid = true;
-            for (size_t inpIdx = 0; inpIdx < inputs.size(); inpIdx++) {
-                const UniValue &input = inputs[inpIdx];
-                if (!input.isArray()) {
-                    fValid = false;
-                    break;
-                }
-                UniValue vinput = input.get_array();
-                if (vinput.size() < 3 || vinput.size() > 4) {
-                    fValid = false;
-                    break;
-                }
-                COutPoint outpoint(uint256S(vinput[0].get_str()),
-                                   vinput[1].get_int());
-                mapprevOutScriptPubKeys[outpoint] =
-                    ParseScript(vinput[2].get_str());
-                if (vinput.size() >= 4) {
-                    mapprevOutValues[outpoint] = Amount(vinput[3].get_int64());
-                }
-            }
-            if (!fValid) {
-                BOOST_ERROR("Bad test: " << strTest);
-                continue;
-            }
-
-            std::string transaction = test[1].get_str();
-            CDataStream stream(ParseHex(transaction), SER_NETWORK,
-                               PROTOCOL_VERSION);
-            CTransaction tx(deserialize, stream);
-
-            CValidationState state;
-            fValid = CheckRegularTransaction(tx, state) && state.IsValid();
-
-            PrecomputedTransactionData txdata(tx);
-            for (size_t i = 0; i < tx.vin.size() && fValid; i++) {
-                if (!mapprevOutScriptPubKeys.count(tx.vin[i].prevout)) {
-                    BOOST_ERROR("Bad test: " << strTest);
-                    break;
-                }
-
-                Amount amount(0);
-                if (0 != mapprevOutValues.count(tx.vin[i].prevout)) {
-                    amount = mapprevOutValues[tx.vin[i].prevout];
-                }
-
-                uint32_t verify_flags = ParseScriptFlags(test[2].get_str());
-                fValid = VerifyScript(
-                    tx.vin[i].scriptSig,
-                    mapprevOutScriptPubKeys[tx.vin[i].prevout], verify_flags,
-                    TransactionSignatureChecker(&tx, i, amount, txdata), &err);
-            }
-            BOOST_CHECK_MESSAGE(!fValid, strTest);
-            BOOST_CHECK_MESSAGE(err != SCRIPT_ERR_OK, ScriptErrorString(err));
-        }
-    }
+    RunTests(tests, false);
 }
 
 BOOST_AUTO_TEST_CASE(basic_transaction_tests) {
@@ -299,6 +277,7 @@ BOOST_AUTO_TEST_CASE(test_Get) {
     CCoinsViewCache coins(&coinsDummy);
     std::vector<CMutableTransaction> dummyTransactions =
         SetupDummyInputs(keystore, coins);
+    DummyConfig config;
 
     CMutableTransaction t1;
     t1.vin.resize(3);
@@ -314,14 +293,14 @@ BOOST_AUTO_TEST_CASE(test_Get) {
     t1.vout[0].nValue = 90 * CENT;
     t1.vout[0].scriptPubKey << OP_1;
 
-    BOOST_CHECK(AreInputsStandard(CTransaction(t1), coins));
+    BOOST_CHECK(AreInputsStandard(config, CTransaction(t1), coins));
     BOOST_CHECK_EQUAL(coins.GetValueIn(CTransaction(t1)),
                       (50 + 21 + 22) * CENT);
 }
 
 void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
                           CTransactionRef &output, CMutableTransaction &input,
-                          bool success = true) {
+                          bool successBeforeGenesis, bool successAfterGenesis) {
     CMutableTransaction outputm;
     outputm.nVersion = 1;
     outputm.vin.resize(1);
@@ -345,9 +324,12 @@ void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
     inputm.vout.resize(1);
     inputm.vout[0].nValue = Amount(1);
     inputm.vout[0].scriptPubKey = CScript();
-    bool ret =
-        SignSignature(keystore, *output, inputm, 0, SigHashType().withForkId());
-    BOOST_CHECK_EQUAL(ret, success);
+    bool retAfter = SignSignature(keystore, true, true, *output, inputm, 0,
+                                   SigHashType().withForkId());
+    BOOST_CHECK_EQUAL(retAfter, successAfterGenesis);
+    bool retBefore = SignSignature(keystore, true, false, *output, inputm, 0,
+                                   SigHashType().withForkId());
+    BOOST_CHECK_EQUAL(retBefore, successBeforeGenesis);
     CDataStream ssin(SER_NETWORK, PROTOCOL_VERSION);
     ssin << inputm;
     ssin >> input;
@@ -358,15 +340,29 @@ void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
 }
 
 void CheckWithFlag(const CTransactionRef &output,
-                   const CMutableTransaction &input, int flags, bool success) {
+                   const CMutableTransaction &input, int flags,
+                   bool successBeforeGenesis, bool successAfterGenesis) {
     ScriptError error;
     CTransaction inputi(input);
-    bool ret = VerifyScript(
+    auto s1 = ScriptToAsmStr(inputi.vin[0].scriptSig);
+    auto s2 = ScriptToAsmStr(output->vout[0].scriptPubKey);
+
+    bool retBefore = VerifyScript(
         inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
         flags | SCRIPT_ENABLE_SIGHASH_FORKID,
         TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
         &error);
-    BOOST_CHECK_EQUAL(ret, success);
+    BOOST_CHECK_MESSAGE(retBefore == successBeforeGenesis,
+                        std::string("failed before genesis result: ") + (retBefore ? "true":"false"));
+    
+    bool retAfter = VerifyScript(
+        inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
+        flags | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
+        TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
+        &error);
+
+    BOOST_CHECK_MESSAGE(retAfter == successAfterGenesis,
+                      std::string("failed after genesis result: ") + (retAfter ? "true" : "false"));
 }
 
 static CScript PushAll(const std::vector<valtype> &values) {
@@ -433,7 +429,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     // sign all inputs
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         bool hashSigned =
-            SignSignature(keystore, scriptPubKey, mtx, i, Amount(1000),
+            SignSignature(keystore, true, true, scriptPubKey, mtx, i, Amount(1000),
                           sigHashes.at(i % sigHashes.size()));
         BOOST_CHECK_MESSAGE(hashSigned, "Failed to sign test transaction");
     }
@@ -517,89 +513,91 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     SignatureData sigdata;
 
     // Normal pay-to-compressed-pubkey.
-    CreateCreditAndSpend(keystore, scriptPubkey1, output1, input1);
-    CreateCreditAndSpend(keystore, scriptPubkey2, output2, input2);
-    CheckWithFlag(output1, input1, 0, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, 0, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CreateCreditAndSpend(keystore, scriptPubkey1, output1, input1, true, true);
+    CreateCreditAndSpend(keystore, scriptPubkey2, output2, input2, true, true);
+    CheckWithFlag(output1, input1, 0, true, true);
+    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
+    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
+    CheckWithFlag(output1, input2, 0, false, false);
+    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, false);
+    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false, false);
 
     // P2SH pay-to-compressed-pubkey.
     CreateCreditAndSpend(keystore,
                          GetScriptForDestination(CScriptID(scriptPubkey1)),
-                         output1, input1);
+                         output1, input1, true, false);
     CreateCreditAndSpend(keystore,
                          GetScriptForDestination(CScriptID(scriptPubkey2)),
-                         output2, input2);
+                         output2, input2, true, false);
     ReplaceRedeemScript(input2.vin[0].scriptSig, scriptPubkey1);
-    CheckWithFlag(output1, input1, 0, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, 0, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CheckWithFlag(output1, input1, 0, true, true);
+    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
+    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
+    CheckWithFlag(output1, input2, 0, true, true);
+    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, true);
+    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false, false); // after genesis fails because stack is not clean as we did not execute redeem script
 
     // Normal pay-to-uncompressed-pubkey.
-    CreateCreditAndSpend(keystore, scriptPubkey1L, output1, input1);
-    CreateCreditAndSpend(keystore, scriptPubkey2L, output2, input2);
-    CheckWithFlag(output1, input1, 0, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, 0, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CreateCreditAndSpend(keystore, scriptPubkey1L, output1, input1, true, true);
+    CreateCreditAndSpend(keystore, scriptPubkey2L, output2, input2, true, true);
+    CheckWithFlag(output1, input1, 0, true, true);
+    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
+    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
+    CheckWithFlag(output1, input2, 0, false, false);
+    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, false);
+    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false, false);
 
     // P2SH pay-to-uncompressed-pubkey.
     CreateCreditAndSpend(keystore,
                          GetScriptForDestination(CScriptID(scriptPubkey1L)),
-                         output1, input1);
+                         output1, input1, true, false);
     CreateCreditAndSpend(keystore,
                          GetScriptForDestination(CScriptID(scriptPubkey2L)),
-                         output2, input2);
+                         output2, input2, true, false);
     ReplaceRedeemScript(input2.vin[0].scriptSig, scriptPubkey1L);
-    CheckWithFlag(output1, input1, 0, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, 0, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CheckWithFlag(output1, input1, 0, true, true);                             // allways passes because redeem script is left on stack and it is converted to TRUE
+    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
+    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
+    CheckWithFlag(output1, input2, 0, true, true);
+    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false, true);           // after genesis passes beacuse script matches but we dont evaluate it
+    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false, false); // after genesis fails because stack is not clean as we did not execute redeem script 
 
     // Normal 2-of-2 multisig
-    CreateCreditAndSpend(keystore, scriptMulti, output1, input1, false);
-    CheckWithFlag(output1, input1, 0, false);
-    CreateCreditAndSpend(keystore2, scriptMulti, output2, input2, false);
-    CheckWithFlag(output2, input2, 0, false);
+    CreateCreditAndSpend(keystore, scriptMulti, output1, input1, false, false);
+    CheckWithFlag(output1, input1, 0, false, false);
+    CreateCreditAndSpend(keystore2, scriptMulti, output2, input2, false, false);
+    CheckWithFlag(output2, input2, 0, false, false);
     BOOST_CHECK(*output1 == *output2);
     UpdateTransaction(
         input1, 0, CombineSignatures(output1->vout[0].scriptPubKey,
                                      MutableTransactionSignatureChecker(
                                          &input1, 0, output1->vout[0].nValue),
                                      DataFromTransaction(input1, 0),
-                                     DataFromTransaction(input2, 0)));
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+                                     DataFromTransaction(input2, 0),
+                                     false));
+    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, true);
 
     // P2SH 2-of-2 multisig
     CreateCreditAndSpend(keystore,
                          GetScriptForDestination(CScriptID(scriptMulti)),
-                         output1, input1, false);
-    CheckWithFlag(output1, input1, 0, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, false);
+                         output1, input1, false, false);
+    CheckWithFlag(output1, input1, 0, true, true);
+    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, false, true);
     CreateCreditAndSpend(keystore2,
                          GetScriptForDestination(CScriptID(scriptMulti)),
-                         output2, input2, false);
-    CheckWithFlag(output2, input2, 0, true);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH, false);
+                         output2, input2, false, false);
+    CheckWithFlag(output2, input2, 0, true, true);
+    CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH, false, true);
     BOOST_CHECK(*output1 == *output2);
     UpdateTransaction(
         input1, 0, CombineSignatures(output1->vout[0].scriptPubKey,
                                      MutableTransactionSignatureChecker(
                                          &input1, 0, output1->vout[0].nValue),
                                      DataFromTransaction(input1, 0),
-                                     DataFromTransaction(input2, 0)));
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+                                     DataFromTransaction(input2, 0), 
+                                     false));
+    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true, true);
+    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true, false); // after genesis fails because stack is not clean as we did not execute redeem script
 }
 
 BOOST_AUTO_TEST_CASE(test_IsStandard) {
