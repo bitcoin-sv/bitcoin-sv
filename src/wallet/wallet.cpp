@@ -2319,6 +2319,7 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
             if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
                 !IsLockedCoin((*it).first, i) &&
                 (pcoin->tx->vout[i].nValue > Amount(0) || fIncludeZeroValue) &&
+                !(pcoin->tx->vout[i].scriptPubKey.IsPayToScriptHash() && pcoin->IsGenesisEnabled()) && // we don't want to select p2sh utxos created after genesis
                 (!coinControl || !coinControl->HasSelected() ||
                  coinControl->fAllowOtherInputs ||
                  coinControl->IsSelected(COutPoint((*it).first, i)))) {
@@ -2730,6 +2731,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         std::vector<COutput> vAvailableCoins;
         AvailableCoins(vAvailableCoins, true, coinControl);
 
+        Config &config = GlobalConfig::GetConfig();
+
         nFeeRet = Amount(0);
         // Start with no fee and loop until there is enough fee.
         while (true) {
@@ -2744,7 +2747,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 nValueToSelect += nFeeRet;
             }
 
-            Config &config = GlobalConfig::GetConfig();
             double dPriority = 0;
             // vouts to the payees
             for (const auto &recipient : vecSend) {
@@ -3001,14 +3003,16 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 const CScript &scriptPubKey =
                     coin.first->tx->vout[coin.second].scriptPubKey;
                 SignatureData sigdata;
-
+                
                 if (!ProduceSignature(
                         TransactionSignatureCreator(
                             this, &txNewConst, nIn,
                             coin.first->tx->vout[coin.second].nValue,
                             sigHashType),
-                        true, false, // // just for compiler to pass, fixing in subsequent commits
-                        scriptPubKey, sigdata)) {
+                        IsGenesisEnabled(config, chainActive.Height() + 1), // new transaction, assume it will be mined in next block
+                        coin.first->IsGenesisEnabled(),
+                        scriptPubKey, 
+                        sigdata)) {
                     strFailReason = _("Signing transaction failed");
                     return false;
                 } else {
@@ -4512,27 +4516,44 @@ void CMerkleTx::SetMerkleBranch(const CBlockIndex *pindex, int posInBlock) {
     nIndex = posInBlock;
 }
 
-int CMerkleTx::GetDepthInMainChain(const CBlockIndex *&pindexRet) const {
-    if (hashUnset()) {
+int CMerkleTx::GetDepthInMainChain() const {
+    int height = GetHeightInMainChain();
+    if (height == MEMPOOL_HEIGHT) {
         return 0;
+    }
+
+    return ((nIndex == -1) ? (-1) : 1) *
+           (chainActive.Height() - height + 1);
+}
+
+int CMerkleTx::GetHeightInMainChain() const {
+    if (hashUnset()) {
+        return MEMPOOL_HEIGHT;
     }
 
     AssertLockHeld(cs_main);
 
     // Find the block it claims to be in.
-    BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
+    auto mi = mapBlockIndex.find(hashBlock);
     if (mi == mapBlockIndex.end()) {
-        return 0;
+        return MEMPOOL_HEIGHT;
     }
 
-    CBlockIndex *pindex = (*mi).second;
+    const CBlockIndex *pindex = (*mi).second;
     if (!pindex || !chainActive.Contains(pindex)) {
-        return 0;
+        return MEMPOOL_HEIGHT;
     }
 
-    pindexRet = pindex;
-    return ((nIndex == -1) ? (-1) : 1) *
-           (chainActive.Height() - pindex->nHeight + 1);
+    return pindex->nHeight;
+}
+
+bool CMerkleTx::IsGenesisEnabled() const {
+    int height = GetHeightInMainChain();
+    if (height == MEMPOOL_HEIGHT) {
+        AssertLockHeld(cs_main);
+        return ::IsGenesisEnabled(GlobalConfig::GetConfig(), chainActive.Height() + 1);
+    }
+    return ::IsGenesisEnabled(GlobalConfig::GetConfig(), height);
 }
 
 int CMerkleTx::GetBlocksToMaturity() const {
