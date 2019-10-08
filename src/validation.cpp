@@ -554,8 +554,8 @@ std::string FormatStateMessage(const CValidationState &state) {
         state.GetRejectCode());
 }
 
-static bool IsCurrentForFeeEstimation() {
-    // cs_main is held by TxnValidator during TxnValidation call.
+bool IsCurrentForFeeEstimation() {
+    AssertLockHeld(cs_main);
     if (IsInitialBlockDownload()) {
         return false;
     }
@@ -885,7 +885,8 @@ CTxnValResult TxnValidation(
     const TxInputDataSPtr& pTxInputData,
     const Config& config,
     CTxMemPool& pool,
-    TxnDoubleSpendDetectorSPtr dsDetector) {
+    TxnDoubleSpendDetectorSPtr dsDetector,
+    bool fReadyForFeeEstimation) {
 
     using Result = CTxnValResult;
 
@@ -1169,7 +1170,7 @@ CTxnValResult TxnValidation(
     // This transaction should only count for fee estimation if
     // the node is not behind and it is not dependent on any other
     // transactions in the Mempool.
-    bool fTxValidForFeeEstimation = IsCurrentForFeeEstimation() && pool.HasNoInputsOf(tx);
+    bool fTxValidForFeeEstimation = fReadyForFeeEstimation && pool.HasNoInputsOf(tx);
     // Transaction is validated successfully. Return valid results.
     return Result{state,
                   pTxInputData,
@@ -1183,7 +1184,8 @@ std::vector<CTxnValResult> TxnValidationBatchProcessing(
     const TxInputDataSPtrRefVec& vTxInputData,
     const Config& config,
     CTxMemPool& pool,
-    CTxnHandlers& handlers) {
+    CTxnHandlers& handlers,
+    bool fReadyForFeeEstimation) {
 
     std::vector<CTxnValResult> results {};
     results.reserve(vTxInputData.size());
@@ -1194,7 +1196,8 @@ std::vector<CTxnValResult> TxnValidationBatchProcessing(
                     elem,
                     config,
                     pool,
-                    handlers.mpTxnDoubleSpendDetector)
+                    handlers.mpTxnDoubleSpendDetector,
+                    fReadyForFeeEstimation)
         };
         // Process validated results
         ProcessValidatedTxn(pool, result, handlers, false);
