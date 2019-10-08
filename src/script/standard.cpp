@@ -4,11 +4,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script/standard.h"
+#include "script/script_num.h"
 
 #include "pubkey.h"
 #include "script/script.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "int_serialization.h"
 
 typedef std::vector<uint8_t> valtype;
 
@@ -122,9 +124,16 @@ bool Solver(const CScript &scriptPubKey,
                 // Found a match
                 typeRet = tplate.first;
                 if (typeRet == TX_MULTISIG) {
+                    // we check minimal encoding before calling CScriptNum to prevent exception throwing in CScriptNum constructor.
+                    // This output will then be unspendable because EvalScript will fail execution of such script
+                    if (!bsv::IsMinimallyEncoded(vSolutionsRet.front(), CScriptNum::MAXIMUM_ELEMENT_SIZE) ||
+                        !bsv::IsMinimallyEncoded(vSolutionsRet.back(), CScriptNum::MAXIMUM_ELEMENT_SIZE)){
+                        typeRet = TX_NONSTANDARD;
+                        return false;
+                    }
                     // Additional checks for TX_MULTISIG:
-                    uint8_t m = vSolutionsRet.front()[0];
-                    uint8_t n = vSolutionsRet.back()[0];
+                    int m = CScriptNum(vSolutionsRet.front(), false).getint();
+                    int n = CScriptNum(vSolutionsRet.back(), false).getint();
                     if (m < 1 || n < 1 || m > n ||
                         vSolutionsRet.size() - 2 != n) {
                         return false;
@@ -165,8 +174,15 @@ bool Solver(const CScript &scriptPubKey,
                 }
                 vSolutionsRet.push_back(vch1);
             } else if (opcode2 == OP_SMALLINTEGER) {
-                // Single-byte small integer pushed onto vSolutions
-                if (opcode1 == OP_0 || (opcode1 >= OP_1 && opcode1 <= OP_16)) {
+                // OP_0 is pushed onto vector as empty element because of minimal enconding 
+                if (opcode1 == OP_0 || (genesisEnabled && !vch1.empty())) {
+                    //if number size is greater than currently max allowed (4 bytes) we break the execution and mark the transaction as non-standard
+                    if (vch1.size() > CScriptNum::MAXIMUM_ELEMENT_SIZE)
+                        break;
+
+                    vSolutionsRet.push_back(vch1);
+                }
+                else if (opcode1 >= OP_1 && opcode1 <= OP_16) {
                     char n = (char)CScript::DecodeOP_N(opcode1);
                     vSolutionsRet.push_back(valtype(1, n));
                 } else {

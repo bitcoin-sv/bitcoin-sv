@@ -2132,6 +2132,7 @@ BOOST_AUTO_TEST_CASE(script_Solver) {
     std::vector<uint8_t> hash160(20, 2);
     std::vector<uint8_t> data(100, 3);
 
+    bool afterGenesis = true;
     CScript nonStandard = CScript() << OP_1;
     CScript P2PK = CScript() << pubKey << OP_CHECKSIG;
     CScript P2PKH = CScript() << OP_DUP << OP_HASH160 << hash160
@@ -2143,28 +2144,109 @@ BOOST_AUTO_TEST_CASE(script_Solver) {
                        << OP_2 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
 
     // Test CheckSolver before genesis
-    CheckSolver(nonStandard, false, TX_NONSTANDARD, false);
-    CheckSolver(P2PK, false, TX_PUBKEY, true);
-    CheckSolver(P2PKH, false, TX_PUBKEYHASH, true);
-    CheckSolver(P2SH, false, TX_SCRIPTHASH, true);
-    CheckSolver(multisig, false, TX_MULTISIG, true);
+    CheckSolver(nonStandard, !afterGenesis, TX_NONSTANDARD, false);
+    CheckSolver(P2PK, !afterGenesis, TX_PUBKEY, true);
+    CheckSolver(P2PKH, !afterGenesis, TX_PUBKEYHASH, true);
+    CheckSolver(P2SH, !afterGenesis, TX_SCRIPTHASH, true);
+    CheckSolver(multisig, !afterGenesis, TX_MULTISIG, true);
 
     // Test CheckSolver after genesis
-    CheckSolver(nonStandard, true, TX_NONSTANDARD, false);
-    CheckSolver(P2PK, true, TX_PUBKEY, true);
-    CheckSolver(P2PKH, true, TX_PUBKEYHASH, true);
-    CheckSolver(P2SH, true, TX_NONSTANDARD, false);
-    CheckSolver(multisig, true, TX_MULTISIG, true);
+    CheckSolver(nonStandard, afterGenesis, TX_NONSTANDARD, false);
+    CheckSolver(P2PK, afterGenesis, TX_PUBKEY, true);
+    CheckSolver(P2PKH, afterGenesis, TX_PUBKEYHASH, true);
+    CheckSolver(P2SH, afterGenesis, TX_NONSTANDARD, false);
+    CheckSolver(multisig, afterGenesis, TX_MULTISIG, true);
 
     // Test CheckSolver - before Genesis both "OP_RETURN" and "OP_FALSE
     // OP_RETURN" is recognized as data
-    CheckSolver(opReturn, false, TX_NULL_DATA, true);
-    CheckSolver(opFalseOpReturn, false, TX_NULL_DATA, true);
+    CheckSolver(opReturn, !afterGenesis, TX_NULL_DATA, true);
+    CheckSolver(opFalseOpReturn, !afterGenesis, TX_NULL_DATA, true);
 
     // Test CheckSolver - after Genesis only "OP_FALSE OP_RETURN" is
     // recognized as data
-    CheckSolver(opReturn, true, TX_NONSTANDARD, false);
-    CheckSolver(opFalseOpReturn, true, TX_NULL_DATA, true);
+    CheckSolver(opReturn, afterGenesis, TX_NONSTANDARD, false);
+    CheckSolver(opFalseOpReturn, afterGenesis, TX_NULL_DATA, true);
+
+    CScript multiSig_OP_16_with_19_keys = CScript() << OP_16;
+    for (int i = 0; i < 19; i++)
+    {
+        multiSig_OP_16_with_19_keys << pubKey;
+    }
+    multiSig_OP_16_with_19_keys << OP_16 << OP_CHECKMULTISIG;
+
+    CScript multiSig22 = CScript() << CScriptNum(22);
+    for (int i = 0; i < 22; i++)
+    {
+        multiSig22 << pubKey;
+    }
+    multiSig22 << CScriptNum(22) << OP_CHECKMULTISIG;
+
+    CScript multiSig280 = CScript() << CScriptNum(100);
+    for (int i = 0; i < 280; i++)
+    {
+        multiSig280 << pubKey;
+    }
+    multiSig280 << CScriptNum(280) << OP_CHECKMULTISIG;
+    //Test CheckSolver to check more than 16 keys before and after genesis
+    CheckSolver(multiSig_OP_16_with_19_keys, !afterGenesis, TX_MULTISIG, false);
+    CheckSolver(multiSig22, !afterGenesis, TX_NONSTANDARD, false);
+    CheckSolver(multiSig22, afterGenesis, TX_MULTISIG, true);
+    CheckSolver(multiSig280, afterGenesis, TX_MULTISIG, true);
+
+    //Test CheckSolver to check for non minimal encoded numbers and mark them as TX_NONSTANDARD
+    CScript nonStardandNonMinimal = CScript() << 2 << pubKey << pubKey << std::vector<uint8_t>(1, 2) << OP_CHECKMULTISIG;
+    CheckSolver(nonStardandNonMinimal, !afterGenesis, TX_NONSTANDARD, false);
+}
+
+BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
+    
+    std::vector<std::vector<uint8_t>> solutions;
+    txnouttype txMultiSig = TX_MULTISIG;
+    std::vector<uint8_t> pubKey(33, 1);
+    
+    //Test solver before genesis with 2 pubkeys and 0 sigs
+    CScript multisig_OP0_OP2 = CScript() << OP_0 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
+    bool result = Solver(multisig_OP0_OP2, false, txMultiSig, solutions);
+    BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 0);
+    BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 2);
+
+    
+    //Test solver before genesis with 16 pubkeys and 1 sig
+    solutions.clear();
+    CScript multisig_OP1_OP16 = CScript() << OP_1;
+    for (int i = 0; i < 16; i++)
+    {
+        multisig_OP1_OP16 << pubKey;
+    }
+    multisig_OP1_OP16 << OP_16 << OP_CHECKMULTISIG;
+    result = Solver(multisig_OP1_OP16, false, txMultiSig, solutions);
+    BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 1);
+    BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 16);
+
+    //Test solver before genesis with 18 pubkeys and 1 sig but without using OP code, it should fail
+    solutions.clear();
+    CScript multisig_OP1_OP18 = CScript() << OP_1;
+    for (int i = 0; i < 18; i++)
+    {
+        multisig_OP1_OP18 << pubKey;
+    }
+    multisig_OP1_OP18 << CScriptNum(18) << OP_CHECKMULTISIG;
+    result = Solver(multisig_OP1_OP18, false, txMultiSig, solutions);
+    BOOST_CHECK(result == false);
+    BOOST_CHECK(txMultiSig == TX_NONSTANDARD);
+
+    //Test solver after genesis with 300 pubkeys (2 bytes) and 1 sig
+    solutions.clear();
+    txMultiSig = TX_MULTISIG;
+    CScript multisig_OP1_OP300 = CScript() << OP_1;
+    for (int i = 0; i < 300; i++)
+    {
+        multisig_OP1_OP300 << pubKey;
+    }
+    multisig_OP1_OP300 << CScriptNum(300) << OP_CHECKMULTISIG;
+    result = Solver(multisig_OP1_OP300, true, txMultiSig, solutions);
+    BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 1);
+    BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 300);
 }
 
 BOOST_AUTO_TEST_CASE(txout_IsDust) {
