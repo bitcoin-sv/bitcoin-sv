@@ -544,13 +544,15 @@ void CommitTxToMempool(
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
  * @param dsDetector A reference to a double spend detector
+ * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
  * @return A result of validation.
  */
 CTxnValResult TxnValidation(
     const TxInputDataSPtr& pTxInputData,
     const Config &config,
     CTxMemPool &pool,
-    TxnDoubleSpendDetectorSPtr dsDetector);
+    TxnDoubleSpendDetectorSPtr dsDetector,
+    bool fReadyForFeeEstimation);
 
 /**
  * Batch processing support for txns validation.
@@ -558,13 +560,16 @@ CTxnValResult TxnValidation(
  * @param vTxInputData A vector of txns data
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
+ * @param handlers Txn handlers
+ * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
  * @return A vector of validation results
  */
 std::vector<CTxnValResult> TxnValidationBatchProcessing(
     const TxInputDataSPtrRefVec& vTxInputData,
     const Config &config,
     CTxMemPool &pool,
-    CTxnHandlers& handlers);
+    CTxnHandlers& handlers,
+    bool fReadyForFeeEstimation);
 
 /**
  * Process validated txn. Submit txn to the mempool if it is valid.
@@ -594,6 +599,9 @@ void CreateTxRejectMsgForP2PTxn(
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
+
+/** Check if all conditions are met to apply fee estimation */
+bool IsCurrentForFeeEstimation();
 
 /**
  * Count ECDSA signature operations the old-fashioned (pre-0.6) way

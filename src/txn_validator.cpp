@@ -142,7 +142,8 @@ CValidationState CTxnValidator::processValidation(
                 pTxInputData,
                 mConfig,
                 mMempool,
-                mpTxnDoubleSpendDetector);
+                mpTxnDoubleSpendDetector,
+                IsCurrentForFeeEstimation());
     // Special handlers
     CTxnHandlers handlers {
         // Mempool Journal ChangeSet
@@ -215,7 +216,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 };
                                 // Validate txns and try to submit them to the mempool
                                 std::vector<TxInputDataSPtr> vAcceptedTxns {
-                                    processNewTransactionsNL(mProcessingQueue, changeSet)
+                                    processNewTransactionsNL(mProcessingQueue, changeSet, IsCurrentForFeeEstimation())
                                 };
                                 // Trim mempool if it's size exceeds the limit.
                                 std::vector<TxId> vRemovedTxIds {
@@ -271,17 +272,20 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
 std::vector<TxInputDataSPtr>
 CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
-    mining::CJournalChangeSetPtr& journalChangeSet) {
+    mining::CJournalChangeSetPtr& journalChangeSet,
+    bool fReadyForFeeEstimation) {
 
     auto tx_validation = [](const TxInputDataSPtrRefVec& vTxInputData,
                             const Config* config,
                             CTxMemPool *pool,
-                            CTxnHandlers& handlers) {
+                            CTxnHandlers& handlers,
+                            bool fReadyForFeeEstimation) {
         return TxnValidationBatchProcessing(
                      vTxInputData,
                     *config,
                     *pool,
-                     handlers);
+                     handlers,
+                     fReadyForFeeEstimation);
     };
     // Special handlers
     CTxnHandlers handlers {
@@ -302,7 +306,8 @@ CTxnValidator::processNewTransactionsNL(
                         &mConfig,
                         &mMempool,
                         txns,
-                        handlers)
+                        handlers,
+                        fReadyForFeeEstimation)
     };
     // Process validation results for transactions.
     std::vector<TxInputDataSPtr> vAcceptedTxns {};

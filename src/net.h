@@ -253,17 +253,20 @@ public:
             const Config* config,
             CTxMemPool *pool,
             TxInputDataSPtrVec& vNewTxns,
-            CTxnHandlers& handlers)
+            CTxnHandlers& handlers,
+            bool fReadyForFeeEstimation)
         -> std::vector<std::future<typename std::result_of<
             Callable(const TxInputDataSPtrRefVec&,
                 const Config*,
                 CTxMemPool*,
-                CTxnHandlers&)>::type>> {
+                CTxnHandlers&,
+                bool)>::type>> {
         using resultType = typename std::result_of<
             Callable(const TxInputDataSPtrRefVec&,
                 const Config*,
                 CTxMemPool*,
-                CTxnHandlers&)>::type;
+                CTxnHandlers&,
+                bool)>::type;
         // A variable which stors results
         std::vector<std::future<resultType>> results {};
         size_t numThreads = mValidatorThreadPool.getPoolSize();
@@ -293,7 +296,8 @@ public:
                             vBatchTxns,
                             config,
                             pool,
-                            handlers));
+                            handlers,
+                            fReadyForFeeEstimation));
                 }
         };
         // Calculate a chunk of txns & create a task which executes a batch processing.
