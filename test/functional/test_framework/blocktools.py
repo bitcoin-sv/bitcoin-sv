@@ -136,6 +136,21 @@ def get_legacy_sigopcount_tx(tx, fAccurate=True):
         count += CScript(j.scriptSig).GetSigOpCount(fAccurate)
     return count
 
+def calc_needed_data_size(script_op_codes, target_size):
+    def pushdata_size(sz):
+        if sz < 0x4c:
+            return 1  # OP_PUSHDATA
+        elif sz <= 0xff:
+            return 2  # OP_PUSHDATA1
+        elif sz <= 0xffff:
+            return 3  # OP_PUSHDATA2
+        elif sz <= 0xffffffff:
+            return 5  # OP_PUSHDATA4
+        else:
+            raise ValueError("Data too long to encode in a PUSHDATA op")
+
+    return target_size - (len(script_op_codes) + pushdata_size(target_size))
+
 
 ### Helper to build chain
 
