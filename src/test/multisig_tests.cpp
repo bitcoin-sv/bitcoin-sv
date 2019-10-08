@@ -249,11 +249,13 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         txnouttype whichType;
         CScript s;
         s << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
-        BOOST_CHECK(SolverNoData(s, whichType, solutions));
-        BOOST_CHECK(solutions.size() == 1);
-        CTxDestination addr;
-        BOOST_CHECK(ExtractDestination(s, addr));
-        BOOST_CHECK(addr == keyaddr[0]);
+        for(bool genesisEnabled : {true, false}){
+            BOOST_CHECK(SolverNoData(s, genesisEnabled, whichType, solutions));
+            BOOST_CHECK(solutions.size() == 1);
+            CTxDestination addr;
+            BOOST_CHECK(ExtractDestination(s, genesisEnabled, addr));
+            BOOST_CHECK(addr == keyaddr[0]);
+        }
         BOOST_CHECK(IsMine(keystore, s));
         BOOST_CHECK(!IsMine(emptykeystore, s));
     }
@@ -263,25 +265,29 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         CScript s;
         s << OP_DUP << OP_HASH160 << ToByteVector(key[0].GetPubKey().GetID())
           << OP_EQUALVERIFY << OP_CHECKSIG;
-        BOOST_CHECK(SolverNoData(s, whichType, solutions));
-        BOOST_CHECK(solutions.size() == 1);
-        CTxDestination addr;
-        BOOST_CHECK(ExtractDestination(s, addr));
-        BOOST_CHECK(addr == keyaddr[0]);
-        BOOST_CHECK(IsMine(keystore, s));
+        for(bool genesisEnabled : {true, false}){
+            BOOST_CHECK(SolverNoData(s, genesisEnabled, whichType, solutions));
+            BOOST_CHECK(solutions.size() == 1);
+            CTxDestination addr;        
+            BOOST_CHECK(ExtractDestination(s, genesisEnabled, addr));
+            BOOST_CHECK(addr == keyaddr[0]);
+        }
         BOOST_CHECK(!IsMine(emptykeystore, s));
+        BOOST_CHECK(IsMine(keystore, s));
     }
     { // Data - has no address  - just test ExtractDestination() and IsMine() since we have Solver() dedicated tests in script_tests.cpp (script_Solver)
         std::vector<uint8_t> data(200, 1);
         std::vector<valtype> solutions;
-        txnouttype whichType;
         CScript opReturn = CScript() << OP_RETURN << data;
         CTxDestination addr;
-        BOOST_CHECK(!ExtractDestination(opReturn,addr));
+        for(bool genesisEnabled : {true, false}){
+            BOOST_CHECK(!ExtractDestination(opReturn, genesisEnabled, addr));
+        }
         BOOST_CHECK(!IsMine(keystore, opReturn));
-
         CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN;
-        BOOST_CHECK(!ExtractDestination(opReturn, addr));
+        for(bool genesisEnabled : {true, false}){
+            BOOST_CHECK(!ExtractDestination(opReturn, genesisEnabled, addr));
+        }
         BOOST_CHECK(!IsMine(keystore, opReturn));
 
     }
@@ -291,10 +297,12 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         CScript s;
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-        BOOST_CHECK(SolverNoData(s, whichType, solutions));
-        BOOST_CHECK_EQUAL(solutions.size(), 4U);
-        CTxDestination addr;
-        BOOST_CHECK(!ExtractDestination(s, addr));
+        for(bool genesisEnabled : {true, false}){
+            BOOST_CHECK(SolverNoData(s, genesisEnabled, whichType, solutions));
+            BOOST_CHECK_EQUAL(solutions.size(), 4U);
+            CTxDestination addr;
+            BOOST_CHECK(!ExtractDestination(s, genesisEnabled, addr));
+        }
         BOOST_CHECK(IsMine(keystore, s));
         BOOST_CHECK(!IsMine(emptykeystore, s));
         BOOST_CHECK(!IsMine(partialkeystore, s));
@@ -305,20 +313,19 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         CScript s;
         s << OP_1 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-        BOOST_CHECK(SolverNoData(s, whichType, solutions));
-        BOOST_CHECK_EQUAL(solutions.size(), 4U);
-        std::vector<CTxDestination> addrs;
-        int nRequired;
-        BOOST_CHECK(ExtractDestinations(s, false, whichType, addrs, nRequired));
-        BOOST_CHECK(addrs[0] == keyaddr[0]);
-        BOOST_CHECK(addrs[1] == keyaddr[1]);
-        BOOST_CHECK(nRequired == 1);
 
-        // Try again with Genesis enabled - it should have no effect on multisig
-        BOOST_CHECK(ExtractDestinations(s, false, whichType, addrs, nRequired));
-        BOOST_CHECK(addrs[0] == keyaddr[0]);
-        BOOST_CHECK(addrs[1] == keyaddr[1]);
-        BOOST_CHECK(nRequired == 1);
+        for(bool genesisEnabled : {true, false}){
+            BOOST_CHECK(SolverNoData(s, genesisEnabled, whichType, solutions));
+            BOOST_CHECK_EQUAL(solutions.size(), 4U);
+            
+            std::vector<CTxDestination> addrs;
+            int nRequired;        
+            BOOST_CHECK(ExtractDestinations(s, genesisEnabled, whichType, addrs, nRequired));
+            BOOST_CHECK(addrs[0] == keyaddr[0]);
+            BOOST_CHECK(addrs[1] == keyaddr[1]);
+            BOOST_CHECK(nRequired == 1);
+
+        }
 
         BOOST_CHECK(IsMine(keystore, s));
         BOOST_CHECK(!IsMine(emptykeystore, s));
@@ -331,8 +338,11 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey())
           << ToByteVector(key[2].GetPubKey()) << OP_3 << OP_CHECKMULTISIG;
-        BOOST_CHECK(SolverNoData(s, whichType, solutions));
+        BOOST_CHECK(SolverNoData(s, true, whichType, solutions));
         BOOST_CHECK(solutions.size() == 5);
+        BOOST_CHECK(SolverNoData(s, false, whichType, solutions));
+        BOOST_CHECK(solutions.size() == 5);
+
     }
 }
 
@@ -376,7 +386,11 @@ BOOST_AUTO_TEST_CASE(multisig_Sign) {
     }
 
     for (int i = 0; i < 3; i++) {
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(keystore, true, true, CTransaction(txFrom),
+                                          txTo[i], 0,
+                                          SigHashType().withForkId()),
+                            strprintf("SignSignature %d", i));
+        BOOST_CHECK_MESSAGE(SignSignature(keystore, true, false, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
