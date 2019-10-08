@@ -109,6 +109,9 @@ public:
     virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const = 0;
 
+    virtual bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBPolicyIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const = 0;
+
     virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const = 0;
 
@@ -203,6 +206,9 @@ public:
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override;
     uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override;
 
+    bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBPolicyIn, std::string* err = nullptr) override;
+    uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const override;
+
     bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* error = nullptr) override;
     uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override;
 
@@ -256,6 +262,9 @@ private:
     int mPerBlockScriptValidationMaxBatchSize;
 
     uint64_t maxOpsPerScriptPolicy;
+
+    uint64_t maxBlockSigOpsPerMBPolicy;
+
 
     uint64_t maxTxSigOpsCountPolicy;
     uint64_t maxPubKeysPerMultiSig;
@@ -399,6 +408,10 @@ public:
     }
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+
+    bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBaPolicyIn, std::string* err = nullptr) override { return true; }
+    uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const override { throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented"); }
+
 
     bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override

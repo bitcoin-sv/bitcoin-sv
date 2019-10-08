@@ -3181,7 +3181,7 @@ static bool ConnectBlock(
     uint64_t nSigOpsCount = 0;
     const uint64_t currentBlockSize =
         ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-    const uint64_t nMaxSigOpsCount = GetMaxBlockSigOpsCount(currentBlockSize);
+    const uint64_t nMaxSigOpsCount = config.GetMaxBlockSigOps(IsGenesisEnabled(config, pindex->nHeight), true, currentBlockSize);
 
     CDiskTxPos pos(pindex->GetBlockPos(),
                    GetSizeOfCompactSize(block.vtx.size()));
@@ -4776,7 +4776,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
 
     // Keep track of the sigops count.
     uint64_t nSigOps = 0;
-    auto nMaxSigOpsCount = GetMaxBlockSigOpsCount(currentBlockSize);
+    auto nMaxSigOpsCount = config.GetMaxBlockSigOps(IsGenesisEnabled(config, blockHeight), true, currentBlockSize);
 
     // Check transactions
     auto txCount = block.vtx.size();

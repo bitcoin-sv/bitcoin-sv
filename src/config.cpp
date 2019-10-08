@@ -50,6 +50,7 @@ void GlobalConfig::Reset()
     mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
     mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
     maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
+    maxBlockSigOpsPerMBPolicy = DEFAULT_MAX_BLOCK_SIGOPS_PER_MB_POLICY_AFTER_GENESIS;
     maxTxSigOpsCountPolicy = DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
     maxPubKeysPerMultiSig = DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS;
 
@@ -548,6 +549,58 @@ bool GlobalConfig::SetMaxTransactionValidationDuration(int ms, std::string* err)
 std::chrono::milliseconds GlobalConfig::GetMaxTransactionValidationDuration() const
 {
     return mMaxTransactionValidationDuration;
+}
+
+bool GlobalConfig::SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBPolicyIn, std::string* err)
+{
+    if (maxBlockSigOpsPerMBPolicyIn < 0) {
+        if (err)
+        {
+            *err = _("Policy value for maxBlockSigOpsPerMB must not be negative.");
+        }
+        return false;
+    }
+    uint64_t  maxBlockSigOpsPerMBPolicyInUnsigned = static_cast<uint64_t>(maxBlockSigOpsPerMBPolicyIn);
+    if (maxBlockSigOpsPerMBPolicyInUnsigned > MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS)
+    {
+        if (err)
+        {
+            *err = _("Policy value for maxBlockSigOpsPerMB must not exceed consensus limit of ") + std::to_string(MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS);
+        }
+        return false;
+    }
+    else if (maxBlockSigOpsPerMBPolicyInUnsigned == 0)
+    {
+        maxBlockSigOpsPerMBPolicy = MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS;
+    }
+    else
+    {
+        maxBlockSigOpsPerMBPolicy = maxBlockSigOpsPerMBPolicyInUnsigned;
+    }
+    return true;
+}
+
+/**
+ * Compute the maximum number of sigops operations that can be contained in a block
+ * given the block size as parameter. It is computed by multiplying the upper sigops limit
+ * (MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS, MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS or 
+ * maxBlockSigOpsPerMBafterGenesis) by the size of the block in MB rounded up to the
+ * closest integer.
+ */
+
+uint64_t GlobalConfig::GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const
+{
+    auto nMbRoundedUp = 1 + ((blockSize - 1) / ONE_MEGABYTE);
+    if (!isGenesisEnabled) 
+    {
+        return nMbRoundedUp * MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
+    } 
+    if (consensus) 
+    {
+        return nMbRoundedUp * MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS;
+    }
+    return nMbRoundedUp * maxBlockSigOpsPerMBPolicy;
+    
 }
 
 DummyConfig::DummyConfig()

@@ -676,7 +676,7 @@ static UniValue getblocktemplate(const Config &config,
     auto defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
     // FIXME: Allow for mining block greater than 1M.
     result.push_back(
-        Pair("sigoplimit", GetMaxBlockSigOpsCount(defaultmaxBlockSize)));
+        Pair("sigoplimit", config.GetMaxBlockSigOps(IsGenesisEnabled(config, pindexPrev->nHeight + 1), false, defaultmaxBlockSize)));
     result.push_back(Pair("sizelimit", defaultmaxBlockSize));
     result.push_back(Pair("curtime", pblock->GetBlockTime()));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));

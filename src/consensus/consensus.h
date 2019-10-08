@@ -25,7 +25,9 @@ static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
  * The maximum allowed number of signature check operations per MB in a block
  * (network rule).
  */
-static const int64_t MAX_BLOCK_SIGOPS_PER_MB = 20000;
+static const int64_t MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS = 20000;
+static const int64_t MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS = ONE_MEGABYTE; //means 1M sigops/1M bytes = 1sigop/byte which is effectively unlimited
+
 /** allowed number of signature check operations per transaction. */
 static const uint64_t MAX_TX_SIGOPS_COUNT = 20000;
 
@@ -65,16 +67,5 @@ enum {
     /* Use GetMedianTimePast() instead of nTime for end point timestamp. */
     LOCKTIME_MEDIAN_TIME_PAST = (1 << 1),
 };
-
-/**
- * Compute the maximum number of sigops operation that can contained in a block
- * given the block size as parameter. It is computed by multiplying
- * MAX_BLOCK_SIGOPS_PER_MB by the size of the block in MB rounded up to the
- * closest integer.
- */
-inline uint64_t GetMaxBlockSigOpsCount(uint64_t blockSize) {
-    auto nMbRoundedUp = 1 + ((blockSize - 1) / ONE_MEGABYTE);
-    return nMbRoundedUp * MAX_BLOCK_SIGOPS_PER_MB;
-}
 
 #endif // BITCOIN_CONSENSUS_CONSENSUS_H

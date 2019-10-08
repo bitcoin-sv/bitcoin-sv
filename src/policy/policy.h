@@ -76,6 +76,8 @@ static const Amount DEFAULT_BLOCK_MIN_TX_FEE(1000);
 static const uint64_t MAX_TX_SIZE_POLICY_BEFORE_GENESIS = 100000 - 1; // -1 because pre genesis policy validation was >=
 /** The default size for transactions we're willing to relay/mine */
 static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = MAX_TX_SIZE_POLICY_BEFORE_GENESIS;
+/** Default policy value for -maxblocksigopspermbpolicy, maximum number of sigops we're willing to mine per MB of block after Genesis */
+static const unsigned int DEFAULT_MAX_BLOCK_SIGOPS_PER_MB_POLICY_AFTER_GENESIS = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
 /** Maximum number of signature check operations in an IsStandard() P2SH script
  */
 static const unsigned int MAX_P2SH_SIGOPS = 15;

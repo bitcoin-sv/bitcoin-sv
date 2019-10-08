@@ -228,11 +228,12 @@ void LegacyBlockAssembler::onlyUnconfirmed(CTxMemPool::setEntries &testSet) {
 
 bool LegacyBlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOps) {
     auto blockSizeWithPackage = nBlockSize + packageSize;
-    if (blockSizeWithPackage >= nMaxGeneratedBlockSize) {
+    if (blockSizeWithPackage >= nMaxGeneratedBlockSize)
+    {
         return false;
     }
-    if (nBlockSigOps + packageSigOps >=
-        GetMaxBlockSigOpsCount(blockSizeWithPackage)) {
+    if (nBlockSigOps + packageSigOps >= mConfig.GetMaxBlockSigOps(IsGenesisEnabled(mConfig, nHeight), false, blockSizeWithPackage))
+    {
         return false;
     }
     return true;
@@ -280,7 +281,7 @@ bool LegacyBlockAssembler::TestForBlock(CTxMemPool::txiter it) {
         return false;
     }
 
-    auto maxBlockSigOps = GetMaxBlockSigOpsCount(blockSizeWithTx);
+    auto maxBlockSigOps = mConfig.GetMaxBlockSigOps(IsGenesisEnabled(mConfig, nHeight), false, blockSizeWithTx);
     if (nBlockSigOps + it->GetSigOpCount() >= maxBlockSigOps) {
         // If the block has room for no more sig ops then flag that the block is
         // finished.
