@@ -11,6 +11,8 @@
 #include "test/test_bitcoin.h"
 #include "uint256.h"
 #include "validation.h"
+#include "chainparams.h"
+#include "config.h"
 
 #include <limits>
 #include <vector>
@@ -86,7 +88,7 @@ ScriptError VerifyWithFlag(const CTransaction &output,
  */
 void BuildTxs(CMutableTransaction &spendingTx, CCoinsViewCache &coins,
               CMutableTransaction &creationTx, const CScript &scriptPubKey,
-              const CScript &scriptSig) {
+              const CScript &scriptSig, int nHeight) {
     creationTx.nVersion = 1;
     creationTx.vin.resize(1);
     creationTx.vin[0].prevout = COutPoint();
@@ -103,7 +105,7 @@ void BuildTxs(CMutableTransaction &spendingTx, CCoinsViewCache &coins,
     spendingTx.vout[0].nValue = Amount(1);
     spendingTx.vout[0].scriptPubKey = CScript();
 
-    AddCoins(coins, CTransaction(creationTx), 0, 0 /* scriptPubKey is not a data about, so genesisActivationHeight does not matter */);
+    AddCoins(coins, CTransaction(creationTx), nHeight, 10 /* scriptPubKey is not a data about, so genesisActivationHEight does not matter */);
 }
 
 BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
@@ -122,6 +124,11 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
     CPubKey pubkey = key.GetPubKey();
     // Default flags
     int flags = SCRIPT_VERIFY_P2SH;
+    
+    uint64_t genesisHeight = 10;
+    auto config = DummyConfig();
+    config.SetGenesisActivationHeight(genesisHeight);
+    
 
     // Multisig script (legacy counting)
     {
@@ -131,22 +138,25 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         // Do not use a valid signature to avoid using wallet operations.
         CScript scriptSig = CScript() << OP_0 << OP_0;
 
-        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig);
+        for(int nHeight : {genesisHeight-1, genesisHeight}){ // test before and after genesis (should be the same)
+            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, nHeight);
 
-        // Legacy counting only includes signature operations in scriptSigs and
-        // scriptPubKeys of a transaction and does not take the actual executed
-        // sig operations into account. spendingTx in itself does not contain a
-        // signature operation.
-        assert(GetTransactionSigOpCount(CTransaction(spendingTx), coins,
-                                        flags) == 0);
-        // creationTx contains two signature operations in its scriptPubKey, but
-        // legacy counting is not accurate.
-        assert(GetTransactionSigOpCount(CTransaction(creationTx), coins,
-                                        flags) == MAX_PUBKEYS_PER_MULTISIG);
-        // Sanity check: script verification fails because of an invalid
-        // signature.
-        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
-               SCRIPT_ERR_CHECKMULTISIGVERIFY);
+            // Legacy counting only includes signature operations in scriptSigs and
+            // scriptPubKeys of a transaction and does not take the actual executed
+            // sig operations into account. spendingTx in itself does not contain a
+            // signature operation.
+            assert(GetTransactionSigOpCount(config, CTransaction(spendingTx), coins,
+                                            true) == 0);
+            // creationTx contains two signature operations in its scriptPubKey, but
+            // legacy counting is not accurate.
+            assert(GetTransactionSigOpCount(config, CTransaction(creationTx), coins,
+                                            true) == MAX_PUBKEYS_PER_MULTISIG);
+            // Sanity check: script verification fails because of an invalid
+            // signature.
+            assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
+                   SCRIPT_ERR_CHECKMULTISIGVERIFY);
+        }
+
     }
 
     // Multisig nested in P2SH
@@ -157,12 +167,20 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
         CScript scriptPubKey = GetScriptForDestination(CScriptID(redeemScript));
         CScript scriptSig = CScript()
                             << OP_0 << OP_0 << ToByteVector(redeemScript);
-
-        BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig);
-        assert(GetTransactionSigOpCount(CTransaction(spendingTx), coins,
-                                        flags) == 2);
-        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
-               SCRIPT_ERR_CHECKMULTISIGVERIFY);
+        { // testing before genesis
+            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight-1);
+            assert(GetTransactionSigOpCount(config, CTransaction(spendingTx), coins,
+                                            true) == 2);
+            assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
+                    SCRIPT_ERR_CHECKMULTISIGVERIFY);
+        }
+        { // testing after genesis
+            BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, genesisHeight);
+            assert(GetTransactionSigOpCount(config, CTransaction(spendingTx), coins,
+                                            true) == 0);
+            assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) ==
+                    SCRIPT_ERR_CHECKMULTISIGVERIFY);
+        }
     }
 }
 
