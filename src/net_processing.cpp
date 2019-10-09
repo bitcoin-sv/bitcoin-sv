@@ -4040,7 +4040,7 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
     std::vector<CInv> vInv;
 
     LOCK(pto->cs_inventory);
-    vInv.reserve(std::max<size_t>(pto->vInventoryBlockToSend.size(), GetInventoryBroadcastMax(config)));
+    vInv.reserve(pto->maxInvElements);
 
     // Add blocks
     for (const uint256 &hash : pto->vInventoryBlockToSend) {

@@ -23,7 +23,7 @@ BOOST_AUTO_TEST_CASE(max_block_size) {
     // SetDefaultBlockSizeParams must be called before using config block size parameters
     // otherwise getters rise exceptions
     BOOST_CHECK_EXCEPTION(config.GetMaxBlockSize(), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
-    BOOST_CHECK_EXCEPTION(config.GetMaxBlockSize(0), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
+    BOOST_CHECK_EXCEPTION(config.GetMaxBlockSize(true), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
     BOOST_CHECK_EXCEPTION(config.GetMaxGeneratedBlockSize(), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
     BOOST_CHECK_EXCEPTION(config.GetMaxGeneratedBlockSize(0), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
     BOOST_CHECK_EXCEPTION(config.GetBlockSizeActivationTime(), std::runtime_error, isSetDefaultBlockSizeParamsCalledException);
@@ -88,31 +88,39 @@ BOOST_AUTO_TEST_CASE(max_block_size_related_defaults) {
 
     config.SetDefaultBlockSizeParams(defaultParams);
 
+    // Make up genesis activation parameters 
+    // - Genesis will be activated at block height 100
+    uint64_t heightBeforeGenesis     = 99;
+    uint64_t heightActivateGenesis   = 100;
+    uint64_t heightAfterGenesis      = 101;
+    config.SetGenesisActivationHeight(heightActivateGenesis);
+
     // Providing defaults should not override anything
     BOOST_CHECK(!config.MaxBlockSizeOverridden());
     BOOST_CHECK(!config.MaxGeneratedBlockSizeOverridden());
 
     BOOST_CHECK_EQUAL(config.GetBlockSizeActivationTime(), 1000);
+    BOOST_CHECK_EQUAL(config.GetGenesisActivationHeight(), 100);
 
     // Functions that do not take time parameter should return future data
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(), defaultParams.maxBlockSizeAfter);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(), defaultParams.maxBlockSizeAfterGenesis);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(), defaultParams.maxGeneratedBlockSizeAfter);
 
 
     ///////////////////
     /// Test with default values - they should change based on activation time
     /////////////////
-        
+       
     // Functions that do take time parameter should return old values before activation time
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(999), defaultParams.maxBlockSizeBefore);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightBeforeGenesis)), defaultParams.maxBlockSizeBeforeGenesis);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(999), defaultParams.maxGeneratedBlockSizeBefore);
 
     // Functions that do take time parameter should return new values on activation time
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1000), defaultParams.maxBlockSizeAfter);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightActivateGenesis)), defaultParams.maxBlockSizeAfterGenesis);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1000), defaultParams.maxGeneratedBlockSizeAfter);
 
     // Functions that do take time parameter should return new value after activation date
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1001), defaultParams.maxBlockSizeAfter);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightAfterGenesis)), defaultParams.maxBlockSizeAfterGenesis);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1001), defaultParams.maxGeneratedBlockSizeAfter);
 
     // Override one of the values, the overriden value should be used regardless of time.
@@ -120,13 +128,13 @@ BOOST_AUTO_TEST_CASE(max_block_size_related_defaults) {
     uint64_t overridenMaxBlockSize { 8 * ONE_MEGABYTE };
 
     BOOST_CHECK(config.SetMaxBlockSize(overridenMaxBlockSize));
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(999), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightBeforeGenesis)), overridenMaxBlockSize);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(999), defaultParams.maxGeneratedBlockSizeBefore);
 
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1000), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightActivateGenesis)), overridenMaxBlockSize);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1000), defaultParams.maxGeneratedBlockSizeAfter);
 
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1001), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightAfterGenesis)), overridenMaxBlockSize);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1001), defaultParams.maxGeneratedBlockSizeAfter);
 
 
@@ -134,13 +142,13 @@ BOOST_AUTO_TEST_CASE(max_block_size_related_defaults) {
     uint64_t overridenMagGeneratedBlockSize = overridenMaxBlockSize - ONE_MEGABYTE;
 
     BOOST_CHECK(config.SetMaxGeneratedBlockSize(overridenMagGeneratedBlockSize));
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(999), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightBeforeGenesis)), overridenMaxBlockSize);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(999), overridenMagGeneratedBlockSize);
 
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1000), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightActivateGenesis)), overridenMaxBlockSize);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1000), overridenMagGeneratedBlockSize);
 
-    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(1001), overridenMaxBlockSize);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSize(IsGenesisEnabled(config, heightAfterGenesis)), overridenMaxBlockSize);
     BOOST_CHECK_EQUAL(config.GetMaxGeneratedBlockSize(1001), overridenMagGeneratedBlockSize);
 
 }

@@ -45,8 +45,8 @@ struct ChainTxData {
 
 struct DefaultBlockSizeParams {
     int64_t blockSizeActivationTime;
-    uint64_t maxBlockSizeBefore;
-    uint64_t maxBlockSizeAfter;
+    uint64_t maxBlockSizeBeforeGenesis;
+    uint64_t maxBlockSizeAfterGenesis;
     uint64_t maxGeneratedBlockSizeBefore;
     uint64_t maxGeneratedBlockSizeAfter;
 };

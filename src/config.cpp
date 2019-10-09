@@ -24,8 +24,8 @@ void GlobalConfig::Reset()
     setDefaultBlockSizeParamsCalled = false;
 
     blockSizeActivationTime = 0;
-    maxBlockSizeBefore = 0;
-    maxBlockSizeAfter = 0;
+    maxBlockSizeBeforeGenesis = 0;
+    maxBlockSizeAfterGenesis = 0;
     maxBlockSizeOverridden = false;
     maxGeneratedBlockSizeBefore = 0;
     maxGeneratedBlockSizeAfter = 0;
@@ -60,8 +60,8 @@ uint64_t GlobalConfig::GetPreferredBlockFileSize() const {
 
 void GlobalConfig::SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) {
     blockSizeActivationTime = params.blockSizeActivationTime;
-    maxBlockSizeBefore = params.maxBlockSizeBefore;
-    maxBlockSizeAfter = params.maxBlockSizeAfter;
+    maxBlockSizeBeforeGenesis = params.maxBlockSizeBeforeGenesis;
+    maxBlockSizeAfterGenesis = params.maxBlockSizeAfterGenesis;
     maxBlockSizeOverridden = false;
     maxGeneratedBlockSizeBefore = params.maxGeneratedBlockSizeBefore;
     maxGeneratedBlockSizeAfter = params.maxGeneratedBlockSizeAfter;
@@ -89,7 +89,7 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
         return false;
     }
 
-    maxBlockSizeAfter = maxSize;
+    maxBlockSizeAfterGenesis = maxSize;
     maxBlockSizeOverridden = true;
 
     return true;
@@ -97,20 +97,17 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
     CheckSetDefaultCalled();
-    return maxBlockSizeAfter;
+    return maxBlockSizeAfterGenesis;
 }
 
-uint64_t GlobalConfig::GetMaxBlockSize(int64_t nMedianTimePast) const {
+uint64_t GlobalConfig::GetMaxBlockSize(bool isGenesisEnabled) const 
+{
     CheckSetDefaultCalled();
-    uint64_t maxSize;
-    if (!maxBlockSizeOverridden) {
-        maxSize = nMedianTimePast >= blockSizeActivationTime ? maxBlockSizeAfter : maxBlockSizeBefore;
+    if (!maxBlockSizeOverridden && !isGenesisEnabled)
+    {
+        return maxBlockSizeBeforeGenesis;
     }
-    else {
-        maxSize = maxBlockSizeAfter;
-    }
-
-    return maxSize;
+    return maxBlockSizeAfterGenesis;
 }
 
 void GlobalConfig::SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytesIn) {
