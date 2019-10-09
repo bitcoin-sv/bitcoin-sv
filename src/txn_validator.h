@@ -91,7 +91,8 @@ class CTxnValidator final
     /** Process all newly arrived transactions. Return txns accepted by the mempool */
     std::vector<TxInputDataSPtr> processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
-        mining::CJournalChangeSetPtr& journalChangeSet);
+        mining::CJournalChangeSetPtr& journalChangeSet,
+        bool fReadyForFeeEstimation);
 
     /** Post validation step for p2p txns before limit mempool size is done*/
     void postValidationP2PStepsNL(
