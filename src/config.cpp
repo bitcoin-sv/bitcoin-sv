@@ -50,6 +50,7 @@ void GlobalConfig::Reset()
     mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
     maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
     maxTxSigOpsCountPolicy = DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
+    maxPubKeysPerMultiSig = DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS;
 
     mMaxTransactionValidationDuration = DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION;
 }
@@ -226,6 +227,53 @@ uint64_t GlobalConfig::GetLimitDescendantCount() const {
 
 const CChainParams &GlobalConfig::GetChainParams() const {
     return Params();
+}
+
+bool GlobalConfig::SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err)
+{
+    if (maxPubKeysPerMultiSigIn < 0)
+    {
+        if (err)
+        {
+            *err = "Policy value for maximum public keys per multisig must not be less than zero";
+        }
+        return false;
+    }
+    
+    uint64_t maxPubKeysPerMultiSigUnsigned = static_cast<uint64_t>(maxPubKeysPerMultiSigIn);
+    if (maxPubKeysPerMultiSigUnsigned > MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS)
+    {
+        if (err)
+        {
+            *err = "Policy value for maximum public keys per multisig must not exceed consensus limit of " + std::to_string(MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS) + ".";
+        }
+        return false;
+    }
+    else if (maxPubKeysPerMultiSigUnsigned == 0)
+    {
+        maxPubKeysPerMultiSig = MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS;
+    }
+    else
+    {
+        maxPubKeysPerMultiSig = maxPubKeysPerMultiSigUnsigned;
+    }
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const
+{
+    if (!isGenesisEnabled)
+    {
+        return MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS; // no changes before  genesis
+    }
+
+    if (consensus)
+    {
+        return MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS; // use new limit after genesis
+    }
+
+    return maxPubKeysPerMultiSig;
 }
 
 GlobalConfig& GlobalConfig::GetConfig()

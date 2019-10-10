@@ -1089,6 +1089,11 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf("Set run frequency in asynchronous mode (default: %dms)",
             CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS)) ;
 
+    strUsage += HelpMessageOpt(
+        "-maxpubkeyspermultisigpolicy=<n>",
+        strprintf("Set maximum allowed number of public keys we're willing to relay/mine in a single CHECK_MULTISIG(VERIFY) operation (default: %d, 0 = unlimited), after Genesis is activated",
+            DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS));
+
     return strUsage;
 }
 
@@ -1881,6 +1886,18 @@ bool AppInitParameterInteraction(Config &config) {
     {
         const int64_t value = gArgs.GetArg("-maxtxsigopscountspolicy", DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
         if (std::string err; !config.SetMaxTxSigOpsCountPolicy(value, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+    // Configure max number of public keys per MULTISIG operation
+    if (gArgs.IsArgSet("-maxpubkeyspermultisigpolicy"))
+    {
+        const int64_t value = gArgs.GetArg("-maxpubkeyspermultisigpolicy", DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS);
+
+        std::string err;
+        if (!config.SetMaxPubKeysPerMultiSigPolicy(value, &err))
         {
             return InitError(err);
         }

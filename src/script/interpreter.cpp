@@ -1338,42 +1338,54 @@ std::optional<bool> EvalScript(
                         // ([sig ...] num_of_signatures [pubkey ...]
                         // num_of_pubkeys -- bool)
 
-                        int i = 1;
-                        if ((int)stack.size() < i) {
+                        uint64_t i = 1;
+                        if (stack.size() < i) {
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
 
-                        int nKeysCount =
+                        int64_t nKeysCountSigned =
                             CScriptNum(stacktop(-i), fRequireMinimal).getint();
-                        if (nKeysCount < 0 ||
-                            nKeysCount > MAX_PUBKEYS_PER_MULTISIG) {
+
+                        if (nKeysCountSigned < 0) {
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
+
+                        uint64_t nKeysCount = static_cast<uint64_t>(nKeysCountSigned);
+                        if (nKeysCount > config.GetMaxPubKeysPerMultiSig(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
+                            return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
+                        }
+
                         nOpCount += nKeysCount;
                         if (!IsValidMaxOpsPerScript(nOpCount, config, flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
                             return set_error(serror, SCRIPT_ERR_OP_COUNT);
                         }
-                        int ikey = ++i;
+                        uint64_t ikey = ++i;
                         // ikey2 is the position of last non-signature item in
                         // the stack. Top stack item = 1. With
                         // SCRIPT_VERIFY_NULLFAIL, this is used for cleanup if
                         // operation fails.
-                        int ikey2 = nKeysCount + 2;
+                        uint64_t ikey2 = nKeysCount + 2;
                         i += nKeysCount;
-                        if ((int)stack.size() < i) {
+                        if (stack.size() < i) {
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
 
-                        int nSigsCount =
+                        int64_t nSigsCountSigned =
                             CScriptNum(stacktop(-i), fRequireMinimal).getint();
-                        if (nSigsCount < 0 || nSigsCount > nKeysCount) {
+
+                        if (nSigsCountSigned < 0) {
                             return set_error(serror, SCRIPT_ERR_SIG_COUNT);
                         }
-                        int isig = ++i;
+                        uint64_t nSigsCount = static_cast<uint64_t>(nSigsCountSigned);
+                        if (nSigsCount > nKeysCount) {
+                            return set_error(serror, SCRIPT_ERR_SIG_COUNT);
+                        }
+
+                        uint64_t isig = ++i;
                         i += nSigsCount;
-                        if ((int)stack.size() < i) {
+                        if (stack.size() < i) {
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
@@ -1383,7 +1395,7 @@ std::optional<bool> EvalScript(
                         CScript scriptCode(pbegincodehash, pend);
 
                         // Remove signature for pre-fork scripts
-                        for (int k = 0; k < nSigsCount; k++) {
+                        for (uint64_t k = 0; k < nSigsCount; k++) {
                             valtype &vchSig = stacktop(-isig - k);
                             CleanupScriptCode(scriptCode, vchSig, flags);
                         }

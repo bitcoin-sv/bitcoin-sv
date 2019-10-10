@@ -6,6 +6,7 @@
 #include "script.h"
 #include "int_serialization.h"
 #include "script_num.h"
+#include "consensus/consensus.h"
 
 #include "tinyformat.h"
 #include "utilstrencodings.h"
@@ -287,7 +288,7 @@ unsigned int CScript::GetSigOpCount(bool fAccurate) const {
             if (fAccurate && lastOpcode >= OP_1 && lastOpcode <= OP_16)
                 n += DecodeOP_N(lastOpcode);
             else
-                n += MAX_PUBKEYS_PER_MULTISIG;
+                n += MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS;
         }
         lastOpcode = opcode;
     }

@@ -38,6 +38,15 @@ static const uint64_t MAX_OPS_PER_SCRIPT_AFTER_GENESIS = UINT32_MAX;
 static const uint64_t MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS = 20000;
 /** Allowed number of signature check operations per transaction after Genesis (max value of uint32) */
 static const uint64_t MAX_TX_SIGOPS_COUNT_AFTER_GENESIS = UINT32_MAX;
+
+// Maximum number of public keys per multisig before GENESIS
+static const uint64_t MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS = 20;
+
+// Maximum number of public keys per multisig after GENESIS
+// Actual maximum number of public keys that can be stored in script of
+// maximum length is actually smaller (since each compressed pub key takes up 33 bytes).
+static const uint64_t MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS = INT32_MAX;
+
 /**
  * Coinbase transaction outputs can only be spent after this number of new
  * blocks (network rule).
