@@ -56,6 +56,9 @@ void GlobalConfig::Reset()
 
     mMaxStdTxnValidationDuration = DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
     mMaxNonStdTxnValidationDuration = DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
+
+    maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS;
+    maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -641,7 +644,65 @@ uint64_t GlobalConfig::GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, 
         return nMbRoundedUp * MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS;
     }
     return nMbRoundedUp * maxBlockSigOpsPerMBPolicy;
-    
+
+}
+
+bool GlobalConfig::SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err)
+{
+    if (maxStackMemoryUsageConsensusIn < 0 || maxStackMemoryUsagePolicyIn < 0)
+    {
+        if (err)
+        {
+            *err = "Policy and consensus value for max stack memory usage must not be less than 0.";
+        }
+        return false;
+    }
+
+    if (maxStackMemoryUsageConsensusIn == 0)
+    {
+        maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
+    }
+    else
+    {
+        maxStackMemoryUsageConsensus = static_cast<uint64_t>(maxStackMemoryUsageConsensusIn);
+    }
+
+    if (maxStackMemoryUsagePolicyIn == 0)
+    {
+        maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
+    }
+    else
+    {
+        maxStackMemoryUsagePolicy = static_cast<uint64_t>(maxStackMemoryUsagePolicyIn);
+    }
+
+    if (maxStackMemoryUsagePolicy > maxStackMemoryUsageConsensus)
+    {
+        if (err)
+        {
+            *err = _("Policy value of max stack memory usage must not exceed consensus limit of ") + std::to_string(maxStackMemoryUsageConsensus);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const
+{
+    // concept of max stack memory usage is not defined before genesis
+    // before Genesis stricter limitations exist, so maxStackMemoryUsage can be infinite
+    if (!isGenesisEnabled)
+    {
+        return INT64_MAX;
+    }
+
+    if (consensus)
+    {
+        return maxStackMemoryUsageConsensus;
+    }
+
+    return maxStackMemoryUsagePolicy;
 }
 
 DummyConfig::DummyConfig()

@@ -918,6 +918,21 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf(_("Maximum size of data in data carrier transactions we "
                     "relay and mine (default: %u)"),
                   DEFAULT_DATA_CARRIER_SIZE));
+    strUsage += HelpMessageOpt(
+        "-maxstackmemoryusageconsensus",
+        strprintf(_("Set maximum stack memory usage used for script verification "
+                    "we're willing to to accept from any source "
+                    "(default: %u bytes, 0 = unlimited) "
+                    "after Genesis is activated (consensus level)."),
+                  DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS));
+    strUsage += HelpMessageOpt(
+        "-maxstackmemoryusagepolicy",
+        strprintf(_("Set maximum stack memory usage used for script verification "
+                    "we're willing to relay/mine in a single transaction "
+                    "(default: %u bytes, 0 = unlimited) "
+                    "after Genesis is activated (policy level). "
+                    "Must be less or equal to -maxstackmemoryusageconsensus."),
+                  DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS));
     strUsage +=
         HelpMessageOpt("-maxopsperscriptpolicy=<n>",
             strprintf(_("Set maximum number of non-push operations "
@@ -1805,6 +1820,13 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
+    if (std::string err; !config.SetMaxStackMemoryUsage(
+        gArgs.GetArg("-maxstackmemoryusageconsensus", 0),
+        gArgs.GetArg("-maxstackmemoryusagepolicy", DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS),
+        &err))
+    {
+        return InitError(err);
+    }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &
     // undo files

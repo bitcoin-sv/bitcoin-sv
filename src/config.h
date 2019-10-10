@@ -121,6 +121,9 @@ public:
 
     virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
+
+    virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -222,6 +225,9 @@ public:
     bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override;
 
+    bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) override;
+    uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -278,6 +284,9 @@ private:
 
     std::chrono::milliseconds mMaxStdTxnValidationDuration;
     std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
+
+    uint64_t maxStackMemoryUsagePolicy;
+    uint64_t maxStackMemoryUsageConsensus;
 };
 
 // Dummy for subclassing in unittests
@@ -401,6 +410,8 @@ public:
     int GetMaxParallelBlocks() const override;
     int GetPerBlockScriptValidatorThreadsCount() const override;
     int GetPerBlockScriptValidationMaxBatchSize() const override;
+    bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr)  override { return true; }
+    uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override { return UINT32_MAX; }
 
     bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) override { return true;  }
     uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override
