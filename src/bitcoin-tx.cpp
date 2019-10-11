@@ -766,9 +766,12 @@ static void MutateTx(CMutableTransaction &tx, const std::string &command,
     }
 }
 
-static void OutputTxJSON(const CTransaction &tx, bool isGenesisEnabled) {
+static void OutputTxJSON(const CTransaction &tx) {
     UniValue entry(UniValue::VOBJ);
-    TxToUniv(tx, uint256(), isGenesisEnabled, entry);
+
+    //treat as after genesis if no output is P2SH
+    bool genesisEnabled = std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) { return out.scriptPubKey.IsPayToScriptHash(); });
+    TxToUniv(tx, uint256(), genesisEnabled, entry);
 
     std::string jsonOutput = entry.write(4);
     fprintf(stdout, "%s\n", jsonOutput.c_str());
@@ -787,9 +790,9 @@ static void OutputTxHex(const CTransaction &tx) {
     fprintf(stdout, "%s\n", strHex.c_str());
 }
 
-static void OutputTx(const CTransaction &tx, bool isGenesisEnabled) {
+static void OutputTx(const CTransaction &tx) {
     if (gArgs.GetBoolArg("-json", false)) {
-        OutputTxJSON(tx, isGenesisEnabled);
+        OutputTxJSON(tx);
     } else if (gArgs.GetBoolArg("-txid", false)) {
         OutputTxHash(tx);
     } else {
@@ -869,7 +872,7 @@ static int CommandLineRawTx(int argc, char *argv[],
             MutateTx(tx, key, value, chainParams);
         }
 
-        OutputTx(CTransaction(tx), true /* we have no block height available - treat all transactions as post-genesis */ );
+        OutputTx(CTransaction(tx));
     }
 
     catch (const boost::thread_interrupted &) {

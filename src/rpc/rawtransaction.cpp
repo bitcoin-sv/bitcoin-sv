@@ -587,7 +587,9 @@ static UniValue decoderawtransaction(const Config &config,
     }
 
     UniValue result(UniValue::VOBJ);
-    TxToUniv(CTransaction(std::move(mtx)), uint256(), true /* we have no block height available - treat all transactions as post-Genesis */ , result);
+    //treat as after genesis if no output is P2SH
+    bool genesisEnabled = std::none_of(mtx.vout.begin(), mtx.vout.end(), [](const CTxOut& out) { return out.scriptPubKey.IsPayToScriptHash(); });
+    TxToUniv(CTransaction(std::move(mtx)), uint256(), genesisEnabled, result);
 
     return result;
 }
@@ -632,8 +634,8 @@ static UniValue decodescript(const Config &config,
     }
 
     ScriptPubKeyToUniv(script,
-        false, 
-        false,  // we have no block height available - treat all transactions as post-Genesis 
+        true, 
+        script.IsPayToScriptHash() ? false : true,  // treat all transactions as post-Genesis, except P2SH 
         r);
 
     UniValue type;

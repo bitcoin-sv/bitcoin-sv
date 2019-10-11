@@ -181,7 +181,7 @@ void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGe
     out.pushKV("addresses", a);
 }
 
-void TxToUniv(const CTransaction &tx, const uint256 &hashBlock, bool isGenesisEnabled,
+void TxToUniv(const CTransaction &tx, const uint256 &hashBlock, bool utxoAfterGenesis,
               UniValue &entry) {
     entry.pushKV("txid", tx.GetId().GetHex());
     entry.pushKV("hash", tx.GetHash().GetHex());
@@ -223,7 +223,7 @@ void TxToUniv(const CTransaction &tx, const uint256 &hashBlock, bool isGenesisEn
         out.pushKV("n", (int64_t)i);
 
         UniValue o(UniValue::VOBJ);
-        ScriptPubKeyToUniv(txout.scriptPubKey, true, isGenesisEnabled, o);
+        ScriptPubKeyToUniv(txout.scriptPubKey, true, utxoAfterGenesis, o);
         out.pushKV("scriptPubKey", o);
         vout.push_back(out);
     }
