@@ -134,6 +134,8 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
 // Update our block template with some new transactions - Caller holds mutex
 void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
 {
+    size_t txnNum {0};
+
     try
     {
         // Update chain state
@@ -149,13 +151,12 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
         // Does our journal or iterator need replacing?
         while(!mJournal->getCurrent() || !mJournalPos.valid())
         {
+            // Release old lock, update journal/block, take new lock
+            journalLock = CJournal::ReadLock {};
             newBlock();
-            // make sure that we don't lock the same journal twice as that is
-            // not allowed by the standard and can cause a deadlock
-            if(!journalLock.IsSame(mJournal))
-            {
-                journalLock = CJournal::ReadLock { mJournal };
-            }
+            journalLock = CJournal::ReadLock { mJournal };
+
+            // Reset our position to the start of the journal
             mJournalPos = journalLock.begin();
         }
 
@@ -165,7 +166,6 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
 
         // Read and process transactions from the journal until either we've done as many
         // as we allow this go or we reach the end of the journal.
-        size_t txnNum {0};
         bool finished { mJournalPos == journalLock.end() };
         while(!finished)
         {
@@ -184,15 +184,15 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
                 finished = true;
             }
         }
-
-        if(txnNum > 0)
-        {
-            LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler processed %d transactions from the journal\n", txnNum);
-        }
     }
     catch(std::exception& e)
     {
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler caught: %s\n", e.what());
+    }
+
+    if(txnNum > 0)
+    {
+        LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler processed %d transactions from the journal\n", txnNum);
     }
 }
 

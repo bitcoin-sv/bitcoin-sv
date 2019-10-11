@@ -140,6 +140,7 @@ class CJournal final
     class ReadLock final
     {
       public:
+        ReadLock() = default;
         ReadLock(const std::shared_ptr<CJournal>& journal);
         ~ReadLock() = default;
 
@@ -151,11 +152,6 @@ class CJournal final
         // Get start/end indexes for our underlying sequence
         Index begin() const;
         Index end() const;
-
-        bool IsSame(const std::shared_ptr<CJournal>& journal)
-        {
-            return mJournal == journal;
-        }
 
       private:
         // Order of declaration is important; we need the lock to be destroyed
