@@ -875,9 +875,6 @@ public:
     bool ReadFeeEstimates(CAutoFile &filein);
 
     size_t DynamicMemoryUsage() const;
-    // A non-locking version of DynamicMemoryUsage.
-    // DEPRECATED - this will become private and ultimately changed or removed
-    size_t DynamicMemoryUsageNL() const;
 
     boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
@@ -975,6 +972,9 @@ private:
 
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;
+
+    // A non-locking version of DynamicMemoryUsage.
+    size_t DynamicMemoryUsageNL() const;
 };
 
 /**
