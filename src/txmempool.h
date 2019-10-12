@@ -646,17 +646,6 @@ public:
             bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
-    // A non-locking version of AddUnchecked
-    // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
-    // It needs to be called explicitly by a user if AddUncheckedNL is used.
-    void AddUncheckedNL(
-            const uint256& hash,
-            const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
-            const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
-            size_t* pnMempoolSize = nullptr,
-            size_t* pnDynamicMemoryUsage = nullptr);
 
     void RemoveRecursive(
         const CTransaction &tx,
@@ -898,6 +887,18 @@ private:
             txiter updateIt,
             cacheMap &cachedDescendants,
             const std::set<uint256> &setExclude);
+
+    // A non-locking version of AddUnchecked
+    // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
+    // It needs to be called explicitly by a user if AddUncheckedNL is used.
+    void AddUncheckedNL(
+            const uint256& hash,
+            const CTxMemPoolEntry &entry,
+            setEntries &setAncestors,
+            const mining::CJournalChangeSetPtr& changeSet,
+            bool validFeeEstimate = true,
+            size_t* pnMempoolSize = nullptr,
+            size_t* pnDynamicMemoryUsage = nullptr);
 
     /**
      * Update ancestors of hash to add/remove it as a descendant transaction.
