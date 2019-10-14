@@ -72,6 +72,10 @@
   "time": 500
  },
  {
+  "name": "bsv-block-size-activation-genesis.py",
+  "time": 382
+ },
+ {
   "name": "dbcrash.py",
   "time": 1257
  },
