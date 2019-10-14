@@ -32,9 +32,12 @@ CTxnValidator::CTxnValidator(
                 gArgs.GetArg("-blockreconstructionextratxn",
                         COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN))
     };
+    
     mpOrphanTxnsP2PQ = std::make_shared<COrphanTxns>(
-                                            maxCollectedOutpoints,
-                                            maxExtraTxnsForCompactBlock);
+        maxCollectedOutpoints,
+        maxExtraTxnsForCompactBlock,
+        config.GetMaxTxSize(true, false) /*orphan tx before genesis might not get accepted by mempool */);
+    
     // Create a shared object for rejected transaction
     mpTxnRecentRejects = std::make_shared<CTxnRecentRejects>();
     // Launch our thread
@@ -251,7 +254,7 @@ void CTxnValidator::processValidation(
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
         mpTxnDoubleSpendDetector, // Double Spend Detector
-        std::make_shared<COrphanTxns>(0, 0), // A temporary orphan txns queue (unlimited)
+        std::make_shared<COrphanTxns>(0, 0, 0), // A temporary orphan txns queue (unlimited)
         std::make_shared<CTxnRecentRejects>() // A temporary recent rejects queue
     };
     // Process a set of given txns

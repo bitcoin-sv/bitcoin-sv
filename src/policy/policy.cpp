@@ -65,9 +65,9 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
     // Extremely large transactions with lots of inputs can cost the network
     // almost as much to process as they cost the sender in fees, because
     // computing signature hashes is O(ninputs*txsize). Limiting transactions
-    // to MAX_STANDARD_TX_SIZE mitigates CPU exhaustion attacks.
+    // mitigates CPU exhaustion attacks.
     unsigned int sz = tx.GetTotalSize();
-    if (sz >= MAX_STANDARD_TX_SIZE) {
+    if (sz > config.GetMaxTxSize(IsGenesisEnabled(config, nHeight), false)) {
         reason = "tx-size";
         return false;
     }

@@ -181,11 +181,18 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
             gArgs.GetArg("-blockreconstructionextratxn",
                       COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN))
     };
+    size_t maxTxSizePolicy {
+        static_cast<size_t>(
+            gArgs.GetArg("-maxtxsizepolicy",
+                      DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS))
+    };
+
     // A common buffer with orphan txns
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                             maxCollectedOutpoints,
-                            maxExtraTxnsForCompactBlock)
+                            maxExtraTxnsForCompactBlock,
+                            maxTxSizePolicy)
     };
 
     CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};

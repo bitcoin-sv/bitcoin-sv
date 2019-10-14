@@ -4,12 +4,15 @@
 
 #include "orphan_txns.h"
 #include "policy/policy.h"
+#include "config.h"
 
 COrphanTxns::COrphanTxns(
     size_t maxCollectedOutpoints,
-    size_t maxExtraTxnsForCompactBlock)
+    size_t maxExtraTxnsForCompactBlock,
+    size_t maxTxSizePolicy)
 : mMaxCollectedOutpoints(maxCollectedOutpoints),
-  mMaxExtraTxnsForCompactBlock(maxExtraTxnsForCompactBlock)
+  mMaxExtraTxnsForCompactBlock(maxExtraTxnsForCompactBlock),
+  mMaxStandardTxSize(maxTxSizePolicy)
 {
     mGenerator.seed(std::chrono::system_clock::now().time_since_epoch().count());
 }
@@ -36,11 +39,9 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
         // attack. If a peer has a legitimate large transaction with a missing
         // parent then we assume it will rebroadcast it later, after the parent
         // transaction(s) have been mined or received.
-        // 100 orphans, each of which is at most 99,999 bytes big is at most 10
-        // megabytes of orphans and somewhat more byprev index (in the worst case):
         if (TxSource::p2p == pTxInputData->mTxSource) {
             unsigned int sz = tx.GetTotalSize();
-            if (sz >= MAX_STANDARD_TX_SIZE) {
+            if (sz >= mMaxStandardTxSize /*mMaxStandardTxSize is always set to after genesis value. If non default value is used for policy tx size then orphan tx before genesis might not get accepted by mempool */) {
                 LogPrint(BCLog::MEMPOOL,
                          "ignoring large orphan tx (size: %u, hash: %s)\n", sz,
                          txid.ToString());
