@@ -171,6 +171,7 @@ BITCOIN_CORE_H = \
   support/lockedpool.h \
   sync.h \
   task.h \
+  taskcancellation.h \
   task_helpers.h \
   threadpool.h \
   threadpoolT.h \

@@ -101,6 +101,7 @@ BITCOIN_TESTS =\
   test/streams_tests.cpp \
   test/stream_serialization_tests.cpp \
   test/stream_test_helpers.h \
+  test/taskcancellation_tests.cpp \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
   test/test_bitcoin_main.cpp \

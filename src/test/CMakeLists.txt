@@ -120,6 +120,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	skiplist_tests.cpp
 	streams_tests.cpp
 	stream_serialization_tests.cpp
+	taskcancellation_tests.cpp
 	test_bitcoin.cpp
 	test_bitcoin_main.cpp
 	test_double_spend_detector.cpp
