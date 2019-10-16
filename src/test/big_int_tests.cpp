@@ -3,6 +3,7 @@
 // LICENSE.
 
 #include "big_int.hpp"
+#include "bn_helpers.h"
 
 #include <array>
 
@@ -10,6 +11,9 @@
 
 using namespace std;
 using bsv::bint;
+
+constexpr int64_t int64_min{numeric_limits<int64_t>::min()+1};
+constexpr int64_t int64_max{numeric_limits<int64_t>::max()};
 
 BOOST_AUTO_TEST_SUITE(bint_tests)
 
@@ -19,6 +23,15 @@ BOOST_AUTO_TEST_CASE(default_construction)
     assignable = bint{1};
     BOOST_CHECK_EQUAL(bint{1}, assignable);
     bint destructible;
+}
+
+BOOST_AUTO_TEST_CASE(int64_t_construction)
+{
+    BOOST_CHECK_EQUAL(0, bint{0});
+    BOOST_CHECK_EQUAL(1, bint{1});
+    BOOST_CHECK_EQUAL(-1, bint{-1});
+    BOOST_CHECK_EQUAL(int64_max, bint{int64_max});
+    BOOST_CHECK_EQUAL(int64_min, bint{int64_min});
 }
 
 BOOST_AUTO_TEST_CASE(is_negative_)
@@ -134,8 +147,8 @@ BOOST_AUTO_TEST_CASE(add)
         BOOST_CHECK_EQUAL(c, 3);
     }
     {
-        bint a(std::numeric_limits<int64_t>::max());
-        bint b(std::numeric_limits<int64_t>::max());
+        bint a(int64_max);
+        bint b(int64_max);
         bint c = a + b;
         BOOST_CHECK_EQUAL(c, bint("18446744073709551614"));
     }
@@ -150,8 +163,8 @@ BOOST_AUTO_TEST_CASE(sub)
         BOOST_CHECK_EQUAL(c, 1);
     }
     {
-        bint a(std::numeric_limits<int64_t>::max());
-        bint b(std::numeric_limits<int64_t>::max());
+        bint a(int64_max);
+        bint b(int64_max);
         bint c = a - b;
         BOOST_CHECK_EQUAL(c, 0);
     }
@@ -166,8 +179,8 @@ BOOST_AUTO_TEST_CASE(mult)
         BOOST_CHECK_EQUAL(c, 2);
     }
     {
-        bint a(std::numeric_limits<int64_t>::max());
-        bint b(std::numeric_limits<int64_t>::max());
+        bint a(int64_max);
+        bint b(int64_max);
         bint c = a * b;
         BOOST_CHECK_EQUAL(c, bint("85070591730234615847396907784232501249"));
     }
@@ -182,7 +195,7 @@ BOOST_AUTO_TEST_CASE(div)
         BOOST_CHECK_EQUAL(c, 3);
     }
     {
-        bint a(std::numeric_limits<int64_t>::max());
+        bint a(int64_max);
         bint b(2);
         bint c = a / b;
         BOOST_CHECK_EQUAL(c, bint("4611686018427387903"));
@@ -198,7 +211,7 @@ BOOST_AUTO_TEST_CASE(mod)
         BOOST_CHECK_EQUAL(c, bint(1));
     }
     {
-        bint a(std::numeric_limits<int64_t>::max());
+        bint a(int64_max);
         bint b(101);
         bint c = a % b;
         BOOST_CHECK_EQUAL(c, 89);
@@ -207,19 +220,15 @@ BOOST_AUTO_TEST_CASE(mod)
 
 BOOST_AUTO_TEST_CASE(negate)
 {
+    vector<int64_t> test_data{0, 
+                              1, -1,
+                              int64_max, -int64_max,
+                              int64_min, -int64_min};
+
+    for(const auto n : test_data)
     {
-        bint a(1);
-        bint b{-a};
-        BOOST_CHECK_EQUAL(b, -1);
-        bint c{-b};
-        BOOST_CHECK_EQUAL(c, 1);
-    }
-    {
-        const auto max{std::numeric_limits<int64_t>::max()};
-        bint a(std::numeric_limits<int64_t>::max());
-        bint b{-a};
-        BOOST_CHECK_EQUAL(a, max);
-        BOOST_CHECK_EQUAL(b, -max);
+        bint bn(n);
+        BOOST_CHECK_EQUAL(bint{-n}, -bn);
     }
 }
 
@@ -381,7 +390,7 @@ BOOST_AUTO_TEST_CASE(absolute_value)
 {
     using namespace bsv;
 
-    const bint a{std::numeric_limits<int64_t>::max()};
+    const bint a{int64_max};
     const bint aa{a * a};
 
     BOOST_TEST(aa == abs(aa));
@@ -392,8 +401,8 @@ BOOST_AUTO_TEST_CASE(to_string)
 {
     BOOST_TEST("" == bsv::to_string(bint()));
 
-    constexpr int64_t min64{numeric_limits<int64_t>::min()};
-    constexpr int64_t max64{numeric_limits<int64_t>::max()};
+    constexpr int64_t min64{int64_min};
+    constexpr int64_t max64{int64_max};
     vector<int64_t> test_data{0, 1, -1, min64, max64};
     for(const auto n : test_data)
     {

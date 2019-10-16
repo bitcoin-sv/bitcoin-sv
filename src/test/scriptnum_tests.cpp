@@ -16,7 +16,7 @@ using bsv::bint;
 
 namespace
 {
-    constexpr auto min64 = numeric_limits<int64_t>::min();
+    constexpr auto min64 = numeric_limits<int64_t>::min()+1;
     constexpr auto max64 = numeric_limits<int64_t>::max();
 
     vector<int64_t> test_data{min64, -1, 0, 1, max64};
@@ -95,9 +95,9 @@ BOOST_AUTO_TEST_CASE(insertion_op)
         BOOST_CHECK_EQUAL(expected.str(), actual.str());
     }
 
-    for(const bint n : test_data)
+    for(const int64_t n : test_data)
     {
-        CScriptNum a{n};
+        CScriptNum a{bint{n}};
         ostringstream actual;
         actual << a;
 
@@ -118,11 +118,12 @@ BOOST_AUTO_TEST_CASE(equality)
         BOOST_CHECK_EQUAL(b, a);
     }
 
-    for(bint n : test_data)
+    for(const int64_t n : test_data)
     {
-        n *= 10; // *10 so we are testing outside of range of int64_t
-        CScriptNum a{n};
-        CScriptNum b{n};
+        bint bn{n};
+        bn *= bint{10}; // *10 so we are testing outside of range of int64_t
+        CScriptNum a{bn};
+        CScriptNum b{bn};
         BOOST_CHECK_EQUAL(a, a);
         BOOST_CHECK_EQUAL(a, b);
         BOOST_CHECK_EQUAL(b, a);
@@ -237,9 +238,9 @@ BOOST_AUTO_TEST_CASE(multiplication)
         {1, 1, 1},
         {-1, -1, 1},
         {min64, 1, min64},
-        {min64 + 1, -1, max64},
+        {min64, -1, max64},
         {max64, 1, max64},
-        {max64, -1, min64 + 1}};
+        {max64, -1, min64}};
 
     for(const auto& [n, m, o] : test_data)
     {
@@ -270,9 +271,9 @@ BOOST_AUTO_TEST_CASE(division)
         {1, 1, 1},
         {-1, -1, 1},
         {min64, 1, min64},
-        {min64 + 1, -1, max64},
+        {min64, -1, max64},
         {max64, 1, max64},
-        {max64, -1, min64 + 1}};
+        {max64, -1, min64}};
 
     for(const auto& [n, m, o] : test_data)
     {
@@ -354,7 +355,7 @@ BOOST_AUTO_TEST_CASE(and_)
 BOOST_AUTO_TEST_CASE(negation)
 {
     const vector<pair<int64_t, int64_t>> test_data{
-        {0, 0}, {1, -1}, {-1, 1}, {max64, min64 + 1}};
+        {0, 0}, {1, -1}, {-1, 1}, {max64, min64}};
 
     for(const auto [n, m] : test_data)
     {

@@ -16,7 +16,7 @@ namespace bsv
     {
     public:
         bint();
-        bint(int64_t); 
+        explicit bint(int64_t); 
         explicit bint(const std::string&);
 
         // special members
@@ -130,7 +130,8 @@ namespace bsv
     std::ostream& operator<<(std::ostream& os, const bint&);
 
     // int64_t overloads
-    inline bool operator==(const bint& a, const int64_t b) { return a == bint(b); }
+    inline bool operator==(const bint& a, const int64_t b) { return a == bint{b}; } 
+    inline bool operator==(const int64_t a, const bint& b)  { return bint{a} == b; }
     inline bool operator!=(const bint& a, const int64_t b) { return a != bint(b); }
 
     inline bool operator<(const bint& a, int64_t b) { return a < bint(b); }

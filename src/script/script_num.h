@@ -46,6 +46,7 @@ class CScriptNum
 public:
     static const size_t MAXIMUM_ELEMENT_SIZE = 4;
 
+    CScriptNum():m_value(0){}
     explicit CScriptNum(const int64_t& n) : m_value(n) {}
     explicit CScriptNum(const bsv::bint& n) : m_value(n) {}
     explicit CScriptNum(const std::vector<uint8_t>& vch,
