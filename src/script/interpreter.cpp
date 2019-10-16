@@ -1039,20 +1039,20 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
                         
-                        const auto& frame_2 = stack.at(stack.size() -2);
-                        if (frame_2.size() > big_ints_byte_limit)
+                        const auto& arg_2 = stack.at(stack.size() -2);
+                        if (arg_2.size() > big_ints_byte_limit)
                             return set_error(serror, SCRIPT_ERR_INVALID_OPERAND_SIZE);
                         
-                        const auto& frame_1 = stack.at(stack.size() -1);
-                        if (frame_1.size() > big_ints_byte_limit)
+                        const auto& arg_1 = stack.at(stack.size() -1);
+                        if (arg_1.size() > big_ints_byte_limit)
                             return set_error(serror, SCRIPT_ERR_INVALID_OPERAND_SIZE);
 
-                        CScriptNum bn1(frame_2, fRequireMinimal,
+                        CScriptNum bn1(arg_2, fRequireMinimal,
                                        big_ints_enabled
                                            ? stacktop(-2).size()
                                            : CScriptNum::MAXIMUM_ELEMENT_SIZE,
                                        big_ints_enabled);
-                        CScriptNum bn2(frame_1, fRequireMinimal,
+                        CScriptNum bn2(arg_1, fRequireMinimal,
                                        big_ints_enabled
                                            ? stacktop(-1).size()
                                            : CScriptNum::MAXIMUM_ELEMENT_SIZE,
