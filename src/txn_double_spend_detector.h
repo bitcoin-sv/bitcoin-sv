@@ -5,6 +5,7 @@
 #pragma once
 
 #include "primitives/transaction.h"
+#include "txn_validation_data.h"
 #include "uint256.h"
 #include <mutex>
 #include <vector>
@@ -25,17 +26,25 @@ class CTxnDoubleSpendDetector {
      * @param tx A given transaction.
      * @return true if inserted, false otherwise.
      */
-    bool insertTxnInputs(const CTransaction &tx);
+    bool insertTxnInputs(const TxInputDataSPtr& pTxInputData);
     /**
      * Remove txn's inputs for known spends.
      * @param tx A given transaction
      */
-    void removeTxnInputs(const CTransaction &tx);
+    void removeTxnInputs(const CTransaction& tx);
     /**
      * Get a number of known spends
      * @return A size of known spends.
      */
     size_t getKnownSpendsSize() const;
+
+    /**
+     * This method returns all detected double spends (if any exists)
+     * by moving all transactions to the caller.
+     * @return A vector of detected double spend txns.
+     */
+    std::vector<TxInputDataSPtr> getDoubleSpendTxns();
+
     /**
      * Clear known spends.
      */
@@ -47,5 +56,6 @@ class CTxnDoubleSpendDetector {
 
   private:
     std::vector<COutPoint> mKnownSpends = {};
-    mutable std::mutex mKnownSpendsMtx {};
+    std::vector<TxInputDataSPtr> mDoubleSpendTxns = {};
+    mutable std::mutex mMainMtx {};
 };
