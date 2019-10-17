@@ -57,15 +57,20 @@ BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs) {
     auto txnInputData3 = CreateTxnWithNInputs(TxSource::p2p, 10);
     const CTransaction &tx3 = *txnInputData3->mpTx;
  
+    BOOST_REQUIRE(dsDetector->getDoubleSpendTxns().empty());
     // tx1 checks
-    BOOST_REQUIRE(dsDetector->insertTxnInputs(tx1));
-    BOOST_REQUIRE(!dsDetector->insertTxnInputs(tx1));
+    BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData1));
+    BOOST_REQUIRE(!dsDetector->insertTxnInputs(txnInputData1));
     // tx2 checks
-    BOOST_REQUIRE(dsDetector->insertTxnInputs(tx2));
-    BOOST_REQUIRE(!dsDetector->insertTxnInputs(tx2));
+    BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData2));
+    BOOST_REQUIRE(!dsDetector->insertTxnInputs(txnInputData2));
     // tx3 checks
-    BOOST_REQUIRE(dsDetector->insertTxnInputs(tx3));
-    BOOST_REQUIRE(!dsDetector->insertTxnInputs(tx3));
+    BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData3));
+    BOOST_REQUIRE(!dsDetector->insertTxnInputs(txnInputData3));
+    // At this moment there should be 3 entries
+    BOOST_REQUIRE(3 == dsDetector->getDoubleSpendTxns().size());
+    // An empty set returned when called again
+    BOOST_REQUIRE(dsDetector->getDoubleSpendTxns().empty());
  
     auto nTxnsVinSize = tx1.vin.size() + tx2.vin.size() + tx3.vin.size();
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == nTxnsVinSize);
@@ -82,15 +87,15 @@ BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs2) {
     auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
     const CTransaction &tx2 = *txnInputData2->mpTx;
 
-    BOOST_REQUIRE(dsDetector->insertTxnInputs(tx1));
+    BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData1));
     // Assign tx1's input as the first input of tx2 
     const_cast<COutPoint&>(tx2.vin[0].prevout) = const_cast<COutPoint&>(tx1.vin[0].prevout);
-    BOOST_REQUIRE(!dsDetector->insertTxnInputs(tx2));
+    BOOST_REQUIRE(!dsDetector->insertTxnInputs(txnInputData2));
 
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == tx1.vin.size());
     // Check if we are able to add tx2 after conflicting inputs were removed
     dsDetector->removeTxnInputs(tx1);
-    BOOST_REQUIRE(dsDetector->insertTxnInputs(tx2));
+    BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData2));
 }
 
 BOOST_AUTO_TEST_CASE(test_detector_remove_txn_inputs) {
@@ -104,13 +109,13 @@ BOOST_AUTO_TEST_CASE(test_detector_remove_txn_inputs) {
     auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
     const CTransaction &tx2 = *txnInputData2->mpTx;
     // Insert tx1
-    BOOST_REQUIRE(dsDetector->insertTxnInputs(tx1));
+    BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData1));
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == tx1.vin.size());
     // Try to remove inputs from a non existing txn
     dsDetector->removeTxnInputs(tx2);
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == tx1.vin.size());
     // Add inputs from tx2
-    BOOST_REQUIRE(dsDetector->insertTxnInputs(tx2));
+    BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData2));
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == tx1.vin.size() + tx2.vin.size());
     // Remove inputs from tx2
     dsDetector->removeTxnInputs(tx2);
@@ -126,7 +131,7 @@ BOOST_AUTO_TEST_CASE(test_detector_clear_txn_inputs) {
     auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10000);
     const CTransaction &tx1 = *txnInputData1->mpTx;
     // Insert tx1
-    BOOST_REQUIRE(dsDetector->insertTxnInputs(tx1));
+    BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData1));
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == tx1.vin.size());
     dsDetector->clear();
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == 0);

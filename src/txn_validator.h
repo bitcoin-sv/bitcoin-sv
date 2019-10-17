@@ -92,6 +92,7 @@ class CTxnValidator final
     std::vector<TxInputDataSPtr> processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
         mining::CJournalChangeSetPtr& journalChangeSet,
+        size_t nTxnsPerTaskThreshold,
         bool fReadyForFeeEstimation);
 
     /** Post validation step for p2p txns before limit mempool size is done*/

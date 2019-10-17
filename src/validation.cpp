@@ -901,7 +901,7 @@ CTxnValResult TxnValidation(
     std::vector<COutPoint> vCoinsToUncache {};
 
     // Check double spend attempt for the given txn
-    if(!dsDetector->insertTxnInputs(tx)) {
+    if(!dsDetector->insertTxnInputs(pTxInputData)) {
        state.Invalid(false, REJECT_DUPLICATE,
                      sDoubleSpendRejectMsg);
        return Result{state, pTxInputData, vCoinsToUncache};
