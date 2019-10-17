@@ -30,12 +30,15 @@ BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
 static void CheckTestResultForAllFlags(const stacktype &original_stack, const CScript &script, const stacktype &expected,
         uint32_t upgradeFlag = 0) {
     const Config& config = GlobalConfig::GetConfig();
+
     BaseSignatureChecker sigchecker;
     auto source = task::CCancellationSource::Make();
 
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
-        stacktype stack{original_stack};
+
+        LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
+        LimitedStack expectedStack = LimitedStack(expected, UINT32_MAX);
         auto r =
             EvalScript(
                 config, true,
@@ -46,11 +49,11 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                 sigchecker,
                 &err);
         BOOST_CHECK(r.value());
-        BOOST_CHECK(stack == expected);
+        BOOST_CHECK(stack == expectedStack);
 
         // Make sure that if we do not pass the upgrade flag, we get the same result
         if (upgradeFlag) {
-            stack = original_stack;
+            stack = LimitedStack(original_stack, UINT32_MAX);
             r =
                 EvalScript(
                     config, true,
@@ -61,7 +64,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                     sigchecker,
                     &err);
             BOOST_CHECK(r.value());
-            BOOST_CHECK(stack == expected);
+            BOOST_CHECK(stack == expectedStack);
         }
     }
 }
@@ -71,7 +74,7 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     BaseSignatureChecker sigchecker;
     const Config& config = GlobalConfig::GetConfig();
     ScriptError err = SCRIPT_ERR_OK;
-    stacktype stack{original_stack};
+    LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
 
     auto source = task::CCancellationSource::Make();
     auto r =
@@ -84,12 +87,13 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
             sigchecker,
             &err);
     BOOST_CHECK(!r.value());
+
     BOOST_CHECK_EQUAL(err, expected_error);
 
     // Make sure that if we do not pass the opcodes flags, we get the same result
     if(upgradeFlag)
     {
-        stack = original_stack;
+        stack = LimitedStack(original_stack, UINT32_MAX);
         r =
             EvalScript(
                 config, true,
@@ -499,7 +503,7 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
 }
 
 BOOST_AUTO_TEST_CASE(invert_test)
-{ 
+{
     CheckUnaryOp({},     OP_INVERT, {});
     CheckUnaryOp({0x00}, OP_INVERT, {0xFF});
     CheckUnaryOp({0xFF}, OP_INVERT, {0x00});
@@ -511,7 +515,7 @@ static void CheckShiftOp(const valtype &x, const valtype &n, opcodetype op, cons
 }
 
 BOOST_AUTO_TEST_CASE(lshift_test)
-{ 
+{
     CheckShiftOp({}, {},     OP_LSHIFT, {}); 
     CheckShiftOp({}, {0x01}, OP_LSHIFT, {}); 
     CheckShiftOp({}, {0x02}, OP_LSHIFT, {}); 
@@ -521,7 +525,7 @@ BOOST_AUTO_TEST_CASE(lshift_test)
     CheckShiftOp({}, {0x0F}, OP_LSHIFT, {}); 
     CheckShiftOp({}, {0x10}, OP_LSHIFT, {}); 
     CheckShiftOp({}, {0x11}, OP_LSHIFT, {}); 
- 
+
     CheckShiftOp({0xFF}, {},     OP_LSHIFT, to_bitpattern("11111111")); 
     CheckShiftOp({0xFF}, {0x01}, OP_LSHIFT, to_bitpattern("11111110")); 
     CheckShiftOp({0xFF}, {0x02}, OP_LSHIFT, to_bitpattern("11111100")); 
@@ -531,7 +535,7 @@ BOOST_AUTO_TEST_CASE(lshift_test)
     CheckShiftOp({0xFF}, {0x06}, OP_LSHIFT, to_bitpattern("11000000")); 
     CheckShiftOp({0xFF}, {0x07}, OP_LSHIFT, to_bitpattern("10000000")); 
     CheckShiftOp({0xFF}, {0x08}, OP_LSHIFT, to_bitpattern("00000000")); 
- 
+
     CheckShiftOp({0xFF}, {0x01}, OP_LSHIFT, {0xFE}); 
     CheckShiftOp({0xFF}, {0x02}, OP_LSHIFT, {0xFC}); 
     CheckShiftOp({0xFF}, {0x03}, OP_LSHIFT, {0xF8}); 
@@ -569,7 +573,7 @@ BOOST_AUTO_TEST_CASE(lshift_test)
     CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_LSHIFT, to_bitpattern("11111010101010101000000000000000"));
 
     // second parameter, n < 0 - should produce error
-    CheckErrorForAllFlags({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_LSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
+    CheckErrorForAllFlags({{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_LSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
 } 
  
 BOOST_AUTO_TEST_CASE(rshift_test) 
@@ -632,7 +636,7 @@ BOOST_AUTO_TEST_CASE(rshift_test)
     CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_RSHIFT, to_bitpattern("00000000000000010011111000100011"));
 
     // second parameter, n < 0 - should produce error
-    CheckErrorForAllFlags({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
+    CheckErrorForAllFlags({{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
 }
 
 /**
@@ -809,6 +813,7 @@ static void CheckBin2NumError(const stacktype &original_stack,
 
 static void CheckNum2BinError(const stacktype &original_stack,
                               ScriptError expected_error) {
+
     CheckErrorForAllFlags(original_stack, CScript() << OP_NUM2BIN,
                           expected_error);
 }
@@ -1075,13 +1080,13 @@ static uint64_t NonPushOpCodeCount(const CScript& script)
  
 static void CheckTestForOpCodeLimit(const CScript &script,
                                     const size_t expNonPushOpcodeCount,
-                                    const BaseSignatureChecker& sigchecker,
-                                    const stacktype &original_stack = {})
+                                    const BaseSignatureChecker& sigchecker)
 { 
     const Config& config = GlobalConfig::GetConfig();
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
-        stacktype stack{original_stack};
+
+        LimitedStack stack(UINT32_MAX);
         auto r =
             EvalScript(
                 config, true,

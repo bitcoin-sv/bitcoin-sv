@@ -10,6 +10,7 @@
 #include "script/script_flags.h"
 #include "script_error.h"
 #include "sighashtype.h"
+#include "limitedstack.h"
 
 #include <cstdint>
 #include <optional>
@@ -108,7 +109,7 @@ std::optional<bool> EvalScript(
     const Config& config,
     bool consensus,
     const task::CCancellationToken& token,
-    std::vector<std::vector<uint8_t>>& stack,
+    LimitedStack& stack,
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,

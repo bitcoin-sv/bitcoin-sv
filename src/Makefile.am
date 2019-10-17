@@ -361,6 +361,8 @@ libbitcoin_consensus_a_SOURCES = \
   script/interpreter.cpp \
   script/interpreter.h \
   script/int_serialization.h \
+  script/limitedstack.cpp \
+  script/limitedstack.h \
   script/script_flags.h \
   script/script.cpp \
   script/script_num.cpp \

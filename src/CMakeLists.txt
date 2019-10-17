@@ -200,6 +200,7 @@ add_library(bitcoinconsensus
 	pubkey.cpp
 	script/bitcoinconsensus.cpp
 	script/interpreter.cpp
+	script/limitedstack.cpp
 	script/script.cpp
 	script/script_num.cpp
 	script/script_error.cpp

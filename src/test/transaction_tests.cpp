@@ -380,15 +380,15 @@ void CheckWithFlag(const CTransactionRef &output,
                       std::string("failed after genesis result: ") + (retAfter ? "true" : "false"));
 }
 
-static CScript PushAll(const std::vector<valtype> &values) {
+static CScript PushAll(const LimitedStack &values) {
     CScript result;
-    for (const valtype &v : values) {
-        if (v.size() == 0) {
+    for (size_t i = 0; i != values.size(); ++i) {
+        if (values.at(i).size() == 0) {
             result << OP_0;
-        } else if (v.size() == 1 && v[0] >= 1 && v[0] <= 16) {
-            result << CScript::EncodeOP_N(v[0]);
+        } else if (values.at(i).size() == 1 && values.at(i)[0] >= 1 && values.at(i)[0] <= 16) {
+            result << CScript::EncodeOP_N(values.at(i)[0]);
         } else {
-            result << v;
+            result << values.at(i).GetElement();
         }
     }
     return result;
@@ -396,7 +396,8 @@ static CScript PushAll(const std::vector<valtype> &values) {
 
 void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
     const Config& config = GlobalConfig::GetConfig();
-    std::vector<valtype> stack;
+
+    LimitedStack stack(UINT32_MAX);
     EvalScript(
         config, true,
         task::CCancellationSource::Make()->GetToken(),
@@ -404,9 +405,10 @@ void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
         script,
         SCRIPT_VERIFY_STRICTENC,
         BaseSignatureChecker());
+
     BOOST_CHECK(stack.size() > 0);
-    stack.back() =
-        std::vector<uint8_t>(redeemScript.begin(), redeemScript.end());
+    stack.pop_back();
+    stack.push_back(LimitedVector(std::vector<uint8_t>(redeemScript.begin(), redeemScript.end()), stack));
     script = PushAll(stack);
 }
 
