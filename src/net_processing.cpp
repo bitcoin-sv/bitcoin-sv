@@ -1123,6 +1123,7 @@ static bool rejectIfMaxDownloadExceeded(const Config &config, CSerializedNetMsg 
     uint64_t maxSendQueuesBytes = config.GetMaxSendQueuesBytes();
     size_t totalSize = CSendQueueBytes::getTotalSendQueuesBytes() + msg.Size() + CMessageHeader::HEADER_SIZE;
     if (totalSize > maxSendQueuesBytes) {
+
         if (!isMostRecentBlock) {
             LogPrint(BCLog::NET, "Size of all msgs currently sending across "
                 "all the queues is too large: %s. Maximum size: %s. Request ignored, block will not be sent. "
@@ -1130,11 +1131,22 @@ static bool rejectIfMaxDownloadExceeded(const Config &config, CSerializedNetMsg 
             connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
                 .Make(NetMsgType::REJECT, std::string(NetMsgType::GETDATA), REJECT_TOOBUSY, strprintf("Max blocks' downloading size exceeded.")));
             return true;
-        } else {
-            LogPrint(BCLog::NET, "Size of all msgs currently sending across "
-                "all the queues is too large: %s. Maximum size: %s. Sending last block anyway. \n",
-                totalSize, maxSendQueuesBytes);
         }
+
+        if (!pfrom->fWhitelisted) {
+            LogPrint(BCLog::NET, "Size of all msgs currently sending across "
+                "all the queues is too large: %s. Maximum size: %s. Last block will not be sent, "
+                "because it was requested by non whitelisted peer. \n",
+                totalSize, maxSendQueuesBytes);
+            connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+                .Make(NetMsgType::REJECT, std::string(NetMsgType::GETDATA), REJECT_TOOBUSY, strprintf("Max blocks' downloading size exceeded.")));
+            return true;
+        }
+        
+        LogPrint(BCLog::NET, "Size of all msgs currently sending across "
+                "all the queues is too large: %s. Maximum size: %s. Sending last block anyway "
+                "because it was requested by whitelisted peer. \n",
+                totalSize, maxSendQueuesBytes);
     }
 
     return false;
