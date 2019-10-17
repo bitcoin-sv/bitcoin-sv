@@ -79,6 +79,9 @@ public:
 
     virtual void SetAcceptP2SH(bool acceptP2SHIn) = 0;
     virtual bool GetAcceptP2SH() const = 0;
+
+    virtual void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) = 0;
+    virtual uint64_t GetGenesisActivationHeight() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -142,6 +145,9 @@ public:
     void SetAcceptP2SH(bool acceptP2SHIn) override;
     bool GetAcceptP2SH() const override;
 
+    void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) override;
+    uint64_t GetGenesisActivationHeight() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -177,6 +183,8 @@ private:
     bool testBlockCandidateValidity;
     mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
     bool acceptP2SH;
+
+    uint64_t genesisActivationHeight;
 };
 
 // Dummy for subclassing in unittests
@@ -256,6 +264,9 @@ public:
 
     void SetAcceptP2SH(bool acceptP2SHIn) override { acceptP2SH = acceptP2SHIn; }
     bool GetAcceptP2SH() const override { return acceptP2SH; }
+
+    void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) override {}
+    uint64_t GetGenesisActivationHeight() const override { return 0; }
 
 private:
     std::unique_ptr<CChainParams> chainParams;

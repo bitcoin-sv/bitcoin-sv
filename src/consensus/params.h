@@ -29,6 +29,11 @@ struct Params {
     int uahfHeight;
     /** Block height at which the new DAA becomes active */
     int daaHeight;
+    /** Block height at which the Genesis becomes active.
+      * The specified block height is the height of the block where the new rules are active.
+      * It is not the height of the last block with the old rules.
+      */
+    int genesisHeight;
     /**
      * Minimum blocks including miner confirmation of the total of 2016 blocks
      * in a retargeting period, (nPowTargetTimespan / nPowTargetSpacing) which

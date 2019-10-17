@@ -40,6 +40,8 @@ void GlobalConfig::Reset()
     testBlockCandidateValidity = false;
     blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
     acceptP2SH = DEFAULT_ACCEPT_P2SH;
+
+    genesisActivationHeight = 0;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -247,6 +249,14 @@ void GlobalConfig::SetAcceptP2SH(bool acceptP2SHIn) {
 
 bool GlobalConfig::GetAcceptP2SH() const {
     return acceptP2SH;
+}
+
+void GlobalConfig::SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) {
+    genesisActivationHeight = genesisActivationHeightIn;
+}
+
+uint64_t GlobalConfig::GetGenesisActivationHeight() const {
+    return genesisActivationHeight;
 }
 
 DummyConfig::DummyConfig()

@@ -593,6 +593,19 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
+static bool IsGenesisEnabled(const Config &config, int nHeight) {
+    return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
+}
+
+bool IsGenesisEnabled(const Config& config, const CBlockIndex* pindexPrev) {
+    if (pindexPrev == nullptr) {
+        return false;
+    }
+
+    // Genesis is enabled on the currently processed block, not on the current tip.
+    return IsGenesisEnabled(config, pindexPrev->nHeight + 1);
+}
+
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
 // were somehow broken and returning the wrong scriptPubKeys.
 //
@@ -2287,12 +2300,15 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
         } else if (!check()) {
             const bool hasNonMandatoryFlags =
                 (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-            if (hasNonMandatoryFlags) {
+            const bool doesNotHaveGenesis =
+                    (flags & SCRIPT_GENESIS) == 0;
+            if (hasNonMandatoryFlags || doesNotHaveGenesis) {
                 // Check whether the failure was caused by a non-mandatory
                 // script verification check, such as non-standard DER encodings
                 // or non-null dummy arguments; if so, don't trigger DoS
                 // protection to avoid splitting the network between upgraded
                 // and non-upgraded nodes.
+                // FIXME: CORE-257 has to check if genesis check is necessary also in check2
                 CScriptCheck check2(
                     scriptPubKey, amount, tx, i,
                     (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
@@ -2576,6 +2592,10 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     if (IsDAAEnabled(config, pChainTip)) {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
+    }
+
+    if (IsGenesisEnabled(config, pChainTip)) {
+        flags |= SCRIPT_GENESIS;
     }
 
     return flags;
@@ -3179,6 +3199,18 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     if (!FlushStateToDisk(config.GetChainParams(), state,
                           FLUSH_STATE_IF_NEEDED)) {
         return false;
+    }
+
+    if ((IsGenesisEnabled(config, pindexDelete)) &&
+        (!IsGenesisEnabled(config, pindexDelete->pprev)))
+    {
+        mempool.Clear();
+        // While not strictly necessary, clearing the disconnect pool is also
+        // beneficial so we don't try to reuse its content at the end of the
+        // reorg, which we know will fail.
+        if (disconnectpool) {
+            disconnectpool->clear();
+        }
     }
 
     if (disconnectpool) {

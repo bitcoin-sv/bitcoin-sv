@@ -495,6 +495,9 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 /** Check if DAA HF has activated. */
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
+/** Check if Genesis has activated. */
+bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
+
 /**
  * Limit mempool size.
  *

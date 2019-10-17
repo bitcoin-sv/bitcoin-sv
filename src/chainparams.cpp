@@ -17,6 +17,10 @@
 
 #include "chainparamsseeds.h"
 
+#define GENESIS_ACTIVATION_MAIN                 630000
+#define GENESIS_ACTIVATION_STN                  500000
+#define GENESIS_ACTIVATION_TESTNET              1342000
+#define GENESIS_ACTIVATION_REGTEST              10000
 
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
                                  const CScript &genesisOutputScript,
@@ -123,6 +127,9 @@ public:
 
         // November 13, 2017 hard fork
         consensus.daaHeight = 504031;
+
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_MAIN;
 
         /**
          * The message start string is designed to be unlikely to occur in
@@ -279,6 +286,9 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 2200;     // must be > 2016 - see assert in pow.cpp:268
 
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_STN;
+
         /**
          * The message start string is designed to be unlikely to occur in
          * normal data. The characters are rarely used upper ASCII, not valid as
@@ -379,6 +389,9 @@ public:
 
         // November 13, 2017 hard fork
         consensus.daaHeight = 1188697;
+
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_TESTNET;
 
         diskMagic[0] = 0x0b;
         diskMagic[1] = 0x11;
@@ -497,6 +510,9 @@ public:
 
         // November 13, 2017 hard fork is always on on regtest.
         consensus.daaHeight = 0;
+
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_REGTEST;
 
         diskMagic[0] = 0xfa;
         diskMagic[1] = 0xbf;

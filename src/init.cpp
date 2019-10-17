@@ -393,6 +393,11 @@ std::string HelpMessage(HelpMessageMode mode) {
     }
 
     strUsage += HelpMessageOpt(
+        "-genesisactivationheight",
+        strprintf("Set block height at which genesis should be activated. "
+                  "(default: %u).",
+                  defaultChainParams->GetConsensus().genesisHeight));
+    strUsage += HelpMessageOpt(
         "-loadblock=<file>",
         _("Imports blocks from external blk000??.dat file on startup"));
     strUsage += HelpMessageOpt("-maxmempool=<n>",
@@ -1657,6 +1662,14 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure ancestor limit size.
     if(gArgs.IsArgSet("-limitancestorsize")) {
         config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", (MAX_TX_SIZE * config.GetLimitAncestorCount()) / 1000) * 1000);
+    }
+
+    // Configure genesis activation height.
+    uint64_t genesisActivationHeight = gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight);
+    if(genesisActivationHeight <= 0) {
+        return InitError(_("Genesis activation height cannot be configured with a zero or negative value."));
+    } else {
+        config.SetGenesisActivationHeight(genesisActivationHeight);
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &
