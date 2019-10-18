@@ -274,7 +274,8 @@ public:
         size_t nTxnsPerTaskRatio {vNewTxns.size() / numThreads};
         // Calculate number of txns for batch processing (per thread)
         size_t nBatchSize {0};
-        if (nTxnsPerTaskRatio < nTxnsPerTaskThreshold) {
+        bool fSingleTask = !nTxnsPerTaskThreshold || (nTxnsPerTaskRatio < nTxnsPerTaskThreshold);
+        if (fSingleTask) {
             nBatchSize = vNewTxns.size();
         } else {
             nBatchSize = vNewTxns.size() / numThreads;
@@ -283,8 +284,7 @@ public:
             }
         }
         // Allocate a buffer for results
-        size_t nNumOfBatches = (nTxnsPerTaskRatio < nTxnsPerTaskThreshold) ? 1 : numThreads;
-        results.reserve(nNumOfBatches);
+        results.reserve(fSingleTask ? 1 : numThreads);
         auto chunkBeginIter = vNewTxns.begin();
         auto chunkEndIter = vNewTxns.begin();
         size_t currChunkBeginPos {0};

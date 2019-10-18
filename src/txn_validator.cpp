@@ -175,6 +175,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
     try {
         RenameThread("bitcoin-txnvalidator");
         LogPrint(BCLog::TXNVAL, "New transaction handling thread. Starting validator.\n");
+        // Get a threshold value for a minimum number of txns that we want to assign per task
+        size_t nTxnsPerTaskThreshold {
+            static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
+        };
         while(mRunning) {
             // Run every few seconds or until stopping
             std::unique_lock lock { mMainMtx };
@@ -214,10 +218,36 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 mining::CJournalChangeSetPtr changeSet {
                                     mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::NEW_TXN)
                                 };
+                                // Check fee estimation requirements
+                                bool fReadyForFeeEstimation = IsCurrentForFeeEstimation();
                                 // Validate txns and try to submit them to the mempool
                                 std::vector<TxInputDataSPtr> vAcceptedTxns {
-                                    processNewTransactionsNL(mProcessingQueue, changeSet, IsCurrentForFeeEstimation())
+                                    processNewTransactionsNL(
+                                            mProcessingQueue,
+                                            changeSet,
+                                            nTxnsPerTaskThreshold,
+                                            fReadyForFeeEstimation)
                                 };
+                                // Process detected double spend transactions (sequential execution)
+                                std::vector<TxInputDataSPtr> vDetectedDoubleSpends {
+                                    mpTxnDoubleSpendDetector->getDoubleSpendTxns()
+                                };
+                                if (!vDetectedDoubleSpends.empty()) {
+                                    LogPrint(BCLog::TXNVAL, "Txnval-asynch: Process detected %d double spend transaction(s)\n",
+                                            vDetectedDoubleSpends.size());
+                                    std::vector<TxInputDataSPtr> vAcceptedTxnsFromDoubleSpends {
+                                        processNewTransactionsNL(
+                                                vDetectedDoubleSpends,
+                                                changeSet,
+                                                0,
+                                                fReadyForFeeEstimation)
+                                    };
+                                    if (!vAcceptedTxnsFromDoubleSpends.empty()) {
+                                        vAcceptedTxns.insert(vAcceptedTxns.end(),
+                                            std::make_move_iterator(vAcceptedTxnsFromDoubleSpends.begin()),
+                                            std::make_move_iterator(vAcceptedTxnsFromDoubleSpends.end()));
+                                    }
+                                }
                                 // Trim mempool if it's size exceeds the limit.
                                 std::vector<TxId> vRemovedTxIds {
                                     LimitMempoolSize(
@@ -273,6 +303,7 @@ std::vector<TxInputDataSPtr>
 CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
     mining::CJournalChangeSetPtr& journalChangeSet,
+    size_t nTxnsPerTaskThreshold,
     bool fReadyForFeeEstimation) {
 
     auto tx_validation = [](const TxInputDataSPtrRefVec& vTxInputData,
@@ -293,10 +324,6 @@ CTxnValidator::processNewTransactionsNL(
         mpTxnDoubleSpendDetector,
         mpOrphanTxnsP2PQ,
         mpTxnRecentRejects
-    };
-    // Set number of txns per thread threshold
-    size_t nTxnsPerTaskThreshold {
-        static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
     };
     // Trigger parallel validation for txns
     auto results {

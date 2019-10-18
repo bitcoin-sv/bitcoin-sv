@@ -57,7 +57,7 @@ class NetworkThreadPinging(Thread):
 class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
 
     # Ensure funding and returns given number of spend money transcations without submitting them
-    def make_transactions(self, num_txns):
+    def make_transactions(self, num_txns, create_double_spends=False):
 
         # Calculate how many found txns are needed to create a required spend money txns (num_txns)
         # - a fund txns are of type 1 - N (N=vouts_num_per_fund_txn)
@@ -122,7 +122,10 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
         spend_txs = []
         for i in range(len(fund_txns)):
             for fund_txn_vout_idx in range(fund_txn_num_vouts):
-                spend_txs.append(make_spend_txn(fund_txns[i].sha256, out_value, fund_txn_vout_idx))
+                spend_tx = make_spend_txn(fund_txns[i].sha256, out_value, fund_txn_vout_idx)
+                if create_double_spends and len(spend_txs) >= num_txns // 2:
+                    spend_tx.vin.append(CTxIn(COutPoint(fund_txns[0].sha256, 0), b''))
+                spend_txs.append(spend_tx)
         return spend_txs
 
     def set_test_params(self):
@@ -158,6 +161,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
 
         def nodoublespends():
             return "nodoublespends"
+
 
         def make_callback_connections(num_callbacks):
             return [NodeConnCB() for i in range(num_callbacks)]
@@ -239,10 +243,18 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                     raise Exception('The value of sync_node_type={} is not defined'.format(sync_node_type))
 
         def runTestWithParams(sync_node_type, description, args, number_of_txns, number_of_peers, timeout):
+            # In case of double spends only half of the set will be valid.
+            # A number of txns required to create a set of double spends should be an even number
+            create_double_spends = (doublespends() == sync_node_type)
+            expected_txns_num = number_of_txns
+            if create_double_spends:
+                if number_of_txns % 2:
+                    raise Exception('Incorrect size given to create a set of double spend txns')
+                expected_txns_num //= 2
             # Start the node0
             self.start_node(0, args)
             # Create a required number of spend money txns.
-            result_txns = self.make_transactions(number_of_txns)
+            result_txns = self.make_transactions(number_of_txns, create_double_spends)
             spend_txns = result_txns[0:number_of_txns]
             # Check if the test has got an enough amount of spend money transactions.
             assert_equal(len(spend_txns), number_of_txns)
@@ -254,9 +266,9 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 # Broadcast txns to the node0
                 sync_node_scenarios(sync_node_type, spend_txns, callback_connections)
                 # Wait until the condition is met
-                wait_until(lambda: len(self.nodes[0].getrawmempool()) == len(spend_txns), timeout=timeout)
+                wait_until(lambda: len(self.nodes[0].getrawmempool()) == expected_txns_num, timeout=timeout)
                 # Assert to confirm that the above wait is successfull (additional check for clarity)
-                assert_equal(len(self.nodes[0].getrawmempool()), len(spend_txns))
+                assert_equal(len(self.nodes[0].getrawmempool()), expected_txns_num)
 
         # To increase a number of txns taken from the queue by the Validator we need to change a default config.
         # This will allow us to observe and measure CPU utilization during validation (asynch mode) of p2p txns.

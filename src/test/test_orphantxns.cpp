@@ -406,12 +406,12 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
     orphanTxns->addTxn(txn6);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber+2);
     orphanTxns->collectTxnOutpoints(*(txn6->mpTx));
-    BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().size() == nDependentTxn1VoutSize);
+    BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
     // Test case 3:
     // There is no newly added dependent orphan txn. There should be nothing for re-try.
     auto txn7 = CreateOrphanTxn(TxSource::p2p);
     orphanTxns->collectTxnOutpoints(*(txn7->mpTx));
-    BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().size() == nDependentTxn1VoutSize);
+    BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
 }
 
 // In this test we have got txn1 which creates two outputs and then two child transactions txn2 and txn3
