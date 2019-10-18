@@ -41,7 +41,7 @@ class COrphanTxns {
     static constexpr unsigned int DEFAULT_MAX_COLLECTED_OUTPOINTS = 300000;
     /** Default for -maxorphantx, maximum number of orphan transactions kept in
      *  memory */
-    static constexpr unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 100;
+    static constexpr unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 5000;
     /** Default number of orphan+recently-replaced txn to keep around for block
      *  reconstruction */
     static constexpr unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
