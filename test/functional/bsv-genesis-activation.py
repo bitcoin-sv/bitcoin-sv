@@ -19,8 +19,9 @@ Genesis height is 109.
 7. Create block on height 109 with tx0 that has OP_RETURN in the locking script and tx1 that
    has OP_TRUE in the unlocking script. Block is accepted.
 
-8. Rewind to the state before genesis (height 107). tx0 and tx1 are back in the mempool.
-9. Try to generate new block (height 108). It will not be successful as tx1 spends tx0 before genesis now.
+8. Invalidate block 109. tx0 and tx1 are added to mempool.
+9. Invalidate block 108. tx0 and tx1 are deleted from mempool (crossing Genesis).
+10. Try to generate new block (height 108). Generating is successful, tx0 and tx1 are not in this block.
 
 """
 from test_framework.test_framework import ComparisonTestFramework
@@ -121,18 +122,29 @@ class BSVGenesisActivation(ComparisonTestFramework):
 
         # At this point, we have tx0 and tx1 in cache script marked as valid.
         # Now, invalidate blocks 109 and 108 so that we are in state before genesis.
-        node.invalidateblock(format(b109_accepted.sha256, 'x'))
-        node.invalidateblock(format(b108.sha256, 'x'))
 
-        # So we are at height 107.
-        assert_equal(node.getblock(node.getbestblockhash())['height'], 107)
+        node.invalidateblock(format(b109_accepted.sha256, 'x'))
 
         # tx0 and tx1 are in mempool (currently valid because it was sent after genesis)
         assert_equal(True, tx0.hash in node.getrawmempool())
         assert_equal(True, tx1.hash in node.getrawmempool())
 
-        # tx1 will not be mined in the next block, because genesis is not activated
-        assert_raises_rpc_error(-1, "bad-txns-inputs-missingorspent", self.nodes[0].generate, 1)
+        node.invalidateblock(format(b108.sha256, 'x'))
+
+         # tx0 and tx1 are not in mempool (mempool is deleted when 108 is invalidated)
+        assert_equal(False, tx0.hash in node.getrawmempool())
+        assert_equal(False, tx1.hash in node.getrawmempool())
+
+        # So we are at height 107.
+        assert_equal(node.getblock(node.getbestblockhash())['height'], 107)
+
+        self.nodes[0].generate(1)
+        tx = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['tx']
+        assert_equal(False, tx0.hash in tx)
+        assert_equal(False, tx1.hash in tx)
+
+        # Now we are at height 108.
+        assert_equal(node.getblock(node.getbestblockhash())['height'], 108)
 
 if __name__ == '__main__':
     BSVGenesisActivation().main()

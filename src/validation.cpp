@@ -3241,8 +3241,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         return false;
     }
 
-    if ((IsGenesisEnabled(config, pindexDelete->nHeight)) &&
-        (!IsGenesisEnabled(config, pindexDelete->nHeight - 1)))
+    if ((IsGenesisEnabled(config, pindexDelete->nHeight + 1)) &&
+        (!IsGenesisEnabled(config, pindexDelete->nHeight)))
     {
         mempool.Clear();
         // While not strictly necessary, clearing the disconnect pool is also
