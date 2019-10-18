@@ -242,9 +242,8 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
         while (dependentOrphanIter != vDependentOrphans.end()) {
             // Take all matching orphans for the current outpoint.
             // In this way we do not prioritize which orphan should be scheduled for retry.
-            // The Double Spend Detector (DSD) will allow to pass through validation only the first seen orphan
-            // (and reject the rest of them). The rejected (by the DSD) orphans will be scheduled for retry
-            // by the next invocation.
+            // In batch processing, the Double Spend Detector (DSD) will allow to pass through validation only the first seen orphan
+            // (and reject the rest of them). The rejected orphans will be processed sequentially when batch processing is finished.
             for (const auto& iterOrphanTxn : dependentOrphanIter->second->second) {
                 const auto& pTxInputData {
                     (*iterOrphanTxn).second.pTxInputData
@@ -264,14 +263,11 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
             // The limit for descendant size & counter would not be properly calculated/updated.
             // Any remaining outpoints (of the current txid - the parent) will be used by the next invocation
             // of the method.
-            // What is more, we want to keep the current outpoint in the mCollectedOutpoints queue
-            // as it is possible that the selected - by DSD - orphan could be rejected.
-            // In that case, the remaining orphans (related to the current outpoint)
-            // could not be scheduled again for retry.
+            // At this stage we don't want to allow the current outpoint to be used again.
             auto txid = dependentOrphanIter->first.GetTxId();
             auto nextTxnIter {
                 std::find_if(
-                   dependentOrphanIter,
+                   ++dependentOrphanIter,
                    vDependentOrphans.end(),
                    [&txid](const std::pair<COutPoint, OrphanTxnsByPrevIter>& elem) {
                        return txid != elem.first.GetTxId(); })
