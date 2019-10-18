@@ -385,7 +385,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     int nOpCount = 0;
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
     const bool big_ints_enabled = (flags & SCRIPT_ENABLE_BIG_INTS) != 0;
-
+    const int big_ints_byte_limit{500}; // To do: Make configurable
+                                        // MAX_SCRIPT_ELEMENT_SIZE = 520
     try {
         while (pc < pend) {
             bool fExec = !count(vfExec.begin(), vfExec.end(), false);
@@ -1037,12 +1038,21 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        CScriptNum bn1(stacktop(-2), fRequireMinimal,
+                        
+                        const auto& arg_2 = stack.at(stack.size() -2);
+                        if (arg_2.size() > big_ints_byte_limit)
+                            return set_error(serror, SCRIPT_ERR_INVALID_OPERAND_SIZE);
+                        
+                        const auto& arg_1 = stack.at(stack.size() -1);
+                        if (arg_1.size() > big_ints_byte_limit)
+                            return set_error(serror, SCRIPT_ERR_INVALID_OPERAND_SIZE);
+
+                        CScriptNum bn1(arg_2, fRequireMinimal,
                                        big_ints_enabled
                                            ? stacktop(-2).size()
                                            : CScriptNum::MAXIMUM_ELEMENT_SIZE,
                                        big_ints_enabled);
-                        CScriptNum bn2(stacktop(-1), fRequireMinimal,
+                        CScriptNum bn2(arg_1, fRequireMinimal,
                                        big_ints_enabled
                                            ? stacktop(-1).size()
                                            : CScriptNum::MAXIMUM_ELEMENT_SIZE,
