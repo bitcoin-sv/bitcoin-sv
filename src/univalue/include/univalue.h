@@ -25,30 +25,30 @@ public:
 
     UniValue() : m_JSONParseDepth (DEFAULT_JSON_DEPTH) { typ = VNULL; }
     UniValue(UniValue::VType initialType, const std::string& initialStr = "")
-        : m_JSONParseDepth(2048)
+        : m_JSONParseDepth(DEFAULT_JSON_DEPTH)
     {
         typ = initialType;
         val = initialStr;
     }
-    UniValue(uint64_t val_) : m_JSONParseDepth (2048) {
+    UniValue(uint64_t val_) : m_JSONParseDepth (DEFAULT_JSON_DEPTH) {
         setInt(val_);
     }
-    UniValue(int64_t val_) : m_JSONParseDepth (2048) {
+    UniValue(int64_t val_) : m_JSONParseDepth (DEFAULT_JSON_DEPTH) {
         setInt(val_);
     }
-    UniValue(bool val_) : m_JSONParseDepth (2048) {
+    UniValue(bool val_) : m_JSONParseDepth (DEFAULT_JSON_DEPTH) {
         setBool(val_);
     }
-    UniValue(int val_) : m_JSONParseDepth (2048) {
+    UniValue(int val_) : m_JSONParseDepth (DEFAULT_JSON_DEPTH) {
         setInt(val_);
     }
-    UniValue(double val_) : m_JSONParseDepth (2048) {
+    UniValue(double val_) : m_JSONParseDepth (DEFAULT_JSON_DEPTH) {
         setFloat(val_);
     }
-    UniValue(const std::string& val_) : m_JSONParseDepth (2048) {
+    UniValue(const std::string& val_) : m_JSONParseDepth (DEFAULT_JSON_DEPTH) {
         setStr(val_);
     }
-    UniValue(const char *val_) : m_JSONParseDepth (2048) {
+    UniValue(const char *val_) : m_JSONParseDepth (DEFAULT_JSON_DEPTH) {
         std::string s(val_);
         setStr(s);
     }
