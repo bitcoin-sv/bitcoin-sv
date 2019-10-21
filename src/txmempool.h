@@ -12,6 +12,7 @@
 #include "primitives/transaction.h"
 #include "random.h"
 #include "sync.h"
+#include "time_locked_mempool.h"
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -522,6 +523,9 @@ private:
     // Our journal builder
     mining::CJournalBuilderPtr mJournalBuilder;
 
+    // Sub-pool for time locked txns
+    CTimeLockedMempool mTimeLockedPool {};
+
 public:
     // public only for testing
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
@@ -705,6 +709,9 @@ public:
     // Get a reference to the journal builder
     const mining::CJournalBuilderPtr& getJournalBuilder() const { return mJournalBuilder; }
 
+    // Get a reference to the time-locked (non-final txn) mempool
+    CTimeLockedMempool& getNonFinalPool() { return mTimeLockedPool; }
+
 public:
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
@@ -806,8 +813,9 @@ public:
     /**
      * Check for conflicts with in-mempool transactions.
      * @param tx A reference to the given txn
+     * @param nonFinal A flag to indicate if tx is a non-final transaction
      */
-    bool CheckTxConflicts(const CTransaction &tx) const;
+    bool CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const;
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */

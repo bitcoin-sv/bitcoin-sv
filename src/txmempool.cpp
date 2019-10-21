@@ -1402,13 +1402,24 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
     return stage.size();
 }
 
-bool CTxMemPool::CheckTxConflicts(const CTransaction &tx) const {
+bool CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
+ {
     std::shared_lock lock(smtx);
-    for (const CTxIn &txin : tx.vin) {
+
+    // Check our locked UTXOs
+    for (const CTxIn &txin : tx->vin) {
         if (mapNextTx.find(txin.prevout) != mapNextTx.end()) {
             return true;
         }
     }
+
+    if(isFinal)
+    {
+        // Check non-final pool locked UTXOs
+        return mTimeLockedPool.checkForDoubleSpend(tx) &&
+            !mTimeLockedPool.finalisesExistingTransaction(tx);
+    }
+
     return false;
 }
 
