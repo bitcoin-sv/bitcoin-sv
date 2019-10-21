@@ -15,6 +15,7 @@
 #include "script/script.h"
 #include "script/script_num.h"
 #include "uint256.h"
+#include "consensus/consensus.h"
 
 typedef std::vector<uint8_t> valtype;
 
@@ -268,6 +269,42 @@ static void CleanupScriptCode(CScript &scriptCode,
     }
 }
 
+bool CheckHeightRelatedFlags(bool usesForkIdAlgorithm, uint32_t flags, ScriptError *serror)
+{
+    bool forkEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
+    bool genesisEnabled = flags & SCRIPT_GENESIS;
+    bool utxoAfterGenesis = flags & SCRIPT_UTXO_AFTER_GENESIS;
+
+    // impossible scenario, cant be before fork and after genesis
+    if(!forkEnabled && genesisEnabled){
+        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+    }
+
+    // impossible scenario, cant spend utxo created after genesis before genesis itself
+    if(!genesisEnabled && utxoAfterGenesis){
+        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+    }
+
+    if(usesForkIdAlgorithm) {
+        // new sighash algorithm is always valid after fork
+        if(forkEnabled) {
+            return true;
+        }
+        return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
+    } else {
+        // old sighash algorithm is valid before fork 
+        // and after genesis but only for utxos that are cerated before genesis
+        if(!forkEnabled) {
+            return true;
+        } else if (genesisEnabled && !utxoAfterGenesis) {
+            return true;
+        }
+        return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+    }
+
+    return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+}
+
 bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
                             ScriptError *serror) {
     // Empty signature. Not strictly DER encoded, but allowed to provide a
@@ -289,13 +326,8 @@ bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
         if (!GetHashType(vchSig).isDefined()) {
             return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
         }
-        bool usesForkId = GetHashType(vchSig).hasForkId();
-        bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
-        if (!forkIdEnabled && usesForkId) {
-            return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
-        }
-        if (forkIdEnabled && !usesForkId) {
-            return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+        if(!CheckHeightRelatedFlags(GetHashType(vchSig).hasForkId(), flags, serror)){
+            return false;
         }
     }
     return true;

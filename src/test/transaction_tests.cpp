@@ -122,7 +122,7 @@ void RunTests(UniValue& tests, bool should_be_valid){
                 bool is_valid = true;
                 PrecomputedTransactionData txdata(tx);
                 size_t i = 0;
-                ScriptError err;
+                ScriptError err = SCRIPT_ERR_UNKNOWN_ERROR;
 
                 for (i = 0; i < tx.vin.size() && is_valid; i++) {
                     if (!mapprevOutScriptPubKeys.count(tx.vin[i].prevout)) {
