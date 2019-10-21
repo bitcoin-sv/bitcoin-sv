@@ -803,6 +803,11 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 } // namespace Consensus
 
 /**
+ * Test whether the given transaction is final for the given height and time.
+ */
+bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
+
+/**
  * Test whether the LockPoints height and time are still valid on the current
  * chain.
  */
@@ -832,6 +837,7 @@ bool SequenceLocks(const CTransaction &tx, int flags,
 bool CheckSequenceLocks(
     const CTransaction &tx,
     const CTxMemPool &pool,
+    const Config& config,
     int flags,
     LockPoints *lp = nullptr,
     bool useExistingLockPoints = false);

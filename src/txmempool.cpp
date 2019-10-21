@@ -713,6 +713,7 @@ void CTxMemPool::RemoveForReorg(
             !CheckSequenceLocks(
                 tx,
                 *this,
+                config,
                 flags,
                 &lp,
                 validLP)) {

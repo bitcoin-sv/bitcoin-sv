@@ -252,8 +252,11 @@ CBlockTreeDB *pblocktree = nullptr;
 static uint32_t GetBlockScriptFlags(const Config &config,
                                     const CBlockIndex *pChainTip);
 
-static bool IsFinalTx(const CTransaction &tx, int nBlockHeight,
-                      int64_t nBlockTime) {
+/**
+ * Test whether the given transaction is final for the given height and time.
+ */
+bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
+{
     if (tx.nLockTime == 0) {
         return true;
     }
@@ -270,6 +273,7 @@ static bool IsFinalTx(const CTransaction &tx, int nBlockHeight,
             return false;
         }
     }
+
     return true;
 }
 
@@ -389,6 +393,7 @@ bool TestLockPointValidity(const LockPoints *lp) {
 bool CheckSequenceLocks(
     const CTransaction &tx,
     const CTxMemPool &pool,
+    const Config& config,
     int flags,
     LockPoints *lp,
     bool useExistingLockPoints) {
@@ -396,6 +401,13 @@ bool CheckSequenceLocks(
     // cs_main is held by TxnValidator during TxnValidation call.
     // pool.smtx is held by TxnValidation method. It is required for viewMemPool::GetCoin()
     CBlockIndex *tip = chainActive.Tip();
+
+    // Post-genesis we don't care about the old sequence lock calculations
+    if(IsGenesisEnabled(config, tip->nHeight))
+    {
+        return true;
+    }
+
     CBlockIndex index;
     index.pprev = tip;
     // CheckSequenceLocks() uses chainActive.Height()+1 to evaluate height based
@@ -983,6 +995,16 @@ void CommitTxToMempool(
 
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
+
+    // Post-genesis, non-final txns have their own mempool
+    if(state.IsNonFinal() || pool.getNonFinalPool().finalisesExistingTransaction(ptx))
+    {
+        // Post-genesis, non-final txns have their own mempool
+        TxMempoolInfo info { pMempoolEntry };
+        pool.getNonFinalPool().addOrUpdateTransaction(info, state);
+        return;
+    }
+
     // Store transaction in the mempool.
     pool.AddUnchecked(
             txid,
@@ -1006,6 +1028,20 @@ void CommitTxToMempool(
             return;
         }
     }
+}
+
+// Does the given non-final txn spend another non-final txn?
+static bool DoesNonFinalSpendNonFinal(const CTransaction& txn)
+{
+    for(const CTxIn& txin : txn.vin)
+    {
+        if(mempool.getNonFinalPool().exists(txin.prevout.GetTxId()))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 CTxnValResult TxnValidation(
@@ -1056,36 +1092,47 @@ CTxnValResult TxnValidation(
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
     CValidationState ctxState;
+    bool isFinal = true;
+    unsigned int lockTimeFlags;
     {
         const CBlockIndex* tip = chainActive.Tip();
-        if (!ContextualCheckTransactionForCurrentBlock(
-                config,
-                tx,
-                tip->nHeight,
-                tip->GetMedianTimePast(),
-                ctxState,
-                STANDARD_LOCKTIME_VERIFY_FLAGS)) {
-            // We copy the state from a dummy to ensure we don't increase the
-            // ban score of peer for transaction that could be valid in the future.
-            state.DoS(0, false, REJECT_NONSTANDARD,
-                      ctxState.GetRejectReason(),
-                      ctxState.CorruptionPossible(),
-                      ctxState.GetDebugMessage());
-            return Result{state, pTxInputData};
+        int height { tip->nHeight };
+        lockTimeFlags = StandardNonFinalVerifyFlags(IsGenesisEnabled(config, height));
+        ContextualCheckTransactionForCurrentBlock(config, tx, height, tip->GetMedianTimePast(),
+            ctxState, lockTimeFlags);
+        if(ctxState.IsNonFinal() || ctxState.IsInvalid()) {
+            if(ctxState.IsInvalid()) {
+                // We copy the state from a dummy to ensure we don't increase the
+                // ban score of peer for transaction that could be valid in the future.
+                state.DoS(0, false, REJECT_NONSTANDARD,
+                          ctxState.GetRejectReason(),
+                          ctxState.CorruptionPossible(),
+                          ctxState.GetDebugMessage());
+                return Result{state, pTxInputData};
+            }
+
+            // Copy non-final status to return state
+            state.SetNonFinal();
+            isFinal = false;
+            // Currently we don't allow chains of non-final txns
+            if(DoesNonFinalSpendNonFinal(tx)) {
+                state.DoS(0, false, REJECT_NONSTANDARD, "too-long-non-final-chain",
+                    false, "Attempt to spend non-final transaction");
+                return Result{state, pTxInputData};
+            }
         }
     }
+
     // Is it already in the memory pool?
     if (pool.Exists(txid)) {
-        state.Invalid(false, REJECT_ALREADY_KNOWN,
-                     "txn-already-in-mempool");
+        state.Invalid(false, REJECT_ALREADY_KNOWN, "txn-already-in-mempool");
         return Result{state, pTxInputData};
     }
     // Check for conflicts with in-memory transactions
-    if (pool.CheckTxConflicts(tx)) {
+    if (pool.CheckTxConflicts(ptx, isFinal)) {
         state.SetMempoolConflictDetected();
         // Disable replacement feature for good
-        state.Invalid(false, REJECT_CONFLICT,
-                     "txn-mempool-conflict");
+        state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
         return Result{state, pTxInputData};
     }
 
@@ -1128,7 +1175,7 @@ CTxnValResult TxnValidation(
         // transactions that can't be mined yet. Must keep pool.cs for this
         // unless we change CheckSequenceLocks to take a CoinsViewCache
         // instead of create its own.
-        if (!CheckSequenceLocks(tx, pool, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp)) {
+        if (!CheckSequenceLocks(tx, pool, config, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp)) {
             state.DoS(0, false, REJECT_NONSTANDARD,
                      "non-BIP68-final");
             return Result{state, pTxInputData, vCoinsToUncache};
@@ -1363,7 +1410,7 @@ CTxnValResult TxnValidation(
         state = CValidationState();
     }
     // Check a mempool conflict and a double spend attempt
-    if(!dsDetector->insertTxnInputs(pTxInputData, pool, state)) {
+    if(!dsDetector->insertTxnInputs(pTxInputData, pool, state, isFinal)) {
         if (state.IsMempoolConflictDetected()) {
             state.Invalid(false, REJECT_CONFLICT,
                         "txn-mempool-conflict");
@@ -1813,11 +1860,18 @@ static void PostValidationStepsForP2PTxn(
         RelayTransaction(*ptx, *g_connman);
         pNode->nLastTXTime = GetTime();
     }
-    // For P2P txns the Validator executes LimitMempoolSize when a batch of txns is
-    // fully processed (validation is finished and all valid txns were commited)
-    // so the else condition can not be interpreted if limit mempool size flag
-    // is set on transaction level. As a consequence AddToCompactExtraTransactions is not
-    // being called for txns added and then removed from the mempool.
+    else {
+        // For P2P txns the Validator executes LimitMempoolSize when a batch of txns is
+        // fully processed (validation is finished and all valid txns were commited)
+        // so the else condition can not be interpreted if limit mempool size flag
+        // is set on transaction level. As a consequence AddToCompactExtraTransactions is not
+        // being called for txns added and then removed from the mempool.
+
+        // Send a reject if required
+        CreateTxRejectMsgForP2PTxn(txStatus.mTxInputData,
+                                   state.GetRejectCode(),
+                                   state.GetRejectReason());
+    }
 }
 
 /**
@@ -1885,8 +1939,7 @@ static void UpdateMempoolForReorg(const Config &config,
     // UpdateTransactionsFromBlock finds descendants of any transactions in the
     // disconnectpool that were added back and cleans up the mempool state.
     LogPrint(BCLog::MEMPOOL, "Update transactions from block\n");
-    mempool.
-        UpdateTransactionsFromBlock(vHashUpdate);
+    mempool.UpdateTransactionsFromBlock(vHashUpdate);
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
     mempool.
@@ -4771,8 +4824,16 @@ static bool ContextualCheckBlockHeader(const Config &config,
 
 bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
                                 CValidationState &state, int nHeight,
-                                int64_t nLockTimeCutoff) {
-    if (!IsFinalTx(tx, nHeight, nLockTimeCutoff)) {
+                                int64_t nLockTimeCutoff)
+{
+    if(!IsFinalTx(tx, nHeight, nLockTimeCutoff))
+    {
+        state.SetNonFinal();
+        if(IsGenesisEnabled(config, nHeight))
+        {
+            return false;
+        }
+
         // While this is only one transaction, we use txns in the error to
         // ensure continuity with other clients.
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-nonfinal", false,
