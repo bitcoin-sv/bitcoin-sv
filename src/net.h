@@ -118,6 +118,28 @@ struct AddedNodeInfo {
     bool fInbound;
 };
 
+class CGetBlockMessageRequest
+{
+public:
+    CGetBlockMessageRequest(CDataStream& vRecv)
+        : mRequestTime{std::chrono::system_clock::now()}
+    {
+        vRecv >> mLocator >> mHashStop;
+    }
+
+    auto GetRequestTime() const
+        -> const std::chrono::time_point<std::chrono::system_clock>&
+    {
+        return mRequestTime;
+    }
+    const CBlockLocator& GetLocator() const {return mLocator;}
+    const uint256& GetHashStop() const {return mHashStop;}
+private:
+    std::chrono::time_point<std::chrono::system_clock> mRequestTime;
+    CBlockLocator mLocator;
+    uint256 mHashStop;
+};
+
 class CTransaction;
 class CNodeStats;
 class CClientUIInterface;
@@ -807,6 +829,7 @@ public:
 
     CCriticalSection cs_sendProcessing {};
 
+    std::optional<CGetBlockMessageRequest> mGetBlockMessageRequest;
     std::deque<CInv> vRecvGetData {};
     uint64_t nRecvBytes {0};
     std::atomic<int> nRecvVersion {INIT_PROTO_VERSION};

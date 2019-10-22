@@ -3829,6 +3829,33 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
     return true;
 }
 
+bool IsBlockABestChainTipCandidate(CBlockIndex& index)
+{
+    AssertLockHeld(cs_main);
+
+    return (setBlockIndexCandidates.find(&index) != setBlockIndexCandidates.end());
+}
+
+bool AreOlderOrEqualUnvalidatedBlockIndexCandidates(
+    const std::chrono::time_point<std::chrono::system_clock>& comparisonTime)
+{
+    AssertLockHeld(cs_main);
+
+    auto time = std::chrono::system_clock::to_time_t(comparisonTime);
+
+    for(const CBlockIndex* pindex : setBlockIndexCandidates)
+    {
+        if(time >= pindex->GetHeaderReceivedTime() &&
+            !pindex->IsValid(BlockValidity::SCRIPTS) &&
+            pindex->nChainWork > chainActive.Tip()->nChainWork)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool PreciousBlock(const Config &config, CValidationState &state,
                    CBlockIndex *pindex) {
     {

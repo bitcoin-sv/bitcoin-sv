@@ -1279,18 +1279,24 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 if (mi != mapBlockIndex.end()) {
                     if (mi->second->nChainTx &&
                         !mi->second->IsValid(BlockValidity::SCRIPTS) &&
-                        mi->second->IsValid(BlockValidity::TREE)) {
+                        mi->second->IsValid(BlockValidity::TREE)
+                        && IsBlockABestChainTipCandidate(*mi->second)) {
+
+                        LogPrint(
+                            BCLog::NET,
+                            "Block %s is still waiting as a candidate. Deferring getdata reply.\n",
+                            inv.hash.ToString());
+
                         // If we have the block and all of its parents, but have
                         // not yet validated it, we might be in the middle of
                         // connecting it (ie in the unlock of cs_main before
                         // ActivateBestChain but after AcceptBlock). In this
-                        // case, we need to run ActivateBestChain prior to
-                        // checking the relay conditions below.
-                        std::shared_ptr<const CBlock> a_recent_block =
-                            mostRecentBlock.GetBlock();
-                        CValidationState dummy;
-                        CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
-                        ActivateBestChain(config, dummy, changeSet, a_recent_block);
+                        // case, we need to wait for a while longer before
+                        // deciding whether we should relay it or not so we
+                        // break out of the loop and continue once we once again
+                        // get our turn.
+                        --it;
+                        break;
                     }
                     if (chainActive.Contains(mi->second)) {
                         send = true;
@@ -2043,32 +2049,31 @@ static OptBool ProcessGetDataMessage(const Config& config, const CNodePtr& pfrom
 /**
 * Process get blocks message.
 */
-static void ProcessGetBlocksMessage(const Config& config, const CNodePtr& pfrom,
-    const CChainParams& chainparams, CDataStream& vRecv)
+static bool ProcessGetBlocks(
+    const Config& config,
+    const CNodePtr& pfrom,
+    const CChainParams& chainparams,
+    const CGetBlockMessageRequest& req)
 {
-    CBlockLocator locator;
-    uint256 hashStop;
-    vRecv >> locator >> hashStop;
 
     // We might have announced the currently-being-connected tip using a
     // compact block, which resulted in the peer sending a getblocks
     // request, which we would otherwise respond to without the new block.
-    // To avoid this situation we simply verify that we are on our best
-    // known chain now. This is super overkill, but we handle it better
-    // for getheaders requests, and there are no known nodes which support
-    // compact blocks but still use getblocks to request blocks.
+    // To avoid this situation we simply verify that there are no more block
+    // index candidates that were received before getblocks request.
+    if(AreOlderOrEqualUnvalidatedBlockIndexCandidates(req.GetRequestTime()))
     {
-        std::shared_ptr<const CBlock> a_recent_block =
-            mostRecentBlock.GetBlock();
-        CValidationState dummy;
-        CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
-        ActivateBestChain(config, dummy, changeSet, a_recent_block);
+        return false;
     }
+
+    const CBlockLocator& locator = req.GetLocator();
+    const uint256& hashStop = req.GetHashStop();
 
     LOCK(cs_main);
 
     // Find the last block the caller has in the main chain
-    const CBlockIndex* pindex = FindForkInGlobalIndex(chainActive, locator);
+    const CBlockIndex* pindex =
+        FindForkInGlobalIndex(chainActive, locator);
 
     // Send the rest of the chain
     if(pindex) {
@@ -2108,6 +2113,28 @@ static void ProcessGetBlocksMessage(const Config& config, const CNodePtr& pfrom,
             pfrom->hashContinue = pindex->GetBlockHash();
             break;
         }
+    }
+
+    return true;
+}
+
+static void ProcessGetBlocksMessage(
+    const Config& config,
+    const CNodePtr& pfrom,
+    const CChainParams& chainparams,
+    CDataStream& vRecv)
+{
+    pfrom->mGetBlockMessageRequest = {vRecv};
+    if(ProcessGetBlocks(config, pfrom, chainparams, *pfrom->mGetBlockMessageRequest))
+    {
+        pfrom->mGetBlockMessageRequest = std::nullopt;
+    }
+    else
+    {
+        LogPrint(
+            BCLog::NET,
+            "Blocks that were received before getblocks message are still"
+            " waiting as a candidate. Deferring getblocks reply.\n");
     }
 }
  
@@ -3447,6 +3474,17 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     //  (x) data
     //
     bool fMoreWork = false;
+
+    if (pfrom->mGetBlockMessageRequest)
+    {
+        if(!ProcessGetBlocks(config, pfrom, chainparams, *pfrom->mGetBlockMessageRequest))
+        {
+            // this maintains the order of responses
+            return false;
+        }
+
+        pfrom->mGetBlockMessageRequest = std::nullopt;
+    }
 
     if (!pfrom->vRecvGetData.empty()) {
         ProcessGetData(config, pfrom, chainparams.GetConsensus(), connman,

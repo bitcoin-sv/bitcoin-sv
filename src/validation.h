@@ -488,6 +488,22 @@ bool ActivateBestChain(
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
 /**
+ * Determines whether block is a best chain candidate or not.
+ *
+ * Being a candidate means that you might be added to the tip or removed from
+ * candidates later on - in any case it indicates that we should wait to see if
+ * it lands in the best chain or not.
+ */
+bool IsBlockABestChainTipCandidate(CBlockIndex& index);
+
+/**
+ * Check whether there are any block index candidates that are older than
+ * the provided time and still don't have SCRIPT validity status.
+ */
+bool AreOlderOrEqualUnvalidatedBlockIndexCandidates(
+    const std::chrono::time_point<std::chrono::system_clock>& comparisonTime);
+
+/**
  * Guess verification progress (as a fraction between 0.0=genesis and
  * 1.0=current tip).
  */
