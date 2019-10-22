@@ -452,6 +452,33 @@ UniValue getrawmempool(const Config &config, const JSONRPCRequest &request) {
     return mempoolToJSON(fVerbose);
 }
 
+UniValue getrawnonfinalmempool(const Config& config, const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() > 0)
+    {
+        throw std::runtime_error(
+            "getrawnonfinalmempool\n"
+            "\nReturns all transaction ids in the non-final memory pool as a json array of "
+            "string transaction ids.\n"
+            "\nResult:\n"
+            "[                     (json array of string)\n"
+            "  \"transactionid\"     (string) The transaction id\n"
+            "  ,...\n"
+            "]\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getrawnonfinalmempool", "") +
+            HelpExampleRpc("getrawnonfinalmempool", ""));
+    }
+
+    UniValue arr { UniValue::VARR };
+    for(const uint256& txid : mempool.getNonFinalPool().getTxnIDs())
+    {
+        arr.push_back(txid.ToString());
+    }
+
+    return arr;
+}
+
 UniValue getmempoolancestors(const Config &config,
                              const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() < 1 ||
@@ -1560,8 +1587,10 @@ UniValue mempoolInfoToJSON() {
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("size", (int64_t)mempool.Size()));
     ret.push_back(Pair("journalsize", (int64_t)mempool.getJournalBuilder()->getCurrentJournal()->size()));
+    ret.push_back(Pair("nonfinalsize", (int64_t)mempool.getNonFinalPool().getNumTxns()));
     ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t)mempool.DynamicMemoryUsage()));
+    ret.push_back(Pair("nonfinalusage", (int64_t)mempool.getNonFinalPool().estimateMemoryUsage()));
     size_t maxmempool =
         gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
@@ -1581,9 +1610,10 @@ UniValue getmempoolinfo(const Config &config, const JSONRPCRequest &request) {
             "{\n"
             "  \"size\": xxxxx,               (numeric) Current tx count\n"
             "  \"journalsize\": xxxxx,        (numeric) Current tx count within the journal\n"
+            "  \"nonfinalsize\": xxxxx,       (numeric) Current non-final tx count\n"
             "  \"bytes\": xxxxx,              (numeric) Transaction size.\n"
-            "  \"usage\": xxxxx,              (numeric) Total memory usage for "
-            "the mempool\n"
+            "  \"usage\": xxxxx,              (numeric) Total memory usage for the mempool\n"
+            "  \"nonfinalusage\": xxxxx,      (numeric) Total memory usage for the non-final mempool\n"
             "  \"maxmempool\": xxxxx,         (numeric) Maximum memory usage "
             "for the mempool\n"
             "  \"mempoolminfee\": xxxxx       (numeric) Minimum fee for tx to "
@@ -2002,6 +2032,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "getmempoolentry",        getmempoolentry,        true,  {"txid"} },
     { "blockchain",         "getmempoolinfo",         getmempoolinfo,         true,  {} },
     { "blockchain",         "getrawmempool",          getrawmempool,          true,  {"verbose"} },
+    { "blockchain",         "getrawnonfinalmempool",  getrawnonfinalmempool,  true,  {} },
     { "blockchain",         "gettxout",               gettxout,               true,  {"txid","n","include_mempool"} },
     { "blockchain",         "gettxoutsetinfo",        gettxoutsetinfo,        true,  {} },
     { "blockchain",         "pruneblockchain",        pruneblockchain,        true,  {"height"} },
