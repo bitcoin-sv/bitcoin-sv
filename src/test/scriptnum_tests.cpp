@@ -9,7 +9,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "big_int.hpp"
+#include "big_int.h"
 
 using namespace std;
 using bsv::bint;

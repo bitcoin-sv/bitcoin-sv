@@ -7,7 +7,7 @@
 #include <list>
 #include <vector>
 
-#include "big_int.hpp"
+#include "big_int.h"
 
 #include "bn_helpers.h"
 

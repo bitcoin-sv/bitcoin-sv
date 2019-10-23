@@ -334,6 +334,7 @@ libbitcoin_consensus_a_SOURCES = \
   arith_uint256.cpp \
   arith_uint256.h \
   big_int.cpp \
+  big_int.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
@@ -351,9 +352,11 @@ libbitcoin_consensus_a_SOURCES = \
   script/sighashtype.h \
   script/interpreter.cpp \
   script/interpreter.h \
+  script/int_serialization.h \
   script/script_flags.h \
   script/script.cpp \
   script/script_num.cpp \
+  script/script_num.h \
   script/script.h \
   script/script_error.cpp \
   script/script_error.h \

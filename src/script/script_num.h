@@ -12,7 +12,7 @@
 #include <variant>
 #include <vector>
 
-#include "big_int.hpp"
+#include "big_int.h"
 
 class scriptnum_overflow_error : public std::overflow_error
 {
