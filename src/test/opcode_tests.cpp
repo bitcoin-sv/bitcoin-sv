@@ -1090,8 +1090,12 @@ static void CheckTestForOpCodeLimit(const CScript &script,
                 flags,
                 sigchecker,
                 &err);
-        size_t nonPushOpcodeCount = NonPushOpCodeCount(script);
-        if (nonPushOpcodeCount > MAX_OPS_PER_SCRIPT) {
+        uint64_t nonPushOpcodeCount = NonPushOpCodeCount(script);
+
+        // // flagset does not contain SCRIPT_UTXO_AFTER_GENESIS flag, so we will test with isGenesisEnabled=false in if
+        BOOST_REQUIRE(!(flags & SCRIPT_UTXO_AFTER_GENESIS));
+        if (nonPushOpcodeCount > config.GetMaxOpsPerScript(false, true))
+        {
             BOOST_CHECK(!r.value());
         } else {
             BOOST_CHECK(r.value());
@@ -1105,7 +1109,7 @@ static CScript add_op1_ntimes(size_t nTimes)
     CScript script;
     // Initial value
     script << OP_1;
-    for (size_t i=0; i<nTimes; ++i) {
+    for (size_t i = 0; i < nTimes; ++i) {
         script << OP_1 << OP_ADD;
     }
     return script;
@@ -1131,17 +1135,21 @@ BOOST_AUTO_TEST_CASE(opcode_limit_tests)
     DummySignatureCreator sigfactory(nullptr); 
     const BaseSignatureChecker& sigchecker = sigfactory.Checker(); 
 
+    // Test pre-Genesis limits. Policy is tested in functional test.
+    uint64_t testLimit = MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
+
+    BOOST_CHECK(testLimit == GlobalConfig::GetConfig().GetMaxOpsPerScript(false, true));
     /**
      * Check based on OP_ADD opcode.
      */
     // test with one opcode
     CheckTestForOpCodeLimit(add_op1_ntimes(1), 1, sigchecker);
     // test with MAX_OPS_PER_SCRIPT-1 opcodes, which is under MAX_OPS_PER_SCRIPT legacy limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-1), MAX_OPS_PER_SCRIPT-1, sigchecker);
+    CheckTestForOpCodeLimit(add_op1_ntimes(testLimit-1), testLimit-1, sigchecker);
     // test with MAX_OPS_PER_SCRIPT opcodes, which is equal MAX_OPS_PER_SCRIPT legacy limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT), MAX_OPS_PER_SCRIPT, sigchecker);
+    CheckTestForOpCodeLimit(add_op1_ntimes(testLimit), testLimit, sigchecker);
     // test with MAX_OPS_PER_SCRIPT+1 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT+1), MAX_OPS_PER_SCRIPT+1, sigchecker);
+    CheckTestForOpCodeLimit(add_op1_ntimes(testLimit+1), testLimit+1, sigchecker);
 
     /**
      * Check OP_CHECKMULTISIG/OP_CHECKMULTISIGVERIFY as this
@@ -1150,11 +1158,11 @@ BOOST_AUTO_TEST_CASE(opcode_limit_tests)
     // Create multi-sig signatures + public keys.
     CScript dummy_multisig (dummy_multisig_with_pubkey());
     // test with MAX_OPS_PER_SCRIPT-5+4 opcodes, which is under MAX_OPS_PER_SCRIPT legacy limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-5) + dummy_multisig, MAX_OPS_PER_SCRIPT-1, sigchecker);
+    CheckTestForOpCodeLimit(add_op1_ntimes(testLimit-5) + dummy_multisig, testLimit-1, sigchecker);
     // test with MAX_OPS_PER_SCRIPT-4+4 opcodes, which is equal MAX_OPS_PER_SCRIPT legacy limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-4) + dummy_multisig, MAX_OPS_PER_SCRIPT, sigchecker);
+    CheckTestForOpCodeLimit(add_op1_ntimes(testLimit-4) + dummy_multisig, testLimit, sigchecker);
     // test with MAX_OPS_PER_SCRIPT-3+4 opcodes, which is over MAX_OPS_PER_SCRIPT legacy limit
-    CheckTestForOpCodeLimit(add_op1_ntimes(MAX_OPS_PER_SCRIPT-3) + dummy_multisig, MAX_OPS_PER_SCRIPT+1, sigchecker);
+    CheckTestForOpCodeLimit(add_op1_ntimes(testLimit-3) + dummy_multisig, testLimit+1, sigchecker);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

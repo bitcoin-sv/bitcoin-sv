@@ -402,8 +402,11 @@ static bool IsInvalidBranchingOpcode(opcodetype opcode) {
     return opcode == OP_VERNOTIF || opcode == OP_VERIF;
 }
 
-inline bool IsValidMaxOpsPerScript(int nOpCount) {
-    return (nOpCount <= MAX_OPS_PER_SCRIPT);
+inline bool IsValidMaxOpsPerScript(uint64_t nOpCount,
+                                   const Config &config, 
+                                   bool isGenesisEnabled, bool consensus) 
+{
+    return (nOpCount <= config.GetMaxOpsPerScript(isGenesisEnabled, consensus));
 }
 
 std::optional<bool> EvalScript(
@@ -436,8 +439,7 @@ std::optional<bool> EvalScript(
     {
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     }
-
-    int nOpCount = 0;
+    uint64_t nOpCount = 0;
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
     const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
     const int big_ints_byte_limit{500}; // To do: Make configurable
@@ -472,7 +474,7 @@ std::optional<bool> EvalScript(
             //
             // Push values are not taken into consideration.
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount)) {
+            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount, config, flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
 
@@ -1349,7 +1351,7 @@ std::optional<bool> EvalScript(
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
                         nOpCount += nKeysCount;
-                        if (!IsValidMaxOpsPerScript(nOpCount)) {
+                        if (!IsValidMaxOpsPerScript(nOpCount, config, flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
                             return set_error(serror, SCRIPT_ERR_OP_COUNT);
                         }
                         int ikey = ++i;

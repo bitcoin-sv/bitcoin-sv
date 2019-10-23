@@ -97,6 +97,9 @@ static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
  */
 static const Amount DUST_RELAY_TX_FEE(1000);
 
+// Default policy value for maximum number of non-push operations per script
+static const int DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
+
 /**
  * Standard script verification flags that standard transactions will comply
  * with. However scripts violating these flags may still be present in valid

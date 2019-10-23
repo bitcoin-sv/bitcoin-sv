@@ -99,6 +99,9 @@ public:
     virtual int GetPerBlockScriptValidatorThreadsCount() const = 0;
     virtual int GetPerBlockScriptValidationMaxBatchSize() const = 0;
 
+    virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
+    virtual uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const = 0;
+
     virtual bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxTransactionValidationDuration() const = 0;
 };
@@ -181,6 +184,9 @@ public:
     int GetPerBlockScriptValidatorThreadsCount() const override;
     int GetPerBlockScriptValidationMaxBatchSize() const override;
 
+    bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) override;
+    uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override;
+
     bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxTransactionValidationDuration() const override;
 
@@ -227,6 +233,8 @@ private:
     int mMaxParallelBlocks;
     int mPerBlockScriptValidatorThreadsCount;
     int mPerBlockScriptValidationMaxBatchSize;
+
+    uint64_t maxOpsPerScriptPolicy;
 
     std::chrono::milliseconds mMaxTransactionValidationDuration;
 };
@@ -342,6 +350,18 @@ public:
     int GetPerBlockScriptValidatorThreadsCount() const override;
     int GetPerBlockScriptValidationMaxBatchSize() const override;
 
+    bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) override { return true;  }
+    uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override
+    {
+        if (isGenesisEnabled)
+        {
+            return MAX_OPS_PER_SCRIPT_AFTER_GENESIS;
+        }
+        else
+        {
+            return MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
+        }
+    }
     bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override
     {
         if(err)

@@ -912,6 +912,11 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf(_("Maximum size of data in data carrier transactions we "
                     "relay and mine (default: %u)"),
                   DEFAULT_DATA_CARRIER_SIZE));
+    strUsage +=
+        HelpMessageOpt("-maxopsperscriptpolicy=<n>",
+            strprintf(_("Set maximum number of non-push operations "
+                        "we're willing to relay/mine per script (default: %d, 0 = unlimited), after Genesis is activated"),
+                      DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS));
 
     strUsage += HelpMessageOpt(
         "-txnvalidationmaxduration=<n>",
@@ -2057,6 +2062,17 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         if (!AppInitServers(config, threadGroup)) {
             return InitError(
                 _("Unable to start HTTP server. See debug log for details."));
+        }
+    }
+
+    if (gArgs.IsArgSet("-maxopsperscriptpolicy"))
+    {
+        const int64_t value = gArgs.GetArg("-maxopsperscriptpolicy", 0);
+
+        std::string err;
+        if (!config.SetMaxOpsPerScriptPolicy(value, &err))
+        {
+            return InitError(err);
         }
     }
 

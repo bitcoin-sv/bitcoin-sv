@@ -48,6 +48,7 @@ void GlobalConfig::Reset()
     mMaxParallelBlocks = DEFAULT_SCRIPT_CHECK_POOL_SIZE;
     mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
     mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
+    maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
 
     mMaxTransactionValidationDuration = DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION;
 }
@@ -363,6 +364,52 @@ int GlobalConfig::GetPerBlockScriptValidatorThreadsCount() const
 int GlobalConfig::GetPerBlockScriptValidationMaxBatchSize() const
 {
     return mPerBlockScriptValidationMaxBatchSize;
+}
+
+bool GlobalConfig::SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error)
+{
+    if (maxOpsPerScriptPolicyIn < 0)
+    {
+        if (error)
+        {
+            *error = "Policy value for MaxOpsPerScript cannot be less than zero.";
+        }
+        return false;
+    }
+    uint64_t maxOpsPerScriptPolicyInUnsigned = static_cast<uint64_t>(maxOpsPerScriptPolicyIn);
+
+    if (maxOpsPerScriptPolicyInUnsigned > MAX_OPS_PER_SCRIPT_AFTER_GENESIS)
+    {
+        if (error)
+        {
+            *error = "Policy value for MaxOpsPerScript must not exceed consensus limit of " + std::to_string(MAX_OPS_PER_SCRIPT_AFTER_GENESIS) + ".";
+        }
+        return false;
+    }
+    else if (maxOpsPerScriptPolicyInUnsigned == 0)
+    {
+        maxOpsPerScriptPolicy = MAX_OPS_PER_SCRIPT_AFTER_GENESIS;
+    }
+    else
+    {
+        maxOpsPerScriptPolicy = maxOpsPerScriptPolicyInUnsigned;
+    }
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const
+{
+    if (!isGenesisEnabled)
+    {
+        return MAX_OPS_PER_SCRIPT_BEFORE_GENESIS; // no changes before genesis
+    }
+
+    if (consensus)
+    {
+        return MAX_OPS_PER_SCRIPT_AFTER_GENESIS; // use new limit after genesis
+    }
+    return maxOpsPerScriptPolicy;
 }
 
 bool GlobalConfig::SetMaxTransactionValidationDuration(int ms, std::string* err)
