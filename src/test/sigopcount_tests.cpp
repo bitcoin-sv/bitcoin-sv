@@ -210,8 +210,8 @@ BOOST_AUTO_TEST_CASE(test_consensus_sigops_limit) {
         GetMaxBlockSigOpsCount(std::numeric_limits<uint32_t>::max()),
         4295 * MAX_BLOCK_SIGOPS_PER_MB);
 }
-
-BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
+void TestMaxSigOps(uint64_t maxTxSigOpsCount)
+{
     CMutableTransaction tx;
     tx.nVersion = 1;
     tx.vin.resize(1);
@@ -223,17 +223,17 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount));
     }
 
     // Get just before the limit.
-    for (size_t i = 0; i < MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS; i++) {
+    for (size_t i = 0; i < maxTxSigOpsCount; i++) {
         tx.vout[0].scriptPubKey << OP_CHECKSIG;
     }
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount));
     }
 
     // And go over.
@@ -241,9 +241,57 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS));
+        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txn-sigops");
     }
+}
+
+BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
+{
+    GlobalConfig config {};
+
+
+    /* Case 1: Genesis is not enabled, consensus - MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS */
+    uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(false, true);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountConsensus, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS);
+    TestMaxSigOps(maxTxSigOpsCountConsensus);
+
+    /* Case 2: Genesis is enabled, consensus - MAX_TX_SIGOPS_COUNT_AFTER_GENESIS */
+    maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(true, true);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountConsensus, MAX_TX_SIGOPS_COUNT_AFTER_GENESIS);
+
+    /* Case 3: Genesis is not enabled, policy - MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS */
+    uint64_t maxTxSigOpsCountPolicy = config.GetMaxTxSigOpsCount(false, false);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS);
+
+    /* Case 4: Genesis is enabled, default policy - DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
+    maxTxSigOpsCountPolicy = config.GetMaxTxSigOpsCount(true, false);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
+
+    /* Case 5: policy is applied with value 0 - returns MAX_TX_SIGOPS_COUNT_AFTER_GENESIS */
+    std::string error("");
+    BOOST_CHECK(config.SetMaxTxSigOpsCountPolicy(0, &error));
+    BOOST_CHECK_EQUAL(error, "");
+    maxTxSigOpsCountPolicy = config.GetMaxTxSigOpsCount(true, false);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_AFTER_GENESIS);
+
+    /* Case 6: policy is applied - returns set value */
+    BOOST_CHECK(config.SetMaxTxSigOpsCountPolicy(20500, &error));
+    BOOST_CHECK_EQUAL(error,"");
+    maxTxSigOpsCountPolicy = config.GetMaxTxSigOpsCount(true, false);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
+    
+    /* Case 7: Policy is applied with too big value - previous value must not be changed */
+    BOOST_CHECK(!config.SetMaxTxSigOpsCountPolicy(static_cast<int64_t>(MAX_TX_SIGOPS_COUNT_AFTER_GENESIS) + 1, &error));
+    BOOST_CHECK(error.find("Policy value for maximum allowed number of signature operations per transaction must not exceed consensus limit of") != std::string::npos);
+    maxTxSigOpsCountPolicy = config.GetMaxTxSigOpsCount(true, false);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
+
+    /* Case 8: Policy is applied with negative value - previous value must not be changed */
+    BOOST_CHECK(!config.SetMaxTxSigOpsCountPolicy(-123, &error));
+    BOOST_CHECK_EQUAL(error, "Policy value for maximum allowed number of signature operations per transaction cannot be less than 0");
+    maxTxSigOpsCountPolicy = config.GetMaxTxSigOpsCount(true, false);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
