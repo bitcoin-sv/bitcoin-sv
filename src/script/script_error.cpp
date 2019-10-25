@@ -34,6 +34,8 @@ const char *ScriptErrorString(const ScriptError serror) {
             return "Signature count negative or greater than pubkey count";
         case SCRIPT_ERR_PUBKEY_COUNT:
             return "Pubkey count negative or limit exceeded";
+        case SCRIPT_ERR_TX_SIZE:
+            return "Transaction too big for this sighash type";
         case SCRIPT_ERR_INVALID_OPERAND_SIZE:
             return "Invalid operand size";
         case SCRIPT_ERR_INVALID_NUMBER_RANGE:
