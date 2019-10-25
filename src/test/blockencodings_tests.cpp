@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
         {
             // No transactions.
             PartiallyDownloadedBlock tmp = partialBlock;
-            BOOST_CHECK(partialBlock.FillBlock(block2, {}) ==
+            BOOST_CHECK(partialBlock.FillBlock(block2, {}, 0) ==
                         READ_STATUS_INVALID);
             partialBlock = tmp;
         }
@@ -114,14 +114,14 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
             // Current implementation doesn't check txn here, but don't require
             // that.
             PartiallyDownloadedBlock tmp = partialBlock;
-            partialBlock.FillBlock(block2, {block.vtx[2]});
+            partialBlock.FillBlock(block2, {block.vtx[2]}, 0);
             partialBlock = tmp;
         }
         bool mutated;
         BOOST_CHECK(block.hashMerkleRoot != BlockMerkleRoot(block2, &mutated));
 
         CBlock block3;
-        BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[1]}) ==
+        BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[1]}, 0) ==
                     READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block3.GetHash().ToString());
@@ -217,7 +217,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
         {
             // No transactions.
             PartiallyDownloadedBlock tmp = partialBlock;
-            BOOST_CHECK(partialBlock.FillBlock(block2, {}) ==
+            BOOST_CHECK(partialBlock.FillBlock(block2, {}, 0) ==
                         READ_STATUS_INVALID);
             partialBlock = tmp;
         }
@@ -227,7 +227,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
             // Current implementation doesn't check txn here, but don't require
             // that.
             PartiallyDownloadedBlock tmp = partialBlock;
-            partialBlock.FillBlock(block2, {block.vtx[1]});
+            partialBlock.FillBlock(block2, {block.vtx[1]}, 0);
             partialBlock = tmp;
         }
         bool mutated;
@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
 
         CBlock block3;
         PartiallyDownloadedBlock partialBlockCopy = partialBlock;
-        BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[0]}) ==
+        BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[0]}, 0) ==
                     READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block3.GetHash().ToString());
@@ -297,7 +297,7 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
 
         CBlock block2;
         PartiallyDownloadedBlock partialBlockCopy = partialBlock;
-        BOOST_CHECK(partialBlock.FillBlock(block2, {}) == READ_STATUS_OK);
+        BOOST_CHECK(partialBlock.FillBlock(block2, {}, 0) == READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block2.GetHash().ToString());
         bool mutated;
@@ -358,7 +358,7 @@ BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
 
         CBlock block2;
         std::vector<CTransactionRef> vtx_missing;
-        BOOST_CHECK(partialBlock.FillBlock(block2, vtx_missing) ==
+        BOOST_CHECK(partialBlock.FillBlock(block2, vtx_missing, 0) ==
                     READ_STATUS_OK);
         BOOST_CHECK_EQUAL(block.GetHash().ToString(),
                           block2.GetHash().ToString());
