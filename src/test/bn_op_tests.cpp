@@ -614,7 +614,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS};
         ScriptError error;
-        const auto status = EvalScript(config, false, token, stack, script,
+        const auto status = EvalScript(config, true, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(true, status.value());

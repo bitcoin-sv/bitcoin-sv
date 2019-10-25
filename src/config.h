@@ -124,6 +124,9 @@ public:
 
     virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const = 0;
+
+    virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -228,6 +231,10 @@ public:
     bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) override;
     uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
 
+    
+    bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override;
+    uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -287,6 +294,8 @@ private:
 
     uint64_t maxStackMemoryUsagePolicy;
     uint64_t maxStackMemoryUsageConsensus;
+
+    uint64_t maxScriptSizePolicy;
 };
 
 // Dummy for subclassing in unittests
@@ -473,12 +482,21 @@ public:
         return DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
     }
 
+    bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override 
+    {
+        if (err) *err = "This is dummy config";
+        maxScriptSizePolicy = static_cast<uint64_t>(maxScriptSizePolicyIn);
+        return true; 
+    };
+    uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override { return maxScriptSizePolicy; };
+
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
     bool acceptP2SH { DEFAULT_ACCEPT_P2SH };
     uint64_t genesisActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
+    uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
 };
 
 #endif

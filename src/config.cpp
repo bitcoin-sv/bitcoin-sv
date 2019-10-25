@@ -59,6 +59,7 @@ void GlobalConfig::Reset()
 
     maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS;
     maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
+    maxScriptSizePolicy = DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -796,4 +797,44 @@ uint64_t GlobalConfig::GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsens
         return MAX_TX_SIGOPS_COUNT_AFTER_GENESIS;
     }
     return maxTxSigOpsCountPolicy;
+}
+
+bool GlobalConfig::SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err) {
+    if (maxScriptSizePolicyIn < 0)
+    {
+        if (err)
+        {
+            *err = "Policy value for max script size must not be less than 0";
+        }
+        return false;
+    }
+    uint64_t maxScriptSizePolicyInUnsigned = static_cast<uint64_t>(maxScriptSizePolicyIn);
+    if (maxScriptSizePolicyInUnsigned > MAX_SCRIPT_SIZE_AFTER_GENESIS)
+    {
+        if (err)
+        {
+            *err = "Policy value for max script size must not exceed consensus limit of " + std::to_string(MAX_SCRIPT_SIZE_AFTER_GENESIS);
+        }
+        return false;
+    }
+    else if (maxScriptSizePolicyInUnsigned == 0 ) {
+        maxScriptSizePolicy = MAX_SCRIPT_SIZE_AFTER_GENESIS;
+    }
+    else
+    {
+        maxScriptSizePolicy = maxScriptSizePolicyInUnsigned;
+    }
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const {
+    if (!isGenesisEnabled) 
+    {
+        return MAX_SCRIPT_SIZE_BEFORE_GENESIS;
+    }
+    if (isConsensus) 
+    {
+        return MAX_SCRIPT_SIZE_AFTER_GENESIS;
+    }
+    return maxScriptSizePolicy;
 }

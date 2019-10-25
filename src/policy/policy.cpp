@@ -75,7 +75,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
         // bytes of scriptSig, which we round off to 1650 bytes for some minor
         // future-proofing. That's also enough to spend a 20-of-20 CHECKMULTISIG
         // scriptPubKey, though such a scriptPubKey is not considered standard.
-        if (txin.scriptSig.size() > 1650) {
+        if (!IsGenesisEnabled(config, nHeight)  && txin.scriptSig.size() > 1650) {
             reason = "scriptsig-size";
             return false;
         }
