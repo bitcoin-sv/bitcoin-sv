@@ -1079,6 +1079,7 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
             // diminishing returns with 2 onward.
             return g_connman->CheckTxnInRecentRejects(inv.hash) ||
                    mempool.Exists(inv.hash) ||
+                   mempool.getNonFinalPool().exists(inv.hash) ||
                    g_connman->CheckOrphanTxnExists(inv.hash) ||
                    g_connman->CheckTxnExistsInValidatorsQueue(inv.hash) ||
                    pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 0)) ||
