@@ -30,9 +30,20 @@
 * Add support for c++ run time checking tools to build scripts
 * Only include thread name in debug message at the beginning of new lines
 * Parallel validation of transactions
+* Scaling Test Network reset
 
-## Scaling Test Network Reset
-NA
+## Scaling Test Network (STN) Reset
+The STN blockchain has grown to over 1TB and it has served its current purpose of producing 2GB blocks and 
+1 million transactions per block. The STN is being reset to reduce the size of the blockchain (from ~1.5TB to about 
+1MB). 
+
+The Bitcoin SV Node implementation will automatically switch to the new blockchain, however this will take a large amount
+of time and it will not automatically clear the blocks from the old blockchain from disk. We recommend that you manually
+clear the old block data and start from scratch with the STN. For more information, see the 
+[bitcoinscaling.io website](http://bitcoinscaling.io/oct-2019-stn-rollback).
+  
+The Scaling Test Network has been reset at block height 1. This block has hash 
+`00000000e23f9436cc8a6d6aaaa515a7b84e7a1720fc9f92805c0007c77420c4`.
 
 # Previous Releases
 * [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.0) - 2018-10-15
