@@ -37,13 +37,16 @@ The STN blockchain has grown to over 1TB and it has served its current purpose o
 1 million transactions per block. The STN is being reset to reduce the size of the blockchain (from ~1.5TB to about 
 1MB). 
 
-The Bitcoin SV Node implementation will automatically switch to the new blockchain, however this will take a large amount
+The Bitcoin SV Node implementation will automatically switch to the new blockchain, however this may take a large amount
 of time and it will not automatically clear the blocks from the old blockchain from disk. We recommend that you manually
 clear the old block data and start from scratch with the STN. For more information, see the 
 [bitcoinscaling.io website](http://bitcoinscaling.io/oct-2019-stn-rollback).
   
-The Scaling Test Network has been reset at block height 1. This block has hash 
-`00000000e23f9436cc8a6d6aaaa515a7b84e7a1720fc9f92805c0007c77420c4`.
+* The Scaling Test Network has been reset at block height 1. This block has hash 
+  `00000000e23f9436cc8a6d6aaaa515a7b84e7a1720fc9f92805c0007c77420c4`.
+* Previous releases of Bitcoin SV node software are not compatiable with this reset. Please upgrade to continue using the STN
+* Acceptance of low difficutly blocks after 20mn has been disabled to bring behaviour more in line with mainnet
+* STN Blocks and Chaindata folders can be deleted before running this release.
 
 # Previous Releases
 * [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.0) - 2018-10-15
