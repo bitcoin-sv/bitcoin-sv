@@ -1,6 +1,9 @@
 Bitcoin SV
 ===========
 
+*Note: version 0.2.2 is a beta release. We encourage miners to test this release carefully
+and maintain a v0.2.1 node available on standby.*
+
 What is Bitcoin SV?
 -------------------
 
