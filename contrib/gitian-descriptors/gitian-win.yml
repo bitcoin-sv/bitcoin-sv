@@ -22,6 +22,7 @@ packages:
 - "ca-certificates"
 - "python"
 - "rename"
+- "libssl-dev"
 remotes:
 - "url": "https://github.com/bitcoin-sv/bitcoin-sv.git"
   "dir": "bitcoin"
