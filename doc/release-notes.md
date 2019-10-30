@@ -1,6 +1,6 @@
-# Bitcoin SV version x.y.z Release Notes
+# Bitcoin SV version 0.2.1 Release Notes
 
-## Important Changes
+This is a beta release. Miners are encouraged to test this release carefully and maintain a v0.2.1 version on standby.
 
 ## List of Changes
 * Do not load whole block into memory when responding to getblock request
