@@ -506,7 +506,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         break;
 
                     case OP_CHECKLOCKTIMEVERIFY: {
-                        if (!(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)) {
+                        if (!(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) || (flags & SCRIPT_UTXO_AFTER_GENESIS)) {
                             // not enabled; treat as a NOP2
                             if (flags &
                                 SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) {
@@ -559,7 +559,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                     }
 
                     case OP_CHECKSEQUENCEVERIFY: {
-                        if (!(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)) {
+                        if (!(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) || (flags & SCRIPT_UTXO_AFTER_GENESIS)) {
                             // not enabled; treat as a NOP3
                             if (flags &
                                 SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) {

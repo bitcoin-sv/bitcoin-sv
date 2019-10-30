@@ -331,8 +331,10 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         vchSig.push_back(uint8_t(SIGHASH_ALL | SIGHASH_FORKID));
         invalid_with_cltv_tx.vin[0].scriptSig = CScript() << vchSig << 101;
 
+        // Since Genesis CLV operator is treated as NOP.
         ValidateCheckInputsForAllFlags(invalid_with_cltv_tx,
-                                       [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY); },
+                                       [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)
+                                                                            || (flags & SCRIPT_UTXO_AFTER_GENESIS); },
                                        true, true);
         
         // Make it valid, and check again
@@ -368,8 +370,10 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         vchSig.push_back(uint8_t(SIGHASH_ALL | SIGHASH_FORKID));
         invalid_with_csv_tx.vin[0].scriptSig = CScript() << vchSig << 101;
 
+        // Since Genesis CSV operator is treated as NOP.
         ValidateCheckInputsForAllFlags(invalid_with_csv_tx,
-                                       [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY); },
+                                       [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)
+                                                                            || (flags & SCRIPT_UTXO_AFTER_GENESIS); },
                                        true, true);
         // Make it valid, and check again
         invalid_with_csv_tx.vin[0].scriptSig = CScript() << vchSig << 100;
