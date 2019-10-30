@@ -1,4 +1,4 @@
-# Bitcoin SV version 0.2.1 Release Notes
+# Bitcoin SV version 0.2.2 Release Notes
 
 This is a beta release. Miners are encouraged to test this release carefully and maintain a v0.2.1 version on standby.
 
