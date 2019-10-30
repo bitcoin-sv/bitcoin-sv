@@ -84,6 +84,9 @@ COINBASE_MATURITY = 100
 # The maximum allowed size for a transaction, in bytes
 MAX_TX_SIZE = ONE_MEGABYTE
 
+# Maximum number of non-push operations per script before GENESIS 
+MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = _extractConsensusValue('MAX_OPS_PER_SCRIPT_BEFORE_GENESIS')
+
 if __name__ == "__main__":
     # Output values if run standalone to verify
     print("REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = %d" % REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME)
@@ -96,3 +99,4 @@ if __name__ == "__main__":
     print("COINBASE_MATURITY = %d (blocks)" % COINBASE_MATURITY)
     print("MAX_STANDARD_TX_SIZE = %d" % MAX_STANDARD_TX_SIZE)
     print("GENESIS_ACTIVATION_HEIGHT_REGTEST = %d" % GENESIS_ACTIVATION_HEIGHT_REGTEST)
+    print("MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = %d" % MAX_OPS_PER_SCRIPT_BEFORE_GENESIS)
