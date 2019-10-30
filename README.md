@@ -1,7 +1,8 @@
 Bitcoin SV
 ===========
 
-*Note: version 0.2.2 is a beta release. We encourage miners to test this release carefully
+*Note: version 0.2.2 is an optional beta release for the BSV mainnet; however it is a required update
+for the Scaling Test Network. We encourage miners to test this release carefully
 and maintain a v0.2.1 node available on standby.*
 
 What is Bitcoin SV?
