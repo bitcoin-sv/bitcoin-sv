@@ -25,6 +25,7 @@
 #include "utilmoneystr.h"
 #include "validation.h"
 #include "validationinterface.h"
+#include "versionbits.h"
 
 #include <algorithm>
 #include <queue>
@@ -32,6 +33,9 @@
 
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
+
+using mining::BlockAssembler;
+using mining::CBlockTemplate;
 
 static const int MAX_COINBASE_SCRIPTSIG_SIZE = 100;
 
@@ -70,29 +74,9 @@ int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
     return nNewTime - nOldTime;
 }
 
-static uint64_t ComputeMaxGeneratedBlockSize(const Config &config,
-                                             const CBlockIndex *pindexPrev) {
-    // Block resource limits
-    uint64_t nMaxGeneratedBlockSize;
-    uint64_t nMaxBlockSize;
-    if (pindexPrev == nullptr) {
-        nMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
-        nMaxBlockSize = config.GetMaxBlockSize();
-    }
-    else {
-        auto medianPastTime = pindexPrev->GetMedianTimePast();
-        nMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize(medianPastTime);
-        nMaxBlockSize = config.GetMaxBlockSize(medianPastTime);
-    }
-
-    // Limit size to between 1K and MaxBlockSize-1K for sanity:
-    nMaxGeneratedBlockSize = std::max(uint64_t(ONE_KILOBYTE), std::min(nMaxBlockSize - ONE_KILOBYTE, nMaxGeneratedBlockSize));
-
-    return nMaxGeneratedBlockSize;
-}
-
-LegacyBlockAssembler::LegacyBlockAssembler(const Config &_config) : config(&_config) {
-
+LegacyBlockAssembler::LegacyBlockAssembler(const Config &_config)
+: BlockAssembler{_config}
+{
     if (gArgs.IsArgSet("-blockmintxfee")) {
         Amount n(0);
         ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n);
@@ -102,8 +86,7 @@ LegacyBlockAssembler::LegacyBlockAssembler(const Config &_config) : config(&_con
     }
 
     LOCK(cs_main);
-    nMaxGeneratedBlockSize =
-        ComputeMaxGeneratedBlockSize(*config, chainActive.Tip());
+    nMaxGeneratedBlockSize = ComputeMaxGeneratedBlockSize(chainActive.Tip());
 }
 
 void LegacyBlockAssembler::resetBlock() {
@@ -115,7 +98,7 @@ void LegacyBlockAssembler::resetBlock() {
 
     // These counters do not include coinbase tx.
     nBlockTx = 0;
-    nFees = Amount(0);
+    mBlockFees = Amount(0);
 
     lastFewTxs = 0;
     blockFinished = false;
@@ -152,26 +135,17 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
     // updated at end
     pblocktemplate->vTxSigOpsCount.push_back(-1);
 
-    LOCK2(cs_main, mempool.cs);
+    LOCK(cs_main);
+    std::unique_lock lock(mempool.smtx);
     CBlockIndex* pindexPrevNew = chainActive.Tip();
     nHeight = pindexPrevNew->nHeight + 1;
 
-    const CChainParams &chainparams = config->GetChainParams();
-    pblock->nVersion =
-        ComputeBlockVersion(pindexPrevNew, chainparams.GetConsensus());
-    // -regtest only: allow overriding block.nVersion with
-    // -blockversion=N to test forking scenarios
-    if (chainparams.MineBlocksOnDemand()) {
-        pblock->nVersion = gArgs.GetArg("-blockversion", pblock->nVersion);
-    }
-
-    pblock->nTime = GetAdjustedTime();
-    nMaxGeneratedBlockSize = ComputeMaxGeneratedBlockSize(*config, pindexPrevNew);
+    nMaxGeneratedBlockSize = ComputeMaxGeneratedBlockSize(pindexPrevNew);
 
     nLockTimeCutoff =
         (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
             ? pindexPrevNew->GetMedianTimePast()
-            : pblock->GetBlockTime();
+            : GetAdjustedTime();
 
     addPriorityTxs();
     int nPackagesSelected = 0;
@@ -183,39 +157,22 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
     nLastBlockTx = nBlockTx;
     nLastBlockSize = nBlockSize;
 
-    // Create coinbase transaction
-    CMutableTransaction coinbaseTx;
-    coinbaseTx.vin.resize(1);
-    coinbaseTx.vin[0].prevout = COutPoint();
-    coinbaseTx.vout.resize(1);
-    coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
-    coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
-    // BIP34 only requires that the block height is available as a CScriptNum, but generally
-    // miner software which reads the coinbase tx will not support SCriptNum.
-    // Adding the extra 00 byte makes it look like a int32.
-    coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0; 
-    pblock->vtx[0] = MakeTransactionRef(coinbaseTx);
-    pblocktemplate->vTxFees[0] = -1 * nFees;
+    FillBlockHeader(blockref, pindexPrevNew, scriptPubKeyIn);
+
+    pblocktemplate->vTxFees[0] = -1 * mBlockFees;
     pblocktemplate->vTxSigOpsCount[0] = GetSigOpCountWithoutP2SH(*pblock->vtx[0]);
 
     uint64_t nSerializeSize = GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
-
     LogPrintf("CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",
-              nSerializeSize, nBlockTx, nFees, nBlockSigOps);
-
-    // Fill in header.
-    pblock->hashPrevBlock = pindexPrevNew->GetBlockHash();
-    UpdateTime(pblock, *config, pindexPrevNew);
-    pblock->nBits = GetNextWorkRequired(pindexPrevNew, pblock, *config);
-    pblock->nNonce = 0;
+              nSerializeSize, nBlockTx, mBlockFees, nBlockSigOps);
 
     // If required, check block validity
     int64_t nTimeValidationStart { GetTimeMicros() };
-    if(config->GetTestBlockCandidateValidity())
+    if(mConfig.GetTestBlockCandidateValidity())
     {
         CValidationState state;
         BlockValidationOptions validationOptions { false, false, true };
-        if (!TestBlockValidity(*config, state, *pblock, pindexPrevNew, validationOptions))
+        if (!TestBlockValidity(mConfig, state, *pblock, pindexPrevNew, validationOptions))
         {
             throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s",
                                                __func__, FormatStateMessage(state)));
@@ -234,7 +191,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
 }
 
 bool LegacyBlockAssembler::isStillDependent(CTxMemPool::txiter iter) {
-    for (CTxMemPool::txiter parent : mempool.GetMemPoolParents(iter)) {
+    for (CTxMemPool::txiter parent : mempool.GetMemPoolParentsNL(iter)) {
         if (!inBlock.count(parent)) {
             return true;
         }
@@ -276,7 +233,7 @@ bool LegacyBlockAssembler::TestPackageTransactions(
     uint64_t nPotentialBlockSize = nBlockSize;
     for (const CTxMemPool::txiter it : package) {
         CValidationState state;
-        if (!ContextualCheckTransaction(*config, it->GetTx(), state, nHeight,
+        if (!ContextualCheckTransaction(mConfig, it->GetTx(), state, nHeight,
                                         nLockTimeCutoff)) {
             return false;
         }
@@ -326,7 +283,7 @@ bool LegacyBlockAssembler::TestForBlock(CTxMemPool::txiter it) {
     // Must check that lock times are still valid. This can be removed once MTP
     // is always enforced as long as reorgs keep the mempool consistent.
     CValidationState state;
-    if (!ContextualCheckTransaction(*config, it->GetTx(), state, nHeight,
+    if (!ContextualCheckTransaction(mConfig, it->GetTx(), state, nHeight,
                                     nLockTimeCutoff)) {
         return false;
     }
@@ -341,7 +298,7 @@ void LegacyBlockAssembler::AddToBlock(CTxMemPool::txiter iter) {
     nBlockSize += iter->GetTxSize();
     ++nBlockTx;
     nBlockSigOps += iter->GetSigOpCount();
-    nFees += iter->GetFee();
+    mBlockFees += iter->GetFee();
     inBlock.insert(iter);
 
     bool fPrintPriority =
@@ -349,7 +306,9 @@ void LegacyBlockAssembler::AddToBlock(CTxMemPool::txiter iter) {
     if (fPrintPriority) {
         double dPriority = iter->GetPriority(nHeight);
         Amount dummy;
-        mempool.ApplyDeltas(iter->GetTx().GetId(), dPriority, dummy);
+        mempool.ApplyDeltasNL(iter->GetTx().GetId(),
+                              dPriority,
+                              dummy);
         LogPrintf(
             "priority %.1f fee %s txid %s\n", dPriority,
             CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString(),
@@ -363,7 +322,7 @@ int LegacyBlockAssembler::UpdatePackagesForAdded(
     int nDescendantsUpdated = 0;
     for (const CTxMemPool::txiter it : alreadyAdded) {
         CTxMemPool::setEntries descendants;
-        mempool.CalculateDescendants(it, descendants);
+        mempool.CalculateDescendantsNL(it, descendants);
         // Insert all descendants (not yet in block) into the modified set.
         for (CTxMemPool::txiter desc : descendants) {
             if (alreadyAdded.count(desc)) {
@@ -529,8 +488,14 @@ void LegacyBlockAssembler::addPackageTxs(int &nPackagesSelected,
         CTxMemPool::setEntries ancestors;
         uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
         std::string dummy;
-        mempool.CalculateMemPoolAncestors(*iter, ancestors, nNoLimit, nNoLimit,
-                                          nNoLimit, nNoLimit, dummy, false);
+        mempool.CalculateMemPoolAncestorsNL(*iter,
+                                            ancestors,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            nNoLimit,
+                                            dummy,
+                                            false);
 
         onlyUnconfirmed(ancestors);
         ancestors.insert(iter);
@@ -567,12 +532,12 @@ void LegacyBlockAssembler::addPackageTxs(int &nPackagesSelected,
 void LegacyBlockAssembler::addPriorityTxs() {
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay.
-    if (config->GetBlockPriorityPercentage() == 0) {
+    if (mConfig.GetBlockPriorityPercentage() == 0) {
         return;
     }
 
     uint64_t nBlockPrioritySize =
-        nMaxGeneratedBlockSize * config->GetBlockPriorityPercentage() / 100;
+        nMaxGeneratedBlockSize * mConfig.GetBlockPriorityPercentage() / 100;
 
     // This vector will be sorted into a priority queue:
     std::vector<TxCoinAgePriority> vecPriority;
@@ -589,7 +554,9 @@ void LegacyBlockAssembler::addPriorityTxs() {
          mi != mempool.mapTx.end(); ++mi) {
         double dPriority = mi->GetPriority(nHeight);
         Amount dummy;
-        mempool.ApplyDeltas(mi->GetTx().GetId(), dPriority, dummy);
+        mempool.ApplyDeltasNL(mi->GetTx().GetId(),
+                              dPriority,
+                              dummy);
         vecPriority.push_back(TxCoinAgePriority(dPriority, mi));
     }
     std::make_heap(vecPriority.begin(), vecPriority.end(), pricomparer);
@@ -632,7 +599,7 @@ void LegacyBlockAssembler::addPriorityTxs() {
 
             // This tx was successfully added, so add transactions that depend
             // on this one to the priority queue to try again.
-            for (CTxMemPool::txiter child : mempool.GetMemPoolChildren(iter)) {
+            for (CTxMemPool::txiter child : mempool.GetMemPoolChildrenNL(iter)) {
                 waitPriIter wpiter = waitPriMap.find(child);
                 if (wpiter != waitPriMap.end()) {
                     vecPriority.push_back(

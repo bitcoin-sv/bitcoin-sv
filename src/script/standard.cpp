@@ -42,25 +42,25 @@ const char *GetTxnOutputType(txnouttype t) {
 bool Solver(const CScript &scriptPubKey, txnouttype &typeRet,
             std::vector<std::vector<uint8_t>> &vSolutionsRet) {
     // Templates
-    static std::multimap<txnouttype, CScript> mTemplates;
-    if (mTemplates.empty()) {
-        // Standard tx, sender provides pubkey, receiver adds signature
-        mTemplates.insert(
-            std::make_pair(TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG));
+    static std::multimap<txnouttype, CScript> mTemplates{
+            // Standard tx, sender provides pubkey, receiver adds signature
+            {TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG},
 
-        // Bitcoin address tx, sender provides hash of pubkey, receiver provides
-        // signature and pubkey
-        mTemplates.insert(
-            std::make_pair(TX_PUBKEYHASH,
-                           CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH
-                                     << OP_EQUALVERIFY << OP_CHECKSIG));
+            // Bitcoin address tx, sender provides hash of pubkey, receiver
+            // provides signature and pubkey
+            {
+                TX_PUBKEYHASH,
+                CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH
+                          << OP_EQUALVERIFY << OP_CHECKSIG
+            },
 
-        // Sender provides N pubkeys, receivers provides M signatures
-        mTemplates.insert(
-            std::make_pair(TX_MULTISIG,
-                           CScript() << OP_SMALLINTEGER << OP_PUBKEYS
-                                     << OP_SMALLINTEGER << OP_CHECKMULTISIG));
-    }
+            // Sender provides N pubkeys, receivers provides M signatures
+            {
+                TX_MULTISIG,
+                CScript() << OP_SMALLINTEGER << OP_PUBKEYS
+                          << OP_SMALLINTEGER << OP_CHECKMULTISIG
+            }
+        };
 
     vSolutionsRet.clear();
 

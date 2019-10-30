@@ -34,7 +34,11 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &w
         return false;
     }
 
-    if (whichType == TX_MULTISIG) {
+    // P2SH will be disabled in Genesis.
+    // In preparation for genesis, node can already treat transactions with P2SH in output as non-standard.
+    if (whichType == TX_SCRIPTHASH && !config.GetAcceptP2SH()) {
+        return false;
+    } else if (whichType == TX_MULTISIG) {
         uint8_t m = vSolutions.front()[0];
         uint8_t n = vSolutions.back()[0];
         // Support up to x-of-3 multisig txns as standard
@@ -42,11 +46,6 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &w
         if (m < 1 || m > n) return false;
     } else if (whichType == TX_NULL_DATA) {
         if (!fAcceptDatacarrier) {
-            return false;
-        }
-
-        auto nMaxDatacarrierBytes = config.GetDataCarrierSize();
-        if (scriptPubKey.size() > nMaxDatacarrierBytes) {
             return false;
         }
     }
@@ -87,7 +86,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &rea
         }
     }
 
-    unsigned int nDataOut = 0;
+    unsigned int nDataSize = 0;
     txnouttype whichType;
     for (const CTxOut &txout : tx.vout) {
         if (!::IsStandard(config, txout.scriptPubKey, whichType)) {
@@ -96,7 +95,7 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &rea
         }
 
         if (whichType == TX_NULL_DATA) {
-            nDataOut++;
+            nDataSize += txout.scriptPubKey.size();
         } else if ((whichType == TX_MULTISIG) && (!fIsBareMultisigStd)) {
             reason = "bare-multisig";
             return false;
@@ -106,9 +105,9 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &rea
         }
     }
 
-    // only one OP_RETURN txout is permitted
-    if (nDataOut > 1) {
-        reason = "multi-op-return";
+    // cumulative size of all OP_RETURN txout should be smaller than -datacarriersize
+    if (nDataSize > config.GetDataCarrierSize()) {
+        reason = "datacarrier-size-exceeded";
         return false;
     }
 

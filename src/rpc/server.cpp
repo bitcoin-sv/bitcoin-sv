@@ -14,6 +14,7 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
+#include "blockchain.h"
 
 #include <univalue.h>
 
@@ -142,7 +143,7 @@ uint256 ParseHashV(const UniValue &v, std::string strName) {
     if (!IsHex(strHex))
         throw JSONRPCError(RPC_INVALID_PARAMETER,
                            strName + " must be hexadecimal string (not '" +
-                               strHex + "')");
+                               strHex + "') and length of it must be devisible by 2");
     if (64 != strHex.length())
         throw JSONRPCError(RPC_INVALID_PARAMETER,
                            strprintf("%s must be of length %d (not %d)",
@@ -160,7 +161,7 @@ std::vector<uint8_t> ParseHexV(const UniValue &v, std::string strName) {
     if (!IsHex(strHex))
         throw JSONRPCError(RPC_INVALID_PARAMETER,
                            strName + " must be hexadecimal string (not '" +
-                               strHex + "')");
+                               strHex + "') and length of it must be devisible by 2");
     return ParseHex(strHex);
 }
 std::vector<uint8_t> ParseHexO(const UniValue &o, std::string strKey) {
@@ -396,33 +397,44 @@ void JSONRPCRequest::parse(const UniValue &valRequest) {
                            "Params must be an array or object");
 }
 
-static UniValue JSONRPCExecOne(Config &config, JSONRPCRequest jreq,
-                               const UniValue &req) {
+static void JSONRPCExecOne(Config &config, JSONRPCRequest jreq,
+                           const UniValue &req, HTTPRequest& httpReq) {
     UniValue rpc_result(UniValue::VOBJ);
 
     try {
         jreq.parse(req);
-
-        UniValue result = tableRPC.execute(config, jreq);
-        rpc_result = JSONRPCReplyObj(result, NullUniValue, jreq.id);
+        if (jreq.strMethod == "getblock") {
+            // getblock response is written in multiple chunks
+            getblock(config, jreq, &httpReq, true);
+        } else {
+            UniValue result = tableRPC.execute(config, jreq);
+            // Response for each RPC method is written as a single chunk.
+            httpReq.WriteReplyChunk(JSONRPCReplyObj(result, NullUniValue, jreq.id).write());
+        }
     } catch (const UniValue &objError) {
-        rpc_result = JSONRPCReplyObj(NullUniValue, objError, jreq.id);
+        httpReq.WriteReplyChunk(JSONRPCReplyObj(NullUniValue, objError, jreq.id).write());
     } catch (const std::exception &e) {
         rpc_result = JSONRPCReplyObj(
             NullUniValue, JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
+        httpReq.WriteReplyChunk(rpc_result.write());
     }
-
-    return rpc_result;
 }
 
-std::string JSONRPCExecBatch(Config &config, const JSONRPCRequest &jreq,
-                             const UniValue &vReq) {
-    UniValue ret(UniValue::VARR);
-    for (size_t i = 0; i < vReq.size(); i++) {
-        ret.push_back(JSONRPCExecOne(config, jreq, vReq[i]));
-    }
+void JSONRPCExecBatch(Config &config, const JSONRPCRequest &jreq,
+                             const UniValue &vReq, HTTPRequest& httpReq) {
 
-    return ret.write() + "\n";
+    httpReq.WriteHeader("Content-Type", "application/json");
+    httpReq.StartWritingChunks(HTTP_OK);
+
+    httpReq.WriteReplyChunk("[");
+    std::string delimiter;
+    for (size_t i = 0; i < vReq.size(); i++) {
+        httpReq.WriteReplyChunk(delimiter);
+        JSONRPCExecOne(config, jreq, vReq[i], httpReq);
+        delimiter = ",";
+    }
+    httpReq.WriteReplyChunk("]\n");
+    httpReq.StopWritingChunks();
 }
 
 /**

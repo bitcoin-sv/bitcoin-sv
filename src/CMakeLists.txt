@@ -22,6 +22,7 @@ endif()
 
 option(BUILD_BITCOIN_CLI "Build bitcoin-cli" ON)
 option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
+option(BUILD_BITCOIN_MINER "Build bitcoin-miner" ON)
 option(BUILD_BITCOIN_BENCH "Build benchmarks" ON)
 
 # Ensure that WINDRES_PREPROC is enabled when using windres.
@@ -220,12 +221,18 @@ add_library(server
 	init.cpp
 	dbwrapper.cpp
 	merkleblock.cpp
+	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
+	mining/journal.cpp
+	mining/journal_builder.cpp
+	mining/journal_change_set.cpp
+	mining/journaling_block_assembler.cpp
     mining/legacy.cpp
 	net.cpp
 	net_processing.cpp
 	noui.cpp
+	orphan_txns.cpp
 	policy/fees.cpp
 	policy/policy.cpp
 	pow.cpp
@@ -245,11 +252,14 @@ add_library(server
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+	txn_double_spend_detector.cpp
 	txn_propagator.cpp
+	txn_validation_data.cpp
+	txn_validator.cpp
+	txn_recent_rejects.cpp
 	ui_interface.cpp
 	validation.cpp
 	validationinterface.cpp
-	versionbits.cpp
     vmtouch.cpp
 )
 
@@ -327,9 +337,19 @@ if(BUILD_BITCOIN_TX)
 	target_link_libraries(bitcoin-tx bitcoinconsensus)
 endif()
 
+# bitcoin-miner
+if(BUILD_BITCOIN_MINER)
+	add_executable(bitcoin-miner bitcoin-miner.cpp)
+	target_include_directories(bitcoin-miner PRIVATE ${EVENT_INCLUDE_DIR})
+	target_link_libraries(bitcoin-miner common rpcclient bitcoinconsensus ${EVENT_LIBRARY})
+endif()
+
 # bitcoind
 add_executable(bitcoind bitcoind.cpp)
-target_link_libraries(bitcoind server)
+target_link_libraries(
+	bitcoind
+	server
+	$<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)
 endif()

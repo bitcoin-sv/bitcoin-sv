@@ -229,7 +229,8 @@ uint256 ParseHashStr(const std::string &strHex, const std::string &strName) {
     if (!IsHex(strHex)) {
         // Note: IsHex("") is false
         throw std::runtime_error(
-            strName + " must be hexadecimal string (not '" + strHex + "')");
+            strName + " must be hexadecimal string (not '" 
+                    + strHex + "') and length of it must be devisible by 2");
     }
 
     uint256 result;
@@ -245,7 +246,8 @@ std::vector<uint8_t> ParseHexUV(const UniValue &v, const std::string &strName) {
 
     if (!IsHex(strHex)) {
         throw std::runtime_error(
-            strName + " must be hexadecimal string (not '" + strHex + "')");
+            strName + " must be hexadecimal string (not '" 
+                    + strHex + "') and length of it must be devisible by 2");
     }
 
     return ParseHex(strHex);

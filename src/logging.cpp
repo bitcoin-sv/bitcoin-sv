@@ -80,6 +80,8 @@ const CLogCategoryDesc LogCategories[] = {
     {BCLog::LEVELDB, "leveldb"},
     {BCLog::TXNPROP, "txnprop"},
     {BCLog::TXNSRC, "txnsrc"},
+    {BCLog::JOURNAL, "journal"},
+    {BCLog::TXNVAL, "txnval"},
     {BCLog::ALL, "1"},
     {BCLog::ALL, "all"},
 };
@@ -130,7 +132,9 @@ std::string BCLog::Logger::LogTimestampStr(const std::string &str) {
             DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
         if (fLogTimeMicros)
             strStamped += strprintf(".%06d", nTimeMicros % 1000000);
-        strStamped += ' ' + str;
+
+        std::string strThreadName = "["+GetThreadName()+"]";
+        strStamped += ' ' + strThreadName + ' ' + str;
     } else
         strStamped = str;
 

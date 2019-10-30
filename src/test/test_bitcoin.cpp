@@ -13,6 +13,7 @@
 #include "key.h"
 #include "logging.h"
 #include "mining/factory.h"
+#include "mining/journal_builder.h"
 #include "net_processing.h"
 #include "pubkey.h"
 #include "random.h"
@@ -35,6 +36,8 @@
 #include <list>
 #include <memory>
 #include <thread>
+
+using mining::CBlockTemplate;
 
 uint256 insecure_rand_seed = GetRandHash();
 FastRandomContext insecure_rand_ctx(insecure_rand_seed);
@@ -79,7 +82,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
                                          (int)(InsecureRandRange(100000)));
     fs::create_directories(pathTemp);
     gArgs.ForceSetArg("-datadir", pathTemp.string());
-    mempool.setSanityCheck(1.0);
+    mempool.SetSanityCheck(1.0);
     pblocktree = new CBlockTreeDB(1 << 20, true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
@@ -88,17 +91,20 @@ TestingSetup::TestingSetup(const std::string &chainName)
     }
     {
         CValidationState state;
-        if (!ActivateBestChain(config, state)) {
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
+        if (!ActivateBestChain(config, state, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }
     nScriptCheckThreads = 3;
     for (int i = 0; i < nScriptCheckThreads - 1; i++) {
-        threadGroup.create_thread(&ThreadScriptCheck);
+        threadGroup.create_thread([i]() { return ThreadScriptCheck(i); });
     }
 
     // Deterministic randomness for tests.
-    g_connman = std::unique_ptr<CConnman>(new CConnman(config, 0x1337, 0x1337));
+    g_connman =
+        std::make_unique<CConnman>(
+            config, 0x1337, 0x1337, std::chrono::milliseconds{0});
     connman = g_connman.get();
     RegisterNodeSignals(GetNodeSignals());
 }
@@ -136,7 +142,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const Config &config = GlobalConfig::GetConfig();
     CBlockIndex* pindexPrev {nullptr};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-            CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+            mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
     CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock &block = *blockRef;
 

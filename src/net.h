@@ -31,9 +31,11 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #ifndef WIN32
@@ -47,6 +49,7 @@ class Config;
 class CNode;
 class CScheduler;
 class CTxnPropagator;
+class CTxnValidator;
 
 using CNodePtr = std::shared_ptr<CNode>;
 
@@ -62,8 +65,6 @@ static const int PING_INTERVAL = 2 * 60;
 static const int TIMEOUT_INTERVAL = 20 * 60;
 /** Run the feeler connection loop once every 2 minutes or 120 seconds. **/
 static const int FEELER_INTERVAL = 120;
-/** The maximum number of entries in an 'inv' protocol message */
-static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
 /** Maximum length of strSubVer in `version` message */
@@ -80,10 +81,6 @@ static const bool DEFAULT_UPNP = USE_UPNP;
 #else
 static const bool DEFAULT_UPNP = false;
 #endif
-/** The maximum number of entries in mapAskFor */
-static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
-/** The maximum number of entries in setAskFor (larger due to getdata latency)*/
-static const size_t SETASKFOR_MAX_SZ = 2 * MAX_INV_SZ;
 /** The maximum number of peer connections to maintain. */
 static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 /** The default for -maxuploadtarget. 0 = Unlimited */
@@ -124,16 +121,45 @@ class CTransaction;
 class CNodeStats;
 class CClientUIInterface;
 
-struct CSerializedNetMsg {
-    CSerializedNetMsg() = default;
+class CSerializedNetMsg
+{
+public:
     CSerializedNetMsg(CSerializedNetMsg &&) = default;
     CSerializedNetMsg &operator=(CSerializedNetMsg &&) = default;
     // No copying, only moves.
     CSerializedNetMsg(const CSerializedNetMsg &msg) = delete;
     CSerializedNetMsg &operator=(const CSerializedNetMsg &) = delete;
 
-    std::vector<uint8_t> data;
-    std::string command;
+    CSerializedNetMsg(
+        std::string&& command,
+        std::vector<uint8_t>&& data)
+        : mCommand{std::move(command)}
+        , mHash{::Hash(data.data(), data.data() + data.size())}
+        , mSize{data.size()}
+        , mData{std::make_unique<CVectorStream>(std::move(data))}
+    {/**/}
+
+    CSerializedNetMsg(
+        std::string&& command,
+        const uint256& hash,
+        size_t size,
+        std::unique_ptr<CForwardAsyncReadonlyStream> data)
+        : mCommand{std::move(command)}
+        , mHash{hash}
+        , mSize{size}
+        , mData{std::move(data)}
+    {/**/}
+
+    const std::string& Command() const {return mCommand;}
+    std::unique_ptr<CForwardAsyncReadonlyStream> MoveData() {return std::move(mData);}
+    const uint256& Hash() const {return mHash;}
+    size_t Size() const {return mSize;}
+
+private:
+    std::string mCommand;
+    uint256 mHash;
+    size_t mSize;
+    std::unique_ptr<CForwardAsyncReadonlyStream> mData;
 };
 
 class CConnman {
@@ -159,7 +185,11 @@ public:
         uint64_t nMaxOutboundTimeframe = 0;
         uint64_t nMaxOutboundLimit = 0;
     };
-    CConnman(const Config &configIn, uint64_t seed0, uint64_t seed1);
+    CConnman(
+        const Config &configIn,
+        uint64_t seed0,
+        uint64_t seed1,
+        std::chrono::milliseconds debugP2PTheadStallsThreshold);
     ~CConnman();
     bool Start(CScheduler &scheduler, std::string &strNodeError,
                Options options);
@@ -204,9 +234,9 @@ public:
     {
         using resultType = typename std::result_of<Callable(const CNodePtr&)>::type;
         std::vector<std::future<resultType>> results {};
-        results.reserve(vNodes.size());
 
         LOCK(cs_vNodes);
+        results.reserve(vNodes.size());
         for(const CNodePtr& node : vNodes) {
             if(NodeFullyConnected(node))
                 results.emplace_back(make_task(mThreadPool, func, node));
@@ -214,6 +244,104 @@ public:
 
         return results;
     };
+
+    /** Call the specified function for parallel validation (batch processing) */
+    template <typename Callable>
+    auto ParallelTxValidationBatchProcessing(
+            Callable&& func,
+            size_t nTxnsPerTaskThreshold,
+            const Config* config,
+            CTxMemPool *pool,
+            TxInputDataSPtrVec& vNewTxns,
+            CTxnHandlers& handlers,
+            bool fReadyForFeeEstimation)
+        -> std::vector<std::future<typename std::result_of<
+            Callable(const TxInputDataSPtrRefVec&,
+                const Config*,
+                CTxMemPool*,
+                CTxnHandlers&,
+                bool)>::type>> {
+        using resultType = typename std::result_of<
+            Callable(const TxInputDataSPtrRefVec&,
+                const Config*,
+                CTxMemPool*,
+                CTxnHandlers&,
+                bool)>::type;
+        // A variable which stors results
+        std::vector<std::future<resultType>> results {};
+        size_t numThreads = mValidatorThreadPool.getPoolSize();
+        // Calculate txns per thread ratio.
+        size_t nTxnsPerTaskRatio {vNewTxns.size() / numThreads};
+        // Calculate number of txns for batch processing (per thread)
+        size_t nBatchSize {0};
+        bool fSingleTask = !nTxnsPerTaskThreshold || (nTxnsPerTaskRatio < nTxnsPerTaskThreshold);
+        if (fSingleTask) {
+            nBatchSize = vNewTxns.size();
+        } else {
+            nBatchSize = vNewTxns.size() / numThreads;
+            if (vNewTxns.size() % numThreads) {
+                ++nBatchSize;
+            }
+        }
+        // Allocate a buffer for results
+        results.reserve(fSingleTask ? 1 : numThreads);
+        auto chunkBeginIter = vNewTxns.begin();
+        auto chunkEndIter = vNewTxns.begin();
+        size_t currChunkBeginPos {0};
+        // Lambda function which creats a task with batch txns
+        auto create_batch_task {
+            [&](const TxInputDataSPtrRefVec& vBatchTxns) {
+                results.emplace_back(
+                        make_task(mValidatorThreadPool, func,
+                            vBatchTxns,
+                            config,
+                            pool,
+                            handlers,
+                            fReadyForFeeEstimation));
+                }
+        };
+        // Calculate a chunk of txns & create a task which executes a batch processing.
+        while (currChunkBeginPos + nBatchSize <= vNewTxns.size()) {
+            std::advance(chunkEndIter, nBatchSize);
+            const TxInputDataSPtrRefVec vBatchTxns(chunkBeginIter, chunkEndIter);
+            create_batch_task(vBatchTxns);
+            chunkBeginIter = chunkEndIter;
+            currChunkBeginPos += nBatchSize;
+        }
+        // Last chunk
+        size_t nLastChunkSize = vNewTxns.size() - currChunkBeginPos;
+        if (nLastChunkSize) {
+            const TxInputDataSPtrRefVec vBatchTxns(chunkBeginIter, vNewTxns.end());
+            create_batch_task(vBatchTxns);
+        }
+        return results;
+    };
+
+    /** Get a handle to our transaction validator */
+    std::shared_ptr<CTxnValidator> getTxnValidator();
+    /** Enqueue a new transaction for validation */
+    void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
+    void EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData);
+    /** Check if the given txn is already known by the Validator */
+    bool CheckTxnExistsInValidatorsQueue(const uint256& txHash) const;
+    /* Find node by it's id */
+    CNodePtr FindNodeById(int64_t nodeId);
+    /* Erase transaction from the given peer */
+    void EraseOrphanTxnsFromPeer(NodeId peer);
+    /* Erase transaction by it's hash */
+    int EraseOrphanTxn(const uint256& txHash);
+    /* Check if orphan transaction exists by prevout */
+    bool CheckOrphanTxnExists(const COutPoint& prevout) const;
+    /* Check if orphan transaction exists by txn hash */
+    bool CheckOrphanTxnExists(const uint256& txHash) const;
+    /* Get transaction's hash for orphan transactions (by prevout) */
+    std::vector<uint256> GetOrphanTxnsHash(const COutPoint& prevout) const;
+    /* Check if transaction exists in recent rejects */
+    bool CheckTxnInRecentRejects(const uint256& txHash) const;
+    /* Reset recent rejects */
+    void ResetRecentRejects();
+    /* Get extra txns for block reconstruction */
+    std::vector<std::pair<uint256, CTransactionRef>> GetCompactExtraTxns() const;
 
     // Addrman functions
     size_t GetAddressCount() const;
@@ -395,8 +523,8 @@ private:
     /** Services this instance cares about */
     ServiceFlags nRelevantServices;
 
-    CSemaphore *semOutbound;
-    CSemaphore *semAddnode;
+    std::shared_ptr<CSemaphore> semOutbound {nullptr};
+    std::shared_ptr<CSemaphore> semAddnode {nullptr};
     int nMaxConnections;
     int nMaxOutbound;
     int nMaxAddnode;
@@ -419,6 +547,10 @@ private:
 
     CThreadPool<CQueueAdaptor> mThreadPool { "ConnmanPool" };
 
+    /** Transaction validator */
+    std::shared_ptr<CTxnValidator> mTxnValidator {};
+    CThreadPool<CQueueAdaptor> mValidatorThreadPool { "ValidatorPool" };
+
     CThreadInterrupt interruptNet;
 
     std::thread threadDNSAddressSeed;
@@ -426,6 +558,8 @@ private:
     std::thread threadOpenAddedConnections;
     std::thread threadOpenConnections;
     std::thread threadMessageHandler;
+
+    std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);
@@ -500,6 +634,7 @@ extern bool fDiscover;
 extern bool fListen;
 extern bool fRelayTxes;
 
+extern CCriticalSection cs_invQueries;
 extern limitedmap<uint256, int64_t> mapAlreadyAskedFor;
 
 struct LocalServiceInfo {
@@ -580,7 +715,7 @@ public:
             return false;
         }
 
-        return (hdr.nMessageSize == nDataPos);
+        return (hdr.nPayloadLength == nDataPos);
     }
 
     const uint256 &GetMessageHash() const;
@@ -631,6 +766,18 @@ class CNode {
     friend class CConnman;
 
 public:
+    /**
+     * Notification structure for SendMessage function that returns:
+     * sendComplete: whether the send was fully complete/partially complete and
+     *               data is needed for sending the rest later.
+     * sentSize: amount of data that was sent.
+     */
+    struct CSendResult
+    {
+        bool sendComplete;
+        size_t sentSize;
+    };
+
     // socket
     std::atomic<ServiceFlags> nServices {NODE_NONE};
     // Services expected from a peer, otherwise it will be disconnected
@@ -638,10 +785,7 @@ public:
     SOCKET hSocket {0};
     // Total size of all vSendMsg entries.
     CSendQueueBytes nSendSize;
-    // Offset inside the first vSendMsg already sent.
-    size_t nSendOffset {0};
-    uint64_t nSendBytes {0};
-    std::deque<std::vector<uint8_t>> vSendMsg {};
+    std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> vSendMsg {};
     CCriticalSection cs_vSend {};
     CCriticalSection cs_hSocket {};
     CCriticalSection cs_vRecv {};
@@ -672,7 +816,7 @@ public:
     // Used for both cleanSubVer and strSubVer.
     CCriticalSection cs_SubVer {};
     // This peer can bypass DoS banning.
-    bool fWhitelisted {false};
+    std::atomic_bool fWhitelisted {false};
     // If true this node is being used as a short lived feeler.
     bool fFeeler {false};
     bool fOneShot {false};
@@ -758,15 +902,33 @@ public:
     Amount lastSentFeeFilter {0};
     int64_t nextSendTimeFeeFilter {0};
 
+    /** Maximum number of CInv elements this peers is willing to accept */
+    uint32_t maxInvElements {CInv::estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)};
+    /** protoconfReceived is false by default and set to true when protoconf is received from peer **/
+    bool protoconfReceived {false};
+
     CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn,
           SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn,
           uint64_t nLocalHostNonceIn, const std::string &addrNameIn = "",
           bool fInboundIn = false);
     ~CNode();
 
+    CNode(CNode&&) = delete;
+    CNode& operator=(CNode&&) = delete;
+    CNode(const CNode&) = delete;
+    CNode& operator=(const CNode&) = delete;
+
 private:
-    CNode(const CNode &);
-    void operator=(const CNode &);
+    /**
+     * Storage for the last chunk being sent to the peer. This variable contains
+     * data for the duration of sending the chunk. Once the chunk is sent it is
+     * cleared.
+     * In case there is an interruption during sending (sent size exceeded or
+     * network layer can not process any more data at the moment) this variable
+     * remains set and is used to continue streaming on the next try.
+     */
+    std::optional<CSpan> mSendChunk;
+    uint64_t nSendBytes {0};
 
     const uint64_t nLocalHostNonce {};
     // Services offered to this peer
@@ -790,6 +952,10 @@ private:
 
 public:
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
+
+    CSendResult SendMessage(
+        CForwardAsyncReadonlyStream& data,
+        size_t maxChunkSize);
 
     /** Add some new transactions to our pending inventory list */
     void AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns);

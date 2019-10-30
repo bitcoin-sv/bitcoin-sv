@@ -6,7 +6,7 @@
 
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN
-from .util import assert_equal, assert_raises_rpc_error
+from .util import assert_equal, assert_raises_rpc_error, hash256
 from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT)
 
 from collections import deque
@@ -28,6 +28,13 @@ def create_block(hashprev, coinbase, nTime=None):
     block.calc_sha256()
     return block
 
+# Do incorrect POW for block
+def solve_bad(block):
+    block.rehash()
+    target = uint256_from_compact(block.nBits)
+    while block.sha256 < target:
+        block.nNonce += 1
+        block.rehash()
 
 def serialize_script_num(value):
     r = bytearray(0)
@@ -44,17 +51,52 @@ def serialize_script_num(value):
         r[-1] |= 0x80
     return r
 
+
+# Calculate the merkle root for a block
+def merkle_root_from_merkle_proof(coinbase_hash, merkle_proof):
+    merkleRootBytes = ser_uint256(coinbase_hash)
+    for mp in merkle_proof:
+        mp = int(mp, 16)
+        mpBytes = ser_uint256(mp)
+        merkleRootBytes = hash256(merkleRootBytes + mpBytes)
+        merkleRootBytes = merkleRootBytes[::-1] # Python stores these the wrong way round
+    return uint256_from_str(merkleRootBytes)
+
+# Create a valid submittable block (and coinbase) from a mining candidate
+def create_block_from_candidate(candidate, get_coinbase):
+    block = CBlock()
+    block.nVersion = candidate["version"]
+    block.hashPrevBlock = int(candidate["prevhash"], 16)
+    block.nTime = candidate["time"]
+    block.nBits = int(candidate["nBits"], 16)
+    block.nNonce = 0
+
+    if(get_coinbase):
+        coinbase_tx = FromHex(CTransaction(), candidate["coinbase"])
+    else:
+        coinbase_tx = create_coinbase(height=int(candidate["height"]) + 1)
+    coinbase_tx.rehash()
+    block.vtx = [coinbase_tx]
+
+    # Calculate merkle root & solve
+    block.hashMerkleRoot = merkle_root_from_merkle_proof(coinbase_tx.sha256, candidate["merkleProof"])
+    block.solve()
+    block.rehash()
+
+    return block, coinbase_tx
+
+
 # Create a coinbase transaction, assuming no miner fees.
 # If pubkey is passed in, the coinbase output will be a P2PK output;
 # otherwise an anyone-can-spend output.
 
 
-def create_coinbase(height, pubkey=None):
+def create_coinbase(height, pubkey=None, outputValue=50):
     coinbase = CTransaction()
     coinbase.vin.append(CTxIn(COutPoint(0, 0xffffffff),
                               ser_string(serialize_script_num(height)), 0xffffffff))
     coinbaseoutput = CTxOut()
-    coinbaseoutput.nValue = 50 * COIN
+    coinbaseoutput.nValue = outputValue * COIN
     halvings = int(height / 150)  # regtest
     coinbaseoutput.nValue >>= halvings
     if (pubkey != None):

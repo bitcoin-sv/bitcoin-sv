@@ -14,7 +14,7 @@ set(PACKAGE_NAME "Bitcoin SV")
 # Version
 set(CLIENT_VERSION_MAJOR 0)
 set(CLIENT_VERSION_MINOR 2)
-set(CLIENT_VERSION_REVISION 1)
+set(CLIENT_VERSION_REVISION 2)
 set(CLIENT_VERSION_BUILD 0)
 
 if(ENABLE_PROD_BUILD)
@@ -115,6 +115,7 @@ check_builtin_exist(__builtin_clzll HAVE_DECL___BUILTIN_CLZLL)
 
 # Various system libraries
 check_symbol_exists(strnlen "string.h" HAVE_DECL_STRNLEN)
+check_symbol_exists(daemon "unistd.h" HAVE_DECL_DAEMON)
 
 # OpenSSL functionality
 include(BrewHelper)

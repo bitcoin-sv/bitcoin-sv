@@ -12,6 +12,7 @@
 #include "primitives/block.h"
 #include "tinyformat.h"
 #include "uint256.h"
+#include "logging.h"
 
 #include <unordered_map>
 #include <vector>
@@ -188,6 +189,9 @@ private:
     // The block has an invalid parent.
     static const uint32_t FAILED_PARENT_FLAG = 0x40;
 
+    // The block disk file hash and content size are set.
+    static const uint32_t HAS_DISK_BLOCK_META_DATA_FLAG = 0x80;
+
     // Mask used to check if the block failed.
     static const uint32_t INVALID_MASK = FAILED_FLAG | FAILED_PARENT_FLAG;
 
@@ -220,6 +224,16 @@ public:
                            (hasFailed ? FAILED_FLAG : 0));
     }
 
+    bool hasDiskBlockMetaData() const
+    {
+        return status & HAS_DISK_BLOCK_META_DATA_FLAG;
+    }
+    BlockStatus withDiskBlockMetaData(bool hasData = true) const
+    {
+        return BlockStatus((status & ~HAS_DISK_BLOCK_META_DATA_FLAG) |
+                           (hasData ? HAS_DISK_BLOCK_META_DATA_FLAG : 0));
+    }
+
     bool hasFailedParent() const { return status & FAILED_PARENT_FLAG; }
     BlockStatus withFailedParent(bool hasFailedParent = true) const {
         return BlockStatus((status & ~FAILED_PARENT_FLAG) |
@@ -248,6 +262,24 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
         READWRITE(VARINT(status));
+    }
+};
+
+/**
+ * Structure for storing hash of the block data on disk and its size.
+ */
+struct CDiskBlockMetaData
+{
+    uint256 diskDataHash;
+    uint64_t diskDataSize = 0;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream &s, Operation ser_action)
+    {
+        READWRITE(diskDataHash);
+        READWRITE(diskDataSize);
     }
 };
 
@@ -338,6 +370,7 @@ public:
         nTimeReceived = 0;
         nBits = 0;
         nNonce = 0;
+        mDiskBlockMetaData = {};
     }
 
     CBlockIndex() { SetNull(); }
@@ -357,6 +390,23 @@ public:
         nNonce = block.nNonce;
     }
 
+    void LoadFromPersistentData(const CBlockIndex& other, CBlockIndex* previous)
+    {
+        pprev = previous;
+        nHeight = other.nHeight;
+        nFile = other.nFile;
+        nDataPos = other.nDataPos;
+        nUndoPos = other.nUndoPos;
+        nVersion = other.nVersion;
+        hashMerkleRoot = other.hashMerkleRoot;
+        nTime = other.nTime;
+        nBits = other.nBits;
+        nNonce = other.nNonce;
+        nStatus = other.nStatus;
+        nTx = other.nTx;
+        mDiskBlockMetaData = other.mDiskBlockMetaData;
+    }
+
     CDiskBlockPos GetBlockPos() const {
         CDiskBlockPos ret;
         if (nStatus.hasData()) {
@@ -373,6 +423,49 @@ public:
             ret.nPos = nUndoPos;
         }
         return ret;
+    }
+
+    CDiskBlockMetaData GetDiskBlockMetaData() const {return mDiskBlockMetaData;}
+    void SetDiskBlockMetaData(const uint256& hash, size_t size)
+    {
+        assert(!hash.IsNull());
+        assert(size > 0);
+
+        mDiskBlockMetaData = {hash, size};
+        nStatus = nStatus.withDiskBlockMetaData();
+    }
+
+    void SetDiskBlockData(
+        size_t transactionsCount,
+        const CDiskBlockPos& pos,
+        CDiskBlockMetaData metaData)
+    {
+        nTx = transactionsCount;
+        nChainTx = 0;
+        nFile = pos.nFile;
+        nDataPos = pos.nPos;
+        nUndoPos = 0;
+        nStatus = nStatus.withData();
+        RaiseValidity(BlockValidity::TRANSACTIONS);
+
+        if (!metaData.diskDataHash.IsNull() && metaData.diskDataSize)
+        {
+            mDiskBlockMetaData = std::move(metaData);
+            nStatus = nStatus.withDiskBlockMetaData();
+        }
+    }
+
+    void ClearFileInfo()
+    {
+        nStatus =
+            nStatus
+                .withData(false)
+                .withUndo(false)
+                .withDiskBlockMetaData(false);
+        nFile = 0;
+        nDataPos = 0;
+        nUndoPos = 0;
+        mDiskBlockMetaData = {};
     }
 
     CBlockHeader GetBlockHeader() const {
@@ -394,7 +487,11 @@ public:
 
     int64_t GetBlockTimeMax() const { return int64_t(nTimeMax); }
 
-    int64_t GetHeaderTimeReceived() const { return nTimeReceived; }
+    int64_t GetHeaderReceivedTime() const { return nTimeReceived; }
+
+    int64_t GetReceivedTimeDiff() const {
+        return GetHeaderReceivedTime() - GetBlockTime();
+    }
 
     enum { nMedianTimeSpan = 11 };
 
@@ -447,6 +544,9 @@ public:
     //! Efficiently find an ancestor of this block.
     CBlockIndex *GetAncestor(int height);
     const CBlockIndex *GetAncestor(int height) const;
+
+protected:
+    CDiskBlockMetaData mDiskBlockMetaData;
 };
 
 /**
@@ -516,6 +616,15 @@ public:
         READWRITE(nTime);
         READWRITE(nBits);
         READWRITE(nNonce);
+        if (nStatus.hasDiskBlockMetaData())
+        {
+            try {
+                READWRITE(mDiskBlockMetaData);
+            } catch (std::ios_base::failure &) {
+                nStatus = nStatus.withDiskBlockMetaData(false);
+                LogPrintf("Can not read metadata from block %s. Probably upgrading from downgraded version. \n", GetBlockHash().ToString());
+            }
+        }
     }
 
     uint256 GetBlockHash() const {

@@ -47,7 +47,7 @@ struct CompareTxnSendingDetails
 
     bool operator()(const CTxnSendingDetails& a, const CTxnSendingDetails& b)
     {   
-        return mMempool->CompareDepthAndScoreUnlocked(b.getInv().hash, a.getInv().hash);
+        return mMempool->CompareDepthAndScoreNL(b.getInv().hash, a.getInv().hash);
     }
 };
 

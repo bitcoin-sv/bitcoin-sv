@@ -3,11 +3,17 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "bench.h"
+#include "mining/journal_change_set.h"
 #include "policy/policy.h"
 #include "txmempool.h"
 
 #include <list>
 #include <vector>
+
+namespace
+{
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+}
 
 static void AddTx(const CTransaction &tx, const Amount &nFee,
                   CTxMemPool &pool) {
@@ -17,10 +23,11 @@ static void AddTx(const CTransaction &tx, const Amount &nFee,
     bool spendsCoinbase = false;
     unsigned int sigOpCost = 4;
     LockPoints lp;
-    pool.addUnchecked(tx.GetId(),
+    pool.AddUnchecked(tx.GetId(),
                       CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime,
                                       dPriority, nHeight, tx.GetValueOut(),
-                                      spendsCoinbase, sigOpCost, lp));
+                                      spendsCoinbase, sigOpCost, lp),
+                      nullChangeSet);
 }
 
 // Right now this is only testing eviction performance in an extremely small
@@ -115,8 +122,8 @@ static void MempoolEviction(benchmark::State &state) {
         AddTx(t5, Amount(1000LL), pool);
         AddTx(t6, Amount(1100LL), pool);
         AddTx(t7, Amount(9000LL), pool);
-        pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4);
-        pool.TrimToSize(t1.GetTotalSize());
+        pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4, nullChangeSet);
+        pool.TrimToSize(t1.GetTotalSize(), nullChangeSet);
     }
 }
 

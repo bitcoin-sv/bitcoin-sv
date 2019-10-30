@@ -33,6 +33,7 @@
 #include <boost/uuid/uuid_io.hpp>
 
 using namespace std;
+using mining::CBlockTemplate;
 
 namespace
 {
@@ -59,13 +60,14 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
     }
 
-    static unsigned int nTransactionsUpdatedLast = std::numeric_limits<unsigned int>::max();
+    auto assembler { mining::CMiningFactory::GetAssembler(config) };
 
     // Update block
     static CBlockIndex *pindexPrev = nullptr;
     static int64_t nStart = 0;
+    static unsigned int nTransactionsUpdatedLast = std::numeric_limits<unsigned int>::max();
     static std::unique_ptr<CBlockTemplate> pblocktemplate { std::make_unique<CBlockTemplate>() };
-    if (pindexPrev != chainActive.Tip() ||
+    if (pindexPrev != chainActive.Tip() || assembler->GetTemplateUpdated() ||
         (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5)) 
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
@@ -92,7 +94,7 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
                 throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available (mining requires a wallet)");
             coinbaseScriptPubKey = coinbaseScript->reserveScript;
         }
-        pblocktemplate = CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScriptPubKey, pindexPrev);
+        pblocktemplate = assembler->CreateNewBlock(coinbaseScriptPubKey, pindexPrev);
 
         if (!pblocktemplate) 
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to create a new block. Possibly out of memory.");
@@ -106,7 +108,7 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     pblock->nNonce = 0;
 
     // Create candidate and return it
-    CMiningCandidateRef candidate  { CMiningFactory::GetCandidateManager().Create(blockref) };
+    CMiningCandidateRef candidate  { mining::CMiningFactory::GetCandidateManager().Create(blockref) };
     return candidate;
 }
 
@@ -152,7 +154,7 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     UniValue ret(UniValue::VOBJ);
     CBlockRef block = candidate->GetBlock();
 
-    CMiningFactory::GetCandidateManager().RemoveOldCandidates();
+    mining::CMiningFactory::GetCandidateManager().RemoveOldCandidates();
 
     std::stringstream idstr {};
     idstr << candidate->GetId();
@@ -257,7 +259,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     std::string idstr { rcvd["id"].get_str() };
     MiningCandidateId id { boost::lexical_cast<MiningCandidateId>(idstr) };
 
-    CMiningCandidateRef result { CMiningFactory::GetCandidateManager().Get(id) };
+    CMiningCandidateRef result { mining::CMiningFactory::GetCandidateManager().Get(id) };
     if (!result)
     {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block candidate ID not found");
@@ -338,7 +340,11 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         block->fChecked = false;
 
         LOCK(cs_main);
-        submitted = SubmitBlock(config, block); // returns string on failure
+        auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr) 
+        {
+            return ProcessNewBlock(config, blockptr, true, nullptr);
+        };
+        submitted = processBlock(config, block, submitBlock); // returns string on failure
     }
     if(submitted.isNull())
     {
@@ -349,7 +355,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     }
 
     // Clear out old candidates
-    CMiningFactory::GetCandidateManager().RemoveOldCandidates();
+    mining::CMiningFactory::GetCandidateManager().RemoveOldCandidates();
 
     return submitted;
 }

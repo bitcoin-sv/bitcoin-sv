@@ -12,6 +12,10 @@ class CTransaction;
  * from it, it is still provided in this header file. Or maybe we'll just
  * blackhole the wallet at some point.
  */
-bool CheckFinalTx(const CTransaction &tx, int flags = -1);
+bool CheckFinalTx(
+    const CTransaction &tx,
+    int nChainActiveHeight,
+    int nMedianTimePast,
+    int flags = -1);
 
 #endif // BITCOIN_DEPRECATED_FINALTX_H

@@ -3,6 +3,7 @@
 
 #include "txn_propagator.h"
 #include "net.h"
+#include "util.h"
 
 // When we get C++17 we should loose this redundant definition, until then it's required.
 constexpr unsigned CTxnPropagator::DEFAULT_RUN_FREQUENCY_MILLIS;
@@ -72,7 +73,7 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
         txnDetails.emplace_back(inv, txn);
     }
     {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         std::sort(txnDetails.begin(), txnDetails.end(), comp);
     }
 
@@ -81,8 +82,8 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
         std::vector<CTxnSendingDetails> filteredNewTxns {};
 
         // Ensure we always take our lock first, then the mempool lock
-        std::unique_lock<std::mutex> lock { mNewTxnsMtx };
-        LOCK(mempool.cs);
+        std::unique_lock<std::mutex> lock1 { mNewTxnsMtx };
+        std::shared_lock lock2(mempool.smtx);
 
         std::sort(mNewTxns.begin(), mNewTxns.end(), comp);
         std::set_difference(mNewTxns.begin(), mNewTxns.end(), txnDetails.begin(), txnDetails.end(),
@@ -92,7 +93,7 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
 
     // Update lists of pending transactions for each node
     {
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         auto results { g_connman->ParallelForEachNode([&txnDetails](const CNodePtr& node) { node->RemoveTxnsFromInventory(txnDetails); }) };
 
         // Wait for all nodes to finish processing so we can safely release the mempool lock
@@ -121,6 +122,7 @@ void CTxnPropagator::shutdown()
 /** Thread entry point for new transaction queue handling */
 void CTxnPropagator::threadNewTxnHandler() noexcept
 {
+    RenameThread("bitcoin-txnpropagator");
     try
     {
         LogPrint(BCLog::TXNPROP, "New transaction handling thread starting\n");
@@ -154,7 +156,7 @@ void CTxnPropagator::processNewTransactions()
 {
     {
         // Take the mempool lock so we can do all the difficult txn sorting and node updating in parallel.
-        LOCK(mempool.cs);
+        std::shared_lock lock(mempool.smtx);
         auto results { g_connman->ParallelForEachNode([this](const CNodePtr& node) { node->AddTxnsToInventory(mNewTxns); }) };
 
         // Wait for all nodes to finish processing so we can safely release the mempool lock

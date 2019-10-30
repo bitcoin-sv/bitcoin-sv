@@ -21,7 +21,6 @@
 #include "version.h"
 
 #include <boost/algorithm/string.hpp>
-
 #include <univalue.h>
 
 // Allow a max of 15 outpoints to be queried at once.
@@ -227,10 +226,13 @@ static bool rest_block(const Config &config, HTTPRequest *req,
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
     }
 
-    CBlock block;
+    std::unique_ptr<CForwardReadonlyStream> stream;
+    bool hasDiskBlockMetaData;
+    CDiskBlockMetaData metadata;
     CBlockIndex *pblockindex = nullptr;
     {
         LOCK(cs_main);
+
         if (mapBlockIndex.count(hash) == 0) {
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
         }
@@ -242,37 +244,50 @@ static bool rest_block(const Config &config, HTTPRequest *req,
                            hashStr + " not available (pruned data)");
         }
 
-        if (!ReadBlockFromDisk(block, pblockindex, config)) {
+
+        stream = StreamSyncBlockFromDisk(*pblockindex);
+        if (!stream) {
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
+        }
+
+        // obtaining data under cs_main lock
+        hasDiskBlockMetaData = pblockindex->nStatus.hasDiskBlockMetaData();
+        if (hasDiskBlockMetaData) {
+            metadata = pblockindex->GetDiskBlockMetaData();
         }
     }
 
-    CDataStream ssBlock(SER_NETWORK,
-                        PROTOCOL_VERSION | RPCSerializationFlags());
-    ssBlock << block;
-
     switch (rf) {
+        /*
+         * When Content-Length HTTP header is NOT set, libevent will automatically use chunked-encoding transfer.
+         * When Content-Length HTTP header is set, no encoding is done by libevent,
+         * but we still read and write response in chunks to avoid bringing whole data in memory.
+        */
         case RF_BINARY: {
-            std::string binaryBlock = ssBlock.str();
+            if (hasDiskBlockMetaData) {
+                req->WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
+            }
             req->WriteHeader("Content-Type", "application/octet-stream");
-            req->WriteReply(HTTP_OK, binaryBlock);
-            return true;
+            req->StartWritingChunks(HTTP_OK);
+            writeBlockChunksAndUpdateMetadata(false, *req, *stream, *pblockindex);
+            break;
         }
 
         case RF_HEX: {
-            std::string strHex = HexStr(ssBlock.begin(), ssBlock.end()) + "\n";
+            if (hasDiskBlockMetaData) {
+                req->WriteHeader("Content-Length", std::to_string(metadata.diskDataSize * 2));
+            }
             req->WriteHeader("Content-Type", "text/plain");
-            req->WriteReply(HTTP_OK, strHex);
-            return true;
+            req->StartWritingChunks(HTTP_OK);
+            writeBlockChunksAndUpdateMetadata(true, *req, *stream, *pblockindex);
+            break;
         }
 
         case RF_JSON: {
-            UniValue objBlock =
-                blockToJSON(config, block, pblockindex, showTxDetails);
-            std::string strJSON = objBlock.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
-            req->WriteReply(HTTP_OK, strJSON);
-            return true;
+            req->StartWritingChunks(HTTP_OK);
+            writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails, *pblockindex);
+            break;
         }
 
         default: {
@@ -282,8 +297,8 @@ static bool rest_block(const Config &config, HTTPRequest *req,
         }
     }
 
-    // not reached
-    // continue to process further HTTP reqs on this cxn
+    req->StopWritingChunks();
+
     return true;
 }
 
@@ -564,7 +579,8 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
     std::vector<bool> hits;
     bitmap.resize((vOutPoints.size() + 7) / 8);
     {
-        LOCK2(cs_main, mempool.cs);
+        LOCK(cs_main);
+        std::shared_lock lock(mempool.smtx);
 
         CCoinsView viewDummy;
         CCoinsViewCache view(&viewDummy);
@@ -582,7 +598,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
             Coin coin;
             bool hit = false;
             if (view.GetCoin(vOutPoints[i], coin) &&
-                !mempool.isSpent(vOutPoints[i])) {
+                !mempool.IsSpentNL(vOutPoints[i])) {
                 hit = true;
                 outs.emplace_back(std::move(coin));
             }

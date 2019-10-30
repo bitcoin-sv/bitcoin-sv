@@ -2,7 +2,7 @@ dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 0)
 define(_CLIENT_VERSION_MINOR, 2)
-define(_CLIENT_VERSION_REVISION, 1)
+define(_CLIENT_VERSION_REVISION, 2)
 define(_CLIENT_VERSION_BUILD, 0)
 define(_COPYRIGHT_YEAR, 2019)
 define(_COPYRIGHT_HOLDERS,[The %s Association])
@@ -178,10 +178,6 @@ else
   AC_SUBST(CLIENT_VERSION_IS_RELEASE, false)
 fi
 
-if test "x$use_asm" = xyes; then
-  AC_DEFINE(USE_ASM, 1, [Define this symbol to build in assembly routines])
-fi
-
 AC_ARG_WITH([system-univalue],
   [AS_HELP_STRING([--with-system-univalue],
   [Build with system UniValue (default is no)])],
@@ -212,7 +208,7 @@ AC_ARG_ENABLE([debug],
 # Enable ASAN
 AC_ARG_ENABLE([asan],
     [AS_HELP_STRING([--enable-asan],
-                    [enable address sanitizer compiler flags (implies --enable-debug, default is no)])],
+                    [enable address sanitizer compiler flags (implies --enable-debug, default is no; implies --enable-asm=no, default is yes)])],
     [enable_asan=$enableval],
     [enable_asan=no])
 
@@ -242,6 +238,7 @@ AX_CHECK_COMPILE_FLAG([-Werror],[CXXFLAG_WERROR="-Werror"],[CXXFLAG_WERROR=""])
 
 if test "x$enable_asan" = xyes; then
 	enable_debug=yes
+  use_asm=no
   asan_failed=no
   AX_CHECK_COMPILE_FLAG([-fsanitize=address],
     [CXXFLAGS="$CXXFLAGS -fsanitize=address"],
@@ -258,6 +255,10 @@ if test "x$enable_asan" = xyes; then
   fi
   # fix linkage in MacOs
   [LIBTOOL_APP_LDFLAGS="$LIBTOOL_APP_LDFLAGS -fsanitize=address"],
+fi
+
+if test "x$use_asm" = xyes; then
+  AC_DEFINE(USE_ASM, 1, [Define this symbol to build in assembly routines])
 fi
 
 if test "x$enable_tsan" = xyes; then
@@ -508,6 +509,7 @@ case $host in
    *linux*)
      TARGET_OS=linux
      LEVELDB_TARGET_FLAGS="-DOS_LINUX"
+     AIO_LIBS="-lrt"
      ;;
    *freebsd*)
      LEVELDB_TARGET_FLAGS="-DOS_FREEBSD"
@@ -1218,6 +1220,7 @@ AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
+AC_SUBST(AIO_LIBS)
 AC_CONFIG_FILES([Makefile src/Makefile doc/man/Makefile share/setup.nsi test/config.ini])
 AC_CONFIG_FILES([contrib/devtools/split-debug.sh],[chmod +x contrib/devtools/split-debug.sh])
 AC_CONFIG_LINKS([test/functional/test_runner.py:test/functional/test_runner.py])

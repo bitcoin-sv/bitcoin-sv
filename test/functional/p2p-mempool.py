@@ -3,11 +3,10 @@
 # Copyright (c) 2019  Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.mininode import *
+from test_framework.mininode import msg_mempool
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import assert_equal
 import time
-import contextlib
 
 # This test checks different cases of handling mempool requests.
 # If a peer is not whitelisted:
@@ -19,6 +18,7 @@ class P2PMempoolTests(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
+        self.num_peers = 1
 
     def setup_network(self):
         self.setup_nodes()
@@ -27,39 +27,17 @@ class P2PMempoolTests(BitcoinTestFramework):
         self.add_nodes(self.num_nodes)
 
     def run_test(self):
-        @contextlib.contextmanager
-        def run_connection(connection, title):
-            logger.debug("setup %s", title)
-
-            connections = [NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], connection)]
-            connection.add_connection(connections[0])
-            thr = NetworkThread()
-            thr.start()
-            connection.wait_for_verack()
-
-            logger.debug("before %s", title)
-            yield
-            logger.debug("after %s", title)
-
-            connections[0].close()
-            del connections
-            thr.join()
-            disconnect_nodes(self.nodes[0],1)
-            self.stop_node(0)
-            logger.debug("finished %s", title)
 
         def runTestWithParams(description, args, expectedReject):
-            self.start_node(0, args)
-            connection = NodeConnCB()
-            with run_connection(connection, description):
+            with self.run_node_with_connections(description, 0, args, self.num_peers) as connections:
                 # request mempool
-                connection.send_message(msg_mempool())
+                connections[0].cb.send_message(msg_mempool())
                 if not expectedReject:
                     time.sleep(1)
                     # mininode must not be disconnected at this point
                     assert_equal(len(self.nodes[0].getpeerinfo()), 1)
                 else:
-                    connection.wait_for_disconnect()
+                    connections[0].cb.wait_for_disconnect()
                     # mininode must be disconnected at this point
                     assert_equal(len(self.nodes[0].getpeerinfo()), 0)
 

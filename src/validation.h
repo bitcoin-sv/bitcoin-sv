@@ -12,13 +12,18 @@
 #endif
 
 #include "amount.h"
+#include "blockstreams.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/consensus.h"
 #include "fs.h"
+#include "mining/journal_change_set.h"
 #include "protocol.h" // For CMessageHeader::MessageMagic
 #include "script/script_error.h"
 #include "sync.h"
+#include "streams.h"
+#include "txn_double_spend_detector.h"
+#include "txn_validation_result.h"
 #include "versionbits.h"
 
 #include <algorithm>
@@ -40,6 +45,7 @@ class CInv;
 class Config;
 class CScriptCheck;
 class CTxMemPool;
+class CTxnHandlers;
 class CTxUndo;
 class CValidationInterface;
 class CValidationState;
@@ -265,6 +271,17 @@ static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
 
+/** Default for treating transactions with P2SH in output as non-standard */
+static const bool DEFAULT_ACCEPT_P2SH = true;
+
+// Flush modes to update on-disk chain state
+enum FlushStateMode {
+    FLUSH_STATE_NONE,
+    FLUSH_STATE_IF_NEEDED,
+    FLUSH_STATE_PERIODIC,
+    FLUSH_STATE_ALWAYS
+};
+
 /**
  * Require that user allocate at least 550MB for block & undo files (blk???.dat
  * and rev???.dat)
@@ -299,6 +316,20 @@ public:
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
     bool shouldMarkChecked() const { return markChecked; }
 };
+
+/**
+ * Verify block without proof-of-work verification.
+ *
+ * If you want to *possibly* get feedback on whether pblock is valid, you must
+ * install a CValidationInterface (see validationinterface.h) - this will have
+ * its BlockChecked method called whenever *any* block completes validation.
+ *
+ * @param[in]   config  The global config.
+ * @param[in]   pblock  The block we want to verify.
+ * @return True if the block is valid.
+ */
+bool VerifyNewBlock(const Config &config,
+                     const std::shared_ptr<const CBlock> pblock);
 
 /**
  * Process an incoming block. This only returns after the best known valid
@@ -386,7 +417,7 @@ void UnloadBlockIndex();
 /**
  * Run an instance of the script checking thread.
  */
-void ThreadScriptCheck();
+void ThreadScriptCheck(int workerNum);
 
 /**
  * Check whether we are doing an initial block download (synchronizing from disk
@@ -423,6 +454,7 @@ bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
  */
 bool ActivateBestChain(
     const Config &config, CValidationState &state,
+    const mining::CJournalChangeSetPtr& changeSet,
     std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 
@@ -433,17 +465,23 @@ Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
 double GuessVerificationProgress(const ChainTxData &data, CBlockIndex *pindex);
 
 /**
- * Mark one block file as pruned.
- */
-void PruneOneBlockFile(const int fileNumber);
-
-/**
- * Actually unlink the specified files
+ * Unlink the specified files and mark associated block indices as pruned
  */
 void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune);
 
 /** Create a new block index entry for a given block hash */
 CBlockIndex *InsertBlockIndex(uint256 hash);
+/**
+ * Update the on-disk chain state.
+ * The caches and indexes are flushed depending on the mode we're called with if
+ * they're too large, if it's been a while since the last write, or always and
+ * in all cases if we're in prune mode and are deleting files.
+ */
+bool FlushStateToDisk(
+    const CChainParams &chainParams,
+    CValidationState &state,
+    FlushStateMode mode,
+    int nManualPruneHeight = 0);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
 /** Prune block files and flush state to disk. */
@@ -458,25 +496,112 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /**
- * (try to) add transaction to memory pool
+ * Limit mempool size.
+ *
+ * @param pool A reference to the mempool
+ * @param changeSet A reference to the Jorunal ChangeSet
+ * @param limit A size limit for txn to remove
+ * @param age Time limit for txn to remove
+ * @return A vector with all TxIds which were removed from the mempool
  */
-bool AcceptToMemoryPool(const Config &config, CTxMemPool &pool,
-                        CValidationState &state, const CTransactionRef &tx,
-                        bool fLimitFree, bool *pfMissingInputs,
-                        bool fOverrideMempoolLimit = false,
-                        const Amount nAbsurdFee = Amount(0));
+std::vector<TxId> LimitMempoolSize(
+    CTxMemPool &pool,
+    const mining::CJournalChangeSetPtr& changeSet,
+    size_t limit,
+    unsigned long age);
+
+/**
+ * Submit transaction to the mempool.
+ *
+ * @param ptx A reference to the transaction
+ * @param entry A valid entry point for the given transaction
+ * @param fTxValidForFeeEstimation A flag to inform if txn is valid for fee estimations.
+ * @param setAncestors  A set of ancestors
+ * @param pool A reference to the mempool
+ * @param state A reference to a state variable
+ * @param changeSet A reference to the Jorunal ChangeSet
+ * @param fLimitMempoolSize A flag to limit a mempool size
+ * @param pnMempoolSize If not null store mempool size after txn is commited
+ * @param pnDynamicMemoryUsage If not null store dynamic memory usage after txn is commited
+ */
+void CommitTxToMempool(
+    const CTransactionRef &ptx,
+    const CTxMemPoolEntry& entry,
+    bool fTxValidForFeeEstimation,
+    CTxMemPool::setEntries& setAncestors,
+    CTxMemPool& pool,
+    CValidationState& state,
+    const mining::CJournalChangeSetPtr& changeSet,
+    bool fLimitMempoolSize=true,
+    size_t* pnMempoolSize=nullptr,
+    size_t* pnDynamicMemoryUsage=nullptr);
+
+/**
+ * The function performs essential checks which need to be fulfilled by a transaction
+ * before submitting to the mempool.
+ *
+ * @param pTxInputData A reference to transaction's details
+ * @param config A reference to a configuration
+ * @param pool A reference to the mempool
+ * @param dsDetector A reference to a double spend detector
+ * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
+ * @return A result of validation.
+ */
+CTxnValResult TxnValidation(
+    const TxInputDataSPtr& pTxInputData,
+    const Config &config,
+    CTxMemPool &pool,
+    TxnDoubleSpendDetectorSPtr dsDetector,
+    bool fReadyForFeeEstimation);
+
+/**
+ * Batch processing support for txns validation.
+ *
+ * @param vTxInputData A vector of txns data
+ * @param config A reference to a configuration
+ * @param pool A reference to the mempool
+ * @param handlers Txn handlers
+ * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
+ * @return A vector of validation results
+ */
+std::vector<CTxnValResult> TxnValidationBatchProcessing(
+    const TxInputDataSPtrRefVec& vTxInputData,
+    const Config &config,
+    CTxMemPool &pool,
+    CTxnHandlers& handlers,
+    bool fReadyForFeeEstimation);
+
+/**
+ * Process validated txn. Submit txn to the mempool if it is valid.
+ *
+ * @param pool A reference to the mempool
+ * @param txStatus A result of validation
+ * @param handlers Txn handlers
+ * @param fLimitMempoolSize A flag to limit a mempool size
+ */
+void ProcessValidatedTxn(
+    CTxMemPool& pool,
+    CTxnValResult& txStatus,
+    CTxnHandlers& handlers,
+    bool fLimitMempoolSize);
+
+/**
+ * Create a tx reject message.
+ *
+ * @param pTxInputData A reference to transaction's details
+ * @param nRejectCode A reject code
+ * @param sRejectReason A reject reason
+ */
+void CreateTxRejectMsgForP2PTxn(
+    const TxInputDataSPtr& pTxInputData,
+    unsigned int nRejectCode,
+    const std::string& sRejectReason);
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
 
-/** Get the BIP9 state for a given deployment at the current tip. */
-ThresholdState VersionBitsTipState(const Consensus::Params &params,
-                                   Consensus::DeploymentPos pos);
-
-/** Get the block height at which the BIP9 deployment switched into the state
- * for the block building on the current tip. */
-int VersionBitsTipStateSinceHeight(const Consensus::Params &params,
-                                   Consensus::DeploymentPos pos);
+/** Check if all conditions are met to apply fee estimation */
+bool IsCurrentForFeeEstimation();
 
 /**
  * Count ECDSA signature operations the old-fashioned (pre-0.6) way
@@ -574,10 +699,15 @@ bool SequenceLocks(const CTransaction &tx, int flags,
  * should not be considered valid if CheckSequenceLocks returns false.
  *
  * See consensus/consensus.h for flag definitions.
+ *
+ * The caller of the method needs to hold the mempool's smtx.
  */
-bool CheckSequenceLocks(const CTransaction &tx, int flags,
-                        LockPoints *lp = nullptr,
-                        bool useExistingLockPoints = false);
+bool CheckSequenceLocks(
+    const CTransaction &tx,
+    const CTxMemPool &pool,
+    int flags,
+    LockPoints *lp = nullptr,
+    bool useExistingLockPoints = false);
 
 /**
  * Closure representing one script verification.
@@ -628,7 +758,13 @@ bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
                        const Config &config);
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
-
+std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+    const CDiskBlockPos& pos, bool calculateDiskBlockMetadata=false);
+std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
+    CBlockIndex& index,
+    int networkVersion);
+std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& index);
+void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata);
 /** Functions for validating blocks and updating the block tree */
 
 /**
@@ -653,14 +789,25 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
 
 /**
  * This is a variant of ContextualCheckTransaction which computes the contextual
- * check for a transaction based on the chain tip.
+ * check for a transaction based on nChainActiveHeight and nMedianTimePast
+ * of the active chain tip (including block flags).
  *
  * See consensus/consensus.h for flag definitions.
+ *
+ * @param config A reference to the configuration
+ * @param tx A reference to the transaction
+ * @param nChainActiveHeight The maximal height in the current active chain
+ * @param nMedianTimePast A median time of the tip for the current active chain
+ * @param state A reference to store a validation state
+ * @param flags Flags assigned to the block
  */
-bool ContextualCheckTransactionForCurrentBlock(const Config &config,
-                                               const CTransaction &tx,
-                                               CValidationState &state,
-                                               int flags = -1);
+bool ContextualCheckTransactionForCurrentBlock(
+    const Config &config,
+    const CTransaction &tx,
+    int nChainActiveHeight,
+    int nMedianTimePast,
+    CValidationState &state,
+    int flags = -1);
 
 /**
  * Check a block is completely valid from start to finish (only works on top of
@@ -732,14 +879,6 @@ extern CBlockTreeDB *pblocktree;
  * This is also true for mempool checks.
  */
 int GetSpendHeight(const CCoinsViewCache &inputs);
-
-extern VersionBitsCache versionbitscache;
-
-/**
- * Determine what nVersion a new block should use.
- */
-int32_t ComputeBlockVersion(const CBlockIndex *pindexPrev,
-                            const Consensus::Params &params);
 
 /**
  * Reject codes greater or equal to this can be returned by AcceptToMemPool for

@@ -15,6 +15,7 @@
 #include "init.h"
 #include "key.h"
 #include "keystore.h"
+#include "mining/journal_builder.h"
 #include "net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
@@ -25,6 +26,7 @@
 #include "script/sign.h"
 #include "timedata.h"
 #include "txmempool.h"
+#include "txn_validator.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -36,6 +38,8 @@
 #include <boost/thread.hpp>
 
 #include <cassert>
+
+using namespace mining;
 
 std::vector<CWalletRef> vpwallets;
 
@@ -1723,13 +1727,22 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
 
     while (pindex) {
         
-        CBlock block;
-        if (ReadBlockFromDisk(block, pindex, GlobalConfig::GetConfig())) {
-            for (size_t posInBlock = 0; posInBlock < block.vtx.size();
-                 ++posInBlock) {
-                AddToWalletIfInvolvingMe(block.vtx[posInBlock], pindex,
-                                         posInBlock, fUpdate);
-            }
+        auto stream = GetDiskBlockStreamReader(pindex->GetBlockPos());
+
+        if (stream)
+        {
+            int posInBlock = 0;
+            do
+            {
+                const CTransaction& transaction = stream->ReadTransaction();
+                AddToWalletIfInvolvingMe(
+                    MakeTransactionRef(transaction),
+                    pindex,
+                    posInBlock,
+                    fUpdate);
+                ++posInBlock;
+            } while(!stream->EndOfStream());
+
             if (!ret) {
                 ret = pindex;
             }
@@ -1772,14 +1785,11 @@ void CWallet::ReacceptWalletTransactions() {
             mapSorted.insert(std::make_pair(wtx.nOrderPos, &wtx));
         }
     }
-
     // Try to add wallet transactions to memory pool.
     for (std::pair<const int64_t, CWalletTx *> &item : mapSorted) {
         CWalletTx &wtx = *(item.second);
-
-        LOCK(mempool.cs);
         CValidationState state;
-        wtx.AcceptToMemoryPool(maxTxFee, state);
+        wtx.SubmitTxToMempool(maxTxFee, state);
     }
 }
 
@@ -1791,11 +1801,11 @@ bool CWalletTx::RelayWalletTransaction(CConnman *connman) {
 
     CValidationState state;
     // GetDepthInMainChain already catches known conflicts.
-    if (InMempool() || AcceptToMemoryPool(maxTxFee, state)) {
+    if (InMempool() || SubmitTxToMempool(maxTxFee, state)) {
         LogPrintf("Relaying wtx %s\n", GetId().ToString());
         if (connman) {
             CInv inv { MSG_TX, GetId() };
-            TxMempoolInfo txinfo { mempool.info(GetId()) };
+            TxMempoolInfo txinfo { mempool.Info(GetId()) };
             connman->EnqueueTransaction( {inv, txinfo} );
             return true;
         }
@@ -1976,17 +1986,15 @@ Amount CWalletTx::GetChange() const {
 }
 
 bool CWalletTx::InMempool() const {
-    LOCK(mempool.cs);
-    if (mempool.exists(GetId())) {
-        return true;
-    }
-
-    return false;
+    return mempool.Exists(GetId());
 }
 
 bool CWalletTx::IsTrusted() const {
     // Quick answer in most cases
-    if (!CheckFinalTx(*this)) {
+    if (!CheckFinalTx(
+           *this,
+            chainActive.Height(),
+            chainActive.Tip()->GetMedianTimePast())) {
         return false;
     }
 
@@ -2209,7 +2217,11 @@ Amount CWallet::GetLegacyBalance(const isminefilter &filter, int minDepth,
     for (const auto &entry : mapWallet) {
         const CWalletTx &wtx = entry.second;
         const int depth = wtx.GetDepthInMainChain();
-        if (depth < 0 || !CheckFinalTx(*wtx.tx) ||
+        if (depth < 0 ||
+            !CheckFinalTx(
+               *wtx.tx,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast()) ||
             wtx.GetBlocksToMaturity() > 0) {
             continue;
         }
@@ -2252,7 +2264,10 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
         const uint256 &wtxid = it->first;
         const CWalletTx *pcoin = &(*it).second;
 
-        if (!CheckFinalTx(*pcoin)) {
+        if (!CheckFinalTx(
+               *pcoin,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast())) {
             continue;
         }
 
@@ -3063,7 +3078,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey,
 
     if (fBroadcastTransactions) {
         // Broadcast
-        if (!wtxNew.AcceptToMemoryPool(maxTxFee, state)) {
+        if (!wtxNew.SubmitTxToMempool(maxTxFee, state)) {
             LogPrintf("CommitTransaction(): Transaction cannot be "
                       "broadcast immediately, %s\n",
                       state.GetRejectReason());
@@ -3121,7 +3136,7 @@ Amount CWallet::GetMinimumFee(unsigned int nTxBytes,
     // User didn't set: use -txconfirmtarget to estimate...
     if (nFeeNeeded == Amount(0)) {
         int estimateFoundTarget = nConfirmTarget;
-        nFeeNeeded = pool.estimateSmartFee(nConfirmTarget, &estimateFoundTarget)
+        nFeeNeeded = pool.EstimateSmartFee(nConfirmTarget, &estimateFoundTarget)
                          .GetFee(nTxBytes);
         // ... unless we don't have enough mempool data for estimatefee, then
         // use fallbackFee.
@@ -4525,8 +4540,28 @@ int CMerkleTx::GetBlocksToMaturity() const {
     return std::max(0, (COINBASE_MATURITY + 1) - GetDepthInMainChain());
 }
 
-bool CMerkleTx::AcceptToMemoryPool(const Amount nAbsurdFee,
+bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
                                    CValidationState &state) {
-    return ::AcceptToMemoryPool(GlobalConfig::GetConfig(), mempool, state, tx, true, nullptr,
-                                false, nAbsurdFee);
+    // Check if g_connman is accessible
+    if (!g_connman) {
+        throw std::runtime_error("Error: P2P functionality missing or disabled");
+    }
+    // Mempool Journal ChangeSet
+    CJournalChangeSetPtr changeSet {
+        mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
+    };
+    // Forward transaction to the validator and wait for results.
+    // To support backward compatibility (of this interface) we need
+    // to wait until the transaction is processed.
+    const auto& txValidator = g_connman->getTxnValidator();
+    state = txValidator->processValidation(
+                            std::make_shared<CTxInputData>(
+                                                TxSource::wallet, // tx source
+                                                tx,           // a pointer to the tx
+                                                GetTime(),    // nAcceptTime
+                                                true,         // fLimitFree
+                                                nAbsurdFee),  // nAbsurdFee
+                            changeSet, // an instance of the mempool journal
+                            true); // fLimitMempoolSize
+    return state.IsValid();
 }

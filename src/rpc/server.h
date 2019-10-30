@@ -9,6 +9,7 @@
 #include "amount.h"
 #include "rpc/protocol.h"
 #include "uint256.h"
+#include "httpserver.h"
 
 #include <cstdint>
 #include <functional>
@@ -245,8 +246,8 @@ extern std::string HelpExampleRpc(const std::string &methodname,
 bool StartRPC();
 void InterruptRPC();
 void StopRPC();
-std::string JSONRPCExecBatch(Config &config, const JSONRPCRequest &req,
-                             const UniValue &vReq);
+void JSONRPCExecBatch(Config &config, const JSONRPCRequest &req,
+                             const UniValue &vReq, HTTPRequest& httpReq);
 void RPCNotifyBlockChange(bool ibd, const CBlockIndex *);
 
 // Retrieves any serialization flags requested in command line argument

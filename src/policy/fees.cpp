@@ -54,7 +54,16 @@ void TxConfirmStats::Record(int blocksToConfirm, double val) {
     if (blocksToConfirm < 1) {
         return;
     }
-    unsigned int bucketindex = bucketMap.lower_bound(val)->second;
+    unsigned int bucketindex;
+    auto iter = bucketMap.lower_bound(val);
+    if (iter == bucketMap.end())
+    {
+        bucketindex = bucketMap.rbegin()->second; // use last element (bucketmap is never empty)
+    }
+    else
+    {
+        bucketindex = iter->second;
+    }
     for (size_t i = blocksToConfirm; i <= curBlockConf.size(); i++) {
         curBlockConf[i - 1][bucketindex]++;
     }
@@ -182,7 +191,13 @@ double TxConfirmStats::EstimateMedianVal(int confTarget, double sufficientTxVal,
                                  "mempool)\n",
              confTarget, requireGreater ? ">" : "<", successBreakPoint,
              requireGreater ? ">" : "<", median, buckets[minBucket],
-             buckets[maxBucket], 100 * nConf / (totalNum + extraNum), nConf,
+             buckets[maxBucket],
+             (
+                totalNum + extraNum != 0
+                ? (100 * nConf / (totalNum + extraNum))
+                : 0
+             ),
+             nConf,
              totalNum, extraNum);
 
     return median;
@@ -277,7 +292,16 @@ void TxConfirmStats::Read(CAutoFile &filein) {
 }
 
 unsigned int TxConfirmStats::NewTx(unsigned int nBlockHeight, double val) {
-    unsigned int bucketindex = bucketMap.lower_bound(val)->second;
+    unsigned int bucketindex;
+    auto iter = bucketMap.lower_bound(val);
+    if (iter == bucketMap.end())
+    {
+        bucketindex = bucketMap.rbegin()->second; // use last element (bucketmap is never empty)
+    }
+    else
+    {
+        bucketindex = iter->second;
+    }
     unsigned int blockIndex = nBlockHeight % unconfTxs.size();
     unconfTxs[blockIndex][bucketindex]++;
     return bucketindex;

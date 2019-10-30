@@ -7,7 +7,7 @@
 
 #include "amount.h"
 #include "consensus/consensus.h"
-#include "validation.h"
+#include "mining/factory.h"
 #include "policy/policy.h"
 #include "script/standard.h"
 #include "validation.h"
@@ -26,20 +26,20 @@ public:
     // used to specify default block size related parameters
     virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) = 0;
     
-    virtual bool SetMaxBlockSize(uint64_t maxBlockSize) = 0;
+    virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
     virtual uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const = 0;
     virtual bool MaxBlockSizeOverridden() const = 0;
     
-    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) = 0;
+    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
     virtual uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const = 0;
     virtual bool MaxGeneratedBlockSizeOverridden() const = 0;
 
-    virtual bool SetBlockSizeActivationTime(int64_t activationTime) = 0;
+    virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
 
-    virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) = 0;
+    virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) = 0;
     virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
 
@@ -74,6 +74,11 @@ public:
     virtual uint64_t GetFactorMaxSendQueuesBytes() const = 0;
     virtual uint64_t GetMaxSendQueuesBytes() const = 0; // calculated based on factorMaxSendQueuesBytes
 
+    virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
+    virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
+
+    virtual void SetAcceptP2SH(bool acceptP2SHIn) = 0;
+    virtual bool GetAcceptP2SH() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -83,20 +88,20 @@ public:
     // Set block size related default. This must be called after constructing GlobalConfig
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override;
 
-    bool SetMaxBlockSize(uint64_t maxBlockSize) override;
+    bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override;
     uint64_t GetMaxBlockSize() const override;
     uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override;
     bool MaxBlockSizeOverridden() const override;
 
-    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) override;
+    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override;
     uint64_t GetMaxGeneratedBlockSize() const override;
     uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override;
     bool MaxGeneratedBlockSizeOverridden() const override;
 
-    bool SetBlockSizeActivationTime(int64_t activationTime) override;
+    bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override;
     int64_t GetBlockSizeActivationTime() const override;
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override;
+    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override;
     uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
 
@@ -131,6 +136,12 @@ public:
     uint64_t GetFactorMaxSendQueuesBytes() const override;
     uint64_t GetMaxSendQueuesBytes() const override;
 
+    void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override;
+    mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override;
+
+    void SetAcceptP2SH(bool acceptP2SHIn) override;
+    bool GetAcceptP2SH() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -164,6 +175,8 @@ private:
     uint64_t limitAncestorSize;
 
     bool testBlockCandidateValidity;
+    mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
+    bool acceptP2SH;
 };
 
 // Dummy for subclassing in unittests
@@ -174,20 +187,30 @@ public:
 
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override {  }
 
-    bool SetMaxBlockSize(uint64_t maxBlockSize) override { return false; }
+    bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override {
+        if (err) *err = "This is dummy config"; 
+        return false; 
+    }
     uint64_t GetMaxBlockSize() const override { return 0; }
     uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override { return 0; }
     bool MaxBlockSizeOverridden() const override { return false; }
 
-    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize) override { return false; };
+    bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override {
+        if (err) *err = "This is dummy config";  
+        return false; 
+    }
     uint64_t GetMaxGeneratedBlockSize() const override { return 0; };
     uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override { return 0; }
     bool MaxGeneratedBlockSizeOverridden() const override { return false; }
 
-    bool SetBlockSizeActivationTime(int64_t activationTime) override { return false; }
+    bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override {
+        if (err) *err = "This is dummy config";  
+        return false; 
+    }
     int64_t GetBlockSizeActivationTime() const override { return 0; }
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage) override {
+    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override {
+        if (err) *err = "This is dummy config";
         return false;
     }
     uint8_t GetBlockPriorityPercentage() const override { return 0; }
@@ -226,9 +249,18 @@ public:
     uint64_t GetFactorMaxSendQueuesBytes() const override { return 0;}
     uint64_t GetMaxSendQueuesBytes() const override { return 0; }
 
+    void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override {}
+    mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override {
+        return mining::CMiningFactory::BlockAssemblerType::LEGACY;
+    }
+
+    void SetAcceptP2SH(bool acceptP2SHIn) override { acceptP2SH = acceptP2SHIn; }
+    bool GetAcceptP2SH() const override { return acceptP2SH; }
+
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
+    bool acceptP2SH { DEFAULT_ACCEPT_P2SH };
 };
 
 #endif

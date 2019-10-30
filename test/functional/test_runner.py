@@ -75,8 +75,8 @@ TEST_PARAMS = {
     "bsv-128Mb-blocks.py": [["--excessiveblocksize=130000000"]],
 
     # Run  automatic block size validation size with default activation time as well as overriden time
-    "bsv-block-size-activation-generated-default.py": [["--blocksizeactivationtime=1563197777"]],
-    "bsv-block-size-activation-default.py": [["--blocksizeactivationtime=1563197777"]]
+    "bsv-block-size-activation-generated-default.py": [["--blocksizeactivationtime={}".format(int(time.time()) + 24 * 60 * 60)]],
+    "bsv-block-size-activation-default.py": [["--blocksizeactivationtime={}".format(int(time.time()) + 24 * 60 * 60)]]
 }
 
 # Used to limit the number of tests, when list of tests is not provided on command line

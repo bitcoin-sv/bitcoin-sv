@@ -44,7 +44,7 @@ def main():
 
 def bctester(testDir, input_basename, buildenv):
     """ Loads and parses the input file, runs all tests and reports results"""
-    input_filename = testDir + "/" + input_basename
+    input_filename = os.path.join(testDir, input_basename)
     raw_data = open(input_filename).read()
     input_data = json.loads(raw_data)
 
@@ -74,8 +74,8 @@ def bctest(testDir, testObj, buildenv):
     are not as expected. Error is caught by bctester() and reported.
     """
     # Get the exec names and arguments
-    execprog = buildenv["BUILDDIR"] + "/src/" + \
-        testObj['exec'] + buildenv["EXEEXT"]
+    execprog = os.path.join(buildenv["BUILDDIR"], "src",
+                            testObj["exec"] + buildenv["EXEEXT"])
     execargs = testObj['args']
     execrun = [execprog] + execargs
 

@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "logging.h"
+#include "util.h"
 
 // Constructor
 template<typename QueueAdaptor>
@@ -39,6 +40,8 @@ CThreadPool<QueueAdaptor>::~CThreadPool()
 template<typename QueueAdaptor>
 void CThreadPool<QueueAdaptor>::worker(size_t n)
 {
+    std::string s = strprintf("bitcoin-worker%d-%s", n, mOwnerStr.c_str());
+    RenameThread(s.c_str());
     LogPrintf("%s ThreadPool thread %d starting\n", mOwnerStr.c_str(), n);
 
     while(mRunning)

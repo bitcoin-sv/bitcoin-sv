@@ -8,7 +8,6 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import p2p_port, disconnect_nodes
 from test_framework.blocktools import create_block, create_coinbase, assert_equal
 
-import contextlib
 import datetime
 
 # This test checks TOOBUSY reject message and behaviour that it triggers.
@@ -34,41 +33,6 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
         return block
 
     def run_test(self):
-        @contextlib.contextmanager
-        def run_connection(title):
-            logger.debug("setup %s", title)
-
-            self.start_node(0)       
-
-            test_nodes = []
-            for i in range(self.num_peers):
-                test_nodes.append(NodeConnCB())
-
-            connections = []
-            for test_node in test_nodes:
-                connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node)
-                connections.append(connection)
-                test_node.add_connection(connection)
-
-            thr = NetworkThread()
-            thr.start()
-            for test_node in test_nodes:
-                test_node.wait_for_verack()
-
-            logger.debug("before %s", title)
-            yield test_nodes
-            logger.debug("after %s", title)
-
-            for connection in connections:
-                connection.close()
-            del connections
-
-            # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
-            thr.join()
-            disconnect_nodes(self.nodes[0],1)
-            self.stop_node(0)
-            logger.debug("finished %s", title)
-
         self.stop_node(0)
 
         askedFor = {}
@@ -82,19 +46,19 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
             # First node that receives GetData should send reject.
             if not rejectSent:
                 rejectSent = True
-                test_node.send_message(msg_reject(message=b"getdata", code=self.REJECT_TOOBUSY, reason=b"node too busy"))
+                conn.send_message(msg_reject(message=b"getdata", code=self.REJECT_TOOBUSY, reason=b"node too busy"))
 
 
-        with run_connection("Scenario 1: sending TOOBUSY reject message with 2 nodes") as test_nodes:
+        with self.run_node_with_connections("Scenario 1: sending TOOBUSY reject message with 2 nodes", 0, [], self.num_peers) as connections:
             block = self.prepareBlock()
 
-            for test_node in test_nodes:
-                test_node.on_getdata = on_getdata
+            for connection in connections:
+                connection.cb.on_getdata = on_getdata
                 headers_message = msg_headers()
                 headers_message.headers = [CBlockHeader(block)]
-                test_node.send_message(headers_message)
-                test_node.wait_for_getdata(block.sha256)
-                test_node.sync_with_ping()
+                connection.cb.send_message(headers_message)
+                connection.cb.wait_for_getdata(block.sha256)
+                connection.cb.sync_with_ping()
 
             for key, value in askedFor.items():
                 assert_equal(value, 1)
@@ -104,22 +68,22 @@ class TooBusyRejectMsgTest(BitcoinTestFramework):
         askedFor = {}
         rejectSent = False
 
-        with run_connection("Scenario 2: sending TOOBUSY reject message with 1 node") as test_nodes:
+        with self.run_node_with_connections("Scenario 2: sending TOOBUSY reject message with 1 node", 0, [], self.num_peers) as connections:
             block = self.prepareBlock()
 
-            test_node = test_nodes[0]
-            test_node.on_getdata = on_getdata
+            connection = connections[0]
+            connection.cb.on_getdata = on_getdata
 
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block)]
 
             begin_test = datetime.datetime.now()
-            test_node.send_message(headers_message)
+            connection.cb.send_message(headers_message)
 
-            test_node.wait_for_getdata(block.sha256)     
-            test_node.last_message["getdata"] = []
+            connection.cb.wait_for_getdata(block.sha256)
+            connection.cb.last_message["getdata"] = []
 
-            test_node.wait_for_getdata(block.sha256)
+            connection.cb.wait_for_getdata(block.sha256)
             end_test = datetime.datetime.now()
             assert(end_test - begin_test > datetime.timedelta(seconds = 5))
 

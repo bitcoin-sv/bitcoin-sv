@@ -109,6 +109,10 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
             return # do not use SkipTest(), since this fails build on Jenkins
 
         node = self.nodes[0]
+
+        # set bitcoind time to be before activation time
+        node.setmocktime(self.activation_time - 3600)
+
         activation_time = self.activation_time
         self.log.info("Using activation time %d " % activation_time)
 

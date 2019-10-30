@@ -22,10 +22,24 @@
 class Config;
 
 /**
- * Maximum length of incoming protocol messages (Currently 2MB).
+ * Maximum length of incoming protocol messages (Currently 2MiB).
  * NB: Messages propagating block content are not subject to this limit.
  */
-static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;
+static const unsigned int MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
+
+/**
+ * By default, size of messages to other peers are limited by this default value.
+ * This limit is raised if a Protoconf message is received from a peer.
+ * Default value is required for compatibility with older versions that do not support Protoconf message.
+**/
+static const unsigned int LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH = 1 * 1024 * 1024;
+
+/**
+ * Maximum size of message that can be send to peer.
+ * If a peer sends Protoconf message with maxRecvPayloadLength larger than MAX_PROTOCOL_SEND_PAYLOAD_LENGTH,
+ * this peer's maxRecvPayloadLength is set to this value.
+**/
+static const unsigned int MAX_PROTOCOL_SEND_PAYLOAD_LENGTH = 2 * MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
 
 /**
  * Message header.
@@ -51,7 +65,7 @@ public:
 
     CMessageHeader(const MessageMagic &pchMessageStartIn);
     CMessageHeader(const MessageMagic &pchMessageStartIn,
-                   const char *pszCommand, unsigned int nMessageSizeIn);
+                   const char *pszCommand, unsigned int nPayloadLengthIn);
 
     std::string GetCommand() const;
     bool IsValid(const Config &config) const;
@@ -64,13 +78,13 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action) {
         READWRITE(FLATDATA(pchMessageStart));
         READWRITE(FLATDATA(pchCommand));
-        READWRITE(nMessageSize);
+        READWRITE(nPayloadLength);
         READWRITE(FLATDATA(pchChecksum));
     }
 
     MessageMagic pchMessageStart;
     char pchCommand[COMMAND_SIZE];
-    uint32_t nMessageSize;
+    uint32_t nPayloadLength;
     uint8_t pchChecksum[CHECKSUM_SIZE];
 };
 
@@ -252,6 +266,11 @@ extern const char *GETBLOCKTXN;
  * @since protocol version 70014 as described by BIP 152
  */
 extern const char *BLOCKTXN;
+/**
+ * Contains a CProtoconf.
+ * Sent right after VERACK message, regardless of remote peer's protocol version
+ */
+extern const char *PROTOCONF;
 
 /**
  * Indicate if the message is used to transmit the content of a block.
@@ -393,6 +412,43 @@ public:
         auto k = GetKind();
         return k == MSG_BLOCK || k == MSG_FILTERED_BLOCK ||
                k == MSG_CMPCT_BLOCK;
+    }
+
+    /* Estimate the maximum number of INV elements that will fit in given payload.
+     * The result is pessimistic, because we assume that 8 bytes are required to encode number
+     * of elements, which is only true for very large numbers.
+     * @param maxPayloadLength : maximal size of INV message *payload* (without header) that a peer can receive (in bytes)
+     * @ return : number of elements in INV message that corresponds to maxPayloadLength 
+
+    **/
+    static constexpr uint32_t estimateMaxInvElements(unsigned int maxPayloadLength) {
+
+        return (maxPayloadLength - 8 /* number of elements */) / (4 /* type */ + 32 /* hash size */);
+    } 
+
+};
+
+/** protoconf message data **/
+class CProtoconf {
+
+public:
+    uint64_t numberOfFields;
+    uint32_t maxRecvPayloadLength;
+public:
+    CProtoconf() : numberOfFields(1), maxRecvPayloadLength(0) {}
+    /** numberOfFields is set to 1, increment if new properties are added **/
+    CProtoconf(unsigned int maxRecvPayloadLengthIn) : numberOfFields(1), maxRecvPayloadLength(maxRecvPayloadLengthIn) {}
+
+    ADD_SERIALIZE_METHODS;
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream &s, Operation ser_action) {
+        READWRITECOMPACTSIZE(numberOfFields);
+        if (numberOfFields > 0) {
+            READWRITE(maxRecvPayloadLength);
+        } else {
+            throw std::ios_base::failure("Invalid deserialization. Number of fields specified in protoconf is equal to 0.");
+        }
+        
     }
 };
 

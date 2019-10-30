@@ -765,8 +765,12 @@ static UniValue getreceivedbyaddress(const Config &config,
 
         CValidationState state;
         if (wtx.IsCoinBase() ||
-            !ContextualCheckTransactionForCurrentBlock(config, *wtx.tx,
-                                                       state)) {
+            !ContextualCheckTransactionForCurrentBlock(
+                config,
+               *wtx.tx,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast(),
+                state)) {
             continue;
         }
 
@@ -835,8 +839,12 @@ static UniValue getreceivedbyaccount(const Config &config,
         const CWalletTx &wtx = pairWtx.second;
         CValidationState state;
         if (wtx.IsCoinBase() ||
-            !ContextualCheckTransactionForCurrentBlock(config, *wtx.tx,
-                                                       state)) {
+            !ContextualCheckTransactionForCurrentBlock(
+                config,
+               *wtx.tx,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast(),
+                state)) {
             continue;
         }
 
@@ -1377,8 +1385,14 @@ struct tallyitem {
     }
 };
 
-static UniValue ListReceived(const Config &config, CWallet *const pwallet,
-                             const UniValue &params, bool fByAccounts) {
+static UniValue ListReceived(
+    const Config &config,
+    CWallet *const pwallet,
+    const UniValue &params,
+    bool fByAccounts,
+    int nChainActiveHeight,
+    int nMedianTimePast) {
+
     // Minimum confirmations
     int nMinDepth = 1;
     if (params.size() > 0) {
@@ -1403,8 +1417,12 @@ static UniValue ListReceived(const Config &config, CWallet *const pwallet,
 
         CValidationState state;
         if (wtx.IsCoinBase() ||
-            !ContextualCheckTransactionForCurrentBlock(config, *wtx.tx,
-                                                       state)) {
+            !ContextualCheckTransactionForCurrentBlock(
+                config,
+               *wtx.tx,
+                nChainActiveHeight,
+                nMedianTimePast,
+                state)) {
             continue;
         }
 
@@ -1559,7 +1577,13 @@ static UniValue listreceivedbyaddress(const Config &config,
     }
 
     LOCK2(cs_main, pwallet->cs_wallet);
-    return ListReceived(config, pwallet, request.params, false);
+    return ListReceived(
+                config,
+                pwallet,
+                request.params,
+                false,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast());
 }
 
 static UniValue listreceivedbyaccount(const Config &config,
@@ -1606,7 +1630,13 @@ static UniValue listreceivedbyaccount(const Config &config,
 
     LOCK2(cs_main, pwallet->cs_wallet);
 
-    return ListReceived(config, pwallet, request.params, true);
+    return ListReceived(
+                config,
+                pwallet,
+                request.params,
+                true,
+                chainActive.Height(),
+                chainActive.Tip()->GetMedianTimePast());
 }
 
 static void MaybePushAddress(UniValue &entry, const CTxDestination &dest) {

@@ -8,6 +8,7 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+#include <string>
 
 BOOST_FIXTURE_TEST_SUITE(config_tests, BasicTestingSetup)
 
@@ -30,13 +31,20 @@ BOOST_AUTO_TEST_CASE(max_block_size) {
     config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
     // Too small.
-    BOOST_CHECK(!config.SetMaxBlockSize(0));
-    BOOST_CHECK(!config.SetMaxBlockSize(12345));
+    std::string err = "";
+    BOOST_CHECK(!config.SetMaxBlockSize(0, &err));
+    BOOST_CHECK(!err.empty());
+    err = "";
+    BOOST_CHECK(!config.SetMaxBlockSize(12345, &err));
+    BOOST_CHECK(!err.empty());
     BOOST_CHECK(!config.SetMaxBlockSize(LEGACY_MAX_BLOCK_SIZE - 1));
     BOOST_CHECK(!config.SetMaxBlockSize(LEGACY_MAX_BLOCK_SIZE));
 
+
     // LEGACY_MAX_BLOCK_SIZE + 1
-    BOOST_CHECK(config.SetMaxBlockSize(LEGACY_MAX_BLOCK_SIZE + 1));
+    err = "";
+    BOOST_CHECK(config.SetMaxBlockSize(LEGACY_MAX_BLOCK_SIZE + 1, &err));
+    BOOST_CHECK(err.empty());
     BOOST_CHECK_EQUAL(config.GetMaxBlockSize(), LEGACY_MAX_BLOCK_SIZE + 1);
 
     // 2MB

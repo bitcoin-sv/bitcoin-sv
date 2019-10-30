@@ -283,7 +283,8 @@ static void MutateTxAddOutAddr(CMutableTransaction &tx,
     std::string strAddr = vStrInputParts[1];
     CTxDestination destination = DecodeDestination(strAddr, chainParams);
     if (!IsValidDestination(destination)) {
-        throw std::runtime_error("invalid TX output address");
+        throw std::runtime_error("invalid TX output address or specific chain "
+                                 "setting missing e.g -regtest");
     }
     CScript scriptPubKey = GetScriptForDestination(destination);
 
@@ -422,7 +423,7 @@ static void MutateTxAddOutData(CMutableTransaction &tx,
 
     std::vector<uint8_t> data = ParseHex(strData);
 
-    CTxOut txout(value, CScript() << OP_RETURN << data);
+    CTxOut txout(value, CScript() << OP_FALSE << OP_RETURN << data);
     tx.vout.push_back(txout);
 }
 

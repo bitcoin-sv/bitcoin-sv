@@ -17,7 +17,7 @@ add_executable(bench_bitcoin
         ccoins_caching.cpp
         checkblock.cpp
         checkqueue.cpp
-        coin_selection.cpp
+        $<$<BOOL:${BUILD_BITCOIN_WALLET}>:coin_selection.cpp>
         crypto_hash.cpp
         lockedpool.cpp
         mempool_eviction.cpp
@@ -34,4 +34,5 @@ target_link_libraries(bench_bitcoin
         leveldb
         memenv
         secp256k1
-        univalue)
+        univalue
+        $<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux

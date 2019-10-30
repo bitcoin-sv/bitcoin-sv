@@ -66,7 +66,9 @@ class BSVBlockSizeActivation(ComparisonTestFramework):
         block = self.chain.next_block
 
         # Create a new block
-        block(0)
+        blk = block(0)
+        blk.nTime = activation_time - 3600
+        self.chain.update_block(0, [])
         self.chain.save_spendable_output()
         yield self.accepted()
 
@@ -122,7 +124,7 @@ class BSVBlockSizeActivation(ComparisonTestFramework):
 
         # block of maximal size
         block(17, spend=out[16], block_size=DEFAULT_MAX_BLOCK_SIZE_AFTER)
-        yield self.accepted()
+        yield self.accepted(sync_timeout=600)
 
         # Oversized blocks will cause us to be disconnected
         assert(not self.test.test_nodes[0].closed)

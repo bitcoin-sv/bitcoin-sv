@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "mining/journal_change_set.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "txmempool.h"
@@ -11,6 +12,11 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+
+namespace
+{
+    mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+}
 
 BOOST_FIXTURE_TEST_SUITE(policyestimator_tests, BasicTestingSetup)
 
@@ -59,12 +65,13 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
                 // make transaction unique
                 tx.vin[0].nSequence = 10000 * blocknum + 100 * j + k;
                 TxId txid = tx.GetId();
-                mpool.addUnchecked(txid,
+                mpool.AddUnchecked(txid,
                                    entry.Fee(feeV[j])
                                        .Time(GetTime())
                                        .Priority(0)
                                        .Height(blocknum)
-                                       .FromTx(tx, &mpool));
+                                       .FromTx(tx, &mpool),
+                                   nullChangeSet);
                 txIds[j].push_back(txid);
             }
         }
@@ -75,39 +82,39 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
             // 1/10 blocks add lowest fee transactions
             size_t i = txIds.size() - h - 1;
             while (txIds[i].size()) {
-                CTransactionRef ptx = mpool.get(txIds[i].back());
+                CTransactionRef ptx = mpool.Get(txIds[i].back());
                 if (ptx) {
                     block.push_back(ptx);
                 }
                 txIds[i].pop_back();
             }
         }
-        mpool.removeForBlock(block, ++blocknum);
+        mpool.RemoveForBlock(block, ++blocknum, nullChangeSet);
         block.clear();
         if (blocknum == 30) {
             // At this point we should need to combine 5 buckets to get enough
             // data points. So estimateFee(1,2,3) should fail and estimateFee(4)
             // should return somewhere around 8*baserate.  estimateFee(4) %'s
             // are 100,100,100,100,90 = average 98%
-            BOOST_CHECK(mpool.estimateFee(1) == CFeeRate(Amount(0)));
-            BOOST_CHECK(mpool.estimateFee(2) == CFeeRate(Amount(0)));
-            BOOST_CHECK(mpool.estimateFee(3) == CFeeRate(Amount(0)));
-            BOOST_CHECK(mpool.estimateFee(4).GetFeePerK() <
+            BOOST_CHECK(mpool.EstimateFee(1) == CFeeRate(Amount(0)));
+            BOOST_CHECK(mpool.EstimateFee(2) == CFeeRate(Amount(0)));
+            BOOST_CHECK(mpool.EstimateFee(3) == CFeeRate(Amount(0)));
+            BOOST_CHECK(mpool.EstimateFee(4).GetFeePerK() <
                         8 * baseRate.GetFeePerK() + deltaFee);
-            BOOST_CHECK(mpool.estimateFee(4).GetFeePerK() >
+            BOOST_CHECK(mpool.EstimateFee(4).GetFeePerK() >
                         8 * baseRate.GetFeePerK() - deltaFee);
             int answerFound;
-            BOOST_CHECK(mpool.estimateSmartFee(1, &answerFound) ==
-                            mpool.estimateFee(4) &&
+            BOOST_CHECK(mpool.EstimateSmartFee(1, &answerFound) ==
+                            mpool.EstimateFee(4) &&
                         answerFound == 4);
-            BOOST_CHECK(mpool.estimateSmartFee(3, &answerFound) ==
-                            mpool.estimateFee(4) &&
+            BOOST_CHECK(mpool.EstimateSmartFee(3, &answerFound) ==
+                            mpool.EstimateFee(4) &&
                         answerFound == 4);
-            BOOST_CHECK(mpool.estimateSmartFee(4, &answerFound) ==
-                            mpool.estimateFee(4) &&
+            BOOST_CHECK(mpool.EstimateSmartFee(4, &answerFound) ==
+                            mpool.EstimateFee(4) &&
                         answerFound == 4);
-            BOOST_CHECK(mpool.estimateSmartFee(8, &answerFound) ==
-                            mpool.estimateFee(8) &&
+            BOOST_CHECK(mpool.EstimateSmartFee(8, &answerFound) ==
+                            mpool.EstimateFee(8) &&
                         answerFound == 8);
         }
     }
@@ -120,7 +127,7 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
     // highest feerate has 100% chance of being included by 2 blocks, so
     // estimateFee(2) should return 9*baseRate etc...
     for (int i = 1; i < 10; i++) {
-        origFeeEst.push_back(mpool.estimateFee(i).GetFeePerK());
+        origFeeEst.push_back(mpool.EstimateFee(i).GetFeePerK());
         // Fee estimates should be monotonically decreasing
         if (i > 2) {
             BOOST_CHECK(origFeeEst[i - 1] <= origFeeEst[i - 2]);
@@ -140,14 +147,14 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
     // change. We haven't decayed the moving average enough so we still have
     // enough data points in every bucket
     while (blocknum < 250) {
-        mpool.removeForBlock(block, ++blocknum);
+        mpool.RemoveForBlock(block, ++blocknum, nullChangeSet);
     }
 
-    BOOST_CHECK(mpool.estimateFee(1) == CFeeRate(Amount(0)));
+    BOOST_CHECK(mpool.EstimateFee(1) == CFeeRate(Amount(0)));
     for (int i = 2; i < 10; i++) {
-        BOOST_CHECK(mpool.estimateFee(i).GetFeePerK() <
+        BOOST_CHECK(mpool.EstimateFee(i).GetFeePerK() <
                     origFeeEst[i - 1] + deltaFee);
-        BOOST_CHECK(mpool.estimateFee(i).GetFeePerK() >
+        BOOST_CHECK(mpool.EstimateFee(i).GetFeePerK() >
                     origFeeEst[i - 1] - deltaFee);
     }
 
@@ -160,24 +167,25 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
             for (int k = 0; k < 4; k++) {
                 tx.vin[0].nSequence = 10000 * blocknum + 100 * j + k;
                 TxId txid = tx.GetId();
-                mpool.addUnchecked(txid,
+                mpool.AddUnchecked(txid,
                                    entry.Fee(feeV[j])
                                        .Time(GetTime())
                                        .Priority(0)
                                        .Height(blocknum)
-                                       .FromTx(tx, &mpool));
+                                       .FromTx(tx, &mpool),
+                                   nullChangeSet);
                 txIds[j].push_back(txid);
             }
         }
-        mpool.removeForBlock(block, ++blocknum);
+        mpool.RemoveForBlock(block, ++blocknum, nullChangeSet);
     }
 
     int answerFound;
     for (int i = 1; i < 10; i++) {
-        BOOST_CHECK(mpool.estimateFee(i) == CFeeRate(Amount(0)) ||
-                    mpool.estimateFee(i).GetFeePerK() >
+        BOOST_CHECK(mpool.EstimateFee(i) == CFeeRate(Amount(0)) ||
+                    mpool.EstimateFee(i).GetFeePerK() >
                         origFeeEst[i - 1] - deltaFee);
-        Amount a1 = mpool.estimateSmartFee(i, &answerFound).GetFeePerK();
+        Amount a1 = mpool.EstimateSmartFee(i, &answerFound).GetFeePerK();
         Amount a2 = origFeeEst[answerFound - 1] - deltaFee;
         BOOST_CHECK(a1 > a2);
     }
@@ -186,18 +194,18 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
     // Estimates should still not be below original
     for (size_t j = 0; j < txIds.size(); j++) {
         while (txIds[j].size()) {
-            CTransactionRef ptx = mpool.get(txIds[j].back());
+            CTransactionRef ptx = mpool.Get(txIds[j].back());
             if (ptx) {
                 block.push_back(ptx);
             }
             txIds[j].pop_back();
         }
     }
-    mpool.removeForBlock(block, 265);
+    mpool.RemoveForBlock(block, 265, nullChangeSet);
     block.clear();
-    BOOST_CHECK(mpool.estimateFee(1) == CFeeRate(Amount(0)));
+    BOOST_CHECK(mpool.EstimateFee(1) == CFeeRate(Amount(0)));
     for (int i = 2; i < 10; i++) {
-        BOOST_CHECK(mpool.estimateFee(i).GetFeePerK() >
+        BOOST_CHECK(mpool.EstimateFee(i).GetFeePerK() >
                     origFeeEst[i - 1] - deltaFee);
     }
 
@@ -210,41 +218,43 @@ BOOST_AUTO_TEST_CASE(BlockPolicyEstimates) {
             for (int k = 0; k < 4; k++) {
                 tx.vin[0].nSequence = 10000 * blocknum + 100 * j + k;
                 TxId txid = tx.GetId();
-                mpool.addUnchecked(txid,
+                mpool.AddUnchecked(txid,
                                    entry.Fee(feeV[j])
                                        .Time(GetTime())
                                        .Priority(0)
                                        .Height(blocknum)
-                                       .FromTx(tx, &mpool));
-                CTransactionRef ptx = mpool.get(txid);
+                                       .FromTx(tx, &mpool),
+                                   nullChangeSet);
+                CTransactionRef ptx = mpool.Get(txid);
                 if (ptx) {
                     block.push_back(ptx);
                 }
             }
         }
-        mpool.removeForBlock(block, ++blocknum);
+        mpool.RemoveForBlock(block, ++blocknum, nullChangeSet);
         block.clear();
     }
-    BOOST_CHECK(mpool.estimateFee(1) == CFeeRate(Amount(0)));
+    BOOST_CHECK(mpool.EstimateFee(1) == CFeeRate(Amount(0)));
     for (int i = 2; i < 10; i++) {
-        BOOST_CHECK(mpool.estimateFee(i).GetFeePerK() <
+        BOOST_CHECK(mpool.EstimateFee(i).GetFeePerK() <
                     origFeeEst[i - 1] - deltaFee);
     }
 
     // Test that if the mempool is limited, estimateSmartFee won't return a
     // value below the mempool min
-    mpool.addUnchecked(
+    mpool.AddUnchecked(
         tx.GetId(),
         entry.Fee(feeV[5]).Time(GetTime()).Priority(0).Height(blocknum).FromTx(
-            tx, &mpool));
+            tx, &mpool),
+        nullChangeSet);
     // evict that transaction which should set a mempool min fee of
     // minRelayTxFee + feeV[5]
-    mpool.TrimToSize(1);
+    mpool.TrimToSize(1, nullChangeSet);
     BOOST_CHECK(mpool.GetMinFee(1).GetFeePerK() > feeV[5]);
     for (int i = 1; i < 10; i++) {
-        BOOST_CHECK(mpool.estimateSmartFee(i).GetFeePerK() >=
-                    mpool.estimateFee(i).GetFeePerK());
-        BOOST_CHECK(mpool.estimateSmartFee(i).GetFeePerK() >=
+        BOOST_CHECK(mpool.EstimateSmartFee(i).GetFeePerK() >=
+                    mpool.EstimateFee(i).GetFeePerK());
+        BOOST_CHECK(mpool.EstimateSmartFee(i).GetFeePerK() >=
                     mpool.GetMinFee(1).GetFeePerK());
     }
 }

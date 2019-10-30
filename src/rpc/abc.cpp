@@ -56,22 +56,48 @@ static UniValue setexcessiveblock(Config &config,
         ebs = boost::lexical_cast<uint64_t>(temp);
     }
 
-    // Do not allow maxBlockSize to be set below historic 1MB limit
-    if (ebs <= LEGACY_MAX_BLOCK_SIZE)
-        throw JSONRPCError(
-            RPC_INVALID_PARAMETER,
-            std::string(
-                "Invalid parameter, excessiveblock must be larger than ") +
-                std::to_string(LEGACY_MAX_BLOCK_SIZE));
-
     // Set the new max block size.
-    if (!config.SetMaxBlockSize(ebs)) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Unexpected error");
+    std::string err("Unexpected error");
+    if ( !config.SetMaxBlockSize(ebs, &err)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, err);
     }
 
     // settingsToUserAgentString();
     std::ostringstream ret;
     ret << "Excessive Block set to " << ebs << " bytes.";
+    return UniValue(ret.str());
+}
+
+static UniValue setblockmaxsize(Config &config,
+                                const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 1) {
+        throw std::runtime_error(
+            "setblockmaxsize blockSize\n"
+            "\nSets maximum size of produced block."
+            "\nResult\n"
+            "  blockSize (integer) block size in bytes\n"
+            "\nExamples:\n" +
+            HelpExampleCli("setblockmaxsize", "") +
+            HelpExampleRpc("setblockmaxsize", ""));
+    }
+
+    uint64_t mbs = 0;
+    if (request.params[0].isNum()) {
+        mbs = request.params[0].get_int64();
+    } else {
+        std::string temp = request.params[0].get_str();
+        if (temp[0] == '-') boost::throw_exception(boost::bad_lexical_cast());
+        mbs = boost::lexical_cast<uint64_t>(temp);
+    }
+
+    // Set the new max block size.
+    std::string err("Unexpected error");
+    if (!config.SetMaxGeneratedBlockSize(mbs, &err)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, err);
+    }
+    
+    std::ostringstream ret;
+    ret << "Maximal generated block size set to " << mbs << " bytes.";
     return UniValue(ret.str());
 }
 
@@ -81,6 +107,7 @@ static const CRPCCommand commands[] = {
     //  ------------------- ------------------------  ----------------------  ----------
     { "network",            "getexcessiveblock",      getexcessiveblock,      true, {}},
     { "network",            "setexcessiveblock",      setexcessiveblock,      true, {"maxBlockSize"}},
+    { "network",            "setblockmaxsize",        setblockmaxsize,        true, {"maxBlockSize"}},
 };
 // clang-format on
 

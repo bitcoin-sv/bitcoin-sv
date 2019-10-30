@@ -275,6 +275,7 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         for i in range(num_transactions):
             txid = node.sendtoaddress(address, 0.1)
+            test_node.sync_with_ping()
             hex_tx = node.gettransaction(txid)["hex"]
             tx = FromHex(CTransaction(), hex_tx)
 
@@ -481,7 +482,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         self.utxos.append(
             [block.vtx[-1].sha256, 0, block.vtx[-1].vout[0].nValue])
         test_node.send_and_ping(msg_tx(block.vtx[1]))
-        assert(block.vtx[1].hash in node.getrawmempool())
+        wait_until(lambda: block.vtx[1].hash in node.getrawmempool(), timeout=120)
 
         # Prefill 4 out of the 6 transactions, and verify that only the one
         # that was not in the mempool is requested.
@@ -502,9 +503,8 @@ class CompactBlocksTest(BitcoinTestFramework):
             test_node.send_message(msg_tx(tx))
         test_node.sync_with_ping()
         # Make sure all transactions were accepted.
-        mempool = node.getrawmempool()
         for tx in block.vtx[1:]:
-            assert(tx.hash in mempool)
+            wait_until(lambda: tx.hash in node.getrawmempool(), timeout=120)
 
         # Clear out last request.
         with mininode_lock:
@@ -533,9 +533,8 @@ class CompactBlocksTest(BitcoinTestFramework):
             test_node.send_message(msg_tx(tx))
         test_node.sync_with_ping()
         # Make sure all transactions were accepted.
-        mempool = node.getrawmempool()
         for tx in block.vtx[1:6]:
-            assert(tx.hash in mempool)
+            wait_until(lambda: tx.hash in node.getrawmempool(), timeout=120)
 
         # Send compact block
         comp_block = HeaderAndShortIDs()
@@ -757,9 +756,8 @@ class CompactBlocksTest(BitcoinTestFramework):
         for tx in block.vtx[1:]:
             delivery_peer.send_message(msg_tx(tx))
         delivery_peer.sync_with_ping()
-        mempool = node.getrawmempool()
         for tx in block.vtx[1:]:
-            assert(tx.hash in mempool)
+            wait_until(lambda: tx.hash in node.getrawmempool(), timeout=120)
 
         delivery_peer.send_and_ping(msg_cmpctblock(cmpct_block.to_p2p()))
         assert_equal(int(node.getbestblockhash(), 16), block.sha256)

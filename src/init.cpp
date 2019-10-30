@@ -22,6 +22,7 @@
 #include "httprpc.h"
 #include "httpserver.h"
 #include "key.h"
+#include "mining/journal_builder.h"
 #include "mining/legacy.h"
 #include "net.h"
 #include "net_processing.h"
@@ -37,6 +38,8 @@
 #include "torcontrol.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "txn_validation_config.h"
+#include "txn_validator.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -53,11 +56,14 @@
 #include <cstdint>
 #include <cstdio>
 #include <memory>
+#include <cinttypes>
+#include <chrono>
 
 #ifndef WIN32
 #include <signal.h>
 #endif
 
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -201,7 +207,15 @@ void Shutdown() {
     MapPort(false);
     UnregisterValidationInterface(peerLogic.get());
     peerLogic.reset();
-    g_connman.reset();
+
+    if (g_connman) {
+        // call Stop first as CConnman members are using g_connman global
+        // variable and they must be shut down before the variable is reset to
+        // nullptr (which happens before the destructor is called making Stop
+        // call inside CConnman destructor too late)
+        g_connman->Stop();
+        g_connman.reset();
+    }
 
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
@@ -381,10 +395,6 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-loadblock=<file>",
         _("Imports blocks from external blk000??.dat file on startup"));
-    strUsage += HelpMessageOpt(
-        "-maxorphantx=<n>", strprintf(_("Keep at most <n> unconnectable "
-                                        "transactions in memory (default: %u)"),
-                                      DEFAULT_MAX_ORPHAN_TRANSACTIONS));
     strUsage += HelpMessageOpt("-maxmempool=<n>",
                                strprintf(_("Keep the transaction memory pool "
                                            "below <n> megabytes (default: %u)"),
@@ -408,11 +418,6 @@ std::string HelpMessage(HelpMessageMode mode) {
                        strprintf(_("Whether to save the mempool on shutdown "
                                    "and load on restart (default: %u)"),
                                  DEFAULT_PERSIST_MEMPOOL));
-    strUsage += HelpMessageOpt(
-        "-blockreconstructionextratxn=<n>",
-        strprintf(_("Extra transactions to keep in memory for compact block "
-                    "reconstructions (default: %u)"),
-                  DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN));
     strUsage += HelpMessageOpt(
         "-par=<n>",
         strprintf(_("Set the number of script verification threads (%u to %d, "
@@ -717,9 +722,6 @@ std::string HelpMessage(HelpMessageMode mode) {
                       "more than <n> kilobytes of in-mempool descendants "
                       "(default: %u).",
                       DEFAULT_DESCENDANT_SIZE_LIMIT));
-        strUsage += HelpMessageOpt("-bip9params=deployment:start:end",
-                                   "Use given start/end times for specified "
-                                   "BIP9 deployment (regtest-only)");
     }
     strUsage += HelpMessageOpt(
         "-debug=<category>",
@@ -741,6 +743,10 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-help-debug",
         _("Show all debugging options (usage: --help -help-debug)"));
+    strUsage += HelpMessageOpt(
+        "-debugp2pthreadstalls",
+        _("Log P2P requests that stall request processing loop for longer than "
+          "specified milliseconds (default: disabled)"));
     strUsage += HelpMessageOpt(
         "-logips",
         strprintf(_("Include IP addresses in debug output (default: %d)"),
@@ -865,8 +871,8 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
         strprintf(_("Set maximum block size in bytes we will mine. "
-                    "Must be less than or equal the hard maximum block size limit "
-                    "as set by -excessiveblocksize. If not specified, the following defaults are used: "
+                    "Size of the mined block will never exceed the maximum block size we will accept (-excessiveblocksize). "
+                    "If not specified, the following defaults are used: "
                     "Mainnet: %d before %s and %d after, "
                     "Testnet: %d before %s and %d after."),
                     defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore,
@@ -895,6 +901,12 @@ std::string HelpMessage(HelpMessageMode mode) {
                            strprintf(_("Perform validity test on block candidates. Defaults: "
                            "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
     }
+
+    strUsage += HelpMessageOpt(
+        "-blockassembler=<type>",
+        strprintf(_("Set the type of block assembler to use for mining. Supported options are "
+                    "LEGACY or JOURNALING. (default: %s)"),
+                  enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
 
     strUsage += HelpMessageGroup(_("RPC server options:"));
     strUsage += HelpMessageOpt("-server",
@@ -975,6 +987,35 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-invalidheaderfreq=<n>",
          strprintf("Set the limit on the number of message headers transmitted from the local node over a given time period (default: %d)",
            DEFAULT_INVALID_HEADER_FREQUENCY)) ;
+
+    /** COrphanTxns */
+    strUsage += HelpMessageGroup(_("Orphan txns config :"));
+    strUsage += HelpMessageOpt(
+        "-blockreconstructionextratxn=<n>",
+        strprintf(_("Extra transactions to keep in memory for compact block "
+                    "reconstructions (default: %u)"),
+            COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN));
+    strUsage += HelpMessageOpt(
+        "-maxorphantx=<n>",
+        strprintf(_("Keep at most <n> unconnectable "
+                    "transactions in memory (default: %u)"),
+            COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+    strUsage += HelpMessageOpt(
+        "-maxcollectedoutpoints=<n>",
+        strprintf(_("Keep at most <n> collected "
+                    "outpoints in memory (default: %u)"),
+            COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS));
+
+    /** TxnValidator */
+    strUsage += HelpMessageGroup(_("TxnValidator options:"));
+    strUsage += HelpMessageOpt(
+        "-txnspertaskthreshold=<n>",
+        strprintf("Set the limit on the min number of txns per task (default: %d)",
+            DEFAULT_TXNS_PER_TASK_THRESHOLD)) ;
+    strUsage += HelpMessageOpt(
+        "-txnvalidationasynchrunfreq=<n>",
+        strprintf("Set run frequency in asynchronous mode (default: %dms)",
+            CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS)) ;
 
     return strUsage;
 }
@@ -1126,7 +1167,8 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
         // scan for better chains in the block chain database, that are not yet
         // connected in the active best chain
         CValidationState state;
-        if (!ActivateBestChain(config, state)) {
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
+        if (!ActivateBestChain(config, state, changeSet)) {
             LogPrintf("Failed to connect best block");
             StartShutdown();
         }
@@ -1388,9 +1430,8 @@ bool AppInitParameterInteraction(Config &config) {
     // stop program execution and warn the user with a proper error message
     const int64_t blkprio = gArgs.GetArg("-blockprioritypercentage",
                                          DEFAULT_BLOCK_PRIORITY_PERCENTAGE);
-    if (!config.SetBlockPriorityPercentage(blkprio)) {
-        return InitError(_("Block priority percentage has to belong to the "
-                           "[0..100] interval."));
+    if (std::string err; !config.SetBlockPriorityPercentage(blkprio, &err)) {
+        return InitError(err);
     }
 
     // Make sure enough file descriptors are available
@@ -1486,7 +1527,7 @@ bool AppInitParameterInteraction(Config &config) {
             0),
         1000000);
     if (ratio != 0) {
-        mempool.setSanityCheck(1.0 / ratio);
+        mempool.SetSanityCheck(1.0 / ratio);
     }
     fCheckBlockIndex = gArgs.GetBoolArg("-checkblockindex",
                                         chainparams.DefaultConsistencyChecks());
@@ -1547,11 +1588,8 @@ bool AppInitParameterInteraction(Config &config) {
     if(gArgs.IsArgSet("-excessiveblocksize")) {
         const uint64_t nProposedExcessiveBlockSize =
             gArgs.GetArg("-excessiveblocksize", 0 /*not used*/ );
-        if (!config.SetMaxBlockSize(nProposedExcessiveBlockSize)) {
-            return InitError(strprintf(
-                _("Excessive block size must be > %d"),
-                LEGACY_MAX_BLOCK_SIZE
-            ));
+        if (std::string err; !config.SetMaxBlockSize(nProposedExcessiveBlockSize, &err)) {
+            return InitError(err);
         }
     }
 
@@ -1564,10 +1602,8 @@ bool AppInitParameterInteraction(Config &config) {
     if(gArgs.IsArgSet("-blockmaxsize")) {
         const uint64_t nProposedMaxGeneratedBlockSize =
             gArgs.GetArg("-blockmaxsize", 0 /* not used*/);
-        if (!config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize)) {
-            auto msg = _("Max generated block size (blockmaxsize) cannot exceed "
-                "the excessive block size (excessiveblocksize)");
-            return InitError(msg);
+        if (std::string err; !config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize, &err)) {
+            return InitError(err);
         }
     }
 
@@ -1575,12 +1611,28 @@ bool AppInitParameterInteraction(Config &config) {
     if(gArgs.IsArgSet("-blocksizeactivationtime")) {
         const int64_t nProposedActivationTime =
             gArgs.GetArg("-blocksizeactivationtime", 0);
-        config.SetBlockSizeActivationTime(nProposedActivationTime);
+        if (std::string err; !config.SetBlockSizeActivationTime(nProposedActivationTime)){
+            return InitError(err);
+        }
     }
 
     // Configure whether to run extra block candidate validity checks
     config.SetTestBlockCandidateValidity(
         gArgs.GetBoolArg("-blockcandidatevaliditytest", chainparams.TestBlockCandidateValidity()));
+
+    // Configure mining block assembler
+    if(gArgs.IsArgSet("-blockassembler")) {
+        std::string assemblerStr { boost::to_upper_copy<std::string>(gArgs.GetArg("-blockassembler", "")) };
+        mining::CMiningFactory::BlockAssemblerType assembler { enum_cast<mining::CMiningFactory::BlockAssemblerType>(assemblerStr) };
+        if(assembler == mining::CMiningFactory::BlockAssemblerType::UNKNOWN)
+            assembler = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
+        config.SetMiningCandidateBuilder(assembler);
+    }
+    
+    // Configure if transactions with P2SH in pubkey should be treated as non-standard.
+    if(gArgs.IsArgSet("-acceptP2SH")) {
+        config.SetAcceptP2SH(gArgs.GetArg("-acceptP2SH", DEFAULT_ACCEPT_P2SH));
+    }
 
     // Configure data carrier size.
     if(gArgs.IsArgSet("-datacarriersize")) {
@@ -1721,50 +1773,6 @@ bool AppInitParameterInteraction(Config &config) {
     nLocalServices = ServiceFlags(nLocalServices | NODE_BITCOIN_CASH);
 
     nMaxTipAge = gArgs.GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
-
-    if (gArgs.IsArgSet("-bip9params")) {
-        // Allow overriding BIP9 parameters for testing
-        if (!chainparams.MineBlocksOnDemand()) {
-            return InitError(
-                "BIP9 parameters may only be overridden on regtest.");
-        }
-        for (const std::string &strDeployment : gArgs.GetArgs("-bip9params")) {
-            std::vector<std::string> vDeploymentParams;
-            boost::split(vDeploymentParams, strDeployment,
-                         boost::is_any_of(":"));
-            if (vDeploymentParams.size() != 3) {
-                return InitError("BIP9 parameters malformed, expecting "
-                                 "deployment:start:end");
-            }
-            int64_t nStartTime, nTimeout;
-            if (!ParseInt64(vDeploymentParams[1], &nStartTime)) {
-                return InitError(
-                    strprintf("Invalid nStartTime (%s)", vDeploymentParams[1]));
-            }
-            if (!ParseInt64(vDeploymentParams[2], &nTimeout)) {
-                return InitError(
-                    strprintf("Invalid nTimeout (%s)", vDeploymentParams[2]));
-            }
-            bool found = false;
-            for (int j = 0; j < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS;
-                 ++j) {
-                if (vDeploymentParams[0].compare(
-                        VersionBitsDeploymentInfo[j].name) == 0) {
-                    UpdateBIP9Parameters(Consensus::DeploymentPos(j),
-                                         nStartTime, nTimeout);
-                    found = true;
-                    LogPrintf("Setting BIP9 activation parameters for %s to "
-                              "start=%ld, timeout=%ld\n",
-                              vDeploymentParams[0], nStartTime, nTimeout);
-                    break;
-                }
-            }
-            if (!found) {
-                return InitError(
-                    strprintf("Invalid deployment (%s)", vDeploymentParams[0]));
-            }
-        }
-    }
 
     return true;
 }
@@ -1935,7 +1943,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
               nScriptCheckThreads);
     if (nScriptCheckThreads) {
         for (int i = 0; i < nScriptCheckThreads - 1; i++) {
-            threadGroup.create_thread(&ThreadScriptCheck);
+            threadGroup.create_thread([i]() { return ThreadScriptCheck(i); });
         }
     }
 
@@ -1974,9 +1982,14 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // need to reindex later.
 
     assert(!g_connman);
-    g_connman = std::unique_ptr<CConnman>(
-        new CConnman(config, GetRand(std::numeric_limits<uint64_t>::max()),
-                     GetRand(std::numeric_limits<uint64_t>::max())));
+    {
+        int64_t duration = gArgs.GetArg("-debugp2pthreadstalls", 0);
+        g_connman =
+            std::make_unique<CConnman>(
+                config, GetRand(std::numeric_limits<uint64_t>::max()),
+                GetRand(std::numeric_limits<uint64_t>::max()),
+                std::chrono::milliseconds{duration > 0 ? duration : 0});
+    }
     CConnman &connman = *g_connman;
 
     peerLogic.reset(new PeerLogicValidation(&connman));
@@ -2422,7 +2435,10 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // Step 11: start node
 
     //// debug print
-    LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
+    {
+        LOCK(cs_main);
+        LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
+    }
     LogPrintf("nBestHeight = %d\n", chainActive.Height());
     if (gArgs.GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
         StartTorControl(threadGroup, scheduler);

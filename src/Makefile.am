@@ -87,10 +87,12 @@ endif
 BITCOIN_CORE_H = \
   addrdb.h \
   addrman.h \
+  async_file_reader.h \
   base58.h \
   bloom.h \
   blockencodings.h \
   blockfileinfostore.h \
+  blockstreams.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -110,6 +112,7 @@ BITCOIN_CORE_H = \
   core_memusage.h \
   cuckoocache.h \
   dstencode.h \
+  enum_cast.h \
   fs.h \
   httprpc.h \
   httpserver.h \
@@ -125,6 +128,11 @@ BITCOIN_CORE_H = \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
+  mining/journal.h \
+  mining/journal_builder.h \
+  mining/journal_change_set.h \
+  mining/journal_entry.h \
+  mining/journaling_block_assembler.h \
   mining/legacy.h \
   mod_pri_queue.h \
   net.h \
@@ -133,6 +141,7 @@ BITCOIN_CORE_H = \
   netbase.h \
   netmessagemaker.h \
   noui.h \
+  orphan_txns.h \
   policy/fees.h \
   policy/policy.h \
   pow.h \
@@ -170,8 +179,15 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txdb.h \
   txmempool.h \
+  txn_double_spend_detector.h \
+  txn_handlers.h \
   txn_propagator.h \
+  txn_recent_rejects.h \
   txn_sending_details.h \
+  txn_validation_config.h \
+  txn_validation_data.h \
+  txn_validation_result.h \
+  txn_validator.h \
   ui_interface.h \
   undo.h \
   util.h \
@@ -219,12 +235,18 @@ libbitcoin_server_a_SOURCES = \
   init.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
+  mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
+  mining/journal.cpp \
+  mining/journal_builder.cpp \
+  mining/journal_change_set.cpp \
+  mining/journaling_block_assembler.cpp \
   mining/legacy.cpp \
   net.cpp \
   net_processing.cpp \
   noui.cpp \
+  orphan_txns.cpp \
   policy/fees.cpp \
   policy/policy.cpp \
   pow.cpp \
@@ -244,11 +266,14 @@ libbitcoin_server_a_SOURCES = \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
+  txn_double_spend_detector.cpp \
   txn_propagator.cpp \
+  txn_validation_data.cpp \
+  txn_recent_rejects.cpp \
+  txn_validator.cpp \
   ui_interface.cpp \
   validation.cpp \
   validationinterface.cpp \
-  versionbits.cpp \
   vmtouch.cpp \
   $(BITCOIN_CORE_H)
 
@@ -442,7 +467,16 @@ bitcoind_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
+bitcoind_LDADD += \
+  $(BOOST_LIBS) \
+  $(BDB_LIBS) \
+  $(SSL_LIBS) \
+  $(CRYPTO_LIBS) \
+  $(MINIUPNPC_LIBS) \
+  $(EVENT_PTHREADS_LIBS) \
+  $(EVENT_LIBS) \
+  $(ZMQ_LIBS) \
+  $(AIO_LIBS)
 
 # bitcoin-cli binary #
 bitcoin_cli_SOURCES = bitcoin-cli.cpp

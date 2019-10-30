@@ -14,9 +14,6 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 from test_framework.cdefs import LEGACY_MAX_BLOCK_SIZE, REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER, ONE_MEGABYTE
 
-MAX_GENERATED_BLOCK_SIZE_ERROR = (
-    'Max generated block size (blockmaxsize) cannot exceed the excessive block size (excessiveblocksize)')
-
 
 class ABC_CmdLine_Test (BitcoinTestFramework):
 
@@ -53,8 +50,6 @@ class ABC_CmdLine_Test (BitcoinTestFramework):
         self.log.info("  Attempt to set below legacy limit of 1MB - try %d bytes" % LEGACY_MAX_BLOCK_SIZE)
         self.stop_node(0)
         self.assert_start_raises_init_error(0, ["-excessiveblocksize=%d" % LEGACY_MAX_BLOCK_SIZE], 'Error:')
-        self.log.info("  Attempt to set below blockmaxsize (mining limit)")
-        self.assert_start_raises_init_error(0, ['-blockmaxsize=1500000', '-excessiveblocksize=1300000'], 'Error: ' + MAX_GENERATED_BLOCK_SIZE_ERROR)
 
         # Make sure we leave the test with a node running as this is what thee
         # framework expects.
