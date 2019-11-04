@@ -12,6 +12,7 @@
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "config.h"
+#include "script/limitedstack.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -23,6 +24,39 @@ typedef std::vector<valtype> stacktype;
 std::array<uint32_t, 3> flagset{{0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRIPT_VERIFY_FLAGS}};
 
 BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
+
+static void CheckStackSize(const std::vector<valtype> &original_stack_elements, const CScript &script,
+    ScriptError expected_error, uint32_t maxStackSize, const std::vector<valtype> &expected_stack_elements={})
+{
+    Config& config = GlobalConfig::GetConfig();
+    BaseSignatureChecker sigchecker;
+    ScriptError err = SCRIPT_ERR_OK;
+    auto source = task::CCancellationSource::Make();
+
+    LimitedStack stack = LimitedStack(original_stack_elements, maxStackSize);
+
+    auto r =
+        EvalScript(
+            config, true,
+            source->GetToken(),
+            stack,
+            script,
+            flagset[0] | 0,
+            sigchecker,
+            &err);
+
+    if (expected_error == SCRIPT_ERR_OK)
+    {
+        LimitedStack expected = LimitedStack(expected_stack_elements, maxStackSize);
+        BOOST_CHECK(r.value());
+        BOOST_CHECK(stack == expected);
+    } else 
+    {
+        BOOST_CHECK(!r.value());
+        BOOST_CHECK_EQUAL(err, expected_error);
+    }
+   
+}
 
 /**
  * General utility functions to check for script passing/failing.
@@ -803,6 +837,49 @@ static void CheckTypeConversionOp(const valtype &bin, const valtype &num) {
     // BIN2NUM is indempotent.
     CheckTestResultForAllFlags({bin}, CScript() << OP_BIN2NUM << OP_BIN2NUM,
                                {num});
+}
+
+BOOST_AUTO_TEST_CASE(limited_stack_test) {
+
+    // Calling constructor of LimitedStack throws error as we are pushing too much elements to stack.
+    BOOST_CHECK_THROW(
+        LimitedStack({{0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}}, 6 + 2 * LimitedVector::ELEMENT_OVERHEAD),
+        stack_overflow_error);
+
+    CheckStackSize({{0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}}, CScript() << OP_CAT, SCRIPT_ERR_OK, 7 + 2 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78}});
+
+    CheckStackSize({{0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}}, CScript() << OP_TUCK, SCRIPT_ERR_OK, 11 + 3 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0x12, 0x34, 0x56, 0x78}, {0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}});
+
+    CheckStackSize({{0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}}, CScript() << OP_TUCK, SCRIPT_ERR_STACK_SIZE, 10 + 3 * LimitedVector::ELEMENT_OVERHEAD);
+
+    CheckStackSize({{0xab}, {0xcd}, {0xef}, {0x12}, {0x34}, {0x56}, {0x78}}, CScript() << OP_2ROT, SCRIPT_ERR_OK, 7 + 7 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}, {0x12}, {0x34}, {0x56}, {0x78}, {0xcd}, {0xef}});
+
+    CheckStackSize({{0xab}, {0xcd}, {0xef}}, CScript() << OP_ROT, SCRIPT_ERR_OK, 3 + 3 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xcd}, {0xef}, {0xab}});
+
+    CheckStackSize({{0xab}, {0xcd}, {0xef}, {0x12}, {0x34}}, CScript() << OP_2SWAP, SCRIPT_ERR_OK, 5 + 5 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}, {0x12}, {0x34}, {0xcd}, {0xef}});
+
+    CheckStackSize({{0xab}, {0xcd}, {0xef}}, CScript() << OP_NIP, SCRIPT_ERR_OK, 3 + 3 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}, {0xef}});
+
+    // OP_OVER: (x1 x2 -- x1 x2 x1)
+    CheckStackSize({{0xab}, {0xcd}}, CScript() << OP_OVER, SCRIPT_ERR_OK, 3 + 3 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}, {0xcd}, {0xab}});
+
+    CheckStackSize({{0xab}, {0xcd}}, CScript() << OP_OVER, SCRIPT_ERR_STACK_SIZE, 2 + 2 * LimitedVector::ELEMENT_OVERHEAD);
+
+    // TOALTSTACK should not modify size
+    CheckStackSize({{0xab}}, CScript() << OP_TOALTSTACK, SCRIPT_ERR_OK, 1 + 2 * LimitedVector::ELEMENT_OVERHEAD, {});
+
+    // FROMALTSTACK cannot be used without TOALTSTACK.
+    CheckStackSize({{0xab}}, CScript() << OP_FROMALTSTACK, SCRIPT_ERR_INVALID_ALTSTACK_OPERATION, 1 + 2 * LimitedVector::ELEMENT_OVERHEAD);
+
+    CheckStackSize({{0xab}}, CScript() << OP_TOALTSTACK << OP_FROMALTSTACK, SCRIPT_ERR_OK, 1 + 2 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}});
 }
 
 static void CheckBin2NumError(const stacktype &original_stack,
