@@ -69,7 +69,6 @@ BITCOIN_TESTS =\
   test/mempool_tests.cpp \
   test/merkle_tests.cpp \
   test/miner_tests.cpp \
-  test/mod_pri_queue_tests.cpp \
   test/object_stream_deserialization_tests.cpp \
   test/opcode_tests.cpp \
   test/multisig_tests.cpp \
