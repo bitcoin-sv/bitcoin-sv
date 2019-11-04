@@ -102,10 +102,6 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams);
 CScript COINBASE_FLAGS;
 
 const std::string strMessageMagic = "Bitcoin Signed Message:\n";
-// A message to identify reject reason when double-spending issue is detected.
-// It is also used (as an additional condition) to check
-// when inputs from the double spend detector can be safely removed.
-const std::string sDoubleSpendRejectMsg = "bad-txn-double-spend-detected";
 
 // Internal stuff
 namespace {
@@ -958,12 +954,6 @@ CTxnValResult TxnValidation(
     CValidationState state;
     std::vector<COutPoint> vCoinsToUncache {};
 
-    // Check double spend attempt for the given txn
-    if(!dsDetector->insertTxnInputs(pTxInputData)) {
-       state.Invalid(false, REJECT_DUPLICATE,
-                     sDoubleSpendRejectMsg);
-       return Result{state, pTxInputData, vCoinsToUncache};
-    }
     // Coinbase is only valid in a block, not as a loose transaction.
     if (!CheckRegularTransaction(tx, state)) {
         return Result{state, pTxInputData};
@@ -1012,6 +1002,7 @@ CTxnValResult TxnValidation(
     }
     // Check for conflicts with in-memory transactions
     if (pool.CheckTxConflicts(tx)) {
+        state.SetMempoolConflictDetected();
         // Disable replacement feature for good
         state.Invalid(false, REJECT_CONFLICT,
                      "txn-mempool-conflict");
@@ -1236,6 +1227,17 @@ CTxnValResult TxnValidation(
         // Clear any invalid state due to promiscuousmempool flags usage.
         state = CValidationState();
     }
+    // Check a mempool conflict and a double spend attempt
+    if(!dsDetector->insertTxnInputs(pTxInputData, pool, state)) {
+        if (state.IsMempoolConflictDetected()) {
+            state.Invalid(false, REJECT_CONFLICT,
+                        "txn-mempool-conflict");
+        } else if (state.IsDoubleSpendDetected()) {
+            state.Invalid(false, REJECT_DUPLICATE,
+                        "txn-double-spend-detected");
+        }
+        return Result{state, pTxInputData, vCoinsToUncache};
+    }
     // Check if txn is valid for fee estimation.
     //
     // This transaction should only count for fee estimation if
@@ -1440,16 +1442,13 @@ void ProcessValidatedTxn(
         // Remove tx if it was queued as an orphan txn.
         handlers.mpOrphanTxns->eraseTxn(tx.GetId());
     }
-    // Remove txn's inputs from the double spend detector as last step.
+    // Remove txn's inputs from the double spend detector as the last step.
     // This needs to be done in all cases:
     // - txn validation has failed
     // - txn committed to the mempool or rejected
-    // By checking reject code and reject reason we only allow to remove inputs
+    // By checking the flag IsDoubleSpendDetected we only allow to remove inputs
     // from the detector by the thread which added them.
-    // Due to backward compatibility support it is risky to define a new reject code
-    // as it could not be interpreted by old clients.
-    if (!(state.GetRejectCode() == REJECT_DUPLICATE &&
-          state.GetRejectReason() == sDoubleSpendRejectMsg)) {
+    if (!state.IsDoubleSpendDetected()) {
         handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
     }
 }
