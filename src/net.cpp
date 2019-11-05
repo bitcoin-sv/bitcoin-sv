@@ -3271,6 +3271,11 @@ void CConnman::EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData)
     mTxnValidator->newTransaction(std::move(vTxInputData));
 }
 
+/** Resubmit a transaction for validation */
+void CConnman::ResubmitTxnForValidator(TxInputDataSPtr pTxInputData) {
+    mTxnValidator->resubmitTransaction(std::move(pTxInputData));
+}
+
 /** Check if the txn is already known */
 bool CConnman::CheckTxnExistsInValidatorsQueue(const uint256& txid) const {
     return mTxnValidator->isTxnKnown(txid);

@@ -58,6 +58,7 @@ class CTxnValidator final
     /** Handle a new transaction */
     void newTransaction(TxInputDataSPtr pTxInputData);
     void newTransaction(TxInputDataSPtrVec pTxInputData);
+    void resubmitTransaction(TxInputDataSPtr pTxInputData);
 
     /**
      * Synchronous txn validation interface.
