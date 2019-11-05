@@ -387,10 +387,13 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     const bool big_ints_enabled = (flags & SCRIPT_ENABLE_BIG_INTS) != 0;
     const int big_ints_byte_limit{500}; // To do: Make configurable
                                         // MAX_SCRIPT_ELEMENT_SIZE = 520
+
+    // if OP_RETURN is found in executed branches after genesis is activated,
+    // we still have to check if the rest of the script is valid
+    bool nonTopLevelReturnAfterGenesis = false;
+    
     try {
         while (pc < pend) {
-            bool fExec = !count(vfExec.begin(), vfExec.end(), false);
-
             //
             // Read instruction
             //
@@ -400,6 +403,9 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE) {
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
             }
+
+            // Do not execute instructions if Genesis OP_RETURN was found in executed branches.
+            bool fExec = !count(vfExec.begin(), vfExec.end(), false) && (!nonTopLevelReturnAfterGenesis || opcode == OP_RETURN);
 
             //
             // Check opcode limits.
@@ -635,12 +641,18 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                     case OP_RETURN: {
                         if (flags & SCRIPT_UTXO_AFTER_GENESIS) {
-                            // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
-                            // presence of unbalanced IFs, invalid opcodes etc)
-                            return set_success(serror);
+                            if (vfExec.empty()) {
+                                // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
+                                // presence of unbalanced IFs, invalid opcodes etc)
+                                return set_success(serror);
+                            }
+
+                            // op_return encountered inside if statement after genesis --> check for invalid grammar
+                            nonTopLevelReturnAfterGenesis = true;
+                        } else {
+                            // Pre-Genesis OP_RETURN marks script as invalid
+                            return set_error(serror, SCRIPT_ERR_OP_RETURN);
                         }
-                        // Pre-Genesis OP_RETURN marks script as invalid
-                        return set_error(serror, SCRIPT_ERR_OP_RETURN);
                     } break;
 
                     //
