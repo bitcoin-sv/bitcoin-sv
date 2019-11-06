@@ -16,7 +16,9 @@ namespace bsv
     {
     public:
         bint();
+        explicit bint(int); 
         explicit bint(int64_t); 
+        explicit bint(std::size_t); 
         explicit bint(const std::string&);
 
         // special members
@@ -59,7 +61,8 @@ namespace bsv
         friend std::ostream& operator<<(std::ostream&, const bint&);
 
         friend bool is_negative(const bint&);
-
+        friend std::size_t to_size_t(const bint&);
+        
     private:
         int spaceship_operator(const bint&) const; // auto operator<=>(const bint&) in C++20
         void negate();
@@ -145,6 +148,16 @@ namespace bsv
     inline bint operator*(bint a, const int64_t b) { return a * bint(b); }
     inline bint operator/(bint a, const int64_t b) { return a / bint(b); }
     inline bint operator%(bint a, const int64_t b) { return a % bint(b); }
+    
+    // size_t overloads
+    inline bool operator==(const bint& a, const size_t b) { return a == bint{b}; } 
+    inline bool operator==(const size_t a, const bint& b)  { return bint{a} == b; }
+    inline bool operator!=(const bint& a, const size_t b) { return a != bint(b); }
+    
+    // int overloads
+    inline bool operator==(const bint& a, const int b) { return a == bint{b}; } 
+    inline bool operator==(const int a, const bint& b)  { return bint{a} == b; }
+    inline bool operator!=(const bint& a, const int b) { return a != bint(b); }
 
     inline uint8_t operator&(const bint& a, const uint8_t b) { 
         return a.lsb() & b;
@@ -153,6 +166,7 @@ namespace bsv
     bool is_negative(const bint&);
     bint abs(const bint&);
     std::string to_string(const bint&);
+    std::size_t to_size_t(const bint&);
 }
 
 namespace std

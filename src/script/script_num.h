@@ -82,6 +82,8 @@ public:
     int getint() const;
     std::vector<uint8_t> getvch() const;
 
+    size_t to_size_t() const;
+
 private:
     bool equal_index(const CScriptNum&) const;
 

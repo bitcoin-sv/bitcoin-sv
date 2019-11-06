@@ -374,6 +374,20 @@ BOOST_AUTO_TEST_CASE(negation)
     }
 }
 
+BOOST_AUTO_TEST_CASE(to_size_t)
+{
+    const auto size_t_min{std::numeric_limits<size_t>::min()};
+    const auto size_t_max{std::numeric_limits<size_t>::max()};
+
+    BOOST_CHECK_EQUAL(size_t_min, CScriptNum{size_t_min}.to_size_t());
+    BOOST_CHECK_EQUAL(1, CScriptNum{1}.to_size_t());
+    // cjgBOOST_CHECK_EQUAL(size_t_max, CScriptNum{size_t_max}.to_size_t());
+
+    BOOST_CHECK_EQUAL(size_t_min, CScriptNum{bint{size_t_min}}.to_size_t());
+    BOOST_CHECK_EQUAL(1, CScriptNum{bint{1}}.to_size_t());
+    BOOST_CHECK_EQUAL(size_t_max, CScriptNum{bint{size_t_max}}.to_size_t());
+}
+
 // clang-format off
 /** A selection of numbers that do not trigger int64_t overflow
  *  when added/subtracted. */

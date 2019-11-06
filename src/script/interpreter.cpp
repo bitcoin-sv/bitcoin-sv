@@ -1457,10 +1457,20 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
 
-                        uint64_t size =
-                            CScriptNum(stacktop(-1), fRequireMinimal).getint();
-                        if (size > MAX_SCRIPT_ELEMENT_SIZE) {
+                        const auto& arg_1 = stacktop(-1);
+                        const CScriptNum n{
+                            arg_1, fRequireMinimal,
+                            big_ints_enabled ? arg_1.size()
+                                             : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            big_ints_enabled};
+                        if(n < 0)
                             return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+
+                        const auto size{n.to_size_t()};
+                        if(!big_ints_enabled)
+                        {
+                            if(size > MAX_SCRIPT_ELEMENT_SIZE)
+                                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
                         }
 
                         popstack(stack);
@@ -1469,7 +1479,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         // Try to see if we can fit that number in the number of
                         // byte requested.
                         bsv::MinimallyEncode(rawnum);
-                        if (rawnum.size() > size) {
+                        if(rawnum.size() > size)
+                        {
                             // We definitively cannot.
                             return set_error(serror,
                                              SCRIPT_ERR_IMPOSSIBLE_ENCODING);
@@ -1502,12 +1513,15 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
 
-                        valtype &n = stacktop(-1);
+                        valtype& n = stacktop(-1);
                         bsv::MinimallyEncode(n);
 
                         // The resulting number must be a valid number.
-                        if (!bsv::IsMinimallyEncoded(
-                                n, CScriptNum::MAXIMUM_ELEMENT_SIZE)) {
+                        if(!bsv::IsMinimallyEncoded(
+                               n, big_ints_enabled
+                                      ? n.size()
+                                      : CScriptNum::MAXIMUM_ELEMENT_SIZE))
+                        {
                             return set_error(serror,
                                              SCRIPT_ERR_INVALID_NUMBER_RANGE);
                         }

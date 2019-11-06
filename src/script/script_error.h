@@ -6,6 +6,8 @@
 #ifndef BITCOIN_SCRIPT_SCRIPT_ERROR_H
 #define BITCOIN_SCRIPT_SCRIPT_ERROR_H
 
+#include <iosfwd>
+
 typedef enum ScriptError_t {
     SCRIPT_ERR_OK = 0,
     SCRIPT_ERR_UNKNOWN_ERROR,
@@ -78,5 +80,7 @@ typedef enum ScriptError_t {
 #define SCRIPT_ERR_LAST SCRIPT_ERR_ERROR_COUNT
 
 const char *ScriptErrorString(const ScriptError error);
+
+std::ostream& operator<<(std::ostream&, const ScriptError);
 
 #endif // BITCOIN_SCRIPT_SCRIPT_ERROR_H
