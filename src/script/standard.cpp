@@ -174,7 +174,7 @@ bool Solver(const CScript &scriptPubKey,
                 }
                 vSolutionsRet.push_back(vch1);
             } else if (opcode2 == OP_SMALLINTEGER) {
-                // OP_0 is pushed onto vector as empty element because of minimal enconding 
+                // OP_0 is pushed onto vector as empty element because of minimal enconding that CScriptNum class (used 40 lines higher) checks
                 if (opcode1 == OP_0 || (genesisEnabled && !vch1.empty())) {
                     //if number size is greater than currently max allowed (4 bytes) we break the execution and mark the transaction as non-standard
                     if (vch1.size() > CScriptNum::MAXIMUM_ELEMENT_SIZE)
@@ -314,11 +314,11 @@ CScript GetScriptForRawPubKey(const CPubKey &pubKey) {
 CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey> &keys) {
     CScript script;
 
-    script << CScript::EncodeOP_N(nRequired);
+    script << static_cast<int64_t>(nRequired); // we cast to int64_t to use operator<<(int64_t b) which uses push_int64 method that encodes numbers between 0..16 to opcodes OP_0..OP_16
     for (const CPubKey &key : keys) {
         script << ToByteVector(key);
     }
-    script << CScript::EncodeOP_N(keys.size()) << OP_CHECKMULTISIG;
+    script << (int64_t)keys.size() << OP_CHECKMULTISIG;
     return script;
 }
 

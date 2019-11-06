@@ -167,9 +167,12 @@ std::optional<bool> AreInputsStandard(
             if (stack.empty()) {
                 return false;
             }
-
+            
+            // isGenesisEnabled is set to false, because TX_SCRIPTHASH is not supported after genesis
+            bool sigOpCountError;
             CScript subscript(stack.back().begin(), stack.back().end());
-            if (subscript.GetSigOpCount(true) > MAX_P2SH_SIGOPS) {
+            uint64_t nSigOpCount = subscript.GetSigOpCount(true, false, sigOpCountError);
+            if (sigOpCountError || nSigOpCount > MAX_P2SH_SIGOPS) {
                 return false;
             }
         }

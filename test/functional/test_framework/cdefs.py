@@ -80,6 +80,13 @@ MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS = _extractPolicyValue('MAX_TX_SIGOPS_C
 # (policy.h constant)
 DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = _extractPolicyValue('DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS')
 
+# The maximum allowed number of signatures per multisis op before genesis
+# (network rule)
+MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS = _extractConsensusValue('MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS')
+# The default maximum number of sigs in multisig operation we're willing to relay/mine in a single multisig operation inside a script after genesis
+# (policy.h constant)
+DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS = _extractPolicyValue('DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS')
+
 # Coinbase transaction outputs can only be spent after this number of new
 # blocks (network rule)
 COINBASE_MATURITY = 100

@@ -495,14 +495,15 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
 
     auto source = task::CCancellationSource::Make();
 
+    bool sigOpCountError;
     activateGenesis();
     BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0).value());
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins), 0U);
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins, sigOpCountError), 0U);
     
     deactivateGenesis();
     BOOST_CHECK(::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0).value());
     // 22 P2SH sigops for all inputs (1 for vin[0], 6 for vin[3], 15 for vin[4]
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins), 22U);
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins, sigOpCountError), 22U);
 
     CMutableTransaction txToNonStd1;
     txToNonStd1.vout.resize(1);
@@ -516,11 +517,11 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
 
     activateGenesis();
     BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0).value());
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins), 0U);
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins, sigOpCountError), 0U);
     
     deactivateGenesis();
     BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0).value());
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins), 16U);
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins, sigOpCountError), 16U);
 
     CMutableTransaction txToNonStd2;
     txToNonStd2.vout.resize(1);
@@ -534,11 +535,11 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
 
     activateGenesis();
     BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0).value());
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins), 0U);
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins, sigOpCountError), 0U);
 
     deactivateGenesis();
     BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0).value());
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins), 20U);
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins, sigOpCountError), 20U);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

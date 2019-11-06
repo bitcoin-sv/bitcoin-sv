@@ -725,7 +725,7 @@ bool IsCurrentForFeeEstimation();
  * @return number of sigops this transaction's outputs will produce when spent
  * @see CTransaction::FetchInputs
  */
-uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx);
+uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled, bool& sigOpCountError);
 
 /**
  * Count ECDSA signature operations in pay-to-script-hash inputs.
@@ -738,7 +738,8 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx);
  */
 uint64_t GetP2SHSigOpCount(const Config &config, 
                            const CTransaction &tx,
-                           const CCoinsViewCache &mapInputs);
+                           const CCoinsViewCache &mapInputs, 
+                           bool& sigOpCountError);
 
 /**
  * Compute total signature operation of a transaction.
@@ -750,7 +751,10 @@ uint64_t GetP2SHSigOpCount(const Config &config,
  */
 uint64_t GetTransactionSigOpCount(const Config &config, 
                                   const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, bool checkP2SH);
+                                  const CCoinsViewCache &inputs, 
+                                  bool checkP2SH, 
+                                  bool isGenesisEnabled, 
+                                  bool& sigOpCountError);
 
 /**
  * Check whether all inputs of this transaction are valid (no double spends,
@@ -789,8 +793,8 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
 /** Transaction validation functions */
 
 /** Context-independent validity checks for coinbase and non-coinbase transactions */
-bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus);
-bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus);
+bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, bool isGenesisEnabled);
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, bool isGenesisEnabled);
 
 namespace Consensus {
 
