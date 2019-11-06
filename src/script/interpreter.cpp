@@ -377,6 +377,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     opcodetype opcode;
     valtype vchPushValue;
     std::vector<bool> vfExec;
+    std::vector<bool> vfElse;
     std::vector<valtype> altstack;
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     if (script.size() > MAX_SCRIPT_SIZE) {
@@ -606,14 +607,17 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             popstack(stack);
                         }
                         vfExec.push_back(fValue);
+                        vfElse.push_back(false);
                     } break;
 
                     case OP_ELSE: {
-                        if (vfExec.empty()) {
+                        // Only one ELSE is allowed in IF after genesis.
+                        if (vfExec.empty() || (vfElse.back() && (flags & SCRIPT_UTXO_AFTER_GENESIS))) {
                             return set_error(serror,
                                              SCRIPT_ERR_UNBALANCED_CONDITIONAL);
                         }
                         vfExec.back() = !vfExec.back();
+                        vfElse.back() = true;
                     } break;
 
                     case OP_ENDIF: {
@@ -622,6 +626,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                              SCRIPT_ERR_UNBALANCED_CONDITIONAL);
                         }
                         vfExec.pop_back();
+                        vfElse.pop_back();
                     } break;
 
                     case OP_VERIFY: {
