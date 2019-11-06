@@ -345,7 +345,7 @@ static bool CheckMinimalPush(const valtype &data, opcodetype opcode) {
     return true;
 }
 
-static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
+static bool IsOpcodeDisabled(opcodetype opcode) {
     switch (opcode) {
         case OP_2MUL:
         case OP_2DIV:
@@ -357,6 +357,10 @@ static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
     }
 
     return false;
+}
+
+static bool IsInvalidBranchingOpcode(opcodetype opcode) {
+    return opcode == OP_VERNOTIF || opcode == OP_VERIF;
 }
 
 inline bool IsValidMaxOpsPerScript(int nOpCount) {
@@ -418,7 +422,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             }
 
             // Some opcodes are disabled.
-            if (IsOpcodeDisabled(opcode, flags)) {
+            if (IsOpcodeDisabled(opcode) && (!(flags & SCRIPT_UTXO_AFTER_GENESIS) || fExec )) {
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
             }
 
@@ -1518,8 +1522,14 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
                     } break;
 
-                    default:
+                    default: {
+                        if (IsInvalidBranchingOpcode(opcode) && (flags & SCRIPT_UTXO_AFTER_GENESIS) && !fExec)
+                        {
+                            break;
+                        }
+
                         return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+                    }
                 }
             }
 
