@@ -412,6 +412,21 @@ std::string HelpMessage(HelpMessageMode mode) {
                        strprintf(_("Do not keep transactions in the mempool "
                                    "longer than <n> hours (default: %u)"),
                                  DEFAULT_MEMPOOL_EXPIRY));
+    strUsage += HelpMessageOpt("-maxmempoolnonfinal=<n>",
+                               strprintf(_("Keep the non-final transaction memory pool "
+                                           "below <n> megabytes (default: %u)"),
+                                         DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE));
+    strUsage +=
+        HelpMessageOpt("-mempoolexpirynonfinal=<n>",
+                       strprintf(_("Do not keep transactions in the non-final mempool "
+                                   "longer than <n> hours (default: %u)"),
+                                 DEFAULT_NONFINAL_MEMPOOL_EXPIRY));
+    if (showDebug) {
+        strUsage += HelpMessageOpt("-checknonfinalfreq=<n>",
+                       strprintf(_("Run checks on non-final transactions every <n> "
+                                   "milli-seconds (default: %u)"),
+                                 CTimeLockedMempool::DEFAULT_NONFINAL_CHECKS_FREQ));
+    }
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-minimumchainwork=<hex>",
@@ -2557,6 +2572,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // Create mining factory
     assert(!mining::g_miningFactory);
     mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(config);
+
+    // Launch non-final mempool periodic checks
+    mempool.getNonFinalPool().startPeriodicChecks(scheduler);
 
     // Step 12: finished
 

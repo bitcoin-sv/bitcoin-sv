@@ -97,9 +97,10 @@ static const uint64_t DEFAULT_ANCESTOR_SIZE_LIMIT = DEFAULT_ANCESTOR_LIMIT * MAX
 /** Default for -limitdescendantsize, maximum kilobytes of in-mempool
  * descendants */
 static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT * MAX_TX_SIZE;
-/** Default for -mempoolexpiry, expiration time for mempool transactions in
- * hours */
+/** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
+/** Default for -nonfinalmempoolexpiry, expiration time for non-final mempool transactions in hours */
+static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
 /** Used to calculate how many bytes of transactions to store for processing during reorg
  *  The value is multiplied with default block size to calculate actual bytes.
  */
