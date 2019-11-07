@@ -4170,6 +4170,8 @@ bool PreciousBlock(const Config &config, CValidationState &state,
 
     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
     auto source = task::CCancellationSource::Make();
+    // state is used to report errors, not block related invalidity
+    // (see description of ActivateBestChain)
     return ActivateBestChain(source->GetToken(), config, state, changeSet);
 }
 
@@ -4218,6 +4220,8 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
 
     if (state.IsValid()) {
         auto source = task::CCancellationSource::Make();
+        // state is used to report errors, not block related invalidity
+        // (see description of ActivateBestChain)
         ActivateBestChain(source->GetToken(), config, state, changeSet);
     }
 
@@ -5001,14 +5005,16 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     auto bestChainActivation =
         [&config, pblock, guard, token]
         {
-            // Only used to report errors, not invalidity - ignore it
-            CValidationState state;
+            // dummyState is used to report errors, not block related invalidity - ignore it
+            // (see description of ActivateBestChain)
+            CValidationState dummyState;
+
             CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
 
             if (!ActivateBestChain(
                     token,
                     config,
-                    state,
+                    dummyState,
                     changeSet,
                     pblock))
             {
@@ -5897,10 +5903,12 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                 // Activate the genesis block so normal node progress can
                 // continue
                 if (hash == chainparams.GetConsensus().hashGenesisBlock) {
-                    CValidationState state;
+                    // dummyState is used to report errors, not block related invalidity - ignore it
+                    // (see description of ActivateBestChain)
+                    CValidationState dummyState;
                     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
                     auto source = task::CCancellationSource::Make();
-                    if (!ActivateBestChain(source->GetToken(), config, state, changeSet)) {
+                    if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
                         break;
                     }
                 }

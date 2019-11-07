@@ -493,6 +493,15 @@ bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
  *
  * Returns true if no fatal errors occurred. Returns false in case a fatal error
  * occurred (no disk space, database error, ...).
+ *
+ * NOTE: ActivateBestChain checks for tip candidates (better than current
+ *      best chain tip so a potential candidate) but is not guaranteed to
+ *      either change the tip or even consider the provided pblock. It may
+ *      change the tip if a better candidate is found but that block is not
+ *      necessarily the one that was provided by the caller of this function.
+ *      Because of this state parameter may contain success or error but
+ *      that value represents activation process in general and is not
+ *      necessarily related to provided block in particular.
  */
 bool ActivateBestChain(
     const task::CCancellationToken& token,

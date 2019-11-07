@@ -1197,10 +1197,13 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
 
         // scan for better chains in the block chain database, that are not yet
         // connected in the active best chain
-        CValidationState state;
+
+        // dummyState is used to report errors, not block related invalidity
+        // (see description of ActivateBestChain)
+        CValidationState dummyState;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
-        if (!ActivateBestChain(source->GetToken(), config, state, changeSet)) {
+        if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
             LogPrintf("Failed to connect best block");
             StartShutdown();
         }

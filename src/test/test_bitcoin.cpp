@@ -91,10 +91,12 @@ TestingSetup::TestingSetup(const std::string &chainName)
         throw std::runtime_error("InitBlockIndex failed.");
     }
     {
-        CValidationState state;
+        // dummyState is used to report errors, not block related invalidity - ignore it
+        // (see description of ActivateBestChain)
+        CValidationState dummyState;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
-        if (!ActivateBestChain(source->GetToken(), config, state, changeSet)) {
+        if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }
