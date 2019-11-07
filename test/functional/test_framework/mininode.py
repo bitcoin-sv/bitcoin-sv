@@ -41,7 +41,7 @@ from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB
 from test_framework.util import hex_str_to_bytes, bytes_to_hex_str, wait_until
 
 BIP0031_VERSION = 60000
-MY_VERSION = 70014  # past bip-31 for ping/pong
+MY_VERSION = 70015 # INVALID_CB_NO_BAN_VERSION
 MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 # from version 70001 onwards, fRelay should be appended to version messages (BIP37)
 MY_RELAY = 1
@@ -351,9 +351,9 @@ class CProtoconf():
 
 
 class CBlockLocator():
-    def __init__(self):
+    def __init__(self, have=[]):
         self.nVersion = MY_VERSION
-        self.vHave = []
+        self.vHave = have
 
     def deserialize(self, f):
         self.nVersion = struct.unpack("<i", f.read(4))[0]
@@ -1227,8 +1227,8 @@ class msg_sendheaders():
 class msg_getheaders():
     command = b"getheaders"
 
-    def __init__(self):
-        self.locator = CBlockLocator()
+    def __init__(self, locator_have=[]):
+        self.locator = CBlockLocator(locator_have)
         self.hashstop = 0
 
     def deserialize(self, f):
@@ -1320,8 +1320,8 @@ class msg_feefilter():
 class msg_sendcmpct():
     command = b"sendcmpct"
 
-    def __init__(self):
-        self.announce = False
+    def __init__(self, announce=False):
+        self.announce = announce
         self.version = 1
 
     def deserialize(self, f):
