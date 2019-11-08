@@ -33,7 +33,7 @@ class BSVBlockSizeActivationGenesis(ComparisonTestFramework):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.genesisactivationheight = 105
-        self.extra_args = [['-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight]]
+        self.extra_args = [['-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight, '-rpcservertimeout=500']]
 
     def run_test(self):
         # Increase timeout when testing with big blocks (mininode's handle_write is not very efficient)

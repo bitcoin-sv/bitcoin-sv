@@ -23,7 +23,7 @@ class BSV128MBlocks(ComparisonTestFramework):
         self.setup_clean_chain = True
         self.excessive_block_size = 2 * ONE_MEGABYTE
         # Set arguments to run a bitcoind node with excessive blocksize 2Mb and banning time 10 seconds
-        self.extra_args = [["-excessiveblocksize=%d" % self.excessive_block_size, "-blockmaxsize=%d" % self.excessive_block_size, "-bantime=10"]]
+        self.extra_args = [["-excessiveblocksize=%d" % self.excessive_block_size, "-blockmaxsize=%d" % self.excessive_block_size, "-bantime=10", '-rpcservertimeout=500']]
 
     def add_options(self, parser):
         super().add_options(parser)

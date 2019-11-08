@@ -26,12 +26,21 @@ _chainparams_cpp_contents = _chainparams_cpp_fh.read()
 _chainparams_cpp_fh.close()
 
 
+# Slurp in consensus.h contents
+_consensus_h_fh = open(os.path.join(get_srcdir(), 'src', 'consensus', 'consensus.h'), 'rt')
+_consensus_h_contents = _consensus_h_fh.read()
+_consensus_h_fh.close()
+
+def _extractConsensusValue(name):
+    return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
+
+UINT32_MAX = 2**32-1
 # This constant is currently needed to evaluate some that are formulas
 ONE_MEGABYTE = 1000000
 ONE_GIGABYTE = 1000000000
 
 def _extractPolicyValue(name):
-    return eval(re.search(name + ' = (.+);', _policy_h_contents).group(1))
+    return int(eval(re.search(name + ' = (.+);', _policy_h_contents).group(1)))
 
 def _extractChainParamsValue(name):
     return eval(re.search('#define ' + name + ' (.+)', _chainparams_cpp_contents).group(1))
@@ -74,7 +83,6 @@ COINBASE_MATURITY = 100
 
 # The maximum allowed size for a transaction, in bytes
 MAX_TX_SIZE = ONE_MEGABYTE
-
 
 if __name__ == "__main__":
     # Output values if run standalone to verify
