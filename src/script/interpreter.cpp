@@ -1679,8 +1679,8 @@ std::optional<bool> EvalScript(
             }
 
             // Size limits
-            if(!genesis_rules_enabled &&
-               (stack.size() + altstack.size() > 1000))
+            if (!genesis_rules_enabled &&
+               (stack.size() + altstack.size() > MAX_STACK_ELEMENTS_BEFORE_GENESIS))
             {
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
             }
