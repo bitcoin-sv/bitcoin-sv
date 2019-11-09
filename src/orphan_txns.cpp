@@ -288,7 +288,8 @@ void COrphanTxns::collectTxnOutpoints(const CTransaction& tx) {
     size_t nTxOutpointsNum = tx.vout.size();
     std::lock_guard lock {mCollectedOutpointsMtx};
     // Check if we need to make a room for new outpoints before adding them.
-    if (mCollectedOutpoints.size() + nTxOutpointsNum > mMaxCollectedOutpoints) {
+    if (mMaxCollectedOutpoints &&
+        (mCollectedOutpoints.size() + nTxOutpointsNum > mMaxCollectedOutpoints)) {
         if (nTxOutpointsNum < mMaxCollectedOutpoints) {
             // Discard a set of the oldest elements (estimated by nTxOutpointsNum value)
             std::rotate(

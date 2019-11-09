@@ -67,6 +67,11 @@ class CTxnValidator final
         const TxInputDataSPtr& txInputData,
         const mining::CJournalChangeSetPtr& changeSet,
         bool fLimitMempoolSize=false);
+    /** Process a set of txns */
+    void processValidation(
+        TxInputDataSPtrVec vTxInputData,
+        const mining::CJournalChangeSetPtr& changeSet,
+        bool fLimitMempoolSize=false);
 
     /**
      * Orphan & rejected txns handlers.
@@ -91,19 +96,20 @@ class CTxnValidator final
     /** Process all newly arrived transactions. Return txns accepted by the mempool */
     std::vector<TxInputDataSPtr> processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
-        mining::CJournalChangeSetPtr& journalChangeSet,
+        CTxnHandlers& handlers,
         size_t nTxnsPerTaskThreshold,
         bool fReadyForFeeEstimation);
 
-    /** Post validation step for p2p txns before limit mempool size is done*/
-    void postValidationP2PStepsNL(
+    /** Post validation step for txns before limit mempool size is done*/
+    void postValidationStepsNL(
         const CTxnValResult& txStatus,
         std::vector<TxInputDataSPtr>& vAcceptedTxns) const;
 
-    /** Post processing step for p2p txns when limit mempool size is done */
-    void postProcessingP2PStepsNL(
+    /** Post processing step for txns when limit mempool size is done */
+    void postProcessingStepsNL(
         const std::vector<TxInputDataSPtr>& vAcceptedTxns,
-        const std::vector<TxId>& vRemovedTxIds);
+        const std::vector<TxId>& vRemovedTxIds,
+        CTxnHandlers& handlers);
 
     /** Schedule orphan p2p txns for retry into the main queue */
     size_t scheduleOrphanP2PTxnsForRetry();

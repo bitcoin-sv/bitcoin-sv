@@ -124,8 +124,7 @@ CValidationState CTxnValidator::processValidation(
     const CTransactionRef& ptx = pTxInputData->mpTx;
     const CTransaction &tx = *ptx;
     LogPrint(BCLog::TXNVAL,
-            "Txnval-synch: Got a new txn= %s \n",
-             tx.GetId().ToString());
+            "Txnval-synch: Got a new txn= %s \n", tx.GetId().ToString());
     // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
     // A synchronous interface locks mtxs in the following order:
     // - first: cs_main
@@ -146,14 +145,10 @@ CValidationState CTxnValidator::processValidation(
                 IsCurrentForFeeEstimation());
     // Special handlers
     CTxnHandlers handlers {
-        // Mempool Journal ChangeSet
-        changeSet,
-        // Double Spend Detector
-        mpTxnDoubleSpendDetector,
-        // Orphan p2p txns queue
-        mpOrphanTxnsP2PQ,
-        // Recent rejects queue
-        mpTxnRecentRejects,
+        changeSet, // Mempool Journal ChangeSet
+        mpTxnDoubleSpendDetector, // Double Spend Detector
+        TxSource::p2p == pTxInputData->mTxSource ? mpOrphanTxnsP2PQ : nullptr, // Orphan txns queue
+        mpTxnRecentRejects // Recent rejects queue
     };
     // Process validated results for the given txn
     ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
@@ -168,6 +163,80 @@ CValidationState CTxnValidator::processValidation(
     FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
 
     return result.mState;
+}
+
+/** Process a set of txns in synchronous mode */
+void CTxnValidator::processValidation(
+    TxInputDataSPtrVec vTxInputData,
+    const mining::CJournalChangeSetPtr& changeSet,
+    bool fLimitMempoolSize) {
+
+    size_t vTxInputDataSize = vTxInputData.size();
+    LogPrint(BCLog::TXNVAL,
+            "Txnval-synch-batch: Got a set of %d new txns\n", vTxInputDataSize);
+    // Check if there is anything to process
+    if (!vTxInputDataSize) {
+        return;
+    }
+    // Get a threshold value for a minimum number of txns that we want to assign per task
+    size_t nTxnsPerTaskThreshold {
+        static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
+    };
+    // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
+    // A synchronous interface locks mtxs in the following order:
+    // - first: cs_main
+    // - second: mMainMtx
+    // It needs to be in that way as the wallet itself (and it's rpc interface) locks
+    // cs_main in many places and holds it (mostly rpc interface) for an entire duration of the call.
+    // A synchronous interface is called from a different threads:
+    // - bitcoin-main, bitcoin-loadblk. bitcoin-httpwor.
+    LOCK(cs_main);
+    std::unique_lock lock { mMainMtx };
+    // A vector of accepted txns
+    std::vector<TxInputDataSPtr> vAcceptedTxns {};
+    // Check fee estimation requirements
+    bool fReadyForFeeEstimation = IsCurrentForFeeEstimation();
+    // Special handlers
+    CTxnHandlers handlers {
+        changeSet, // Mempool Journal ChangeSet
+        mpTxnDoubleSpendDetector, // Double Spend Detector
+        std::make_shared<COrphanTxns>(0, 0), // A temporary orphan txns queue (unlimited)
+        std::make_shared<CTxnRecentRejects>() // A temporary recent rejects queue
+    };
+    // Process a set of given txns
+    do {
+        // Execute parallel validation
+        auto vCurrAcceptedTxns {
+            processNewTransactionsNL(vTxInputData, handlers, nTxnsPerTaskThreshold, fReadyForFeeEstimation)
+        };
+        vAcceptedTxns.insert(vAcceptedTxns.end(),
+            std::make_move_iterator(vCurrAcceptedTxns.begin()),
+            std::make_move_iterator(vCurrAcceptedTxns.end()));
+        // Get dependent orphans (if any exists)
+        vTxInputData = handlers.mpOrphanTxns->collectDependentTxnsForRetry();
+        vTxInputDataSize = vTxInputData.size();
+        if (vTxInputDataSize) {
+            LogPrint(BCLog::TXNVAL,
+                    "Txnval-synch-batch: Reprocess a set of %d orphan txns\n", vTxInputDataSize);
+        }
+    } while (vTxInputDataSize);
+    // Limit mempool size if required
+    std::vector<TxId> vRemovedTxIds {};
+    if (fLimitMempoolSize) {
+        // Trim mempool if it's size exceeds the limit.
+        vRemovedTxIds =
+            LimitMempoolSize(
+                mMempool,
+                changeSet,
+                gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
+                gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+    }
+    // Execute post processing steps.
+    postProcessingStepsNL(vAcceptedTxns, vRemovedTxIds, handlers);
+    // After we've (potentially) uncached entries, ensure our coins cache is
+    // still within its size limits
+    CValidationState dummyState;
+    FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
 }
 
 /** Thread entry point for new transaction queue handling */
@@ -214,9 +283,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                             if(!mProcessingQueue.empty()) {
                                 LogPrint(BCLog::TXNVAL, "Txnval-asynch: Got %d new transactions\n",
                                          mProcessingQueue.size());
-                                // Mempool Journal ChangeSet
-                                mining::CJournalChangeSetPtr changeSet {
-                                    mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::NEW_TXN)
+                                // Special handlers
+                                CTxnHandlers handlers {
+                                    mMempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::NEW_TXN),
+                                    mpTxnDoubleSpendDetector,
+                                    mpOrphanTxnsP2PQ,
+                                    mpTxnRecentRejects
                                 };
                                 // Check fee estimation requirements
                                 bool fReadyForFeeEstimation = IsCurrentForFeeEstimation();
@@ -224,7 +296,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 std::vector<TxInputDataSPtr> vAcceptedTxns {
                                     processNewTransactionsNL(
                                             mProcessingQueue,
-                                            changeSet,
+                                            handlers,
                                             nTxnsPerTaskThreshold,
                                             fReadyForFeeEstimation)
                                 };
@@ -238,7 +310,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     std::vector<TxInputDataSPtr> vAcceptedTxnsFromDoubleSpends {
                                         processNewTransactionsNL(
                                                 vDetectedDoubleSpends,
-                                                changeSet,
+                                                handlers,
                                                 0,
                                                 fReadyForFeeEstimation)
                                     };
@@ -252,12 +324,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 std::vector<TxId> vRemovedTxIds {
                                     LimitMempoolSize(
                                         mMempool,
-                                        changeSet,
+                                        handlers.mJournalChangeSet,
                                         gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
                                         gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60)
                                 };
                                 // Execute post processing steps.
-                                postProcessingP2PStepsNL(vAcceptedTxns, vRemovedTxIds);
+                                postProcessingStepsNL(vAcceptedTxns, vRemovedTxIds, handlers);
                                 // After we've (potentially) uncached entries, ensure our coins cache is
                                 // still within its size limits
                                 CValidationState dummyState;
@@ -302,7 +374,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
 std::vector<TxInputDataSPtr>
 CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
-    mining::CJournalChangeSetPtr& journalChangeSet,
+    CTxnHandlers& handlers,
     size_t nTxnsPerTaskThreshold,
     bool fReadyForFeeEstimation) {
 
@@ -317,13 +389,6 @@ CTxnValidator::processNewTransactionsNL(
                     *pool,
                      handlers,
                      fReadyForFeeEstimation);
-    };
-    // Special handlers
-    CTxnHandlers handlers {
-        journalChangeSet,
-        mpTxnDoubleSpendDetector,
-        mpOrphanTxnsP2PQ,
-        mpTxnRecentRejects
     };
     // Trigger parallel validation for txns
     auto results {
@@ -341,13 +406,13 @@ CTxnValidator::processNewTransactionsNL(
     for(auto& task_result : results) {
         auto vBatchResults = task_result.get();
         for (auto& result : vBatchResults) {
-            postValidationP2PStepsNL(result, vAcceptedTxns);
+            postValidationStepsNL(result, vAcceptedTxns);
         }
     }
     return vAcceptedTxns;
 }
 
-void CTxnValidator::postValidationP2PStepsNL(
+void CTxnValidator::postValidationStepsNL(
     const CTxnValResult& txStatus,
     std::vector<TxInputDataSPtr>& vAcceptedTxns) const {
 
@@ -379,26 +444,33 @@ void CTxnValidator::postValidationP2PStepsNL(
     }
 }
 
-void CTxnValidator::postProcessingP2PStepsNL(
+void CTxnValidator::postProcessingStepsNL(
     const std::vector<TxInputDataSPtr>& vAcceptedTxns,
-    const std::vector<TxId>& vRemovedTxIds) {
+    const std::vector<TxId>& vRemovedTxIds,
+    CTxnHandlers& handlers) {
 
     /**
-     * 1. Send tx reject message if txn was accepted by the mempool
+     * 1. Send tx reject message if p2p txn was accepted by the mempool
      * and then removed from there because of insufficient fee.
      *
      * 2. Notify subscribers if a new txn is accepted and not removed.
+     *
+     * 3. Do not keep outpoints from txns which were added to the mempool and then removed from there.
      */
     for (const auto& pTxInputDataSPtr: vAcceptedTxns) {
-        if (std::find(
+        if (!vRemovedTxIds.empty() &&
+            std::find(
                 vRemovedTxIds.begin(),
                 vRemovedTxIds.end(),
                 pTxInputDataSPtr->mpTx->GetId()) != vRemovedTxIds.end()) {
-            // Create a reject message for the removed txn
-            CreateTxRejectMsgForP2PTxn(
-                pTxInputDataSPtr,
-                REJECT_INSUFFICIENTFEE,
-                std::string("mempool full"));
+            // Removed p2p txns from the mempool
+            if (TxSource::p2p == pTxInputDataSPtr->mTxSource) {
+                // Create a reject message for the removed txn
+                CreateTxRejectMsgForP2PTxn(
+                    pTxInputDataSPtr,
+                    REJECT_INSUFFICIENTFEE,
+                    std::string("mempool full"));
+            }
         } else {
             // Notify subscribers that a new txn was added to the mempool.
             // At this stage we do know that the signal won't be triggered for removed txns.
@@ -411,7 +483,9 @@ void CTxnValidator::postProcessingP2PStepsNL(
      * removed from the mempool (because of insufficient fee).
      * It could schedule false-possitive orphans for re-try.
      */
-    mpOrphanTxnsP2PQ->eraseCollectedOutpointsFromTxns(vRemovedTxIds);
+    if (handlers.mpOrphanTxns && !vRemovedTxIds.empty()) {
+        handlers.mpOrphanTxns->eraseCollectedOutpointsFromTxns(vRemovedTxIds);
+    }
 }
 
 // The method needs to take mNewTxnsMtx lock to move collected orphan txns
