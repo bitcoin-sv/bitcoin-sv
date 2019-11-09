@@ -248,6 +248,9 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         size_t nTxnsPerTaskThreshold {
             static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
         };
+        size_t nMaxMempoolSize = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
+        unsigned long nMempoolExpiry = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
+        // The main running loop
         while(mRunning) {
             // Run every few seconds or until stopping
             std::unique_lock lock { mMainMtx };
@@ -325,8 +328,8 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     LimitMempoolSize(
                                         mMempool,
                                         handlers.mJournalChangeSet,
-                                        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-                                        gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60)
+                                        nMaxMempoolSize,
+                                        nMempoolExpiry)
                                 };
                                 // Execute post processing steps.
                                 postProcessingStepsNL(vAcceptedTxns, vRemovedTxIds, handlers);
