@@ -20,7 +20,7 @@
 #include <vector>
 
 // Maximum number of bytes pushable to the stack
-static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
+static const unsigned int MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520;
 
 // Maximum number of elements on the stack
 static const unsigned int MAX_STACK_ELEMENTS_BEFORE_GENESIS = 1000;

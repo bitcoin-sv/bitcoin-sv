@@ -443,7 +443,7 @@ std::optional<bool> EvalScript(
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
     const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
     const int big_ints_byte_limit{500}; // To do: Make configurable
-                                        // MAX_SCRIPT_ELEMENT_SIZE = 520
+                                        // MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520
 
     // if OP_RETURN is found in executed branches after genesis is activated,
     // we still have to check if the rest of the script is valid
@@ -462,7 +462,9 @@ std::optional<bool> EvalScript(
             if (!script.GetOp(pc, opcode, vchPushValue)) {
                 return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
             }
-            if (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE) {
+
+            if (!utxo_after_genesis && (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
+            {
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
             }
 
@@ -1544,10 +1546,13 @@ std::optional<bool> EvalScript(
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
+
                         valtype &vch1 = stacktop(-2);
                         valtype &vch2 = stacktop(-1);
-                        if (vch1.size() + vch2.size() >
-                            MAX_SCRIPT_ELEMENT_SIZE) {
+
+                        if (!utxo_after_genesis &&
+                            (vch1.size() + vch2.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
+                        {
                             return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
                         }
                         vch1.insert(vch1.end(), vch2.begin(), vch2.end());
@@ -1607,10 +1612,9 @@ std::optional<bool> EvalScript(
                             return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
 
                         const auto size{n.to_size_t_limited()};
-                        if(!utxo_after_genesis)
+                        if(!utxo_after_genesis && (size > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
                         {
-                            if(size > MAX_SCRIPT_ELEMENT_SIZE)
-                                return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                            return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
                         }
 
                         popstack(stack);
@@ -1679,7 +1683,7 @@ std::optional<bool> EvalScript(
             }
 
             // Size limits
-            if (!genesis_rules_enabled &&
+            if (!utxo_after_genesis &&
                (stack.size() + altstack.size() > MAX_STACK_ELEMENTS_BEFORE_GENESIS))
             {
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
