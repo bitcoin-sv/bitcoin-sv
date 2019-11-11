@@ -81,14 +81,13 @@ static bool SignStep(const BaseSignatureCreator &creator,
     ret.clear();
 
     std::vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, whichTypeRet, vSolutions)) {
+    if (!SolverNoData(scriptPubKey, whichTypeRet, vSolutions)) {
         return false;
     }
 
     CKeyID keyID;
     switch (whichTypeRet) {
         case TX_NONSTANDARD:
-        case TX_NULL_DATA:
             return false;
         case TX_PUBKEY:
             keyID = CPubKey(vSolutions[0]).GetID();
@@ -323,7 +322,7 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
 
             txnouttype txType2;
             std::vector<std::vector<uint8_t>> vSolutions2;
-            Solver(pubKey2, txType2, vSolutions2);
+            SolverNoData(pubKey2, txType2, vSolutions2);
             sigs1.script.pop_back();
             sigs2.script.pop_back();
             Stacks result = CombineSignatures(pubKey2, checker, txType2,
@@ -345,7 +344,7 @@ SignatureData CombineSignatures(const CScript &scriptPubKey,
                                 const SignatureData &scriptSig2) {
     txnouttype txType;
     std::vector<std::vector<uint8_t>> vSolutions;
-    Solver(scriptPubKey, txType, vSolutions);
+    SolverNoData(scriptPubKey, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
                              Stacks(scriptSig1), Stacks(scriptSig2))

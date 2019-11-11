@@ -175,7 +175,13 @@ public:
             std::vector<CTxDestination> addresses;
             txnouttype whichType;
             int nRequired;
-            ExtractDestinations(subscript, whichType, addresses, nRequired);
+            // DescribeAddressVisitor is used by RPC call validateaddress, which only takes address as input. 
+            // We have no block height available - treat all transactions as post-Genesis.
+            // An OP_RETURN output has no address, so this should be no problem
+            // TODO: We might revisit this when sunsetting P2SH, but it probably doesn't matter really much, since 
+            //       it would only incorrectly decode redeem scripts which are P2SH scripts by itself.
+            bool isGenesisEnabled = true; 
+            ExtractDestinations(subscript, isGenesisEnabled, whichType, addresses, nRequired);
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(
                 Pair("hex", HexStr(subscript.begin(), subscript.end())));

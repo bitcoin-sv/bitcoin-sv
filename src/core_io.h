@@ -28,9 +28,8 @@ std::vector<uint8_t> ParseHexUV(const UniValue &v, const std::string &strName);
 // core_write.cpp
 std::string FormatScript(const CScript &script);
 std::string EncodeHexTx(const CTransaction &tx, const int serializeFlags = 0);
-void ScriptPubKeyToUniv(const CScript &scriptPubKey, UniValue &out,
-                        bool fIncludeHex);
-void TxToUniv(const CTransaction &tx, const uint256 &hashBlock,
+void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGenesisEnabled, UniValue &out);
+void TxToUniv(const CTransaction &tx, const uint256 &hashBlock, bool isGenesisEnabled,
               UniValue &entry);
 
 #endif // BITCOIN_CORE_IO_H

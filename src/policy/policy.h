@@ -103,14 +103,16 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS =
     LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
 
-bool IsStandard(const Config &config, const CScript &scriptPubKey, txnouttype &whichType);
+bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType);
 
 /**
  * Check for standard transaction types
+ * @param[in] nHeight represents the height that transactions was mined or the height that
+ * we expect transcation will be mined in (in case transcation is being added to mempool)
  * @return True if all outputs (scriptPubKeys) use only standard transaction
  * forms
  */
-bool IsStandardTx(const Config &config, const CTransaction &tx, std::string &reason);
+bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std::string &reason);
 
 /**
  * Check for standard transaction types

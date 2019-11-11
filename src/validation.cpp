@@ -593,17 +593,12 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
-static bool IsGenesisEnabled(const Config &config, int nHeight) {
-    return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
-}
-
-bool IsGenesisEnabled(const Config& config, const CBlockIndex* pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
+bool IsGenesisEnabled(const Config &config, int nHeight) {
+    if (nHeight == MEMPOOL_HEIGHT) {
+        throw std::runtime_error("Checking if genesis is enabled with height == MEMPOOL_HEIGHT.");
     }
 
-    // Genesis is enabled on the currently processed block, not on the current tip.
-    return IsGenesisEnabled(config, pindexPrev->nHeight + 1);
+    return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
 }
 
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
@@ -615,6 +610,7 @@ bool IsGenesisEnabled(const Config& config, const CBlockIndex* pindexPrev) {
 // so that it can not be shared by other threads.
 // Mt support is present in CCoinsViewCache class.
 static bool CheckInputsFromMempoolAndCache(
+    const Config& config,
     const CTransaction& tx,
     CValidationState& state,
     const CCoinsViewCache* pcoinsTip,
@@ -650,6 +646,7 @@ static bool CheckInputsFromMempoolAndCache(
         }
     }
     return CheckInputs(
+                config,
                 tx,
                 state,
                 view,
@@ -924,8 +921,15 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
+    // We determine if a transaction is standard or not based on assumption that
+    // it will be mined in the next block. We accept the fact that it might get mined
+    // into a later block and thus can become non standard transaction. 
+    // Example: Transaction containing output with "OP_RETURN" and 0 value 
+    //          is not dust under old rules, but it is dust under new rules,
+    //          but we will mine it nevertheless. Anyone can collect such
+    //          coin by providing OP_1 unlock script
     std::string reason;
-    if (fRequireStandard && !IsStandardTx(config, tx, reason)) {
+    if (fRequireStandard && !IsStandardTx(config, tx, chainActive.Height() + 1, reason)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                   reason);
         return Result{state, pTxInputData};
@@ -1111,7 +1115,8 @@ CTxnValResult TxnValidation(
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
-    if (!CheckInputs(tx,
+    if (!CheckInputs(config,
+                     tx,
                      state,
                      view,
                      true,      /* fScriptChecks */
@@ -1140,6 +1145,7 @@ CTxnValResult TxnValidation(
     uint32_t currentBlockScriptVerifyFlags =
         GetBlockScriptFlags(config, chainActive.Tip());
     if (!CheckInputsFromMempoolAndCache(
+            config,
             tx,
             state,
             pcoinsTip,
@@ -1158,7 +1164,8 @@ CTxnValResult TxnValidation(
                 __func__, txid.ToString(), FormatStateMessage(state));
             return Result{state, pTxInputData, vCoinsToUncache};
         }
-        if (!CheckInputs(tx,
+        if (!CheckInputs(config,
+                         tx,
                          state,
                          view,
                          true,      /* fScriptChecks */
@@ -1700,11 +1707,14 @@ static void UpdateMempoolForReorg(const Config &config,
 
 /**
  * Return transaction in txOut, and if it was found inside a block, its hash is
- * placed in hashBlock.
+ * placed in hashBlock and info about if this is post-Genesis transactions is placed into isGenesisEnabled
  */
 bool GetTransaction(const Config &config, const TxId &txid,
-                    CTransactionRef &txOut, uint256 &hashBlock,
-                    bool fAllowSlow) {
+                    CTransactionRef &txOut,
+                    bool fAllowSlow,
+                    uint256 &hashBlock,
+                    bool& isGenesisEnabled
+                    ) {
     CBlockIndex *pindexSlow = nullptr;
 
     LOCK(cs_main);
@@ -1712,6 +1722,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
     CTransactionRef ptx = mempool.Get(txid);
     if (ptx) {
         txOut = ptx;
+        isGenesisEnabled = IsGenesisEnabled(config, chainActive.Tip()->nHeight + 1); // assume that the transaction from mempool will be mined in next block
         return true;
     }
 
@@ -1736,6 +1747,12 @@ bool GetTransaction(const Config &config, const TxId &txid,
             if (txOut->GetId() != txid) {
                 return error("%s: txid mismatch", __func__);
             }
+            auto foundBlockIndex = mapBlockIndex.find(hashBlock);
+            if (foundBlockIndex == mapBlockIndex.end() || foundBlockIndex->second == nullptr)
+            {
+                return error("%s: mapBlockIndex mismatch  ", __func__);
+            }
+            isGenesisEnabled = IsGenesisEnabled(config, foundBlockIndex->second->nHeight);
             return true;
         }
     }
@@ -1755,6 +1772,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
                 if (tx->GetId() == txid) {
                     txOut = tx;
                     hashBlock = pindexSlow->GetBlockHash();
+                    isGenesisEnabled = IsGenesisEnabled(config, pindexSlow->nHeight);
                     return true;
                 }
             }
@@ -2163,7 +2181,7 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
     }
 
     // Add outputs.
-    AddCoins(inputs, tx, nHeight);
+    AddCoins(inputs, tx, nHeight, GlobalConfig::GetConfig().GetGenesisActivationHeight());
 }
 
 void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight) {
@@ -2241,7 +2259,17 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 }
 } // namespace Consensus
 
-bool CheckInputs(const CTransaction &tx, CValidationState &state,
+static int GetInputScriptBlockHeight(int coinHeight) {
+    if (coinHeight == MEMPOOL_HEIGHT) {
+        // When spending an output that was created in mempool, we assume that it will be mined in the next block.
+        return chainActive.Height() + 1;
+    }
+
+    return coinHeight;
+}
+
+bool CheckInputs(const Config& config,
+                 const CTransaction &tx, CValidationState &state,
                  const CCoinsViewCache &inputs, bool fScriptChecks,
                  const uint32_t flags, bool sigCacheStore,
                  bool scriptCacheStore,
@@ -2292,8 +2320,19 @@ bool CheckInputs(const CTransaction &tx, CValidationState &state,
         const CScript &scriptPubKey = coin.GetTxOut().scriptPubKey;
         const Amount amount = coin.GetTxOut().nValue;
 
+        uint32_t perInputScriptFlags = 0;
+        int inputScriptBlockHeight = GetInputScriptBlockHeight(coin.GetHeight());
+        
+        if (IsGenesisEnabled(config, inputScriptBlockHeight)) 
+        {
+            perInputScriptFlags = SCRIPT_UTXO_AFTER_GENESIS;
+        }
+        // TODO: Currently, scriptExecutionCache does NOT contain per-input flags. 
+        //       This means that it can contain wrong cached result when Genesis activation line is crossed in either
+        //       direction (when  a block is mined or when there is a reorg). This will be fixed as part of CORE-204)
+        
         // Verify signature
-        CScriptCheck check(scriptPubKey, amount, tx, i, flags, sigCacheStore,
+        CScriptCheck check(scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
                            txdata);
         if (pvChecks) {
             pvChecks->push_back(std::move(check));
@@ -2425,7 +2464,7 @@ bool AbortNode(CValidationState &state, const std::string &strMessage,
 
 /** Restore the UTXO in a Coin at a given COutPoint. */
 DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
-                               const COutPoint &out) {
+                               const COutPoint &out, const Config &config) {
     bool fClean = true;
 
     if (view.HaveCoin(out)) {
@@ -2455,7 +2494,7 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
     // if we know for sure that the coin did not already exist in the cache. As
     // we have queried for that above using HaveCoin, we don't need to guess.
     // When fClean is false, a coin already existed and it is an overwrite.
-    view.AddCoin(out, std::move(undo), !fClean);
+    view.AddCoin(out, std::move(undo), !fClean, config.GetGenesisActivationHeight());
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
@@ -2498,10 +2537,11 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
         const CTransaction &tx = *(block.vtx[i]);
         uint256 txid = tx.GetId();
 
+        Config &config = GlobalConfig::GetConfig();
         // Check that all outputs are available and match the outputs in the
         // block itself exactly.
         for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (tx.vout[o].scriptPubKey.IsUnspendable()) {
+            if (tx.vout[o].scriptPubKey.IsUnspendable(IsGenesisEnabled(config, pindex->nHeight))) {
                 continue;
             }
 
@@ -2529,7 +2569,7 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
         for (size_t j = tx.vin.size(); j-- > 0;) {
             const COutPoint &out = tx.vin[j].prevout;
             const Coin &undo = txundo.vprevout[j];
-            DisconnectResult res = UndoCoinSpend(undo, view, out);
+            DisconnectResult res = UndoCoinSpend(undo, view, out, config);
             if (res == DISCONNECT_FAILED) {
                 return DISCONNECT_FAILED;
             }
@@ -2594,7 +2634,7 @@ static uint32_t GetBlockScriptFlags(const Config &config,
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
-    if (IsGenesisEnabled(config, pChainTip)) {
+    if (IsGenesisEnabled(config, pChainTip->nHeight + 1)) {
         flags |= SCRIPT_GENESIS;
     }
 
@@ -2827,7 +2867,7 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
             bool fCacheResults = fJustCheck;
 
             std::vector<CScriptCheck> vChecks;
-            if (!CheckInputs(tx, state, view, fScriptChecks, flags,
+            if (!CheckInputs(config, tx, state, view, fScriptChecks, flags,
                              fCacheResults, fCacheResults,
                              PrecomputedTransactionData(tx), &vChecks)) {
                 return error("ConnectBlock(): CheckInputs on %s failed with %s",
@@ -3201,8 +3241,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
         return false;
     }
 
-    if ((IsGenesisEnabled(config, pindexDelete)) &&
-        (!IsGenesisEnabled(config, pindexDelete->pprev)))
+    if ((IsGenesisEnabled(config, pindexDelete->nHeight + 1)) &&
+        (!IsGenesisEnabled(config, pindexDelete->nHeight)))
     {
         mempool.Clear();
         // While not strictly necessary, clearing the disconnect pool is also
@@ -5073,7 +5113,7 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CCoinsViewCache &inputs,
         }
 
         // Pass check = true as every addition may be an overwrite.
-        AddCoins(inputs, *tx, pindex->nHeight, true);
+        AddCoins(inputs, *tx, pindex->nHeight, config.GetGenesisActivationHeight(), true);
     }
 
     return true;

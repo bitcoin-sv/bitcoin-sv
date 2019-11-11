@@ -182,25 +182,25 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard) {
     CScript a_and_b;
     a_and_b << OP_2 << ToByteVector(key[0].GetPubKey())
             << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(config, a_and_b, whichType));
+    BOOST_CHECK(::IsStandard(config, a_and_b, 1, whichType));
 
     CScript a_or_b;
     a_or_b << OP_1 << ToByteVector(key[0].GetPubKey())
            << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(config, a_or_b, whichType));
+    BOOST_CHECK(::IsStandard(config, a_or_b, 1, whichType));
 
     CScript escrow;
     escrow << OP_2 << ToByteVector(key[0].GetPubKey())
            << ToByteVector(key[1].GetPubKey())
            << ToByteVector(key[2].GetPubKey()) << OP_3 << OP_CHECKMULTISIG;
-    BOOST_CHECK(::IsStandard(config, escrow, whichType));
+    BOOST_CHECK(::IsStandard(config, escrow, 1, whichType));
 
     CScript one_of_four;
     one_of_four << OP_1 << ToByteVector(key[0].GetPubKey())
                 << ToByteVector(key[1].GetPubKey())
                 << ToByteVector(key[2].GetPubKey())
                 << ToByteVector(key[3].GetPubKey()) << OP_4 << OP_CHECKMULTISIG;
-    BOOST_CHECK(!::IsStandard(config, one_of_four, whichType));
+    BOOST_CHECK(!::IsStandard(config, one_of_four, 1, whichType));
 
     CScript malformed[6];
     malformed[0] << OP_3 << ToByteVector(key[0].GetPubKey())
@@ -221,7 +221,7 @@ BOOST_AUTO_TEST_CASE(multisig_IsStandard) {
                  << ToByteVector(key[1].GetPubKey());
 
     for (int i = 0; i < 6; i++)
-        BOOST_CHECK(!::IsStandard(config, malformed[i], whichType));
+        BOOST_CHECK(!::IsStandard(config, malformed[i], 1, whichType));
 }
 
 BOOST_AUTO_TEST_CASE(multisig_Solver1) {
@@ -244,12 +244,12 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
     }
     partialkeystore.AddKey(key[0]);
 
-    {
+    { // P2PK
         std::vector<valtype> solutions;
         txnouttype whichType;
         CScript s;
         s << ToByteVector(key[0].GetPubKey()) << OP_CHECKSIG;
-        BOOST_CHECK(Solver(s, whichType, solutions));
+        BOOST_CHECK(SolverNoData(s, whichType, solutions));
         BOOST_CHECK(solutions.size() == 1);
         CTxDestination addr;
         BOOST_CHECK(ExtractDestination(s, addr));
@@ -257,13 +257,13 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         BOOST_CHECK(IsMine(keystore, s));
         BOOST_CHECK(!IsMine(emptykeystore, s));
     }
-    {
+    { // P2PKH
         std::vector<valtype> solutions;
         txnouttype whichType;
         CScript s;
         s << OP_DUP << OP_HASH160 << ToByteVector(key[0].GetPubKey().GetID())
           << OP_EQUALVERIFY << OP_CHECKSIG;
-        BOOST_CHECK(Solver(s, whichType, solutions));
+        BOOST_CHECK(SolverNoData(s, whichType, solutions));
         BOOST_CHECK(solutions.size() == 1);
         CTxDestination addr;
         BOOST_CHECK(ExtractDestination(s, addr));
@@ -271,13 +271,27 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         BOOST_CHECK(IsMine(keystore, s));
         BOOST_CHECK(!IsMine(emptykeystore, s));
     }
-    {
+    { // Data - has no address  - just test ExtractDestination() and IsMine() since we have Solver() dedicated tests in script_tests.cpp (script_Solver)
+        std::vector<uint8_t> data(200, 1);
+        std::vector<valtype> solutions;
+        txnouttype whichType;
+        CScript opReturn = CScript() << OP_RETURN << data;
+        CTxDestination addr;
+        BOOST_CHECK(!ExtractDestination(opReturn,addr));
+        BOOST_CHECK(!IsMine(keystore, opReturn));
+
+        CScript opFalseOpReturn = CScript() << OP_FALSE << OP_RETURN;
+        BOOST_CHECK(!ExtractDestination(opReturn, addr));
+        BOOST_CHECK(!IsMine(keystore, opReturn));
+
+    }
+    { // Multisig
         std::vector<valtype> solutions;
         txnouttype whichType;
         CScript s;
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-        BOOST_CHECK(Solver(s, whichType, solutions));
+        BOOST_CHECK(SolverNoData(s, whichType, solutions));
         BOOST_CHECK_EQUAL(solutions.size(), 4U);
         CTxDestination addr;
         BOOST_CHECK(!ExtractDestination(s, addr));
@@ -285,32 +299,39 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
         BOOST_CHECK(!IsMine(emptykeystore, s));
         BOOST_CHECK(!IsMine(partialkeystore, s));
     }
-    {
+    { // Multisig
         std::vector<valtype> solutions;
         txnouttype whichType;
         CScript s;
         s << OP_1 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
-        BOOST_CHECK(Solver(s, whichType, solutions));
+        BOOST_CHECK(SolverNoData(s, whichType, solutions));
         BOOST_CHECK_EQUAL(solutions.size(), 4U);
         std::vector<CTxDestination> addrs;
         int nRequired;
-        BOOST_CHECK(ExtractDestinations(s, whichType, addrs, nRequired));
+        BOOST_CHECK(ExtractDestinations(s, false, whichType, addrs, nRequired));
         BOOST_CHECK(addrs[0] == keyaddr[0]);
         BOOST_CHECK(addrs[1] == keyaddr[1]);
         BOOST_CHECK(nRequired == 1);
+
+        // Try again with Genesis enabled - it should have no effect on multisig
+        BOOST_CHECK(ExtractDestinations(s, false, whichType, addrs, nRequired));
+        BOOST_CHECK(addrs[0] == keyaddr[0]);
+        BOOST_CHECK(addrs[1] == keyaddr[1]);
+        BOOST_CHECK(nRequired == 1);
+
         BOOST_CHECK(IsMine(keystore, s));
         BOOST_CHECK(!IsMine(emptykeystore, s));
         BOOST_CHECK(!IsMine(partialkeystore, s));
     }
-    {
+    { // Multisig
         std::vector<valtype> solutions;
         txnouttype whichType;
         CScript s;
         s << OP_2 << ToByteVector(key[0].GetPubKey())
           << ToByteVector(key[1].GetPubKey())
           << ToByteVector(key[2].GetPubKey()) << OP_3 << OP_CHECKMULTISIG;
-        BOOST_CHECK(Solver(s, whichType, solutions));
+        BOOST_CHECK(SolverNoData(s, whichType, solutions));
         BOOST_CHECK(solutions.size() == 5);
     }
 }

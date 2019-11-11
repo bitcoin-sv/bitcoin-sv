@@ -39,14 +39,14 @@
 
 using namespace mining;
 
-void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
+void TxToJSON(const CTransaction& tx, const uint256 hashBlock, bool isGenesisEnabled, UniValue& entry)
 {
     // Call into TxToUniv() in bitcoin-common to decode the transaction hex.
     //
     // Blockchain contextual information (confirmations and blocktime) is not
     // available to code in bitcoin-common, so we query them here and push the
     // data into the returned UniValue.
-    TxToUniv(tx, uint256(), entry);
+    TxToUniv(tx, uint256(), isGenesisEnabled, entry);
 
     if (!hashBlock.IsNull()) {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
@@ -176,7 +176,8 @@ static UniValue getrawtransaction(const Config &config,
 
     CTransactionRef tx;
     uint256 hashBlock;
-    if (!GetTransaction(config, txid, tx, hashBlock, true)) {
+    bool isGenesisEnabled;
+    if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled)) {
         throw JSONRPCError(
             RPC_INVALID_ADDRESS_OR_KEY,
             std::string(fTxIndex ? "No such mempool or blockchain transaction"
@@ -193,7 +194,7 @@ static UniValue getrawtransaction(const Config &config,
 
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hex", strHex));
-    TxToJSON(*tx, hashBlock, result);
+    TxToJSON(*tx, hashBlock, isGenesisEnabled, result);
     return result;
 }
 
@@ -272,7 +273,8 @@ static UniValue gettxoutproof(const Config &config,
 
     if (pblockindex == nullptr) {
         CTransactionRef tx;
-        if (!GetTransaction(config, oneTxId, tx, hashBlock, false) ||
+        bool isGenesisEnabledDummy; // not used
+        if (!GetTransaction(config, oneTxId, tx, false, hashBlock, isGenesisEnabledDummy) ||
             hashBlock.IsNull()) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                "Transaction not yet in block");
@@ -585,7 +587,7 @@ static UniValue decoderawtransaction(const Config &config,
     }
 
     UniValue result(UniValue::VOBJ);
-    TxToUniv(CTransaction(std::move(mtx)), uint256(), result);
+    TxToUniv(CTransaction(std::move(mtx)), uint256(), true /* we have no block height available - treat all transactions as post-Genesis */ , result);
 
     return result;
 }
@@ -629,7 +631,10 @@ static UniValue decodescript(const Config &config,
         // Empty scripts are valid.
     }
 
-    ScriptPubKeyToUniv(script, r, false);
+    ScriptPubKeyToUniv(script,
+        false, 
+        false,  // we have no block height available - treat all transactions as post-Genesis 
+        r);
 
     UniValue type;
     type = find_value(r, "type");
@@ -900,7 +905,11 @@ static UniValue signrawtransaction(const Config &config,
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing amount");
                 }
 
-                view.AddCoin(out, Coin(txout, 1, false), true);
+                // We do not have coin height here. We assume that both coin height
+                // and Genesis activation height is 1, effectively using Genesis rules. 
+                // This basically means, that output script starting with OP_RETURN will
+                // be treated as possibly spendable.
+                view.AddCoin(out, Coin(txout, 1, false), true, 1);
             }
 
             // If redeemScript given and not using the local wallet (private

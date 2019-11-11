@@ -17,7 +17,7 @@ void TxToJSON(const Config &config, const CTransaction &tx,
               const uint256 hashBlock, UniValue &entry);
 std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHeader,
                      const CBlockIndex *blockindex);
-UniValue blockTxToJSON(const Config &config, const CTransaction& tx, bool txDetails);
+UniValue blockTxToJSON(const Config &config, const CTransaction& tx, bool txDetails, bool isGenesisEnabled);
 UniValue blockheaderToJSON(const CBlockIndex *blockindex);
 
 #endif // BITCOIN_RPCTOJSON_H

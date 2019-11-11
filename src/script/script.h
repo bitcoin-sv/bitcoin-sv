@@ -405,11 +405,45 @@ public:
      * Returns whether the script is guaranteed to fail at execution, regardless
      * of the initial stack. This allows outputs to be pruned instantly when
      * entering the UTXO set.
+     * nHeight reflects the height of the block that script was mined in
+     * For Genesis OP_RETURN this can return false negatives. For example if we have:
+     *   <some complex script that always return OP_FALSE> OP_RETURN
+     * this function will return false even though the ouput is unspendable.
+     * 
      */
-    bool IsUnspendable() const {
+
+    bool IsUnspendable(bool isGenesisEnabled) const {
+        if (isGenesisEnabled)
+        {
+            // Genesis restored OP_RETURN functionality. It no longer uncoditionally fails execution
+            // The top stack value determines if execution suceeds, and OP_RETURN lock script might be spendable if 
+            // unlock script pushes non 0 value to the stack.
+
+            // We currently only detect OP_FALSE OP_RETURN as provably unspendable.
+            return  (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
+                (size() > MAX_SCRIPT_SIZE);
+        }
+        else
+        {
+            return (size() > 0 && *begin() == OP_RETURN) ||
+                (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
+                (size() > MAX_SCRIPT_SIZE);
+        }
+    }
+
+    /**
+     * Returns whether the script looks like a known OP_RETURN script. This is similar to IsUnspendable()
+     * but it does not require nHeight. 
+     * Use cases:
+     *   - decoding transactions to avoid parsing OP_RETURN as other data
+     *   - used in wallet for:
+     *   -   for extracting addresses (we do not now how to do that for OP_RETURN) 
+     *   -   logging unsolvable transactions that contain OP_RETURN
+     */
+    bool IsKnownOpReturn() const
+    {
         return (size() > 0 && *begin() == OP_RETURN) ||
-               (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
-               (size() > MAX_SCRIPT_SIZE);
+            (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN);        
     }
 
     void clear() {

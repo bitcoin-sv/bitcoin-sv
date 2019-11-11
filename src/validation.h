@@ -441,7 +441,7 @@ std::string GetWarnings(const std::string &strFor);
  * Retrieve a transaction (from memory pool, or from disk, if possible).
  */
 bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
-                    uint256 &hashBlock, bool fAllowSlow = false);
+    bool fAllowSlow, uint256 &hashBlock, bool& isGenesisEnabled);
 
 /**
  * Find the best known block, and make it the active tip of the block chain.
@@ -496,7 +496,7 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /** Check if Genesis has activated. */
-bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
+bool IsGenesisEnabled(const Config& config, int nHeight);
 
 /**
  * Limit mempool size.
@@ -648,7 +648,8 @@ uint64_t GetTransactionSigOpCount(const CTransaction &tx,
  * corresponding cache which are matched. This is useful for checking blocks
  * where we will likely never need the cache entry again.
  */
-bool CheckInputs(const CTransaction &tx, CValidationState &state,
+bool CheckInputs(const Config& config,
+                 const CTransaction &tx, CValidationState &state,
                  const CCoinsViewCache &view, bool fScriptChecks,
                  const uint32_t flags, bool sigCacheStore,
                  bool scriptCacheStore,
