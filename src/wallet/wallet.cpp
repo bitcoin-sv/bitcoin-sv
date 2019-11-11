@@ -58,8 +58,9 @@ const uint32_t BIP32_HARDENED_KEY_LIMIT = 0x80000000;
 CFeeRate CWallet::minTxFee = CFeeRate(DEFAULT_TRANSACTION_MINFEE);
 
 /**
- * If fee estimation does not have enough data to provide estimates, use this
- * fee instead. Has no effect if not using fee estimation.
+ * If fee estimation does not have enough data to provide estimates and 
+ * -minrelaytxfee is set to 0, use this fee instead. 
+ * Has no effect if not using fee estimation.
  * Override with -fallbackfee
  */
 CFeeRate CWallet::fallbackFee = CFeeRate(DEFAULT_FALLBACK_FEE);

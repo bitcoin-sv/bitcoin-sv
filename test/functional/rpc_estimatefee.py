@@ -18,8 +18,8 @@ class RpcEstimateFeeTest(BitcoinTestFramework):
     def run_test(self):
         for i in range(3):
             self.nodes[0].generate(1)
-            # estimatefee is 0.00001 by default, regardless of block contents
-            assert_equal(self.nodes[0].estimatefee(), Decimal('0.00001'))
+            # estimatefee is 0.00000250 by default, regardless of block contents
+            assert_equal(self.nodes[0].estimatefee(), Decimal('0.00000250'))
             # estimatefee may be different for nodes that set it in their config
             assert_equal(self.nodes[1].estimatefee(), Decimal('0.005'))
 
