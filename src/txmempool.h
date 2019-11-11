@@ -612,8 +612,7 @@ public:
      * are in the mapNextTx array, journal is in agreement with mempool).
      * If sanity-checking is turned off, check does nothing.
      */
-    void Check(
-        const int64_t nSpendHeight,
+    void CheckMempool(
         const CCoinsViewCache *pcoins,
         const mining::CJournalChangeSetPtr& changeSet) const;
 

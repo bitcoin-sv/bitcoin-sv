@@ -1809,7 +1809,7 @@ static void PostValidationStepsForP2PTxn(
     const CValidationState& state = txStatus.mState;
     // Post processing step for successfully commited txns (non-orphans & orphans)
     if (state.IsValid()) {
-        pool.Check(GetSpendHeight(pcoinsTip), pcoinsTip, handlers.mJournalChangeSet);
+        pool.CheckMempool(pcoinsTip, handlers.mJournalChangeSet);
         RelayTransaction(*ptx, *g_connman);
         pNode->nLastTXTime = GetTime();
     }
@@ -2398,10 +2398,9 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
             &error);
 }
 
-int GetSpendHeight(const CCoinsViewCache &inputs) {
-    //LOCK(cs_main);
+std::pair<int,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs) {
     CBlockIndex *pindexPrev = mapBlockIndex.find(inputs.GetBestBlock())->second;
-    return pindexPrev->nHeight + 1;
+    return { pindexPrev->nHeight + 1, pindexPrev->GetMedianTimePast() };
 }
 
 namespace Consensus {
@@ -2484,7 +2483,9 @@ std::optional<bool> CheckInputs(
 {
     assert(!tx.IsCoinBase());
 
-    if (!Consensus::CheckTxInputs(tx, state, inputs, GetSpendHeight(inputs))) {
+    const auto [ height, mtp ] = GetSpendHeightAndMTP(inputs);
+    (void)mtp;  // Silence unused variable warning
+    if (!Consensus::CheckTxInputs(tx, state, inputs, height)) {
         return false;
     }
 
@@ -4022,7 +4023,7 @@ static bool ActivateBestChainStep(
     {
         changeSet->apply();
     }
-    mempool.Check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
+    mempool.CheckMempool(pcoinsTip, changeSet);
 
     // Callbacks/notifications for a new best chain.
     if (fInvalidFound) {
@@ -4414,7 +4415,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     }
 
     // Check mempool & journal
-    mempool.Check(GetSpendHeight(pcoinsTip), pcoinsTip, changeSet);
+    mempool.CheckMempool(pcoinsTip, changeSet);
 
     return true;
 }

@@ -1001,12 +1001,12 @@ extern CCoinsViewCache *pcoinsTip;
 extern CBlockTreeDB *pblocktree;
 
 /**
- * Return the spend height, which is one more than the inputs.GetBestBlock().
+ * Return the MTP and spend height, which is one more than the inputs.GetBestBlock().
  * While checking, GetBestBlock() refers to the parent block. (protected by
  * cs_main)
  * This is also true for mempool checks.
  */
-int GetSpendHeight(const CCoinsViewCache &inputs);
+std::pair<int,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs);
 
 /**
  * Reject codes greater or equal to this can be returned by AcceptToMemPool for

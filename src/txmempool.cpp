@@ -838,8 +838,7 @@ void CTxMemPool::Clear() {
     clearNL();
 }
 
-void CTxMemPool::Check(
-    const int64_t nSpendHeight,
+void CTxMemPool::CheckMempool(
     const CCoinsViewCache *pcoins,
     const mining::CJournalChangeSetPtr& changeSet) const {
 
@@ -850,6 +849,9 @@ void CTxMemPool::Check(
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency) {
         return;
     }
+
+    // Get spend height and MTP
+    const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(*pcoins);
 
     std::shared_lock lock(smtx);
 
@@ -960,6 +962,9 @@ void CTxMemPool::Check(
             assert(fCheckResult);
             UpdateCoins(tx, mempoolDuplicate, 1000000);
         }
+
+        // Check we haven't let any non-final txns in
+        assert(IsFinalTx(tx, nSpendHeight, medianTimePast));
     }
 
     unsigned int stepsSinceLastRemove = 0;
