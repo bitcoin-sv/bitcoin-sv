@@ -42,6 +42,12 @@ void GlobalConfig::Reset()
     acceptP2SH = DEFAULT_ACCEPT_P2SH;
 
     genesisActivationHeight = 0;
+
+    mMaxConcurrentAsyncTasksPerNode = DEFAULT_NODE_ASYNC_TASKS_LIMIT;
+
+    mMaxParallelBlocks = DEFAULT_SCRIPT_CHECK_POOL_SIZE;
+    mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
+    mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -259,6 +265,107 @@ uint64_t GlobalConfig::GetGenesisActivationHeight() const {
     return genesisActivationHeight;
 }
 
+bool GlobalConfig::SetMaxConcurrentAsyncTasksPerNode(
+    int maxConcurrentAsyncTasksPerNode,
+    std::string* error)
+{
+    if (maxConcurrentAsyncTasksPerNode < 1
+        || maxConcurrentAsyncTasksPerNode > mMaxParallelBlocks)
+    {
+        *error =
+            strprintf(
+            _("Max parallel tasks per node count must be at least 1 and at most"
+                " maxParallelBlocks"));
+        return false;
+    }
+
+    mMaxConcurrentAsyncTasksPerNode = maxConcurrentAsyncTasksPerNode;
+
+    return true;
+}
+
+int GlobalConfig::GetMaxConcurrentAsyncTasksPerNode() const
+{
+    return mMaxConcurrentAsyncTasksPerNode;
+}
+
+bool GlobalConfig::SetBlockScriptValidatorsParams(
+    int maxParallelBlocks,
+    int perValidatorThreadsCount,
+    int perValidatorThreadMaxBatchSize,
+    std::string* error)
+{
+    {
+        constexpr int max = 100;
+        if (maxParallelBlocks < 1 || maxParallelBlocks > max)
+        {
+            *error =
+                strprintf(
+                _("Max parallel blocks count must be at least 1 and at most %d"),
+                max);
+            return false;
+        }
+
+        mMaxParallelBlocks = maxParallelBlocks;
+
+        // limit dependent variable
+        mMaxConcurrentAsyncTasksPerNode =
+            std::min(mMaxConcurrentAsyncTasksPerNode, mMaxParallelBlocks);
+    }
+
+    {
+        // perValidatorThreadsCount==0 means autodetect,
+        // but nScriptCheckThreads==0 means no concurrency
+        if (perValidatorThreadsCount == 0)
+        {
+            perValidatorThreadsCount =
+                std::clamp(GetNumCores(), 0, MAX_SCRIPTCHECK_THREADS);
+        }
+        else if (perValidatorThreadsCount < 0
+            || perValidatorThreadsCount > MAX_SCRIPTCHECK_THREADS)
+        {
+            *error =
+                strprintf(
+                    _("Per block script validation threads count must be at "
+                      "least 0 and at most %d"), MAX_SCRIPTCHECK_THREADS);
+            return false;
+        }
+
+        mPerBlockScriptValidatorThreadsCount = perValidatorThreadsCount;
+    }
+
+    {
+        if (perValidatorThreadMaxBatchSize < 1
+            || perValidatorThreadMaxBatchSize > std::numeric_limits<uint8_t>::max())
+        {
+            *error =
+                strprintf(
+                    _("Per block script validation max batch size must be at "
+                      "least 1 and at most %d"),
+                    std::numeric_limits<uint8_t>::max());
+            return false;
+        }
+        mPerBlockScriptValidationMaxBatchSize = perValidatorThreadMaxBatchSize;
+    }
+
+    return true;
+}
+
+int GlobalConfig::GetMaxParallelBlocks() const
+{
+    return mMaxParallelBlocks;
+}
+
+int GlobalConfig::GetPerBlockScriptValidatorThreadsCount() const
+{
+    return mPerBlockScriptValidatorThreadsCount;
+}
+
+int GlobalConfig::GetPerBlockScriptValidationMaxBatchSize() const
+{
+    return mPerBlockScriptValidationMaxBatchSize;
+}
+
 DummyConfig::DummyConfig()
     : chainParams(CreateChainParams(CBaseChainParams::REGTEST)) {}
 
@@ -267,6 +374,26 @@ DummyConfig::DummyConfig(std::string net)
 
 void DummyConfig::SetChainParams(std::string net) {
     chainParams = CreateChainParams(net);
+}
+
+int DummyConfig::GetMaxConcurrentAsyncTasksPerNode() const
+{
+    return DEFAULT_NODE_ASYNC_TASKS_LIMIT;
+}
+
+int DummyConfig::GetMaxParallelBlocks() const
+{
+    return DEFAULT_SCRIPT_CHECK_POOL_SIZE;
+}
+
+int DummyConfig::GetPerBlockScriptValidatorThreadsCount() const
+{
+    return DEFAULT_SCRIPTCHECK_THREADS;
+}
+
+int DummyConfig::GetPerBlockScriptValidationMaxBatchSize() const
+{
+    return DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
 }
 
 void GlobalConfig::SetExcessUTXOCharge(Amount fee) {

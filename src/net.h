@@ -114,6 +114,12 @@ static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);
 // NOTE: When adjusting this, update rpcnet:setban's help ("24h")
 static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
 
+/**
+ * Default maximum amount of concurrent async tasks per node before node message
+ * processing is skipped until the amount is freed up again.
+ */
+constexpr size_t DEFAULT_NODE_ASYNC_TASKS_LIMIT = 3;
+
 typedef int64_t NodeId;
 
 struct AddedNodeInfo {
@@ -456,7 +462,6 @@ public:
 
     void WakeMessageHandler();
 
-    static constexpr size_t NODES_ASYNC_TASK_THREADS_LIMIT = 6;
     // Task pool for executing async node tasks. Task queue size is implicitly
     // limited by maximum allowed connections (DEFAULT_MAX_PEER_CONNECTIONS)
     // times maximum async requests that a node may have active at any given
@@ -464,6 +469,7 @@ public:
     class CAsyncTaskPool
     {
     public:
+        CAsyncTaskPool(const Config& config);
         ~CAsyncTaskPool();
 
         void AddToPool(
@@ -471,7 +477,7 @@ public:
             std::function<void(std::weak_ptr<CNode>)> function,
             std::shared_ptr<task::CCancellationSource> source);
 
-        size_t GetActiveTasksCount(NodeId id)
+        bool HasReachedSoftAsyncTaskLimit(NodeId id)
         {
             return
                 std::count_if(
@@ -480,7 +486,7 @@ public:
                     [id](const CRunningTask& container)
                     {
                         return container.mId == id;
-                    });
+                    }) >= mPerInstanceSoftAsyncTaskLimit;
         }
 
         /**
@@ -506,10 +512,9 @@ public:
             std::shared_ptr<task::CCancellationSource> mCancellationSource;
         };
 
-        CThreadPool<CQueueAdaptor> mPool{
-            "CAsyncTaskPool",
-            NODES_ASYNC_TASK_THREADS_LIMIT};
+        CThreadPool<CQueueAdaptor> mPool;
         std::vector<CRunningTask> mRunningTasks;
+        int mPerInstanceSoftAsyncTaskLimit;
     };
 
 private:
@@ -646,6 +651,7 @@ private:
     std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
 
     CAsyncTaskPool mAsyncTaskPool;
+    uint8_t mNodeAsyncTaskLimit;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);
@@ -1162,15 +1168,6 @@ public:
     void RunAsyncProcessing(
         std::function<void(std::weak_ptr<CNode>)> function,
         std::shared_ptr<task::CCancellationSource> source);
-
-    bool IsAsyncBlocked() const
-    {
-        constexpr size_t NODE_ASYNC_LIMIT = 3;
-
-        // async limit could be exceeded in the future if a single request would
-        // spawn more than one async task so we check with >=
-        return (mAsyncTaskPool.GetActiveTasksCount(GetId()) >= NODE_ASYNC_LIMIT);
-    }
 };
 
 /**

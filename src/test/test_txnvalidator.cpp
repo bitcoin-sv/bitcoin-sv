@@ -212,7 +212,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
     {
         // Create a dummy address
         CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
-        CConnman::CAsyncTaskPool asyncTaskPool;
+        CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
         CNodePtr pDummyNode =
             CNode::Make(
                 0,
@@ -265,7 +265,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_p2p_doublespend_via_asynch_api) {
     {
         // Create a dummy address
         CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
-        CConnman::CAsyncTaskPool asyncTaskPool;
+        CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
         CNodePtr pDummyNode =
             CNode::Make(
                 0,

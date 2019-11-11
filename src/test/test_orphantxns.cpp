@@ -114,7 +114,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_creation) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
-    CConnman::CAsyncTaskPool asyncTaskPool;
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
-    CConnman::CAsyncTaskPool asyncTaskPool;
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -155,7 +155,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
-    CConnman::CAsyncTaskPool asyncTaskPool;
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -176,7 +176,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
-    CConnman::CAsyncTaskPool asyncTaskPool;
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -202,7 +202,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
-    CConnman::CAsyncTaskPool asyncTaskPool;
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(

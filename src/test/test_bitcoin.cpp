@@ -98,8 +98,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }
-    nScriptCheckThreads = 3;
-    InitScriptCheckQueues(threadGroup, nScriptCheckThreads);
+    InitScriptCheckQueues(config, threadGroup);
 
     // Deterministic randomness for tests.
     g_connman =

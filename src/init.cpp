@@ -425,11 +425,36 @@ std::string HelpMessage(HelpMessageMode mode) {
                                    "and load on restart (default: %u)"),
                                  DEFAULT_PERSIST_MEMPOOL));
     strUsage += HelpMessageOpt(
-        "-par=<n>",
-        strprintf(_("Set the number of script verification threads (%u to %d, "
-                    "0 = auto, <0 = leave that many cores free, default: %d)"),
-                  -GetNumCores(), MAX_SCRIPTCHECK_THREADS,
+        "-threadsperblock=<n>",
+        strprintf(_("Set the number of script verification threads used when "
+                    "validating single block (0 to %d, 0 = auto, default: %d)"),
+                  MAX_SCRIPTCHECK_THREADS,
                   DEFAULT_SCRIPTCHECK_THREADS));
+    strUsage +=
+        HelpMessageOpt(
+            "-scriptvalidatormaxbatchsize=<n>",
+            strprintf(
+                _("Set size of script verification batch per thread (1 to %d, "
+                  "default: %d)"),
+                std::numeric_limits<uint8_t>::max(),
+                DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE));
+
+    strUsage +=
+        HelpMessageOpt(
+        "-maxparallelblocks=<n>",
+        strprintf(_("Set the number of block that can be validated in parallel"
+                    " across all nodes. If additional block arrive, validation"
+                    " of an old block is terminated. (1 to 100, default: %d)"),
+                  DEFAULT_SCRIPT_CHECK_POOL_SIZE));
+    strUsage +=
+        HelpMessageOpt(
+            "-maxparallelblocksperpeer=<n>",
+            strprintf(
+                _("Set the number of blocks that can be validated in parallel "
+                  "from a single peer. If peers sends another block, the validation"
+                  " of it is delayed. (1 to maxparallelblocks, default: %d)"),
+                DEFAULT_NODE_ASYNC_TASKS_LIMIT));
+
 #ifndef WIN32
     strUsage += HelpMessageOpt(
         "-pid=<file>",
@@ -1578,13 +1603,23 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(strprintf(_("-maxmempool must be at least %d MB"),
                                    std::ceil(nMempoolSizeMin / 1000000.0)));
 
-    // -par=0 means autodetect, but nScriptCheckThreads==0 means no concurrency
-    nScriptCheckThreads = gArgs.GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
-    if (nScriptCheckThreads <= 0) nScriptCheckThreads += GetNumCores();
-    if (nScriptCheckThreads <= 1)
-        nScriptCheckThreads = 0;
-    else if (nScriptCheckThreads > MAX_SCRIPTCHECK_THREADS)
-        nScriptCheckThreads = MAX_SCRIPTCHECK_THREADS;
+
+    // script validation settings
+    if(std::string error; !config.SetBlockScriptValidatorsParams(
+        gArgs.GetArg("-maxparallelblocks", DEFAULT_SCRIPT_CHECK_POOL_SIZE),
+        gArgs.GetArg("-threadsperblock", DEFAULT_SCRIPTCHECK_THREADS),
+        gArgs.GetArg("-scriptvalidatormaxbatchsize", DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE),
+        &error))
+    {
+        return InitError(error);
+    }
+
+    if(std::string error; !config.SetMaxConcurrentAsyncTasksPerNode(
+        gArgs.GetArg("-maxparallelblocksperpeer", DEFAULT_NODE_ASYNC_TASKS_LIMIT),
+        &error))
+    {
+        return InitError("-maxparallelblocksperpeer: " + error);
+    }
 
     // Configure preferred size of blockfile.
     config.SetPreferredBlockFileSize(
@@ -1955,8 +1990,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     InitScriptExecutionCache();
 
     LogPrintf("Using %u threads for script verification\n",
-              nScriptCheckThreads);
-    InitScriptCheckQueues(threadGroup, nScriptCheckThreads);
+              config.GetPerBlockScriptValidatorThreadsCount());
+    InitScriptCheckQueues(config, threadGroup);
 
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop =

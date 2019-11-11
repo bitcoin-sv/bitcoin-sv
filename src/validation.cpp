@@ -75,7 +75,6 @@ CChain chainActive;
 CBlockIndex *pindexBestHeader = nullptr;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
-int nScriptCheckThreads = 0;
 std::atomic_bool fImporting(false);
 bool fReindex = false;
 bool fTxIndex = false;
@@ -2637,17 +2636,14 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
 
 static std::unique_ptr<checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>> scriptCheckQueuePool;
 
-void InitScriptCheckQueues(boost::thread_group& threadGroup, size_t threadCount)
+void InitScriptCheckQueues(const Config& config, boost::thread_group& threadGroup)
 {
-    constexpr size_t SCRIPT_CHECK_POOL_SIZE = 4;
-    constexpr size_t SCRIPT_CHECK_BATCH_SIZE = 128;
-
     scriptCheckQueuePool =
         std::make_unique<checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>>(
-            SCRIPT_CHECK_POOL_SIZE,
+            config.GetMaxParallelBlocks(),
             threadGroup,
-            threadCount,
-            SCRIPT_CHECK_BATCH_SIZE);
+            config.GetPerBlockScriptValidatorThreadsCount(),
+            config.GetPerBlockScriptValidationMaxBatchSize());
 }
 
 // Returns the script flags which should be checked for a given block

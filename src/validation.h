@@ -114,7 +114,7 @@ static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
 /** Maximum number of script-checking threads allowed */
 static const int MAX_SCRIPTCHECK_THREADS = 16;
-/** -par default (number of script-checking threads, 0 = auto) */
+/** -threadsperblock default (number of script-checking threads, 0 = auto) */
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 /** Number of blocks that can be requested at any given time from a single peer.
  */
@@ -221,6 +221,11 @@ static const bool DEFAULT_PEERBLOOMFILTERS = true;
 /** Default for -stopatheight */
 static const int DEFAULT_STOPATHEIGHT = 0;
 
+/** Default count of transaction script checker instances */
+constexpr size_t DEFAULT_SCRIPT_CHECK_POOL_SIZE = 4;
+/** Default maximum size of script batches processed by a single checker thread */
+constexpr size_t DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE = 128;
+
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
@@ -231,7 +236,6 @@ extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
 extern std::atomic_bool fImporting;
 extern bool fReindex;
-extern int nScriptCheckThreads;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
 extern bool fRequireStandard;
@@ -452,7 +456,7 @@ void UnloadBlockIndex();
 /**
  * Initialize script checking pool.
  */
-void InitScriptCheckQueues(boost::thread_group& threadGroup, size_t threadCount);
+void InitScriptCheckQueues(const Config& config, boost::thread_group& threadGroup);
 
 /**
  * Check whether we are doing an initial block download (synchronizing from disk

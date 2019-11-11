@@ -628,6 +628,16 @@ void CConnman::AddWhitelistedRange(const CSubNet &subnet) {
     vWhitelistedRange.push_back(subnet);
 }
 
+CConnman::CAsyncTaskPool::CAsyncTaskPool(const Config& config)
+    : mPool{
+        "CAsyncTaskPool",
+        // +1 so that we have more async threads than there are block checker
+        // queues so that a better block can terminate one of the existing
+        // blocked block check queues on exhaustion
+        static_cast<size_t>(config.GetMaxParallelBlocks()) + 1}
+    , mPerInstanceSoftAsyncTaskLimit{config.GetMaxConcurrentAsyncTasksPerNode()}
+{/**/}
+
 CConnman::CAsyncTaskPool::~CAsyncTaskPool()
 {
     for(auto& task : mRunningTasks)
@@ -2312,7 +2322,8 @@ void CConnman::ThreadMessageHandler()
 
         for (const CNodePtr& pnode : vNodesCopy)
         {
-            if (pnode->fDisconnect || pnode->IsAsyncBlocked())
+            if (pnode->fDisconnect ||
+                mAsyncTaskPool.HasReachedSoftAsyncTaskLimit(pnode->GetId()))
             {
                 continue;
             }
@@ -2562,6 +2573,7 @@ CConnman::CConnman(
     , nSeed0(nSeed0In)
     , nSeed1(nSeed1In)
     , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
+    , mAsyncTaskPool{configIn}
 {
     fNetworkActive = true;
     setBannedIsDirty = false;
