@@ -18,7 +18,7 @@ using stack_type = vector<frame_type>;
     
 using bsv::bint;
 
-constexpr auto min64{std::numeric_limits<int64_t>::min()};
+constexpr auto min64{std::numeric_limits<int64_t>::min()+1};
 constexpr auto max64{std::numeric_limits<int64_t>::max()};
 
 BOOST_AUTO_TEST_SUITE(bn_op_tests)
@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_op)
         BOOST_CHECK_EQUAL(1, stack.size());
         const auto frame = stack[0];
         const auto actual =
-            frame.empty() ? 0
+            frame.empty() ? bint{0}
                           : bsv::deserialize<bint>(begin(frame), end(frame));
         bint expected = polynomial_value(begin(exp_poly), end(exp_poly), bn);
         BOOST_CHECK_EQUAL(expected, actual);
@@ -179,7 +179,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
             const auto frame = stack[0];
             const auto actual =
                 frame.empty()
-                    ? 0
+                    ? bint{0}
                     : bsv::deserialize<bint>(begin(frame), end(frame));
             bint expected =
                 polynomial_value(begin(exp_poly), end(exp_poly), bn);

@@ -23,6 +23,9 @@ bsv::bint::bint() : value_{nullptr} {}
 
 bsv::bint::bint(int64_t i) : value_(BN_new(), empty_bn_deleter())
 {
+    // Precondition: i > std::numeric_limits<int64_t>::min() 
+    // as negation is out-of-range of int64_t
+    assert(i > std::numeric_limits<int64_t>::min());
     assert(value_);
     const bool negative{i < 0};
     const auto s{BN_set_word(value_.get(), negative ? -i : i)};

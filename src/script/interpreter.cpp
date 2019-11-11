@@ -1057,7 +1057,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                            ? stacktop(-1).size()
                                            : CScriptNum::MAXIMUM_ELEMENT_SIZE,
                                        big_ints_enabled);
-                        CScriptNum bn(big_ints_enabled ? bsv::bint{0} : 0);
+                        CScriptNum bn;
                         switch (opcode) {
                             case OP_ADD:
                                 bn = bn1 + bn2;
