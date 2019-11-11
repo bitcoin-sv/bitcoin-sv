@@ -21,6 +21,7 @@
 #include "rpc/tojson.h"
 #include "streams.h"
 #include "sync.h"
+#include "taskcancellation.h"
 #include "txmempool.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -1704,7 +1705,8 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
 
     CValidationState state;
     mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::REORG) };
-    ActivateBestChain(config, state, changeSet);
+    auto source = task::CCancellationSource::Make();
+    ActivateBestChain(source->GetToken(), config, state, changeSet);
 
     if (!state.IsValid()) {
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());

@@ -58,6 +58,11 @@ namespace boost {
 class thread_group;
 } // namespace boost
 
+namespace task
+{
+    class CCancellationSource;
+}
+
 /** Time between pings automatically sent out for latency probing and keepalive
  * (in seconds). */
 static const int PING_INTERVAL = 2 * 60;
@@ -451,6 +456,62 @@ public:
 
     void WakeMessageHandler();
 
+    static constexpr size_t NODES_ASYNC_TASK_THREADS_LIMIT = 6;
+    // Task pool for executing async node tasks. Task queue size is implicitly
+    // limited by maximum allowed connections (DEFAULT_MAX_PEER_CONNECTIONS)
+    // times maximum async requests that a node may have active at any given
+    // time.
+    class CAsyncTaskPool
+    {
+    public:
+        ~CAsyncTaskPool();
+
+        void AddToPool(
+            const std::shared_ptr<CNode>& node,
+            std::function<void(std::weak_ptr<CNode>)> function,
+            std::shared_ptr<task::CCancellationSource> source);
+
+        size_t GetActiveTasksCount(NodeId id)
+        {
+            return
+                std::count_if(
+                    mRunningTasks.begin(),
+                    mRunningTasks.end(),
+                    [id](const CRunningTask& container)
+                    {
+                        return container.mId == id;
+                    });
+        }
+
+        /**
+         * Node can be used to execute some code on a different thread to return
+         * control back to CConnman. Each node stores its pending futures that are
+         * removed once the task is done.
+         */
+        void HandleCompletedAsyncProcessing();
+
+    private:
+        struct CRunningTask
+        {
+            CRunningTask(
+                NodeId id,
+                std::future<void>&& future,
+                std::shared_ptr<task::CCancellationSource>&& cancellationSource)
+                : mId{id}
+                , mFuture{std::move(future)}
+                , mCancellationSource{std::move(cancellationSource)}
+            {/**/}
+            NodeId mId;
+            std::future<void> mFuture;
+            std::shared_ptr<task::CCancellationSource> mCancellationSource;
+        };
+
+        CThreadPool<CQueueAdaptor> mPool{
+            "CAsyncTaskPool",
+            NODES_ASYNC_TASK_THREADS_LIMIT};
+        std::vector<CRunningTask> mRunningTasks;
+    };
+
 private:
     struct ListenSocket {
         SOCKET socket;
@@ -584,14 +645,7 @@ private:
 
     std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
 
-    static constexpr size_t NODES_ASYNC_TASK_THREADS_LIMIT = 6;
-    // Task pool for executing async node tasks. Task queue size is implicitly
-    // limited by maximum allowed connections (DEFAULT_MAX_PEER_CONNECTIONS)
-    // times maximum async requests that a node may have active at any given
-    // time.
-    CThreadPool<CQueueAdaptor> mCNodeAsyncTaskPool{
-        "CNodeAsyncTaskPool",
-        NODES_ASYNC_TASK_THREADS_LIMIT};
+    CAsyncTaskPool mAsyncTaskPool;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);
@@ -964,7 +1018,7 @@ private:
         const CAddress& addrIn,
         uint64_t nKeyedNetGroupIn,
         uint64_t nLocalHostNonceIn,
-        CThreadPool<CQueueAdaptor>& asyncTaskPool,
+        CConnman::CAsyncTaskPool& asyncTaskPool,
         const std::string &addrNameIn = "",
         bool fInboundIn = false);
 
@@ -997,8 +1051,7 @@ private:
     std::deque<CTxnSendingDetails> mInvList;
     CCriticalSection cs_mInvList {};
 
-    CThreadPool<CQueueAdaptor>& mAsyncTaskPool;
-    std::vector<std::future<void>> mAsyncTaskFuture;
+    CConnman::CAsyncTaskPool& mAsyncTaskPool;
 
 public:
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
@@ -1084,35 +1137,31 @@ public:
     void MaybeSetAddrName(const std::string &addrNameIn);
 
     /**
-     * Node can be used to execute some code on a different thread to return
-     * controll back to CConnman. Each node stores its pending futures that are
-     * removed once the task is done.
-     */
-    void HandleCompletedAsyncProcessing();
-
-    /**
      * Run node related task asynchronously.
+     * Tasks may live longer than CNode instance exists as they are gracefully
+     * terminated before completion only when CConnman instance is terminated
+     * (CConnman destructor implicitly calls CAsyncTaskPool destructor which
+     * terminates the tasks).
      *
-     * NOTE: Function should never capture this node internally as that can lead
-     *       to unwanted lifetime extension:
-     *         - server begins to shut down
-     *         - async task isn't complete
-     *         - current node's destructor isn't called as the async task is
-     *           extending it's lifetime
-     *         - server shuts down without calling terminationFunction or
-     *           waiting for asynchronous tasks to gracefully finish
+     * The reason for task lifetime extension past CNode lifetime is that the
+     * network connection can be dropped which destroys CNode instance while
+     * on the other hand tasks should not be bound to this external event - for
+     * example current tasks call ActivateBestChain() which should finish even
+     * if connection is dropped (not related to a specific node).
+     *
+     * NOTE: Function should never capture bare pointer or shared pointer
+     *       reference to this node internally as that can lead to unwanted
+     *       lifetime extension (tasks may run longer than node is kept alive).
      *       For this reason the weak pointer that is provided as call parameter
      *       should be used instead.
+     *       In current tasks the weak pointer is used only for updating
+     *       CNode::nLastBlockTime which is relevant only while node instance
+     *       exists and has no side effects when we can't perform it after the
+     *       node instance no longer exists.
      */
     void RunAsyncProcessing(
-        std::function<void(std::weak_ptr<CNode>)> function)
-    {
-        mAsyncTaskFuture.push_back(
-            make_task(
-                mAsyncTaskPool,
-                function,
-                weak_from_this()));
-    }
+        std::function<void(std::weak_ptr<CNode>)> function,
+        std::shared_ptr<task::CCancellationSource> source);
 
     bool IsAsyncBlocked() const
     {
@@ -1120,7 +1169,7 @@ public:
 
         // async limit could be exceeded in the future if a single request would
         // spawn more than one async task so we check with >=
-        return (mAsyncTaskFuture.size() >= NODE_ASYNC_LIMIT);
+        return (mAsyncTaskPool.GetActiveTasksCount(GetId()) >= NODE_ASYNC_LIMIT);
     }
 };
 

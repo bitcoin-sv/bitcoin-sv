@@ -20,6 +20,7 @@
 #include "netbase.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
+#include "taskcancellation.h"
 #include "txn_propagator.h"
 #include "txn_validator.h"
 #include "ui_interface.h"
@@ -407,7 +408,7 @@ CNodePtr CConnman::ConnectNode(CAddress addrConnect, const char *pszDest,
                 addrConnect,
                 CalculateKeyedNetGroup(addrConnect),
                 nonce,
-                mCNodeAsyncTaskPool,
+                mAsyncTaskPool,
                 pszDest ? pszDest : "",
                 false);
         pnode->nServicesExpected = ServiceFlags(addrConnect.nServices & nRelevantServices);
@@ -627,6 +628,62 @@ void CConnman::AddWhitelistedRange(const CSubNet &subnet) {
     vWhitelistedRange.push_back(subnet);
 }
 
+CConnman::CAsyncTaskPool::~CAsyncTaskPool()
+{
+    for(auto& task : mRunningTasks)
+    {
+        task.mCancellationSource->Cancel();
+    }
+    for(auto& task : mRunningTasks)
+    {
+        task.mFuture.wait();
+    }
+}
+
+void CConnman::CAsyncTaskPool::AddToPool(
+    const std::shared_ptr<CNode>& node,
+    std::function<void(std::weak_ptr<CNode>)> function,
+    std::shared_ptr<task::CCancellationSource> source)
+{
+    mRunningTasks.emplace_back(
+        node->GetId(),
+        make_task(
+            mPool,
+            function,
+            std::weak_ptr<CNode>{node}),
+        std::move(source));
+}
+
+void CConnman::CAsyncTaskPool::HandleCompletedAsyncProcessing()
+{
+    using namespace std::literals::chrono_literals;
+
+    for(size_t i=0; i<mRunningTasks.size();)
+    {
+        if(mRunningTasks[i].mFuture.wait_for(1ms) == std::future_status::ready)
+        {
+            try
+            {
+                mRunningTasks[i].mFuture.get();
+            }
+            catch(const std::exception& e)
+            {
+                PrintExceptionContinue(&e, "ProcessMessages()");
+            }
+            catch(...)
+            {
+                PrintExceptionContinue(nullptr, "ProcessMessages()");
+            }
+
+            mRunningTasks.erase(std::next(mRunningTasks.begin(), i));
+        }
+        else
+        {
+            ++i;
+        }
+    }
+}
+
 std::string CNode::GetAddrName() const {
     LOCK(cs_addrName);
     return addrName;
@@ -639,34 +696,14 @@ void CNode::MaybeSetAddrName(const std::string &addrNameIn) {
     }
 }
 
-void CNode::HandleCompletedAsyncProcessing()
+void CNode::RunAsyncProcessing(
+    std::function<void(std::weak_ptr<CNode>)> function,
+    std::shared_ptr<task::CCancellationSource> source)
 {
-    using namespace std::literals::chrono_literals;
-
-    for(size_t i=0; i<mAsyncTaskFuture.size();)
-    {
-        if(mAsyncTaskFuture[i].wait_for(1ms) == std::future_status::ready)
-        {
-            try
-            {
-                mAsyncTaskFuture[i].get();
-            }
-            catch(const std::exception& e)
-            {
-                PrintExceptionContinue(&e, "ProcessMessages()");
-            }
-            catch(...)
-            {
-                PrintExceptionContinue(nullptr, "ProcessMessages()");
-            }
-
-            mAsyncTaskFuture.erase(std::next(mAsyncTaskFuture.begin(), i));
-        }
-        else
-        {
-            ++i;
-        }
-    }
+    mAsyncTaskPool.AddToPool(
+        shared_from_this(),
+        function,
+        source);
 }
 
 CService CNode::GetAddrLocal() const {
@@ -1313,7 +1350,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
             addr,
             CalculateKeyedNetGroup(addr),
             nonce,
-            mCNodeAsyncTaskPool,
+            mAsyncTaskPool,
             "",
             true);
     pnode->fWhitelisted = whitelisted;
@@ -2271,10 +2308,10 @@ void CConnman::ThreadMessageHandler()
 
         bool fMoreWork = false;
 
+        mAsyncTaskPool.HandleCompletedAsyncProcessing();
+
         for (const CNodePtr& pnode : vNodesCopy)
         {
-            pnode->HandleCompletedAsyncProcessing();
-
             if (pnode->fDisconnect || pnode->IsAsyncBlocked())
             {
                 continue;
@@ -3009,7 +3046,7 @@ CNode::CNode(
     const CAddress& addrIn,
     uint64_t nKeyedNetGroupIn,
     uint64_t nLocalHostNonceIn,
-    CThreadPool<CQueueAdaptor>& asyncTaskPool,
+    CConnman::CAsyncTaskPool& asyncTaskPool,
     const std::string& addrNameIn,
     bool fInboundIn)
     : hSocket(hSocketIn)
@@ -3038,7 +3075,8 @@ CNode::CNode(
     }
 }
 
-CNode::~CNode() {
+CNode::~CNode()
+{
     CloseSocket(hSocket);
 
     LOCK(cs_filter);

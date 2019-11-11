@@ -21,6 +21,7 @@
 #include "rpc/server.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
+#include "taskcancellation.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -92,7 +93,8 @@ TestingSetup::TestingSetup(const std::string &chainName)
     {
         CValidationState state;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
-        if (!ActivateBestChain(config, state, changeSet)) {
+        auto source = task::CCancellationSource::Make();
+        if (!ActivateBestChain(source->GetToken(), config, state, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }

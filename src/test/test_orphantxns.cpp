@@ -79,7 +79,7 @@ namespace {
         std::shared_ptr<COrphanTxns>& orphanTxns,
         TxSource source,
         int32_t nOrphanTxnsCount,
-        CThreadPool<CQueueAdaptor>& asyncTaskPool)
+        CConnman::CAsyncTaskPool& asyncTaskPool)
     {
         for (NodeId i = 0; i < nOrphanTxnsCount; i++) {
             CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
@@ -114,7 +114,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_creation) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -155,7 +155,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -176,7 +176,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -202,7 +202,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(

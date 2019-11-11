@@ -158,8 +158,7 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test) {
 
     // Test that fFeeler is false by default.
 
-    CThreadPool<CQueueAdaptor> asyncTaskPool{
-        "cnode_simple_test_AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     CNodePtr pnode1 =
         CNode::Make(
             id++,

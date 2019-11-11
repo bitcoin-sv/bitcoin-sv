@@ -33,6 +33,7 @@
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
+#include "taskcancellation.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "txdb.h"
@@ -109,6 +110,18 @@ const std::string sDoubleSpendRejectMsg = "bad-txn-double-spend-detected";
 
 // Internal stuff
 namespace {
+
+/**
+ * Exception used for indicating validation termination (not an error).
+ */
+class CBlockValidationCancellation : public std::exception
+{
+public:
+    const char* what() const noexcept override
+    {
+        return "CBlockValidationCancellation";
+    };
+};
 
 struct CBlockIndexWorkComparator {
     bool operator()(const CBlockIndex *pa, const CBlockIndex *pb) const {
@@ -2622,7 +2635,7 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
-static std::unique_ptr<checkqueue::CCheckQueuePool<CScriptCheck>> scriptCheckQueuePool;
+static std::unique_ptr<checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>> scriptCheckQueuePool;
 
 void InitScriptCheckQueues(boost::thread_group& threadGroup, size_t threadCount)
 {
@@ -2630,7 +2643,7 @@ void InitScriptCheckQueues(boost::thread_group& threadGroup, size_t threadCount)
     constexpr size_t SCRIPT_CHECK_BATCH_SIZE = 128;
 
     scriptCheckQueuePool =
-        std::make_unique<checkqueue::CCheckQueuePool<CScriptCheck>>(
+        std::make_unique<checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>>(
             SCRIPT_CHECK_POOL_SIZE,
             threadGroup,
             threadCount,
@@ -2705,8 +2718,17 @@ static int64_t nTimeTotal = 0;
  *     - CBestBlockAttachmentCancellation when chain tip has changed while cs_main
  *       was unlocked (a different best block candidate has finished validation
  *       before we re-locked cs_main)
+ *
+ * THROWS:
+ *     - CBlockValidationCancellation when validation was canceled through the
+ *       cancellation token before it could finish. This can happen due to an
+ *       external reason (e.g. shutting down the application) or internal (e.g.
+ *       a better block candidate came in but all the checkers were already in
+ *       use so check queue pool cancels the worst one for reuse with the better
+ *       candidate).
  */
 static bool ConnectBlock(
+    const task::CCancellationToken& token,
     bool parallelBlockValidation,
     const Config &config,
     const CBlock &block,
@@ -2856,11 +2878,14 @@ static bool ConnectBlock(
 
     // CCheckQueueScopeGuard that does nothing and does not belong to any pool.
     using NullScriptChecker =
-        checkqueue::CCheckQueuePool<CScriptCheck>::CCheckQueueScopeGuard;
+        checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>::CCheckQueueScopeGuard;
+
+    // Token for use during functional testing
+    std::optional<task::CCancellationToken> checkPoolToken;
 
     auto control =
         fScriptChecks
-        ? scriptCheckQueuePool->GetChecker()
+        ? scriptCheckQueuePool->GetChecker(pindex->nChainWork, token, &checkPoolToken)
         : NullScriptChecker{};
 
     std::vector<int> prevheights;
@@ -2937,7 +2962,10 @@ static bool ConnectBlock(
                              tx.GetId().ToString(), FormatStateMessage(state));
             }
 
-            control.Add(vChecks);
+            if(fScriptChecks)
+            {
+                control.Add(vChecks);
+            }
         }
 
         CTxUndo undoDummy;
@@ -2987,10 +3015,24 @@ static bool ConnectBlock(
             ? std::make_unique<CTemporaryLeaveCriticalSectionGuard>(cs_main)
             : nullptr;
 
-        blockValidationStatus.waitIfRequired(pindex->GetBlockHash());
-        auto controllValidationStatusOK = control.Wait();
+        if(checkPoolToken)
+        {
+            // We only wait during tests and even then only if validation would
+            // be performed.
+            blockValidationStatus.waitIfRequired(
+                pindex->GetBlockHash(),
+                task::CCancellationToken::JoinToken(checkPoolToken.value(), token));
+        }
+        auto controlValidationStatusOK = control.Wait();
 
-        if (!controllValidationStatusOK)
+        if (!controlValidationStatusOK.has_value())
+        {
+            // validation was terminated before it was able to complete so we should
+            // skip validity setting to SCRIPTS
+            throw CBlockValidationCancellation{};
+        }
+
+        if (!controlValidationStatusOK.value())
         {
             return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
                              "parallel script check failed");
@@ -3492,6 +3534,7 @@ public:
  */
 static bool ConnectTip(
     bool parallelBlockValidation,
+    const task::CCancellationToken& token,
     const Config &config,
     CValidationState &state,
     CBlockIndex *pindexNew,
@@ -3533,6 +3576,7 @@ static bool ConnectTip(
 
         bool rv =
             ConnectBlock(
+                token,
                 parallelBlockValidation,
                 config,
                 blockConnecting,
@@ -3685,6 +3729,7 @@ static void PruneBlockIndexCandidates() {
  * pindexMostWork.
  */
 static bool ActivateBestChainStep(
+    const task::CCancellationToken& token,
     const Config &config,
     CValidationState &state,
     CBlockIndex *pindexMostWork,
@@ -3738,6 +3783,7 @@ static bool ActivateBestChainStep(
                     validation thus wasting resources. We also don't wish to
                     end up announcing older chain items as new best tip.*/
                     pindexOldTip && chainActive.Tip()->nChainWork == pindexOldTip->nChainWork,
+                    token,
                     config,
                     state,
                     pindexConnect,
@@ -3886,9 +3932,13 @@ namespace
     };
 }
 
-bool ActivateBestChain(const Config &config, CValidationState &state,
-                       const CJournalChangeSetPtr& changeSet,
-                       std::shared_ptr<const CBlock> pblock) {
+bool ActivateBestChain(
+    const task::CCancellationToken& token,
+    const Config &config,
+    CValidationState &state,
+    const CJournalChangeSetPtr& changeSet,
+    std::shared_ptr<const CBlock> pblock)
+{
     // Note that while we're often called here from ProcessNewBlock, this is
     // far from a guarantee. Things in the P2P/RPC will often end up calling
     // us in the middle of ProcessNewBlock - do not assume pblock is set
@@ -3906,7 +3956,7 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
         try
         {
             boost::this_thread::interruption_point();
-            if (ShutdownRequested()) {
+            if (ShutdownRequested() || token.IsCanceled()) {
                 break;
             }
 
@@ -3977,6 +4027,7 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
                 bool fInvalidFound = false;
                 std::shared_ptr<const CBlock> nullBlockPtr;
                 if (!ActivateBestChainStep(
+                        token,
                         config, state, pindexMostWork,
                         pblock &&
                                 pblock->GetHash() == pindexMostWork->GetBlockHash()
@@ -4031,6 +4082,15 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
             LogPrintf(
                 "Block %s was not activated as best chain as a better block was"
                 " already validated before this one was fully validated.\n",
+                hash);
+        }
+        catch(const CBlockValidationCancellation&)
+        {
+            std::string hash{pblock ? pblock->GetHash().GetHex() : ""};
+
+            LogPrintf(
+                "Block %s validation was terminated before completion. It will"
+                " not be considered for best block chain at this moment.\n",
                 hash);
         }
     } while (true); // loop exit should be determined inside cs_main lock above
@@ -4113,7 +4173,8 @@ bool PreciousBlock(const Config &config, CValidationState &state,
     }
 
     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
-    return ActivateBestChain(config, state, changeSet);
+    auto source = task::CCancellationSource::Make();
+    return ActivateBestChain(source->GetToken(), config, state, changeSet);
 }
 
 bool InvalidateBlock(const Config &config, CValidationState &state,
@@ -4160,7 +4221,8 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
 
     if (state.IsValid()) {
-        ActivateBestChain(config, state, changeSet);
+        auto source = task::CCancellationSource::Make();
+        ActivateBestChain(source->GetToken(), config, state, changeSet);
     }
 
     // Check mempool & journal
@@ -4901,6 +4963,7 @@ bool VerifyNewBlock(const Config &config,
 }
 
 std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
+    task::CCancellationToken&& token,
     const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
@@ -4940,12 +5003,18 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     NotifyHeaderTip();
 
     auto bestChainActivation =
-        [&config, pblock, guard]
+        [&config, pblock, guard, token]
         {
             // Only used to report errors, not invalidity - ignore it
             CValidationState state;
             CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
-            if (!ActivateBestChain(config, state, changeSet, pblock))
+
+            if (!ActivateBestChain(
+                    token,
+                    config,
+                    state,
+                    changeSet,
+                    pblock))
             {
                 return error("%s: ActivateBestChain failed", __func__);
             }
@@ -4960,9 +5029,10 @@ bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
                      bool fForceProcessing, bool *fNewBlock)
 {
+    auto source = task::CCancellationSource::Make();
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            config, pblock, fForceProcessing, fNewBlock);
+            source->GetToken(), config, pblock, fForceProcessing, fNewBlock);
 
     if(!bestChainActivation)
     {
@@ -5012,7 +5082,8 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
         return error("%s: Consensus::ContextualCheckBlock: %s", __func__,
                      FormatStateMessage(state));
     }
-    if (!ConnectBlock(false, config, block, state, &indexDummy, viewNew, true))
+    auto source = task::CCancellationSource::Make();
+    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, true))
     {
         return false;
     }
@@ -5437,7 +5508,8 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
                     "VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s",
                     pindex->nHeight, pindex->GetBlockHash().ToString());
             }
-            if (!ConnectBlock(false, config, block, state, pindex, coins)) {
+            auto source = task::CCancellationSource::Make();
+            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins)) {
                 return error(
                     "VerifyDB(): *** found unconnectable block at %d, hash=%s",
                     pindex->nHeight, pindex->GetBlockHash().ToString());
@@ -5831,7 +5903,8 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                 if (hash == chainparams.GetConsensus().hashGenesisBlock) {
                     CValidationState state;
                     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
-                    if (!ActivateBestChain(config, state, changeSet)) {
+                    auto source = task::CCancellationSource::Make();
+                    if (!ActivateBestChain(source->GetToken(), config, state, changeSet)) {
                         break;
                     }
                 }

@@ -28,6 +28,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "random.h"
+#include "taskcancellation.h"
 #include "tinyformat.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -2589,12 +2590,13 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
 
     if(fBlockRead) {
         bool fNewBlock = false;
+        auto source = task::CCancellationSource::Make();
         // Since we requested this block (it was in mapBlocksInFlight),
         // force it to be processed, even if it would not be a candidate for
         // new tip (missing previous block, chain not long enough, etc)
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                config, pblock, true, &fNewBlock);
+                source->GetToken(), config, pblock, true, &fNewBlock);
         if(!bestChainActivation)
         {
             // something went wrong before we need to activate best chain
@@ -2615,7 +2617,8 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
                         pfrom->nLastBlockTime = GetTime();
                     }
                 }
-            });
+            },
+            source);
     }
 }
  
@@ -2843,9 +2846,10 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         }
 
         bool fNewBlock = false;
+        auto source = task::CCancellationSource::Make();
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                config, pblock, true, &fNewBlock);
+                source->GetToken(), config, pblock, true, &fNewBlock);
         if(bestChainActivation)
         {
             pfrom->RunAsyncProcessing(
@@ -2873,7 +2877,8 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                         // interfere with block relay.
                         MarkBlockAsReceived(pblock->GetHash());
                     }
-                });
+                },
+                source);
         }
         // else something went wrong before we need to activate best chain
         // so we just skip it
@@ -2910,9 +2915,10 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
     }
 
     bool fNewBlock = false;
+    auto source = task::CCancellationSource::Make();
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            config, pblock, forceProcessing, &fNewBlock);
+            source->GetToken(), config, pblock, forceProcessing, &fNewBlock);
     if(!bestChainActivation)
     {
         // something went wrong before we need to activate best chain
@@ -2933,7 +2939,8 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
                     pfrom->nLastBlockTime = GetTime();
                 }
             }
-        });
+        },
+        source);
 }
  
 /**

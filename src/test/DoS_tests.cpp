@@ -37,7 +37,7 @@ BOOST_AUTO_TEST_CASE(DoS_banning) {
     const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"DoS_banning_AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     connman->ClearBanned();
     CAddress addr1(ip(0xa0b0c001), NODE_NONE);
     CNodePtr dummyNode1 =
@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(DoS_banscore) {
     const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"DoS_banscore_AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     connman->ClearBanned();
     // because 11 is my favorite number.
     gArgs.ForceSetArg("-banscore", "111");
@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(DoS_bantime) {
     const Config &config = GlobalConfig::GetConfig();
     std::atomic<bool> interruptDummy(false);
 
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"DoS_bantime_AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
     connman->ClearBanned();
     int64_t nStartTime = GetTime();
     // Overrides future calls to GetTime()
@@ -188,7 +188,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                             maxExtraTxnsForCompactBlock)
     };
 
-    CThreadPool<CQueueAdaptor> asyncTaskPool{"DoS_mapOrphans_AsyncNodeTaskPool"};
+    CConnman::CAsyncTaskPool asyncTaskPool;
 
     // 50 orphan transactions:
     for (NodeId i = 0; i < 50; i++) {

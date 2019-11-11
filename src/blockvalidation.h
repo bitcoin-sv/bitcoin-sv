@@ -13,6 +13,7 @@
 
 #include "chain.h"
 #include "uint256.h"
+#include "taskcancellation.h"
 
 /**
  * Exception used for indicating that block has been validated but a different
@@ -156,7 +157,9 @@ public:
         }
     }
 
-    void waitIfRequired(const uint256& blockHash) const
+    void waitIfRequired(
+        const uint256& blockHash,
+        const task::CCancellationToken& token) const
     {
         bool foundFlag = false;
 
@@ -181,7 +184,7 @@ public:
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(100ms);
             }
-        } while (foundFlag);
+        } while (foundFlag && !token.IsCanceled());
     }
 };
 

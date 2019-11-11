@@ -61,6 +61,11 @@ namespace boost
     class thread_group;
 }
 
+namespace task
+{
+    class CCancellationToken;
+}
+
 #define MIN_TRANSACTION_SIZE                                                   \
     (::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION))
 
@@ -381,6 +386,7 @@ bool ProcessNewBlock(const Config &config,
  * seen it.
  */
 std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
+    task::CCancellationToken&& token,
     const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
@@ -485,7 +491,9 @@ bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
  * occurred (no disk space, database error, ...).
  */
 bool ActivateBestChain(
-    const Config &config, CValidationState &state,
+    const task::CCancellationToken& token,
+    const Config &config,
+    CValidationState &state,
     const mining::CJournalChangeSetPtr& changeSet,
     std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);

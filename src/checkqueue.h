@@ -6,11 +6,15 @@
 #define BITCOIN_CHECKQUEUE_H
 
 #include <algorithm>
+#include <memory>
+#include <optional>
 #include <vector>
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
+
+#include "taskcancellation.h"
 
 /**
  * Queue for verifications that have to be performed.
@@ -21,9 +25,47 @@
  * queue, where they are processed by N-1 worker threads. When the master is
  * done adding work, it temporarily joins the worker pool as an N'th worker,
  * until all jobs are done.
+ *
+ * NOTE: This class is intended to be used through CCheckQueuePool and not by
+ *       itself.
  */
 template <typename T> class CCheckQueue {
 private:
+    /**
+     * Scope guard that makes sure that even if an exception is thrown inside
+     * Loop() (e.g. by cond.wait(lock);) the worker count will be correct.
+     */
+    class CTotalScopeGuard
+    {
+    public:
+        CTotalScopeGuard(
+            boost::mutex& mutex,
+            int& counter)
+            : mMutex{mutex}
+            , mCounter{&counter}
+        {/**/}
+
+        ~CTotalScopeGuard()
+        {
+            if(mRunning)
+            {
+                boost::unique_lock<boost::mutex> lock{mMutex};
+                --(*mCounter);
+            }
+        }
+
+        void runNL()
+        {
+            ++(*mCounter);
+            mRunning = true;
+        }
+
+    private:
+      boost::mutex& mMutex;
+      int* mCounter;
+      bool mRunning = false;
+    };
+
     //! Mutex to protect the inner state
     boost::mutex mutex;
 
@@ -38,34 +80,42 @@ private:
     std::vector<T> queue;
 
     //! The number of workers (including the master) that are idle.
-    int nIdle;
+    int nIdle = 0;
 
     //! The total number of workers (including the master).
-    int nTotal;
+    int nTotal = 0;
 
     //! The temporary evaluation result.
-    bool fAllOk;
+    bool fAllOk = true;
 
     /**
      * Number of verifications that haven't completed yet.
      * This includes elements that are no longer queued, but still in the
      * worker's own batches.
      */
-    unsigned int nTodo;
+    unsigned int nTodo = 0;
 
-    //! Whether we're shutting down.
-    bool fQuit;
+    std::optional<task::CCancellationToken> mSessionToken;
 
     //! The maximum number of elements to be processed in one batch
     unsigned int nBatchSize;
 
+    /**
+     * flag that is used only to enforce that after wait is called/object is
+     * moved we are no longer allowed to call `Add()`
+     */
+    bool mWaitCalled = true;
+
     /** Internal function that does bulk of the verification work. */
-    bool Loop(bool fMaster = false) {
+    std::optional<bool> Loop(bool fMaster = false)
+    {
         boost::condition_variable &cond = fMaster ? condMaster : condWorker;
         std::vector<T> vChecks;
         vChecks.reserve(nBatchSize);
         unsigned int nNow = 0;
         bool fOk = true;
+        CTotalScopeGuard guard{mutex, nTotal};
+
         do {
             {
                 boost::unique_lock<boost::mutex> lock(mutex);
@@ -74,27 +124,59 @@ private:
                 if (nNow) {
                     fAllOk &= fOk;
                     nTodo -= nNow;
+
+                    if (mSessionToken->IsCanceled())
+                    {
+                        // drain remaining work from the queue (there can still
+                        // be some work in other workers)
+                        nTodo -= queue.size();
+                        queue.clear();
+                    }
+
                     if (nTodo == 0 && !fMaster)
+                    {
                         // We processed the last element; inform the master it
                         // can exit and return the result
                         condMaster.notify_one();
-                } else {
-                    // first iteration
-                    nTotal++;
+                    }
                 }
+                else
+                {
+                    // first iteration
+                    guard.runNL();
+                }
+
                 // logically, the do loop starts here
                 while (queue.empty()) {
-                    if ((fMaster || fQuit) && nTodo == 0) {
-                        nTotal--;
-                        bool fRet = fAllOk;
-                        // reset the status for new work later
-                        if (fMaster) fAllOk = true;
+                    // master will exit only after all the work has been done
+                    // so we need to wait for all the workers to finish at which
+                    // point nTodo == 0 is true
+                    if (fMaster && nTodo == 0)
+                    {
+                        // At this point we know that all the workers have
+                        // completed their tasks (nTodo == 0) so we can return
+                        // the result without the fear of some workers still
+                        // being active from current session once the next
+                        // session starts
+                        if (mSessionToken->IsCanceled())
+                        {
+                            return {};
+                        }
+
                         // return the current status
-                        return fRet;
+                        return fAllOk;
                     }
+
+                    // increment idle counter and decrement it once the guard goes out of scope
                     nIdle++;
-                    cond.wait(lock); // wait
-                    nIdle--;
+                    auto decrement = [](int* counter) {--(*counter);};
+                    std::unique_ptr<int, decltype(decrement)> idleGuard{&nIdle, decrement};
+
+                    // wait for either more work to continue processing
+                    // or thread termination in which case this function exits
+                    // with an exception that is automatically caught inside
+                    // boost thread object before thread termination inside join
+                    cond.wait(lock);
                 }
                 // Decide how many work units to process now.
                 // * Do not try to do everything at once, but aim for
@@ -120,7 +202,12 @@ private:
             }
             // execute work
             for (T &check : vChecks) {
-                if (fOk) fOk = check();
+                if (!fOk || mSessionToken->IsCanceled())
+                {
+                    break;
+                }
+
+                fOk = check();
             }
             vChecks.clear();
         } while (true);
@@ -129,19 +216,53 @@ private:
 public:
     //! Create a new check queue
     CCheckQueue(unsigned int nBatchSizeIn)
-        : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), fQuit(false),
-          nBatchSize(nBatchSizeIn) {}
+        : nBatchSize(nBatchSizeIn) {}
 
     //! Worker thread
-    void Thread() { Loop(); }
+    void Thread() {Loop();}
 
-    //! Wait until execution finishes, and return whether all evaluations were
-    //! successful.
-    bool Wait() { return Loop(true); }
+    /**
+     * Wait until execution finishes, and return whether all evaluations were
+     * successful. In case of early validation termination an empty optional is
+     * returned.
+     *
+     * NOTE: StartCheckingSession, Add and Wait are not thread safe and should
+     *       be called from the same thread or the caller should make sure to
+     *       handle thread synchronization.
+     */
+    std::optional<bool> Wait()
+    {
+        if (!mSessionToken)
+        {
+            throw std::runtime_error("Session token not set!");
+        }
 
-    //! Add a batch of checks to the queue
-    void Add(std::vector<T> &vChecks) {
+        mWaitCalled = true;
+
+        return Loop(true);
+    }
+
+    /**
+     * Add a batch of checks to the queue. Add can not be performed before a
+     * session is opened and can't be performed after `Wait()` has been called.
+     *
+     * NOTE: StartCheckingSession, Add and Wait are not thread safe and should
+     *       be called from the same thread or the caller should make sure to
+     *       handle thread synchronization.
+     */
+    void Add(std::vector<T> &vChecks)
+    {
+        if (!mSessionToken)
+        {
+            throw std::runtime_error("Session token not set!");
+        }
+        else if (mWaitCalled)
+        {
+            throw std::runtime_error("Add() called after Wait()!");
+        }
+
         boost::unique_lock<boost::mutex> lock(mutex);
+
         for (T &check : vChecks) {
             queue.push_back(std::move(check));
         }
@@ -155,54 +276,30 @@ public:
 
     bool IsIdle() {
         boost::unique_lock<boost::mutex> lock(mutex);
-        return (nTotal == nIdle && nTodo == 0 && fAllOk == true);
-    }
-};
-
-/**
- * RAII-style controller object for a CCheckQueue that guarantees the passed
- * queue is finished before continuing.
- */
-template <typename T> class CCheckQueueControl {
-private:
-    CCheckQueue<T> *pqueue;
-    bool fDone;
-
-public:
-    CCheckQueueControl(CCheckQueue<T> *pqueueIn)
-        : pqueue(pqueueIn), fDone(false) {
-        // passed queue is supposed to be unused, or nullptr
-        if (pqueue != nullptr) {
-            bool isIdle = pqueue->IsIdle();
-            assert(isIdle);
-        }
+        return (nTotal == nIdle && nTodo == 0);
     }
 
-    CCheckQueueControl(CCheckQueueControl&& other) noexcept
-        : pqueue{other.pqueue}
-        , fDone{other.fDone}
+    /**
+     * Start new checking session - must be called before Add/Wait.
+     *
+     * New session can be started only after IsIdle() is true.
+     *
+     * NOTE: StartCheckingSession, Add and Wait are not thread safe and should
+     *       be called from the same thread or the caller should make sure to
+     *       handle thread synchronization.
+     */
+    void StartCheckingSession(task::CCancellationToken&& token)
     {
-        other.pqueue = nullptr;
-        other.fDone = true;
-    }
+        if(!mWaitCalled || !IsIdle())
+        {
+            throw std::runtime_error("Session already in progress!");
+        }
 
-    CCheckQueueControl& operator=(CCheckQueueControl&&) = delete;
-    CCheckQueueControl(const CCheckQueueControl&) = delete;
-    CCheckQueueControl& operator=(const CCheckQueueControl&) = delete;
+        boost::unique_lock<boost::mutex> lock(mutex);
 
-    bool Wait() {
-        if (pqueue == nullptr) return true;
-        bool fRet = pqueue->Wait();
-        fDone = true;
-        return fRet;
-    }
-
-    void Add(std::vector<T> &vChecks) {
-        if (pqueue != nullptr) pqueue->Add(vChecks);
-    }
-
-    ~CCheckQueueControl() {
-        if (!fDone) Wait();
+        mSessionToken = token;
+        fAllOk = true;
+        mWaitCalled = false;
     }
 };
 

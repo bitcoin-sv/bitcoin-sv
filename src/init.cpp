@@ -34,6 +34,7 @@
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
+#include "taskcancellation.h"
 #include "timedata.h"
 #include "torcontrol.h"
 #include "txdb.h"
@@ -1173,7 +1174,8 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
         // connected in the active best chain
         CValidationState state;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
-        if (!ActivateBestChain(config, state, changeSet)) {
+        auto source = task::CCancellationSource::Make();
+        if (!ActivateBestChain(source->GetToken(), config, state, changeSet)) {
             LogPrintf("Failed to connect best block");
             StartShutdown();
         }

@@ -6,7 +6,7 @@
 #include "data/tx_valid.json.h"
 #include "test/test_bitcoin.h"
 
-#include "checkqueue.h"
+#include "checkqueuepool.h"
 #include "clientversion.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -443,13 +443,13 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     // check all inputs concurrently, with the cache
     PrecomputedTransactionData txdata(tx);
     boost::thread_group threadGroup;
-    CCheckQueue<CScriptCheck> scriptcheckqueue(128);
-    CCheckQueueControl<CScriptCheck> control(&scriptcheckqueue);
-
-    for (int i = 0; i < 20; i++) {
-        threadGroup.create_thread(boost::bind(
-            &CCheckQueue<CScriptCheck>::Thread, boost::ref(scriptcheckqueue)));
-    }
+    checkqueue::CCheckQueuePool<CScriptCheck, int> pool{
+        1, /* validator count */
+        threadGroup,
+        20, // validation threads count
+        128}; // max batch size
+    auto source = task::CCancellationSource::Make();
+    auto control = pool.GetChecker(0, source->GetToken());
 
     std::vector<Coin> coins;
     for (size_t i = 0; i < mtx.vin.size(); i++) {
@@ -469,8 +469,8 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         control.Add(vChecks);
     }
 
-    bool controlCheck = control.Wait();
-    BOOST_CHECK(controlCheck);
+    auto controlCheck = control.Wait();
+    BOOST_CHECK(controlCheck && controlCheck.value());
 
     threadGroup.interrupt_all();
     threadGroup.join_all();
