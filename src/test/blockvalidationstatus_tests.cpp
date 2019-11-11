@@ -40,9 +40,15 @@ BOOST_AUTO_TEST_CASE(blockvalidationstatus_rpc) {
     BOOST_CHECK_NO_THROW(CallRPC("waitaftervalidatingblock 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f remove"));
     BOOST_CHECK(blockValidationStatus.getWaitingAfterValidationBlocks().size() == 0);
 
+
+    uint256 dummyBlockHash = GetRandHash();
+    CBlockIndex index;
+    index.phashBlock = &dummyBlockHash;
     {
-        auto guard = blockValidationStatus.getScopedCurrentlyValidatingBlock(uint256S("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"));
-        BOOST_CHECK_EQUAL(blockValidationStatus.getCurrentlyValidatingBlocks().at(0).ToString(), "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f");
+        auto guard = blockValidationStatus.getScopedCurrentlyValidatingBlock(index);
+        BOOST_CHECK_EQUAL(
+            blockValidationStatus.getCurrentlyValidatingBlocks().at(0).ToString(),
+            dummyBlockHash.ToString());
     }
     BOOST_CHECK(blockValidationStatus.getCurrentlyValidatingBlocks().size() == 0);
 

@@ -477,9 +477,12 @@ bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
  * If it fails, the tip is not updated.
  *
  * pblock is either nullptr or a pointer to a block that is already loaded
- * in memory (to avoid loading it from disk again).
+ * in memory (to avoid loading it from disk again). It also enables parallel
+ * block validation if provided block is building on top of currently active
+ * tip and a different call to ActivateBestChain is already in progress.
  *
- * Returns true if a new chain tip was set.
+ * Returns true if no fatal errors occurred. Returns false in case a fatal error
+ * occurred (no disk space, database error, ...).
  */
 bool ActivateBestChain(
     const Config &config, CValidationState &state,

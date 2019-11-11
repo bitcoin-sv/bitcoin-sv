@@ -5,32 +5,75 @@
 #define BITCOIN_BLOCK_VALIDATION_H
 
 #include <algorithm>
+#include <exception>
 #include <mutex>
 #include <string_view>
 #include <thread>
 #include <vector>
 
+#include "chain.h"
 #include "uint256.h"
 
+/**
+ * Exception used for indicating that block has been validated but a different
+ * block that was in parallel validation was validated before and changed
+ * chain tip so we should not change it again (not an error).
+ */
+class CBestBlockAttachmentCancellation : public std::exception
+{
+public:
+    const char* what() const noexcept override
+    {
+        return "CBestBlockAttachmentCancellation";
+    };
+};
+
+/**
+ * Class for tracking blocks that are currently in script validation stage.
+ *
+ * FOR TESTING ONLY: Also handles blocking blocks from reporting validation
+ *                   completed to simulate long validating blocks and reorder
+ *                   of accepted-validating blocks order while cs_main is
+ *                   released.
+ *
+ * NOTE: This class doesn't require cs_main lock as CBlockIndex address and hash
+ *       stability are guaranteed by mapBlockIndex implementation.
+ */
 class CBlockValidationStatus
 {
 private:
-    std::vector<uint256> mCurrentlyValidatingBlocks;
-    std::mutex mMutexCurrentlyValidatingBlocks;
+    std::vector<const CBlockIndex*> mCurrentlyValidatingBlocks;
+    mutable std::mutex mMutexCurrentlyValidatingBlocks;
 
     std::vector<uint256> mWaitAfterValidation;
-    std::mutex mMutexWaitAfterValidation;
+    mutable std::mutex mMutexWaitAfterValidation;
 
 public:
     class CScopeGuard
     {
     public:
-        CScopeGuard(CBlockValidationStatus& instance, const uint256& blockHash)
+        CScopeGuard(CBlockValidationStatus& instance, const CBlockIndex& index)
             : mInstance{instance}
-            , mBlockHash{blockHash}
+            , mIndex{index}
         {
             std::scoped_lock lockGuard{mInstance.mMutexCurrentlyValidatingBlocks};
-            mInstance.mCurrentlyValidatingBlocks.push_back(mBlockHash);
+
+            bool alreadyValidating =
+                std::any_of(
+                    mInstance.mCurrentlyValidatingBlocks.begin(),
+                    mInstance.mCurrentlyValidatingBlocks.end(),
+                    [&index](const CBlockIndex* other)
+                    {
+                        return other == &index;
+                    });
+
+            if (alreadyValidating)
+            {
+                // Same block already being validated - if this happens we have a bug
+                throw CBestBlockAttachmentCancellation{};
+            }
+
+            mInstance.mCurrentlyValidatingBlocks.push_back(&mIndex);
         }
 
         ~CScopeGuard()
@@ -40,26 +83,52 @@ public:
                 std::find(
                     mInstance.mCurrentlyValidatingBlocks.begin(),
                     mInstance.mCurrentlyValidatingBlocks.end(),
-                    mBlockHash));
+                    &mIndex));
         }
 
     private:
         CBlockValidationStatus& mInstance;
-        uint256 mBlockHash;
+        const CBlockIndex& mIndex;
     };
 
-    CScopeGuard getScopedCurrentlyValidatingBlock(const uint256& blockHash)
+    CScopeGuard getScopedCurrentlyValidatingBlock(const CBlockIndex& index)
     {
-        return {*this, blockHash};
+        return {*this, index};
     }
 
-    std::vector<uint256> getCurrentlyValidatingBlocks()
+    bool isAncestorInValidation(const CBlockIndex& index) const
     {
-        std::scoped_lock lockGuard(mMutexCurrentlyValidatingBlocks);
-        return mCurrentlyValidatingBlocks;
+        std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};
+
+        return
+            std::any_of(
+                mCurrentlyValidatingBlocks.begin(),
+                mCurrentlyValidatingBlocks.end(),
+                [&index](const CBlockIndex* other)
+                {
+                    return index.GetAncestor(other->nHeight) == other;
+                });
     }
 
-    std::vector<uint256> getWaitingAfterValidationBlocks()
+    bool areBlocksInValidation() const
+    {
+        std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};
+        return !mCurrentlyValidatingBlocks.empty();
+    }
+
+    std::vector<uint256> getCurrentlyValidatingBlocks() const
+    {
+        std::lock_guard<std::mutex> lockGuard(mMutexCurrentlyValidatingBlocks);
+        std::vector<uint256> result;
+        result.reserve(mCurrentlyValidatingBlocks.size());
+        for (auto validatingIndex : mCurrentlyValidatingBlocks)
+        {
+            result.emplace_back(validatingIndex->GetBlockHash());
+        }
+        return result;
+    }
+
+    std::vector<uint256> getWaitingAfterValidationBlocks() const
     {
         std::scoped_lock lockGuard(mMutexWaitAfterValidation);
         return mWaitAfterValidation;
@@ -87,7 +156,7 @@ public:
         }
     }
 
-    void waitIfRequired(const uint256& blockHash)
+    void waitIfRequired(const uint256& blockHash) const
     {
         bool foundFlag = false;
 
