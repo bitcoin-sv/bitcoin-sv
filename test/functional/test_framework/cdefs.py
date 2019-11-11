@@ -31,6 +31,18 @@ _consensus_h_fh = open(os.path.join(get_srcdir(), 'src', 'consensus', 'consensus
 _consensus_h_contents = _consensus_h_fh.read()
 _consensus_h_fh.close()
 
+# Slurp in script.h contents
+_script_h_fh = open(os.path.join(get_srcdir(), 'src', 'script',
+                                    'script.h'), 'rt')
+_script_h_contents = _script_h_fh.read()
+_script_h_fh.close()
+
+# Slurp in limitedstack.h contents
+_limitedstack_h_fh = open(os.path.join(get_srcdir(), 'src', 'script',
+                                    'limitedstack.h'), 'rt')
+_limitedstack_h_contents = _limitedstack_h_fh.read()
+_limitedstack_h_fh.close()
+
 def _extractConsensusValue(name):
     return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
 
@@ -44,6 +56,12 @@ def _extractPolicyValue(name):
 
 def _extractChainParamsValue(name):
     return eval(re.search('#define ' + name + ' (.+)', _chainparams_cpp_contents).group(1))
+
+def _extractScriptValue(name):
+    return int(eval(re.search(name + ' = (.+);', _script_h_contents).group(1)))
+
+def _extractLimitedStackValue(name):
+    return int(eval(re.search(name + ' = (.+);', _limitedstack_h_contents).group(1)))
 
 # Extract relevant default values parameters
 
@@ -98,6 +116,10 @@ MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = _extractConsensusValue('MAX_TX_SIZE_CONSE
 # Maximum number of non-push operations per script before GENESIS 
 MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = _extractConsensusValue('MAX_OPS_PER_SCRIPT_BEFORE_GENESIS')
 
+MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = _extractScriptValue('MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS')
+MAX_STACK_ELEMENTS_BEFORE_GENESIS = _extractScriptValue('MAX_STACK_ELEMENTS_BEFORE_GENESIS')
+ELEMENT_OVERHEAD = _extractLimitedStackValue('ELEMENT_OVERHEAD')
+
 if __name__ == "__main__":
     # Output values if run standalone to verify
     print("REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = %d" % REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME)
@@ -113,3 +135,6 @@ if __name__ == "__main__":
     print("MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = %d" % MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)    
     print("GENESIS_ACTIVATION_HEIGHT_REGTEST = %d" % GENESIS_ACTIVATION_HEIGHT_REGTEST)
     print("MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = %d" % MAX_OPS_PER_SCRIPT_BEFORE_GENESIS)
+    print("MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = %d" % MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)
+    print("MAX_STACK_ELEMENTS_BEFORE_GENESIS = %d" % MAX_STACK_ELEMENTS_BEFORE_GENESIS)
+    print("ELEMENT_OVERHEAD = %d" % ELEMENT_OVERHEAD)

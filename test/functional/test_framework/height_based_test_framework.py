@@ -112,8 +112,8 @@ class HeightBasedTestsCase:
 
 
 class SimpleTestDefinition:
-    def __init__(self, scenario, utxo_label, locking_script, label, unlocking_script, p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None):
-        self.scenario            = scenario
+    def __init__(self, utxo_label, locking_script, label, unlocking_script, p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None):
+        self.scenario            = None
         self.label               = label
         self.locking_script      = locking_script
         self.unlocking_script    = unlocking_script
@@ -152,7 +152,7 @@ class HeightBasedSimpleTestsCase(HeightBasedTestsCase):
             if t.utxo_label is not None and t.utxo_label == label:
                 tx = t.make_utxo(coinbases(), 0)
                 tx.rehash()
-                self.log.info(f"Created UTXO Tx {tx.hash} for scenario: {t.scenario} and for utxo_label: {t.utxo_label}")
+                self.log.info(f"Created UTXO Tx {tx.hash} for scenario: {t.scenario or self.NAME} and for utxo_label: {t.utxo_label}")
                 txs.append(tx)
         return txs, None
 
@@ -165,7 +165,7 @@ class HeightBasedSimpleTestsCase(HeightBasedTestsCase):
                     tx_collection.add_mempool_tx(utxo_tx)
                 tx = t.make_test_tx()
                 tx.rehash()
-                self.log.info(f"Created Test Tx {tx.hash} for scenario: {t.scenario} and for test_label: {t.label}")
+                self.log.info(f"Created Test Tx {tx.hash} for scenario: {t.scenario or self.NAME} and for test_label: {t.label}")
                 tx_collection.add_tx(tx, t.p2p_reject_reason, t.block_reject_reason)
 
 class SimplifiedTestFramework(BitcoinTestFramework):
