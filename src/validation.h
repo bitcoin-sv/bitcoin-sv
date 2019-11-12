@@ -1026,6 +1026,8 @@ static const unsigned int REJECT_HIGHFEE = 0x100;
 static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 /** Transaction conflicts with a transaction already known */
 static const unsigned int REJECT_CONFLICT = 0x102;
+/** No space for transaction */
+static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
 
 /** Dump the mempool to disk. */
 void DumpMempool();
