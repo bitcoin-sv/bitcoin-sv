@@ -8,6 +8,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 from test_framework.mininode import *
 from test_framework.script import CScript, OP_RETURN, OP_FALSE
+from test_framework.blocktools import calc_needed_data_size
 
 # Test the functionality -datacarriersize works as expected. It should accept both OP_RETURN and OP_FALSE, OP_RETURN
 # 1. Set -datacarriersize to 500B.
@@ -27,19 +28,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
-        self.start_node(0)
-
-    
-
-    def calc_needed_data_size(self,script_op_codes, target_size):
-        def pushdata_size(sz):
-            if sz < 0x4c: return 1  # OP_PUSHDATA
-            elif sz <= 0xff: return 2  # OP_PUSHDATA1
-            elif sz <= 0xffff: return 3  # OP_PUSHDATA2
-            elif sz <= 0xffffffff: return 5 # OP_PUSHDATA4
-            else: raise ValueError("Data too long to encode in a PUSHDATA op")
-
-        return target_size - (len(script_op_codes) + pushdata_size(target_size))
+        self.start_node(0)    
 
     @staticmethod
     def _split_int(n, n_parts):
@@ -52,7 +41,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
     def fill_outputs(self, tx, n_outputs, script_op_codes, fund, total_bytes):
         for amount, n_bytes in zip(self._split_int(fund, n_outputs), self._split_int(total_bytes, n_outputs)):
-            script = CScript(script_op_codes + [b"a" * self.calc_needed_data_size(script_op_codes, n_bytes)])
+            script = CScript(script_op_codes + [b"a" * calc_needed_data_size(script_op_codes, n_bytes)])
             assert len(script) == n_bytes
             tx.vout.append(CTxOut(amount, script))
 
