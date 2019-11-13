@@ -728,7 +728,10 @@ static bool CheckInputsFromMempoolAndCache(
             assert(coinFromDisk.GetTxOut() == coin.GetTxOut());
         }
     }
+
+    auto source = task::CCancellationSource::Make();
     return CheckInputs(
+                source->GetToken(),
                 config,
                 tx,
                 state,
@@ -737,7 +740,7 @@ static bool CheckInputsFromMempoolAndCache(
                 flags,
                 cacheSigStore,  /* sigCacheStore */
                 true,           /* scriptCacheStore */
-                txdata);
+                txdata).value();
 }
 
 static bool CheckTxOutputs(
@@ -1198,15 +1201,19 @@ CTxnValResult TxnValidation(
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
-    if (!CheckInputs(config,
-                     tx,
-                     state,
-                     view,
-                     true,      /* fScriptChecks */
-                     scriptVerifyFlags,
-                     true,      /* sigCacheStore */
-                     false,     /* scriptCacheStore */
-                     txdata)) {
+    auto source = task::CCancellationSource::Make();
+    if (!CheckInputs(
+            source->GetToken(),
+            config,
+            tx,
+            state,
+            view,
+            true,      /* fScriptChecks */
+            scriptVerifyFlags,
+            true,      /* sigCacheStore */
+            false,     /* scriptCacheStore */
+            txdata).value()) // TODO: handle in CORE-215 where token is used for interrupts
+    {
         // State filled in by CheckInputs.
         return Result{state, pTxInputData, vCoinsToUncache};
     }
@@ -1247,15 +1254,18 @@ CTxnValResult TxnValidation(
                 __func__, txid.ToString(), FormatStateMessage(state));
             return Result{state, pTxInputData, vCoinsToUncache};
         }
-        if (!CheckInputs(config,
-                         tx,
-                         state,
-                         view,
-                         true,      /* fScriptChecks */
-                         MANDATORY_SCRIPT_VERIFY_FLAGS,
-                         true,      /* sigCacheStore */
-                         false,     /* scriptCacheStore */
-                         txdata)) {
+        if (!CheckInputs(
+                source->GetToken(),
+                config,
+                tx,
+                state,
+                view,
+                true,      /* fScriptChecks */
+                MANDATORY_SCRIPT_VERIFY_FLAGS,
+                true,      /* sigCacheStore */
+                false,     /* scriptCacheStore */
+                txdata).value()) // TODO: handle in CORE-215 where token is used for interrupts
+        {
             error(
                 "%s: ConnectInputs failed against MANDATORY but not "
                 "STANDARD flags due to promiscuous mempool %s, %s",
@@ -2375,13 +2385,19 @@ static int GetInputScriptBlockHeight(int coinHeight) {
     return coinHeight;
 }
 
-bool CheckInputs(const Config& config,
-                 const CTransaction &tx, CValidationState &state,
-                 const CCoinsViewCache &inputs, bool fScriptChecks,
-                 const uint32_t flags, bool sigCacheStore,
-                 bool scriptCacheStore,
-                 const PrecomputedTransactionData &txdata,
-                 std::vector<CScriptCheck> *pvChecks) {
+std::optional<bool> CheckInputs(
+    const task::CCancellationToken& token,
+    const Config& config,
+    const CTransaction& tx,
+    CValidationState& state,
+    const CCoinsViewCache& inputs,
+    bool fScriptChecks,
+    const uint32_t flags,
+    bool sigCacheStore,
+    bool scriptCacheStore,
+    const PrecomputedTransactionData& txdata,
+    std::vector<CScriptCheck>* pvChecks)
+{
     assert(!tx.IsCoinBase());
 
     if (!Consensus::CheckTxInputs(tx, state, inputs, GetSpendHeight(inputs))) {
@@ -2441,10 +2457,15 @@ bool CheckInputs(const Config& config,
         // Verify signature
         CScriptCheck check(scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
                            txdata);
-        auto source = task::CCancellationSource::Make(); // TODO move to parameter in later commit (handle return of check/check2 on cancellation triggered)
         if (pvChecks) {
             pvChecks->push_back(std::move(check));
-        } else if (auto res = check(source->GetToken()); !res.value()) {
+        }
+        else if (auto res = check(token); !res.has_value())
+        {
+            return {};
+        }
+        else if (!res.value())
+        {
             const bool hasNonMandatoryFlags =
                 (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
             const bool doesNotHaveGenesis =
@@ -2460,7 +2481,12 @@ bool CheckInputs(const Config& config,
                     scriptPubKey, amount, tx, i,
                     (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
                     sigCacheStore, txdata);
-                if (auto res2 = check2(source->GetToken()); res2.value()) {
+                if (auto res2 = check2(token); !res2.has_value())
+                {
+                    return {};
+                }
+                else if (res2.value())
+                {
                     return state.Invalid(false, REJECT_NONSTANDARD,
                             strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
                 }
@@ -3008,9 +3034,29 @@ static bool ConnectBlock(
             bool fCacheResults = fJustCheck;
 
             std::vector<CScriptCheck> vChecks;
-            if (!CheckInputs(config, tx, state, view, fScriptChecks, flags,
-                             fCacheResults, fCacheResults,
-                             PrecomputedTransactionData(tx), &vChecks)) {
+
+            auto res =
+                CheckInputs(
+                    token,
+                    config,
+                    tx,
+                    state,
+                    view,
+                    fScriptChecks,
+                    flags,
+                    fCacheResults,
+                    fCacheResults,
+                    PrecomputedTransactionData(tx),
+                    &vChecks);
+            if (!res.has_value())
+            {
+                // With current implementation this can never happen as providing
+                // vChecks as parameter skips the path that checks the cancellation
+                // token
+                throw CBlockValidationCancellation{};
+            }
+            else if (!res.value())
+            {
                 return error("ConnectBlock(): CheckInputs on %s failed with %s",
                              tx.GetId().ToString(), FormatStateMessage(state));
             }

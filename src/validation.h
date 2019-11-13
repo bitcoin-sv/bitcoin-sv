@@ -730,14 +730,22 @@ uint64_t GetTransactionSigOpCount(const Config &config,
  * Setting sigCacheStore/scriptCacheStore to false will remove elements from the
  * corresponding cache which are matched. This is useful for checking blocks
  * where we will likely never need the cache entry again.
+ *
+ * In case a task cancellation is triggered through token before result is
+ * known the function returns a std::nullopt
  */
-bool CheckInputs(const Config& config,
-                 const CTransaction &tx, CValidationState &state,
-                 const CCoinsViewCache &view, bool fScriptChecks,
-                 const uint32_t flags, bool sigCacheStore,
-                 bool scriptCacheStore,
-                 const PrecomputedTransactionData &txdata,
-                 std::vector<CScriptCheck> *pvChecks = nullptr);
+std::optional<bool> CheckInputs(
+    const task::CCancellationToken& token,
+    const Config& config,
+    const CTransaction& tx,
+    CValidationState& state,
+    const CCoinsViewCache& view,
+    bool fScriptChecks,
+    const uint32_t flags,
+    bool sigCacheStore,
+    bool scriptCacheStore,
+    const PrecomputedTransactionData& txdata,
+    std::vector<CScriptCheck>* pvChecks = nullptr);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
 void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight);
