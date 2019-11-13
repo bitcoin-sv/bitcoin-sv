@@ -883,10 +883,10 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
         n = mInvList.size();
     }
 
-    for (int i = 0; i < n; i++) {
-        results.push_back(std::move(mInvList.front()));
-        mInvList.pop_front();
-    }
+    results.reserve(n);
+    auto endIt = std::next(begin(mInvList), n);
+    std::move(std::begin(mInvList), endIt, std::back_inserter(results));
+    mInvList.erase(std::begin(mInvList), endIt);
 
     return results;
 }
