@@ -1488,6 +1488,8 @@ static void HandleInvalidP2POrphanTxn(
     if (!state.IsMissingInputs()) {
         int nDoS = 0;
         if (state.IsInvalid(nDoS) && nDoS > 0) {
+            // Punish peer that gave us an invalid orphan tx
+            Misbehaving(pNode->GetId(), nDoS, "invalid-orphan-tx");
             // Remove all orphan txns queued from the punished peer
             handlers.mpOrphanTxnsP2PQ->eraseTxnsFromPeer(pNode->GetId());
         } else {
@@ -1592,6 +1594,10 @@ static void HandleInvalidStateForP2PNonOrphanTxn(
         txStatus.mTxInputData,
         state.GetRejectCode(),
         state.GetRejectReason());
+    if (nDoS > 0) {
+        // Punish peer that gave us an invalid tx
+        Misbehaving(pNode->GetId(), nDoS, state.GetRejectReason());
+    }
 }
 
 static void PostValidationStepsForP2PTxn(

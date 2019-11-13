@@ -355,27 +355,6 @@ void CTxnValidator::postValidationP2PStepsNL(
     if (state.IsValid()) {
         // Txns accepted by the mempool
         vAcceptedTxns.emplace_back(txStatus.mTxInputData);
-    } else {
-        // Misbehaving needs to be called by the Validator thread due to cs_main lock.
-        // It is used internally by the method to protect an access to mapNodeState.
-        // mapNodeState needs to be decoupled from cs_main, then we can move it back to p2p hadling methods.
-        if (TxSource::p2p == txStatus.mTxInputData->mTxSource) {
-            if (!state.IsMissingInputs()) {
-                int nDoS = 0;
-                if (state.IsInvalid(nDoS) && nDoS > 0) {
-                    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
-                    // Punish the peer that gave us an invalid orphan tx
-                    if (pNode) {
-                        Misbehaving(
-                            pNode->GetId(),
-                            nDoS,
-                            txStatus.mTxInputData->mfOrphan ? "invalid-orphan-tx" : state.GetRejectReason());
-                    } else {
-                        LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
-                    }
-                }
-            }
-        }
     }
 }
 
