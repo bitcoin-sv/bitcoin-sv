@@ -4825,12 +4825,12 @@ static bool ContextualCheckBlockHeader(const Config &config,
 
 bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
                                 CValidationState &state, int nHeight,
-                                int64_t nLockTimeCutoff)
+                                int64_t nLockTimeCutoff, bool fromBlock)
 {
     if(!IsFinalTx(tx, nHeight, nLockTimeCutoff))
     {
         state.SetNonFinal();
-        if(IsGenesisEnabled(config, nHeight))
+        if(!fromBlock && IsGenesisEnabled(config, nHeight))
         {
             return false;
         }
@@ -4881,7 +4881,8 @@ bool ContextualCheckTransactionForCurrentBlock(
                 tx,
                 state,
                 nBlockHeight,
-                nLockTimeCutoff);
+                nLockTimeCutoff,
+                false);
 }
 
 static bool ContextualCheckBlock(const Config &config, const CBlock &block,
@@ -4920,7 +4921,7 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     // Check that all transactions are finalized
     for (const auto &tx : block.vtx) {
         if (!ContextualCheckTransaction(config, *tx, state, nHeight,
-                                        nLockTimeCutoff)) {
+                                        nLockTimeCutoff, true)) {
             // state set by ContextualCheckTransaction.
             return false;
         }

@@ -260,7 +260,7 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
     if(pindex)
     {
         CValidationState state {};
-        if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->nHeight + 1, mLockTimeCutoff))
+        if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->nHeight + 1, mLockTimeCutoff, false))
         {
             return false;
         }

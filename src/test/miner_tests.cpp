@@ -732,7 +732,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransaction(
             config, CTransaction(tx), state, chainActive.Tip()->nHeight + 2,
-            chainActive.Tip()->GetMedianTimePast()));
+            chainActive.Tip()->GetMedianTimePast(), false));
     }
 
     // Absolute time locked.
@@ -765,7 +765,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransaction(
             config, CTransaction(tx), state, chainActive.Tip()->nHeight + 1,
-            chainActive.Tip()->GetMedianTimePast() + 1));
+            chainActive.Tip()->GetMedianTimePast() + 1, false));
     }
 
     // mempool-dependent transactions (not added)
