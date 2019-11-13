@@ -144,7 +144,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
     nMaxGeneratedBlockSize = ComputeMaxGeneratedBlockSize(pindexPrevNew);
 
     nLockTimeCutoff =
-        (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
+        (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, nHeight)) & LOCKTIME_MEDIAN_TIME_PAST)
             ? pindexPrevNew->GetMedianTimePast()
             : GetAdjustedTime();
 

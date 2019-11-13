@@ -126,11 +126,15 @@ inline unsigned int StandardScriptVerifyFlags(bool genesisEnabled,
     return scriptFlags;
 }
 
-
-/** Used as the flags parameter to sequence and nLocktime checks in
- * non-consensus code. */
-static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS =
-    LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
+/** Get the flags to use for non-final transaction checks */
+inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
+{
+    unsigned int flags { LOCKTIME_MEDIAN_TIME_PAST };
+    if(!genesisEnabled) {
+        flags |= LOCKTIME_VERIFY_SEQUENCE;
+    }
+    return flags;
+}
 
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType);
 

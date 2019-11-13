@@ -1175,7 +1175,7 @@ CTxnValResult TxnValidation(
         // transactions that can't be mined yet. Must keep pool.cs for this
         // unless we change CheckSequenceLocks to take a CoinsViewCache
         // instead of create its own.
-        if (!CheckSequenceLocks(tx, pool, config, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp)) {
+        if (!CheckSequenceLocks(tx, pool, config, lockTimeFlags, &lp)) {
             state.DoS(0, false, REJECT_NONSTANDARD,
                      "non-BIP68-final");
             return Result{state, pTxInputData, vCoinsToUncache};
@@ -1942,14 +1942,15 @@ static void UpdateMempoolForReorg(const Config &config,
     mempool.UpdateTransactionsFromBlock(vHashUpdate);
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
+    int height { chainActive.Height() };
     mempool.
         RemoveForReorg(
             config,
             pcoinsTip,
             changeSet,
-            chainActive.Height(),
+            height,
             chainActive.Tip()->GetMedianTimePast(),
-            STANDARD_LOCKTIME_VERIFY_FLAGS);
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, height)));
 }
 
 /**
@@ -3082,7 +3083,7 @@ static bool ConnectBlock(
     // Start enforcing BIP68 (sequence locks).
     int nLockTimeFlags = 0;
     if (pindex->nHeight >= consensusParams.CSVHeight) {
-        nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
+        nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->nHeight));
     }
     const uint32_t flags = GetBlockScriptFlags(config, pindex->pprev);
 
