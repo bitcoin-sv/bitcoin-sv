@@ -684,6 +684,74 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
 
 }
 
+void AppendScriptPubKeyToFitTxSize(CMutableTransaction& t, uint64_t txSizeNew)
+{
+    t.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN;
+    CTransaction tx = CTransaction(t);
+    uint32_t txSizeOrig = tx.GetTotalSize();
+    if (txSizeNew > txSizeOrig)
+    {
+        std::vector<uint8_t> data(txSizeNew - txSizeOrig - GetSizeOfCompactSize(txSizeNew) + 1 /*one byte is always used for size*/);
+        t.vout[0].scriptPubKey.insert(t.vout[0].scriptPubKey.end(), data.begin(), data.end());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(test_IsStandard_MaxTxSizePolicy)
+{
+    LOCK(cs_main);
+    CBasicKeyStore keystore;
+    CCoinsView coinsDummy;
+    CCoinsViewCache coins(&coinsDummy);
+    std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
+
+    std::string reason;
+    GlobalConfig config;
+    uint64_t genesisActivationHeight = config.GetChainParams().GetConsensus().genesisHeight;
+    config.SetGenesisActivationHeight(genesisActivationHeight);
+
+    CMutableTransaction t;
+    t.vin.resize(1);
+    t.vin[0].prevout = COutPoint(dummyTransactions[0].GetId(), 1);
+    t.vin[0].scriptSig << std::vector<uint8_t>(65, 0);
+    t.vout.resize(1);
+    t.vout[0].nValue = 90 * CENT;
+    CKey key;
+    key.MakeNewKey(true);
+    t.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN;
+
+    // tx size less then default max policy tx size
+    CTransaction tx_lt_def = CTransaction(t);
+    BOOST_CHECK(tx_lt_def.GetTotalSize() < config.GetMaxTxSize(false, false));
+
+    // tx size greater then default max policy tx size
+    int64_t size_gt_def{ static_cast<int64_t>(config.GetMaxTxSize(false, false) + 1) };
+    AppendScriptPubKeyToFitTxSize(t, size_gt_def);
+    CTransaction tx_gt_def = CTransaction(t); // 
+    BOOST_CHECK(tx_gt_def.GetTotalSize() > config.GetMaxTxSize(false, false));
+
+
+    // before SetMaxTxSizePolicy
+
+    BOOST_CHECK(IsStandardTx(config, tx_lt_def, genesisActivationHeight - 1, reason));
+
+    reason.clear();
+    BOOST_CHECK(!IsStandardTx(config, tx_gt_def, genesisActivationHeight - 1, reason));
+    BOOST_CHECK(reason == "tx-size");    
+
+
+    BOOST_CHECK(config.SetMaxTxSizePolicy(size_gt_def, &reason));
+
+
+    // after SetMaxTxSizePolicy
+
+    reason.clear();
+    BOOST_CHECK(!IsStandardTx(config, tx_gt_def, genesisActivationHeight - 1, reason));
+    BOOST_CHECK(reason == "tx-size");
+
+    BOOST_CHECK(IsStandardTx(config, tx_gt_def, genesisActivationHeight, reason));
+}
+
+
 void TestIsStandardWithScriptFactory(std::function<CScript()> scriptFactory, uint64_t initialScriptSize) {
 
     DummyConfig config(CBaseChainParams::MAIN);
