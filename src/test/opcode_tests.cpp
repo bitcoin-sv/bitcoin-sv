@@ -10,6 +10,7 @@
 #include "script/interpreter.h"
 #include "script/script_num.h"
 #include "script/sign.h"
+#include "taskcancellation.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -28,19 +29,34 @@ BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
 static void CheckTestResultForAllFlags(const stacktype &original_stack, const CScript &script, const stacktype &expected,
         uint32_t upgradeFlag = 0) {
     BaseSignatureChecker sigchecker;
+    auto source = task::CCancellationSource::Make();
 
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
-        bool r = EvalScript(stack, script, flags | upgradeFlag, sigchecker, &err);
-        BOOST_CHECK(r);
+        auto r =
+            EvalScript(
+                source->GetToken(),
+                stack,
+                script,
+                flags | upgradeFlag,
+                sigchecker,
+                &err);
+        BOOST_CHECK(r.value());
         BOOST_CHECK(stack == expected);
 
         // Make sure that if we do not pass the upgrade flag, we get the same result
         if (upgradeFlag) {
             stack = original_stack;
-            r = EvalScript(stack, script, flags, sigchecker, &err);
-            BOOST_CHECK(r);
+            r =
+                EvalScript(
+                    source->GetToken(),
+                    stack,
+                    script,
+                    flags,
+                    sigchecker,
+                    &err);
+            BOOST_CHECK(r.value());
             BOOST_CHECK(stack == expected);
         }
     }
@@ -51,16 +67,32 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     BaseSignatureChecker sigchecker;
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
-    bool r = EvalScript(stack, script, flags | upgradeFlag, sigchecker, &err);
-    BOOST_CHECK(!r);
+
+    auto source = task::CCancellationSource::Make();
+    auto r =
+        EvalScript(
+            source->GetToken(),
+            stack,
+            script,
+            flags | upgradeFlag,
+            sigchecker,
+            &err);
+    BOOST_CHECK(!r.value());
     BOOST_CHECK_EQUAL(err, expected_error);
 
     // Make sure that if we do not pass the opcodes flags, we get the same result
     if(upgradeFlag)
     {
         stack = original_stack;
-        r = EvalScript(stack, script, flags, sigchecker, &err);
-        BOOST_CHECK(!r);
+        r =
+            EvalScript(
+                source->GetToken(),
+                stack,
+                script,
+                flags,
+                sigchecker,
+                &err);
+        BOOST_CHECK(!r.value());
         BOOST_CHECK_EQUAL(err, expected_error);
     }
 }
@@ -1041,12 +1073,19 @@ static void CheckTestForOpCodeLimit(const CScript &script,
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
-        bool r = EvalScript(stack, script, flags, sigchecker, &err);
+        auto r =
+            EvalScript(
+                task::CCancellationSource::Make(),
+                stack,
+                script,
+                flags,
+                sigchecker,
+                &err);
         size_t nonPushOpcodeCount = NonPushOpCodeCount(script);
         if (nonPushOpcodeCount > MAX_OPS_PER_SCRIPT) {
-            BOOST_CHECK(!r);
+            BOOST_CHECK(!r.value());
         } else {
-            BOOST_CHECK(r);
+            BOOST_CHECK(r.value());
         }
         BOOST_CHECK(nonPushOpcodeCount == expNonPushOpcodeCount);
     }

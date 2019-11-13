@@ -41,12 +41,17 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = Amount(1);
 
-    return VerifyScript(
-        scriptSig, scriptPubKey,
-        (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
-            SCRIPT_ENABLE_SIGHASH_FORKID,
-        MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
-        &err);
+    auto res =
+        VerifyScript(
+            task::CCancellationSource::Make()->GetToken(),
+            scriptSig,
+            scriptPubKey,
+            (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
+                SCRIPT_ENABLE_SIGHASH_FORKID,
+            MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
+            &err);
+
+    return res.value();
 }
 
 BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)

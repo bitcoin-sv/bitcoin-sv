@@ -8,6 +8,7 @@
 
 #include "policy/policy.h"
 
+#include "taskcancellation.h"
 #include "tinyformat.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -141,8 +142,16 @@ bool AreInputsStandard(const Config& config,
             std::vector<std::vector<uint8_t>> stack;
             // convert the scriptSig into a stack, so we can inspect the
             // redeemScript
-            if (!EvalScript(stack, tx.vin[i].scriptSig, SCRIPT_VERIFY_NONE,
-                            BaseSignatureChecker())) {
+            auto source = task::CCancellationSource::Make();
+            auto res =
+                EvalScript(
+                    source->GetToken(),
+                    stack,
+                    tx.vin[i].scriptSig,
+                    SCRIPT_VERIFY_NONE,
+                    BaseSignatureChecker());
+            if (!res.value())
+            {
                 return false;
             }
             if (stack.empty()) {

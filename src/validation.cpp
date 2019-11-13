@@ -2293,10 +2293,15 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight) {
 std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& token)
 {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    return VerifyScript(scriptSig, scriptPubKey, nFlags,
-                        CachingTransactionSignatureChecker(ptxTo, nIn, amount,
-                                                           cacheStore, txdata),
-                        &error);
+    return
+        VerifyScript(
+            token,
+            scriptSig,
+            scriptPubKey,
+            nFlags,
+            CachingTransactionSignatureChecker(
+                ptxTo, nIn, amount, cacheStore, txdata),
+            &error);
 }
 
 int GetSpendHeight(const CCoinsViewCache &inputs) {

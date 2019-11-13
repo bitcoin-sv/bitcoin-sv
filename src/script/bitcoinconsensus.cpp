@@ -8,6 +8,7 @@
 #include "primitives/transaction.h"
 #include "pubkey.h"
 #include "script/interpreter.h"
+#include "taskcancellation.h"
 #include "version.h"
 
 namespace {
@@ -91,10 +92,16 @@ static int verify_script(const uint8_t *scriptPubKey,
         set_error(err, bitcoinconsensus_ERR_OK);
 
         PrecomputedTransactionData txdata(tx);
-        return VerifyScript(
-            tx.vin[nIn].scriptSig,
-            CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
-            TransactionSignatureChecker(&tx, nIn, amount, txdata), nullptr);
+        auto source = task::CCancellationSource::Make();
+
+        auto res =
+          VerifyScript(
+              source->GetToken(),
+              tx.vin[nIn].scriptSig,
+              CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
+              TransactionSignatureChecker(&tx, nIn, amount, txdata), nullptr);
+
+        return res.value();
     } catch (const std::exception &) {
         // Error deserializing
         return set_error(err, bitcoinconsensus_ERR_TX_DESERIALIZE);

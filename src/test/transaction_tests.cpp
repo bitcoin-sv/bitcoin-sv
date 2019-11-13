@@ -17,6 +17,7 @@
 #include "script/script_error.h"
 #include "script/sign.h"
 #include "script/standard.h"
+#include "taskcancellation.h"
 #include "test/jsonutil.h"
 #include "test/scriptflags.h"
 #include "utilstrencodings.h"
@@ -135,11 +136,12 @@ void RunTests(UniValue& tests, bool should_be_valid){
                         amount = Amount(mapprevOutValues[tx.vin[i].prevout]);
                     }
 
-                    is_valid = VerifyScript(tx.vin[i].scriptSig,
+                    is_valid = VerifyScript(task::CCancellationSource::Make()->GetToken(),
+                                            tx.vin[i].scriptSig,
                                             mapprevOutScriptPubKeys[tx.vin[i].prevout],
                                             verify_flags, 
                                             TransactionSignatureChecker(&tx, i, amount, txdata),
-                                            &err);
+                                            &err).value();
                 }
                 if (is_valid != should_be_valid){
                     BOOST_ERROR("Bad test: " << strTest << 
@@ -348,18 +350,20 @@ void CheckWithFlag(const CTransactionRef &output,
     auto s2 = ScriptToAsmStr(output->vout[0].scriptPubKey);
 
     bool retBefore = VerifyScript(
+        task::CCancellationSource::Make()->GetToken(),
         inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
         flags | SCRIPT_ENABLE_SIGHASH_FORKID,
         TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
-        &error);
+        &error).value();
     BOOST_CHECK_MESSAGE(retBefore == successBeforeGenesis,
                         std::string("failed before genesis result: ") + (retBefore ? "true":"false"));
     
     bool retAfter = VerifyScript(
+        task::CCancellationSource::Make()->GetToken(),
         inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
         flags | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
         TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue),
-        &error);
+        &error).value();
 
     BOOST_CHECK_MESSAGE(retAfter == successAfterGenesis,
                       std::string("failed after genesis result: ") + (retAfter ? "true" : "false"));
@@ -381,7 +385,12 @@ static CScript PushAll(const std::vector<valtype> &values) {
 
 void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
     std::vector<valtype> stack;
-    EvalScript(stack, script, SCRIPT_VERIFY_STRICTENC, BaseSignatureChecker());
+    EvalScript(
+        task::CCancellationSource::Make()->GetToken(),
+        stack,
+        script,
+        SCRIPT_VERIFY_STRICTENC,
+        BaseSignatureChecker());
     BOOST_CHECK(stack.size() > 0);
     stack.back() =
         std::vector<uint8_t>(redeemScript.begin(), redeemScript.end());

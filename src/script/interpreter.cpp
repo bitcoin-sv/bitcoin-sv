@@ -14,6 +14,7 @@
 #include "script/int_serialization.h"
 #include "script/script.h"
 #include "script/script_num.h"
+#include "taskcancellation.h"
 #include "uint256.h"
 #include "consensus/consensus.h"
 
@@ -404,9 +405,14 @@ inline bool IsValidMaxOpsPerScript(int nOpCount) {
     return (nOpCount <= MAX_OPS_PER_SCRIPT);
 }
 
-bool EvalScript(std::vector<valtype> &stack, const CScript &script,
-                uint32_t flags, const BaseSignatureChecker &checker,
-                ScriptError *serror) {
+std::optional<bool> EvalScript(
+    const task::CCancellationToken& token,
+    std::vector<valtype>& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker,
+    ScriptError* serror)
+{
     static const CScriptNum bnZero(0);
     static const CScriptNum bnOne(1);
     static const valtype vchFalse(0);
@@ -436,6 +442,11 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     
     try {
         while (pc < pend) {
+            if (token.IsCanceled())
+            {
+                return {};
+            }
+
             //
             // Read instruction
             //
@@ -1950,9 +1961,14 @@ size_t TransactionSignatureChecker::GetOutTxSize() const {
     return GetSerializeSize(*txTo, SER_NETWORK, PROTOCOL_VERSION);
 }
 
-bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,
-                  uint32_t flags, const BaseSignatureChecker &checker,
-                  ScriptError *serror) {
+std::optional<bool> VerifyScript(
+    const task::CCancellationToken& token,
+    const CScript& scriptSig,
+    const CScript& scriptPubKey,
+    uint32_t flags,
+    const BaseSignatureChecker& checker,
+    ScriptError* serror)
+{
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
     // If FORKID is enabled, we also ensure strict encoding.
@@ -1965,16 +1981,18 @@ bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,
     }
 
     std::vector<valtype> stack, stackCopy;
-    if (!EvalScript(stack, scriptSig, flags, checker, serror)) {
-        // serror is set
-        return false;
+    if (auto res = EvalScript(token, stack, scriptSig, flags, checker, serror);
+        !res.has_value() || !res.value())
+    {
+        return res;
     }
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
         stackCopy = stack;
     }
-    if (!EvalScript(stack, scriptPubKey, flags, checker, serror)) {
-        // serror is set
-        return false;
+    if (auto res = EvalScript(token, stack, scriptPubKey, flags, checker, serror);
+        !res.has_value() || !res.value())
+    {
+        return res;
     }
     if (stack.empty()) {
         return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
@@ -2006,9 +2024,10 @@ bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
 
-        if (!EvalScript(stack, pubKey2, flags, checker, serror)) {
-            // serror is set
-            return false;
+        if (auto res = EvalScript(token, stack, pubKey2, flags, checker, serror);
+            !res.has_value() || !res.value())
+        {
+            return res;
         }
         if (stack.empty()) {
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
