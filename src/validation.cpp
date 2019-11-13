@@ -6514,27 +6514,25 @@ CBlockFileInfo *GetBlockFileInfo(size_t n) {
 
 static const uint64_t MEMPOOL_DUMP_VERSION = 1;
 
-bool LoadMempool(const Config &config) {
-    int64_t nExpiryTimeout =
-        gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
-    FILE *filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
-    CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
-    if (file.IsNull()) {
-        LogPrintf(
-            "Failed to open mempool file from disk. Continuing anyway.\n");
-        return false;
-    }
-
-    int64_t count = 0;
-    int64_t skipped = 0;
-    int64_t failed = 0;
-    int64_t nNow = GetTime();
-
+bool LoadMempool(const Config &config)
+{
     try {
+        int64_t nExpiryTimeout = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
+        FILE *filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
+        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+        if (file.IsNull()) {
+            throw std::runtime_error("Failed to open mempool file from disk");
+        }
+
+        int64_t count = 0;
+        int64_t skipped = 0;
+        int64_t failed = 0;
+        int64_t nNow = GetTime();
+
         uint64_t version;
         file >> version;
         if (version != MEMPOOL_DUMP_VERSION) {
-            return false;
+            throw std::runtime_error("Bad mempool dump version");
         }
         uint64_t num;
         file >> num;
@@ -6591,17 +6589,19 @@ bool LoadMempool(const Config &config) {
             mempool.PrioritiseTransaction(i.first, i.first.ToString(),
                                           prioritydummy, i.second);
         }
-    } catch (const std::exception &e) {
-        LogPrintf("Failed to deserialize mempool data on disk: %s. Continuing "
-                  "anyway.\n",
+
+        LogPrintf("Imported mempool transactions from disk: %i successes, %i "
+                  "failed, %i expired\n",
+                  count, failed, skipped);
+
+    }
+    catch (const std::exception &e) {
+        LogPrintf("Failed to deserialize mempool data on disk: %s. Continuing anyway.\n",
                   e.what());
-        return false;
     }
 
-    LogPrintf("Imported mempool transactions from disk: %i successes, %i "
-              "failed, %i expired\n",
-              count, failed, skipped);
-    return true;
+    // Restore non-final transactions
+    return mempool.getNonFinalPool().loadMempool();
 }
 
 void DumpMempool(void) {
@@ -6650,6 +6650,9 @@ void DumpMempool(void) {
     } catch (const std::exception &e) {
         LogPrintf("Failed to dump mempool: %s. Continuing anyway.\n", e.what());
     }
+
+    // Dump non-final pool
+    mempool.getNonFinalPool().dumpMempool();
 }
 
 //! Guess how far we are in the verification process at the given block index

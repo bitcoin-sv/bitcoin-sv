@@ -6,10 +6,14 @@
 #include <init.h>
 #include <logging.h>
 #include <memusage.h>
+#include <mining/journal_change_set.h>
 #include <net.h>
 #include <policy/policy.h>
 #include <scheduler.h>
 #include <time_locked_mempool.h>
+#include <txn_validator.h>
+
+using namespace mining;
 
 CTimeLockedMempool::CTimeLockedMempool()
 {
