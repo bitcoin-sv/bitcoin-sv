@@ -60,6 +60,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, bool isGenesisEna
                          1 + chainActive.Height() - pindex->nHeight));
                 entry.push_back(Pair("time", pindex->GetBlockTime()));
                 entry.push_back(Pair("blocktime", pindex->GetBlockTime()));
+                entry.push_back(Pair("blockheight", pindex->nHeight));
             } else {
                 entry.push_back(Pair("confirmations", 0));
             }
@@ -143,8 +144,9 @@ static UniValue getrawtransaction(const Config &config,
             "  \"confirmations\" : n,      (numeric) The confirmations\n"
             "  \"time\" : ttt,             (numeric) The transaction time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
-            "  \"blocktime\" : ttt         (numeric) The block time in seconds "
+            "  \"blocktime\" : ttt,        (numeric) The block time in seconds "
             "since epoch (Jan 1 1970 GMT)\n"
+            "  \"blockheight\" : n         (numeric) The block height\n"
             "}\n"
 
             "\nExamples:\n" +

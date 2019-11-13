@@ -210,6 +210,11 @@ class RawTransactionsTest(BitcoinTestFramework):
         decrawtx = self.nodes[0].decoderawtransaction(rawtx)
         assert_equal(decrawtx['vin'][0]['sequence'], 4294967294)
 
+        # 11. check if getrawtransaction with verbose 'True' returns blockheight
+        assert isinstance(self.nodes[0].getrawtransaction(txHash, True)['blockheight'], int)
+        txList = self.nodes[0].getblockbyheight(self.nodes[0].getrawtransaction(txHash, True)['blockheight'])['tx']
+        assert txHash in txList
+
         # tests with transactions containing data
         # 1. sending ffffffff, we get 006a04ffffffff
         # 00(OP_FALSE) 6a(OP_RETURN) 04(size of data, 4 bytes in this case) ffffffff(data)
