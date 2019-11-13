@@ -824,7 +824,7 @@ public:
           nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn),
           error(SCRIPT_ERR_UNKNOWN_ERROR), txdata(txdataIn) {}
 
-    bool operator()();
+    std::optional<bool> operator()(const task::CCancellationToken& token);
 
     void swap(CScriptCheck &check) {
         scriptPubKey.swap(check.scriptPubKey);

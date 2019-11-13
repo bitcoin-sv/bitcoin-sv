@@ -26,7 +26,7 @@ namespace
             : mBlocking{&blocking}
         {/**/}
 
-        bool operator()()
+        std::optional<bool> operator()(const task::CCancellationToken&)
         {
             while(mBlocking->load())
             {
@@ -49,8 +49,23 @@ namespace
 
     struct CDummyValidator
     {
-        bool operator()() {return true;}
+        std::optional<bool> operator()(const task::CCancellationToken&)
+        {
+            return true;
+        }
         void swap(CDummyValidator& check) {/**/}
+    };
+
+    struct CCancellingValidator
+    {
+        std::optional<bool> operator()(const task::CCancellationToken& token)
+        {
+            while(!token.IsCanceled());
+
+            return {};
+        }
+
+        void swap(CCancellingValidator& check) {/**/}
     };
 }
 
@@ -125,32 +140,17 @@ BOOST_AUTO_TEST_CASE(removal_of_threads_during_processing)
 
 BOOST_AUTO_TEST_CASE(premature_validation_cancellation)
 {
-    CCheckQueue<CBlockingValidator> check{4};
+    CCheckQueue<CCancellingValidator> check{4};
 
     boost::thread_group threadGroup;
     threadGroup.create_thread([&check]{check.Thread();});
-
-    constexpr size_t checksNumber = 20;
-
-    std::array<std::atomic<bool>, checksNumber> blocking;
-    std::vector<CBlockingValidator> checks;
-
-    for(size_t i=0; i<checksNumber; ++i)
-    {
-        blocking[i] = true;
-        checks.emplace_back(blocking[i]);
-    }
+    std::vector<CCancellingValidator> checks(20);
 
     auto source = task::CCancellationSource::Make();
     check.StartCheckingSession(source->GetToken());
 
     check.Add(checks);
     source->Cancel();
-
-    for(auto& b : blocking)
-    {
-        b = false;
-    }
 
     // we expect that validation will be terminated without result as we quit
     // before we tried to get to result

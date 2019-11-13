@@ -2290,7 +2290,8 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight) {
     UpdateCoins(tx, inputs, txundo, nHeight);
 }
 
-bool CScriptCheck::operator()() {
+std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& token)
+{
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     return VerifyScript(scriptSig, scriptPubKey, nFlags,
                         CachingTransactionSignatureChecker(ptxTo, nIn, amount,
@@ -2435,9 +2436,10 @@ bool CheckInputs(const Config& config,
         // Verify signature
         CScriptCheck check(scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
                            txdata);
+        auto source = task::CCancellationSource::Make(); // TODO move to parameter in later commit (handle return of check/check2 on cancellation triggered)
         if (pvChecks) {
             pvChecks->push_back(std::move(check));
-        } else if (!check()) {
+        } else if (auto res = check(source->GetToken()); !res.value()) {
             const bool hasNonMandatoryFlags =
                 (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
             const bool doesNotHaveGenesis =
@@ -2453,7 +2455,7 @@ bool CheckInputs(const Config& config,
                     scriptPubKey, amount, tx, i,
                     (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
                     sigCacheStore, txdata);
-                if (check2()) {
+                if (auto res2 = check2(source->GetToken()); res2.value()) {
                     return state.Invalid(false, REJECT_NONSTANDARD,
                             strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
                 }

@@ -33,8 +33,9 @@ namespace checkqueue
  * it's premature termination. After that we block until one of the checkers
  * is freed up.
  *
- * The verifications are represented by a type T, which must provide an
- * operator(), returning a bool.
+ * The verifications are represented by a type T, which must provide operator
+ * `std::optional<bool> operator()(const task::CCancellationToken&)`. Returning
+ * an empty optional indicates that the validation was canceled.
  *
  * The termination of checker with lower priority is controlled by ValueT type
  * which value is provided as parameter to GetChecker() function. ValueT type

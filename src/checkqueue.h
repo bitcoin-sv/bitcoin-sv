@@ -18,8 +18,9 @@
 
 /**
  * Queue for verifications that have to be performed.
- * The verifications are represented by a type T, which must provide an
- * operator(), returning a bool.
+ * The verifications are represented by a type T, which must provide operator
+ * `std::optional<bool> operator()(const task::CCancellationToken&)`. Returning
+ * an empty optional indicates that the validation was canceled.
  *
  * One thread (the master) is assumed to push batches of verifications onto the
  * queue, where they are processed by N-1 worker threads. When the master is
@@ -31,6 +32,10 @@
  */
 template <typename T> class CCheckQueue {
 private:
+    // make sure that T provides expected function signature and return type
+    static_assert(
+        std::is_same_v<std::optional<bool>,
+        decltype(std::declval<T>()(std::declval<task::CCancellationToken>()))>);
     /**
      * Scope guard that makes sure that even if an exception is thrown inside
      * Loop() (e.g. by cond.wait(lock);) the worker count will be correct.
@@ -86,7 +91,7 @@ private:
     int nTotal = 0;
 
     //! The temporary evaluation result.
-    bool fAllOk = true;
+    std::optional<bool> fAllOk = true;
 
     /**
      * Number of verifications that haven't completed yet.
@@ -113,7 +118,7 @@ private:
         std::vector<T> vChecks;
         vChecks.reserve(nBatchSize);
         unsigned int nNow = 0;
-        bool fOk = true;
+        std::optional<bool> fOk = true;
         CTotalScopeGuard guard{mutex, nTotal};
 
         do {
@@ -122,7 +127,15 @@ private:
                 // first do the clean-up of the previous loop run (allowing us
                 // to do it in the same critsect)
                 if (nNow) {
-                    fAllOk &= fOk;
+                    if(fAllOk.has_value() && fOk.has_value())
+                    {
+                        fAllOk.value() &= fOk.value();
+                    }
+                    else
+                    {
+                        fAllOk = {};
+                    }
+
                     nTodo -= nNow;
 
                     if (mSessionToken->IsCanceled())
@@ -160,7 +173,7 @@ private:
                         // session starts
                         if (mSessionToken->IsCanceled())
                         {
-                            return {};
+                            fAllOk = {};
                         }
 
                         // return the current status
@@ -202,12 +215,12 @@ private:
             }
             // execute work
             for (T &check : vChecks) {
-                if (!fOk || mSessionToken->IsCanceled())
+                if (!fOk.has_value() || !fOk.value() || mSessionToken->IsCanceled())
                 {
                     break;
                 }
 
-                fOk = check();
+                fOk = check(*mSessionToken);
             }
             vChecks.clear();
         } while (true);
