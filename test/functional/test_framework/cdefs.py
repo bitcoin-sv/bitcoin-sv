@@ -71,11 +71,14 @@ MAX_BLOCK_SIGOPS_PER_MB = 20000
 
 # The maximum allowed number of signature check operations per transaction
 # (network rule)
-MAX_TX_SIGOPS_COUNT = 20000
+MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS = _extractConsensusValue('MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS')
 
 # The maximum number of sigops we're willing to relay/mine in a single tx
 # (policy.h constant)
-MAX_STANDARD_TX_SIGOPS = MAX_TX_SIGOPS_COUNT // 5
+MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS = _extractPolicyValue('MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS')
+# The default maximum number of sigops we're willing to relay/mine in a single tx after genesis
+# (policy.h constant)
+DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = _extractPolicyValue('DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS')
 
 # Coinbase transaction outputs can only be spent after this number of new
 # blocks (network rule)
@@ -95,7 +98,7 @@ if __name__ == "__main__":
     print("REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = %d (bytes)" % REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE)
     print("REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = %d (bytes)" % REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
     print("MAX_BLOCK_SIGOPS_PER_MB = %d (sigops)" % MAX_BLOCK_SIGOPS_PER_MB)
-    print("MAX_TX_SIGOPS_COUNT = %d (sigops)" % MAX_TX_SIGOPS_COUNT)
+    print("MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS = %d (sigops)" % MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
     print("COINBASE_MATURITY = %d (blocks)" % COINBASE_MATURITY)
     print("MAX_STANDARD_TX_SIZE = %d" % MAX_STANDARD_TX_SIZE)
     print("GENESIS_ACTIVATION_HEIGHT_REGTEST = %d" % GENESIS_ACTIVATION_HEIGHT_REGTEST)
