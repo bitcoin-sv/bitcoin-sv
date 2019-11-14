@@ -21,7 +21,27 @@ void bsv::bint::empty_bn_deleter::operator()(bignum_st* p) const
 
 bsv::bint::bint() : value_{nullptr} {}
 
-bsv::bint::bint(int64_t i) : value_(BN_new(), empty_bn_deleter())
+bsv::bint::bint(const int i) : value_(BN_new(), empty_bn_deleter())
+{
+    // Precondition: i > std::numeric_limits<int>::min() 
+    // as negation is out-of-range of int
+    assert(i > std::numeric_limits<int>::min());
+    assert(value_);
+    const bool negative{i < 0};
+    const auto s{BN_set_word(value_.get(), negative ? -i : i)};
+    assert(s);
+
+    if(negative)
+        BN_set_negative(value_.get(), 1);
+
+    // clang-format off
+    assert( ((i < 0) && (is_negative(*this))) ||
+            ((i == 0) && (BN_is_zero(value_.get()))) ||
+            ((i > 0) && (!is_negative(*this))) );
+    // clang-format on
+}
+
+bsv::bint::bint(const int64_t i) : value_(BN_new(), empty_bn_deleter())
 {
     // Precondition: i > std::numeric_limits<int64_t>::min() 
     // as negation is out-of-range of int64_t
@@ -37,6 +57,21 @@ bsv::bint::bint(int64_t i) : value_(BN_new(), empty_bn_deleter())
     // clang-format off
     assert( ((i < 0) && (is_negative(*this))) ||
             ((i == 0) && (BN_is_zero(value_.get()))) ||
+            ((i > 0) && (!is_negative(*this))) );
+    // clang-format on
+}
+
+bsv::bint::bint(const size_t i) : value_(BN_new(), empty_bn_deleter())
+{
+    // Precondition: i > std::numeric_limits<size_t>::min()
+    // as negation is out-of-range of size_t
+    assert(i >= std::numeric_limits<size_t>::min());
+    assert(value_);
+    const auto s{BN_set_word(value_.get(), i)};
+    assert(s);
+
+    // clang-format off
+    assert( ((i == 0) && (BN_is_zero(value_.get())))  ||
             ((i > 0) && (!is_negative(*this))) );
     // clang-format on
 }
@@ -154,7 +189,7 @@ bsv::bint& bsv::bint::operator&=(const bint& other)
 
     if(other.empty())
     {
-        *this = bint(0);
+        *this = bint{0};
         return *this;
     }
 
@@ -338,6 +373,20 @@ std::string bsv::to_string(const bint& n) // used in gdb pretty-printer
     std::ostringstream oss;
     oss << n;
     return oss.str();
+}
+
+std::size_t bsv::to_size_t(const bint& n)
+{
+    // Precondition:
+    // n <= numeric_limit<size_t>::max() and n>=numeric_limit<size_t>::min()
+
+    auto* asn1{ BN_to_ASN1_INTEGER(n.value_.get(), nullptr) };
+    assert(asn1);
+
+    uint64_t i64{};
+    const int status{ASN1_INTEGER_get_uint64(&i64, asn1)};
+    assert(status);
+    return i64;
 }
 
 // Notes

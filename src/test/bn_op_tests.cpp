@@ -296,6 +296,119 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
     }
 }
 
+BOOST_AUTO_TEST_CASE(op_bin2num)
+{
+    // clang-format off
+    vector<tuple<vector<uint8_t>, vector<uint8_t>>> test_data = {
+        { {}, {}},
+        { {0x1}, {0x1}},               // +1
+        { {0x7f}, {0x7f}},             // +127 
+        { {0x80, 0x0}, {0x80, 0x0}},   // +128
+        { {0xff, 0x0}, {0xff, 0x0}},   // 255
+        { {0x81}, {0x81}},             // -1
+        { {0xff}, {0xff}},             // -127 
+        { {0x80, 0x80}, {0x80, 0x80}}, // -128
+        { {0xff, 0x80}, {0xff, 0x80}}, // -255
+        { {0x1, 0x0}, {0x1}},           // should be 0x1 for +1
+        { {0x7f, 0x80}, {0xff}},        // should be 0xff for -127
+        { {0x1, 0x2, 0x3, 0x4, 0x5}, {0x1, 0x2, 0x3, 0x4, 0x5}} // invalid range?
+    };
+    // clang-format on
+    for(auto& [ip, op] : test_data)
+    {
+        stack_type stack;
+        vector<uint8_t> args;
+
+        args.push_back(OP_PUSHDATA1);
+        args.push_back(ip.size());
+        copy(begin(ip), end(ip), back_inserter(args));
+
+        args.push_back(OP_BIN2NUM);
+
+        CScript script(args.begin(), args.end());
+
+        // uint32_t flags{};
+        uint32_t flags{1 << 17};
+        ScriptError error;
+        const auto status =
+            EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
+
+        BOOST_CHECK_EQUAL(true, status);
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+        BOOST_CHECK_EQUAL(1, stack.size());
+        BOOST_CHECK_EQUAL(op.size(), stack[0].size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]), begin(op),
+                                      end(op));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_num2bin)
+{
+    // clang-format off
+    vector<tuple<vector<uint8_t>, 
+                 vector<uint8_t>,
+                 bool,
+                 ScriptError,
+                 vector<uint8_t>>> test_data = {
+
+        { {}, {}, true, SCRIPT_ERR_OK, {}},
+        { {}, {0x0}, true, SCRIPT_ERR_OK, {}},
+        { {}, {0x1}, true, SCRIPT_ERR_OK, {0x0}},
+        { {}, {0x2}, true, SCRIPT_ERR_OK, {0x0, 0x0}},
+        { {0x0}, {0x0}, true, SCRIPT_ERR_OK, {}},
+        { {0x0}, {0x1}, true, SCRIPT_ERR_OK, {0x0}},
+        { {0x0}, {0x2}, true, SCRIPT_ERR_OK, {0x0, 0x0}},
+        { {0x1}, {0x1}, true, SCRIPT_ERR_OK, { 0x1}},
+        { {0x1, 0x2}, {0x2}, true, SCRIPT_ERR_OK, { 0x1, 0x2}},
+        { {0x1, 0x2, 0x3}, {0x3}, true, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3}},
+        { {0x1, 0x2, 0x3, 0x4}, {0x4}, true, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3, 0x4}},
+        { {0x1, 0x2, 0x3, 0x4, 0x5}, {0x5}, true, SCRIPT_ERR_OK, { 0x1, 0x2, 0x3, 0x4, 0x5}},
+        
+        // 0x0 used as padding
+        { {0x1}, {0x2}, true, SCRIPT_ERR_OK, {0x1, 0x0}},
+        { {0x2}, {0x2}, true, SCRIPT_ERR_OK, {0x2, 0x0}},
+
+        // -ve numbers 
+        { {0x81}, {0x1}, true, SCRIPT_ERR_OK, {0x81}},              // -1
+        { {0x81}, {0x2}, true, SCRIPT_ERR_OK, {0x1, 0x80}},         // -1
+        { {0x81}, {0x3}, true, SCRIPT_ERR_OK, {0x1, 0x0, 0x80}},    // -1
+
+        // requested length to short
+        { {0x1}, {}, false, SCRIPT_ERR_IMPOSSIBLE_ENCODING, {0x1}},
+        { {0x1}, {0x0}, false, SCRIPT_ERR_IMPOSSIBLE_ENCODING, {0x1}},
+        { {0x1, 0x2}, {0x1}, false, SCRIPT_ERR_IMPOSSIBLE_ENCODING, { 0x1, 0x2}},
+
+    };
+    // clang-format on
+    for(auto& [arg1, arg2, exp_status, exp_error, op] : test_data)
+    {
+        stack_type stack;
+        vector<uint8_t> args;
+
+        args.push_back(OP_PUSHDATA1);
+        args.push_back(arg1.size());
+        copy(begin(arg1), end(arg1), back_inserter(args));
+        
+        args.push_back(OP_PUSHDATA1);
+        args.push_back(arg2.size());
+        copy(begin(arg2), end(arg2), back_inserter(args));
+
+        args.push_back(OP_NUM2BIN);
+
+        CScript script(args.begin(), args.end());
+
+        uint32_t flags(1 << 17);
+        ScriptError error;
+        const auto status =
+            EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
+
+        BOOST_CHECK_EQUAL(exp_status, status);
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]), begin(op),
+                                      end(op));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
 
 
