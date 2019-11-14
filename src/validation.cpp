@@ -11,7 +11,7 @@
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "checkpoints.h"
-#include "checkqueue.h"
+#include "checkqueuepool.h"
 #include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
@@ -33,6 +33,7 @@
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
+#include "taskcancellation.h"
 #include "timedata.h"
 #include "tinyformat.h"
 #include "txdb.h"
@@ -74,7 +75,6 @@ CChain chainActive;
 CBlockIndex *pindexBestHeader = nullptr;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
-int nScriptCheckThreads = 0;
 std::atomic_bool fImporting(false);
 bool fReindex = false;
 bool fTxIndex = false;
@@ -90,6 +90,7 @@ int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 
 uint256 hashAssumeValid;
 arith_uint256 nMinimumChainWork;
+CBlockValidationStatus blockValidationStatus;
 
 Amount maxTxFee = DEFAULT_TRANSACTION_MAXFEE;
 
@@ -109,6 +110,18 @@ const std::string sDoubleSpendRejectMsg = "bad-txn-double-spend-detected";
 // Internal stuff
 namespace {
 
+/**
+ * Exception used for indicating validation termination (not an error).
+ */
+class CBlockValidationCancellation : public std::exception
+{
+public:
+    const char* what() const noexcept override
+    {
+        return "CBlockValidationCancellation";
+    };
+};
+
 struct CBlockIndexWorkComparator {
     bool operator()(const CBlockIndex *pa, const CBlockIndex *pb) const {
         // First sort by most total work, ...
@@ -116,6 +129,14 @@ struct CBlockIndexWorkComparator {
             return false;
         }
         if (pa->nChainWork < pb->nChainWork) {
+            return true;
+        }
+
+        // ... then by when block was completely validated, ...
+        if (pa->GetValidationCompletionTime() < pb->GetValidationCompletionTime()) {
+            return false;
+        }
+        if (pa->GetValidationCompletionTime() > pb->GetValidationCompletionTime()) {
             return true;
         }
 
@@ -128,7 +149,7 @@ struct CBlockIndexWorkComparator {
         }
 
         // Use pointer address as tie breaker (should only happen with blocks
-        // loaded from disk, as those all have id 0).
+        // loaded from disk, as those all have id 0 and validation time 0).
         if (pa < pb) {
             return false;
         }
@@ -139,6 +160,33 @@ struct CBlockIndexWorkComparator {
         // Identical blocks.
         return false;
     }
+};
+
+/**
+ * Class for counting the amount of blocks being processed.
+ */
+class CBlockProcessing
+{
+public:
+    CBlockProcessing() = delete;
+
+    /** Get a scope guard that adds one block to the count. */
+    static std::shared_ptr<std::atomic<int>> GetCountGuard()
+    {
+        ++mCount;
+        return {&mCount, decrement};
+    }
+
+    /** Get the number of blocks being processed/waiting for processing. */
+    static int Count() {return mCount;}
+
+private:
+    static void decrement(std::atomic<int>* counter)
+    {
+        --(*counter);
+    }
+
+    inline static std::atomic<int> mCount{0};
 };
 
 CBlockIndex *pindexBestInvalid;
@@ -938,20 +986,23 @@ CTxnValResult TxnValidation(
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
     CValidationState ctxState;
-    if (!ContextualCheckTransactionForCurrentBlock(
-            config,
-            tx,
-            chainActive.Height(),
-            chainActive.Tip()->GetMedianTimePast(),
-            ctxState,
-            STANDARD_LOCKTIME_VERIFY_FLAGS)) {
-        // We copy the state from a dummy to ensure we don't increase the
-        // ban score of peer for transaction that could be valid in the future.
-        state.DoS(0, false, REJECT_NONSTANDARD,
-                  ctxState.GetRejectReason(),
-                  ctxState.CorruptionPossible(),
-                  ctxState.GetDebugMessage());
-        return Result{state, pTxInputData};
+    {
+        const CBlockIndex* tip = chainActive.Tip();
+        if (!ContextualCheckTransactionForCurrentBlock(
+                config,
+                tx,
+                tip->nHeight,
+                tip->GetMedianTimePast(),
+                ctxState,
+                STANDARD_LOCKTIME_VERIFY_FLAGS)) {
+            // We copy the state from a dummy to ensure we don't increase the
+            // ban score of peer for transaction that could be valid in the future.
+            state.DoS(0, false, REJECT_NONSTANDARD,
+                      ctxState.GetRejectReason(),
+                      ctxState.CorruptionPossible(),
+                      ctxState.GetDebugMessage());
+            return Result{state, pTxInputData};
+        }
     }
     // Is it already in the memory pool?
     if (pool.Exists(txid)) {
@@ -2583,12 +2634,16 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
-static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
+static std::unique_ptr<checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>> scriptCheckQueuePool;
 
-void ThreadScriptCheck(int workerNum) {
-    std::string s = strprintf("bitcoin-scriptch%d", workerNum);
-    RenameThread(s.c_str());
-    scriptcheckqueue.Thread();
+void InitScriptCheckQueues(const Config& config, boost::thread_group& threadGroup)
+{
+    scriptCheckQueuePool =
+        std::make_unique<checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>>(
+            config.GetMaxParallelBlocks(),
+            threadGroup,
+            config.GetPerBlockScriptValidatorThreadsCount(),
+            config.GetPerBlockScriptValidationMaxBatchSize());
 }
 
 // Returns the script flags which should be checked for a given block
@@ -2654,10 +2709,30 @@ static int64_t nTimeTotal = 0;
  * represented by coins. Validity checks that depend on the UTXO set are also
  * done; ConnectBlock() can fail if those validity checks fail (among other
  * reasons).
+ *
+ * THROWS (only when parallelBlockValidation is set to true):
+ *     - CBestBlockAttachmentCancellation when chain tip has changed while cs_main
+ *       was unlocked (a different best block candidate has finished validation
+ *       before we re-locked cs_main)
+ *
+ * THROWS:
+ *     - CBlockValidationCancellation when validation was canceled through the
+ *       cancellation token before it could finish. This can happen due to an
+ *       external reason (e.g. shutting down the application) or internal (e.g.
+ *       a better block candidate came in but all the checkers were already in
+ *       use so check queue pool cancels the worst one for reuse with the better
+ *       candidate).
  */
-static bool ConnectBlock(const Config &config, const CBlock &block,
-                         CValidationState &state, CBlockIndex *pindex,
-                         CCoinsViewCache &view, bool fJustCheck = false) {
+static bool ConnectBlock(
+    const task::CCancellationToken& token,
+    bool parallelBlockValidation,
+    const Config &config,
+    const CBlock &block,
+    CValidationState &state,
+    CBlockIndex *pindex,
+    CCoinsViewCache &view,
+    bool fJustCheck = false)
+{
     AssertLockHeld(cs_main);
 
     int64_t nTimeStart = GetTimeMicros();
@@ -2797,8 +2872,17 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
 
     CBlockUndo blockundo;
 
-    CCheckQueueControl<CScriptCheck> control(fScriptChecks ? &scriptcheckqueue
-                                                           : nullptr);
+    // CCheckQueueScopeGuard that does nothing and does not belong to any pool.
+    using NullScriptChecker =
+        checkqueue::CCheckQueuePool<CScriptCheck, arith_uint256>::CCheckQueueScopeGuard;
+
+    // Token for use during functional testing
+    std::optional<task::CCancellationToken> checkPoolToken;
+
+    auto control =
+        fScriptChecks
+        ? scriptCheckQueuePool->GetChecker(pindex->nChainWork, token, &checkPoolToken)
+        : NullScriptChecker{};
 
     std::vector<int> prevheights;
     Amount nFees(0);
@@ -2874,7 +2958,10 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
                              tx.GetId().ToString(), FormatStateMessage(state));
             }
 
-            control.Add(vChecks);
+            if(fScriptChecks)
+            {
+                control.Add(vChecks);
+            }
         }
 
         CTxUndo undoDummy;
@@ -2907,9 +2994,45 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
                          REJECT_INVALID, "bad-cb-amount");
     }
 
-    if (!control.Wait()) {
-        return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
-                         "parallel script check failed");
+    const CBlockIndex* tipBeforeMainLockReleased = chainActive.Tip();
+
+    {
+        auto guard =
+            blockValidationStatus.getScopedCurrentlyValidatingBlock(*pindex);
+
+        /* Script validation is the most expensive part and is also not cs_main
+        dependent so in case of parallel block validation we release it for
+        the duration of validation.
+        After we obtain the lock once again we check if chain tip has changed
+        in the meantime - if not we continue as if we had a lock all along,
+        otherwise we skip chain tip update part and retry with a new candidate.*/
+        std::unique_ptr<CTemporaryLeaveCriticalSectionGuard> csGuard =
+            parallelBlockValidation
+            ? std::make_unique<CTemporaryLeaveCriticalSectionGuard>(cs_main)
+            : nullptr;
+
+        if(checkPoolToken)
+        {
+            // We only wait during tests and even then only if validation would
+            // be performed.
+            blockValidationStatus.waitIfRequired(
+                pindex->GetBlockHash(),
+                task::CCancellationToken::JoinToken(checkPoolToken.value(), token));
+        }
+        auto controlValidationStatusOK = control.Wait();
+
+        if (!controlValidationStatusOK.has_value())
+        {
+            // validation was terminated before it was able to complete so we should
+            // skip validity setting to SCRIPTS
+            throw CBlockValidationCancellation{};
+        }
+
+        if (!controlValidationStatusOK.value())
+        {
+            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
+                             "parallel script check failed");
+        }
     }
 
     int64_t nTime4 = GetTimeMicros();
@@ -2945,12 +3068,25 @@ static bool ConnectBlock(const Config &config, const CBlock &block,
             pindex->nStatus = pindex->nStatus.withUndo();
         }
 
+        // since we are changing validation time we need to update
+        // setBlockIndexCandidates as well - it sorts by that time
+        setBlockIndexCandidates.erase(pindex);
         pindex->RaiseValidity(BlockValidity::SCRIPTS);
+        setBlockIndexCandidates.insert(pindex);
+
         setDirtyBlockIndex.insert(pindex);
     }
 
     if (fTxIndex && !pblocktree->WriteTxIndex(vPos)) {
         return AbortNode(state, "Failed to write transaction index");
+    }
+
+    if (parallelBlockValidation &&
+        tipBeforeMainLockReleased != chainActive.Tip())
+    {
+        // a different block managed to become best block before this one
+        // so we should terminate connecting process
+        throw CBestBlockAttachmentCancellation{};
     }
 
     // add this block to the view's block chain
@@ -3313,16 +3449,43 @@ class ConnectTrace {
 private:
     std::vector<PerBlockConnectTrace> blocksConnected;
     CTxMemPool &pool;
+    bool mTracingPoolEntryRemovedEvents = false;
 
-public:
-    ConnectTrace(CTxMemPool &_pool) : blocksConnected(1), pool(_pool) {
+    void ConnectToPoolEntryRemovedEvent()
+    {
+        mTracingPoolEntryRemovedEvents = true;
         pool.NotifyEntryRemoved.connect(
             boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
     }
 
-    ~ConnectTrace() {
+    void DisconnectFromPoolEntryRemovedEvent()
+    {
+        mTracingPoolEntryRemovedEvents = false;
         pool.NotifyEntryRemoved.disconnect(
             boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
+    }
+
+public:
+    ConnectTrace(CTxMemPool &_pool) : blocksConnected(1), pool(_pool)
+    {
+        ConnectToPoolEntryRemovedEvent();
+    }
+
+    ~ConnectTrace()
+    {
+        DisconnectFromPoolEntryRemovedEvent();
+    }
+
+    void TracePoolEntryRemovedEvents(bool trace)
+    {
+        if(trace && !mTracingPoolEntryRemovedEvents)
+        {
+            ConnectToPoolEntryRemovedEvent();
+        }
+        else if(!trace && mTracingPoolEntryRemovedEvents)
+        {
+            DisconnectFromPoolEntryRemovedEvent();
+        }
     }
 
     void BlockConnected(CBlockIndex *pindex,
@@ -3365,12 +3528,16 @@ public:
  * by copying pblock) - if that is not intended, care must be taken to remove
  * the last entry in blocksConnected in case of failure.
  */
-static bool ConnectTip(const Config &config, CValidationState &state,
-                       CBlockIndex *pindexNew,
-                       const std::shared_ptr<const CBlock> &pblock,
-                       ConnectTrace &connectTrace,
-                       DisconnectedBlockTransactions &disconnectpool,
-                       const CJournalChangeSetPtr& changeSet)
+static bool ConnectTip(
+    bool parallelBlockValidation,
+    const task::CCancellationToken& token,
+    const Config &config,
+    CValidationState &state,
+    CBlockIndex *pindexNew,
+    const std::shared_ptr<const CBlock> &pblock,
+    ConnectTrace &connectTrace,
+    DisconnectedBlockTransactions &disconnectpool,
+    const CJournalChangeSetPtr& changeSet)
 {
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
@@ -3396,7 +3563,26 @@ static bool ConnectTip(const Config &config, CValidationState &state,
              (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
         CCoinsViewCache view(pcoinsTip);
-        bool rv = ConnectBlock(config, blockConnecting, state, pindexNew, view);
+
+        // Temporarily stop tracing events if we are in parallel validation as
+        // we will possibly release cs_main lock for a while. In case of an
+        // exception we don't need to re-enable it since we won't be using the
+        // result
+        connectTrace.TracePoolEntryRemovedEvents(!parallelBlockValidation);
+
+        bool rv =
+            ConnectBlock(
+                token,
+                parallelBlockValidation,
+                config,
+                blockConnecting,
+                state,
+                pindexNew,
+                view);
+
+        // re-enable tracing of events if it was disabled
+        connectTrace.TracePoolEntryRemovedEvents(true);
+
         GetMainSignals().BlockChecked(blockConnecting, state);
         if (!rv) {
             if (state.IsInvalid()) {
@@ -3487,24 +3673,24 @@ static CBlockIndex *FindMostWorkChain() {
                     (pindexBestInvalid == nullptr ||
                      pindexNew->nChainWork > pindexBestInvalid->nChainWork)) {
                     pindexBestInvalid = pindexNew;
-                }
-                CBlockIndex *pindexFailed = pindexNew;
-                // Remove the entire chain from the set.
+        }
+        CBlockIndex* pindexFailed = pindexNew;
+        // Remove the entire chain from the set.
                 while (pindexTest != pindexFailed) {
-                    if (fInvalidChain) {
-                        pindexFailed->nStatus =
-                            pindexFailed->nStatus.withFailedParent();
-                    } else if (fMissingData) {
-                        // If we're missing data, then add back to
-                        // mapBlocksUnlinked, so that if the block arrives in
-                        // the future we can try adding to
-                        // setBlockIndexCandidates again.
-                        mapBlocksUnlinked.insert(
-                            std::make_pair(pindexFailed->pprev, pindexFailed));
-                    }
-                    setBlockIndexCandidates.erase(pindexFailed);
-                    pindexFailed = pindexFailed->pprev;
-                }
+            if (fInvalidChain) {
+                pindexFailed->nStatus =
+                    pindexFailed->nStatus.withFailedParent();
+            } else if (fMissingData) {
+                // If we're missing data, then add back to
+                // mapBlocksUnlinked, so that if the block arrives in
+                // the future we can try adding to
+                // setBlockIndexCandidates again.
+                mapBlocksUnlinked.insert(
+                    std::make_pair(pindexFailed->pprev, pindexFailed));
+            }
+            setBlockIndexCandidates.erase(pindexFailed);
+            pindexFailed = pindexFailed->pprev;
+        }
                 setBlockIndexCandidates.erase(pindexTest);
                 fInvalidAncestor = true;
                 break;
@@ -3538,12 +3724,15 @@ static void PruneBlockIndexCandidates() {
  * pblock is either nullptr or a pointer to a CBlock corresponding to
  * pindexMostWork.
  */
-static bool ActivateBestChainStep(const Config &config, CValidationState &state,
-                                  CBlockIndex *pindexMostWork,
-                                  const std::shared_ptr<const CBlock> &pblock,
-                                  bool &fInvalidFound,
-                                  ConnectTrace &connectTrace,
-                                  const CJournalChangeSetPtr& changeSet)
+static bool ActivateBestChainStep(
+    const task::CCancellationToken& token,
+    const Config &config,
+    CValidationState &state,
+    CBlockIndex *pindexMostWork,
+    const std::shared_ptr<const CBlock> &pblock,
+    bool &fInvalidFound,
+    ConnectTrace &connectTrace,
+    const CJournalChangeSetPtr& changeSet)
 {
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
@@ -3582,12 +3771,25 @@ static bool ActivateBestChainStep(const Config &config, CValidationState &state,
         // Connect new blocks.
         for (CBlockIndex *pindexConnect :
              boost::adaptors::reverse(vpindexToConnect)) {
-            if (!ConnectTip(config, state, pindexConnect,
-                            pindexConnect == pindexMostWork
-                                ? pblock
-                                : std::shared_ptr<const CBlock>(),
-                            connectTrace, disconnectpool,
-                            changeSet)) {
+            if (!ConnectTip(
+                    /* We always want to get to the same nChainWork amount as
+                    we started with before enabling parallel validation as we
+                    don't want to end up in a situation where sibling blocks
+                    from older chain items are once again eligible for parallel
+                    validation thus wasting resources. We also don't wish to
+                    end up announcing older chain items as new best tip.*/
+                    pindexOldTip && chainActive.Tip()->nChainWork == pindexOldTip->nChainWork,
+                    token,
+                    config,
+                    state,
+                    pindexConnect,
+                    pindexConnect == pindexMostWork
+                        ? pblock
+                        : std::shared_ptr<const CBlock>(),
+                    connectTrace,
+                    disconnectpool,
+                    changeSet))
+            {
                 if (state.IsInvalid()) {
                     // The block violates a consensus rule.
                     if (!state.CorruptionPossible()) {
@@ -3665,85 +3867,234 @@ static void NotifyHeaderTip() {
     }
 }
 
-bool ActivateBestChain(const Config &config, CValidationState &state,
-                       const CJournalChangeSetPtr& changeSet,
-                       std::shared_ptr<const CBlock> pblock) {
+/**
+ * Find chain with most work that is considered currently the best but prefer
+ * provided block chain if it contains the same amount of work and same parent
+ * as the designated best chain.
+ * This enables us to process multiple "best" tips in parallel thus
+ * preventing one long validating block from delaying alternatives.
+ */
+static CBlockIndex* ConsiderBlockForMostWorkChain(
+    CBlockIndex& mostWork,
+    const CBlock& block,
+    const CBlockIndex& currentTip)
+{
+    if(block.GetHash() == mostWork.GetBlockHash() ||
+       block.GetBlockHeader().hashPrevBlock != *currentTip.phashBlock)
+    {
+        return &mostWork;
+    }
+
+    auto it = mapBlockIndex.find(block.GetHash());
+
+    // if block is missing from the mapBlockIndex then treat it as code bug
+    // since every new block should be added to index before getting here
+    assert(it != mapBlockIndex.end());
+    assert(*it->second->pprev->phashBlock == block.GetBlockHeader().hashPrevBlock);
+
+    CBlockIndex* indexOfNewBlock = it->second;
+
+    if(mostWork.nChainWork > indexOfNewBlock->nChainWork
+        || !indexOfNewBlock->IsValid(BlockValidity::TRANSACTIONS)
+        || !indexOfNewBlock->nChainTx)
+    {
+        return &mostWork;
+    }
+
+    return indexOfNewBlock;
+}
+
+namespace
+{
+    /**
+     * Class for use in ActivateBestChain() that clears cache by default and
+     * preserves it if CCacheScopedGuard::DoNotClear() is called.
+     */
+    class CCacheScopedGuard
+    {
+    public:
+        CCacheScopedGuard(CBlockIndex** guarding) : mGuarding{guarding} {}
+        ~CCacheScopedGuard()
+        {
+            if(mGuarding)
+            {
+                *mGuarding = nullptr;
+            }
+        }
+        void DoNotClear() {mGuarding = nullptr;}
+
+    private:
+        CBlockIndex** mGuarding;
+    };
+}
+
+bool ActivateBestChain(
+    const task::CCancellationToken& token,
+    const Config &config,
+    CValidationState &state,
+    const CJournalChangeSetPtr& changeSet,
+    std::shared_ptr<const CBlock> pblock)
+{
     // Note that while we're often called here from ProcessNewBlock, this is
     // far from a guarantee. Things in the P2P/RPC will often end up calling
     // us in the middle of ProcessNewBlock - do not assume pblock is set
     // sanely for performance or correctness!
 
-    CBlockIndex *pindexMostWork = nullptr;
-    CBlockIndex *pindexNewTip = nullptr;
+    // We cache pindexMostWork as with cases where we have multiple consecutive
+    // known blocks (e.g initial block download) we don't want to check after
+    // each block which block is the next best block
+    CBlockIndex* pindexMostWork = nullptr;
+
+    const CBlockIndex* pindexNewTip = nullptr;
+    bool tipChanged = false;
 
     do {
-        boost::this_thread::interruption_point();
-        if (ShutdownRequested()) {
-            break;
-        }
-
-        const CBlockIndex *pindexFork;
-        bool fInitialDownload;
+        try
         {
-            LOCK(cs_main);
-
-            // Destructed before cs_main is unlocked.
-            ConnectTrace connectTrace(mempool);
-
-            if (pindexMostWork == nullptr || pindexNewTip != chainActive.Tip()) {
-                // If we've not yet calculated the best chain, or someone else has updated the current tip
-                // from under us, work out the best new tip to aim for.
-                pindexMostWork = FindMostWorkChain();
+            boost::this_thread::interruption_point();
+            if (ShutdownRequested() || token.IsCanceled()) {
+                break;
             }
 
-            // Whether we have anything to do at all.
-            if (pindexMostWork == nullptr ||
-                pindexMostWork == chainActive.Tip()) {
-                return true;
+            const CBlockIndex *pindexFork;
+            bool fInitialDownload;
+            {
+                LOCK(cs_main);
+
+                // Destructed before cs_main is unlocked (during script
+                // validation cs_main can be released so during that time
+                // signal processing is disabled for this class to prevent it
+                // from being used outside cs_main lock).
+                ConnectTrace connectTrace(mempool);
+
+                const CBlockIndex* pindexOldTip = chainActive.Tip();
+
+                // make sure that we clear cache by default and only preserve it
+                // when we manage to change tip and clear it otherwise
+                CCacheScopedGuard cacheGuard{&pindexMostWork};
+
+                // If we've not yet calculated the best chain, or someone else
+                // has updated the current tip from under us, work out the best
+                // new tip to aim for.
+                if (pindexMostWork == nullptr || pindexNewTip != chainActive.Tip())
+                {
+                    pindexMostWork = FindMostWorkChain();
+
+                    // Whether we have anything to do at all.
+                    if (pindexMostWork == nullptr)
+                    {
+                        break;
+                    }
+
+                    // if block was provided consider it as an alternative candidate
+                    if(pblock && pindexOldTip != nullptr)
+                    {
+                        pindexMostWork =
+                            ConsiderBlockForMostWorkChain(
+                                *pindexMostWork,
+                                *pblock,
+                                *pindexOldTip);
+                    }
+
+                    if(pindexMostWork == pindexOldTip)
+                    {
+                        break;
+                    }
+                }
+
+                // make sure that we don't start validating child on the path
+                // that is already covered by a parent that is currently in
+                // validation
+                if(blockValidationStatus.isAncestorInValidation(*pindexMostWork))
+                {
+                    if(pblock)
+                    {
+                        LogPrintf(
+                            "Block %s will not be considered by the current"
+                            " tip activation as a different activation is"
+                            " already validating it's ancestor and moving"
+                            " towards this block.\n",
+                            pblock->GetHash().GetHex());
+                    }
+
+                    break;
+                }
+
+                bool fInvalidFound = false;
+                std::shared_ptr<const CBlock> nullBlockPtr;
+                if (!ActivateBestChainStep(
+                        token,
+                        config, state, pindexMostWork,
+                        pblock &&
+                                pblock->GetHash() == pindexMostWork->GetBlockHash()
+                            ? pblock
+                            : nullBlockPtr,
+                        fInvalidFound,
+                        connectTrace,
+                        changeSet))
+                {
+                    return false;
+                }
+
+                pindexNewTip = chainActive.Tip();
+
+                if (!fInvalidFound && pindexMostWork != pindexNewTip)
+                {
+                    // Preserve cache as there is more work to be done on this
+                    // path
+                    cacheGuard.DoNotClear();
+                }
+
+                pindexFork = chainActive.FindFork(pindexOldTip);
+                fInitialDownload = IsInitialBlockDownload();
+
+                for (const PerBlockConnectTrace &trace :
+                     connectTrace.GetBlocksConnected()) {
+                    assert(trace.pblock && trace.pindex);
+                    GetMainSignals().BlockConnected(trace.pblock, trace.pindex,
+                                                    *trace.conflictedTxs);
+                }
+            }
+            // When we reach this point, we switched to a new tip (stored in
+            // pindexNewTip).
+
+            // Notifications/callbacks that can run without cs_main
+
+            // Notify external listeners about the new tip.
+            GetMainSignals().UpdatedBlockTip(pindexNewTip, pindexFork,
+                                             fInitialDownload);
+
+            // Always notify the UI if a new block tip was connected
+            if (pindexFork != pindexNewTip) {
+                uiInterface.NotifyBlockTip(fInitialDownload, pindexNewTip);
             }
 
-            bool fInvalidFound = false;
-            std::shared_ptr<const CBlock> nullBlockPtr;
-            CBlockIndex *pindexOldTip = chainActive.Tip();
-            if (!ActivateBestChainStep(
-                    config, state, pindexMostWork,
-                    pblock &&
-                            pblock->GetHash() == pindexMostWork->GetBlockHash()
-                        ? pblock
-                        : nullBlockPtr,
-                    fInvalidFound, connectTrace, changeSet)) {
-                return false;
-            }
-
-            if (fInvalidFound) {
-                // Wipe cache, we may need another branch now.
-                pindexMostWork = nullptr;
-            }
-            pindexNewTip = chainActive.Tip();
-            pindexFork = chainActive.FindFork(pindexOldTip);
-            fInitialDownload = IsInitialBlockDownload();
-
-            for (const PerBlockConnectTrace &trace :
-                 connectTrace.GetBlocksConnected()) {
-                assert(trace.pblock && trace.pindex);
-                GetMainSignals().BlockConnected(trace.pblock, trace.pindex,
-                                                *trace.conflictedTxs);
-            }
+            tipChanged = true;
         }
-        // When we reach this point, we switched to a new tip (stored in
-        // pindexNewTip).
+        catch(const CBestBlockAttachmentCancellation&)
+        {
+            std::string hash{pblock ? pblock->GetHash().GetHex() : ""};
 
-        // Notifications/callbacks that can run without cs_main
-
-        // Notify external listeners about the new tip.
-        GetMainSignals().UpdatedBlockTip(pindexNewTip, pindexFork,
-                                         fInitialDownload);
-
-        // Always notify the UI if a new block tip was connected
-        if (pindexFork != pindexNewTip) {
-            uiInterface.NotifyBlockTip(fInitialDownload, pindexNewTip);
+            LogPrintf(
+                "Block %s was not activated as best chain as a better block was"
+                " already validated before this one was fully validated.\n",
+                hash);
         }
-    } while (pindexNewTip != pindexMostWork);
+        catch(const CBlockValidationCancellation&)
+        {
+            std::string hash{pblock ? pblock->GetHash().GetHex() : ""};
+
+            LogPrintf(
+                "Block %s validation was terminated before completion. It will"
+                " not be considered for best block chain at this moment.\n",
+                hash);
+        }
+    } while (true); // loop exit should be determined inside cs_main lock above
+
+    if(!tipChanged)
+    {
+        return true;
+    }
 
     const CChainParams &params = config.GetChainParams();
     CheckBlockIndex(params.GetConsensus());
@@ -3762,6 +4113,33 @@ bool ActivateBestChain(const Config &config, CValidationState &state,
     return true;
 }
 
+bool IsBlockABestChainTipCandidate(CBlockIndex& index)
+{
+    AssertLockHeld(cs_main);
+
+    return (setBlockIndexCandidates.find(&index) != setBlockIndexCandidates.end());
+}
+
+bool AreOlderOrEqualUnvalidatedBlockIndexCandidates(
+    const std::chrono::time_point<std::chrono::system_clock>& comparisonTime)
+{
+    AssertLockHeld(cs_main);
+
+    auto time = std::chrono::system_clock::to_time_t(comparisonTime);
+
+    for(const CBlockIndex* pindex : setBlockIndexCandidates)
+    {
+        if(time >= pindex->GetHeaderReceivedTime() &&
+            !pindex->IsValid(BlockValidity::SCRIPTS) &&
+            pindex->nChainWork > chainActive.Tip()->nChainWork)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool PreciousBlock(const Config &config, CValidationState &state,
                    CBlockIndex *pindex) {
     {
@@ -3777,6 +4155,7 @@ bool PreciousBlock(const Config &config, CValidationState &state,
         }
         nLastPreciousChainwork = chainActive.Tip()->nChainWork;
         setBlockIndexCandidates.erase(pindex);
+        pindex->IgnoreValidationTime();
         pindex->nSequenceId = nBlockReverseSequenceId;
         if (nBlockReverseSequenceId > std::numeric_limits<int32_t>::min()) {
             // We can't keep reducing the counter if somebody really wants to
@@ -3790,7 +4169,10 @@ bool PreciousBlock(const Config &config, CValidationState &state,
     }
 
     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
-    return ActivateBestChain(config, state, changeSet);
+    auto source = task::CCancellationSource::Make();
+    // state is used to report errors, not block related invalidity
+    // (see description of ActivateBestChain)
+    return ActivateBestChain(source->GetToken(), config, state, changeSet);
 }
 
 bool InvalidateBlock(const Config &config, CValidationState &state,
@@ -3837,7 +4219,10 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
 
     if (state.IsValid()) {
-        ActivateBestChain(config, state, changeSet);
+        auto source = task::CCancellationSource::Make();
+        // state is used to report errors, not block related invalidity
+        // (see description of ActivateBestChain)
+        ActivateBestChain(source->GetToken(), config, state, changeSet);
     }
 
     // Check mempool & journal
@@ -4577,9 +4962,15 @@ bool VerifyNewBlock(const Config &config,
     return true;
 }
 
-bool ProcessNewBlock(const Config &config,
-                     const std::shared_ptr<const CBlock> pblock,
-                     bool fForceProcessing, bool *fNewBlock) {
+std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
+    task::CCancellationToken&& token,
+    const Config& config,
+    const std::shared_ptr<const CBlock>& pblock,
+    bool fForceProcessing,
+    bool* fNewBlock)
+{
+    auto guard = CBlockProcessing::GetCountGuard();
+
     {
         CBlockIndex *pindex = nullptr;
         if (fNewBlock) {
@@ -4603,20 +4994,59 @@ bool ProcessNewBlock(const Config &config,
         CheckBlockIndex(chainparams.GetConsensus());
         if (!ret) {
             GetMainSignals().BlockChecked(*pblock, state);
-            return error("%s: AcceptBlock FAILED", __func__);
+            error("%s: AcceptBlock FAILED", __func__);
+
+            return {};
         }
     }
 
     NotifyHeaderTip();
 
-    // Only used to report errors, not invalidity - ignore it
-    CValidationState state;
-    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
-    if (!ActivateBestChain(config, state, changeSet, pblock)) {
-        return error("%s: ActivateBestChain failed", __func__);
+    auto bestChainActivation =
+        [&config, pblock, guard, token]
+        {
+            // dummyState is used to report errors, not block related invalidity - ignore it
+            // (see description of ActivateBestChain)
+            CValidationState dummyState;
+
+            CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
+
+            if (!ActivateBestChain(
+                    token,
+                    config,
+                    dummyState,
+                    changeSet,
+                    pblock))
+            {
+                return error("%s: ActivateBestChain failed", __func__);
+            }
+
+            return true;
+        };
+
+    return bestChainActivation;
+}
+
+bool ProcessNewBlock(const Config &config,
+                     const std::shared_ptr<const CBlock>& pblock,
+                     bool fForceProcessing, bool *fNewBlock)
+{
+    auto source = task::CCancellationSource::Make();
+    auto bestChainActivation =
+        ProcessNewBlockWithAsyncBestChainActivation(
+            source->GetToken(), config, pblock, fForceProcessing, fNewBlock);
+
+    if(!bestChainActivation)
+    {
+        return false;
     }
 
-    return true;
+    return bestChainActivation();
+}
+
+int GetProcessingBlocksCount()
+{
+    return CBlockProcessing::Count();
 }
 
 bool TestBlockValidity(const Config &config, CValidationState &state,
@@ -4635,6 +5065,8 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
 
     CCoinsViewCache viewNew(pcoinsTip);
     CBlockIndex indexDummy(block);
+    uint256 dummyHash;
+    indexDummy.phashBlock = &dummyHash;
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
 
@@ -4652,7 +5084,9 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
         return error("%s: Consensus::ContextualCheckBlock: %s", __func__,
                      FormatStateMessage(state));
     }
-    if (!ConnectBlock(config, block, state, &indexDummy, viewNew, true)) {
+    auto source = task::CCancellationSource::Make();
+    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, true))
+    {
         return false;
     }
 
@@ -5076,7 +5510,8 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
                     "VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s",
                     pindex->nHeight, pindex->GetBlockHash().ToString());
             }
-            if (!ConnectBlock(config, block, state, pindex, coins)) {
+            auto source = task::CCancellationSource::Make();
+            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins)) {
                 return error(
                     "VerifyDB(): *** found unconnectable block at %d, hash=%s",
                     pindex->nHeight, pindex->GetBlockHash().ToString());
@@ -5468,9 +5903,12 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                 // Activate the genesis block so normal node progress can
                 // continue
                 if (hash == chainparams.GetConsensus().hashGenesisBlock) {
-                    CValidationState state;
+                    // dummyState is used to report errors, not block related invalidity - ignore it
+                    // (see description of ActivateBestChain)
+                    CValidationState dummyState;
                     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
-                    if (!ActivateBestChain(config, state, changeSet)) {
+                    auto source = task::CCancellationSource::Make();
+                    if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
                         break;
                     }
                 }
@@ -5681,28 +6119,6 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
             // Checks for not-invalid blocks.
             // The failed mask cannot be set for blocks without invalid parents.
             assert(!pindex->nStatus.isInvalid());
-        }
-        if (!CBlockIndexWorkComparator()(pindex, chainActive.Tip()) &&
-            pindexFirstNeverProcessed == nullptr) {
-            if (pindexFirstInvalid == nullptr) {
-                // If this block sorts at least as good as the current tip and
-                // is valid and we have all data for its parents, it must be in
-                // setBlockIndexCandidates. chainActive.Tip() must also be there
-                // even if some data has been pruned.
-                if (pindexFirstMissing == nullptr ||
-                    pindex == chainActive.Tip()) {
-                    assert(setBlockIndexCandidates.count(pindex));
-                }
-                // If some parent is missing, then it could be that this block
-                // was in setBlockIndexCandidates but had to be removed because
-                // of the missing data. In this case it must be in
-                // mapBlocksUnlinked -- see test below.
-            }
-        } else {
-            // If this block sorts worse than the current tip or some ancestor's
-            // block has never been seen, it cannot be in
-            // setBlockIndexCandidates.
-            assert(setBlockIndexCandidates.count(pindex) == 0);
         }
         // Check whether this block is in mapBlocksUnlinked.
         std::pair<std::multimap<CBlockIndex *, CBlockIndex *>::iterator,

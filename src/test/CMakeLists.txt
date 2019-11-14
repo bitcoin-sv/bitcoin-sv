@@ -63,10 +63,12 @@ add_test_to_suite(bitcoin test_bitcoin
 	blockmaxsize_tests.cpp
 	blockfile_reading_tests.cpp
 	blockstatus_tests.cpp
+	blockvalidationstatus_tests.cpp
 	bloom_tests.cpp
     bn_op_tests.cpp
 	bswap_tests.cpp
 	checkpoints_tests.cpp
+	checkqueue_tests.cpp
 	coins_tests.cpp
 	compress_tests.cpp
 	config_tests.cpp
@@ -119,6 +121,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	skiplist_tests.cpp
 	streams_tests.cpp
 	stream_serialization_tests.cpp
+	taskcancellation_tests.cpp
 	test_bitcoin.cpp
 	test_bitcoin_main.cpp
 	test_double_spend_detector.cpp

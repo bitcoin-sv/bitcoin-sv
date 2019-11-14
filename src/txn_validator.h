@@ -80,6 +80,9 @@ class CTxnValidator final
     /** Wait for the Validator to process all queued txns (through asynch interface) */
     void waitForEmptyQueue(bool fCheckOrphanQueueEmpty=true);
 
+    /** Get number of transactions that are still unvalidated */
+    size_t GetTransactionsInQueueCount() const;
+
     /** Check if the given txn is already queued for processing (or being processed)
      *  in asynch mode by the Validator */
     bool isTxnKnown(const uint256& txid) const;

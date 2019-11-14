@@ -908,13 +908,21 @@ void CheckBlockMaxSizeForTime(Config& config, uint64_t medianPastTime, uint64_t 
     // Make sure that we got correct median past time.
     BOOST_REQUIRE_EQUAL(blocks.back().GetMedianTimePast(), medianPastTime);
 
-    // chainActive is used by BlockAssembler to get median past time, which is used to select default block size
-    chainActive.SetTip(&blocks.back());
+    {
+        LOCK(cs_main);
+
+        // chainActive is used by BlockAssembler to get median past time, which is used to select default block size
+        chainActive.SetTip(&blocks.back());
+    }
 
     BlockAssemblerRef ba = mining::CMiningFactory::GetAssembler(config);
     BOOST_CHECK_EQUAL(ba->GetMaxGeneratedBlockSize(), expectedSize);
 
-    chainActive.SetTip(nullptr); // cleanup
+    {
+        LOCK(cs_main);
+
+        chainActive.SetTip(nullptr); // cleanup
+    }
 }
 
 BOOST_AUTO_TEST_CASE(BlockAssembler_construction_activate_new_blocksize)

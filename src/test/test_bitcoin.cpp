@@ -21,6 +21,7 @@
 #include "rpc/server.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
+#include "taskcancellation.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -64,7 +65,17 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
 
 BasicTestingSetup::~BasicTestingSetup() {
     ECC_Stop();
-    g_connman.reset();
+
+    if(g_connman)
+    {
+        g_connman->Interrupt();
+        // call Stop first as CConnman members are using g_connman global
+        // variable and they must be shut down before the variable is reset to
+        // nullptr (which happens before the destructor is called making Stop
+        // call inside CConnman destructor too late)
+        g_connman->Stop();
+        g_connman.reset();
+    }
 }
 
 TestingSetup::TestingSetup(const std::string &chainName)
@@ -90,16 +101,16 @@ TestingSetup::TestingSetup(const std::string &chainName)
         throw std::runtime_error("InitBlockIndex failed.");
     }
     {
-        CValidationState state;
+        // dummyState is used to report errors, not block related invalidity - ignore it
+        // (see description of ActivateBestChain)
+        CValidationState dummyState;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
-        if (!ActivateBestChain(config, state, changeSet)) {
+        auto source = task::CCancellationSource::Make();
+        if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }
-    nScriptCheckThreads = 3;
-    for (int i = 0; i < nScriptCheckThreads - 1; i++) {
-        threadGroup.create_thread([i]() { return ThreadScriptCheck(i); });
-    }
+    InitScriptCheckQueues(config, threadGroup);
 
     // Deterministic randomness for tests.
     g_connman =

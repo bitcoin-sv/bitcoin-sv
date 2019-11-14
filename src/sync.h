@@ -182,6 +182,36 @@ typedef CMutexLock<CCriticalSection> CCriticalBlock;
         LeaveCritical();                                                       \
     }
 
+/**
+ * RAII exiting and later re-entering a critical section.
+ *
+ * NOTE: This class unlocks a single layer. In case of reentrant mutexes we
+ *       can't know if there is more than one level that we need to unlock so
+ *       in that case our thread would remain locked even though this class was
+ *       used.
+ */
+class CTemporaryLeaveCriticalSectionGuard
+{
+public:
+    CTemporaryLeaveCriticalSectionGuard(CCriticalSection& cs)
+        : mCs{cs}
+    {
+        LEAVE_CRITICAL_SECTION(mCs)
+    }
+    ~CTemporaryLeaveCriticalSectionGuard()
+    {
+        ENTER_CRITICAL_SECTION(mCs)
+    }
+
+    CTemporaryLeaveCriticalSectionGuard(CTemporaryLeaveCriticalSectionGuard&&) = delete;
+    CTemporaryLeaveCriticalSectionGuard& operator=(CTemporaryLeaveCriticalSectionGuard&&) = delete;
+    CTemporaryLeaveCriticalSectionGuard(const CTemporaryLeaveCriticalSectionGuard&) = delete;
+    CTemporaryLeaveCriticalSectionGuard& operator=(const CTemporaryLeaveCriticalSectionGuard&) = delete;
+
+private:
+    CCriticalSection& mCs;
+};
+
 class CSemaphore {
 private:
     boost::condition_variable condition;

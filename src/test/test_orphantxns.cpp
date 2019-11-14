@@ -58,7 +58,7 @@ namespace {
     }
 
     // Create an orphan txn
-	TxInputDataSPtr CreateOrphanTxn(TxSource source,
+    TxInputDataSPtr CreateOrphanTxn(TxSource source,
                                     std::vector<CTxIn> vTxnInputs = CreateTxnInputs(1),
                                     std::vector<CTxOut> vTxnOutputs = CreateTxnOutputs(1),
                                     std::shared_ptr<CNode> pNode=nullptr) {
@@ -75,14 +75,26 @@ namespace {
                                    pNode);   // pNode
     }
     // Populate orphan txn's object with a given number of txns.
-    void OrphanTxnsObjectCreateNOrphanTxns(std::shared_ptr<COrphanTxns>& orphanTxns,
-                                           TxSource source,
-                                           int32_t nOrphanTxnsCount) {
+    void OrphanTxnsObjectCreateNOrphanTxns(
+        std::shared_ptr<COrphanTxns>& orphanTxns,
+        TxSource source,
+        int32_t nOrphanTxnsCount,
+        CConnman::CAsyncTaskPool& asyncTaskPool)
+    {
         for (NodeId i = 0; i < nOrphanTxnsCount; i++) {
             CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
-            auto pNode {
-                std::make_shared<CNode>(i, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
-            };
+            CNodePtr pNode =
+                CNode::Make(
+                    i,
+                    NODE_NETWORK,
+                    0,
+                    INVALID_SOCKET,
+                    dummy_addr,
+                    0u,
+                    0u,
+                    asyncTaskPool,
+                    "",
+                    true);
             // Create txn and add it to the queue
             orphanTxns->addTxn(CreateOrphanTxn(source, CreateTxnInputs(1), CreateTxnOutputs(1), pNode));
         }
@@ -102,6 +114,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_creation) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -110,7 +123,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase all txns
@@ -119,6 +132,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -128,7 +142,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
     size_t nTxnsNumber=100;
     CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
     // Create orphan transactions:
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Test limit function:
@@ -141,6 +155,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -149,7 +164,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Create a txns which is not present in queue
@@ -161,6 +176,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -169,7 +185,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Create a txns which is not present in queue
@@ -186,6 +202,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
 }
 
 BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
@@ -195,7 +212,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
     size_t nTxnsNumber=10;
     size_t nNodesNumber=10;
     // Create orphan transactions:
-    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber);
+    OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Erase txns from a node which is not connected (there are no orphan txns from this node)
@@ -253,15 +270,15 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_maxcollectedoutpoints) {
                        CreateTxnOutputs(nTxnNumOfOutpoints));
         orphanTxns->collectTxnOutpoints(*(txn->mpTx));
         // Check if rotate can be applied to remove the oldest outpoints
-		if (nTxnNumOfOutpoints < nMaxCollectedOutpoints) {
+        if (nTxnNumOfOutpoints < nMaxCollectedOutpoints) {
                 std::rotate(
                     vExpectedOutpoints.begin(),
                     vExpectedOutpoints.begin() + nTxnNumOfOutpoints,
                     vExpectedOutpoints.end());
             vExpectedOutpoints.resize(vExpectedOutpoints.size() - nTxnNumOfOutpoints);
-		} else {
-			vExpectedOutpoints.clear();
-		}
+        } else {
+            vExpectedOutpoints.clear();
+        }
         auto txnid = txn->mpTx->GetId();
         for (size_t i=0; i<nTxnNumOfOutpoints; ++i) {
             vExpectedOutpoints.emplace_back(COutPoint{txnid, (uint32_t)i});

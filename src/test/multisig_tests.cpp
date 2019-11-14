@@ -274,7 +274,6 @@ BOOST_AUTO_TEST_CASE(multisig_Solver1) {
     { // Data - has no address  - just test ExtractDestination() and IsMine() since we have Solver() dedicated tests in script_tests.cpp (script_Solver)
         std::vector<uint8_t> data(200, 1);
         std::vector<valtype> solutions;
-        txnouttype whichType;
         CScript opReturn = CScript() << OP_RETURN << data;
         CTxDestination addr;
         BOOST_CHECK(!ExtractDestination(opReturn,addr));

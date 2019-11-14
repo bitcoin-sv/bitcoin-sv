@@ -21,11 +21,13 @@
 #include "rpc/tojson.h"
 #include "streams.h"
 #include "sync.h"
+#include "taskcancellation.h"
 #include "txmempool.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "blockfileinfostore.h"
+#include "txn_validator.h"
 
 #include <boost/thread/thread.hpp> // boost::thread::interrupt
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
@@ -74,9 +76,15 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
+    const CBlockIndex* pnext = nullptr;
+    {
+        LOCK(cs_main);
+
+        // Only report confirmations if the block is on the main chain
+        if (chainActive.Contains(blockindex)) {
+            confirmations = chainActive.Height() - blockindex->nHeight + 1;
+            pnext = chainActive.Next(blockindex);
+        }
     }
     result.push_back(Pair("confirmations", confirmations));
     result.push_back(Pair("height", blockindex->nHeight));
@@ -96,7 +104,7 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
         result.push_back(Pair("previousblockhash",
                               blockindex->pprev->GetBlockHash().GetHex()));
     }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
+
     if (pnext) {
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     }
@@ -944,9 +952,15 @@ std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHea
 
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     int confirmations = -1;
-    // Only report confirmations if the block is on the main chain
-    if (chainActive.Contains(blockindex)) {
-        confirmations = chainActive.Height() - blockindex->nHeight + 1;
+    const CBlockIndex* pnext = nullptr;
+    {
+        LOCK(cs_main);
+
+        // Only report confirmations if the block is on the main chain
+        if (chainActive.Contains(blockindex)) {
+            confirmations = chainActive.Height() - blockindex->nHeight + 1;
+            pnext = chainActive.Next(blockindex);
+        }
     }
     result.push_back(Pair("confirmations", confirmations));
     if (blockindex->nStatus.hasDiskBlockMetaData()) {
@@ -968,7 +982,7 @@ std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHea
         result.push_back(Pair("previousblockhash",
                               blockindex->pprev->GetBlockHash().GetHex()));
     }
-    CBlockIndex *pnext = chainActive.Next(blockindex);
+
     if (pnext) {
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
     }
@@ -1689,9 +1703,12 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
         ResetBlockFailureFlags(pblockindex);
     }
 
+    // state is used to report errors, not block related invalidity
+    // (see description of ActivateBestChain)
     CValidationState state;
     mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::REORG) };
-    ActivateBestChain(config, state, changeSet);
+    auto source = task::CCancellationSource::Make();
+    ActivateBestChain(source->GetToken(), config, state, changeSet);
 
     if (!state.IsValid()) {
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
@@ -1846,6 +1863,126 @@ UniValue rebuildjournal(const Config &config, const JSONRPCRequest &request) {
     return NullUniValue;
 }
 
+static UniValue getblockchainactivity(
+    const Config& config,
+    const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+    {
+        throw
+            std::runtime_error(
+                "getblockchainactivity\n"
+                "\nReturn number of blocks and transactions being processed/waiting for processing at the moment\n"
+                "\nResult:\n"
+                "{\n"
+                "  \"blocks\": xx,          (integer) Number of blocks\n"
+                "  \"transactions\": xx,    (integer) Number of transactions\n"
+                "}\n"
+                "\nExamples:\n" +
+                HelpExampleCli("getblockchainactivity", "") +
+                HelpExampleRpc("getblockchainactivity", ""));
+    }
+
+    if (!g_connman)
+    {
+        throw JSONRPCError(
+            RPC_CLIENT_P2P_DISABLED,
+            "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    UniValue result{UniValue::VOBJ};
+
+    result.push_back(Pair("blocks", GetProcessingBlocksCount()));
+    static_assert(std::numeric_limits<size_t>::max() <= std::numeric_limits<uint64_t>::max());
+    result.push_back(
+        Pair(
+            "transactions",
+            static_cast<uint64_t>(
+                g_connman->getTxnValidator()->GetTransactionsInQueueCount())));
+
+    return result;
+}
+
+static UniValue waitaftervalidatingblock(const Config &config,
+                                  const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 2) {
+		throw std::runtime_error(
+            "WARNING: For testing purposes only! Can hang a node/create a fork."
+            "\n\n"
+			"waitaftervalidatingblock \"blockhash\" \"action\"\n"
+            "\nMakes specific block to wait before validation completion\n"
+			"\nReturn the information about our action"
+			"\nResult\n"
+			"  blockhash (string) blockhash we added or removed\n"
+			"  action (string) add or remove\n"
+			"\nExamples:\n" +
+			HelpExampleCli("waitaftervalidatingblock", "\"blockhash\" \"add\"") +
+            HelpExampleRpc("waitaftervalidatingblock", "\"blockhash\" \"add\""));
+    }
+
+    std::string strHash = request.params[0].get_str();
+    if (strHash.size() != 64 || !IsHex(strHash)) {
+        return JSONRPCError(RPC_PARSE_ERROR, "Wrong hexdecimal string");
+    }
+
+    std::string strAction = request.params[1].get_str();
+    if (strAction != "add" && strAction != "remove") {
+        return JSONRPCError(RPC_TYPE_ERROR, "Wrong action");
+    }
+
+    uint256 blockHash(uint256S(strHash));
+
+    blockValidationStatus.waitAfterValidation(blockHash, strAction);
+
+    UniValue ret(UniValue::VOBJ);
+    ret.push_back(Pair("blockhash", blockHash.GetHex()));
+    ret.push_back(Pair("action", strAction));
+
+    return ret;
+}
+
+static UniValue getcurrentlyvalidatingblocks(const Config &config,
+                                  const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "getcurrentlyvalidatingblocks\n"
+            "\nReturn the block hashes of blocks that are currently validating"
+            "\nResult\n"
+            "[ blockhashes ]     (array) hashes of blocks\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getcurrentlyvalidatingblocks", "") +
+            HelpExampleRpc("getcurrentlyvalidatingblocks", ""));
+    }
+
+    UniValue blockHashes(UniValue::VARR);
+    for (uint256 hash : blockValidationStatus.getCurrentlyValidatingBlocks()) {
+		blockHashes.push_back(hash.GetHex());
+    }
+
+    return blockHashes;
+}
+
+static UniValue getwaitingblocks(const Config& config,
+    const JSONRPCRequest& request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "getwaitingblocks\n"
+            "\nReturn the block hashes of blocks that are currently waiting validation completion"
+            "\nResult\n"
+            "[ blockhashes ]     (array) hashes of blocks\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getwaitingblocks", "") +
+            HelpExampleRpc("getwaitingblocks", ""));
+    }
+
+    UniValue blockHashes(UniValue::VARR);
+    for (uint256 hash : blockValidationStatus.getWaitingAfterValidationBlocks()) {
+        blockHashes.push_back(hash.GetHex());
+    }
+
+    return blockHashes;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafe argNames
@@ -1879,6 +2016,10 @@ static const CRPCCommand commands[] = {
     { "hidden",             "waitfornewblock",        waitfornewblock,        true,  {"timeout"} },
     { "hidden",             "waitforblock",           waitforblock,           true,  {"blockhash","timeout"} },
     { "hidden",             "waitforblockheight",     waitforblockheight,     true,  {"height","timeout"} },
+    { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} },
+    { "hidden",             "getcurrentlyvalidatingblocks",     getcurrentlyvalidatingblocks,     true,  {} },
+    { "hidden",             "waitaftervalidatingblock",         waitaftervalidatingblock,         true,  {"blockhash","action"} },
+    { "hidden",             "getwaitingblocks",                 getwaitingblocks,            true,  {} }
 };
 // clang-format on
 

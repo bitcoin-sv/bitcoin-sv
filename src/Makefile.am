@@ -93,12 +93,14 @@ BITCOIN_CORE_H = \
   blockencodings.h \
   blockfileinfostore.h \
   blockstreams.h \
+  blockvalidation.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
   chainparamsseeds.h \
   checkpoints.h \
   checkqueue.h \
+  checkqueuepool.h \
   clientversion.h \
   coins.h \
   compat.h \
@@ -169,6 +171,7 @@ BITCOIN_CORE_H = \
   support/lockedpool.h \
   sync.h \
   task.h \
+  taskcancellation.h \
   task_helpers.h \
   threadpool.h \
   threadpoolT.h \

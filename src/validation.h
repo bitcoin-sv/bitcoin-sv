@@ -13,6 +13,7 @@
 
 #include "amount.h"
 #include "blockstreams.h"
+#include "blockvalidation.h"
 #include "chain.h"
 #include "coins.h"
 #include "consensus/consensus.h"
@@ -33,6 +34,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -53,6 +55,16 @@ struct ChainTxData;
 
 struct PrecomputedTransactionData;
 struct LockPoints;
+
+namespace boost
+{
+    class thread_group;
+}
+
+namespace task
+{
+    class CCancellationToken;
+}
 
 #define MIN_TRANSACTION_SIZE                                                   \
     (::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION))
@@ -101,8 +113,8 @@ static const unsigned int BLOCKFILE_BLOCK_HEADER_SIZE = 8;  // 8 bytes: - 4 byte
 static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
 /** Maximum number of script-checking threads allowed */
-static const int MAX_SCRIPTCHECK_THREADS = 16;
-/** -par default (number of script-checking threads, 0 = auto) */
+static const int MAX_SCRIPTCHECK_THREADS = 64;
+/** -threadsperblock default (number of script-checking threads, 0 = auto) */
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 /** Number of blocks that can be requested at any given time from a single peer.
  */
@@ -209,6 +221,11 @@ static const bool DEFAULT_PEERBLOOMFILTERS = true;
 /** Default for -stopatheight */
 static const int DEFAULT_STOPATHEIGHT = 0;
 
+/** Default count of transaction script checker instances */
+constexpr size_t DEFAULT_SCRIPT_CHECK_POOL_SIZE = 4;
+/** Default maximum size of script batches processed by a single checker thread */
+constexpr size_t DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE = 128;
+
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
@@ -219,7 +236,6 @@ extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
 extern std::atomic_bool fImporting;
 extern bool fReindex;
-extern int nScriptCheckThreads;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
 extern bool fRequireStandard;
@@ -296,6 +312,9 @@ enum FlushStateMode {
  */
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 
+/** get number of blocks that are currently being processed */
+int GetProcessingBlocksCount();
+
 class BlockValidationOptions {
 private:
     bool checkPoW : 1;
@@ -316,6 +335,11 @@ public:
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
     bool shouldMarkChecked() const { return markChecked; }
 };
+
+/**
+ * Keeping status of currently validating blocks and blocks that we wait after validation
+ */
+extern CBlockValidationStatus blockValidationStatus;
 
 /**
  * Verify block without proof-of-work verification.
@@ -354,8 +378,23 @@ bool VerifyNewBlock(const Config &config,
  * @return True if the block is accepted as a valid block.
  */
 bool ProcessNewBlock(const Config &config,
-                     const std::shared_ptr<const CBlock> pblock,
+                     const std::shared_ptr<const CBlock>& pblock,
                      bool fForceProcessing, bool *fNewBlock);
+
+/**
+ * Same as ProcessNewBlock but it doesn't activate best chain - it returns a
+ * function that should be called asyncrhonously to activate the best chain.
+ * Reason for this split is that ProcessNewBlock adds block to mapBlockIndex
+ * so we execute that part synchronously as otherwise child blocks that were
+ * sent right after the parent could be missing parent even though we've already
+ * seen it.
+ */
+std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
+    task::CCancellationToken&& token,
+    const Config& config,
+    const std::shared_ptr<const CBlock>& pblock,
+    bool fForceProcessing,
+    bool* fNewBlock);
 
 /**
  * Process incoming block headers.
@@ -415,9 +454,9 @@ void LoadChainTip(const CChainParams &chainparams);
 void UnloadBlockIndex();
 
 /**
- * Run an instance of the script checking thread.
+ * Initialize script checking pool.
  */
-void ThreadScriptCheck(int workerNum);
+void InitScriptCheckQueues(const Config& config, boost::thread_group& threadGroup);
 
 /**
  * Check whether we are doing an initial block download (synchronizing from disk
@@ -448,15 +487,45 @@ bool GetTransaction(const Config &config, const TxId &txid, CTransactionRef &tx,
  * If it fails, the tip is not updated.
  *
  * pblock is either nullptr or a pointer to a block that is already loaded
- * in memory (to avoid loading it from disk again).
+ * in memory (to avoid loading it from disk again). It also enables parallel
+ * block validation if provided block is building on top of currently active
+ * tip and a different call to ActivateBestChain is already in progress.
  *
- * Returns true if a new chain tip was set.
+ * Returns true if no fatal errors occurred. Returns false in case a fatal error
+ * occurred (no disk space, database error, ...).
+ *
+ * NOTE: ActivateBestChain checks for tip candidates (better than current
+ *      best chain tip so a potential candidate) but is not guaranteed to
+ *      either change the tip or even consider the provided pblock. It may
+ *      change the tip if a better candidate is found but that block is not
+ *      necessarily the one that was provided by the caller of this function.
+ *      Because of this state parameter may contain success or error but
+ *      that value represents activation process in general and is not
+ *      necessarily related to provided block in particular.
  */
 bool ActivateBestChain(
-    const Config &config, CValidationState &state,
+    const task::CCancellationToken& token,
+    const Config &config,
+    CValidationState &state,
     const mining::CJournalChangeSetPtr& changeSet,
     std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
 Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
+
+/**
+ * Determines whether block is a best chain candidate or not.
+ *
+ * Being a candidate means that you might be added to the tip or removed from
+ * candidates later on - in any case it indicates that we should wait to see if
+ * it lands in the best chain or not.
+ */
+bool IsBlockABestChainTipCandidate(CBlockIndex& index);
+
+/**
+ * Check whether there are any block index candidates that are older than
+ * the provided time and still don't have SCRIPT validity status.
+ */
+bool AreOlderOrEqualUnvalidatedBlockIndexCandidates(
+    const std::chrono::time_point<std::chrono::system_clock>& comparisonTime);
 
 /**
  * Guess verification progress (as a fraction between 0.0=genesis and

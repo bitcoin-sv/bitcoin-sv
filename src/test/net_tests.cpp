@@ -157,14 +157,36 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test) {
     bool fInboundIn = false;
 
     // Test that fFeeler is false by default.
-    std::unique_ptr<CNode> pnode1(new CNode(id++, NODE_NETWORK, height, hSocket,
-                                            addr, 0, 0, pszDest, fInboundIn));
+
+    CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
+    CNodePtr pnode1 =
+        CNode::Make(
+            id++,
+            NODE_NETWORK,
+            height,
+            hSocket,
+            addr,
+            0u,
+            0u,
+            asyncTaskPool,
+            pszDest,
+            fInboundIn);
     BOOST_CHECK(pnode1->fInbound == false);
     BOOST_CHECK(pnode1->fFeeler == false);
 
     fInboundIn = true;
-    std::unique_ptr<CNode> pnode2(new CNode(id++, NODE_NETWORK, height, hSocket,
-                                            addr, 1, 1, pszDest, fInboundIn));
+    CNodePtr pnode2 =
+        CNode::Make(
+            id++,
+            NODE_NETWORK,
+            height,
+            hSocket,
+            addr,
+            1u,
+            1u,
+            asyncTaskPool,
+            pszDest,
+            fInboundIn);
     BOOST_CHECK(pnode2->fInbound == true);
     BOOST_CHECK(pnode2->fFeeler == false);
 }

@@ -8,6 +8,7 @@
 #include "amount.h"
 #include "consensus/consensus.h"
 #include "mining/factory.h"
+#include "net.h"
 #include "policy/policy.h"
 #include "script/standard.h"
 #include "validation.h"
@@ -82,6 +83,20 @@ public:
 
     virtual void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) = 0;
     virtual uint64_t GetGenesisActivationHeight() const = 0;
+
+    virtual bool SetMaxConcurrentAsyncTasksPerNode(
+        int maxConcurrentAsyncTasksPerNode,
+        std::string* error = nullptr) = 0;
+    virtual int GetMaxConcurrentAsyncTasksPerNode() const = 0;
+
+    virtual bool SetBlockScriptValidatorsParams(
+        int maxParallelBlocks,
+        int perValidatorThreadsCount,
+        int perValidatorThreadMaxBatchSize,
+        std::string* error = nullptr) = 0;
+    virtual int GetMaxParallelBlocks() const = 0;
+    virtual int GetPerBlockScriptValidatorThreadsCount() const = 0;
+    virtual int GetPerBlockScriptValidationMaxBatchSize() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -148,6 +163,20 @@ public:
     void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) override;
     uint64_t GetGenesisActivationHeight() const override;
 
+    bool SetMaxConcurrentAsyncTasksPerNode(
+        int maxConcurrentAsyncTasksPerNode,
+        std::string* error = nullptr) override;
+    int GetMaxConcurrentAsyncTasksPerNode() const override;
+
+    bool SetBlockScriptValidatorsParams(
+        int maxParallelBlocks,
+        int perValidatorThreadsCount,
+        int perValidatorThreadMaxBatchSize,
+        std::string* error = nullptr) override;
+    int GetMaxParallelBlocks() const override;
+    int GetPerBlockScriptValidatorThreadsCount() const override;
+    int GetPerBlockScriptValidationMaxBatchSize() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -185,6 +214,12 @@ private:
     bool acceptP2SH;
 
     uint64_t genesisActivationHeight;
+
+    int mMaxConcurrentAsyncTasksPerNode;
+
+    int mMaxParallelBlocks;
+    int mPerBlockScriptValidatorThreadsCount;
+    int mPerBlockScriptValidationMaxBatchSize;
 };
 
 // Dummy for subclassing in unittests
@@ -267,6 +302,36 @@ public:
 
     void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) override { genesisActivationHeight = genesisActivationHeightIn; }
     uint64_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
+
+    bool SetMaxConcurrentAsyncTasksPerNode(
+        int maxConcurrentAsyncTasksPerNode,
+        std::string* error = nullptr) override
+    {
+        if(error)
+        {
+            *error = "This is dummy config";
+        }
+
+        return false;
+    }
+    int GetMaxConcurrentAsyncTasksPerNode() const override;
+
+    bool SetBlockScriptValidatorsParams(
+        int maxParallelBlocks,
+        int perValidatorThreadsCount,
+        int perValidatorThreadMaxBatchSize,
+        std::string* error = nullptr) override
+    {
+        if(error)
+        {
+            *error = "This is dummy config";
+        }
+
+        return false;
+    }
+    int GetMaxParallelBlocks() const override;
+    int GetPerBlockScriptValidatorThreadsCount() const override;
+    int GetPerBlockScriptValidationMaxBatchSize() const override;
 
 private:
     std::unique_ptr<CChainParams> chainParams;

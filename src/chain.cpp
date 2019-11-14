@@ -8,7 +8,10 @@
 /**
  * CChain implementation
  */
-void CChain::SetTip(CBlockIndex *pindex) {
+void CChain::SetTip(CBlockIndex *pindex)
+{
+    mChainTip = pindex;
+
     if (pindex == nullptr) {
         vChain.clear();
         return;

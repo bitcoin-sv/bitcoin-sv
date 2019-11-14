@@ -28,6 +28,7 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "random.h"
+#include "taskcancellation.h"
 #include "tinyformat.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -1279,18 +1280,24 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 if (mi != mapBlockIndex.end()) {
                     if (mi->second->nChainTx &&
                         !mi->second->IsValid(BlockValidity::SCRIPTS) &&
-                        mi->second->IsValid(BlockValidity::TREE)) {
+                        mi->second->IsValid(BlockValidity::TREE)
+                        && IsBlockABestChainTipCandidate(*mi->second)) {
+
+                        LogPrint(
+                            BCLog::NET,
+                            "Block %s is still waiting as a candidate. Deferring getdata reply.\n",
+                            inv.hash.ToString());
+
                         // If we have the block and all of its parents, but have
                         // not yet validated it, we might be in the middle of
                         // connecting it (ie in the unlock of cs_main before
                         // ActivateBestChain but after AcceptBlock). In this
-                        // case, we need to run ActivateBestChain prior to
-                        // checking the relay conditions below.
-                        std::shared_ptr<const CBlock> a_recent_block =
-                            mostRecentBlock.GetBlock();
-                        CValidationState dummy;
-                        CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
-                        ActivateBestChain(config, dummy, changeSet, a_recent_block);
+                        // case, we need to wait for a while longer before
+                        // deciding whether we should relay it or not so we
+                        // break out of the loop and continue once we once again
+                        // get our turn.
+                        --it;
+                        break;
                     }
                     if (chainActive.Contains(mi->second)) {
                         send = true;
@@ -1364,11 +1371,9 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         CMerkleBlock merkleBlock;
                         {
                             LOCK(pfrom->cs_filter);
-                            if (pfrom->pfilter) {
-                                sendMerkleBlock = true;
-                                merkleBlock =
-                                    CMerkleBlock(*stream, *pfrom->pfilter);
-                            }
+                            sendMerkleBlock = true;
+                            merkleBlock =
+                                CMerkleBlock(*stream, pfrom->mFilter);
                         }
                         if (sendMerkleBlock) {
                             CSerializedNetMsg merkleBlockMsg = msgMaker.Make(NetMsgType::MERKLEBLOCK, merkleBlock);
@@ -1797,7 +1802,7 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
 /**
 * Process peer address message.
 */
-static OptBool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& interruptMsgProc,
+static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& interruptMsgProc,
     CDataStream& vRecv, CConnman& connman)
 {
     std::vector<CAddress> vAddr;
@@ -1897,7 +1902,7 @@ static OptBool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>
         pfrom->fDisconnect = true;
     }
 
-    return {};
+    return true;
 }
 
 /**
@@ -2043,32 +2048,31 @@ static OptBool ProcessGetDataMessage(const Config& config, const CNodePtr& pfrom
 /**
 * Process get blocks message.
 */
-static void ProcessGetBlocksMessage(const Config& config, const CNodePtr& pfrom,
-    const CChainParams& chainparams, CDataStream& vRecv)
+static bool ProcessGetBlocks(
+    const Config& config,
+    const CNodePtr& pfrom,
+    const CChainParams& chainparams,
+    const CGetBlockMessageRequest& req)
 {
-    CBlockLocator locator;
-    uint256 hashStop;
-    vRecv >> locator >> hashStop;
 
     // We might have announced the currently-being-connected tip using a
     // compact block, which resulted in the peer sending a getblocks
     // request, which we would otherwise respond to without the new block.
-    // To avoid this situation we simply verify that we are on our best
-    // known chain now. This is super overkill, but we handle it better
-    // for getheaders requests, and there are no known nodes which support
-    // compact blocks but still use getblocks to request blocks.
+    // To avoid this situation we simply verify that there are no more block
+    // index candidates that were received before getblocks request.
+    if(AreOlderOrEqualUnvalidatedBlockIndexCandidates(req.GetRequestTime()))
     {
-        std::shared_ptr<const CBlock> a_recent_block =
-            mostRecentBlock.GetBlock();
-        CValidationState dummy;
-        CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
-        ActivateBestChain(config, dummy, changeSet, a_recent_block);
+        return false;
     }
+
+    const CBlockLocator& locator = req.GetLocator();
+    const uint256& hashStop = req.GetHashStop();
 
     LOCK(cs_main);
 
     // Find the last block the caller has in the main chain
-    const CBlockIndex* pindex = FindForkInGlobalIndex(chainActive, locator);
+    const CBlockIndex* pindex =
+        FindForkInGlobalIndex(chainActive, locator);
 
     // Send the rest of the chain
     if(pindex) {
@@ -2108,6 +2112,28 @@ static void ProcessGetBlocksMessage(const Config& config, const CNodePtr& pfrom,
             pfrom->hashContinue = pindex->GetBlockHash();
             break;
         }
+    }
+
+    return true;
+}
+
+static void ProcessGetBlocksMessage(
+    const Config& config,
+    const CNodePtr& pfrom,
+    const CChainParams& chainparams,
+    CDataStream& vRecv)
+{
+    pfrom->mGetBlockMessageRequest = {vRecv};
+    if(ProcessGetBlocks(config, pfrom, chainparams, *pfrom->mGetBlockMessageRequest))
+    {
+        pfrom->mGetBlockMessageRequest = std::nullopt;
+    }
+    else
+    {
+        LogPrint(
+            BCLog::NET,
+            "Blocks that were received before getblocks message are still"
+            " waiting as a candidate. Deferring getblocks reply.\n");
     }
 }
  
@@ -2296,7 +2322,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
 /**
 * Process headers message.
 */
-static OptBool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
+static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker, const CChainParams& chainparams, CDataStream& vRecv,
     CConnman& connman)
 {
@@ -2486,13 +2512,13 @@ static OptBool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom
         }
     }
 
-    return {};
+    return true;
 }
  
 /**
 * Process block txn message.
 */
-static OptBool ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
+static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker, CDataStream& vRecv, CConnman& connman)
 {
     BlockTransactions resp;
@@ -2509,7 +2535,7 @@ static OptBool ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfro
             LogPrint(BCLog::NET,
                      "Peer %d sent us block transactions for block we weren't expecting\n",
                      pfrom->id);
-            return true;
+            return;
         }
 
         PartiallyDownloadedBlock &partialBlock = *it->second.second->partialBlock;
@@ -2520,7 +2546,7 @@ static OptBool ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfro
             Misbehaving(pfrom, 100, "invalid-cmpctblk-txns");
             LogPrintf("Peer %d sent us invalid compact block/non-matching block transactions\n",
                       pfrom->id);
-            return true;
+            return;
         }
         else if(status == READ_STATUS_FAILED) {
             // Might have collided, fall back to getdata now :(
@@ -2562,22 +2588,42 @@ static OptBool ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfro
 
     if(fBlockRead) {
         bool fNewBlock = false;
+        auto source = task::CCancellationSource::Make();
         // Since we requested this block (it was in mapBlocksInFlight),
         // force it to be processed, even if it would not be a candidate for
         // new tip (missing previous block, chain not long enough, etc)
-        ProcessNewBlock(config, pblock, true, &fNewBlock);
-        if(fNewBlock) {
-            pfrom->nLastBlockTime = GetTime();
+        auto bestChainActivation =
+            ProcessNewBlockWithAsyncBestChainActivation(
+                source->GetToken(), config, pblock, true, &fNewBlock);
+        if(!bestChainActivation)
+        {
+            // something went wrong before we need to activate best chain
+            return;
         }
-    }
 
-    return {};
+        pfrom->RunAsyncProcessing(
+            [fNewBlock, bestChainActivation]
+            (std::weak_ptr<CNode> weakFrom)
+            {
+                bestChainActivation();
+
+                if(fNewBlock)
+                {
+                    auto pfrom = weakFrom.lock();
+                    if(pfrom)
+                    {
+                        pfrom->nLastBlockTime = GetTime();
+                    }
+                }
+            },
+            source);
+    }
 }
  
 /**
 * Process compact block message.
 */
-static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfrom,
+static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfrom,
     const CNetMsgMaker& msgMaker, const std::string& strCommand, const CChainParams& chainparams,
     const std::atomic<bool>& interruptMsgProc, int64_t nTimeReceived, CDataStream& vRecv,
     CConnman& connman)
@@ -2780,7 +2826,8 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
     } // cs_main
 
     if(fProcessBLOCKTXN) {
-        return ProcessBlockTxnMessage(config, pfrom, msgMaker, blockTxnMsg, connman);
+        ProcessBlockTxnMessage(config, pfrom, msgMaker, blockTxnMsg, connman);
+        return true;
     }
 
     if(fRevertToHeaderProcessing) {
@@ -2795,24 +2842,47 @@ static OptBool ProcessCompactBlockMessage(const Config& config, const CNodePtr& 
             mapBlockSource.emplace(pblock->GetHash(),
                                    std::make_pair(pfrom->GetId(), false));
         }
-        bool fNewBlock = false;
-        ProcessNewBlock(config, pblock, true, &fNewBlock);
-        if(fNewBlock) {
-            pfrom->nLastBlockTime = GetTime();
-        }
 
-        // hold cs_main for CBlockIndex::IsValid()
-        LOCK(cs_main);
-        if(pindex->IsValid(BlockValidity::TRANSACTIONS)) {
-            // Clear download state for this block, which is in process from
-            // some other peer. We do this after calling. ProcessNewBlock so
-            // that a malleated cmpctblock announcement can't be used to
-            // interfere with block relay.
-            MarkBlockAsReceived(pblock->GetHash());
+        bool fNewBlock = false;
+        auto source = task::CCancellationSource::Make();
+        auto bestChainActivation =
+            ProcessNewBlockWithAsyncBestChainActivation(
+                source->GetToken(), config, pblock, true, &fNewBlock);
+        if(bestChainActivation)
+        {
+            pfrom->RunAsyncProcessing(
+                [pindex, pblock, fNewBlock, bestChainActivation]
+                (std::weak_ptr<CNode> weakFrom)
+                {
+                    bestChainActivation();
+
+                    if(fNewBlock)
+                    {
+                        auto pfrom = weakFrom.lock();
+                        if(pfrom)
+                        {
+                            pfrom->nLastBlockTime = GetTime();
+                        }
+                    }
+
+                    // hold cs_main for CBlockIndex::IsValid()
+                    LOCK(cs_main);
+                    if(pindex->IsValid(BlockValidity::TRANSACTIONS))
+                    {
+                        // Clear download state for this block, which is in process from
+                        // some other peer. We do this after calling. ProcessNewBlock so
+                        // that a malleated cmpctblock announcement can't be used to
+                        // interfere with block relay.
+                        MarkBlockAsReceived(pblock->GetHash());
+                    }
+                },
+                source);
         }
+        // else something went wrong before we need to activate best chain
+        // so we just skip it
     }
 
-    return {};
+    return true;
 }
  
 /**
@@ -2841,11 +2911,34 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
         // is fine.
         mapBlockSource.emplace(hash, std::make_pair(pfrom->GetId(), true));
     }
+
     bool fNewBlock = false;
-    ProcessNewBlock(config, pblock, forceProcessing, &fNewBlock);
-    if(fNewBlock) {
-        pfrom->nLastBlockTime = GetTime();
+    auto source = task::CCancellationSource::Make();
+    auto bestChainActivation =
+        ProcessNewBlockWithAsyncBestChainActivation(
+            source->GetToken(), config, pblock, forceProcessing, &fNewBlock);
+    if(!bestChainActivation)
+    {
+        // something went wrong before we need to activate best chain
+        return;
     }
+
+    pfrom->RunAsyncProcessing(
+        [pblock, fNewBlock, bestChainActivation]
+        (std::weak_ptr<CNode> weakFrom)
+        {
+            bestChainActivation();
+
+            if(fNewBlock)
+            {
+                auto pfrom = weakFrom.lock();
+                if(pfrom)
+                {
+                    pfrom->nLastBlockTime = GetTime();
+                }
+            }
+        },
+        source);
 }
  
 /**
@@ -3035,9 +3128,8 @@ static void ProcessFilterLoadMessage(const CNodePtr& pfrom, CDataStream& vRecv)
     }
     else {
         LOCK(pfrom->cs_filter);
-        delete pfrom->pfilter;
-        pfrom->pfilter = new CBloomFilter(filter);
-        pfrom->pfilter->UpdateEmptyFull();
+        pfrom->mFilter = std::move(filter);
+        pfrom->mFilter.UpdateEmptyFull();
         pfrom->fRelayTxes = true;
     }
 }
@@ -3053,24 +3145,12 @@ static void ProcessFilterAddMessage(const CNodePtr& pfrom, CDataStream& vRecv)
     // Nodes must NEVER send a data item > 520 bytes (the max size for a
     // script data object, and thus, the maximum size any matched object can
     // have) in a filteradd message.
-    bool bad = false;
     if(vData.size() > MAX_SCRIPT_ELEMENT_SIZE) {
-        bad = true;
+        Misbehaving(pfrom, 100, "invalid-filteradd");
     }
     else {
         LOCK(pfrom->cs_filter);
-        if(pfrom->pfilter) {
-            pfrom->pfilter->insert(vData);
-        }
-        else {
-            bad = true;
-        }
-    }
-
-    if(bad) {
-        // The structure of this code doesn't really allow for a good error
-        // code. We'll go generic.
-        Misbehaving(pfrom, 100, "invalid-filteradd");
+        pfrom->mFilter.insert(vData);
     }
 }
 
@@ -3081,8 +3161,7 @@ static void ProcessFilterClearMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 {
     LOCK(pfrom->cs_filter);
     if(pfrom->GetLocalServices() & NODE_BLOOM) {
-        delete pfrom->pfilter;
-        pfrom->pfilter = new CBloomFilter();
+        pfrom->mFilter = {};
     }
     pfrom->fRelayTxes = true;
 }
@@ -3206,10 +3285,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::ADDR) {
-        if(OptBool res { ProcessAddrMessage(pfrom, interruptMsgProc, vRecv, connman) }) {
-            // If ProcessAddr returned a definite true/false, return that to our caller.
-            return res.get();
-        }
+        return ProcessAddrMessage(pfrom, interruptMsgProc, vRecv, connman);
     }
 
     else if (strCommand == NetMsgType::SENDHEADERS) {
@@ -3261,18 +3337,12 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::CMPCTBLOCK && !fImporting && !fReindex) {
-        if(OptBool res { ProcessCompactBlockMessage(config, pfrom, msgMaker, strCommand, chainparams, interruptMsgProc, nTimeReceived, vRecv, connman) }) {
-            // If ProcessCompactBlock returned a definite true/false, return that to our caller.
-            return res.get();
-        }
+        return ProcessCompactBlockMessage(config, pfrom, msgMaker, strCommand, chainparams, interruptMsgProc, nTimeReceived, vRecv, connman);
     }
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::BLOCKTXN && !fImporting && !fReindex) {
-        if(OptBool res { ProcessBlockTxnMessage(config, pfrom, msgMaker, vRecv, connman) }) {
-            // If ProcessBlockTxn returned a definite true/false, return that to our caller.
-            return res.get();
-        }
+        ProcessBlockTxnMessage(config, pfrom, msgMaker, vRecv, connman);
     }
 
     // Ignore headers received while importing
@@ -3393,6 +3463,17 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     //
     bool fMoreWork = false;
 
+    if (pfrom->mGetBlockMessageRequest)
+    {
+        if(!ProcessGetBlocks(config, pfrom, chainparams, *pfrom->mGetBlockMessageRequest))
+        {
+            // this maintains the order of responses
+            return false;
+        }
+
+        pfrom->mGetBlockMessageRequest = std::nullopt;
+    }
+
     if (!pfrom->vRecvGetData.empty()) {
         ProcessGetData(config, pfrom, chainparams.GetConsensus(), connman,
                        interruptMsgProc);
@@ -3509,24 +3590,24 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     } catch (const std::ios_base::failure &e) {
         connman.PushMessage(pfrom,
                             CNetMsgMaker(INIT_PROTO_VERSION)
-                                .Make(NetMsgType::REJECT, strCommand,
-                                      REJECT_MALFORMED,
-                                      std::string("error parsing message")));
+                            .Make(NetMsgType::REJECT, strCommand,
+                                  REJECT_MALFORMED,
+                                  std::string("error parsing message")));
         if (strstr(e.what(), "end of data")) {
             // Allow exceptions from under-length message on vRecv
             LogPrint(BCLog::NET,
-                "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
-                "message being shorter than its stated length\n",
-                __func__, SanitizeString(strCommand), nPayloadLength, e.what());
+                     "%s(%s, %u bytes): Exception '%s' caught, normally caused by a "
+                     "message being shorter than its stated length\n",
+                     __func__, SanitizeString(strCommand), nPayloadLength, e.what());
         } else if (strstr(e.what(), "size too large")) {
             // Allow exceptions from over-long size
             LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
-                      SanitizeString(strCommand), nPayloadLength, e.what());
+                     SanitizeString(strCommand), nPayloadLength, e.what());
             Misbehaving(pfrom, 1, "Over-long size message protection");
         } else if (strstr(e.what(), "non-canonical ReadCompactSize()")) {
             // Allow exceptions from non-canonical encoding
             LogPrint(BCLog::NET, "%s(%s, %u bytes): Exception '%s' caught\n", __func__,
-                      SanitizeString(strCommand), nPayloadLength, e.what());
+                     SanitizeString(strCommand), nPayloadLength, e.what());
         } else {
             PrintExceptionContinue(&e, "ProcessMessages()");
         }
@@ -3946,10 +4027,8 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
                     continue;
                 }
             }
-            if (pto->pfilter) {
-                if (!pto->pfilter->IsRelevantAndUpdate(*txinfo.tx)) {
-                    continue;
-                }
+            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.tx)) {
+                continue;
             }
             pto->filterInventoryKnown.insert(txid);
             vInv.push_back(inv);
