@@ -1104,7 +1104,7 @@ static UniValue sendrawtransaction(const Config &config,
             RPC_CLIENT_P2P_DISABLED,
             "Error: Peer-to-peer functionality missing or disabled");
     }
-    if (!mempool.Exists(txid)) {
+    if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
             mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
@@ -1130,7 +1130,7 @@ static UniValue sendrawtransaction(const Config &config,
         // Check if the transaction was accepted by the mempool.
         // Due to potential race-condition we have to explicitly call exists() instead of
         // checking a result from the status variable.
-        if (!mempool.Exists(txid)) {
+        if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
             if (!status.IsValid()) {
                 if (status.IsMissingInputs()) {
                         throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
@@ -1152,8 +1152,18 @@ static UniValue sendrawtransaction(const Config &config,
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN,
                            "Transaction already in the mempool");
     }
+
     CInv inv(MSG_TX, txid);
-    TxMempoolInfo txinfo { mempool.Info(txid) };
+    TxMempoolInfo txinfo {};
+    if(mempool.Exists(txid))
+    {
+        txinfo = mempool.Info(txid);
+    }
+    else if(mempool.getNonFinalPool().exists(txid))
+    {
+        txinfo = mempool.getNonFinalPool().getInfo(txid);
+    }
+
     // It is possible that we relay txn which was added and removed from the mempool, because:
     // - block was mined
     // - the Validator's asynch mode removed the txn (and triggered reject msg)

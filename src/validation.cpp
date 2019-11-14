@@ -1476,6 +1476,11 @@ static void PostValidationStepsForP2PTxn(
     CTxMemPool& pool,
     CTxnHandlers& handlers);
 
+static void PostValidationStepsForFinalisedTxn(
+    const CTxnValResult& txStatus,
+    CTxMemPool& pool,
+    CTxnHandlers& handlers);
+
 static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
@@ -1604,6 +1609,9 @@ void ProcessValidatedTxn(
         // Check txn's commit status and do all required actions.
         if (TxSource::p2p == source) {
             PostValidationStepsForP2PTxn(txStatus, pool, handlers);
+        }
+        else if(TxSource::finalised == source) {
+            PostValidationStepsForFinalisedTxn(txStatus, pool, handlers);
         }
         // Logging txn commit status
         LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
@@ -1856,8 +1864,12 @@ static void PostValidationStepsForP2PTxn(
     const CValidationState& state = txStatus.mState;
     // Post processing step for successfully commited txns (non-orphans & orphans)
     if (state.IsValid()) {
-        pool.CheckMempool(pcoinsTip, handlers.mJournalChangeSet);
-        RelayTransaction(*ptx, *g_connman);
+        // Finalising txns have another round of validation before making it into the
+        // mempool, hold off relaying them until that has completed.
+        if(pool.Exists(ptx->GetId()) || pool.getNonFinalPool().exists(ptx->GetId())) {
+            pool.CheckMempool(pcoinsTip, handlers.mJournalChangeSet);
+            RelayTransaction(*ptx, *g_connman);
+        }
         pNode->nLastTXTime = GetTime();
     }
     else {
@@ -1871,6 +1883,21 @@ static void PostValidationStepsForP2PTxn(
         CreateTxRejectMsgForP2PTxn(txStatus.mTxInputData,
                                    state.GetRejectCode(),
                                    state.GetRejectReason());
+    }
+}
+
+static void PostValidationStepsForFinalisedTxn(
+    const CTxnValResult& txStatus,
+    CTxMemPool& pool,
+    CTxnHandlers& handlers)
+{
+    const CTransactionRef& ptx { txStatus.mTxInputData->mpTx };
+    const CValidationState& state { txStatus.mState };
+
+    if(state.IsValid())
+    {
+        pool.CheckMempool(pcoinsTip, handlers.mJournalChangeSet);
+        RelayTransaction(*ptx, *g_connman);
     }
 }
 

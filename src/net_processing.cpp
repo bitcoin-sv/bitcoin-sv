@@ -1094,8 +1094,17 @@ bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
 
 void RelayTransaction(const CTransaction &tx, CConnman &connman) {
     CInv inv { MSG_TX, tx.GetId() };
+    TxMempoolInfo txinfo {};
 
-    TxMempoolInfo txinfo { mempool.Info(tx.GetId()) };
+    if(mempool.Exists(tx.GetId()))
+    {
+        txinfo = mempool.Info(tx.GetId());
+    }
+    else if(mempool.getNonFinalPool().exists(tx.GetId()))
+    {
+        txinfo = mempool.getNonFinalPool().getInfo(tx.GetId());
+    }
+
     if(txinfo.tx)
     {
         connman.EnqueueTransaction( {inv, txinfo} );

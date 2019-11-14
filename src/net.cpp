@@ -884,7 +884,7 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
     }
 
     results.reserve(n);
-    auto endIt = std::next(begin(mInvList), n);
+    auto endIt = std::next(std::begin(mInvList), n);
     std::move(std::begin(mInvList), endIt, std::back_inserter(results));
     mInvList.erase(std::begin(mInvList), endIt);
 
