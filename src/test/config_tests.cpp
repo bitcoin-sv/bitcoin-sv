@@ -153,7 +153,7 @@ BOOST_AUTO_TEST_CASE(max_block_size_related_defaults) {
 
 }
 
-BOOST_AUTO_TEST_CASE(max_policy_tx_size) {
+BOOST_AUTO_TEST_CASE(max_tx_size) {
 
     GlobalConfig config;
     std::string reason;
@@ -165,6 +165,13 @@ BOOST_AUTO_TEST_CASE(max_policy_tx_size) {
 
     // default post genesis policy tx size
     BOOST_CHECK(config.GetMaxTxSize(true, false) == DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
+
+    // default pre genesis consensus tx size
+    BOOST_CHECK(config.GetMaxTxSize(false, true) == MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
+
+    // default post genesis consensus tx size
+    BOOST_CHECK(config.GetMaxTxSize(true, true) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
+
 
     // can not set policy tx size < pre genesis policy tx size
     BOOST_CHECK(!config.SetMaxTxSizePolicy(MAX_TX_SIZE_POLICY_BEFORE_GENESIS - 1, &reason));
