@@ -1391,6 +1391,8 @@ void ProcessValidatedTxn(
             } else {
                 HandleInvalidP2PNonOrphanTxn(txStatus, handlers);
             }
+        } else if (handlers.mpOrphanTxns && state.IsMissingInputs()) {
+            handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
         // Logging txn status
         LogTxnInvalidStatus(txStatus);
@@ -1423,10 +1425,20 @@ void ProcessValidatedTxn(
         // Logging txn commit status
         LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
     }
-    // Check if we need to uncache coins if validation or commit has failed
+    // If txn validation or commit has failed then:
+    // - uncache coins
+    // If txn is accepted by the mempool and orphan handler is present then:
+    // - collect txn's outpoints
+    // - remove txn from the orphan queue
     if (!state.IsValid()) {
         // coins to uncache
         pcoinsTip->Uncache(txStatus.mCoinsToUncache);
+    } else if (handlers.mpOrphanTxns) {
+        // At this stage we want to collect outpoints of successfully submitted txn.
+        // There might be other related txns being validated at the same time.
+        handlers.mpOrphanTxns->collectTxnOutpoints(tx);
+        // Remove tx if it was queued as an orphan txn.
+        handlers.mpOrphanTxns->eraseTxn(tx.GetId());
     }
     // Remove txn's inputs from the double spend detector as last step.
     // This needs to be done in all cases:
@@ -1473,18 +1485,18 @@ static void HandleOrphanAndRejectedP2PTxns(
     }
     if (!fRejectedParents) {
         // Add txn to the orphan queue if it is not there.
-        if (!handlers.mpOrphanTxnsP2PQ->checkTxnExists(tx.GetId())) {
+        if (!handlers.mpOrphanTxns->checkTxnExists(tx.GetId())) {
             AskForMissingParents(pNode, tx);
-            handlers.mpOrphanTxnsP2PQ->addTxn(txStatus.mTxInputData);
+            handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
-        // DoS prevention: do not allow mpOrphanTxnsP2PQ to grow unbounded
+        // DoS prevention: do not allow mpOrphanTxns to grow unbounded
         unsigned int nMaxOrphanTxns {
             static_cast<unsigned int>(
                     std::max(gArgs.GetArg("-maxorphantx",
                                         COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS),
                              (int64_t)0))
         };
-        unsigned int nEvicted = handlers.mpOrphanTxnsP2PQ->limitTxnsNumber(nMaxOrphanTxns);
+        unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsNumber(nMaxOrphanTxns);
         if (nEvicted > 0) {
             LogPrint(BCLog::MEMPOOL,
                     "%s: mapOrphan overflow, removed %u tx\n",
@@ -1542,10 +1554,10 @@ static void HandleInvalidP2POrphanTxn(
             // Punish peer that gave us an invalid orphan tx
             Misbehaving(pNode->GetId(), nDoS, "invalid-orphan-tx");
             // Remove all orphan txns queued from the punished peer
-            handlers.mpOrphanTxnsP2PQ->eraseTxnsFromPeer(pNode->GetId());
+            handlers.mpOrphanTxns->eraseTxnsFromPeer(pNode->GetId());
         } else {
             // Erase an invalid orphan as we don't want to reprocess it again.
-            handlers.mpOrphanTxnsP2PQ->eraseTxn(tx.GetId());
+            handlers.mpOrphanTxns->eraseTxn(tx.GetId());
         }
         // Has inputs but not accepted to mempool
         // Probably non-standard or insufficient fee/priority
@@ -1607,7 +1619,7 @@ static void HandleInvalidStateForP2PNonOrphanTxn(
         // for details.
         handlers.mpTxnRecentRejects->insert(tx.GetId());
         if (RecursiveDynamicUsage(tx) < 100000) {
-            handlers.mpOrphanTxnsP2PQ->addToCompactExtraTxns(ptx);
+            handlers.mpOrphanTxns->addToCompactExtraTxns(ptx);
         }
     }
     bool fWhiteListForceRelay {
@@ -1662,18 +1674,12 @@ static void PostValidationStepsForP2PTxn(
         return;
     }
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
-    const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
     // Post processing step for successfully commited txns (non-orphans & orphans)
     if (state.IsValid()) {
         pool.Check(GetSpendHeight(pcoinsTip), pcoinsTip, handlers.mJournalChangeSet);
         RelayTransaction(*ptx, *g_connman);
         pNode->nLastTXTime = GetTime();
-        // At this stage we want to collect outpoints of successfully submitted txn.
-        // There might be other related txns being validated at the same time.
-        handlers.mpOrphanTxnsP2PQ->collectTxnOutpoints(tx);
-        // Remove tx if it was queued as an orphan txn.
-        handlers.mpOrphanTxnsP2PQ->eraseTxn(tx.GetId());
     }
     // For P2P txns the Validator executes LimitMempoolSize when a batch of txns is
     // fully processed (validation is finished and all valid txns were commited)
@@ -1698,10 +1704,9 @@ static void PostValidationStepsForP2PTxn(
 static void UpdateMempoolForReorg(const Config &config,
                                   DisconnectedBlockTransactions &disconnectpool,
                                   bool fAddToMempool,
-                                  const CJournalChangeSetPtr& changeSet)
-{
+                                  const CJournalChangeSetPtr& changeSet) {
     AssertLockHeld(cs_main);
-    std::vector<uint256> vHashUpdate;
+    TxInputDataSPtrVec vTxInputData {};
     // disconnectpool's insertion_order index sorts the entries from oldest to
     // newest, but the oldest entry will be the last tx from the latest mined
     // block that was disconnected.
@@ -1710,42 +1715,47 @@ static void UpdateMempoolForReorg(const Config &config,
     // previously seen in a block.
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
-        // ignore validation errors in resurrected transactions
         bool fRemoveRecursive { !fAddToMempool || (*it)->IsCoinBase() };
-        if (!fRemoveRecursive) {
-            const auto& txValidator = g_connman->getTxnValidator();
-            const auto& state {
-                // Execute txn validation synchronously
-                txValidator->processValidation(
-                                std::make_shared<CTxInputData>(
-                                                    TxSource::reorg, // tx source
-                                                   *it,       // a pointer to the tx
-                                                    GetTime(),// nAcceptTime
-                                                    false),    // fLimitFree
-                                changeSet)
-            };
-            fRemoveRecursive = !state.IsValid();
-        }
         if (fRemoveRecursive) {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
             mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
-        } else if (mempool.Exists((*it)->GetId())) {
-            vHashUpdate.push_back((*it)->GetId());
+        } else {
+            vTxInputData.emplace_back(
+                    std::make_shared<CTxInputData>(
+                                        TxSource::reorg,  // tx source
+                                        *it,              // a pointer to the tx
+                                        GetTime(),        // nAcceptTime
+                                        false));          // fLimitFree
         }
         ++it;
     }
     disconnectpool.queuedTx.clear();
+    // Validate a set of transactions
+    g_connman->getTxnValidator()->processValidation(vTxInputData, changeSet, true);
+    // Mempool related updates
+    std::vector<uint256> vHashUpdate {};
+    for (const auto& txInputData : vTxInputData) {
+        auto const& txid = txInputData->mpTx->GetId();
+        if (mempool.Exists(txid)) {
+            // A set of transaction hashes from a disconnected block re-added to the mempool.
+            vHashUpdate.emplace_back(txid);
+        } else {
+            // If the transaction doesn't make it in to the mempool, remove any
+            // transactions that depend on it (which would now be orphans).
+            mempool.RemoveRecursive(*(txInputData->mpTx), changeSet, MemPoolRemovalReason::REORG);
+        }
+    }
     // Validator/addUnchecked all assume that new mempool entries have
     // no in-mempool children, which is generally not true when adding
     // previously-confirmed transactions back to the mempool.
     // UpdateTransactionsFromBlock finds descendants of any transactions in the
     // disconnectpool that were added back and cleans up the mempool state.
-    LogPrint(BCLog::MEMPOOL, "Update transactions from block");
-    mempool.UpdateTransactionsFromBlock(vHashUpdate);
-
+    LogPrint(BCLog::MEMPOOL, "Update transactions from block\n");
+    mempool.
+        UpdateTransactionsFromBlock(vHashUpdate);
     // We also need to remove any now-immature transactions
-    LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions");
+    LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
     mempool.
         RemoveForReorg(
             config,
@@ -1754,12 +1764,6 @@ static void UpdateMempoolForReorg(const Config &config,
             chainActive.Height(),
             chainActive.Tip()->GetMedianTimePast(),
             STANDARD_LOCKTIME_VERIFY_FLAGS);
-    // Re-limit mempool size, in case we added any transactions
-    LimitMempoolSize(
-        mempool,
-        changeSet,
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
-        gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
 }
 
 /**

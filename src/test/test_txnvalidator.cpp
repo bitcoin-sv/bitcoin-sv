@@ -90,8 +90,8 @@ namespace {
     }
     // Validate txn using asynchronous validation interface
     void ProcessTxnsAsynchApi(std::vector<CMutableTransaction>& spends,
-                                       TxSource source,
-                                       std::shared_ptr<CNode> pNode = nullptr) {
+                              TxSource source,
+                              std::shared_ptr<CNode> pNode = nullptr) {
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
             std::make_shared<CTxnValidator>(
@@ -108,8 +108,8 @@ namespace {
     }
     // Validate txn using synchronous validation interface
     void ProcessTxnsSynchApi(std::vector<CMutableTransaction>& spends,
-                                      TxSource source,
-                                      std::shared_ptr<CNode> pNode = nullptr) {
+                             TxSource source,
+                             std::shared_ptr<CNode> pNode = nullptr) {
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
             std::make_shared<CTxnValidator>(
@@ -130,6 +130,24 @@ namespace {
         // spends1 should be rejected if spend0 is in the mempool
         result = txnValidator->processValidation(TxInputData(source, spends[1], pNode), changeSet);
         BOOST_CHECK(!result.IsValid());
+    }
+    // Validate txns using synchronous batch validation interface
+    void ProcessTxnsSynchBatchApi(std::vector<CMutableTransaction>& spends,
+                                  TxSource source,
+                                  std::shared_ptr<CNode> pNode = nullptr) {
+        // Create txn validator
+        std::shared_ptr<CTxnValidator> txnValidator {
+            std::make_shared<CTxnValidator>(
+                    GlobalConfig::GetConfig(),
+                    mempool,
+                    std::make_shared<CTxnDoubleSpendDetector>())
+        };
+        // Clear mempool before validation
+        mempool.Clear();
+        // Mempool Journal ChangeSet
+        mining::CJournalChangeSetPtr changeSet {nullptr};
+        // Validate the first txn
+        txnValidator->processValidation(TxInputDataVec(source, spends, pNode), changeSet);
     }
     struct TestChain100Setup2 : TestChain100Setup {
         CScript scriptPubKey {
@@ -236,6 +254,37 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
     BOOST_CHECK_EQUAL(mempool.Size(), 1);
     // Process txn if it is valid.
     ProcessTxnsSynchApi(spends2, TxSource::unknown);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_batch_api) {
+    // Test: Txns from wallet.
+    ProcessTxnsSynchBatchApi(spendsN, TxSource::wallet);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
+    // Test: Txns from rpc.
+    ProcessTxnsSynchBatchApi(spendsN, TxSource::rpc);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
+    // Test: Txns from file.
+    ProcessTxnsSynchBatchApi(spendsN, TxSource::file);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
+    // Test: Txns from p2p.
+    {
+        // Create a dummy address
+        CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
+        std::shared_ptr<CNode> pDummyNode {
+            std::make_shared<CNode>(0, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
+        };
+        ProcessTxnsSynchBatchApi(spendsN, TxSource::p2p, pDummyNode);
+        BOOST_CHECK_EQUAL(mempool.Size(), 1);
+    }
+    // Process txn if it is valid.
+    ProcessTxnsSynchBatchApi(spendsN, TxSource::p2p);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
+    // Test: Txns from reorg.
+    ProcessTxnsSynchBatchApi(spendsN, TxSource::reorg);
+    BOOST_CHECK_EQUAL(mempool.Size(), 1);
+    // Process txn if it is valid.
+    ProcessTxnsSynchBatchApi(spendsN, TxSource::unknown);
     BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
