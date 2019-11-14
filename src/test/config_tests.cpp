@@ -169,8 +169,8 @@ BOOST_AUTO_TEST_CASE(max_policy_tx_size) {
     // can not set policy tx size < pre genesis policy tx size
     BOOST_CHECK(!config.SetMaxTxSizePolicy(MAX_TX_SIZE_POLICY_BEFORE_GENESIS - 1, &reason));
 
-    // can not set policy tx size > consensus policy tx size
-    BOOST_CHECK(!config.SetMaxTxSizePolicy(MAX_TX_SIZE + 1, &reason));
+    // can not set policy tx size > post genesis consensus tx size
+    BOOST_CHECK(!config.SetMaxTxSizePolicy(MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS + 1, &reason));
 
     // can not set policy tx size < 0
     BOOST_CHECK(!config.SetMaxTxSizePolicy(- 1, &reason));

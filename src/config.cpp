@@ -202,11 +202,11 @@ bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* er
         return true;
     }
     uint64_t maxTxSizePolicyInUnsigned = static_cast<uint64_t>(maxTxSizePolicyIn);
-    if (maxTxSizePolicyInUnsigned > MAX_TX_SIZE)
+    if (maxTxSizePolicyInUnsigned > MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS)
     {
         if (err)
         {
-            *err = "Policy value for max tx size must not exceed consensus limit of " + std::to_string(MAX_TX_SIZE);
+            *err = "Policy value for max tx size must not exceed consensus limit of " + std::to_string(MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
         }
         return false;
     }

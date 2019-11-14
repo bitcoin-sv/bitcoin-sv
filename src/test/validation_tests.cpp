@@ -57,12 +57,12 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
     CTransaction empty_tx;
     size_t empty_tx_size = GetSerializeSize(empty_tx, SER_DISK, CLIENT_VERSION);
 
-    size_t num_tx = (10 * MAX_TX_SIZE) / empty_tx_size;
+    size_t num_tx = (10 * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS) / empty_tx_size;
 
     CBlock block = makeLargeDummyBlock(num_tx);
 
     BOOST_CHECK(GetSerializeSize(block, SER_DISK, CLIENT_VERSION) >
-                2 * MAX_TX_SIZE);
+                2 * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
 
     unsigned int size = GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
     {

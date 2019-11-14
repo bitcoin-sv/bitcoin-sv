@@ -94,11 +94,12 @@ static const uint64_t DEFAULT_ANCESTOR_LIMIT = 25;
 static const uint64_t DEFAULT_DESCENDANT_LIMIT = 25;
 /** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool
  * ancestors */
-static const uint64_t DEFAULT_ANCESTOR_SIZE_LIMIT = DEFAULT_ANCESTOR_LIMIT * MAX_TX_SIZE;
+static const uint64_t DEFAULT_ANCESTOR_SIZE_LIMIT = DEFAULT_ANCESTOR_LIMIT * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
 /** Default for -limitdescendantsize, maximum kilobytes of in-mempool
  * descendants */
-static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT * MAX_TX_SIZE;
-/** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
+static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
+/** Default for -mempoolexpiry, expiration time for mempool transactions in
+ * hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 /** Default for -nonfinalmempoolexpiry, expiration time for non-final mempool transactions in hours */
 static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
@@ -793,8 +794,8 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
 /** Transaction validation functions */
 
 /** Context-independent validity checks for coinbase and non-coinbase transactions */
-bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, bool isGenesisEnabled);
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, bool isGenesisEnabled);
+bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus, uint64_t maxTxSizeConsensus, bool isGenesisEnabled);
+bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus, uint64_t maxTxSizeConsensus, bool isGenesisEnabled);
 
 namespace Consensus {
 

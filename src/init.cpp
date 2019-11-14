@@ -1756,12 +1756,12 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure descendant limit size.
     if(gArgs.IsArgSet("-limitdescendantsize")) {
-        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", (MAX_TX_SIZE * config.GetLimitDescendantCount()) / 1000) * 1000);
+        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000);
     }
 
     // Configure ancestor limit size.
     if(gArgs.IsArgSet("-limitancestorsize")) {
-        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", (MAX_TX_SIZE * config.GetLimitAncestorCount()) / 1000) * 1000);
+        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000);
     }
 
     // Configure genesis activation height.

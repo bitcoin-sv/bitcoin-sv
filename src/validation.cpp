@@ -562,6 +562,7 @@ uint64_t GetTransactionSigOpCount(const Config &config,
 static bool CheckTransactionCommon(const CTransaction& tx,
                                    CValidationState& state,
                                    uint64_t maxTxSigOpsCountConsensus,
+                                   uint64_t maxTxSizeConsensus,
                                    bool isGenesisEnabled) {
     // Basic checks that don't depend on any context
     if (tx.vin.empty()) {
@@ -573,7 +574,7 @@ static bool CheckTransactionCommon(const CTransaction& tx,
     }
 
     // Size limit
-    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TX_SIZE) {
+    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > maxTxSizeConsensus) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
     }
 
@@ -605,14 +606,14 @@ static bool CheckTransactionCommon(const CTransaction& tx,
     return true;
 }
 
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, bool isGenesisEnabled)
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, uint64_t maxTxSizeConsensus, bool isGenesisEnabled)
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
                          "first tx is not coinbase");
     }
 
-    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
+    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, isGenesisEnabled)) {
         // CheckTransactionCommon fill in the state.
         return false;
     }
@@ -624,13 +625,12 @@ bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t max
     return true;
 }
 
-bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, bool isGenesisEnabled)
-{
+bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus, uint64_t maxTxSizeConsensus, bool isGenesisEnabled) {
     if (tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-tx-coinbase");
     }
-
-    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
+    
+    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, isGenesisEnabled)) {
         // CheckTransactionCommon fill in the state.
         return false;
     }
@@ -1101,8 +1101,9 @@ CTxnValResult TxnValidation(
     // We re-test the transaction with policy rules later in this method (without banning if rules are violated)
     bool isGenesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
     uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(isGenesisEnabled, true);
+    uint64_t maxTxSizeConsensus = config.GetMaxTxSize(isGenesisEnabled, true);
     // Coinbase is only valid in a block, not as a loose transaction.
-    if (!CheckRegularTransaction(tx, state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
+    if (!CheckRegularTransaction(tx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, isGenesisEnabled)) {
         return Result{state, pTxInputData};
     }
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
@@ -4760,9 +4761,10 @@ bool CheckBlock(const Config &config, const CBlock &block,
 
     bool isGenesisEnabled = IsGenesisEnabled(config, blockHeight);
     uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(isGenesisEnabled, true);
+    uint64_t maxTxSizeConsensus = config.GetMaxTxSize(isGenesisEnabled, true);
 
     // And a valid coinbase.
-    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
+    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, isGenesisEnabled)) {
         return state.Invalid(false, state.GetRejectCode(),
                              state.GetRejectReason(),
                              strprintf("Coinbase check failed (txid %s) %s",
@@ -4801,7 +4803,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
         // the coinbase, the loop is arranged such as this only runs after at
         // least one increment.
         tx = block.vtx[i].get();
-        if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
+        if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, isGenesisEnabled)) {
             return state.Invalid(
                 false, state.GetRejectCode(), state.GetRejectReason(),
                 strprintf("Transaction check failed (txid %s) %s",
@@ -6185,10 +6187,8 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
 
     int nLoaded = 0;
     try {
-        // This takes over fileIn and calls fclose() on it in the CBufferedFile
-        // destructor. Make sure we have at least 2*MAX_TX_SIZE space in there
-        // so any transaction can fit in the buffer.
-        CBufferedFile blkdat(fileIn, 2 * MAX_TX_SIZE, MAX_TX_SIZE + 8, SER_DISK,
+        // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor.
+        CBufferedFile blkdat(fileIn, 2 * ONE_MEGABYTE, ONE_MEGABYTE + 8, SER_DISK,
                              CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof()) {
