@@ -2,7 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
-#include "big_int.hpp"
+#include "big_int.h"
 
 #include <array>
 

@@ -26,6 +26,7 @@ packages:
 - "pkg-config"
 - "autoconf"
 - "libtool"
+- "libssl-dev"
 - "automake"
 - "faketime"
 - "bsdmainutils"
