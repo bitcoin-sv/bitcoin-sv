@@ -13,6 +13,7 @@
 #include "random.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
+#include "tx_mempool_info.h"
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -364,23 +365,6 @@ struct entry_time {};
 struct ancestor_score {};
 
 class CBlockPolicyEstimator;
-
-/**
- * Information about a mempool transaction.
- */
-struct TxMempoolInfo {
-    /** The transaction itself */
-    CTransactionRef tx;
-
-    /** Time the transaction entered the mempool. */
-    int64_t nTime;
-
-    /** Feerate of the transaction. */
-    CFeeRate feeRate;
-
-    /** The fee delta. */
-    Amount nFeeDelta;
-};
 
 /**
  * Reason why a transaction was removed from the mempool, this is passed to the
