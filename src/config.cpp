@@ -49,6 +49,7 @@ void GlobalConfig::Reset()
     mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
     mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
     maxOpsPerScriptPolicy = DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS;
+    maxTxSigOpsCountPolicy = DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
 
     mMaxTransactionValidationDuration = DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION;
 }
@@ -480,4 +481,51 @@ void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {
 
 CFeeRate GlobalConfig::GetMinFeePerKB() const {
     return feePerKB;
+}
+bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err)
+{
+    if (maxTxSigOpsCountIn < 0)
+    {
+        if (err)
+        {
+            *err = _("Policy value for maximum allowed number of signature operations per transaction cannot be less than 0");
+        }
+        return false;
+    }
+    uint64_t maxTxSigOpsCountInUnsigned = static_cast<uint64_t>(maxTxSigOpsCountIn);
+    if (maxTxSigOpsCountInUnsigned > MAX_TX_SIGOPS_COUNT_AFTER_GENESIS)
+    {
+        if (err)
+        {
+            *err = _("Policy value for maximum allowed number of signature operations per transaction must not exceed consensus limit of ") + std::to_string(MAX_TX_SIGOPS_COUNT_AFTER_GENESIS);
+        }
+        return false;
+    }
+    if (maxTxSigOpsCountInUnsigned == 0)
+    {
+        maxTxSigOpsCountPolicy = MAX_TX_SIGOPS_COUNT_AFTER_GENESIS;
+    }
+    else
+    {
+        maxTxSigOpsCountPolicy = maxTxSigOpsCountInUnsigned;
+    }
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const
+{
+    if (!isGenesisEnabled)
+    {
+        if (isConsensus)
+        {
+            return MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS;
+        }
+        return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS;
+    }
+
+    if (isConsensus)
+    {
+        return MAX_TX_SIGOPS_COUNT_AFTER_GENESIS;
+    }
+    return maxTxSigOpsCountPolicy;
 }

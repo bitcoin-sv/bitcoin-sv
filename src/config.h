@@ -102,6 +102,10 @@ public:
     virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
     virtual uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const = 0;
 
+    /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
+    virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const = 0;
+
     virtual bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxTransactionValidationDuration() const = 0;
 };
@@ -187,6 +191,9 @@ public:
     bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) override;
     uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override;
 
+    bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override;
+    uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override;
+
     bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxTransactionValidationDuration() const override;
 
@@ -235,6 +242,8 @@ private:
     int mPerBlockScriptValidationMaxBatchSize;
 
     uint64_t maxOpsPerScriptPolicy;
+
+    uint64_t maxTxSigOpsCountPolicy;
 
     std::chrono::milliseconds mMaxTransactionValidationDuration;
 };
@@ -362,6 +371,9 @@ public:
             return MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
         }
     }
+    bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override { return true; }
+    uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+
     bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override
     {
         if(err)

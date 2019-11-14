@@ -223,17 +223,17 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS));
     }
 
     // Get just before the limit.
-    for (size_t i = 0; i < MAX_TX_SIGOPS_COUNT; i++) {
+    for (size_t i = 0; i < MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS; i++) {
         tx.vout[0].scriptPubKey << OP_CHECKSIG;
     }
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS));
     }
 
     // And go over.
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
 
     {
         CValidationState state;
-        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state));
+        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txn-sigops");
     }
 }

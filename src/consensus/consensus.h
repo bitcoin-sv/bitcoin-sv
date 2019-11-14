@@ -33,6 +33,11 @@ static const uint64_t MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = 500;
 // Maximum number of non-push operations per script after GENESIS
 static const uint64_t MAX_OPS_PER_SCRIPT_AFTER_GENESIS = UINT32_MAX;
 
+
+/** Allowed number of signature check operations per transaction before Genesis */
+static const uint64_t MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS = 20000;
+/** Allowed number of signature check operations per transaction after Genesis (max value of uint32) */
+static const uint64_t MAX_TX_SIGOPS_COUNT_AFTER_GENESIS = UINT32_MAX;
 /**
  * Coinbase transaction outputs can only be spent after this number of new
  * blocks (network rule).

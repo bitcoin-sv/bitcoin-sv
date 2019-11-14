@@ -917,6 +917,11 @@ std::string HelpMessage(HelpMessageMode mode) {
             strprintf(_("Set maximum number of non-push operations "
                         "we're willing to relay/mine per script (default: %d, 0 = unlimited), after Genesis is activated"),
                       DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS));
+    strUsage += HelpMessageOpt(
+        "-maxtxsigopscountspolicy=<n>",
+        strprintf("Set maximum allowed number of signature operations we're willing to relay/mine in a single transaction (default: %d, 0 = unlimited) after Genesis is activated.",
+                  DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS));
+
 
     strUsage += HelpMessageOpt(
         "-txnvalidationmaxduration=<n>",
@@ -1876,6 +1881,16 @@ bool AppInitParameterInteraction(Config &config) {
     nLocalServices = ServiceFlags(nLocalServices | NODE_BITCOIN_CASH);
 
     nMaxTipAge = gArgs.GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
+
+    // Configure the maximum number of sigops we're willing to relay/mine in a single tx
+    if (gArgs.IsArgSet("-maxtxsigopscountspolicy"))
+    {
+        const int64_t value = gArgs.GetArg("-maxtxsigopscountspolicy", DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
+        if (std::string err; !config.SetMaxTxSigOpsCountPolicy(value, &err))
+        {
+            return InitError(err);
+        }
+    }
 
     return true;
 }
