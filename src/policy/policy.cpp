@@ -179,4 +179,3 @@ std::optional<bool> AreInputsStandard(
 }
 
 CFeeRate dustRelayFee = CFeeRate(DUST_RELAY_TX_FEE);
-unsigned int nBytesPerSigOp = DEFAULT_BYTES_PER_SIGOP;

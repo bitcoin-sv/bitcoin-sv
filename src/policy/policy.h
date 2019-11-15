@@ -88,8 +88,6 @@ static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
 /** Default for -incrementalrelayfee, which sets the minimum feerate increase
  * for mempool limiting or BIP 125 replacement **/
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
-/** Default for -bytespersigop */
-static const unsigned int DEFAULT_BYTES_PER_SIGOP = 20;
 /**
  * Min feerate for defining dust. Historically this has been the same as the
  * minRelayTxFee, however changing the dust limit changes which transactions are
@@ -167,6 +165,5 @@ std::optional<bool> AreInputsStandard(
 
 extern CFeeRate incrementalRelayFee;
 extern CFeeRate dustRelayFee;
-extern unsigned int nBytesPerSigOp;
 
 #endif // BITCOIN_POLICY_POLICY_H

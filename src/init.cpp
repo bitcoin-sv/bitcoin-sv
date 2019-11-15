@@ -898,11 +898,6 @@ std::string HelpMessage(HelpMessageMode mode) {
                       "in fees at this fee rate to spend it. (default: %s)",
                       CURRENCY_UNIT, FormatMoney(DUST_RELAY_TX_FEE)));
     }
-    strUsage +=
-        HelpMessageOpt("-bytespersigop",
-                       strprintf(_("Equivalent bytes per sigop in transactions "
-                                   "for relay and mining (default: %u)"),
-                                 DEFAULT_BYTES_PER_SIGOP));
     strUsage += HelpMessageOpt(
         "-datacarrier",
         strprintf(_("Relay and mine data carrier transactions (default: %d)"),
@@ -1858,7 +1853,6 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(
             strprintf("acceptnonstdtxn is not currently supported for %s chain",
                       chainparams.NetworkIDString()));
-    nBytesPerSigOp = gArgs.GetArg("-bytespersigop", nBytesPerSigOp);
 
 #ifdef ENABLE_WALLET
     if (!CWallet::ParameterInteraction()) return false;
