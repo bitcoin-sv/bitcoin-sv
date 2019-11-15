@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -77,6 +78,8 @@ namespace task
     class CCancellationSource : public std::enable_shared_from_this<CCancellationSource>
     {
     public:
+        virtual ~CCancellationSource() = default;
+
         static std::shared_ptr<CCancellationSource> Make()
         {
             return
@@ -89,11 +92,56 @@ namespace task
         }
 
         void Cancel() { mCanceled = true; }
-        bool IsCanceled() const { return mCanceled; }
+        virtual bool IsCanceled() { return mCanceled; }
+
+    protected:
+        CCancellationSource() = default;
 
     private:
-        CCancellationSource() = default;
         std::atomic<bool> mCanceled = false;
+    };
+
+    /**
+     * A long running task cancellation source with same features as
+     * CCancellationSource but can additionally be set so that it auto cancels
+     * after N wall time elapsed.
+     */
+    class CTimedCancellationSource final : public CCancellationSource
+    {
+    public:
+        static std::shared_ptr<CCancellationSource> Make(
+            std::chrono::milliseconds const& after)
+        {
+            return
+                std::shared_ptr<CCancellationSource>{
+                    new CTimedCancellationSource{after}};
+        }
+
+        bool IsCanceled() override
+        {
+            if(CCancellationSource::IsCanceled())
+            {
+                return true;
+            }
+
+            if(mCancelAfter < (std::chrono::steady_clock::now() - mStart_))
+            {
+                Cancel();
+                return true;
+            }
+
+            return false;
+        }
+
+    private:
+        CTimedCancellationSource(std::chrono::milliseconds const& after)
+            : mStart_{std::chrono::steady_clock::now()}
+            , mCancelAfter{after}
+        {/**/}
+
+        std::chrono::time_point<std::chrono::steady_clock> mStart_;
+        std::chrono::milliseconds mCancelAfter;
+
     };
 }
 

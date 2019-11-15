@@ -76,4 +76,16 @@ BOOST_AUTO_TEST_CASE(token_joining)
     }
 }
 
+BOOST_AUTO_TEST_CASE(cancellation_after_500ms)
+{
+    using namespace std::chrono_literals;
+
+    auto source = task::CTimedCancellationSource::Make(500ms);
+    auto token = source->GetToken();
+
+    BOOST_CHECK_EQUAL(token.IsCanceled(), false);
+    std::this_thread::sleep_for(510ms);
+    BOOST_CHECK_EQUAL(token.IsCanceled(), true);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
