@@ -345,7 +345,7 @@ static bool CheckMinimalPush(const valtype &data, opcodetype opcode) {
     return true;
 }
 
-static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
+static bool IsOpcodeDisabled(opcodetype opcode) {
     switch (opcode) {
         case OP_2MUL:
         case OP_2DIV:
@@ -357,6 +357,10 @@ static bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
     }
 
     return false;
+}
+
+static bool IsInvalidBranchingOpcode(opcodetype opcode) {
+    return opcode == OP_VERNOTIF || opcode == OP_VERIF;
 }
 
 inline bool IsValidMaxOpsPerScript(int nOpCount) {
@@ -377,6 +381,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     opcodetype opcode;
     valtype vchPushValue;
     std::vector<bool> vfExec;
+    std::vector<bool> vfElse;
     std::vector<valtype> altstack;
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     if (script.size() > MAX_SCRIPT_SIZE) {
@@ -417,7 +422,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
             }
 
             // Some opcodes are disabled.
-            if (IsOpcodeDisabled(opcode, flags)) {
+            if (IsOpcodeDisabled(opcode) && (!(flags & SCRIPT_UTXO_AFTER_GENESIS) || fExec )) {
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
             }
 
@@ -606,14 +611,17 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             popstack(stack);
                         }
                         vfExec.push_back(fValue);
+                        vfElse.push_back(false);
                     } break;
 
                     case OP_ELSE: {
-                        if (vfExec.empty()) {
+                        // Only one ELSE is allowed in IF after genesis.
+                        if (vfExec.empty() || (vfElse.back() && (flags & SCRIPT_UTXO_AFTER_GENESIS))) {
                             return set_error(serror,
                                              SCRIPT_ERR_UNBALANCED_CONDITIONAL);
                         }
                         vfExec.back() = !vfExec.back();
+                        vfElse.back() = true;
                     } break;
 
                     case OP_ENDIF: {
@@ -622,6 +630,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                                              SCRIPT_ERR_UNBALANCED_CONDITIONAL);
                         }
                         vfExec.pop_back();
+                        vfElse.pop_back();
                     } break;
 
                     case OP_VERIFY: {
@@ -1527,8 +1536,14 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         }
                     } break;
 
-                    default:
+                    default: {
+                        if (IsInvalidBranchingOpcode(opcode) && (flags & SCRIPT_UTXO_AFTER_GENESIS) && !fExec)
+                        {
+                            break;
+                        }
+
                         return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+                    }
                 }
             }
 
