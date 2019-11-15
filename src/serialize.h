@@ -26,7 +26,7 @@
 
 #include "prevector.h"
 
-static const uint64_t MAX_SIZE = 0x02000000;
+static const uint64_t MAX_SIZE = std::numeric_limits<uint32_t>::max();
 
 /**
  * Dummy data type to identify deserializing constructors.
