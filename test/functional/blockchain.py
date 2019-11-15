@@ -192,8 +192,31 @@ class BlockchainTest(BitcoinTestFramework):
         for tx in blockjson['tx']:
             assert isinstance(tx, dict)
 
+        self.log.info("Test getblock with verbosity=3")
+        blockjson = node.getblock(besthash, 3)
+        assert_equal(blockjson['hash'], besthash)
+        assert_equal(blockjson['height'], 200)
+        assert_equal(blockjson['confirmations'], 1)
+        assert_equal(blockjson['previousblockhash'], secondbesthash)
+        assert_is_hex_string(blockjson['chainwork'])
+        assert_is_hash_string(blockjson['hash'])
+        assert_is_hash_string(blockjson['previousblockhash'])
+        assert_is_hash_string(blockjson['merkleroot'])
+        assert_is_hash_string(blockjson['bits'], length=None)
+        assert isinstance(blockjson['time'], int)
+        assert isinstance(blockjson['mediantime'], int)
+        assert isinstance(blockjson['nonce'], int)
+        assert isinstance(blockjson['version'], int)
+        assert isinstance(int(blockjson['versionHex'], 16), int)
+        assert isinstance(blockjson['difficulty'], Decimal)
+        #only coinbase tx should be in block
+        assert_equal(len(blockjson['tx']), 1)
+        tx = blockjson['tx'][0]
+        assert isinstance(tx, dict)
+        assert_is_hash_string(tx['vin'][0]['coinbase'], length=None)
+
         self.log.info("Test getblock with invalid verbosity fails")
-        assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, 3)
+        assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, 4)
         assert_raises_rpc_error(-8, "Verbosity value out of range", node.getblock, besthash, -1)
         assert_raises_rpc_error(-8, "Verbosity value not recognized", node.getblock, besthash, "ASDFG")
 
