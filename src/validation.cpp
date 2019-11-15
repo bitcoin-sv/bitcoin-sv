@@ -469,7 +469,8 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx) {
     return nSigOps;
 }
 
-uint64_t GetP2SHSigOpCount(const CTransaction &tx,
+uint64_t GetP2SHSigOpCount(const Config &config,
+                           const CTransaction &tx,
                            const CCoinsViewCache &inputs) {
     if (tx.IsCoinBase()) {
         return 0;
@@ -477,7 +478,25 @@ uint64_t GetP2SHSigOpCount(const CTransaction &tx,
 
     uint64_t nSigOps = 0;
     for (auto &i : tx.vin) {
-        const CTxOut &prevout = inputs.GetOutputFor(i);
+        const Coin &coin = inputs.AccessCoin(i.prevout);
+        assert(!coin.IsSpent());
+
+        bool genesisEnabled = true;
+        if (coin.GetHeight() != MEMPOOL_HEIGHT){
+            genesisEnabled = IsGenesisEnabled(config, coin.GetHeight());
+        } else {
+            // When this function is called from CTxnValidator, we could be spending UTXOS from mempool
+            // CTxnValidator already takes cs_main lock when starting validation in it's main thread
+            AssertLockHeld(cs_main);
+
+            // TODO: in releases after genesis upgrade this part could be removed
+            genesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
+        }
+
+        if (genesisEnabled) {
+            continue;
+        }
+        const CTxOut &prevout = coin.GetTxOut();
         if (prevout.scriptPubKey.IsPayToScriptHash()) {
             nSigOps += prevout.scriptPubKey.GetSigOpCount(i.scriptSig);
         }
@@ -485,15 +504,16 @@ uint64_t GetP2SHSigOpCount(const CTransaction &tx,
     return nSigOps;
 }
 
-uint64_t GetTransactionSigOpCount(const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, int flags) {
+uint64_t GetTransactionSigOpCount(const Config &config,
+                                  const CTransaction &tx,
+                                  const CCoinsViewCache &inputs, bool checkP2SH) {
     uint64_t nSigOps = GetSigOpCountWithoutP2SH(tx);
     if (tx.IsCoinBase()) {
         return nSigOps;
     }
 
-    if (flags & SCRIPT_VERIFY_P2SH) {
-        nSigOps += GetP2SHSigOpCount(tx, inputs);
+    if (checkP2SH) {
+        nSigOps += GetP2SHSigOpCount(config, tx, inputs);
     }
 
     return nSigOps;
@@ -639,10 +659,29 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
 
 bool IsGenesisEnabled(const Config &config, int nHeight) {
     if (nHeight == MEMPOOL_HEIGHT) {
-        throw std::runtime_error("Checking if genesis is enabled with height == MEMPOOL_HEIGHT.");
+        throw std::runtime_error("A coin with height == MEMPOOL_HEIGHT was passed "
+            "to IsGenesisEnabled() overload that does not handle this case. "
+            "Use the overload that takes Coin as parameter");
     }
 
     return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
+}
+
+bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight) {
+    auto height = coin.GetHeight();
+    if (height == MEMPOOL_HEIGHT) {
+        return (uint32_t)mempoolHeight >= config.GetGenesisActivationHeight();
+    }
+    return height >= config.GetGenesisActivationHeight();
+}
+
+bool IsGenesisEnabled(const Config &config, const CBlockIndex* pindexPrev) {
+    if (pindexPrev == nullptr) {
+        return false;
+    }
+
+    // Genesis is enabled on the currently processed block, not on the current tip.
+    return IsGenesisEnabled(config, pindexPrev->nHeight + 1);
 }
 
 // Used to avoid mempool polluting consensus critical paths if CCoinsViewMempool
@@ -863,9 +902,9 @@ static bool CalculateMempoolAncestors(
     return true;
 }
 
-static uint32_t GetScriptVerifyFlags(const Config &config) {
+static uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) {
     // Check inputs based on the set of flags we activate.
-    uint32_t scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+    uint32_t scriptVerifyFlags = StandardScriptVerifyFlags(genesisEnabled, false);
     if (!config.GetChainParams().RequireStandard()) {
         scriptVerifyFlags =
             SCRIPT_ENABLE_SIGHASH_FORKID |
@@ -1055,14 +1094,14 @@ CTxnValResult TxnValidation(
         }
     }
     // Check for non-standard pay-to-script-hash in inputs
-    if (fRequireStandard && !AreInputsStandard(tx, view)) {
+    if (fRequireStandard && !AreInputsStandard(config, tx, view, chainActive.Height() + 1)) {
         state.Invalid(false, REJECT_NONSTANDARD,
                      "bad-txns-nonstandard-inputs");
         return Result{state, pTxInputData, vCoinsToUncache};
     }
     const int64_t nSigOpsCount {
         static_cast<int64_t>(
-                GetTransactionSigOpCount(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS))
+                GetTransactionSigOpCount(config, tx, view, true))
     };
     // Check that the transaction doesn't have an excessive number of
     // sigops, making it impossible to mine. Since the coinbase transaction
@@ -1153,7 +1192,9 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData, vCoinsToUncache};
     }
 
-    uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config);
+    // We are getting flags as they would be if the utxos are before genesis. 
+    // "CheckInputs" is adding specific flags for each input based on its height in the main chain
+    uint32_t scriptVerifyFlags = GetScriptVerifyFlags(config, IsGenesisEnabled(config, chainActive.Height() + 1));
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
@@ -1456,7 +1497,6 @@ void ProcessValidatedTxn(
 static void AskForMissingParents(
     const CNodePtr& pNode,
     const CTransaction &tx) {
-
     for (const CTxIn &txin : tx.vin) {
         // FIXME: MSG_TX should use a TxHash, not a TxId.
         CInv inv(MSG_TX, txin.prevout.GetTxId());
@@ -1776,13 +1816,14 @@ bool GetTransaction(const Config &config, const TxId &txid,
                     bool& isGenesisEnabled
                     ) {
     CBlockIndex *pindexSlow = nullptr;
+    isGenesisEnabled = true;
 
     LOCK(cs_main);
 
     CTransactionRef ptx = mempool.Get(txid);
     if (ptx) {
         txOut = ptx;
-        isGenesisEnabled = IsGenesisEnabled(config, chainActive.Tip()->nHeight + 1); // assume that the transaction from mempool will be mined in next block
+        isGenesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1); // assume that the transaction from mempool will be mined in next block
         return true;
     }
 
@@ -2939,8 +2980,8 @@ static bool ConnectBlock(
 
         // GetTransactionSigOpCount counts 2 types of sigops:
         // * legacy (always)
-        // * p2sh (when P2SH enabled in flags and excludes coinbase)
-        auto txSigOpsCount = GetTransactionSigOpCount(tx, view, flags);
+        // * p2sh (when P2SH enabled)
+        auto txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH);
         if (txSigOpsCount > MAX_TX_SIGOPS_COUNT) {
             return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
         }

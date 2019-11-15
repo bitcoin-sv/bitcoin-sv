@@ -30,7 +30,7 @@
  */
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType) {
     std::vector<std::vector<uint8_t>> vSolutions;
-    if (!SolverWithData(scriptPubKey, IsGenesisEnabled(config, nScriptPubKeyHeight), whichType, vSolutions)) {
+    if (!Solver(scriptPubKey, IsGenesisEnabled(config, nScriptPubKeyHeight), whichType, vSolutions)) {
         return false;
     }
 
@@ -114,8 +114,10 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
     return true;
 }
 
-bool AreInputsStandard(const CTransaction &tx,
-                       const CCoinsViewCache &mapInputs) {
+bool AreInputsStandard(const Config& config,
+                       const CTransaction &tx,
+                       const CCoinsViewCache &mapInputs,
+                       const int mempoolHeight) {
     if (tx.IsCoinBase()) {
         // Coinbases don't use vin normally.
         return true;
@@ -123,12 +125,15 @@ bool AreInputsStandard(const CTransaction &tx,
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
         const CTxOut &prev = mapInputs.GetOutputFor(tx.vin[i]);
+        const Coin& coin = mapInputs.AccessCoin(tx.vin[i].prevout);
 
         std::vector<std::vector<uint8_t>> vSolutions;
         txnouttype whichType;
         // get the scriptPubKey corresponding to this input:
         const CScript &prevScript = prev.scriptPubKey;
-        if (!SolverNoData(prevScript, whichType, vSolutions)) {
+        
+        if (!Solver(prevScript, IsGenesisEnabled(config, coin, mempoolHeight),
+                    whichType, vSolutions)) {
             return false;
         }
 

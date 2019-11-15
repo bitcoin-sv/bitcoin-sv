@@ -50,9 +50,9 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, bool isGenesisEna
 
     if (!hashBlock.IsNull()) {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
-        BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
+        auto mi = mapBlockIndex.find(hashBlock);
         if (mi != mapBlockIndex.end() && (*mi).second) {
-            CBlockIndex *pindex = (*mi).second;
+            const CBlockIndex *pindex = (*mi).second;
             if (chainActive.Contains(pindex)) {
                 entry.push_back(
                     Pair("confirmations",
@@ -587,7 +587,9 @@ static UniValue decoderawtransaction(const Config &config,
     }
 
     UniValue result(UniValue::VOBJ);
-    TxToUniv(CTransaction(std::move(mtx)), uint256(), true /* we have no block height available - treat all transactions as post-Genesis */ , result);
+    //treat as after genesis if no output is P2SH
+    bool genesisEnabled = std::none_of(mtx.vout.begin(), mtx.vout.end(), [](const CTxOut& out) { return out.scriptPubKey.IsPayToScriptHash(); });
+    TxToUniv(CTransaction(std::move(mtx)), uint256(), genesisEnabled, result);
 
     return result;
 }
@@ -632,8 +634,8 @@ static UniValue decodescript(const Config &config,
     }
 
     ScriptPubKeyToUniv(script,
-        false, 
-        false,  // we have no block height available - treat all transactions as post-Genesis 
+        true, 
+        script.IsPayToScriptHash() ? false : true,  // treat all transactions as post-Genesis, except P2SH 
         r);
 
     UniValue type;
@@ -905,11 +907,18 @@ static UniValue signrawtransaction(const Config &config,
                     throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing amount");
                 }
 
-                // We do not have coin height here. We assume that both coin height
-                // and Genesis activation height is 1, effectively using Genesis rules. 
-                // This basically means, that output script starting with OP_RETURN will
-                // be treated as possibly spendable.
-                view.AddCoin(out, Coin(txout, 1, false), true, 1);
+                // We do not have coin height here. We assume that the coin is about to
+                // be mined using latest active rules.
+                const auto genesisActivationHeight = config.GetGenesisActivationHeight();
+                uint32_t coinHeight = static_cast<uint32_t>(chainActive.Height() + 1);
+
+                // except if we are trying to sign transactions that spends p2sh transaction, which
+                // are non-standard (and therefore cannot be signed) after genesis upgrade
+                if( coinHeight >= genesisActivationHeight && txout.scriptPubKey.IsPayToScriptHash()){
+                    coinHeight = genesisActivationHeight - 1;
+                }
+
+                view.AddCoin(out, Coin(txout, coinHeight, false), true, genesisActivationHeight);
             }
 
             // If redeemScript given and not using the local wallet (private
@@ -978,6 +987,9 @@ static UniValue signrawtransaction(const Config &config,
     // Use CTransaction for the constant parts of the transaction to avoid
     // rehashing.
     const CTransaction txConst(mergedTx);
+
+    bool genesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
+
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
@@ -990,13 +1002,15 @@ static UniValue signrawtransaction(const Config &config,
         const CScript &prevPubKey = coin.GetTxOut().scriptPubKey;
         const Amount amount = coin.GetTxOut().nValue;
 
+        bool utxoAfterGenesis = IsGenesisEnabled(config, coin, chainActive.Height() + 1); 
+
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
             (i < mergedTx.vout.size())) {
             ProduceSignature(MutableTransactionSignatureCreator(
                                  &keystore, &mergedTx, i, amount, sigHashType),
-                             prevPubKey, sigdata);
+                             genesisEnabled, utxoAfterGenesis, prevPubKey, sigdata);
         }
 
         // ... and merge in other signatures:
@@ -1005,16 +1019,19 @@ static UniValue signrawtransaction(const Config &config,
                 sigdata = CombineSignatures(
                     prevPubKey,
                     TransactionSignatureChecker(&txConst, i, amount), sigdata,
-                    DataFromTransaction(txv, i));
+                    DataFromTransaction(txv, i),
+                    utxoAfterGenesis);
             }
         }
 
         UpdateTransaction(mergedTx, i, sigdata);
 
         ScriptError serror = SCRIPT_ERR_OK;
-        if (!VerifyScript(
-                txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS,
-                TransactionSignatureChecker(&txConst, i, amount), &serror)) {
+        if (!VerifyScript(txin.scriptSig, 
+                          prevPubKey,
+                          StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis),
+                          TransactionSignatureChecker(&txConst, i, amount), 
+                          &serror)) {
             TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
         }
     }

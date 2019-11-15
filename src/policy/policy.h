@@ -98,6 +98,20 @@ static const unsigned int STANDARD_SCRIPT_VERIFY_FLAGS =
 static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =
     STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS;
 
+/** returns flags for "standard" script*/
+inline unsigned int StandardScriptVerifyFlags(bool genesisEnabled,
+                                       bool utxoAfterGenesis) {
+    unsigned int scriptFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+    if (utxoAfterGenesis) {
+        scriptFlags |= SCRIPT_UTXO_AFTER_GENESIS;
+    }
+    if (genesisEnabled) {
+        scriptFlags |= SCRIPT_GENESIS;
+    }
+    return scriptFlags;
+}
+
+
 /** Used as the flags parameter to sequence and nLocktime checks in
  * non-consensus code. */
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS =
@@ -120,8 +134,10 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
  * spending
  * @return True if all inputs (scriptSigs) use only standard transaction forms
  */
-bool AreInputsStandard(const CTransaction &tx,
-                       const CCoinsViewCache &mapInputs);
+bool AreInputsStandard(const Config& config,
+                       const CTransaction &tx,
+                       const CCoinsViewCache &mapInputs,
+                       const int mempoolHeight);
 
 extern CFeeRate incrementalRelayFee;
 extern CFeeRate dustRelayFee;

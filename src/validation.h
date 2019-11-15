@@ -565,7 +565,19 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
 bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev);
 
 /** Check if Genesis has activated. */
+bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
+/** Check if Genesis has activated.
+ * Do not call this overload with height of coin. If the coin was created in mempool, 
+ * this function will throw exception.
+ */
 bool IsGenesisEnabled(const Config& config, int nHeight);
+/**  Check if Genesis has activated.
+ * When a coins is present in mempool, it will have height MEMPOOL_HEIGHT. 
+ * In this case, you should call this overload and specify the mempool height (chainActive.Height()+1) 
+ *as parameter to correctly determine if genesis is enabled for this coin.
+ */
+bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight  );
+int GetGenesisActivationHeight(const Config& config);
 
 /**
  * Limit mempool size.
@@ -691,7 +703,8 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx);
  * inputs
  * @see CTransaction::FetchInputs
  */
-uint64_t GetP2SHSigOpCount(const CTransaction &tx,
+uint64_t GetP2SHSigOpCount(const Config &config, 
+                           const CTransaction &tx,
                            const CCoinsViewCache &mapInputs);
 
 /**
@@ -699,11 +712,12 @@ uint64_t GetP2SHSigOpCount(const CTransaction &tx,
  * @param[in] tx     Transaction for which we are computing the cost
  * @param[in] inputs Map of previous transactions that have outputs we're
  * spending
- * @param[out] flags Script verification flags
+ * @param[in] checkP2SH  check if it is P2SH and include signature operation of the redeem scripts
  * @return Total signature operation cost of tx
  */
-uint64_t GetTransactionSigOpCount(const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, int flags);
+uint64_t GetTransactionSigOpCount(const Config &config, 
+                                  const CTransaction &tx,
+                                  const CCoinsViewCache &inputs, bool checkP2SH);
 
 /**
  * Check whether all inputs of this transaction are valid (no double spends,

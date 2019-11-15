@@ -43,7 +43,10 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
                   bool &isInvalid) {
     std::vector<valtype> vSolutions;
     txnouttype whichType;
-    if (!SolverNoData(scriptPubKey, whichType, vSolutions)) {
+    // We will assume that the utxo is before genesis if it is P2SH because we still want to recognize 
+    // P2SH scripts as ours and we dont have utxo height here. 
+    bool isGenesisEnsbled = scriptPubKey.IsPayToScriptHash() ? false : true;
+    if (!Solver(scriptPubKey, isGenesisEnsbled, whichType, vSolutions)) {
         if (keystore.HaveWatchOnly(scriptPubKey))
             return ISMINE_WATCH_UNSOLVABLE;
         return ISMINE_NO;
@@ -92,8 +95,8 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
         // TODO: This could be optimized some by doing some work after the above
         // solver
         SignatureData sigs;
-        return ProduceSignature(DummySignatureCreator(&keystore), scriptPubKey,
-                                sigs)
+        return ProduceSignature(DummySignatureCreator(&keystore),  true, isGenesisEnsbled,
+                                scriptPubKey, sigs)
                    ? ISMINE_WATCH_SOLVABLE
                    : ISMINE_WATCH_UNSOLVABLE;
     }

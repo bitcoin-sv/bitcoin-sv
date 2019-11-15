@@ -82,6 +82,11 @@ struct CompareValueOnly {
     }
 };
 
+bool CWallet::ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet) {
+    bool isGenesisEnabled = scriptPubKey.IsPayToScriptHash() ? false : true;
+    return ::ExtractDestination(scriptPubKey, isGenesisEnabled, addressRet);
+}
+
 std::string COutput::ToString() const {
     return strprintf("COutput(%s, %d, %d) [%s]", tx->GetId().ToString(), i,
                      nDepth, FormatMoney(tx->tx->vout[i].nValue));
@@ -101,7 +106,8 @@ public:
         txnouttype type;
         std::vector<CTxDestination> vDest;
         int nRequired;
-        bool isGenesisEnabled = false; // CAffectedKeysVisitor does not care about data/non standard transactions. When sunsetting P2SH, we will need the real value here
+        // We will treat all scripts as after genesis except P2SH.
+        bool isGenesisEnabled = script.IsPayToScriptHash() ? false : true;
         if (ExtractDestinations(script, isGenesisEnabled, type, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest) {
                 boost::apply_visitor(*this, dest);
@@ -1433,7 +1439,7 @@ bool CWallet::IsChange(const CTxOut &txout) const {
     // change).
     if (::IsMine(*this, txout.scriptPubKey)) {
         CTxDestination address;
-        if (!ExtractDestination(txout.scriptPubKey, address)) {
+        if (!CWallet::ExtractDestination(txout.scriptPubKey, address)) {
             return true;
         }
 
@@ -1677,7 +1683,7 @@ void CWalletTx::GetAmounts(std::list<COutputEntry> &listReceived,
         // In either case, we need to get the destination address.
         CTxDestination address;
 
-        if (!ExtractDestination(txout.scriptPubKey, address) &&
+        if (!CWallet::ExtractDestination(txout.scriptPubKey, address) &&
             !txout.scriptPubKey.IsKnownOpReturn()) {
             LogPrintf("CWalletTx::GetAmounts: Unknown transaction type found, "
                       "txid %s\n",
@@ -2319,6 +2325,7 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
             if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
                 !IsLockedCoin((*it).first, i) &&
                 (pcoin->tx->vout[i].nValue > Amount(0) || fIncludeZeroValue) &&
+                !(pcoin->tx->vout[i].scriptPubKey.IsPayToScriptHash() && pcoin->IsGenesisEnabled()) && // we don't want to select p2sh utxos created after genesis
                 (!coinControl || !coinControl->HasSelected() ||
                  coinControl->fAllowOtherInputs ||
                  coinControl->IsSelected(COutPoint((*it).first, i)))) {
@@ -2730,6 +2737,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         std::vector<COutput> vAvailableCoins;
         AvailableCoins(vAvailableCoins, true, coinControl);
 
+        Config &config = GlobalConfig::GetConfig();
+
         nFeeRet = Amount(0);
         // Start with no fee and loop until there is enough fee.
         while (true) {
@@ -2744,7 +2753,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 nValueToSelect += nFeeRet;
             }
 
-            Config &config = GlobalConfig::GetConfig();
             double dPriority = 0;
             // vouts to the payees
             for (const auto &recipient : vecSend) {
@@ -3001,13 +3009,16 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 const CScript &scriptPubKey =
                     coin.first->tx->vout[coin.second].scriptPubKey;
                 SignatureData sigdata;
-
+                
                 if (!ProduceSignature(
                         TransactionSignatureCreator(
                             this, &txNewConst, nIn,
                             coin.first->tx->vout[coin.second].nValue,
                             sigHashType),
-                        scriptPubKey, sigdata)) {
+                        IsGenesisEnabled(config, chainActive.Height() + 1), // new transaction, assume it will be mined in next block
+                        coin.first->IsGenesisEnabled(),
+                        scriptPubKey, 
+                        sigdata)) {
                     strFailReason = _("Signing transaction failed");
                     return false;
                 } else {
@@ -3290,7 +3301,7 @@ bool CWallet::DelAddressBook(const CTxDestination &address) {
 
 const std::string &CWallet::GetAccountName(const CScript &scriptPubKey) const {
     CTxDestination address;
-    if (ExtractDestination(scriptPubKey, address) &&
+    if (CWallet::ExtractDestination(scriptPubKey, address) &&
         !scriptPubKey.IsKnownOpReturn()) { // we do not know how to spend coins containing OP_RETURN (for both pre and post Genesis OP_RETURNs)
         auto mi = mapAddressBook.find(address);
         if (mi != mapAddressBook.end()) {
@@ -3562,7 +3573,7 @@ std::map<CTxDestination, Amount> CWallet::GetAddressBalances() {
                 continue;
             }
 
-            if (!ExtractDestination(pcoin->tx->vout[i].scriptPubKey, addr)) {
+            if (!CWallet::ExtractDestination(pcoin->tx->vout[i].scriptPubKey, addr)) {
                 continue;
             }
 
@@ -3597,7 +3608,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
                     continue;
                 }
 
-                if (!ExtractDestination(mapWallet[txin.prevout.GetTxId()]
+                if (!CWallet::ExtractDestination(mapWallet[txin.prevout.GetTxId()]
                                             .tx->vout[txin.prevout.GetN()]
                                             .scriptPubKey,
                                         address)) {
@@ -3613,7 +3624,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
                 for (CTxOut txout : pcoin->tx->vout) {
                     if (IsChange(txout)) {
                         CTxDestination txoutAddr;
-                        if (!ExtractDestination(txout.scriptPubKey,
+                        if (!CWallet::ExtractDestination(txout.scriptPubKey,
                                                 txoutAddr)) {
                             continue;
                         }
@@ -3633,7 +3644,7 @@ std::set<std::set<CTxDestination>> CWallet::GetAddressGroupings() {
         for (unsigned int i = 0; i < pcoin->tx->vout.size(); i++)
             if (IsMine(pcoin->tx->vout[i])) {
                 CTxDestination address;
-                if (!ExtractDestination(pcoin->tx->vout[i].scriptPubKey,
+                if (!CWallet::ExtractDestination(pcoin->tx->vout[i].scriptPubKey,
                                         address)) {
                     continue;
                 }
@@ -4513,27 +4524,44 @@ void CMerkleTx::SetMerkleBranch(const CBlockIndex *pindex, int posInBlock) {
     nIndex = posInBlock;
 }
 
-int CMerkleTx::GetDepthInMainChain(const CBlockIndex *&pindexRet) const {
-    if (hashUnset()) {
+int CMerkleTx::GetDepthInMainChain() const {
+    int height = GetHeightInMainChain();
+    if (height == MEMPOOL_HEIGHT) {
         return 0;
+    }
+
+    return ((nIndex == -1) ? (-1) : 1) *
+           (chainActive.Height() - height + 1);
+}
+
+int CMerkleTx::GetHeightInMainChain() const {
+    if (hashUnset()) {
+        return MEMPOOL_HEIGHT;
     }
 
     AssertLockHeld(cs_main);
 
     // Find the block it claims to be in.
-    BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
+    auto mi = mapBlockIndex.find(hashBlock);
     if (mi == mapBlockIndex.end()) {
-        return 0;
+        return MEMPOOL_HEIGHT;
     }
 
-    CBlockIndex *pindex = (*mi).second;
+    const CBlockIndex *pindex = (*mi).second;
     if (!pindex || !chainActive.Contains(pindex)) {
-        return 0;
+        return MEMPOOL_HEIGHT;
     }
 
-    pindexRet = pindex;
-    return ((nIndex == -1) ? (-1) : 1) *
-           (chainActive.Height() - pindex->nHeight + 1);
+    return pindex->nHeight;
+}
+
+bool CMerkleTx::IsGenesisEnabled() const {
+    int height = GetHeightInMainChain();
+    if (height == MEMPOOL_HEIGHT) {
+        AssertLockHeld(cs_main);
+        return ::IsGenesisEnabled(GlobalConfig::GetConfig(), chainActive.Height() + 1);
+    }
+    return ::IsGenesisEnabled(GlobalConfig::GetConfig(), height);
 }
 
 int CMerkleTx::GetBlocksToMaturity() const {

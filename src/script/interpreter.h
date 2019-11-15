@@ -27,13 +27,13 @@ uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       unsigned int nIn, SigHashType sigHashType,
                       const Amount amount,
                       const PrecomputedTransactionData *cache = nullptr,
-                      uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID);
+                      bool enabledSighashForkid = true);
 
 class BaseSignatureChecker {
 public:
     virtual bool CheckSig(const std::vector<uint8_t> &scriptSig,
                           const std::vector<uint8_t> &vchPubKey,
-                          const CScript &scriptCode, uint32_t flags) const {
+                          const CScript &scriptCode, bool enabledSighashForkid) const {
         return false;
     }
 
@@ -70,7 +70,7 @@ public:
         : txTo(txToIn), nIn(nInIn), amount(amountIn), txdata(&txdataIn) {}
     bool CheckSig(const std::vector<uint8_t> &scriptSig,
                   const std::vector<uint8_t> &vchPubKey,
-                  const CScript &scriptCode, uint32_t flags) const override;
+                  const CScript &scriptCode, bool enabledSighashForkid) const override;
     bool CheckLockTime(const CScriptNum &nLockTime) const override;
     bool CheckSequence(const CScriptNum &nSequence) const override;
 };

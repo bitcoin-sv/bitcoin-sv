@@ -1247,7 +1247,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         CleanupScriptCode(scriptCode, vchSig, flags);
 
                         bool fSuccess = checker.CheckSig(vchSig, vchPubKey,
-                                                         scriptCode, flags);
+                                                         scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
 
                         if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) &&
                             vchSig.size()) {
@@ -1341,7 +1341,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
 
                             // Check signature
                             bool fOk = checker.CheckSig(vchSig, vchPubKey,
-                                                        scriptCode, flags);
+                                                        scriptCode, flags & SCRIPT_ENABLE_SIGHASH_FORKID);
 
                             if (fOk) {
                                 isig++;
@@ -1703,8 +1703,8 @@ PrecomputedTransactionData::PrecomputedTransactionData(
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
                       unsigned int nIn, SigHashType sigHashType,
                       const Amount amount,
-                      const PrecomputedTransactionData *cache, uint32_t flags) {
-    if (sigHashType.hasForkId() && (flags & SCRIPT_ENABLE_SIGHASH_FORKID)) {
+                      const PrecomputedTransactionData *cache, bool enabledSighashForkid) {
+    if (sigHashType.hasForkId() && enabledSighashForkid) {
         uint256 hashPrevouts;
         uint256 hashSequence;
         uint256 hashOutputs;
@@ -1784,7 +1784,7 @@ bool TransactionSignatureChecker::VerifySignature(
 
 bool TransactionSignatureChecker::CheckSig(
     const std::vector<uint8_t> &vchSigIn, const std::vector<uint8_t> &vchPubKey,
-    const CScript &scriptCode, uint32_t flags) const {
+    const CScript &scriptCode, bool enabledSighashForkid) const {
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid()) {
         return false;
@@ -1799,7 +1799,7 @@ bool TransactionSignatureChecker::CheckSig(
     vchSig.pop_back();
 
     uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, sigHashType, amount,
-                                    this->txdata, flags);
+                                    this->txdata, enabledSighashForkid);
 
     if (!VerifySignature(vchSig, pubkey, sighash)) {
         return false;
@@ -1915,7 +1915,7 @@ bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,
         // serror is set
         return false;
     }
-    if (flags & SCRIPT_VERIFY_P2SH) {
+    if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
         stackCopy = stack;
     }
     if (!EvalScript(stack, scriptPubKey, flags, checker, serror)) {
@@ -1930,7 +1930,11 @@ bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,
     }
 
     // Additional validation for spend-to-script-hash transactions:
-    if ((flags & SCRIPT_VERIFY_P2SH) && scriptPubKey.IsPayToScriptHash()) {
+    // But only if if the utxo is before genesis
+    if(  (flags & SCRIPT_VERIFY_P2SH) &&
+        !(flags & SCRIPT_UTXO_AFTER_GENESIS) &&
+        scriptPubKey.IsPayToScriptHash())
+    {
         // scriptSig must be literals-only or validation fails
         if (!scriptSig.IsPushOnly()) {
             return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);

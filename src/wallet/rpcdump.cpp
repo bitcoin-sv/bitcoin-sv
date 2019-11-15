@@ -193,7 +193,7 @@ void ImportScript(CWallet *const pwallet, const CScript &script,
         ImportAddress(pwallet, CScriptID(script), strLabel);
     } else {
         CTxDestination destination;
-        if (ExtractDestination(script, destination)) {
+        if (CWallet::ExtractDestination(script, destination)) {
             pwallet->SetAddressBook(destination, strLabel, "receive");
         }
     }
@@ -1000,7 +1000,7 @@ UniValue ProcessImport(CWallet *const pwallet, const UniValue &data,
                 if (isScript) {
                     CTxDestination destination;
 
-                    if (ExtractDestination(script, destination)) {
+                    if (CWallet::ExtractDestination(script, destination)) {
                         if (!(destination == pubkey_dest)) {
                             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                                "Consistency check failed");
@@ -1083,7 +1083,7 @@ UniValue ProcessImport(CWallet *const pwallet, const UniValue &data,
                 if (isScript) {
                     CTxDestination destination;
 
-                    if (ExtractDestination(script, destination)) {
+                    if (CWallet::ExtractDestination(script, destination)) {
                         if (!(destination == pubkey_dest)) {
                             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                                "Consistency check failed");
