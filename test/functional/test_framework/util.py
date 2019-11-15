@@ -230,7 +230,7 @@ def satoshi_round(amount):
     return Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
 
 
-def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=None):
+def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=None, check_interval=0.05, label="wait_until"):
     if attempts == float('inf') and timeout == float('inf'):
         timeout = 60
     attempt = 0
@@ -245,11 +245,11 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
             if predicate():
                 return
         attempt += 1
-        time.sleep(0.05)
+        time.sleep(check_interval)
 
     # Print the cause of the timeout
-    assert_greater_than(attempts, attempt)
-    assert_greater_than(timeout, time.time())
+    assert attempts >= attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
+    assert timeout >= time.time(), f"{label} : timeout exceeded {timeout}"
     raise RuntimeError('Unreachable')
 
 # RPC/P2P connection constants and functions

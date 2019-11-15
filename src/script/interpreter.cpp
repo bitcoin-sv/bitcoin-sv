@@ -15,6 +15,7 @@
 #include "script/script.h"
 #include "script/script_num.h"
 #include "uint256.h"
+#include "consensus/consensus.h"
 
 typedef std::vector<uint8_t> valtype;
 
@@ -268,7 +269,48 @@ static void CleanupScriptCode(CScript &scriptCode,
     }
 }
 
-bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
+bool CheckHeightRelatedFlags(bool usesForkIdAlgorithm, uint32_t flags, const BaseSignatureChecker* checker, ScriptError *serror)
+{
+    bool forkEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
+    bool genesisEnabled = flags & SCRIPT_GENESIS;
+    bool utxoAfterGenesis = flags & SCRIPT_UTXO_AFTER_GENESIS;
+
+    // impossible scenario, cant be before fork and after genesis
+    if(!forkEnabled && genesisEnabled){
+        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+    }
+
+    // impossible scenario, cant spend utxo created after genesis before genesis itself
+    if(!genesisEnabled && utxoAfterGenesis){
+        return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+    }
+
+    if(usesForkIdAlgorithm) {
+        // new sighash algorithm is always valid after fork
+        if(forkEnabled) {
+            return true;
+        }
+        return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
+    } else {
+        // old sighash algorithm is valid before fork 
+        // and after genesis but only for utxos that are cerated before genesis
+        if(!forkEnabled) {
+            return true;
+        } else if (genesisEnabled && !utxoAfterGenesis) {
+            // old sighash algorithm has quadratic complexity so we will not
+            // allow to use it on the large transactions, setting maximal size to the pre-fork limit
+            if (checker && checker->GetOutTxSize() > ONE_MEGABYTE) {
+                return set_error(serror, SCRIPT_ERR_TX_SIZE);
+            }
+            return true;
+        }
+        return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+    }
+
+    return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+}
+
+bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, const BaseSignatureChecker* checker,
                             ScriptError *serror) {
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
@@ -289,13 +331,8 @@ bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
         if (!GetHashType(vchSig).isDefined()) {
             return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
         }
-        bool usesForkId = GetHashType(vchSig).hasForkId();
-        bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
-        if (!forkIdEnabled && usesForkId) {
-            return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
-        }
-        if (forkIdEnabled && !usesForkId) {
-            return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
+        if(!CheckHeightRelatedFlags(GetHashType(vchSig).hasForkId(), flags, checker, serror)){
+            return false;
         }
     }
     return true;
@@ -1242,7 +1279,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                         valtype &vchSig = stacktop(-2);
                         valtype &vchPubKey = stacktop(-1);
 
-                        if (!CheckSignatureEncoding(vchSig, flags, serror) ||
+                        if (!CheckSignatureEncoding(vchSig, flags, &checker, serror) ||
                             !CheckPubKeyEncoding(vchPubKey, flags, serror)) {
                             // serror is set
                             return false;
@@ -1340,10 +1377,8 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             // pubkey/signature evaluation distinguishable by
                             // CHECKMULTISIG NOT if the STRICTENC flag is set.
                             // See the script_(in)valid tests for details.
-                            if (!CheckSignatureEncoding(vchSig, flags,
-                                                        serror) ||
-                                !CheckPubKeyEncoding(vchPubKey, flags,
-                                                     serror)) {
+                            if (!CheckSignatureEncoding(vchSig, flags, &checker, serror) ||
+                                !CheckPubKeyEncoding(vchPubKey, flags, serror)) {
                                 // serror is set
                                 return false;
                             }
@@ -1909,6 +1944,10 @@ bool TransactionSignatureChecker::CheckSequence(
     }
 
     return true;
+}
+
+size_t TransactionSignatureChecker::GetOutTxSize() const {
+    return GetSerializeSize(*txTo, SER_NETWORK, PROTOCOL_VERSION);
 }
 
 bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,

@@ -21,6 +21,7 @@ typedef enum ScriptError_t {
     SCRIPT_ERR_STACK_SIZE,
     SCRIPT_ERR_SIG_COUNT,
     SCRIPT_ERR_PUBKEY_COUNT,
+    SCRIPT_ERR_TX_SIZE,
 
     /* Operands checks */
     SCRIPT_ERR_INVALID_OPERAND_SIZE,

@@ -26,6 +26,7 @@ from codecs import encode
 from collections import defaultdict
 import copy
 import hashlib
+from contextlib import contextmanager
 from io import BytesIO
 import logging
 import random
@@ -1603,6 +1604,18 @@ class NodeConnCB():
 
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
         self.ping_counter += 1
+
+    @contextmanager
+    def temporary_override_callback(self, **callbacks):
+        old_callbacks = {cb_name: getattr(self, cb_name) for cb_name in callbacks.keys()}
+        for cb_name, cb in callbacks.items():
+            setattr(self, cb_name, cb)
+
+        yield
+
+        for cb_name, cb in old_callbacks.items():
+            setattr(self, cb_name, cb)
+
 
 # The actual NodeConn class
 # This class provides an interface for a p2p connection to a specified node
