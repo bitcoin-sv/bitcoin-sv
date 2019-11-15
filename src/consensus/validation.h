@@ -33,6 +33,8 @@ private:
     unsigned int chRejectCode {0};
     bool corruptionPossible {false};
     bool fMissingInputs {false};
+    bool fDoubleSpendDetected {false};
+    bool fMempoolConflictDetected {false};
 
 public:
     bool DoS(int level, bool ret = false, unsigned int chRejectCodeIn = 0,
@@ -77,10 +79,14 @@ public:
         return false;
     }
     bool IsMissingInputs() const { return fMissingInputs; }
+    bool IsDoubleSpendDetected() { return fDoubleSpendDetected; }
+    bool IsMempoolConflictDetected() { return fMempoolConflictDetected; }
 
     bool CorruptionPossible() const { return corruptionPossible; }
     void SetCorruptionPossible() { corruptionPossible = true; }
     void SetMissingInputs() { fMissingInputs = true; }
+    void SetDoubleSpendDetected() { fDoubleSpendDetected = true; }
+    void SetMempoolConflictDetected() { fMempoolConflictDetected = true; }
 
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }

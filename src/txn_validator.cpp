@@ -312,26 +312,6 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                             nTxnsPerTaskThreshold,
                                             fReadyForFeeEstimation)
                                 };
-                                // Process detected double spend transactions (sequential execution)
-                                std::vector<TxInputDataSPtr> vDetectedDoubleSpends {
-                                    mpTxnDoubleSpendDetector->getDoubleSpendTxns()
-                                };
-                                if (!vDetectedDoubleSpends.empty()) {
-                                    LogPrint(BCLog::TXNVAL, "Txnval-asynch: Process detected %d double spend transaction(s)\n",
-                                            vDetectedDoubleSpends.size());
-                                    std::vector<TxInputDataSPtr> vAcceptedTxnsFromDoubleSpends {
-                                        processNewTransactionsNL(
-                                                vDetectedDoubleSpends,
-                                                handlers,
-                                                0,
-                                                fReadyForFeeEstimation)
-                                    };
-                                    if (!vAcceptedTxnsFromDoubleSpends.empty()) {
-                                        vAcceptedTxns.insert(vAcceptedTxns.end(),
-                                            std::make_move_iterator(vAcceptedTxnsFromDoubleSpends.begin()),
-                                            std::make_move_iterator(vAcceptedTxnsFromDoubleSpends.end()));
-                                    }
-                                }
                                 // Trim mempool if it's size exceeds the limit.
                                 std::vector<TxId> vRemovedTxIds {
                                     LimitMempoolSize(

@@ -10,6 +10,9 @@
 #include <mutex>
 #include <vector>
 
+class CTxMemPool;
+class CValidationState;
+
 class CTxnDoubleSpendDetector;
 using TxnDoubleSpendDetectorSPtr = std::shared_ptr<CTxnDoubleSpendDetector>;
 
@@ -23,10 +26,15 @@ class CTxnDoubleSpendDetector {
     ~CTxnDoubleSpendDetector() = default;
     /**
      * Insert txn's inputs into known spends only if non of it's inputs is already known.
-     * @param tx A given transaction.
+     * @param pTxInputData Transaction's input data
+     * @param pool A reference to the mempool.
+     * @param state A reference to the validation state.
      * @return true if inserted, false otherwise.
      */
-    bool insertTxnInputs(const TxInputDataSPtr& pTxInputData);
+    bool insertTxnInputs(
+	    const TxInputDataSPtr& pTxInputData,
+	    const CTxMemPool& pool,
+	    CValidationState& state);
     /**
      * Remove txn's inputs for known spends.
      * @param tx A given transaction
@@ -39,13 +47,6 @@ class CTxnDoubleSpendDetector {
     size_t getKnownSpendsSize() const;
 
     /**
-     * This method returns all detected double spends (if any exists)
-     * by moving all transactions to the caller.
-     * @return A vector of detected double spend txns.
-     */
-    std::vector<TxInputDataSPtr> getDoubleSpendTxns();
-
-    /**
      * Clear known spends.
      */
     void clear();
@@ -56,6 +57,5 @@ class CTxnDoubleSpendDetector {
 
   private:
     std::vector<COutPoint> mKnownSpends = {};
-    std::vector<TxInputDataSPtr> mDoubleSpendTxns = {};
     mutable std::mutex mMainMtx {};
 };

@@ -271,9 +271,19 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_batch_api) {
     {
         // Create a dummy address
         CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
-        std::shared_ptr<CNode> pDummyNode {
-            std::make_shared<CNode>(0, NODE_NETWORK, 0, INVALID_SOCKET, dummy_addr, 0, 0, "", true)
-        };
+        CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
+        CNodePtr pDummyNode =
+            CNode::Make(
+                0,
+                NODE_NETWORK,
+                0,
+                INVALID_SOCKET,
+                dummy_addr,
+                0u,
+                0u,
+                asyncTaskPool,
+                "",
+                true);
         ProcessTxnsSynchBatchApi(spendsN, TxSource::p2p, pDummyNode);
         BOOST_CHECK_EQUAL(mempool.Size(), 1);
     }
