@@ -1294,31 +1294,26 @@ CTxnValResult TxnValidation(
                   fTxValidForFeeEstimation};
 }
 
-std::vector<CTxnValResult> TxnValidationBatchProcessing(
-    const TxInputDataSPtrRefVec& vTxInputData,
+CTxnValResult TxnValidationProcessingTask(
+    const TxInputDataSPtr& txInputData,
     const Config& config,
     CTxMemPool& pool,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation) {
 
-    std::vector<CTxnValResult> results {};
-    results.reserve(vTxInputData.size());
-    for (const auto& elem : vTxInputData) {
-        // Execute validation for the given txn
-        CTxnValResult result {
-            TxnValidation(
-                    elem,
-                    config,
-                    pool,
-                    handlers.mpTxnDoubleSpendDetector,
-                    fReadyForFeeEstimation)
-        };
-        // Process validated results
-        ProcessValidatedTxn(pool, result, handlers, false);
-        // Forward results to the next processing stage
-        results.emplace_back(std::move(result));
-    }
-    return results;
+    // Execute validation for the given txn
+    CTxnValResult result {
+        TxnValidation(
+                txInputData,
+                config,
+                pool,
+                handlers.mpTxnDoubleSpendDetector,
+                fReadyForFeeEstimation)
+    };
+    // Process validated results
+    ProcessValidatedTxn(pool, result, handlers, false);
+    // Forward results to the next processing stage
+    return std::move(result);
 }
 
 static void HandleInvalidP2POrphanTxn(

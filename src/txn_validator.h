@@ -100,7 +100,6 @@ class CTxnValidator final
     std::vector<TxInputDataSPtr> processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
         CTxnHandlers& handlers,
-        size_t nTxnsPerTaskThreshold,
         bool fReadyForFeeEstimation);
 
     /** Post validation step for txns before limit mempool size is done*/

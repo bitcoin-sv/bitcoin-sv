@@ -60,4 +60,5 @@ public:
 
 using TxInputDataSPtr = std::shared_ptr<CTxInputData>;
 using TxInputDataSPtrVec = std::vector<TxInputDataSPtr>;
-using TxInputDataSPtrRefVec = std::vector<std::reference_wrapper<TxInputDataSPtr>>;
+using TxInputDataSPtrRef = std::reference_wrapper<TxInputDataSPtr>;
+using TxInputDataSPtrRefVec = std::vector<TxInputDataSPtrRef>;

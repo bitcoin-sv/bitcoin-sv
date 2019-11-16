@@ -641,15 +641,15 @@ CTxnValResult TxnValidation(
 /**
  * Batch processing support for txns validation.
  *
- * @param vTxInputData A vector of txns data
+ * @param pTxInputData A reference to transaction's details
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
  * @param handlers Txn handlers
  * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
  * @return A vector of validation results
  */
-std::vector<CTxnValResult> TxnValidationBatchProcessing(
-    const TxInputDataSPtrRefVec& vTxInputData,
+CTxnValResult TxnValidationProcessingTask(
+    const TxInputDataSPtr& pTxInputData,
     const Config &config,
     CTxMemPool &pool,
     CTxnHandlers& handlers,

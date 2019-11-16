@@ -187,10 +187,11 @@ void CTxnValidator::processValidation(
     if (!vTxInputDataSize) {
         return;
     }
-    // Get a threshold value for a minimum number of txns that we want to assign per task
-    size_t nTxnsPerTaskThreshold {
-        static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
-    };
+    //// Get a threshold value for a minimum number of txns that we want to assign per task
+    //size_t nTxnsPerTaskThreshold {
+    //    static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
+    //};
+
     // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
     // A synchronous interface locks mtxs in the following order:
     // - first: cs_main
@@ -216,7 +217,7 @@ void CTxnValidator::processValidation(
     do {
         // Execute parallel validation
         auto vCurrAcceptedTxns {
-            processNewTransactionsNL(vTxInputData, handlers, nTxnsPerTaskThreshold, fReadyForFeeEstimation)
+            processNewTransactionsNL(vTxInputData, handlers, fReadyForFeeEstimation)
         };
         vAcceptedTxns.insert(vAcceptedTxns.end(),
             std::make_move_iterator(vCurrAcceptedTxns.begin()),
@@ -253,10 +254,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
     try {
         RenameThread("bitcoin-txnvalidator");
         LogPrint(BCLog::TXNVAL, "New transaction handling thread. Starting validator.\n");
-        // Get a threshold value for a minimum number of txns that we want to assign per task
-        size_t nTxnsPerTaskThreshold {
-            static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
-        };
+        //// Get a threshold value for a minimum number of txns that we want to assign per task
+        //size_t nTxnsPerTaskThreshold {
+        //    static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
+        //};
         size_t nMaxMempoolSize = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
         unsigned long nMempoolExpiry = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
         // The main running loop
@@ -309,7 +310,6 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     processNewTransactionsNL(
                                             mProcessingQueue,
                                             handlers,
-                                            nTxnsPerTaskThreshold,
                                             fReadyForFeeEstimation)
                                 };
                                 // Trim mempool if it's size exceeds the limit.
@@ -367,39 +367,34 @@ std::vector<TxInputDataSPtr>
 CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
     CTxnHandlers& handlers,
-    size_t nTxnsPerTaskThreshold,
     bool fReadyForFeeEstimation) {
 
-    auto tx_validation = [](const TxInputDataSPtrRefVec& vTxInputData,
-                            const Config* config,
-                            CTxMemPool *pool,
-                            CTxnHandlers& handlers,
-                            bool fReadyForFeeEstimation) {
-        return TxnValidationBatchProcessing(
-                     vTxInputData,
-                    *config,
-                    *pool,
-                     handlers,
-                     fReadyForFeeEstimation);
-    };
-    // Trigger parallel validation for txns
+    // Trigger parallel validation
     auto results {
-        g_connman->ParallelTxValidationBatchProcessing(
-                        tx_validation,
-                        nTxnsPerTaskThreshold,
-                        &mConfig,
-                        &mMempool,
-                        txns,
-                        handlers,
-                        fReadyForFeeEstimation)
+        g_connman->
+            ParallelTxnValidation(
+                [](const TxInputDataSPtr& pTxInputData,
+                    const Config* config,
+                    CTxMemPool *pool,
+                    CTxnHandlers& handlers,
+                    bool fReadyForFeeEstimation) {
+                    return TxnValidationProcessingTask(
+                                pTxInputData,
+                               *config,
+                               *pool,
+                                handlers,
+                                fReadyForFeeEstimation);
+                },
+                &mConfig,
+                &mMempool,
+                txns,
+                handlers,
+                fReadyForFeeEstimation)
     };
-    // Process validation results for transactions.
+    // Process validation results
     std::vector<TxInputDataSPtr> vAcceptedTxns {};
-    for(auto& task_result : results) {
-        auto vBatchResults = task_result.get();
-        for (auto& result : vBatchResults) {
-            postValidationStepsNL(result, vAcceptedTxns);
-        }
+    for(auto& result : results) {
+        postValidationStepsNL(result.get(), vAcceptedTxns);
     }
     return vAcceptedTxns;
 }
