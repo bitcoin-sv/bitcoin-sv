@@ -4,5 +4,7 @@
 
 #pragma once
 
-/** A default threshold which controls a number of txns per task */
-static constexpr uint64_t DEFAULT_TXNS_PER_TASK_THRESHOLD = 10;
+/** A default ratio for max number of standard transactions per thread. */
+static constexpr uint64_t DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO = 1000;
+/** A default ratio for max number of non-standard transactions per thread. */
+static constexpr uint64_t DEFAULT_MAX_NON_STD_TXNS_PER_THREAD_RATIO = 1000;

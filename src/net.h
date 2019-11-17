@@ -321,6 +321,7 @@ public:
     std::shared_ptr<CTxnValidator> getTxnValidator();
     /** Enqueue a new transaction for validation */
     void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
+    /* Support for a vector */
     void EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData);
     /** Check if the given txn is already known by the Validator */
     bool CheckTxnExistsInValidatorsQueue(const uint256& txHash) const;

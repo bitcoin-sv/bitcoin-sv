@@ -72,6 +72,7 @@ CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
 CChain chainActive;
+std::atomic_int chainActiveHeight {0};
 CBlockIndex *pindexBestHeader = nullptr;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -1758,6 +1759,7 @@ static void UpdateMempoolForReorg(const Config &config,
             vTxInputData.emplace_back(
                     std::make_shared<CTxInputData>(
                                         TxSource::reorg,  // tx source
+                                        TxType::unknown,  // tx type (we don't need to check it)
                                         *it,              // a pointer to the tx
                                         GetTime(),        // nAcceptTime
                                         false));          // fLimitFree
@@ -3314,6 +3316,7 @@ void PruneAndFlush() {
  */
 static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
     chainActive.SetTip(pindexNew);
+    chainActiveHeight = chainActive.Height();
 
     // New best block
     mempool.AddTransactionsUpdated(1);
@@ -5396,6 +5399,7 @@ void LoadChainTip(const CChainParams &chainparams) {
     }
 
     chainActive.SetTip(it->second);
+    chainActiveHeight = chainActive.Height();
 
     PruneBlockIndexCandidates();
 
@@ -5749,6 +5753,7 @@ void UnloadBlockIndex() {
     LOCK(cs_main);
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
+    chainActiveHeight = 0;
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
     mempool.Clear();
@@ -6355,6 +6360,7 @@ bool LoadMempool(const Config &config) {
                     txValidator->processValidation(
                                         std::make_shared<CTxInputData>(
                                                             TxSource::file, // tx source
+                                                            TxType::unknown,  // tx type (we don't need to check it)
                                                             tx,    // a pointer to the tx
                                                             nTime, // nAcceptTime
                                                             true),  // fLimitFree

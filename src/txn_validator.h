@@ -57,7 +57,7 @@ class CTxnValidator final
      */
     /** Handle a new transaction */
     void newTransaction(TxInputDataSPtr pTxInputData);
-    void newTransaction(std::vector<TxInputDataSPtr> pTxInputData);
+    void newTransaction(TxInputDataSPtrVec pTxInputData);
 
     /**
      * Synchronous txn validation interface.
@@ -117,19 +117,45 @@ class CTxnValidator final
     size_t scheduleOrphanP2PTxnsForRetry();
 
     /** Check if the given txn is known in the given set of txns */
+	template<typename T>
     bool isTxnKnownInSetNL(
         const uint256& txid,
-        const std::vector<TxInputDataSPtr>& vTxns) const;
+        const T& vTxns) const {
+        return findIfTxnIsInSetNL(txid, vTxns) != vTxns.end();
+    }
 
     /** Find if the given txn is known in the given set of txns */
-    std::vector<TxInputDataSPtr>::const_iterator findIfTxnIsInSetNL(
+	template<typename T>
+    typename T::const_iterator findIfTxnIsInSetNL(
         const uint256& txid,
-        const std::vector<TxInputDataSPtr>& vTxns) const;
+        const T& vTxns) const {
+		return std::find_if(
+				vTxns.begin(),
+				vTxns.end(),
+				[&txid](const TxInputDataSPtr& ptxInputData){
+					return ptxInputData->mpTx->GetId() == txid; });
+	}
+
+    template<typename T1, typename T2>
+    void collectTxns(T1& dest, T2& src, size_t nNumOfTxns, size_t nMaxNumOfTxnsToSchedule) {
+        dest.insert(dest.end(),
+	        std::make_move_iterator(src.begin()),
+	        std::make_move_iterator(nMaxNumOfTxnsToSchedule > nNumOfTxns
+                                        ? src.end() : src.begin() + nMaxNumOfTxnsToSchedule));
+        src.erase(
+            src.begin(),
+            nMaxNumOfTxnsToSchedule > nNumOfTxns
+                ? src.end() : src.begin() + nMaxNumOfTxnsToSchedule);
+    }
 
     /** List of new transactions that need processing */
-    std::vector<TxInputDataSPtr> mNewTxns {};
-    /** A dedicated mutex to protect an exclusive access to mNewTxns */
-    mutable std::shared_mutex mNewTxnsMtx {};
+    std::vector<TxInputDataSPtr> mStdTxns {};
+    /** A dedicated mutex to protect an exclusive access to mStdTxns */
+    mutable std::shared_mutex mStdTxnsMtx {};
+    /** List of new non-standard transactions that need processing */
+    std::deque<TxInputDataSPtr> mNonStdTxns {};
+    /** A dedicated mutex to protect an exclusive access to mStdTxns */
+    mutable std::shared_mutex mNonStdTxnsMtx {};
     /** A vector of txns which are currently being processed */
     std::vector<TxInputDataSPtr> mProcessingQueue {};
     /** A dedicated mutex to protect an access to mTxnsProcessingQueue */

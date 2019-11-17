@@ -20,6 +20,16 @@ enum class TxSource
 // Enable enum_cast for TxSource, so we can log informatively
 const enumTableT<TxSource>& enumTable(TxSource);
 
+// Enumerate possible txn's types
+enum class TxType : int
+{
+    unknown = 0,
+    standard = 1,
+    nonstandard = 2
+};
+// Enable enum_cast for TxType, so we can log informatively
+const enumTableT<TxType>& enumTable(TxType);
+
 class CNode;
 
 /**
@@ -30,6 +40,7 @@ public:
     // Constructor
     CTxInputData(
         TxSource txSource,
+        TxType txType,
         CTransactionRef ptx,
         int64_t nAcceptTime=0,
         bool fLimitFree=false,
@@ -37,6 +48,7 @@ public:
         std::shared_ptr<CNode> pNode=nullptr,
         bool fOrphan=false)
     : mTxSource(txSource),
+      mTxType(txType),
       mpTx(ptx),
       mnAcceptTime(nAcceptTime),
       mfLimitFree(fLimitFree),
@@ -50,6 +62,7 @@ public:
     ~CTxInputData() = default;
 
     TxSource mTxSource {TxSource::unknown};
+    TxType mTxType {TxType::unknown};
     CTransactionRef mpTx {nullptr};
     int64_t mnAcceptTime {0};
     bool mfLimitFree {false};

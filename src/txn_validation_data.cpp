@@ -17,3 +17,15 @@ const enumTableT<TxSource>& enumTable(TxSource)
     };
     return table;
 }
+
+// Enable enum_cast for TxType, so we can log informatively
+const enumTableT<TxType>& enumTable(TxType)
+{
+    static enumTableT<TxType> table
+    {
+        { TxType::unknown,      "unknown" },
+        { TxType::standard,     "standard" },
+        { TxType::nonstandard,  "nonstandard" }
+    };
+    return table;
+}

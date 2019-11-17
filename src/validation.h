@@ -950,6 +950,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex);
 
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
+extern std::atomic_int chainActiveHeight;
 
 /** Global variable that points to the active CCoinsView (protected by cs_main)
  */
