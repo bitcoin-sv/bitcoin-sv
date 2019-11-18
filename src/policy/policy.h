@@ -103,6 +103,21 @@ static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = MAX_SCR
  */
 static const Amount DUST_RELAY_TX_FEE(1000);
 
+/*
+* Number of blocks around GENESIS activation (72 blocks before and 72 blocks after) when
+* nodes will not be banned if they send a script that is not valid. That means if a node
+* sends a GENESIS only valid transaction before GENESIS is activated it will not be baned.
+* Same applies for a node that sent a PRE-GENESIS only valid transaction after GENESIS
+* is activated
+*/
+static const int DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 72;
+
+/*
+* Maximum number of blocks for Genesis graceful period on either side of the Genesis 
+* activation block (span of ~100 days)
+*/
+static const int MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 7200;
+
 // Default policy value for maximum number of non-push operations per script
 static const int DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
 

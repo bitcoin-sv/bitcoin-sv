@@ -772,10 +772,13 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
         }
     }
 
+    // For Consenus parameter false is used because we already use policy rules in first CheckInputs call
+    // from TxnValidation function that is called before this one, and if that call succeeds then we 
+    // can use policy rules again but with different flags now
     return CheckInputs(
                 token,
                 config,
-                false,          /*false is used because transactions taken from mempool will be using policy rules which will be set individually by miners*/
+                false,          
                 tx,
                 state,
                 view,
@@ -1092,6 +1095,17 @@ static bool CheckIsTransactionWithP2SHOutputAfterGenesis(const CTransaction& tx,
     return false;
 }
 
+static bool IsGenesisGracefulPeriod(const Config& config, int spendHeight)
+{
+    uint64_t uSpendHeight = static_cast<uint64_t>(spendHeight);
+    if (((config.GetGenesisActivationHeight() - config.GetGenesisGracefulPeriod()) < uSpendHeight) &&
+        ((config.GetGenesisActivationHeight() + config.GetGenesisGracefulPeriod()) > uSpendHeight))
+    {
+        return true;
+    }
+    return false;
+}
+
 CTxnValResult TxnValidation(
     const TxInputDataSPtr& pTxInputData,
     const Config& config,
@@ -1118,15 +1132,36 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
 
-    // First check against policy limits. If this check fails, then banscore will be increased. 
+    // First check against consensus limits. If this check fails, then banscore will be increased. 
     // We re-test the transaction with policy rules later in this method (without banning if rules are violated)
     bool isGenesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
     uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(isGenesisEnabled, true);
     uint64_t maxTxSizeConsensus = config.GetMaxTxSize(isGenesisEnabled, true);
     // Coinbase is only valid in a block, not as a loose transaction.
-    if (!CheckRegularTransaction(tx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, isGenesisEnabled)) {
-        return Result{state, pTxInputData};
+    if (!CheckRegularTransaction(tx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, isGenesisEnabled)) 
+    {
+        // We will re-check the transaction if we are in Genesis gracefull period, to check if genesis rules would 
+        // allow this script transaction to be accepted. If it is valid under Genesis rules, we only reject it
+        // without adding banscore
+        bool isGenesisGracefulPeriod = IsGenesisGracefulPeriod(config, chainActive.Height() + 1);
+        if (isGenesisGracefulPeriod)
+        {
+            uint64_t maxTxSigOpsCountGraceful = config.GetMaxTxSigOpsCount(!isGenesisEnabled, true);
+            uint64_t maxTxSizeGraceful = config.GetMaxTxSize(!isGenesisEnabled, true);
+
+            CValidationState genesisState;
+            if (CheckRegularTransaction(tx, genesisState, maxTxSigOpsCountGraceful, maxTxSizeGraceful, !isGenesisEnabled))
+            {
+                genesisState.DoS(0, false, REJECT_INVALID, "flexible-" + state.GetRejectReason());
+                return Result{ genesisState, pTxInputData };
+            }
+            else
+            {
+                return Result{ genesisState, pTxInputData };
+            }
+        }
     }
+
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     // We determine if a transaction is standard or not based on assumption that
     // it will be mined in the next block. We accept the fact that it might get mined
@@ -1247,6 +1282,7 @@ CTxnValResult TxnValidation(
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }
+
     // Check for non-standard pay-to-script-hash in inputs
     if (fRequireStandard)
     {
@@ -2639,13 +2675,15 @@ std::optional<bool> CheckInputs(
 {
     assert(!tx.IsCoinBase());
 
-    const auto [ height, mtp ] = GetSpendHeightAndMTP(inputs);
+    const auto [ spendHeight, mtp ] = GetSpendHeightAndMTP(inputs);
     (void)mtp;  // Silence unused variable warning
-    if (!Consensus::CheckTxInputs(tx, state, inputs, height)) {
+    if (!Consensus::CheckTxInputs(tx, state, inputs, spendHeight)) 
+    {
         return false;
     }
 
-    if (pvChecks) {
+    if (pvChecks) 
+    {
         pvChecks->reserve(tx.vin.size());
     }
 
@@ -2658,7 +2696,8 @@ std::optional<bool> CheckInputs(
     // block merkle hashes are still computed and checked, of course, if an
     // assumed valid block is invalid due to false scriptSigs this optimization
     // would allow an invalid chain to be accepted.
-    if (!fScriptChecks) {
+    if (!fScriptChecks) 
+    {
         return true;
     }
 
@@ -2667,11 +2706,13 @@ std::optional<bool> CheckInputs(
     // transaction hash which is in tx's prevouts properly commits to the
     // scriptPubKey in the inputs view of that transaction).
     uint256 hashCacheEntry = GetScriptCacheKey(tx, flags);
-    if (IsKeyInScriptCache(hashCacheEntry, !scriptCacheStore)) {
+    if (IsKeyInScriptCache(hashCacheEntry, !scriptCacheStore)) 
+    {
         return true;
     }
 
-    for (size_t i = 0; i < tx.vin.size(); i++) {
+    for (size_t i = 0; i < tx.vin.size(); i++) 
+    {
         const COutPoint &prevout = tx.vin[i].prevout;
         const Coin &coin = inputs.AccessCoin(prevout);
         assert(!coin.IsSpent());
@@ -2686,8 +2727,8 @@ std::optional<bool> CheckInputs(
 
         uint32_t perInputScriptFlags = 0;
         int inputScriptBlockHeight = GetInputScriptBlockHeight(coin.GetHeight());
-        
-        if (IsGenesisEnabled(config, inputScriptBlockHeight)) 
+        bool isGenesisEnabled = IsGenesisEnabled(config, inputScriptBlockHeight);
+        if (isGenesisEnabled)
         {
             perInputScriptFlags = SCRIPT_UTXO_AFTER_GENESIS;
         }
@@ -2697,7 +2738,8 @@ std::optional<bool> CheckInputs(
         // Verify signature
         CScriptCheck check(config, consensus, scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
                            txdata);
-        if (pvChecks) {
+        if (pvChecks) 
+        {
             pvChecks->push_back(std::move(check));
         }
         else if (auto res = check(token); !res.has_value())
@@ -2706,21 +2748,25 @@ std::optional<bool> CheckInputs(
         }
         else if (!res.value())
         {
-            const bool hasNonMandatoryFlags =
-                (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-            const bool doesNotHaveGenesis =
-                    (flags & SCRIPT_GENESIS) == 0;
-            if (hasNonMandatoryFlags || doesNotHaveGenesis) {
+            int genesisActivationHeight = config.GetGenesisActivationHeight();
+            bool genesisGracefulPeriod = IsGenesisGracefulPeriod(config, spendHeight);
+            const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
+
+            if (hasNonMandatoryFlags)
+            {
                 // Check whether the failure was caused by a non-mandatory
                 // script verification check, such as non-standard DER encodings
                 // or non-null dummy arguments; if so, don't trigger DoS
                 // protection to avoid splitting the network between upgraded
                 // and non-upgraded nodes.
                 // FIXME: CORE-257 has to check if genesis check is necessary also in check2
+                uint32_t flags2Check = flags | perInputScriptFlags;
+                // Consensus flag is set to true, because we check policy rules in check1. If we would test policy rules 
+                // again and fail because the transaction exceeds our policy limits, the node would get banned and this is not ok
                 CScriptCheck check2(
-                    config, consensus,
+                    config, true,
                     scriptPubKey, amount, tx, i,
-                    (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
+                    ((flags2Check) & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
                     sigCacheStore, txdata);
                 if (auto res2 = check2(token); !res2.has_value())
                 {
@@ -2730,6 +2776,26 @@ std::optional<bool> CheckInputs(
                 {
                     return state.Invalid(false, REJECT_NONSTANDARD,
                             strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+                } 
+                else if (genesisGracefulPeriod)
+                {
+                    uint32_t flags3Check = flags2Check ^ SCRIPT_UTXO_AFTER_GENESIS;
+
+                    CScriptCheck check3(
+                        config, true,
+                        scriptPubKey, amount, tx, i,
+                        ((flags3Check) & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
+                        sigCacheStore, txdata);
+
+                    if (auto res3 = check3(token); !res3.has_value())
+                    {
+                        return {};
+                    }
+                    else if (res3.value()) 
+                    {
+                        return state.Invalid(false, REJECT_NONSTANDARD,
+                            strprintf("genesis-script-verify-flag-failed (%s)", ScriptErrorString(check.GetScriptError())));
+                    }
                 }
             }
 
@@ -2746,7 +2812,8 @@ std::optional<bool> CheckInputs(
         }
     }
 
-    if (scriptCacheStore && !pvChecks) {
+    if (scriptCacheStore && !pvChecks) 
+    {
         // We executed all of the provided scripts, and were told to cache the
         // result. Do so now.
         AddKeyInScriptCache(hashCacheEntry);

@@ -130,6 +130,9 @@ public:
 
     virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const = 0;
+
+    virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetGenesisGracefulPeriod() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -241,6 +244,9 @@ public:
     bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) override;
     uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override;
 
+    bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override;
+    uint64_t GetGenesisGracefulPeriod() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -294,6 +300,7 @@ private:
 
     uint64_t maxTxSigOpsCountPolicy;
     uint64_t maxPubKeysPerMultiSig;
+    uint64_t genesisGracefulPeriod;
 
     std::chrono::milliseconds mMaxStdTxnValidationDuration;
     std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
@@ -448,6 +455,8 @@ public:
     bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBaPolicyIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const override { throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented"); }
 
+    bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override { return true; }
+    uint64_t GetGenesisGracefulPeriod() const override { return DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD; }
 
     bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override

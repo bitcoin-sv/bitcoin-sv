@@ -1155,6 +1155,14 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf("Set maximum allowed number of public keys we're willing to relay/mine in a single CHECK_MULTISIG(VERIFY) operation (default: %d, 0 = unlimited), after Genesis is activated",
             DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS));
 
+    strUsage += HelpMessageOpt(
+        "-maxgenesisgracefulperiod=<n>",
+        strprintf(_("Set maximum allowed number of blocks for Genesis graceful period (default: %d) where nodes will not be banned "
+                    "for violating Genesis rules in case the calling node is not yet on Genesis height and vice versa. "
+                    "Seting 0 will disable Genesis graceful period. Genesis graceful period range :"
+                    "(GENESIS_ACTIVATION_HEIGHT - n |...| GENESIS_ACTIVATION_HEIGHT |...| GENESIS_ACTIVATION_HEIGHT + n)"),
+            DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD, MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
+
     return strUsage;
 }
 
@@ -2012,6 +2020,18 @@ bool AppInitParameterInteraction(Config &config) {
     {
         const int64_t value = gArgs.GetArg("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
         if (std::string err; !config.SetMaxScriptNumLengthPolicy(value, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+    // Configure max number of blocks in which Genesis graceful period is active
+    if (gArgs.IsArgSet("-maxgenesisgracefulperiod"))
+    {
+        const int64_t value = gArgs.GetArg("-maxgenesisgracefulperiod", DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD);
+
+        std::string err;
+        if (!config.SetGenesisGracefulPeriod(value, &err))
         {
             return InitError(err);
         }
