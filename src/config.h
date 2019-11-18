@@ -29,7 +29,7 @@ public:
     
     virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
-    virtual uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const = 0;
+    virtual uint64_t GetMaxBlockSize(bool isGenesisEnabled) const = 0;
     virtual bool MaxBlockSizeOverridden() const = 0;
     
     virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
@@ -108,11 +108,11 @@ public:
 
     bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override;
     uint64_t GetMaxBlockSize() const override;
-    uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override;
+    uint64_t GetMaxBlockSize(bool isGenesisEnabled) const override;
     bool MaxBlockSizeOverridden() const override;
 
     bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override;
-    uint64_t GetMaxGeneratedBlockSize() const override;
+    uint64_t GetMaxGeneratedBlockSize() const override;   
     uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override;
     bool MaxGeneratedBlockSizeOverridden() const override;
 
@@ -196,8 +196,8 @@ private:
     void  CheckSetDefaultCalled() const;
 
     int64_t blockSizeActivationTime;
-    uint64_t maxBlockSizeBefore;
-    uint64_t maxBlockSizeAfter;
+    uint64_t maxBlockSizeBeforeGenesis;
+    uint64_t maxBlockSizeAfterGenesis;
     bool maxBlockSizeOverridden;
     uint64_t maxGeneratedBlockSizeBefore;
     uint64_t maxGeneratedBlockSizeAfter;
@@ -235,7 +235,7 @@ public:
         return false; 
     }
     uint64_t GetMaxBlockSize() const override { return 0; }
-    uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override { return 0; }
+    uint64_t GetMaxBlockSize(bool isGenesisEnabled) const override { return 0; }
     bool MaxBlockSizeOverridden() const override { return false; }
 
     bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override {

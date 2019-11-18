@@ -185,6 +185,7 @@ class TestManager():
         self.block_store = BlockStore(datadir)
         self.tx_store = TxStore(datadir)
         self.ping_counter = 1
+        self.waitForPingTimeout = 60
 
     def add_all_connections(self, nodes):
         for i in range(len(nodes)):
@@ -380,7 +381,7 @@ class TestManager():
                              for c in self.connections]
                             [c.cb.send_ping(self.ping_counter)
                              for c in self.connections]
-                            self.wait_for_pings(self.ping_counter)
+                            self.wait_for_pings(self.ping_counter, self.waitForPingTimeout)
                             self.ping_counter += 1
                         if (not self.check_results(tip, outcome)):
                             raise AssertionError(

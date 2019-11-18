@@ -797,7 +797,7 @@ std::string HelpMessage(HelpMessageMode mode) {
             "Replace actual time with <n> seconds since epoch (default: 0)");
         strUsage += HelpMessageOpt(
             "-blocksizeactivationtime=<n>",
-            "Change time that specifies when new defaults for excessiveblocksize and -blockmaxsize are used");
+            "Change time that specifies when new defaults for -blockmaxsize are used");
         strUsage += HelpMessageOpt(
             "-limitfreerelay=<n>",
             strprintf("Continuously rate-limit free transactions to <n>*1000 "
@@ -860,14 +860,12 @@ std::string HelpMessage(HelpMessageMode mode) {
                        strprintf(_("Set the maximum block size in bytes we will accept "
                                    "from any source. This is the effective block size "
                                    "hard limit  If not specified, the following defaults are used : "
-                                   "Mainnet: %d before %s and %d after, "
-                                   "Testnet: %d before %s and %d after."),
-                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeBefore,
-                                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", defaultChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
-                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfter,
-                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeBefore,
-                                    DateTimeStrFormat("%Y-%m-%d %H:%M:%S", testnetChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
-                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfter
+                                   "Mainnet: %d before Genesis and %d after, "
+                                   "Testnet: %d before Genesis and %d after."),
+                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis,
+                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfterGenesis,
+                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis,
+                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfterGenesis
                                  ));
     if (showDebug) {
         strUsage += HelpMessageOpt(
