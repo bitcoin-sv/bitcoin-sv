@@ -11,6 +11,7 @@
 #include <array>
 #include <atomic>
 #include <future>
+#include <mutex>
 #include <thread>
 
 namespace
@@ -192,15 +193,23 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
     auto checker3 = scriptCheckQueuePool.GetChecker(3, source->GetToken());
     auto checker4 = scriptCheckQueuePool.GetChecker(4, source->GetToken());
 
+    // we need a lock since we access checkerWorst from two threads and checker
+    // is not thread safe
+    std::mutex worstWaitSyncLock;
+
     // queue is returned to the pool only after checker goes out of scope or
     // Wait() is called on it so we need to run it on a different thread
     auto future =
         std::async(
             std::launch::async,
-            [&checkerWorst, token = std::move(worstCancellationToken.value())]
+            [
+                &worstWaitSyncLock,
+                &checkerWorst,
+                token = std::move(worstCancellationToken.value())]
             {
                 // wait until pool requests the cancellation
                 while(!token.IsCanceled());
+                std::lock_guard lock{worstWaitSyncLock};
                 BOOST_CHECK(!checkerWorst.Wait().has_value());
             });
 
@@ -208,7 +217,10 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
     // should be terminated by the pool without blocking
     auto checkerBest = scriptCheckQueuePool.GetChecker(5, source->GetToken());
 
-    BOOST_CHECK(!checkerWorst.Wait().has_value());
+    {
+        std::lock_guard lock{worstWaitSyncLock};
+        BOOST_CHECK(!checkerWorst.Wait().has_value());
+    }
     BOOST_CHECK(checker2.Wait().value());
     BOOST_CHECK(checker3.Wait().value());
     BOOST_CHECK(checker4.Wait().value());
