@@ -81,10 +81,8 @@ BOOST_AUTO_TEST_CASE(check_queue_termination)
             [&running]
             {
                 running = true;
-                CCheckQueue<CDummyValidator> check{4};
-
                 boost::thread_group threadGroup;
-                threadGroup.create_thread([&check]{check.Thread();});
+                CCheckQueue<CDummyValidator> check{4, threadGroup, 1, ""};
 
                 // worker threads expect to be terminated by the interrupt signal
                 threadGroup.interrupt_all();
@@ -103,10 +101,8 @@ BOOST_AUTO_TEST_CASE(check_queue_termination)
 
 BOOST_AUTO_TEST_CASE(removal_of_threads_during_processing)
 {
-    CCheckQueue<CBlockingValidator> check{4};
-
     boost::thread_group threadGroup;
-    threadGroup.create_thread([&check]{check.Thread();});
+    CCheckQueue<CBlockingValidator> check{4, threadGroup, 1, ""};
 
     constexpr size_t checksNumber = 20;
 
@@ -141,10 +137,8 @@ BOOST_AUTO_TEST_CASE(removal_of_threads_during_processing)
 
 BOOST_AUTO_TEST_CASE(premature_validation_cancellation)
 {
-    CCheckQueue<CCancellingValidator> check{4};
-
     boost::thread_group threadGroup;
-    threadGroup.create_thread([&check]{check.Thread();});
+    CCheckQueue<CCancellingValidator> check{4, threadGroup, 1, ""};
     std::vector<CCancellingValidator> checks(20);
 
     auto source = task::CCancellationSource::Make();

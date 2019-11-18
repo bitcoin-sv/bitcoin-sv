@@ -6,15 +6,21 @@
 #define BITCOIN_CHECKQUEUE_H
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <memory>
 #include <optional>
+#include <string>
+#include <thread>
 #include <vector>
 
+#include <boost/thread/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "taskcancellation.h"
+#include "util.h"
 
 /**
  * Queue for verifications that have to be performed.
@@ -47,7 +53,7 @@ private:
             boost::mutex& mutex,
             int& counter)
             : mMutex{mutex}
-            , mCounter{&counter}
+            , mCounter{counter}
         {/**/}
 
         ~CTotalScopeGuard()
@@ -55,20 +61,25 @@ private:
             if(mRunning)
             {
                 boost::unique_lock<boost::mutex> lock{mMutex};
-                --(*mCounter);
+                --mCounter;
             }
         }
 
+        CTotalScopeGuard(CTotalScopeGuard&&) = delete;
+        CTotalScopeGuard& operator=(CTotalScopeGuard&&) = delete;
+        CTotalScopeGuard(const CTotalScopeGuard&) = delete;
+        CTotalScopeGuard& operator=(const CTotalScopeGuard&) = delete;
+
         void runNL()
         {
-            ++(*mCounter);
+            ++mCounter;
             mRunning = true;
         }
 
     private:
-      boost::mutex& mMutex;
-      int* mCounter;
-      bool mRunning = false;
+        boost::mutex& mMutex;
+        int& mCounter;
+        bool mRunning = false;
     };
 
     //! Mutex to protect the inner state
@@ -89,6 +100,18 @@ private:
 
     //! The total number of workers (including the master).
     int nTotal = 0;
+
+    /**
+     * The total number of workers that were spawned on separate threads (even
+     * those that were spawned but have not yet been run by the thread pool)
+     * used for graceful shutdown
+     */
+    std::atomic<int> mSpawnedWorkersCount = 0;
+    /**
+     * Used in destructor for graceful shutdown to notify worker threads that
+     * they should quit.
+     */
+    bool mQuit = false;
 
     //! The temporary evaluation result.
     std::optional<bool> fAllOk = true;
@@ -160,7 +183,13 @@ private:
                 }
 
                 // logically, the do loop starts here
-                while (queue.empty()) {
+                while (queue.empty())
+                {
+                    if(mQuit)
+                    {
+                        return {};
+                    }
+
                     // master will exit only after all the work has been done
                     // so we need to wait for all the workers to finish at which
                     // point nTodo == 0 is true
@@ -226,8 +255,69 @@ public:
     CCheckQueue(unsigned int nBatchSizeIn)
         : nBatchSize(nBatchSizeIn) {}
 
-    //! Worker thread
-    void Thread() {Loop();}
+    CCheckQueue(
+        unsigned int nBatchSizeIn,
+        boost::thread_group& threadGroup,
+        size_t workerThreadCount,
+        const std::string& baseThreadName)
+        : nBatchSize{nBatchSizeIn}
+    {
+        // spawn worker threads
+        for(size_t workerNum=0; workerNum<workerThreadCount; ++workerNum)
+        {
+            ++mSpawnedWorkersCount;
+            threadGroup.create_thread(
+                [this, baseThreadName, workerNum]()
+                {
+                    try
+                    {
+                        TraceThread(
+                            (baseThreadName + '_' + std::to_string(workerNum)).c_str(),
+                            [this]{Loop();});
+                    }
+                    catch(...)
+                    {
+                        --mSpawnedWorkersCount;
+                        throw;
+                    }
+
+                    --mSpawnedWorkersCount;
+                });
+        }
+    }
+
+    ~CCheckQueue()
+    {
+        {
+            boost::unique_lock lock{mutex};
+            mQuit = true;
+            condWorker.notify_all();
+        }
+
+        std::chrono::steady_clock::time_point begin =
+            std::chrono::steady_clock::now();
+        using namespace std::chrono_literals;
+
+        // Try to gracefully terminate running threads
+        while(std::chrono::steady_clock::now() - begin < 20s)
+        {
+            if(mSpawnedWorkersCount == 0)
+            {
+                break;
+            }
+
+            std::this_thread::sleep_for(100ms);
+        }
+
+        if(mSpawnedWorkersCount != 0)
+        {
+            // This can result in crash during shutdown, if threads are still
+            // accessing memory associated with *this
+            LogPrintf(
+                "WARNING: CCheckQueue workers did not exit within allotted time"
+                ", continuing with exit.\n");
+        }
+    }
 
     /**
      * Wait until execution finishes, and return whether all evaluations were

@@ -2935,6 +2935,11 @@ void InitScriptCheckQueues(const Config& config, boost::thread_group& threadGrou
             config.GetPerBlockScriptValidationMaxBatchSize());
 }
 
+void ShutdownScriptCheckQueues()
+{
+    scriptCheckQueuePool.reset();
+}
+
 // Returns the script flags which should be checked for a given block
 static uint32_t GetBlockScriptFlags(const Config &config,
                                     const CBlockIndex *pChainTip) {

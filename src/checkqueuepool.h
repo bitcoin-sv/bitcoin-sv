@@ -170,13 +170,16 @@ public:
 
         mScriptCheckQueue.reserve(poolSize);
 
+        constexpr auto baseThreadName{"bitcoin-scriptch_"};
         for(size_t queueNum=0; queueNum<poolSize; ++queueNum)
         {
             auto& queue =
                 mScriptCheckQueue.emplace_back(
-                    std::make_unique<CCheckQueue<T>>(batchSize));
-
-            SpawnQueueWorkerThreads(*queue, threadGroup, threadCount, queueNum);
+                    std::make_unique<CCheckQueue<T>>(
+                        batchSize,
+                        threadGroup,
+                        threadCount,
+                        baseThreadName + std::to_string(queueNum)));
 
             mIdleQueues.push(queue.get());
         }
@@ -184,13 +187,25 @@ public:
 
     ~CCheckQueuePool()
     {
-        for(auto& checker : mRunningCheckers)
         {
-            checker.mPrematureCheckerTerminationSource->Cancel();
+            std::unique_lock lock{mIdleQueuesLock};
+
+            for(auto& checker : mRunningCheckers)
+            {
+                checker.mPrematureCheckerTerminationSource->Cancel();
+            }
         }
 
-        while(!mRunningCheckers.empty())
+        while(true)
         {
+            {
+                std::unique_lock lock{mIdleQueuesLock};
+                if(mRunningCheckers.empty())
+                {
+                    break;
+                }
+            }
+
             using namespace std::chrono_literals;
             std::this_thread::sleep_for(100ms);
         }
@@ -294,27 +309,6 @@ private:
         assert(found);
 
         mIdleQueuesCV.notify_one();
-    }
-
-    void SpawnQueueWorkerThreads(
-        CCheckQueue<T>& queue,
-        boost::thread_group& threadGroup,
-        size_t threadCount,
-        size_t queueNum)
-    {
-        for(size_t workerNum=0; workerNum<threadCount; ++workerNum)
-        {
-            threadGroup.create_thread(
-                [&queue, workerNum, queueNum]()
-                {
-                    TraceThread(
-                        strprintf(
-                            "bitcoin-scriptch_%d_%d",
-                            queueNum,
-                            workerNum).c_str(),
-                        [&queue]{queue.Thread();});
-                });
-        }
     }
 
     struct CRunningChecker
