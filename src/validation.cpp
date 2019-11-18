@@ -1015,7 +1015,9 @@ CTxnValResult TxnValidation(
     TxnDoubleSpendDetectorSPtr dsDetector,
     bool fReadyForFeeEstimation) {
 
-    auto source = task::CCancellationSource::Make();
+    auto source =
+        task::CTimedCancellationSource::Make(
+            MAX_TRANSACTION_VALIDATION_DURATION);
 
     using Result = CTxnValResult;
 
@@ -1133,12 +1135,24 @@ CTxnValResult TxnValidation(
         }
     }
     // Check for non-standard pay-to-script-hash in inputs
-    if (fRequireStandard &&
-        !AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1).value()) // TODO: handle in CORE-215 where token is used for interrupts
+    if (fRequireStandard)
     {
-        state.Invalid(false, REJECT_NONSTANDARD,
-                     "bad-txns-nonstandard-inputs");
-        return Result{state, pTxInputData, vCoinsToUncache};
+        auto res =
+            AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
+
+        if (!res.has_value())
+        {
+            state.DoS(0, false, REJECT_NONSTANDARD,
+                     "too-long-validation-time",
+                      false);
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
+        else if (!res.value())
+        {
+            state.Invalid(false, REJECT_NONSTANDARD,
+                         "bad-txns-nonstandard-inputs");
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
     }
     const int64_t nSigOpsCount {
         static_cast<int64_t>(
@@ -1239,7 +1253,8 @@ CTxnValResult TxnValidation(
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
-    if (!CheckInputs(
+    auto res =
+        CheckInputs(
             source->GetToken(),
             config,
             tx,
@@ -1249,7 +1264,17 @@ CTxnValResult TxnValidation(
             scriptVerifyFlags,
             true,      /* sigCacheStore */
             false,     /* scriptCacheStore */
-            txdata).value()) // TODO: handle in CORE-215 where token is used for interrupts
+            txdata);
+
+    if (!res.has_value())
+    {
+        state.DoS(0, false, REJECT_NONSTANDARD,
+                 "too-long-validation-time",
+                  false,
+                  errString);
+        return Result{state, pTxInputData, vCoinsToUncache};
+    }
+    else if (!res.value())
     {
         // State filled in by CheckInputs.
         return Result{state, pTxInputData, vCoinsToUncache};
@@ -1271,7 +1296,8 @@ CTxnValResult TxnValidation(
     // transactions into the mempool can be exploited as a DoS attack.
     uint32_t currentBlockScriptVerifyFlags =
         GetBlockScriptFlags(config, chainActive.Tip());
-    if (!CheckInputsFromMempoolAndCache(
+    res =
+        CheckInputsFromMempoolAndCache(
             source->GetToken(),
             config,
             tx,
@@ -1281,7 +1307,17 @@ CTxnValResult TxnValidation(
             pool,
             currentBlockScriptVerifyFlags,
             true,
-            txdata).value()) { // TODO: handle in CORE-215 where token is used for interrupts
+            txdata);
+    if (!res.has_value())
+    {
+        state.DoS(0, false, REJECT_NONSTANDARD,
+                 "too-long-validation-time",
+                  false,
+                  errString);
+        return Result{state, pTxInputData, vCoinsToUncache};
+    }
+    else if (!res.value())
+    {
         // If we're using promiscuousmempoolflags, we may hit this normally.
         // Check if current block has some flags that scriptVerifyFlags does
         // not before printing an ominous warning.
@@ -1292,7 +1328,8 @@ CTxnValResult TxnValidation(
                 __func__, txid.ToString(), FormatStateMessage(state));
             return Result{state, pTxInputData, vCoinsToUncache};
         }
-        if (!CheckInputs(
+        res =
+            CheckInputs(
                 source->GetToken(),
                 config,
                 tx,
@@ -1302,7 +1339,16 @@ CTxnValResult TxnValidation(
                 MANDATORY_SCRIPT_VERIFY_FLAGS,
                 true,      /* sigCacheStore */
                 false,     /* scriptCacheStore */
-                txdata).value()) // TODO: handle in CORE-215 where token is used for interrupts
+                txdata);
+        if (!res.has_value())
+        {
+            state.DoS(0, false, REJECT_NONSTANDARD,
+                     "too-long-validation-time",
+                      false,
+                      errString);
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
+        if (!res.value())
         {
             error(
                 "%s: ConnectInputs failed against MANDATORY but not "

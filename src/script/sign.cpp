@@ -165,6 +165,8 @@ bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, 
 
     sigdata.scriptSig = PushAll(result);
 
+    // no need to cancel script verification after n time
+    // because wallet only produces standard transactions
     auto source = task::CCancellationSource::Make();
 
     // Test solution
