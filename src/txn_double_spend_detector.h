@@ -34,7 +34,8 @@ class CTxnDoubleSpendDetector {
     bool insertTxnInputs(
 	    const TxInputDataSPtr& pTxInputData,
 	    const CTxMemPool& pool,
-	    CValidationState& state);
+	    CValidationState& state,
+        bool isFinal);
     /**
      * Remove txn's inputs for known spends.
      * @param tx A given transaction
