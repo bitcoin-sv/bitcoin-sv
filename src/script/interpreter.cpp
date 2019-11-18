@@ -1381,6 +1381,11 @@ std::optional<bool> EvalScript(
 
                         bool fSuccess = true;
                         while (fSuccess && nSigsCount > 0) {
+                            if (token.IsCanceled())
+                            {
+                                return {};
+                            }
+
                             valtype &vchSig = stacktop(-isig);
                             valtype &vchPubKey = stacktop(-ikey);
 
