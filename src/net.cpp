@@ -2566,6 +2566,9 @@ CConnman::CConnman(
     : config(&configIn)
     , nSeed0(nSeed0In)
     , nSeed1(nSeed1In)
+    , mValidatorThreadPool{"TxnValidatorPool",
+         static_cast<size_t>(gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs())),
+         static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
     , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
     , mAsyncTaskPool{configIn}
 {

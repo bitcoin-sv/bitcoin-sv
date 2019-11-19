@@ -307,7 +307,10 @@ public:
         // Create validation tasks
         for (const TxInputDataSPtr& txn : vNewTxns) {
             results.emplace_back(
-                make_task(mValidatorThreadPool, func,
+                make_task(
+                    mValidatorThreadPool,
+                    txn->mTxType == TxType::nonstandard ? CTask::Priority::Low : CTask::Priority::High,
+                    func,
                     txn,
                     config,
                     pool,
@@ -605,7 +608,7 @@ private:
 
     /** Transaction validator */
     std::shared_ptr<CTxnValidator> mTxnValidator {};
-    CThreadPool<CQueueAdaptor> mValidatorThreadPool { "ValidatorPool" };
+    CThreadPool<CDualQueueAdaptor> mValidatorThreadPool;
 
     CThreadInterrupt interruptNet;
 
