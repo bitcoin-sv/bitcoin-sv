@@ -374,18 +374,18 @@ BOOST_AUTO_TEST_CASE(negation)
     }
 }
 
-BOOST_AUTO_TEST_CASE(to_size_t)
+BOOST_AUTO_TEST_CASE(to_size_t_limited)
 {
-    const auto size_t_min{std::numeric_limits<size_t>::min()};
-    const auto size_t_max{std::numeric_limits<size_t>::max()};
+    constexpr size_t size_t_min{std::numeric_limits<size_t>::min()};
+    constexpr size_t size_t_max{static_cast<size_t>(std::numeric_limits<int32_t>::max()) };
 
-    BOOST_CHECK_EQUAL(size_t_min, CScriptNum{size_t_min}.to_size_t());
-    BOOST_CHECK_EQUAL(1, CScriptNum{1}.to_size_t());
-    // cjgBOOST_CHECK_EQUAL(size_t_max, CScriptNum{size_t_max}.to_size_t());
+    BOOST_CHECK_EQUAL(size_t_min, CScriptNum{size_t_min}.to_size_t_limited());
+    BOOST_CHECK_EQUAL(1, CScriptNum{1}.to_size_t_limited());
+    // cjgBOOST_CHECK_EQUAL(size_t_max, CScriptNum{size_t_max}.to_size_t_limited());
 
-    BOOST_CHECK_EQUAL(size_t_min, CScriptNum{bint{size_t_min}}.to_size_t());
-    BOOST_CHECK_EQUAL(1, CScriptNum{bint{1}}.to_size_t());
-    BOOST_CHECK_EQUAL(size_t_max, CScriptNum{bint{size_t_max}}.to_size_t());
+    BOOST_CHECK_EQUAL(size_t_min, CScriptNum{bint{size_t_min}}.to_size_t_limited());
+    BOOST_CHECK_EQUAL(1, CScriptNum{bint{1}}.to_size_t_limited());
+    BOOST_CHECK_EQUAL(size_t_max, CScriptNum{bint{size_t_max}}.to_size_t_limited());
 }
 
 // clang-format off

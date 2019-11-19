@@ -82,7 +82,8 @@ public:
     int getint() const;
     std::vector<uint8_t> getvch() const;
 
-    size_t to_size_t() const;
+    // Precondition: n <= numeric_limit<int32_t>::max() and n>=0
+    size_t to_size_t_limited() const;
 
 private:
     bool equal_index(const CScriptNum&) const;

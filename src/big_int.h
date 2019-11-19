@@ -61,7 +61,7 @@ namespace bsv
         friend std::ostream& operator<<(std::ostream&, const bint&);
 
         friend bool is_negative(const bint&);
-        friend std::size_t to_size_t(const bint&);
+        friend std::size_t to_size_t_limited(const bint&);
         
     private:
         int spaceship_operator(const bint&) const; // auto operator<=>(const bint&) in C++20
@@ -166,7 +166,7 @@ namespace bsv
     bool is_negative(const bint&);
     bint abs(const bint&);
     std::string to_string(const bint&);
-    std::size_t to_size_t(const bint&);
+    std::size_t to_size_t_limited(const bint&);
 }
 
 namespace std

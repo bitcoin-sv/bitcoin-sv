@@ -375,18 +375,20 @@ std::string bsv::to_string(const bint& n) // used in gdb pretty-printer
     return oss.str();
 }
 
-std::size_t bsv::to_size_t(const bint& n)
+std::size_t bsv::to_size_t_limited(const bint& n)
 {
     // Precondition:
-    // n <= numeric_limit<size_t>::max() and n>=numeric_limit<size_t>::min()
+    // n <= numeric_limit<int32_t>::max() and n>=0 <-- applies to Windows/MSVC (sizeof(long) == 4 bytes)
+    // n <= numeric_limit<int64_t>::max() and n>=0 <-- applies to Linux/GCC (sizeof(long) == 8 bytes)
 
     auto* asn1{ BN_to_ASN1_INTEGER(n.value_.get(), nullptr) };
     assert(asn1);
 
-    uint64_t i64{};
-    const int status{ASN1_INTEGER_get_uint64(&i64, asn1)};
-    assert(status);
-    return i64;
+    //-1 means either error or an integer with a value of -1 
+    //(we don't want to use ASN1_INTEGER_get_uint64 because it's not supported in older version of OpenSSL)
+    int64_t i64 = ASN1_INTEGER_get(asn1);
+    assert(i64 >= 0); 
+    return static_cast<size_t>(i64);
 }
 
 // Notes
