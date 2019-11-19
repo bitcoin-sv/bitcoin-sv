@@ -176,6 +176,7 @@ BITCOIN_CORE_H = \
   task_helpers.h \
   threadpool.h \
   threadpoolT.h \
+  threadpriority.h \
   threadsafety.h \
   threadinterrupt.h \
   timedata.h \
@@ -414,6 +415,7 @@ libbitcoin_util_a_SOURCES = \
   support/cleanse.cpp \
   sync.cpp \
   threadinterrupt.cpp \
+  threadpriority.cpp \
   uint256.cpp \
   uint256.h \
   util.cpp \

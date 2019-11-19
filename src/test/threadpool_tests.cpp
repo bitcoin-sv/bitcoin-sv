@@ -111,5 +111,134 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     BOOST_CHECK(taskResults == expectedResults);
 }
 
+// Test dual queue processed by prioritised thread pool
+BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase1)
+{
+    Counter = 0;
+    CThreadPool<CDualQueueAdaptor> pool { "TestPool", 4, 1 };
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 5);
+    BOOST_CHECK_EQUAL(Counter, 0);
+
+    // Submit some tasks to the queue
+    std::vector<std::future<void>> results {};
+    results.push_back(make_task(pool, CTask::Priority::Low, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, lambdaTask, Increment));
+
+    // Wait for all tasks to complete
+    for(auto& res : results)
+    {
+        res.get();
+    }
+
+    // Should have run 16 tasks
+    BOOST_CHECK_EQUAL(Counter, Increment * results.size());
+}
+
+// Test dual queue processed by prioritised thread pool
+BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase2)
+{
+    Counter = 0;
+    CThreadPool<CDualQueueAdaptor> pool { "TestPool", 1, 4 };
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 5);
+    BOOST_CHECK_EQUAL(Counter, 0);
+
+    // Submit some tasks to the queue
+    std::vector<std::future<void>> results {};
+    results.push_back(make_task(pool, CTask::Priority::High, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, lambdaTask, Increment));
+
+    // Wait for all tasks to complete
+    for(auto& res : results)
+    {
+        res.get();
+    }
+
+    // Should have run 16 tasks
+    BOOST_CHECK_EQUAL(Counter, Increment * results.size());
+}
+
+// Test dual queue processed by prioritised thread pool
+BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase3)
+{
+    Counter = 0;
+    CThreadPool<CDualQueueAdaptor> pool { "TestPool", 0, 4 };
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 4);
+    BOOST_CHECK_EQUAL(Counter, 0);
+
+    // Submit some tasks to the queue
+    std::vector<std::future<void>> results {};
+    results.push_back(make_task(pool, CTask::Priority::High, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, lambdaTask, Increment));
+
+    // Wait for all tasks to complete
+    for(auto& res : results)
+    {
+        res.get();
+    }
+
+    // Should have run 6 tasks
+    BOOST_CHECK_EQUAL(Counter, Increment * results.size());
+}
+
+// Test dual queue processed by prioritised thread pool
+BOOST_AUTO_TEST_CASE(DualQueueProcessedByPriotisedThreadsCase4)
+{
+    Counter = 0;
+    CThreadPool<CDualQueueAdaptor> pool { "TestPool", 4, 0 };
+    BOOST_CHECK_EQUAL(pool.getPoolSize(), 4);
+    BOOST_CHECK_EQUAL(Counter, 0);
+
+    // Submit some tasks to the queue
+    std::vector<std::future<void>> results {};
+    results.push_back(make_task(pool, CTask::Priority::Low, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, Function, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, &TaskClass::MemberFunction, &taskClass, Increment));
+    results.push_back(make_task(pool, CTask::Priority::Low, lambdaTask, Increment));
+    results.push_back(make_task(pool, CTask::Priority::High, lambdaTask, Increment));
+
+    // Wait for all tasks to complete
+    for(auto& res : results)
+    {
+        res.get();
+    }
+
+    // Should have run 6 tasks
+    BOOST_CHECK_EQUAL(Counter, Increment * results.size());
+}
+
+
 BOOST_AUTO_TEST_SUITE_END();
 
