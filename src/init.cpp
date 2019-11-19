@@ -896,6 +896,15 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "relay and mine (default: %u)"),
                   DEFAULT_DATA_CARRIER_SIZE));
 
+    strUsage += HelpMessageOpt(
+        "-txnvalidationmaxduration=<n>",
+        strprintf(
+            _("Set the single transaction validation duration threshold in"
+              " milliseconds after which the transaction validation will"
+              " terminate with error and the transaction is not accepted to"
+              " mempool (min 10ms, default: %dms)"),
+            DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION.count()));
+
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
@@ -1747,6 +1756,15 @@ bool AppInitParameterInteraction(Config &config) {
                   "files.\n",
                   nPruneTarget / 1024 / 1024);
         fPruneMode = true;
+    }
+
+    if(std::string err; !config.SetMaxTransactionValidationDuration(
+        gArgs.GetArg(
+            "-txnvalidationmaxduration",
+            DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION.count()),
+        &err))
+    {
+        return InitError(err);
     }
 
     RegisterAllRPCCommands(tableRPC);

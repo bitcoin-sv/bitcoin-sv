@@ -1017,7 +1017,7 @@ CTxnValResult TxnValidation(
 
     auto source =
         task::CTimedCancellationSource::Make(
-            MAX_TRANSACTION_VALIDATION_DURATION);
+            config.GetMaxTransactionValidationDuration());
 
     using Result = CTxnValResult;
 
