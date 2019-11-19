@@ -692,7 +692,8 @@ bool IsGenesisEnabled(const Config &config, const CBlockIndex* pindexPrev) {
 // view is constructed as local variable (by TxnValidation), populated and then disconnected from backing view,
 // so that it can not be shared by other threads.
 // Mt support is present in CCoinsViewCache class.
-static bool CheckInputsFromMempoolAndCache(
+static std::optional<bool> CheckInputsFromMempoolAndCache(
+    const task::CCancellationToken& token,
     const Config& config,
     const CTransaction& tx,
     CValidationState& state,
@@ -729,9 +730,8 @@ static bool CheckInputsFromMempoolAndCache(
         }
     }
 
-    auto source = task::CCancellationSource::Make();
     return CheckInputs(
-                source->GetToken(),
+                token,
                 config,
                 tx,
                 state,
@@ -740,7 +740,7 @@ static bool CheckInputsFromMempoolAndCache(
                 flags,
                 cacheSigStore,  /* sigCacheStore */
                 true,           /* scriptCacheStore */
-                txdata).value();
+                txdata);
 }
 
 static bool CheckTxOutputs(
@@ -984,6 +984,8 @@ CTxnValResult TxnValidation(
     TxnDoubleSpendDetectorSPtr dsDetector,
     bool fReadyForFeeEstimation) {
 
+    auto source = task::CCancellationSource::Make();
+
     using Result = CTxnValResult;
 
     const CTransactionRef& ptx = pTxInputData->mpTx;
@@ -1097,7 +1099,9 @@ CTxnValResult TxnValidation(
         }
     }
     // Check for non-standard pay-to-script-hash in inputs
-    if (fRequireStandard && !AreInputsStandard(config, tx, view, chainActive.Height() + 1)) {
+    if (fRequireStandard &&
+        !AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1).value()) // TODO: handle in CORE-215 where token is used for interrupts
+    {
         state.Invalid(false, REJECT_NONSTANDARD,
                      "bad-txns-nonstandard-inputs");
         return Result{state, pTxInputData, vCoinsToUncache};
@@ -1201,7 +1205,6 @@ CTxnValResult TxnValidation(
     // Check against previous transactions. This is done last to help
     // prevent CPU exhaustion denial-of-service attacks.
     PrecomputedTransactionData txdata(tx);
-    auto source = task::CCancellationSource::Make();
     if (!CheckInputs(
             source->GetToken(),
             config,
@@ -1235,6 +1238,7 @@ CTxnValResult TxnValidation(
     uint32_t currentBlockScriptVerifyFlags =
         GetBlockScriptFlags(config, chainActive.Tip());
     if (!CheckInputsFromMempoolAndCache(
+            source->GetToken(),
             config,
             tx,
             state,
@@ -1243,7 +1247,7 @@ CTxnValResult TxnValidation(
             pool,
             currentBlockScriptVerifyFlags,
             true,
-            txdata)) {
+            txdata).value()) { // TODO: handle in CORE-215 where token is used for interrupts
         // If we're using promiscuousmempoolflags, we may hit this normally.
         // Check if current block has some flags that scriptVerifyFlags does
         // not before printing an ominous warning.

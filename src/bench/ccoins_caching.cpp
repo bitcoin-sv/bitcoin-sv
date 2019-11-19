@@ -7,6 +7,7 @@
 #include "policy/policy.h"
 #include "wallet/crypter.h"
 #include "config.h"
+#include "taskcancellation.h"
 
 #include <vector>
 
@@ -81,7 +82,13 @@ static void CCoinsCaching(benchmark::State &state) {
     // Benchmark.
     while (state.KeepRunning()) {
         CTransaction t(t1);
-        bool success = AreInputsStandard(GlobalConfig::GetConfig(), t, coins, 0);
+        bool success =
+            AreInputsStandard(
+                task::CCancellationSource::Make()->GetToken(),
+                GlobalConfig::GetConfig(),
+                t,
+                coins,
+                0).value();
         assert(success);
         Amount value = coins.GetValueIn(t);
         assert(value == (50 + 21 + 22) * CENT);

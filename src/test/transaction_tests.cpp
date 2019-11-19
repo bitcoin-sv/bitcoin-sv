@@ -295,7 +295,13 @@ BOOST_AUTO_TEST_CASE(test_Get) {
     t1.vout[0].nValue = 90 * CENT;
     t1.vout[0].scriptPubKey << OP_1;
 
-    BOOST_CHECK(AreInputsStandard(config, CTransaction(t1), coins, 0));
+    BOOST_CHECK(
+        AreInputsStandard(
+            task::CCancellationSource::Make()->GetToken(),
+            config,
+            CTransaction(t1),
+            coins,
+            0));
     BOOST_CHECK_EQUAL(coins.GetValueIn(CTransaction(t1)),
                       (50 + 21 + 22) * CENT);
 }
