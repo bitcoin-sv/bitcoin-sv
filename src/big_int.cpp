@@ -14,6 +14,8 @@
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
 
+using namespace std;
+
 void bsv::bint::empty_bn_deleter::operator()(bignum_st* p) const
 {
     ::BN_free(p);
@@ -389,6 +391,37 @@ std::size_t bsv::to_size_t_limited(const bint& n)
     int64_t i64 = ASN1_INTEGER_get(asn1);
     assert(i64 >= 0); 
     return static_cast<size_t>(i64);
+}
+
+namespace
+{
+    constexpr auto length_in_bytes{4};
+}
+
+std::vector<uint8_t> bsv::bint::serialize() const
+{
+    const auto len{BN_bn2mpi(value_.get(), nullptr)};
+    assert(len >= length_in_bytes);
+    vector<unsigned char> result(len);
+    BN_bn2mpi(value_.get(), result.data());
+    result.erase(begin(result), begin(result) + length_in_bytes);
+    reverse(begin(result), end(result));
+    return result;
+}
+
+bsv::bint bsv::bint::deserialize(const vector<uint8_t>& v)
+{
+    const auto size{v.size()};
+    vector<uint8_t> tmp(size + length_in_bytes);
+    tmp[0] = (size >> 24) & 0xff;
+    tmp[1] = (size >> 16) & 0xff;
+    tmp[2] = (size >> 8) & 0xff;
+    tmp[3] = (size >> 0) & 0xff;
+    reverse_copy(begin(v), end(v), begin(tmp) + length_in_bytes);
+    auto p{BN_mpi2bn(tmp.data(), tmp.size(), nullptr)};
+    bint b;
+    b.value_.reset(p);
+    return b;
 }
 
 // Notes

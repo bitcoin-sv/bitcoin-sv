@@ -4,6 +4,7 @@
 
 #include "script/int_serialization.h"
 
+#include <iostream>
 #include <list>
 #include <vector>
 
@@ -33,6 +34,7 @@ namespace
         {256, {0x0, 0x1}},
         {257, {0x1,0x1}},
         {std::numeric_limits<int8_t>::max()+1, {0x80, 0x0}}, // 128
+        {129, {0x81, 0x0}}, // 129
         {std::numeric_limits<int16_t>::max()-1, {0xfe, 0x7f}},
         {std::numeric_limits<int16_t>::max(), {0xff, 0x7f}},
         {std::numeric_limits<int16_t>::max()+1, {0x0, 0x80, 0x0}},
@@ -105,6 +107,7 @@ BOOST_AUTO_TEST_CASE(serialize_bint)
         std::vector<uint8_t> op;
         op.reserve(sizeof(n));
         serialize(bint{n}, back_inserter(op));
+
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(s), end(s), begin(op), end(op));
 
         const auto ip{deserialize<bint>(op.begin(), op.end())};
@@ -123,9 +126,10 @@ BOOST_AUTO_TEST_CASE(serialize_bint)
 
     for(const auto& [n, s] : bint_test_data)
     {
-        std::vector<uint8_t> op;
-        op.reserve(sizeof(n));
-        serialize(n, back_inserter(op));
+        vector<uint8_t> op;
+        op.reserve(n.size_bytes());
+        bsv::serialize(n, back_inserter(op));
+
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(s), end(s), begin(op), end(op));
 
         const auto ip{deserialize<bint>(op.begin(), op.end())};
@@ -136,13 +140,11 @@ BOOST_AUTO_TEST_CASE(serialize_bint)
 BOOST_AUTO_TEST_CASE(very_big_number)
 {
     const auto n = power_binary(bint{2}, std::multiplies<bint>(),
-                                15); // bn = 2^(2^15) == 2^32,768
+                                20); // bn = 2^(2^x)
     std::vector<uint8_t> op;
     op.reserve(n.size_bytes());
     serialize(n, back_inserter(op));
-    BOOST_CHECK_EQUAL(4097, op.size());
-
-    const auto ip{deserialize<bint>(op.begin(), op.end())};
+    const auto ip{bsv::deserialize(begin(op), end(op))};
     BOOST_CHECK_EQUAL(n, ip);
 }
 

@@ -40,7 +40,7 @@ CScriptNum::CScriptNum(const vector<uint8_t>& vch,
     else if(vch.size() <= nMaxNumSize)
     {
         if(big_int)
-            m_value = bsv::deserialize<bint>(begin(vch), end(vch));
+            m_value = bsv::bint::deserialize(vch);
         else
             m_value = bsv::deserialize<int64_t>(begin(vch), end(vch));
     }
@@ -271,10 +271,7 @@ vector<uint8_t> CScriptNum::getvch() const
     // clang-format off
     return std::visit(overload{[](const bsv::bint& n) 
                       {
-                          vector<uint8_t> v;
-                          v.reserve(n.size_bytes());
-                          bsv::serialize(n, back_inserter(v));
-                          return v;
+                          return n.serialize();
                       },
                       [](const auto& n) 
                       {
