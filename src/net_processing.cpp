@@ -2122,6 +2122,7 @@ static bool ProcessGetBlocks(
     const CChainParams& chainparams,
     const CGetBlockMessageRequest& req)
 {
+    LOCK(cs_main);
 
     // We might have announced the currently-being-connected tip using a
     // compact block, which resulted in the peer sending a getblocks
@@ -2135,8 +2136,6 @@ static bool ProcessGetBlocks(
 
     const CBlockLocator& locator = req.GetLocator();
     const uint256& hashStop = req.GetHashStop();
-
-    LOCK(cs_main);
 
     // Find the last block the caller has in the main chain
     const CBlockIndex* pindex =
