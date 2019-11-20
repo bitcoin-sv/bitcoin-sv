@@ -1507,10 +1507,10 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
                             big_ints_enabled ? arg_1.size()
                                              : CScriptNum::MAXIMUM_ELEMENT_SIZE,
                             big_ints_enabled};
-                        if(n < 0)
+                        if(n < 0 || n > std::numeric_limits<int32_t>::max())
                             return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
 
-                        const auto size{n.to_size_t()};
+                        const auto size{n.to_size_t_limited()};
                         if(!big_ints_enabled)
                         {
                             if(size > MAX_SCRIPT_ELEMENT_SIZE)

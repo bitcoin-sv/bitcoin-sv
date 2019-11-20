@@ -430,16 +430,17 @@ BOOST_AUTO_TEST_CASE(to_string)
     }
 }
 
-BOOST_AUTO_TEST_CASE(to_size_t)
+BOOST_AUTO_TEST_CASE(to_size_t_limited)
 {
     BOOST_TEST("" == bsv::to_string(bint{}));
 
-    constexpr size_t min_size_t{numeric_limits<size_t>::min()};
-    constexpr size_t max_size_t{numeric_limits<size_t>::max()};
-    vector<size_t> test_data{min_size_t, 1, max_size_t};
+    constexpr size_t size_t_min{ std::numeric_limits<size_t>::min() };
+    constexpr size_t size_t_max{ static_cast<size_t>(std::numeric_limits<int32_t>::max()) };
+
+    vector<size_t> test_data{ size_t_min, 1, size_t_max };
     for(const auto n : test_data)
     {
-        BOOST_TEST(n == bsv::to_size_t(bint{n}));
+        BOOST_TEST(n == bsv::to_size_t_limited(bint{n}));
     }
 }
 

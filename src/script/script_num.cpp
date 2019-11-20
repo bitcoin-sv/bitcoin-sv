@@ -245,16 +245,18 @@ namespace
     overload(Ts...)->overload<Ts...>;
 }
 
-size_t CScriptNum::to_size_t() const
+size_t CScriptNum::to_size_t_limited() const
 {
     static_assert(variant_size_v<CScriptNum::value_type> == 2);
 
     return std::visit(overload{[](const bsv::bint& n) {
-                                   assert(n >= 0);
-                                   return bsv::to_size_t(n);
+                                   //we are using int32_t because this is minimum supported size in Windows and Linux based compiler
+                                   assert(n >= 0 && n <= std::numeric_limits<int32_t>::max());
+                                   return bsv::to_size_t_limited(n);
                                },
                                [](const int64_t n) {
-                                   assert(n >= 0);
+                                   //we are using int32_t because this is minimum supported size in Windows and Linux based compiler
+                                   assert(n >= 0 && n <= std::numeric_limits<int32_t>::max());
                                    // n <= numeric_limits<size_t>::max());
                                    return size_t(n);
                                }},
