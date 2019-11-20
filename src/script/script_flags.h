@@ -91,7 +91,6 @@ enum {
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
-    SCRIPT_ENABLE_BIG_INTS = (1U << 17),
 
     // Is Genesis enabled - transcations that is being executed is part of block that uses Geneisis rules.
     //
