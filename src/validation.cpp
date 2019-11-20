@@ -1037,7 +1037,10 @@ CTxnValResult TxnValidation(
     //          but we will mine it nevertheless. Anyone can collect such
     //          coin by providing OP_1 unlock script
     std::string reason;
-    if (fRequireStandard && !IsStandardTx(config, tx, chainActive.Height() + 1, reason)) {
+    bool fStandard = IsStandardTx(config, tx, chainActive.Height() + 1, reason);
+    // Update txn's type.
+    pTxInputData->mTxType = fStandard ? TxType::standard : TxType::nonstandard;
+    if (fRequireStandard && !fStandard) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                   reason);
         return Result{state, pTxInputData};
@@ -1372,6 +1375,7 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
     const TxSource source = txStatus.mTxInputData->mTxSource;
+    const TxType type = txStatus.mTxInputData->mTxType;
     std::string sTxnStatusMsg;
     if (state.IsMissingInputs()) {
         sTxnStatusMsg = "detected orphan";
@@ -1381,8 +1385,9 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
         sTxnStatusMsg = "rejected " + FormatStateMessage(state);
     }
     LogPrint(BCLog::TXNVAL,
-            "%s: txn= %s %s\n",
+            "%s: %s txn= %s %s\n",
              enum_cast<std::string>(source),
+             enum_cast<std::string>(type),
              tx.GetId().ToString(),
              sTxnStatusMsg);
 }
@@ -1398,6 +1403,7 @@ static void LogTxnCommitStatus(
     const CValidationState& state = txStatus.mState;
     const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
     const TxSource source = txStatus.mTxInputData->mTxSource;
+    const TxType type = txStatus.mTxInputData->mTxType;
     const std::string csPeerId {
         TxSource::p2p == source ? (pNode ? std::to_string(pNode->GetId()) : "-1")  : ""
     };
@@ -1417,8 +1423,9 @@ static void LogTxnCommitStatus(
         sTxnStatusMsg += FormatStateMessage(state);
     }
     LogPrint(state.IsValid() ? BCLog::MEMPOOL : BCLog::MEMPOOLREJ,
-            "%s: txn= %s %s (poolsz %u txn, %u kB) %s\n",
+            "%s: %s txn= %s %s (poolsz %u txn, %u kB) %s\n",
              enum_cast<std::string>(source),
+             enum_cast<std::string>(type),
              tx.GetId().ToString(),
              sTxnStatusMsg,
              nMempoolSize,
