@@ -298,12 +298,14 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay (default), "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq (default) " # txn validator config
-                "-txnspertaskthreshold (default)",       # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=150',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=100',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
@@ -325,13 +327,15 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "P2P-Scenario2 [nodoublespends]: "
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
-                "-txnvalidationasynchrunfreq=200 " # txn validator config
-                "-txnspertaskthreshold (default)", # txn validator config
+                "-txnvalidationasynchrunfreq=200 "        # txn validator config
+                "-numstdtxvalidationthreads=6 "           # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",       # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=200',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
@@ -355,14 +359,16 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "P2P-Scenario3 [nodoublespends]: "
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
-                "-txnvalidationasynchrunfreq=200 " # txn validator config
-                "-txnspertaskthreshold (default)"  # txn validator config
-                "-persistmempool=0",
+                "-txnvalidationasynchrunfreq=200 "       # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 "       # txn validator thread pool config
+                "-persistmempool=0 ",
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=200',
-                 '-txnspertaskthreshold=10',
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2',
                  '-persistmempool=0'],
                 # A number of spend money txns used in the test
                 5000,
@@ -397,12 +403,14 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay (default), "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq (default) " # txn validator config
-                "-txnspertaskthreshold (default) ",      # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=150',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=100',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
@@ -429,12 +437,14 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq=200"        # txn validator config
-                "-txnspertaskthreshold (default) ",      # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=200',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node
@@ -460,12 +470,14 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq=10"         # txn validator config
-                "-txnspertaskthreshold (default) ",      # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=10',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node
@@ -487,12 +499,14 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq (default)"  # txn validator config
-                "-txnspertaskthreshold (default) ",      # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=100',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node
@@ -516,13 +530,15 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq (default)"  # txn validator config
-                "-txnspertaskthreshold (default) ",      # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-checkmempool=0',
                  '-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=100',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node
@@ -547,13 +563,15 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq (default)"  # txn validator config
-                "-txnspertaskthreshold (default) ",      # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-checkmempool=0',
                  '-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=100',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
                 # A number of spend money txns used in the test
                 30000,
                 # A number of peers connected to the node
