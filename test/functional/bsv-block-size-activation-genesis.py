@@ -37,7 +37,7 @@ class BSVBlockSizeActivationGenesis(ComparisonTestFramework):
 
     def run_test(self):
         # Increase timeout when testing with big blocks (mininode's handle_write is not very efficient)
-        self.test.waitForPingTimeout = 180
+        self.test.waitForPingTimeout = 360
         self.test.run()
 
     def get_tests(self):

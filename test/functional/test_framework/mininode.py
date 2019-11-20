@@ -1660,7 +1660,7 @@ class NodeConn(asyncore.dispatcher):
         self.dstaddr = dstaddr
         self.dstport = dstport
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sendbuf = b""
+        self.sendbuf = bytearray()
         self.recvbuf = b""
         self.ver_send = 209
         self.ver_recv = 209
@@ -1703,7 +1703,7 @@ class NodeConn(asyncore.dispatcher):
                      (self.dstaddr, self.dstport))
         self.state = "closed"
         self.recvbuf = b""
-        self.sendbuf = b""
+        self.sendbuf = bytearray()
         try:
             self.close()
         except:
@@ -1746,7 +1746,7 @@ class NodeConn(asyncore.dispatcher):
             except:
                 self.handle_close()
                 return
-            self.sendbuf = self.sendbuf[sent:]
+            del self.sendbuf[:sent]
 
     def got_data(self):
         try:
