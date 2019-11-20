@@ -426,7 +426,7 @@ bool EvalScript(std::vector<valtype> &stack, const CScript &script,
     }
     int nOpCount = 0;
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-    const bool big_ints_enabled = (flags & SCRIPT_ENABLE_BIG_INTS) != 0;
+    const bool big_ints_enabled = (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0;
     const int big_ints_byte_limit{500}; // To do: Make configurable
                                         // MAX_SCRIPT_ELEMENT_SIZE = 520
 

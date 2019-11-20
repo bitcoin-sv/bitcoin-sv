@@ -9,6 +9,8 @@
 
 #include "script/int_serialization.h"
 #include "script/interpreter.h"
+#include "script/script_flags.h"
+
 #include <vector>
 
 using namespace std;
@@ -111,8 +113,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_op)
 
         CScript script(args.begin(), args.end());
 
-        // uint32_t flags(1 << SCRIPT_ENABLE_BIG_INTS);
-        uint32_t flags(1 << 17);
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         const auto status =
             EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
@@ -162,8 +163,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 
         CScript script(args.begin(), args.end());
 
-        // uint32_t flags(1 << SCRIPT_ENABLE_BIG_INTS);
-        uint32_t flags(1 << 17);
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         const auto status =
             EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
@@ -286,7 +286,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
 
         CScript script(args.begin(), args.end());
 
-        uint32_t flags(1 << 17);
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         const auto status =
             EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
@@ -327,8 +327,7 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
 
         CScript script(args.begin(), args.end());
 
-        // uint32_t flags{};
-        uint32_t flags{1 << 17};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         const auto status =
             EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
