@@ -1040,11 +1040,11 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-numstdtxvalidationthreads=<n>",
         strprintf(_("Set the number of 'High' priority threads used to validate standard txns (dynamically calculated default: %d)"),
-            std::thread::hardware_concurrency())) ;
+            GetNumHighPriorityValidationThrs())) ;
     strUsage += HelpMessageOpt(
         "-numnonstdtxvalidationthreads=<n>",
         strprintf(_("Set the number of 'Low' priority threads used to validate non-standard txns (dynamically calculated default: %d)"),
-            std::thread::hardware_concurrency())) ;
+            GetNumLowPriorityValidationThrs())) ;
     strUsage += HelpMessageOpt(
         "-maxstdtxnsperthreadratio=<n>",
         strprintf(_("Set the max ratio for a number of standard txns per 'High' priority thread (default: %d)"),

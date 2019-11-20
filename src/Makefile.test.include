@@ -111,6 +111,7 @@ BITCOIN_TESTS =\
   test/test_double_spend_detector.cpp \
   test/test_orphantxns.cpp \
   test/test_recent_rejects.cpp \
+  test/test_txnvalidation_utils.cpp \
   test/test_txnvalidator.cpp \
   test/testutil.cpp \
   test/testutil.h \

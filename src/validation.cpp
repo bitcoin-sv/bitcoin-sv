@@ -915,6 +915,36 @@ static uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) 
     return scriptVerifyFlags;
 }
 
+size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue) {
+    size_t numHardwareThrs {0};
+	// nTestingHCValue used by UTs
+	if (nTestingHCValue == SIZE_MAX) {
+		numHardwareThrs = std::thread::hardware_concurrency();
+	} else {
+		numHardwareThrs = nTestingHCValue;
+	}
+    // Calculate a number of low priority threads
+    if (numHardwareThrs < 4) {
+        return 1;
+    }
+    return static_cast<size_t>(numHardwareThrs * 0.25);
+}
+
+size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue) {
+	size_t numHardwareThrs {0};
+	// nTestingHCValue used by UTs
+	if (nTestingHCValue == SIZE_MAX) {
+		numHardwareThrs = std::thread::hardware_concurrency();
+	} else {
+		numHardwareThrs = nTestingHCValue;
+	}
+	// Calculate number of high priority threads
+	if (!numHardwareThrs || numHardwareThrs == 1) {
+		return 1;
+	}
+    return numHardwareThrs - GetNumLowPriorityValidationThrs(numHardwareThrs);
+}
+
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const CJournalChangeSetPtr& changeSet,

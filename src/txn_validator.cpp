@@ -265,16 +265,14 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
     try {
         RenameThread("bitcoin-txnvalidator");
         LogPrint(BCLog::TXNVAL, "New transaction handling thread. Starting validator.\n");
-        // TODO: A default value for -numstdtxvalidationthreads and -numnonstdtxvalidationthreads
-        // will be changed by the next commit
         // Get a number of High and Low priority threads.
         size_t nNumStdTxValidationThreads {
             static_cast<size_t>(
-                    gArgs.GetArg("-numstdtxvalidationthreads", std::thread::hardware_concurrency()))
+                    gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs()))
         };
         size_t nNumNonStdTxValidationThreads {
             static_cast<size_t>(
-                    gArgs.GetArg("-numnonstdtxvalidationthreads", std::thread::hardware_concurrency()))
+                    gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))
         };
         // Get a ratio for std and nonstd txns to be scheduled for validation in a single iteration.
         size_t nMaxStdTxnsPerThreadRatio {

@@ -580,6 +580,32 @@ bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight 
 int GetGenesisActivationHeight(const Config& config);
 
 /**
+ * A function used to produce a default value for a number of Low priority threads
+ * (on the running hardware).
+ *
+ * If std::thread::hardware_concurrency < 8, then the value is 1, otherwise the returned value
+ * shouldn't be greater than 25% of std::thread::hardware_concurrency.
+ *
+ * @param nTestingHCValue The argument used for testing purposes.
+ * @return Returns a number of low priority threads supported by the platform.
+ */
+size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
+
+/**
+ * A function used to produce a default value for a number of High priority threads
+ * (on the running hardware).
+ *
+ * If std::thread::hardware_concurrency < 3, then the value is 1,
+ * If std::thread::hardware_concurrency == 3, then the value is 2,
+ * If std::thread::hardware_concurrency == 4, then the value is 3,
+ * otherwise the returned value shouldn't be greater than 75% of std::thread::hardware_concurrency.
+ *
+ * @param nTestingHCValue The argument used for testing purposes.
+ * @return Returns a number of high priority threads supported by the platform.
+ */
+size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
+
+/**
  * Limit mempool size.
  *
  * @param pool A reference to the mempool
