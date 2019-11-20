@@ -368,9 +368,12 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
         { {0x2}, {0x2}, true, SCRIPT_ERR_OK, {0x2, 0x0}},
 
         // -ve numbers 
-        { {0x81}, {0x1}, true, SCRIPT_ERR_OK, {0x81}},              // -1
-        { {0x81}, {0x2}, true, SCRIPT_ERR_OK, {0x1, 0x80}},         // -1
-        { {0x81}, {0x3}, true, SCRIPT_ERR_OK, {0x1, 0x0, 0x80}},    // -1
+        { {0x81}, {0x1}, true, SCRIPT_ERR_OK, {0x81}},          
+        { {0x81}, {0x2}, true, SCRIPT_ERR_OK, {0x1, 0x80}},     
+        { {0x81}, {0x3}, true, SCRIPT_ERR_OK, {0x1, 0x0, 0x80}},
+
+        // -ve length
+        { {0x1}, {0x81}, false, SCRIPT_ERR_PUSH_SIZE, {0x1}},
 
         // requested length to short
         { {0x1}, {}, false, SCRIPT_ERR_IMPOSSIBLE_ENCODING, {0x1}},
