@@ -103,11 +103,10 @@ void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
 }
 
 size_t CTxnValidator::GetTransactionsInQueueCount() const {
-    std::unique_lock<std::shared_mutex> lock1{mStdTxnsMtx, std::defer_lock};
-    std::unique_lock<std::shared_mutex> lock2(mNonStdTxnsMtx, std::defer_lock);
-    std::unique_lock<std::shared_mutex> lock3{mProcessingQueueMtx, std::defer_lock};
-    std::lock(lock1, lock2, lock3);
-
+    // Take shared locks in the following order.
+    std::shared_lock lock1 { mStdTxnsMtx };
+    std::shared_lock lock2 { mNonStdTxnsMtx };
+    std::shared_lock lock3 { mProcessingQueueMtx };
     return mStdTxns.size() + mNonStdTxns.size() + mProcessingQueue.size();
 }
 
