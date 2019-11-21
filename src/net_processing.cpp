@@ -2330,10 +2330,14 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
     }
     // Enqueue txn for validation if it is not known
     if(!AlreadyHave(inv)) {
+        // Check if the given txn is standard.
+        std::string sReason;
+        bool fStandard = IsStandardTx(config, tx, chainActiveHeight + 1, sReason);
         // Forward transaction to the validator thread.
         connman.EnqueueTxnForValidator(
 					std::make_shared<CTxInputData>(
                                         TxSource::p2p,  // tx source
+                                        fStandard ? TxType::standard : TxType::nonstandard,  // tx type
                                         std::move(ptx), // a pointer to the tx
                                         GetTime(),      // nAcceptTime
                                         true,           // fLimitFree

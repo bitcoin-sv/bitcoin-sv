@@ -86,38 +86,63 @@ std::shared_ptr<CTxnRecentRejects> CTxnValidator::getTxnRecentRejectsPtr() {
 
 /** Wait for the Validator to process all queued txns. Used to support testing. */
 void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
-    std::shared_lock lock { mNewTxnsMtx };
-    mTxnsProcessedCV.wait(lock,
-            [&] { return !mNewTxns.size() &&
-                         (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
+    // Check the standard queue.
+    {
+        std::shared_lock lock { mStdTxnsMtx };
+        mTxnsProcessedCV.wait(lock,
+                [&] { return !mStdTxns.size() &&
+                             (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
+    }
+    // Check the non-standard queue.
+    {
+        std::shared_lock lock { mNonStdTxnsMtx };
+        mTxnsProcessedCV.wait(lock,
+                [&] { return !mNonStdTxns.size() &&
+                             (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
+    }
 }
 
-size_t CTxnValidator::GetTransactionsInQueueCount() const
-{
-    std::unique_lock<std::shared_mutex> lock1{mNewTxnsMtx, std::defer_lock};
-    std::unique_lock<std::shared_mutex> lock2{mProcessingQueueMtx, std::defer_lock};
-    std::lock(lock1, lock2);
-
-    return mNewTxns.size() + mProcessingQueue.size();
+size_t CTxnValidator::GetTransactionsInQueueCount() const {
+    // Take shared locks in the following order.
+    std::shared_lock lock1 { mStdTxnsMtx };
+    std::shared_lock lock2 { mNonStdTxnsMtx };
+    std::shared_lock lock3 { mProcessingQueueMtx };
+    return mStdTxns.size() + mNonStdTxns.size() + mProcessingQueue.size();
 }
 
 /** Handle a new transaction */
 void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
+
     const TxId& txid = pTxInputData->mpTx->GetId();
-    // Check if exists in mNewTxns
-    std::unique_lock lock { mNewTxnsMtx };
-    if (!isTxnKnownInSetNL(txid, mNewTxns)) {
-        // Check if exists in mProcessingQueue
-        std::shared_lock lock2 { mProcessingQueueMtx };
-        if (!isTxnKnownInSetNL(txid, mProcessingQueue)) {
-            // Add the given txn to the list of new transactions.
-            mNewTxns.emplace_back(std::move(pTxInputData));
+    const TxType& txtype = pTxInputData->mTxType;
+    // Check if exists in mStdTxns
+    if (TxType::standard == txtype || TxType::unknown == txtype) {
+        std::unique_lock lock { mStdTxnsMtx };
+        if (!isTxnKnownInSetNL(txid, mStdTxns)) {
+            // Check if exists in mProcessingQueue
+            std::shared_lock lock2 { mProcessingQueueMtx };
+            if (!isTxnKnownInSetNL(txid, mProcessingQueue)) {
+                // Add the given txn to the list of new standard transactions.
+                mStdTxns.emplace_back(std::move(pTxInputData));
+            }
+        }
+    }
+    // Check if exists in mNonStdTxns
+    else if (TxType::nonstandard == txtype) {
+        std::unique_lock lock { mNonStdTxnsMtx };
+        if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
+            // Check if exists in mProcessingQueue
+            std::shared_lock lock2 { mProcessingQueueMtx };
+            if (!isTxnKnownInSetNL(txid, mProcessingQueue)) {
+                // Add the given txn to the list of new non-standard transactions.
+                mNonStdTxns.emplace_back(std::move(pTxInputData));
+            }
         }
     }
 }
 
 /** Handle a batch of new transactions */
-void CTxnValidator::newTransaction(std::vector<TxInputDataSPtr> vTxInputData) {
+void CTxnValidator::newTransaction(TxInputDataSPtrVec vTxInputData) {
     // Add it to the list of new transactions
     for (auto&& txInputData : vTxInputData) {
         newTransaction(std::move(txInputData));
@@ -187,10 +212,6 @@ void CTxnValidator::processValidation(
     if (!vTxInputDataSize) {
         return;
     }
-    // Get a threshold value for a minimum number of txns that we want to assign per task
-    size_t nTxnsPerTaskThreshold {
-        static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
-    };
     // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
     // A synchronous interface locks mtxs in the following order:
     // - first: cs_main
@@ -216,7 +237,7 @@ void CTxnValidator::processValidation(
     do {
         // Execute parallel validation
         auto vCurrAcceptedTxns {
-            processNewTransactionsNL(vTxInputData, handlers, nTxnsPerTaskThreshold, fReadyForFeeEstimation)
+            processNewTransactionsNL(vTxInputData, handlers, fReadyForFeeEstimation)
         };
         vAcceptedTxns.insert(vAcceptedTxns.end(),
             std::make_move_iterator(vCurrAcceptedTxns.begin()),
@@ -253,10 +274,25 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
     try {
         RenameThread("bitcoin-txnvalidator");
         LogPrint(BCLog::TXNVAL, "New transaction handling thread. Starting validator.\n");
-        // Get a threshold value for a minimum number of txns that we want to assign per task
-        size_t nTxnsPerTaskThreshold {
-            static_cast<size_t>(gArgs.GetArg("-txnspertaskthreshold", DEFAULT_TXNS_PER_TASK_THRESHOLD))
+        // Get a number of High and Low priority threads.
+        size_t nNumStdTxValidationThreads {
+            static_cast<size_t>(
+                    gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs()))
         };
+        size_t nNumNonStdTxValidationThreads {
+            static_cast<size_t>(
+                    gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))
+        };
+        // Get a ratio for std and nonstd txns to be scheduled for validation in a single iteration.
+        size_t nMaxStdTxnsPerThreadRatio {
+            static_cast<size_t>(
+                    gArgs.GetArg("-maxstdtxnsperthreadratio", DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO))
+        };
+        size_t nMaxNonStdTxnsPerThreadRatio {
+            static_cast<size_t>(
+                    gArgs.GetArg("-maxnonstdtxnsperthreadratio", DEFAULT_MAX_NON_STD_TXNS_PER_THREAD_RATIO))
+        };
+        // Get mempool limits.
         size_t nMaxMempoolSize = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
         unsigned long nMempoolExpiry = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
         // The main running loop
@@ -281,12 +317,32 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         if (!lockMain) {
                             continue;
                         }
-                        // Lock mNewTxnsMtx & mProcessingQueueMtx for a minimal duration to get all queued txns.
+                        // Lock mStdTxnsMtx, mNonStdTxnsMtx & mProcessingQueueMtx for a minimal duration to get queued txns.
                         {
-                            std::unique_lock<std::shared_mutex> lock1(mNewTxnsMtx, std::defer_lock);
-                            std::unique_lock<std::shared_mutex> lock2(mProcessingQueueMtx, std::defer_lock);
-                            std::lock(lock1, lock2);
-                            mProcessingQueue = std::move_if_noexcept(mNewTxns);
+                            std::unique_lock<std::shared_mutex> lock1(mStdTxnsMtx, std::defer_lock);
+                            std::unique_lock<std::shared_mutex> lock2(mNonStdTxnsMtx, std::defer_lock);
+                            std::unique_lock<std::shared_mutex> lock3(mProcessingQueueMtx, std::defer_lock);
+                            std::lock(lock1, lock2, lock3);
+                            // Get a required number of standard txns if any exists
+                            size_t nNumOfStdTxns = mStdTxns.size();
+                            size_t nMaxNumOfStdTxnsToSchedule = nMaxStdTxnsPerThreadRatio * nNumStdTxValidationThreads;
+                            if (nNumOfStdTxns) {
+                                LogPrint(BCLog::TXNVAL, "Txnval-asynch: The Standard queue, size= %d\n",
+                                         nNumOfStdTxns);
+                                if (nNumOfStdTxns < nMaxNumOfStdTxnsToSchedule) {
+                                    mProcessingQueue = std::move_if_noexcept(mStdTxns);
+                                } else {
+                                    collectTxns(mProcessingQueue, mStdTxns, nNumOfStdTxns, nMaxNumOfStdTxnsToSchedule);
+                                }
+                            }
+                            // Get a required number of non-standard txns if any exists
+                            size_t nNumOfNonStdTxns = mNonStdTxns.size();
+                            size_t nMaxNumOfNonStdTxnsToSchedule = nMaxNonStdTxnsPerThreadRatio * nNumNonStdTxValidationThreads;
+                            if (nNumOfNonStdTxns) {
+                                LogPrint(BCLog::TXNVAL, "Txnval-asynch: The Non-standard queue, size= %d\n",
+                                         nNumOfNonStdTxns);
+                                collectTxns(mProcessingQueue, mNonStdTxns, nNumOfNonStdTxns, nMaxNumOfNonStdTxnsToSchedule);
+                            }
                         }
                         // Lock processing queue in a shared mode as it might be queried during processing.
                         {
@@ -309,7 +365,6 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     processNewTransactionsNL(
                                             mProcessingQueue,
                                             handlers,
-                                            nTxnsPerTaskThreshold,
                                             fReadyForFeeEstimation)
                                 };
                                 // Trim mempool if it's size exceeds the limit.
@@ -367,39 +422,34 @@ std::vector<TxInputDataSPtr>
 CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
     CTxnHandlers& handlers,
-    size_t nTxnsPerTaskThreshold,
     bool fReadyForFeeEstimation) {
 
-    auto tx_validation = [](const TxInputDataSPtrRefVec& vTxInputData,
-                            const Config* config,
-                            CTxMemPool *pool,
-                            CTxnHandlers& handlers,
-                            bool fReadyForFeeEstimation) {
-        return TxnValidationBatchProcessing(
-                     vTxInputData,
-                    *config,
-                    *pool,
-                     handlers,
-                     fReadyForFeeEstimation);
-    };
-    // Trigger parallel validation for txns
+    // Trigger parallel validation
     auto results {
-        g_connman->ParallelTxValidationBatchProcessing(
-                        tx_validation,
-                        nTxnsPerTaskThreshold,
-                        &mConfig,
-                        &mMempool,
-                        txns,
-                        handlers,
-                        fReadyForFeeEstimation)
+        g_connman->
+            ParallelTxnValidation(
+                [](const TxInputDataSPtr& pTxInputData,
+                    const Config* config,
+                    CTxMemPool *pool,
+                    CTxnHandlers& handlers,
+                    bool fReadyForFeeEstimation) {
+                    return TxnValidationProcessingTask(
+                                pTxInputData,
+                               *config,
+                               *pool,
+                                handlers,
+                                fReadyForFeeEstimation);
+                },
+                &mConfig,
+                &mMempool,
+                txns,
+                handlers,
+                fReadyForFeeEstimation)
     };
-    // Process validation results for transactions.
+    // Process validation results
     std::vector<TxInputDataSPtr> vAcceptedTxns {};
-    for(auto& task_result : results) {
-        auto vBatchResults = task_result.get();
-        for (auto& result : vBatchResults) {
-            postValidationStepsNL(result, vAcceptedTxns);
-        }
+    for(auto& result : results) {
+        postValidationStepsNL(result.get(), vAcceptedTxns);
     }
     return vAcceptedTxns;
 }
@@ -459,8 +509,8 @@ void CTxnValidator::postProcessingStepsNL(
     }
 }
 
-// The method needs to take mNewTxnsMtx lock to move collected orphan txns
-// to the mNewTxns queue.
+// The method needs to take mStdTxnsMtx lock to move collected orphan txns
+// to the mStdTxns queue.
 // Collected orphnas are created as copies and not removed from the orphan's queue.
 size_t CTxnValidator::scheduleOrphanP2PTxnsForRetry() {
     /** Get p2p orphan txns */
@@ -468,8 +518,8 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForRetry() {
     size_t nOrphanTxnsNum { vOrphanTxns.size() };
     if (nOrphanTxnsNum) {
         // Move p2p orphan txns into the main queue
-        std::unique_lock lock { mNewTxnsMtx };
-        mNewTxns.insert(mNewTxns.end(),
+        std::unique_lock lock { mStdTxnsMtx };
+        mStdTxns.insert(mStdTxns.end(),
             std::make_move_iterator(vOrphanTxns.begin()),
             std::make_move_iterator(vOrphanTxns.end()));
     }
@@ -477,31 +527,17 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForRetry() {
 }
 
 bool CTxnValidator::isTxnKnown(const uint256& txid) const {
-    // Check if exists in mNewTxns
-    std::shared_lock lock { mNewTxnsMtx };
-    if (!isTxnKnownInSetNL(txid, mNewTxns)) {
-        // Check if exists in mProcessingQueue
-        std::shared_lock lock2 { mProcessingQueueMtx };
-        return isTxnKnownInSetNL(txid, mProcessingQueue);
+    // Check if exists in standard queue
+    std::shared_lock lock1 { mStdTxnsMtx };
+    if (!isTxnKnownInSetNL(txid, mStdTxns)) {
+        // Check if exists in non-standard queue
+        std::shared_lock lock2 { mNonStdTxnsMtx };
+        if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
+            // Check if exists in mProcessingQueue
+            std::shared_lock lock3 { mProcessingQueueMtx };
+            return isTxnKnownInSetNL(txid, mProcessingQueue);
+        }
     }
     // Txn is already known
     return true;
-}
-
-bool CTxnValidator::isTxnKnownInSetNL(
-    const uint256& txid,
-    const std::vector<TxInputDataSPtr>& vTxns) const {
-
-    return findIfTxnIsInSetNL(txid, vTxns) != vTxns.end();
-}
-
-std::vector<TxInputDataSPtr>::const_iterator CTxnValidator::findIfTxnIsInSetNL(
-    const uint256& txid,
-    const std::vector<TxInputDataSPtr>& vTxns) const {
-
-    return std::find_if(
-            vTxns.begin(),
-            vTxns.end(),
-            [&txid](const TxInputDataSPtr& ptxInputData){
-                return ptxInputData->mpTx->GetId() == txid; });
 }

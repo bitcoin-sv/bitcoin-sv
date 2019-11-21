@@ -1038,9 +1038,21 @@ std::string HelpMessage(HelpMessageMode mode) {
     /** TxnValidator */
     strUsage += HelpMessageGroup(_("TxnValidator options:"));
     strUsage += HelpMessageOpt(
-        "-txnspertaskthreshold=<n>",
-        strprintf("Set the limit on the min number of txns per task (default: %d)",
-            DEFAULT_TXNS_PER_TASK_THRESHOLD)) ;
+        "-numstdtxvalidationthreads=<n>",
+        strprintf(_("Set the number of 'High' priority threads used to validate standard txns (dynamically calculated default: %d)"),
+            GetNumHighPriorityValidationThrs())) ;
+    strUsage += HelpMessageOpt(
+        "-numnonstdtxvalidationthreads=<n>",
+        strprintf(_("Set the number of 'Low' priority threads used to validate non-standard txns (dynamically calculated default: %d)"),
+            GetNumLowPriorityValidationThrs())) ;
+    strUsage += HelpMessageOpt(
+        "-maxstdtxnsperthreadratio=<n>",
+        strprintf(_("Set the max ratio for a number of standard txns per 'High' priority thread (default: %d)"),
+            DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO)) ;
+    strUsage += HelpMessageOpt(
+        "-maxnonstdtxnsperthreadratio=<n>",
+        strprintf(_("Set the max ratio for a number of non-standard txns per 'Low' priority thread (default: %d)"),
+            DEFAULT_MAX_NON_STD_TXNS_PER_THREAD_RATIO)) ;
     strUsage += HelpMessageOpt(
         "-txnvalidationasynchrunfreq=<n>",
         strprintf("Set run frequency in asynchronous mode (default: %dms)",

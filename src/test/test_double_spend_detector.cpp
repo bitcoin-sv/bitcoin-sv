@@ -33,6 +33,7 @@ namespace {
         // Return a shared object with txn's input data
         return std::make_shared<CTxInputData>(
                                     source,                   // tx source
+                                    TxType::unknown,          // tx type
                                     MakeTransactionRef(tx));  // a pointer to the tx
     }
 }

@@ -76,10 +76,12 @@ class P2PInvMsgTimeOrder(BitcoinTestFramework):
                 transaction_list_by_time.append(txts.hash)
                 connection.send_message(msg_tx(txts))
 
-            wait_until(lambda: transaction_list_by_time == txinvs, timeout=20)
+            # Due to asynchronous validation we can not expect that an order of receiving transactions is the same as order of sending.
+            for txid in transaction_list_by_time:
+                wait_until(lambda:  txid in txinvs, timeout=20)
 
-            # Assert if order of receiving transactions is the same as order of sending
-            assert_equal(transaction_list_by_time == txinvs, True)
+            # Assert the number of received transactions is the same as the number of sent transactions.
+            assert_equal(len(transaction_list_by_time), len(txinvs))
 
     def run_test(self):
         self.run_test_parametrized()

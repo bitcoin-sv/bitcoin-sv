@@ -4589,6 +4589,7 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
     state = txValidator->processValidation(
                             std::make_shared<CTxInputData>(
                                                 TxSource::wallet, // tx source
+                                                TxType::unknown, // tx type (we don't need to check it)
                                                 tx,           // a pointer to the tx
                                                 GetTime(),    // nAcceptTime
                                                 true,         // fLimitFree

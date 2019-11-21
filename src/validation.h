@@ -580,6 +580,32 @@ bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight 
 int GetGenesisActivationHeight(const Config& config);
 
 /**
+ * A function used to produce a default value for a number of Low priority threads
+ * (on the running hardware).
+ *
+ * If std::thread::hardware_concurrency < 8, then the value is 1, otherwise the returned value
+ * shouldn't be greater than 25% of std::thread::hardware_concurrency.
+ *
+ * @param nTestingHCValue The argument used for testing purposes.
+ * @return Returns a number of low priority threads supported by the platform.
+ */
+size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
+
+/**
+ * A function used to produce a default value for a number of High priority threads
+ * (on the running hardware).
+ *
+ * If std::thread::hardware_concurrency < 3, then the value is 1,
+ * If std::thread::hardware_concurrency == 3, then the value is 2,
+ * If std::thread::hardware_concurrency == 4, then the value is 3,
+ * otherwise the returned value shouldn't be greater than 75% of std::thread::hardware_concurrency.
+ *
+ * @param nTestingHCValue The argument used for testing purposes.
+ * @return Returns a number of high priority threads supported by the platform.
+ */
+size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
+
+/**
  * Limit mempool size.
  *
  * @param pool A reference to the mempool
@@ -641,15 +667,15 @@ CTxnValResult TxnValidation(
 /**
  * Batch processing support for txns validation.
  *
- * @param vTxInputData A vector of txns data
+ * @param pTxInputData A reference to transaction's details
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
  * @param handlers Txn handlers
  * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
  * @return A vector of validation results
  */
-std::vector<CTxnValResult> TxnValidationBatchProcessing(
-    const TxInputDataSPtrRefVec& vTxInputData,
+CTxnValResult TxnValidationProcessingTask(
+    const TxInputDataSPtr& pTxInputData,
     const Config &config,
     CTxMemPool &pool,
     CTxnHandlers& handlers,
@@ -958,6 +984,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex);
 
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
+extern std::atomic_int chainActiveHeight;
 
 /** Global variable that points to the active CCoinsView (protected by cs_main)
  */

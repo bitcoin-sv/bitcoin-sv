@@ -72,6 +72,7 @@ CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
 CChain chainActive;
+std::atomic_int chainActiveHeight {0};
 CBlockIndex *pindexBestHeader = nullptr;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -917,6 +918,36 @@ static uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) 
     return scriptVerifyFlags;
 }
 
+size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue) {
+    size_t numHardwareThrs {0};
+	// nTestingHCValue used by UTs
+	if (nTestingHCValue == SIZE_MAX) {
+		numHardwareThrs = std::thread::hardware_concurrency();
+	} else {
+		numHardwareThrs = nTestingHCValue;
+	}
+    // Calculate a number of low priority threads
+    if (numHardwareThrs < 4) {
+        return 1;
+    }
+    return static_cast<size_t>(numHardwareThrs * 0.25);
+}
+
+size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue) {
+	size_t numHardwareThrs {0};
+	// nTestingHCValue used by UTs
+	if (nTestingHCValue == SIZE_MAX) {
+		numHardwareThrs = std::thread::hardware_concurrency();
+	} else {
+		numHardwareThrs = nTestingHCValue;
+	}
+	// Calculate number of high priority threads
+	if (!numHardwareThrs || numHardwareThrs == 1) {
+		return 1;
+	}
+    return numHardwareThrs - GetNumLowPriorityValidationThrs(numHardwareThrs);
+}
+
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const CJournalChangeSetPtr& changeSet,
@@ -1011,7 +1042,10 @@ CTxnValResult TxnValidation(
     //          but we will mine it nevertheless. Anyone can collect such
     //          coin by providing OP_1 unlock script
     std::string reason;
-    if (fRequireStandard && !IsStandardTx(config, tx, chainActive.Height() + 1, reason)) {
+    bool fStandard = IsStandardTx(config, tx, chainActive.Height() + 1, reason);
+    // Update txn's type.
+    pTxInputData->mTxType = fStandard ? TxType::standard : TxType::nonstandard;
+    if (fRequireStandard && !fStandard) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                   reason);
         return Result{state, pTxInputData};
@@ -1308,31 +1342,26 @@ CTxnValResult TxnValidation(
                   fTxValidForFeeEstimation};
 }
 
-std::vector<CTxnValResult> TxnValidationBatchProcessing(
-    const TxInputDataSPtrRefVec& vTxInputData,
+CTxnValResult TxnValidationProcessingTask(
+    const TxInputDataSPtr& txInputData,
     const Config& config,
     CTxMemPool& pool,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation) {
 
-    std::vector<CTxnValResult> results {};
-    results.reserve(vTxInputData.size());
-    for (const auto& elem : vTxInputData) {
-        // Execute validation for the given txn
-        CTxnValResult result {
-            TxnValidation(
-                    elem,
-                    config,
-                    pool,
-                    handlers.mpTxnDoubleSpendDetector,
-                    fReadyForFeeEstimation)
-        };
-        // Process validated results
-        ProcessValidatedTxn(pool, result, handlers, false);
-        // Forward results to the next processing stage
-        results.emplace_back(std::move(result));
-    }
-    return results;
+    // Execute validation for the given txn
+    CTxnValResult result {
+        TxnValidation(
+                txInputData,
+                config,
+                pool,
+                handlers.mpTxnDoubleSpendDetector,
+                fReadyForFeeEstimation)
+    };
+    // Process validated results
+    ProcessValidatedTxn(pool, result, handlers, false);
+    // Forward results to the next processing stage
+    return std::move(result);
 }
 
 static void HandleInvalidP2POrphanTxn(
@@ -1360,6 +1389,7 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
     const TxSource source = txStatus.mTxInputData->mTxSource;
+    const TxType type = txStatus.mTxInputData->mTxType;
     std::string sTxnStatusMsg;
     if (state.IsMissingInputs()) {
         sTxnStatusMsg = "detected orphan";
@@ -1369,8 +1399,9 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
         sTxnStatusMsg = "rejected " + FormatStateMessage(state);
     }
     LogPrint(BCLog::TXNVAL,
-            "%s: txn= %s %s\n",
+            "%s: %s txn= %s %s\n",
              enum_cast<std::string>(source),
+             enum_cast<std::string>(type),
              tx.GetId().ToString(),
              sTxnStatusMsg);
 }
@@ -1386,6 +1417,7 @@ static void LogTxnCommitStatus(
     const CValidationState& state = txStatus.mState;
     const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
     const TxSource source = txStatus.mTxInputData->mTxSource;
+    const TxType type = txStatus.mTxInputData->mTxType;
     const std::string csPeerId {
         TxSource::p2p == source ? (pNode ? std::to_string(pNode->GetId()) : "-1")  : ""
     };
@@ -1405,8 +1437,9 @@ static void LogTxnCommitStatus(
         sTxnStatusMsg += FormatStateMessage(state);
     }
     LogPrint(state.IsValid() ? BCLog::MEMPOOL : BCLog::MEMPOOLREJ,
-            "%s: txn= %s %s (poolsz %u txn, %u kB) %s\n",
+            "%s: %s txn= %s %s (poolsz %u txn, %u kB) %s\n",
              enum_cast<std::string>(source),
+             enum_cast<std::string>(type),
              tx.GetId().ToString(),
              sTxnStatusMsg,
              nMempoolSize,
@@ -1777,6 +1810,7 @@ static void UpdateMempoolForReorg(const Config &config,
             vTxInputData.emplace_back(
                     std::make_shared<CTxInputData>(
                                         TxSource::reorg,  // tx source
+                                        TxType::unknown,  // tx type (we don't need to check it)
                                         *it,              // a pointer to the tx
                                         GetTime(),        // nAcceptTime
                                         false));          // fLimitFree
@@ -3376,6 +3410,7 @@ void PruneAndFlush() {
  */
 static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
     chainActive.SetTip(pindexNew);
+    chainActiveHeight = chainActive.Height();
 
     // New best block
     mempool.AddTransactionsUpdated(1);
@@ -5458,6 +5493,7 @@ void LoadChainTip(const CChainParams &chainparams) {
     }
 
     chainActive.SetTip(it->second);
+    chainActiveHeight = chainActive.Height();
 
     PruneBlockIndexCandidates();
 
@@ -5811,6 +5847,7 @@ void UnloadBlockIndex() {
     LOCK(cs_main);
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
+    chainActiveHeight = 0;
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
     mempool.Clear();
@@ -6417,6 +6454,7 @@ bool LoadMempool(const Config &config) {
                     txValidator->processValidation(
                                         std::make_shared<CTxInputData>(
                                                             TxSource::file, // tx source
+                                                            TxType::unknown,  // tx type (we don't need to check it)
                                                             tx,    // a pointer to the tx
                                                             nTime, // nAcceptTime
                                                             true),  // fLimitFree
