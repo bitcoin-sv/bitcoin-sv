@@ -107,6 +107,9 @@ static const int DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = MAX_OPS_PER_SCRIP
 // Default policy value for maximum number of public keys per multisig after GENESIS
 static const uint64_t DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS = MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS;
 
+/** Maximum stack memory usage (used instead of MAX_SCRIPT_ELEMENT_SIZE and MAX_STACK_ELEMENTS) after Genesis. **/
+static const uint64_t DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS = 100 * ONE_MEGABYTE;
+
 /**
  * Standard script verification flags that standard transactions will comply
  * with. However scripts violating these flags may still be present in valid
