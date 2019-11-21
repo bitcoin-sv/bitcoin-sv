@@ -299,6 +299,11 @@ public:
         using namespace std::chrono_literals;
 
         // Try to gracefully terminate running threads
+        //
+        // 10s is the longest duration that we expect one script OP code to take
+        // before checking mQuit (session token is assumed to already being
+        // canceled at this point) so we wait for 20s which should be more than
+        // enough.
         while(std::chrono::steady_clock::now() - begin < 20s)
         {
             if(mSpawnedWorkersCount == 0)
