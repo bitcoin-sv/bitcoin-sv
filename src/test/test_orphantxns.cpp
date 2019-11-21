@@ -135,7 +135,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 0);
 }
 
-BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
+BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_size) {
     CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
     // Create orphan txn's object.
     std::shared_ptr<COrphanTxns> orphanTxns {
@@ -144,18 +144,24 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
                 maxExtraTxnsForCompactBlock,
                 maxTxSizePolicy)
     };
-    size_t nTxnsNumber=100;
+    size_t nTxnsNumber=1000;
     CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
     // Create orphan transactions:
     OrphanTxnsObjectCreateNOrphanTxns(orphanTxns, TxSource::p2p, nTxnsNumber, asyncTaskPool);
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
-    // Test limit function:
-    orphanTxns->limitTxnsNumber(40);
-    BOOST_CHECK(orphanTxns->getTxnsNumber() == 40);
-    orphanTxns->limitTxnsNumber(10);
+    // Test limit function: (each generated transaction is 86 bytes long)
+    orphanTxns->limitTxnsSize(86000);
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 1000);
+    orphanTxns->limitTxnsSize(860);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 10);
-    orphanTxns->limitTxnsNumber(0);
+     orphanTxns->limitTxnsSize(859);
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 9);
+    orphanTxns->limitTxnsSize(86);
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 1);
+    orphanTxns->limitTxnsSize(85);
+    BOOST_CHECK(orphanTxns->getTxnsNumber() == 0);
+    orphanTxns->limitTxnsSize(0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 0);
 }
 

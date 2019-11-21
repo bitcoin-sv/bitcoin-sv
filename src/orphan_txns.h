@@ -15,6 +15,7 @@
 struct COrphanTxnEntry {
     TxInputDataSPtr pTxInputData {nullptr};
     int64_t nTimeExpire {};
+    unsigned int size{};
 };
 
 struct IterComparator {
@@ -45,9 +46,8 @@ class COrphanTxns {
   public:
     /** A default max limit for collected outpoints */
     static constexpr unsigned int DEFAULT_MAX_COLLECTED_OUTPOINTS = 300000;
-    /** Default for -maxorphantx, maximum number of orphan transactions kept in
-     *  memory */
-    static constexpr unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 5000;
+    /** Default for -maxorphantxssize, maximum size of orphan transactions is 10 MB*/
+    static constexpr unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE = 10 * ONE_MEGABYTE;
     /** Default number of orphan+recently-replaced txn to keep around for block
      *  reconstruction */
     static constexpr unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
@@ -82,8 +82,8 @@ class COrphanTxns {
     std::vector<uint256> getTxnsHash(const COutPoint& prevout) const;
     /** Get extra transactions needed by block's reconstruction */
     CompactExtraTxnsVec getCompactExtraTxns() const;
-    /** Limit a number of orphan transaction */
-    unsigned int limitTxnsNumber(unsigned int nMaxOrphanTxns, bool fSkipRndEviction=false);
+    /** Limit a number of orphan transactions size */
+    unsigned int limitTxnsSize(unsigned int nMaxOrphanTxnsSize, bool fSkipRndEviction=false);
     /** Collect dependent transactions which might be processed later */
     std::vector<TxInputDataSPtr> collectDependentTxnsForRetry();
     /** Collect txn's outpoints which will be used to find any dependant orphan txn */

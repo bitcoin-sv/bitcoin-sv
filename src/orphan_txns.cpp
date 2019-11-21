@@ -35,12 +35,12 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
         if (checkTxnExistsNL(txid)) {
             return;
         }
-        // Ignore big transactions, to avoid a send-big-orphans memory exhaustion
-        // attack. If a peer has a legitimate large transaction with a missing
-        // parent then we assume it will rebroadcast it later, after the parent
-        // transaction(s) have been mined or received.
+
+        // Ignore if transaction is bigger than MAX_STANDARD_TX_SIZE. 
+        // Since we support big transactions we do not limit number of orphan transactions
+        // but combined size of those transactions. limitTxnsSize is called after adding.
+        unsigned int sz = tx.GetTotalSize();
         if (TxSource::p2p == pTxInputData->mTxSource) {
-            unsigned int sz = tx.GetTotalSize();
             if (sz >= mMaxStandardTxSize /*mMaxStandardTxSize is always set to after genesis value. If non default value is used for policy tx size then orphan tx before genesis might not get accepted by mempool */) {
                 LogPrint(BCLog::MEMPOOL,
                          "ignoring large orphan tx (size: %u, hash: %s)\n", sz,
@@ -50,7 +50,7 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
             addToCompactExtraTxns(ptx);
         }
         auto ret = mOrphanTxns.emplace(
-            txid, COrphanTxnEntry{pTxInputData, GetTime() + ORPHAN_TX_EXPIRE_TIME});
+            txid, COrphanTxnEntry{pTxInputData, GetTime() + ORPHAN_TX_EXPIRE_TIME, sz});
         assert(ret.second);
         for (const CTxIn &txin : tx.vin) {
             mOrphanTxnsByPrev[txin.prevout].insert(ret.first);
@@ -152,9 +152,10 @@ CompactExtraTxnsVec COrphanTxns::getCompactExtraTxns() const {
     return mExtraTxnsForCompact;
 }
 
-unsigned int COrphanTxns::limitTxnsNumber(unsigned int nMaxOrphanTxns,
+unsigned int COrphanTxns::limitTxnsSize(unsigned int nMaxOrphanTxnsSize,
                                           bool fSkipRndEviction) {
     unsigned int nEvicted {0};
+    uint64_t nOrphanTxnsSize {0};
     int64_t nNow {0};
     int64_t nMinExpTime {0};
     int nErasedTimeLimit {0};
@@ -166,13 +167,20 @@ unsigned int COrphanTxns::limitTxnsNumber(unsigned int nMaxOrphanTxns,
         OrphanTxnsIter iter = mOrphanTxns.begin();
         while (iter != mOrphanTxns.end()) {
             OrphanTxnsIter maybeErase = iter++;
+            unsigned int txSize =  maybeErase->second.size;
             const CTransactionRef& ptx = maybeErase->second.pTxInputData->mpTx;
             if (mNextSweep <= nNow) {
                 if (maybeErase->second.nTimeExpire <= nNow) {
                     nErasedTimeLimit += eraseTxnNL(ptx->GetId());
                 } else {
                     nMinExpTime = std::min(maybeErase->second.nTimeExpire, nMinExpTime);
+                    // Calculate size of all transactions
+                    nOrphanTxnsSize += txSize;
                 }
+            }
+            else
+            {
+                nOrphanTxnsSize +=txSize;
             }
         }
         if (mNextSweep <= nNow) {
@@ -180,13 +188,26 @@ unsigned int COrphanTxns::limitTxnsNumber(unsigned int nMaxOrphanTxns,
             // batch the linear scan.
             mNextSweep = nMinExpTime + ORPHAN_TX_EXPIRE_INTERVAL;
         }
+
         // If the limit is still not reached then remove a random txn
-        while (!fSkipRndEviction && mOrphanTxns.size() > nMaxOrphanTxns) {
-            // Evict a random orphan:
+        while (!fSkipRndEviction && nOrphanTxnsSize > nMaxOrphanTxnsSize) {
             uint256 randomhash = GetRandHash();
             OrphanTxnsIter it = mOrphanTxns.lower_bound(randomhash);
             if (it == mOrphanTxns.end()) {
                 it = mOrphanTxns.begin();
+            }
+            
+            const CTransactionRef& ptx = it->second.pTxInputData->mpTx;
+            const CTransaction& tx = *ptx;
+            // Make sure we never go below 0 (causing overflow in uint)
+            unsigned int txTotalSize = tx.GetTotalSize();
+            if (txTotalSize >= nOrphanTxnsSize)
+            {
+                nOrphanTxnsSize = 0;
+            }
+            else
+            {
+                nOrphanTxnsSize -= txTotalSize;
             }
             eraseTxnNL(it->first);
             ++nEvicted;
@@ -198,6 +219,7 @@ unsigned int COrphanTxns::limitTxnsNumber(unsigned int nMaxOrphanTxns,
                 "Erased %d orphan txn due to expiration\n",
                  nErasedTimeLimit);
     }
+
     return nEvicted;
 }
 
