@@ -61,10 +61,15 @@ namespace bsv
         friend std::ostream& operator<<(std::ostream&, const bint&);
 
         friend bool is_negative(const bint&);
+
         friend std::size_t to_size_t_limited(const bint&);
-        
+
+        std::vector<uint8_t> serialize() const;
+        static bint deserialize(const std::vector<uint8_t>&);
+
     private:
-        int spaceship_operator(const bint&) const; // auto operator<=>(const bint&) in C++20
+        int spaceship_operator(
+            const bint&) const; // auto operator<=>(const bint&) in C++20
         void negate();
 
         int size_bits() const;
@@ -167,6 +172,20 @@ namespace bsv
     bint abs(const bint&);
     std::string to_string(const bint&);
     std::size_t to_size_t_limited(const bint&);
+
+    template <typename O>
+    inline void serialize(const bint& n, O o)
+    {
+        const std::vector<uint8_t> v{n.serialize()};
+        std::copy(begin(v), end(v), o);
+    }
+
+    template <typename I>
+    bint deserialize(I first, I last)
+    {
+        std::vector<uint8_t> v(first, last);
+        return bint::deserialize(v);
+    }
 }
 
 namespace std
