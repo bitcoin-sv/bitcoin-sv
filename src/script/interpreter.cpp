@@ -432,7 +432,8 @@ std::optional<bool> EvalScript(
     }
     int nOpCount = 0;
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-    const bool big_ints_enabled = (flags & SCRIPT_UTXO_AFTER_GENESIS) != 0;
+    const bool genesis_rules_enabled{(flags & SCRIPT_GENESIS) != 0};
+    const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
     const int big_ints_byte_limit{500}; // To do: Make configurable
                                         // MAX_SCRIPT_ELEMENT_SIZE = 520
 
@@ -1123,15 +1124,15 @@ std::optional<bool> EvalScript(
                             return set_error(serror, SCRIPT_ERR_INVALID_OPERAND_SIZE);
 
                         CScriptNum bn1(arg_2, fRequireMinimal,
-                                       big_ints_enabled
+                                       utxo_after_genesis
                                            ? stacktop(-2).size()
                                            : CScriptNum::MAXIMUM_ELEMENT_SIZE,
-                                       big_ints_enabled);
+                                       utxo_after_genesis);
                         CScriptNum bn2(arg_1, fRequireMinimal,
-                                       big_ints_enabled
+                                       utxo_after_genesis
                                            ? stacktop(-1).size()
                                            : CScriptNum::MAXIMUM_ELEMENT_SIZE,
-                                       big_ints_enabled);
+                                       utxo_after_genesis);
                         CScriptNum bn;
                         switch (opcode) {
                             case OP_ADD:
@@ -1520,14 +1521,15 @@ std::optional<bool> EvalScript(
                         const auto& arg_1 = stacktop(-1);
                         const CScriptNum n{
                             arg_1, fRequireMinimal,
-                            big_ints_enabled ? arg_1.size()
-                                             : CScriptNum::MAXIMUM_ELEMENT_SIZE,
-                            big_ints_enabled};
+                            utxo_after_genesis
+                                ? arg_1.size()
+                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            utxo_after_genesis};
                         if(n < 0 || n > std::numeric_limits<int32_t>::max())
                             return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
 
                         const auto size{n.to_size_t_limited()};
-                        if(!big_ints_enabled)
+                        if(!utxo_after_genesis)
                         {
                             if(size > MAX_SCRIPT_ELEMENT_SIZE)
                                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
@@ -1578,7 +1580,7 @@ std::optional<bool> EvalScript(
 
                         // The resulting number must be a valid number.
                         if(!bsv::IsMinimallyEncoded(
-                               n, big_ints_enabled
+                               n, utxo_after_genesis
                                       ? n.size()
                                       : CScriptNum::MAXIMUM_ELEMENT_SIZE))
                         {
