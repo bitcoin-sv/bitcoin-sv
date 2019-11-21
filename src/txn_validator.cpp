@@ -86,10 +86,20 @@ std::shared_ptr<CTxnRecentRejects> CTxnValidator::getTxnRecentRejectsPtr() {
 
 /** Wait for the Validator to process all queued txns. Used to support testing. */
 void CTxnValidator::waitForEmptyQueue(bool fCheckOrphanQueueEmpty) {
-    std::shared_lock lock { mStdTxnsMtx };
-    mTxnsProcessedCV.wait(lock,
-            [&] { return !mStdTxns.size() &&
-                         (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
+    // Check the standard queue.
+    {
+        std::shared_lock lock { mStdTxnsMtx };
+        mTxnsProcessedCV.wait(lock,
+                [&] { return !mStdTxns.size() &&
+                             (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
+    }
+    // Check the non-standard queue.
+    {
+        std::shared_lock lock { mNonStdTxnsMtx };
+        mTxnsProcessedCV.wait(lock,
+                [&] { return !mNonStdTxns.size() &&
+                             (fCheckOrphanQueueEmpty ? !mpOrphanTxnsP2PQ->getTxnsNumber() : true); });
+    }
 }
 
 size_t CTxnValidator::GetTransactionsInQueueCount() const {
