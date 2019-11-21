@@ -11,6 +11,7 @@
 #include "script/script_error.h"
 #include "script/sighashtype.h"
 #include "script/sign.h"
+#include "taskcancellation.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
 #include "chainparams.h"
@@ -85,30 +86,45 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
     keys.assign(1, key[0]);
     keys.push_back(key[1]);
     s = sign_multisig(a_and_b, keys, txTo[0], 0);
-    BOOST_CHECK(VerifyScript(
-        s, a_and_b, flags,
-        MutableTransactionSignatureChecker(&txTo[0], 0, amount), &err));
+    auto source = task::CCancellationSource::Make();
+    auto res =
+        VerifyScript(
+            source->GetToken(),
+            s,
+            a_and_b,
+            flags,
+            MutableTransactionSignatureChecker(&txTo[0], 0, amount),
+            &err);
+    BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 
     for (int i = 0; i < 4; i++) {
         keys.assign(1, key[i]);
         s = sign_multisig(a_and_b, keys, txTo[0], 0);
-        BOOST_CHECK_MESSAGE(
-            !VerifyScript(
-                s, a_and_b, flags,
-                MutableTransactionSignatureChecker(&txTo[0], 0, amount), &err),
-            strprintf("a&b 1: %d", i));
+        res =
+            VerifyScript(
+                source->GetToken(),
+                s,
+                a_and_b,
+                flags,
+                MutableTransactionSignatureChecker(&txTo[0], 0, amount),
+                &err);
+        BOOST_CHECK_MESSAGE(!res.value(), strprintf("a&b 1: %d", i));
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_INVALID_STACK_OPERATION,
                             ScriptErrorString(err));
 
         keys.assign(1, key[1]);
         keys.push_back(key[i]);
         s = sign_multisig(a_and_b, keys, txTo[0], 0);
-        BOOST_CHECK_MESSAGE(
-            !VerifyScript(
-                s, a_and_b, flags,
-                MutableTransactionSignatureChecker(&txTo[0], 0, amount), &err),
-            strprintf("a&b 2: %d", i));
+        res =
+            VerifyScript(
+                source->GetToken(),
+                s,
+                a_and_b,
+                flags,
+                MutableTransactionSignatureChecker(&txTo[0], 0, amount),
+                &err);
+        BOOST_CHECK_MESSAGE(!res.value(), strprintf("a&b 2: %d", i));
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                             ScriptErrorString(err));
     }
@@ -118,28 +134,41 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
         keys.assign(1, key[i]);
         s = sign_multisig(a_or_b, keys, txTo[1], 0);
         if (i == 0 || i == 1) {
-            BOOST_CHECK_MESSAGE(VerifyScript(s, a_or_b, flags,
-                                             MutableTransactionSignatureChecker(
-                                                 &txTo[1], 0, amount),
-                                             &err),
-                                strprintf("a|b: %d", i));
+            res =
+                VerifyScript(
+                    source->GetToken(),
+                    s,
+                    a_or_b,
+                    flags,
+                    MutableTransactionSignatureChecker(&txTo[1], 0, amount),
+                    &err);
+            BOOST_CHECK_MESSAGE(res.value(), strprintf("a|b: %d", i));
             BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
         } else {
-            BOOST_CHECK_MESSAGE(
-                !VerifyScript(
-                    s, a_or_b, flags,
+            res =
+                VerifyScript(
+                    source->GetToken(),
+                    s,
+                    a_or_b,
+                    flags,
                     MutableTransactionSignatureChecker(&txTo[1], 0, amount),
-                    &err),
-                strprintf("a|b: %d", i));
+                    &err);
+            BOOST_CHECK_MESSAGE(!res.value(), strprintf("a|b: %d", i));
             BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                                 ScriptErrorString(err));
         }
     }
     s.clear();
     s << OP_0 << OP_1;
-    BOOST_CHECK(!VerifyScript(
-        s, a_or_b, flags,
-        MutableTransactionSignatureChecker(&txTo[1], 0, amount), &err));
+    res =
+        VerifyScript(
+            source->GetToken(),
+            s,
+            a_or_b,
+            flags,
+            MutableTransactionSignatureChecker(&txTo[1], 0, amount),
+            &err);
+    BOOST_CHECK(!res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_SIG_DER, ScriptErrorString(err));
 
     for (int i = 0; i < 4; i++)
@@ -148,20 +177,28 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             keys.push_back(key[j]);
             s = sign_multisig(escrow, keys, txTo[2], 0);
             if (i < j && i < 3 && j < 3) {
-                BOOST_CHECK_MESSAGE(
+                res =
                     VerifyScript(
-                        s, escrow, flags,
+                        source->GetToken(),
+                        s,
+                        escrow,
+                        flags,
                         MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        &err),
-                    strprintf("escrow 1: %d %d", i, j));
+                        &err);
+                BOOST_CHECK_MESSAGE(res.value(), strprintf("escrow 1: %d %d", i, j));
                 BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK,
                                     ScriptErrorString(err));
             } else {
-                BOOST_CHECK_MESSAGE(
-                    !VerifyScript(
-                        s, escrow, flags,
+                res =
+                    VerifyScript(
+                        source->GetToken(),
+                        s,
+                        escrow,
+                        flags,
                         MutableTransactionSignatureChecker(&txTo[2], 0, amount),
-                        &err),
+                        &err);
+                BOOST_CHECK_MESSAGE(
+                    !res.value(),
                     strprintf("escrow 2: %d %d", i, j));
                 BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_EVAL_FALSE,
                                     ScriptErrorString(err));

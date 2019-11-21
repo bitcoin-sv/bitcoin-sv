@@ -8,6 +8,7 @@
 #include "pubkey.h"
 #include "script/script.h"
 #include "script/standard.h"
+#include "taskcancellation.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
 #include "validation.h"
@@ -73,10 +74,15 @@ ScriptError VerifyWithFlag(const CTransaction &output,
                            const CMutableTransaction &input, int flags) {
     ScriptError error;
     CTransaction inputi(input);
-    bool ret = VerifyScript(
-        inputi.vin[0].scriptSig, output.vout[0].scriptPubKey, flags,
-        TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue), &error);
-    BOOST_CHECK((ret == true) == (error == SCRIPT_ERR_OK));
+    auto ret =
+        VerifyScript(
+            task::CCancellationSource::Make(),
+            inputi.vin[0].scriptSig,
+            output.vout[0].scriptPubKey,
+            flags,
+            TransactionSignatureChecker(&inputi, 0, output.vout[0].nValue),
+            &error);
+    BOOST_CHECK((ret.value() == true) == (error == SCRIPT_ERR_OK));
 
     return error;
 }

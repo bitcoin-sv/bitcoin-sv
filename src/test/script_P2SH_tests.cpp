@@ -15,6 +15,7 @@
 #include "script/sign.h"
 #include "test/test_bitcoin.h"
 #include "validation.h"
+#include "taskcancellation.h"
 
 #include <vector>
 
@@ -40,12 +41,17 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = Amount(1);
 
-    return VerifyScript(
-        scriptSig, scriptPubKey,
-        (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
-            SCRIPT_ENABLE_SIGHASH_FORKID,
-        MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
-        &err);
+    auto res =
+        VerifyScript(
+            task::CCancellationSource::Make()->GetToken(),
+            scriptSig,
+            scriptPubKey,
+            (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
+                SCRIPT_ENABLE_SIGHASH_FORKID,
+            MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
+            &err);
+
+    return res.value();
 }
 
 BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)
@@ -139,6 +145,7 @@ BOOST_AUTO_TEST_CASE(sign) {
     // All of the above should be OK, and the txTos have valid signatures
     // Check to make sure signature verification fails if we use the wrong
     // ScriptSig:
+    auto source = task::CCancellationSource::Make();
     for (int i = 0; i < 8; i++) {
         CTransaction tx(txTo[i]);
         PrecomputedTransactionData txdata(tx);
@@ -146,16 +153,16 @@ BOOST_AUTO_TEST_CASE(sign) {
             CScript sigSave = txTo[i].vin[0].scriptSig;
             txTo[i].vin[0].scriptSig = txTo[j].vin[0].scriptSig;
             const CTxOut &output = txFrom.vout[txTo[i].vin[0].prevout.GetN()];
-            bool sigOK = CScriptCheck(
+            auto sigOK = CScriptCheck(
                 output.scriptPubKey, output.nValue, CTransaction(txTo[i]), 0,
                 SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC |
                     SCRIPT_ENABLE_SIGHASH_FORKID,
-                false, txdata)();
+                false, txdata)(source->GetToken());
             if (i == j) {
-                BOOST_CHECK_MESSAGE(sigOK,
+                BOOST_CHECK_MESSAGE(sigOK.value(),
                                     strprintf("VerifySignature %d %d", i, j));
             } else {
-                BOOST_CHECK_MESSAGE(!sigOK,
+                BOOST_CHECK_MESSAGE(!sigOK.value(),
                                     strprintf("VerifySignature %d %d", i, j));
             }
             txTo[i].vin[0].scriptSig = sigSave;
@@ -486,12 +493,14 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     auto activateGenesis = [&config, coinHeight]() {config.SetGenesisActivationHeight(coinHeight);}; 
     auto deactivateGenesis = [&config, coinHeight]() {config.SetGenesisActivationHeight(coinHeight + 1);}; // set genesis at mempool height + 1
 
+    auto source = task::CCancellationSource::Make();
+
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txTo), coins, 0));
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), config, CTransaction(txTo), coins, 0).value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txTo), coins), 0U);
     
     deactivateGenesis();
-    BOOST_CHECK(::AreInputsStandard(config, CTransaction(txTo), coins, 0));
+    BOOST_CHECK(::AreInputsStandard(source->GetToken(), config, CTransaction(txTo), coins, 0).value());
     // 22 P2SH sigops for all inputs (1 for vin[0], 6 for vin[3], 15 for vin[4]
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txTo), coins), 22U);
 
@@ -506,11 +515,11 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         << std::vector<uint8_t>(sixteenSigops.begin(), sixteenSigops.end());
 
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd1), coins, 0));
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), config, CTransaction(txToNonStd1), coins, 0).value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txToNonStd1), coins), 0U);
     
     deactivateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd1), coins, 0));
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), config, CTransaction(txToNonStd1), coins, 0).value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txToNonStd1), coins), 16U);
 
     CMutableTransaction txToNonStd2;
@@ -524,11 +533,11 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         << std::vector<uint8_t>(twentySigops.begin(), twentySigops.end());
 
     activateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd2), coins, 0));
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), config, CTransaction(txToNonStd2), coins, 0).value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txToNonStd2), coins), 0U);
 
     deactivateGenesis();
-    BOOST_CHECK(!::AreInputsStandard(config, CTransaction(txToNonStd2), coins, 0));
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), config, CTransaction(txToNonStd2), coins, 0).value());
     BOOST_CHECK_EQUAL(GetP2SHSigOpCount(config, CTransaction(txToNonStd2), coins), 20U);
 }
 

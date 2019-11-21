@@ -10,10 +10,13 @@
 #include "script/interpreter.h"
 #include "script/standard.h"
 
+#include <optional>
 #include <string>
 
 class Config;
 class CCoinsViewCache;
+
+namespace task{class CCancellationToken;}
 
 /** Defaults for -excessiveblocksize and -blockmaxsize. The changed when we reach blocksize activation time.
  *
@@ -144,10 +147,12 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
  * spending
  * @return True if all inputs (scriptSigs) use only standard transaction forms
  */
-bool AreInputsStandard(const Config& config,
-                       const CTransaction &tx,
-                       const CCoinsViewCache &mapInputs,
-                       const int mempoolHeight);
+std::optional<bool> AreInputsStandard(
+    const task::CCancellationToken& token,
+    const Config& config,
+    const CTransaction& tx,
+    const CCoinsViewCache &mapInputs,
+    const int mempoolHeight);
 
 extern CFeeRate incrementalRelayFee;
 extern CFeeRate dustRelayFee;

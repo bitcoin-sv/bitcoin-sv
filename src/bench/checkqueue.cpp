@@ -11,6 +11,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include <optional>
 #include <vector>
 
 // This Benchmark tests the CheckQueue with the lightest weight Checks, so it
@@ -22,7 +23,10 @@ static const int PREVECTOR_SIZE = 28;
 static const unsigned int QUEUE_BATCH_SIZE = 128;
 static void CCheckQueueSpeed(benchmark::State &state) {
     struct FakeJobNoWork {
-        bool operator()() { return true; }
+        std::optional<bool> operator()(const task::CCancellationToken&)
+        {
+            return true;
+        }
         void swap(FakeJobNoWork &x){};
     };
     boost::thread_group tg;
@@ -66,7 +70,10 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::State &state) {
         PrevectorJob(FastRandomContext &insecure_rand) {
             p.resize(insecure_rand.randrange(PREVECTOR_SIZE * 2));
         }
-        bool operator()() { return true; }
+        std::optional<bool> operator()(const task::CCancellationToken&)
+        {
+            return true;
+        }
         void swap(PrevectorJob &x) { p.swap(x.p); };
     };
     boost::thread_group tg;

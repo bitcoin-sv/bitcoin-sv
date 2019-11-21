@@ -10,6 +10,7 @@
 #include "script/int_serialization.h"
 #include "script/interpreter.h"
 #include "script/script_flags.h"
+#include "taskcancellation.h"
 
 #include <vector>
 
@@ -115,9 +116,16 @@ BOOST_AUTO_TEST_CASE(bint_bint_op)
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
+        auto source = task::CCancellationSource::Make();
         const auto status =
-            EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
-        BOOST_CHECK_EQUAL(true, status);
+            EvalScript(
+                source->GetToken(),
+                stack,
+                script,
+                flags,
+                BaseSignatureChecker{},
+                &error);
+        BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
         const auto frame = stack[0];
@@ -165,9 +173,16 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
+        auto source = task::CCancellationSource::Make();
         const auto status =
-            EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
-        if(status)
+            EvalScript(
+                source->GetToken(),
+                stack,
+                script,
+                flags,
+                BaseSignatureChecker{},
+                &error);
+        if(status.value())
         {
             BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
             BOOST_CHECK(stack.empty());
@@ -288,11 +303,18 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
+        auto source = task::CCancellationSource::Make();
         const auto status =
-            EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
-        BOOST_CHECK_EQUAL(exp_status, status);
+            EvalScript(
+                source->GetToken(),
+                stack,
+                script,
+                flags,
+                BaseSignatureChecker{},
+                &error);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_script_error, error);
-        BOOST_CHECK_EQUAL(status ? 1:2, stack.size());
+        BOOST_CHECK_EQUAL(status.value() ? 1:2, stack.size());
     }
 }
 
@@ -330,9 +352,11 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         const auto status =
-            EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
+            EvalScript(
+                task::CCancellationSource::Make()->GetToken(),
+                stack, script, flags, BaseSignatureChecker{}, &error);
 
-        BOOST_CHECK_EQUAL(true, status);
+        BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
         BOOST_CHECK_EQUAL(op.size(), stack[0].size());
@@ -402,9 +426,11 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
         uint32_t flags(1 << 17);
         ScriptError error;
         const auto status =
-            EvalScript(stack, script, flags, BaseSignatureChecker{}, &error);
+            EvalScript(
+                task::CCancellationSource::Make()->GetToken(),
+                stack, script, flags, BaseSignatureChecker{}, &error);
 
-        BOOST_CHECK_EQUAL(exp_status, status);
+        BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]), begin(op),
                                       end(op));
@@ -412,5 +438,3 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-
-

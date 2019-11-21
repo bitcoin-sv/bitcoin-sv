@@ -12,6 +12,7 @@
 #include "sighashtype.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,6 +21,11 @@ class CScript;
 class CTransaction;
 class uint256;
 class BaseSignatureChecker;
+
+namespace task
+{
+  class CCancellationToken;
+}
 
 bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, const BaseSignatureChecker* checker,
                             ScriptError *serror);
@@ -91,11 +97,19 @@ public:
         : TransactionSignatureChecker(&txTo, nInIn, amount), txTo(*txToIn) {}
 };
 
-bool EvalScript(std::vector<std::vector<uint8_t>> &stack, const CScript &script,
-                uint32_t flags, const BaseSignatureChecker &checker,
-                ScriptError *error = nullptr);
-bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey,
-                  uint32_t flags, const BaseSignatureChecker &checker,
-                  ScriptError *serror = nullptr);
+std::optional<bool> EvalScript(
+    const task::CCancellationToken& token,
+    std::vector<std::vector<uint8_t>>& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker,
+    ScriptError* error = nullptr);
+std::optional<bool> VerifyScript(
+    const task::CCancellationToken& token,
+    const CScript& scriptSig,
+    const CScript& scriptPubKey,
+    uint32_t flags,
+    const BaseSignatureChecker& checker,
+    ScriptError* serror = nullptr);
 
 #endif // BITCOIN_SCRIPT_INTERPRETER_H

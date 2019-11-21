@@ -23,6 +23,7 @@
 #include "script/script_error.h"
 #include "script/sign.h"
 #include "script/standard.h"
+#include "taskcancellation.h"
 #include "txmempool.h"
 #include "txn_validator.h"
 #include "uint256.h"
@@ -1027,11 +1028,17 @@ static UniValue signrawtransaction(const Config &config,
         UpdateTransaction(mergedTx, i, sigdata);
 
         ScriptError serror = SCRIPT_ERR_OK;
-        if (!VerifyScript(txin.scriptSig, 
-                          prevPubKey,
-                          StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis),
-                          TransactionSignatureChecker(&txConst, i, amount), 
-                          &serror)) {
+        auto source = task::CCancellationSource::Make();
+        auto res =
+            VerifyScript(
+                source->GetToken(),
+                txin.scriptSig,
+                prevPubKey,
+                StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis),
+                TransactionSignatureChecker(&txConst, i, amount),
+                &serror);
+        if (!res.value())
+        {
             TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
         }
     }

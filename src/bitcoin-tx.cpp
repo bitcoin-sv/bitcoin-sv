@@ -18,6 +18,7 @@
 #include "primitives/transaction.h"
 #include "script/script.h"
 #include "script/sign.h"
+#include "taskcancellation.h"
 #include "univalue.h"
 #include "util.h"
 #include "utilmoneystr.h"
@@ -702,10 +703,17 @@ static void MutateTxSign(CMutableTransaction &tx, const std::string &flagStr) {
 
         UpdateTransaction(mergedTx, i, sigdata);
 
-        if (!VerifyScript(
-                txin.scriptSig, prevPubKey,
+        auto source = task::CCancellationSource::Make();
+        auto res =
+            VerifyScript(
+                source->GetToken(),
+                txin.scriptSig,
+                prevPubKey,
                 StandardScriptVerifyFlags(true, assumeUtxoAfterGenesis),
-                MutableTransactionSignatureChecker(&mergedTx, i, amount))) {
+                MutableTransactionSignatureChecker(&mergedTx, i, amount));
+
+        if (!res.value())
+        {
             fComplete = false;
         }
     }

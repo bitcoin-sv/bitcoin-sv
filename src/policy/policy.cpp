@@ -8,6 +8,7 @@
 
 #include "policy/policy.h"
 
+#include "taskcancellation.h"
 #include "tinyformat.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -114,10 +115,13 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
     return true;
 }
 
-bool AreInputsStandard(const Config& config,
-                       const CTransaction &tx,
-                       const CCoinsViewCache &mapInputs,
-                       const int mempoolHeight) {
+std::optional<bool> AreInputsStandard(
+    const task::CCancellationToken& token,
+    const Config& config,
+    const CTransaction& tx,
+    const CCoinsViewCache &mapInputs,
+    const int mempoolHeight)
+{
     if (tx.IsCoinBase()) {
         // Coinbases don't use vin normally.
         return true;
@@ -141,8 +145,19 @@ bool AreInputsStandard(const Config& config,
             std::vector<std::vector<uint8_t>> stack;
             // convert the scriptSig into a stack, so we can inspect the
             // redeemScript
-            if (!EvalScript(stack, tx.vin[i].scriptSig, SCRIPT_VERIFY_NONE,
-                            BaseSignatureChecker())) {
+            auto res =
+                EvalScript(
+                    token,
+                    stack,
+                    tx.vin[i].scriptSig,
+                    SCRIPT_VERIFY_NONE,
+                    BaseSignatureChecker());
+            if (!res.has_value())
+            {
+                return {};
+            }
+            else if (!res.value())
+            {
                 return false;
             }
             if (stack.empty()) {

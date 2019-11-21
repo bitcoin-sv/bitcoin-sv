@@ -10,6 +10,7 @@
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "script/standard.h"
+#include "taskcancellation.h"
 #include "uint256.h"
 #include "validation.h"
 
@@ -164,12 +165,14 @@ bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, 
 
     sigdata.scriptSig = PushAll(result);
 
+    auto source = task::CCancellationSource::Make();
+
     // Test solution
 
     uint32_t flags = StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis);
     return solved &&
-           VerifyScript(sigdata.scriptSig, fromPubKey,
-                        flags, creator.Checker());
+           VerifyScript(source->GetToken(), sigdata.scriptSig, fromPubKey,
+                        flags, creator.Checker()).value();
 }
 
 SignatureData DataFromTransaction(const CMutableTransaction &tx,
@@ -281,8 +284,9 @@ struct Stacks {
     explicit Stacks(const std::vector<valtype> &scriptSigStack_)
         : script(scriptSigStack_) {}
     explicit Stacks(const SignatureData &data) {
-        EvalScript(script, data.scriptSig, MANDATORY_SCRIPT_VERIFY_FLAGS,
-                   BaseSignatureChecker());
+        auto source = task::CCancellationSource::Make();
+        EvalScript(source->GetToken(), script, data.scriptSig,
+                   MANDATORY_SCRIPT_VERIFY_FLAGS, BaseSignatureChecker());
     }
 
     SignatureData Output() const {
