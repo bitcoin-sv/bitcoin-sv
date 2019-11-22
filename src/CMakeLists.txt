@@ -109,6 +109,7 @@ add_library(util
 	support/lockedpool.cpp
 	sync.cpp
 	threadinterrupt.cpp
+	threadpriority.cpp
 	uint256.cpp
 	util.cpp
 	utilmoneystr.cpp
