@@ -362,8 +362,17 @@ bool GlobalConfig::GetAcceptP2SH() const {
     return acceptP2SH;
 }
 
-void GlobalConfig::SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) {
-    genesisActivationHeight = genesisActivationHeightIn;
+bool GlobalConfig::SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err) {
+    if (genesisActivationHeightIn <= 0)
+    {
+        if (err)
+        {
+            *err = "Genesis activation height cannot be configured with a zero or negative value.";
+        }
+        return false;
+    }
+    genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn);
+    return true;
 }
 
 uint64_t GlobalConfig::GetGenesisActivationHeight() const {

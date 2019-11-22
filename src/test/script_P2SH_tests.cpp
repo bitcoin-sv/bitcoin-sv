@@ -389,7 +389,7 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         keys.push_back(key[i].GetPubKey());
 
     auto& tempConfig = testConfig;
-    auto activateGenesis = [&tempConfig]() {tempConfig.SetGenesisActivationHeight(0); };
+    auto activateGenesis = [&tempConfig]() {tempConfig.SetGenesisActivationHeight(1); };
     auto deactivateGenesis = [&tempConfig]() {tempConfig.SetGenesisActivationHeight(1000); };
 
     CMutableTransaction txFrom;

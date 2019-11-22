@@ -1765,11 +1765,9 @@ bool AppInitParameterInteraction(Config &config) {
     }
 
     // Configure genesis activation height.
-    uint64_t genesisActivationHeight = gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight);
-    if(genesisActivationHeight <= 0) {
-        return InitError(_("Genesis activation height cannot be configured with a zero or negative value."));
-    } else {
-        config.SetGenesisActivationHeight(genesisActivationHeight);
+    int64_t genesisActivationHeight = gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight);
+    if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
+        return InitError(err);
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &
