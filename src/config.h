@@ -15,6 +15,7 @@
 
 #include <boost/noncopyable.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -97,6 +98,9 @@ public:
     virtual int GetMaxParallelBlocks() const = 0;
     virtual int GetPerBlockScriptValidatorThreadsCount() const = 0;
     virtual int GetPerBlockScriptValidationMaxBatchSize() const = 0;
+
+    virtual bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual std::chrono::milliseconds GetMaxTransactionValidationDuration() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -177,6 +181,9 @@ public:
     int GetPerBlockScriptValidatorThreadsCount() const override;
     int GetPerBlockScriptValidationMaxBatchSize() const override;
 
+    bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override;
+    std::chrono::milliseconds GetMaxTransactionValidationDuration() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -220,6 +227,8 @@ private:
     int mMaxParallelBlocks;
     int mPerBlockScriptValidatorThreadsCount;
     int mPerBlockScriptValidationMaxBatchSize;
+
+    std::chrono::milliseconds mMaxTransactionValidationDuration;
 };
 
 // Dummy for subclassing in unittests
@@ -332,6 +341,20 @@ public:
     int GetMaxParallelBlocks() const override;
     int GetPerBlockScriptValidatorThreadsCount() const override;
     int GetPerBlockScriptValidationMaxBatchSize() const override;
+
+    bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override
+    {
+        if(err)
+        {
+            *err = "This is dummy config";
+        }
+
+        return false;
+    }
+    std::chrono::milliseconds GetMaxTransactionValidationDuration() const override
+    {
+        return DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION;
+    }
 
 private:
     std::unique_ptr<CChainParams> chainParams;

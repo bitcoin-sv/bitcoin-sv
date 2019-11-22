@@ -48,6 +48,8 @@ void GlobalConfig::Reset()
     mMaxParallelBlocks = DEFAULT_SCRIPT_CHECK_POOL_SIZE;
     mPerBlockScriptValidatorThreadsCount = DEFAULT_SCRIPTCHECK_THREADS;
     mPerBlockScriptValidationMaxBatchSize = DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
+
+    mMaxTransactionValidationDuration = DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -361,6 +363,30 @@ int GlobalConfig::GetPerBlockScriptValidatorThreadsCount() const
 int GlobalConfig::GetPerBlockScriptValidationMaxBatchSize() const
 {
     return mPerBlockScriptValidationMaxBatchSize;
+}
+
+bool GlobalConfig::SetMaxTransactionValidationDuration(int ms, std::string* err)
+{
+    if(ms < 10)
+    {
+        if(err)
+        {
+            *err =
+                strprintf(
+                    _("Per transaction max validation duration must be at least 10ms"));
+        }
+
+        return false;
+    }
+
+    mMaxTransactionValidationDuration = std::chrono::milliseconds{ms};
+
+    return true;
+}
+
+std::chrono::milliseconds GlobalConfig::GetMaxTransactionValidationDuration() const
+{
+    return mMaxTransactionValidationDuration;
 }
 
 DummyConfig::DummyConfig()

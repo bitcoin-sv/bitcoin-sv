@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <exception>
 #include <map>
@@ -225,6 +226,10 @@ static const int DEFAULT_STOPATHEIGHT = 0;
 constexpr size_t DEFAULT_SCRIPT_CHECK_POOL_SIZE = 4;
 /** Default maximum size of script batches processed by a single checker thread */
 constexpr size_t DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE = 128;
+
+/** The maximum wall time for transaction validation before we terminate the task */
+constexpr std::chrono::milliseconds DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION =
+    std::chrono::seconds{10};
 
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
