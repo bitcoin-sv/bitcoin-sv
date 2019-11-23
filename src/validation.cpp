@@ -72,7 +72,7 @@ CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
 CChain chainActive;
-std::atomic_int chainActiveHeight {0};
+CChainActiveSharedData chainActiveSharedData;
 CBlockIndex *pindexBestHeader = nullptr;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -3581,7 +3581,8 @@ void PruneAndFlush() {
  */
 static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
     chainActive.SetTip(pindexNew);
-    chainActiveHeight = chainActive.Height();
+    chainActiveSharedData.SetChainActiveHeight(chainActive.Height());
+    chainActiveSharedData.SetChainActiveTipBlockHash(chainActive.Tip()->GetBlockHash());
 
     // New best block
     mempool.AddTransactionsUpdated(1);
@@ -5720,7 +5721,8 @@ void LoadChainTip(const CChainParams &chainparams) {
     }
 
     chainActive.SetTip(it->second);
-    chainActiveHeight = chainActive.Height();
+    chainActiveSharedData.SetChainActiveHeight(chainActive.Height());
+    chainActiveSharedData.SetChainActiveTipBlockHash(chainActive.Tip()->GetBlockHash());
 
     PruneBlockIndexCandidates();
 
@@ -6074,7 +6076,8 @@ void UnloadBlockIndex() {
     LOCK(cs_main);
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
-    chainActiveHeight = 0;
+    chainActiveSharedData.SetChainActiveHeight(0);
+    chainActiveSharedData.SetChainActiveTipBlockHash(uint256());
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
     mempool.Clear();
