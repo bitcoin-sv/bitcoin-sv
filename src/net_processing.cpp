@@ -1059,13 +1059,15 @@ void PeerLogicValidation::BlockChecked(const CBlock &block,
 bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
     switch (inv.type) {
         case MSG_TX: {
-            if (chainActive.Tip()->GetBlockHash() !=
-                hashRecentRejectsChainTip) {
+            const uint256& activeTipBlockHash {
+                chainActiveSharedData.GetChainActiveTipBlockHash()
+            };
+            if (activeTipBlockHash != hashRecentRejectsChainTip) {
                 // If the chain tip has changed previously rejected transactions
                 // might be now valid, e.g. due to a nLockTime'd tx becoming
                 // valid, or a double-spend. Reset the rejects filter and give
                 // those txs a second chance.
-                hashRecentRejectsChainTip = chainActive.Tip()->GetBlockHash();
+                hashRecentRejectsChainTip = activeTipBlockHash;
                 g_connman->ResetRecentRejects();
             }
 
@@ -2339,7 +2341,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
     if(!AlreadyHave(inv)) {
         // Check if the given txn is standard.
         std::string sReason;
-        bool fStandard = IsStandardTx(config, tx, chainActiveHeight + 1, sReason);
+        bool fStandard = IsStandardTx(config, tx, chainActiveSharedData.GetChainActiveHeight() + 1, sReason);
         // Forward transaction to the validator thread.
         connman.EnqueueTxnForValidator(
 					std::make_shared<CTxInputData>(
