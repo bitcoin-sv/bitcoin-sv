@@ -51,8 +51,12 @@ struct CNodeStateStats {
     std::vector<int> vHeightInFlight;
 };
 
-/** Check if inv already known */
+/** Check if inv already known (txn or block) */
 bool AlreadyHave(const CInv &inv);
+/** Check if txn is already known */
+bool IsTxnKnown(const CInv &inv);
+/** Check if block is already known */
+bool IsBlockKnown(const CInv &inv);
 
 /** Relay transaction */
 void RelayTransaction(const CTransaction &tx, CConnman &connman);

@@ -1684,7 +1684,8 @@ static void AskForMissingParents(
         // FIXME: MSG_TX should use a TxHash, not a TxId.
         CInv inv(MSG_TX, txin.prevout.GetTxId());
         pNode->AddInventoryKnown(inv);
-        if (!AlreadyHave(inv)) {
+        // Check if txn is already known.
+        if (!IsTxnKnown(inv)) {
             pNode->AskFor(inv);
         }
     }
