@@ -1066,13 +1066,24 @@ std::optional<bool> EvalScript(
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        CScriptNum bn(stacktop(-1), fRequireMinimal);
+
+                        const auto &top{stacktop(-1)};
+                        CScriptNum bn{top, fRequireMinimal,
+                                      utxo_after_genesis
+                                          ? top.size()
+                                          : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                                      utxo_after_genesis};
                         switch (opcode) {
                             case OP_1ADD:
-                                bn += bnOne;
+                                bn += utxo_after_genesis
+                                          ? CScriptNum{bsv::bint{1}}
+                                          : bnOne;
                                 break;
                             case OP_1SUB:
-                                bn -= bnOne;
+                                bn -= utxo_after_genesis
+                                          ? CScriptNum{bsv::bint{1}}
+                                          : bnOne;
+                                // bn -= bnOne;
                                 break;
                             case OP_NEGATE:
                                 bn = -bn;
