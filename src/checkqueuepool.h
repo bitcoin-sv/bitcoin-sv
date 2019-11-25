@@ -307,12 +307,12 @@ private:
             threadGroup.create_thread(
                 [&queue, workerNum, queueNum]()
                 {
-                    RenameThread(
+                    TraceThread(
                         strprintf(
                             "bitcoin-scriptch_%d_%d",
                             queueNum,
-                            workerNum).c_str());
-                    queue.Thread();
+                            workerNum).c_str(),
+                        [&queue]{queue.Thread();});
                 });
         }
     }

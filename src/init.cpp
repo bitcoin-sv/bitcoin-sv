@@ -2573,7 +2573,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 
     threadGroup.create_thread(
-        boost::bind(&ThreadImport, std::ref(config), vImportFiles));
+        [&config, vImportFiles]
+        {
+            TraceThread(
+                "import_files",
+                [&config, &vImportFiles]{ThreadImport(config, vImportFiles);});
+        });
 
     // Wait for genesis block to be processed
     {
