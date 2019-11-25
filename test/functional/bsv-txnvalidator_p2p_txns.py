@@ -5,8 +5,9 @@
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from test_framework.mininode import *
-from test_framework.script import CScript, OP_TRUE
+from test_framework.script import CScript, OP_TRUE, OP_RETURN
 from test_framework.blocktools import create_block, create_coinbase
+from enum import Enum
 import datetime
 import contextlib
 import random
@@ -39,6 +40,11 @@ class switch(object):
         else:
             return False
 
+class TxType(Enum):
+    standard = 1
+    nonstandard = 2
+    std_and_nonstd = 3 # standard and non-standard txns
+
 class NetworkThreadPinging(Thread):
     def __init__(self, conn):
         super().__init__()
@@ -57,8 +63,8 @@ class NetworkThreadPinging(Thread):
 
 class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
 
-    # Ensure funding and returns given number of spend money transcations without submitting them
-    def make_transactions(self, num_txns, create_double_spends=False):
+    # Create given number of spend money transcations without submitting them
+    def make_transactions(self, txtype, num_txns, create_double_spends=False):
 
         # Calculate how many found txns are needed to create a required spend money txns (num_txns)
         # - a fund txns are of type 1 - N (N=vouts_num_per_fund_txn)
@@ -85,10 +91,15 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
             return ftx, ftxHex
 
         # Create a spend txn
-        def make_spend_txn(fund_txn_hash, out_value, vout_idx):
+        def make_spend_txn(txtype, fund_txn_hash, out_value, vout_idx):
             spend_tx = CTransaction()
             spend_tx.vin.append(CTxIn(COutPoint(fund_txn_hash, vout_idx), b''))
-            spend_tx.vout.append(CTxOut(out_value-1000, CScript([OP_TRUE])))
+            # Standard transaction
+            if TxType.standard == txtype:
+                spend_tx.vout.append(CTxOut(out_value-1000, CScript([OP_RETURN])))
+            # Non-standard transaction
+            elif TxType.nonstandard == txtype:
+                spend_tx.vout.append(CTxOut(out_value-1000, CScript([OP_TRUE])))
             spend_tx.rehash()
             return spend_tx
 
@@ -120,10 +131,17 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
         #
         # Create transactions that depend on funding transactions that has just been submitted:
         #
+        txtype_to_create = txtype
         spend_txs = []
         for i in range(len(fund_txns)):
             for fund_txn_vout_idx in range(fund_txn_num_vouts):
-                spend_tx = make_spend_txn(fund_txns[i].sha256, out_value, fund_txn_vout_idx)
+                # If standard and non-standard txns are required then create equal (in size) sets.
+                if TxType.std_and_nonstd == txtype:
+                    if fund_txn_vout_idx % 2:
+                        txtype_to_create = TxType.standard
+                    else:
+                        txtype_to_create = TxType.nonstandard
+                spend_tx = make_spend_txn(txtype_to_create, fund_txns[i].sha256, out_value, fund_txn_vout_idx)
                 if create_double_spends and len(spend_txs) < num_txns // 2:
                     # The first half of the array are double spend txns
                     spend_tx.vin.append(CTxIn(COutPoint(fund_txns[len(fund_txns) - i - 1].sha256, 0), b''))
@@ -245,7 +263,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 if case(): # default
                     raise Exception('The value of sync_node_type={} is not defined'.format(sync_node_type))
 
-        def runTestWithParams(sync_node_type, description, args, number_of_txns, number_of_peers, timeout, shuffle_txns=False):
+        def runTestWithParams(sync_node_type, description, args, txtype, number_of_txns, number_of_peers, timeout, shuffle_txns=False):
             # In case of double spends only a half of the set will be valid.
             # A number of txns required to create a set of double spends should be an even number
             create_double_spends = (doublespends() == sync_node_type)
@@ -257,7 +275,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
             # Start the node0
             self.start_node(0, args)
             # Create a required number of spend money txns.
-            result_txns = self.make_transactions(number_of_txns, create_double_spends)
+            result_txns = self.make_transactions(txtype, number_of_txns, create_double_spends)
             spend_txns = result_txns[0:number_of_txns]
             # Shuffle spend txns if required
             if shuffle_txns:
@@ -306,6 +324,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-txnvalidationasynchrunfreq=100',
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2'],
+                TxType.standard,
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
@@ -336,6 +355,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-txnvalidationasynchrunfreq=200',
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
@@ -370,6 +390,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2',
                  '-persistmempool=0'],
+                TxType.std_and_nonstd,
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node0
@@ -380,7 +401,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
         ]
         # Execute test cases.
         for test_case in test_cases:
-            runTestWithParams(test_case[0], test_case[1], test_case[2], test_case[3], test_case[4], test_case[5])
+            runTestWithParams(test_case[0], test_case[1], test_case[2], test_case[3], test_case[4], test_case[5], test_case[6])
 
         #
         # Double spends: A definition of test cases dependent on node0's configuration.
@@ -411,6 +432,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-txnvalidationasynchrunfreq=100',
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
@@ -445,6 +467,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-txnvalidationasynchrunfreq=200',
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node
@@ -478,6 +501,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-txnvalidationasynchrunfreq=10',
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node
@@ -507,6 +531,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-txnvalidationasynchrunfreq=100',
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2'],
+                TxType.standard,
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node
@@ -539,6 +564,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-txnvalidationasynchrunfreq=100',
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2'],
+                TxType.std_and_nonstd,
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node
@@ -572,6 +598,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                  '-txnvalidationasynchrunfreq=100',
                  '-numstdtxvalidationthreads=6',
                  '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 30000,
                 # A number of peers connected to the node
@@ -584,7 +611,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
         ]
         # Execute test cases.
         for test_case in test_cases:
-            runTestWithParams(test_case[0], test_case[1], test_case[2], test_case[3], test_case[4], test_case[5], test_case[6])
+            runTestWithParams(test_case[0], test_case[1], test_case[2], test_case[3], test_case[4], test_case[5], test_case[6], test_case[7])
 
 if __name__ == '__main__':
     TxnValidatorP2PTxnsTest().main()
