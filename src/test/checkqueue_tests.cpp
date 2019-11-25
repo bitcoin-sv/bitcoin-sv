@@ -232,21 +232,16 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
 
 BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_wait_before_session)
 {
-    boost::thread_group threadGroup;
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
     BOOST_CHECK_THROW(scriptCheckQueue.Wait(), std::runtime_error);
     scriptCheckQueue.StartCheckingSession(
         task::CCancellationSource::Make()->GetToken());
     scriptCheckQueue.Wait();
-
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 }
 
 BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_before_session)
 {
-    boost::thread_group threadGroup;
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
     std::vector check{CDummyValidator{}};
@@ -256,14 +251,10 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_before_session)
         task::CCancellationSource::Make()->GetToken());
     scriptCheckQueue.Add(check);
     scriptCheckQueue.Wait();
-
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 }
 
 BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_after_wait)
 {
-    boost::thread_group threadGroup;
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
     std::vector check{CDummyValidator{}};
@@ -274,14 +265,10 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_after_wait)
     check = {CDummyValidator{}};
     scriptCheckQueue.Wait();
     BOOST_CHECK_THROW(scriptCheckQueue.Add(check), std::runtime_error);
-
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 }
 
 BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_second_session_before_wait)
 {
-    boost::thread_group threadGroup;
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
     scriptCheckQueue.StartCheckingSession(
@@ -293,9 +280,6 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_second_session_before_wait)
     scriptCheckQueue.Wait();
     scriptCheckQueue.StartCheckingSession(
         task::CCancellationSource::Make()->GetToken());
-
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
