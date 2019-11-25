@@ -66,6 +66,11 @@ script: |
         echo "export FAKETIME=\"$1\"" >> ${WRAP_DIR}/${i}-${prog}
         echo "\$REAL \$@" >> ${WRAP_DIR}/${i}-${prog}
         chmod +x ${WRAP_DIR}/${i}-${prog}
+        if [ ${prog} == "windres" ]; then # Need to add the executable windres raw name as it is required when building openssl 1.1.1
+            rm -fR ${WRAP_DIR}/windres
+            cp ${WRAP_DIR}/${i}-${prog} ${WRAP_DIR}/windres
+            chmod +x ${WRAP_DIR}/windres
+        fi
     done
   done
   }
