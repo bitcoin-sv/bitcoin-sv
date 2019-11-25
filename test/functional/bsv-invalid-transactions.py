@@ -58,7 +58,7 @@ def create_parent_tx(tx_to_spend, key_for_tx_to_spend, n_outputs, invalidity=Non
     for i in range(n_outputs):
         k = CECKey()
         keys.append(k)
-        k.set_secretbytes(b"x" * i)
+        k.set_secretbytes(b"x" * (i+1))
         tx.vout.append(CTxOut(amount_per_output, CScript([k.get_pubkey(), OP_CHECKSIG])))
 
     if invalidity == "bad_signature":
@@ -85,7 +85,7 @@ def create_children_txs(parent_tx1, keys1, parent_tx2, keys2, invalidity=None):
         tx.vin.append(CTxIn(COutPoint(parent_tx2.sha256, n), b"", 0xffffffff))
 
         k = CECKey()
-        k.set_secretbytes(b"x" * n)
+        k.set_secretbytes(b"x" * (n+1))
         tx.vout.append(CTxOut(amount, CScript([k.get_pubkey(), OP_CHECKSIG])))
         tx.calc_sha256()
 
