@@ -248,17 +248,25 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
                 const auto& pTxInputData {
                     (*iterOrphanTxn).second.pTxInputData
                 };
-                vRetryTxns.
-                    emplace_back(
-                       std::make_shared<CTxInputData>(
-                                           pTxInputData->mTxSource,   // tx source
-                                           pTxInputData->mTxType,     // tx type
-                                           pTxInputData->mpTx,        // a pointer to the tx
-                                           GetTime(),                 // nAcceptTime
-                                           pTxInputData->mfLimitFree, // fLimitFree
-                                           pTxInputData->mnAbsurdFee, // nAbsurdFee
-                                           pTxInputData->mpNode,      // pNode
-                                           pTxInputData->mfOrphan));  // fOrphan
+                // Add txn to the result set if it's not there yet. Otherwise, a multiple entry of the same txn would be added,
+                // if it has more than one parent, for which outpoints were collected during the current interval.
+                const auto& txnid = pTxInputData->mpTx->GetId();
+                if (std::find_if(vRetryTxns.begin(), vRetryTxns.end(),
+                                    [&txnid](const TxInputDataSPtr& elem) {
+                                        return txnid == elem->mpTx->GetId(); }) == vRetryTxns.end()) {
+                    // The result set of orphan txns to be reprocessed.
+                    vRetryTxns.
+                        emplace_back(
+                           std::make_shared<CTxInputData>(
+                                               pTxInputData->mTxSource,   // tx source
+                                               pTxInputData->mTxType,     // tx type
+                                               pTxInputData->mpTx,        // a pointer to the tx
+                                               GetTime(),                 // nAcceptTime
+                                               pTxInputData->mfLimitFree, // fLimitFree
+                                               pTxInputData->mnAbsurdFee, // nAbsurdFee
+                                               pTxInputData->mpNode,      // pNode
+                                               pTxInputData->mfOrphan));  // fOrphan
+                }
             }
             // We cannot simply return all dependent orphan txns to the given tx.vout of the parent tx.
             // The limit for descendant size & counter would not be properly calculated/updated.
