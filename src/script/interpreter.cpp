@@ -427,12 +427,15 @@ std::optional<bool> EvalScript(
     std::vector<bool> vfElse;
     std::vector<valtype> altstack;
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
-    if (script.size() > MAX_SCRIPT_SIZE) {
+
+    const bool genesis_rules_enabled{(flags & SCRIPT_GENESIS) != 0};
+    if(!genesis_rules_enabled && (script.size() > MAX_SCRIPT_SIZE))
+    {
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     }
+
     int nOpCount = 0;
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-    const bool genesis_rules_enabled{(flags & SCRIPT_GENESIS) != 0};
     const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
     const int big_ints_byte_limit{500}; // To do: Make configurable
                                         // MAX_SCRIPT_ELEMENT_SIZE = 520
@@ -1601,7 +1604,9 @@ std::optional<bool> EvalScript(
             }
 
             // Size limits
-            if (stack.size() + altstack.size() > 1000) {
+            if(!genesis_rules_enabled &&
+               (stack.size() + altstack.size() > 1000))
+            {
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
             }
         }

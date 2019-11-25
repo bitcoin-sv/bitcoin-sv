@@ -423,7 +423,7 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
 
         CScript script(args.begin(), args.end());
 
-        uint32_t flags(1 << 17);
+        uint32_t flags{};
         ScriptError error;
         const auto status =
             EvalScript(
@@ -433,6 +433,39 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]), begin(op),
+                                      end(op));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_depth)
+{
+    // vector<size_t> test_data = {0, 1, 2,
+    //                            std::numeric_limits<int32_t>::max() - 2000};
+    vector<size_t> test_data = {0, 1, 20'000};
+
+    for(const auto i : test_data)
+    {
+        stack_type stack;
+        vector<uint8_t> args(i, OP_0);
+
+        args.push_back(OP_DEPTH);
+
+        CScript script(args.begin(), args.end());
+
+        const auto cancellation_source{task::CCancellationSource::Make()};
+        const auto token{cancellation_source->GetToken()};
+        const auto flags{SCRIPT_GENESIS};
+        // uint32_t flags(1 << 17);
+        ScriptError error;
+        const auto status = EvalScript(token, stack, script, flags,
+                                       BaseSignatureChecker{}, &error);
+
+        BOOST_CHECK_EQUAL(true, status.value());
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+        BOOST_CHECK_EQUAL(i + 1, stack.size());
+        vector<uint8_t> op;
+        bsv::serialize<int>(i, back_inserter(op));
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[i]), end(stack[i]), begin(op),
                                       end(op));
     }
 }
