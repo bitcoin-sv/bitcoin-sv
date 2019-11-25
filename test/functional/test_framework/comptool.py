@@ -188,6 +188,7 @@ class TestManager():
         self.block_store = BlockStore(datadir)
         self.tx_store = TxStore(datadir)
         self.ping_counter = 1
+        self.destAddr = '127.0.0.1'
         self.waitForPingTimeout = 60
 
     def add_all_connections(self, nodes):
@@ -196,7 +197,7 @@ class TestManager():
             test_node = TestNode(self.block_store, self.tx_store)
             self.test_nodes.append(test_node)
             self.connections.append(
-                NodeConn('127.0.0.1', p2p_port(i), nodes[i], test_node))
+                NodeConn(self.destAddr, p2p_port(i), nodes[i], test_node))
             # Make sure the TestNode (callback class) has a reference to its
             # associated NodeConn
             test_node.add_connection(self.connections[-1])

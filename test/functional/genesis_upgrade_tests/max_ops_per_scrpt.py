@@ -17,7 +17,7 @@ class MaxOpsPerScriptTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE] + [OP_NOP] * (MAX_OPS_PER_SCRIPT_BEFORE_GENESIS + 1)),
                              "PRE-GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Operation limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Operation limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),                      
         SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_TRUE] + [OP_NOP] * MAX_OPS_PER_SCRIPT_BEFORE_GENESIS),
@@ -25,7 +25,7 @@ class MaxOpsPerScriptTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
                              ),           
         SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_TRUE] + [OP_NOP] * (MAX_OPS_PER_SCRIPT_BEFORE_GENESIS + 1)),
                              "MEMPOOL AT GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Operation limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Operation limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),                
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE] + [OP_NOP] * MAX_OPS_PER_SCRIPT_BEFORE_GENESIS),
@@ -33,7 +33,7 @@ class MaxOpsPerScriptTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE] + [OP_NOP] * (MAX_OPS_PER_SCRIPT_BEFORE_GENESIS + 1)),
                              "GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Operation limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Operation limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),                                               
         SimpleTestDefinition("GENESIS", CScript([OP_TRUE] + [OP_NOP] * 1000),
@@ -41,7 +41,7 @@ class MaxOpsPerScriptTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("GENESIS", CScript([OP_TRUE] + [OP_NOP] * 1001),
                              "GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Operation limit exceeded)'
+                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Operation limit exceeded)'
                              ),
     ]
 
@@ -55,7 +55,7 @@ class MaxOpsPerScriptTest(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE] + [OP_NOP] * (MAX_OPS_PER_SCRIPT_BEFORE_GENESIS + 1)),
                              "PRE-GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Operation limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Operation limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
         SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_TRUE] + [OP_NOP] * MAX_OPS_PER_SCRIPT_BEFORE_GENESIS),
@@ -63,7 +63,7 @@ class MaxOpsPerScriptTest(GenesisHeightBasedSimpleTestsCase):
                              ),           
         SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_TRUE] + [OP_NOP] * (MAX_OPS_PER_SCRIPT_BEFORE_GENESIS + 1)),
                              "MEMPOOL AT GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Operation limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Operation limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),          
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE] + [OP_NOP] * MAX_OPS_PER_SCRIPT_BEFORE_GENESIS),
@@ -71,11 +71,11 @@ class MaxOpsPerScriptTest(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE] + [OP_NOP] * (MAX_OPS_PER_SCRIPT_BEFORE_GENESIS + 1)),
                              "GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Operation limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Operation limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),                                                                     
         SimpleTestDefinition("GENESIS", CScript([OP_TRUE] + [OP_NOP] * (MAX_OPS_PER_SCRIPT_BEFORE_GENESIS + 1)),
                              "GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Operation limit exceeded)',
+                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Operation limit exceeded)',
                              ),
     ]

@@ -25,7 +25,7 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
                              "PRE-GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Push value size limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
@@ -33,7 +33,7 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
                              "MEMPOOL AT GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Push value size limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS - 1), b"b", OP_CAT]),
@@ -41,7 +41,7 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([b"a"*MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
                              "GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Push value size limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
         # UTXO is in block at height "MEMPOOL AT GENESIS" which means pre genesis rules apply to this block
@@ -50,7 +50,7 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([b"a"*MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, b"b", OP_CAT]),
                              "GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Push value size limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
 
@@ -66,7 +66,7 @@ class MaxStackSizeTestWithCustomSize(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("GENESIS", CScript([b"a"*(MAX_STACK_MEMORY_USAGE_CONSENSUS - 1), b"b", OP_CAT]),
                              "GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Stack size limit exceeded)',
+                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Stack size limit exceeded)',
                              block_reject_reason=None
                              ),
         SimpleTestDefinition("GENESIS", CScript([b"a"*MAX_STACK_MEMORY_USAGE_CONSENSUS, b"b", OP_CAT]),
@@ -91,12 +91,12 @@ class MaxStackSizeTestWithElementsCount(GenesisHeightBasedSimpleTestsCase):
                              ),
         SimpleTestDefinition("PRE-GENESIS", CScript([b"a"]*(MAX_STACK_ELEMENTS_BEFORE_GENESIS + 1)),
                              "PRE-GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Stack size limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Stack size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
         SimpleTestDefinition("GENESIS", CScript([b"a"]*(MAX_STACK_ELEMENTS_BEFORE_GENESIS + 1)),
                              "GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Script did not clean its stack)',
+                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Script did not clean its stack)',
                              block_reject_reason=None
                              ),
     ]
@@ -111,7 +111,7 @@ class MaxStackSizeTest(GenesisHeightBasedSimpleTestsCase):
     TESTS = [
         SimpleTestDefinition("PRE-GENESIS", CScript([b"a"] + [OP_DUP, OP_CAT]*18),
                              "PRE-GENESIS", b"",
-                             p2p_reject_reason=b'mandatory-script-verify-flag-failed (Push value size limit exceeded)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Push value size limit exceeded)',
                              block_reject_reason=b'blk-bad-inputs'
                              ),
         SimpleTestDefinition("GENESIS", CScript([b"a"] + [OP_DUP, OP_CAT]*26),

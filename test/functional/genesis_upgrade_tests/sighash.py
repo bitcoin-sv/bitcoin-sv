@@ -78,7 +78,7 @@ class SighashCaseTest(GenesisHeightTestsCaseBase):
             #tx_collection.add_tx(tx_new_sighash)
             tx_old_sighash = self.new_transaction(post_genesis_utxos.pop(0), use_new_sighash_algorithm=False, target_tx_size=500)
             tx_collection.add_tx(tx_old_sighash,
-                                 p2p_reject_reason=b'non-mandatory-script-verify-flag (Signature must use SIGHASH_FORKID)',
+                                 p2p_reject_reason=b'genesis-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
                                  block_reject_reason=b'blk-bad-inputs')
 
 
@@ -116,7 +116,7 @@ class SighashSimpleCaseTest(GenesisHeightBasedSimpleTestsCase):
                              "MEMPOOL AT GENESIS", make_unlock_with_new),
         SimpleTestDefinition(None, P2PK_LOCKING_SCRIPT,
                              "MEMPOOL AT GENESIS", make_unlock_with_old,
-                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Signature must use SIGHASH_FORKID)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
                              block_reject_reason=b'blk-bad-inputs'),
 
         SimpleTestDefinition("PRE-GENESIS", P2PK_LOCKING_SCRIPT,
@@ -128,7 +128,7 @@ class SighashSimpleCaseTest(GenesisHeightBasedSimpleTestsCase):
                              "GENESIS", make_unlock_with_new),
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                              "GENESIS", make_unlock_with_old,
-                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Signature must use SIGHASH_FORKID)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
                              block_reject_reason=b'blk-bad-inputs'),
     ]
 
@@ -167,7 +167,7 @@ class SighashMultisigSimpleCaseTest(GenesisHeightBasedSimpleTestsCase):
                              "MEMPOOL AT GENESIS", make_multsig_unlock_with_new),
         SimpleTestDefinition(None, MULTISIG_LOCKING_SCRIPT,
                              "MEMPOOL AT GENESIS", make_multsig_unlock_with_old,
-                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Signature must use SIGHASH_FORKID)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
                              block_reject_reason=b'blk-bad-inputs'),
         
         SimpleTestDefinition("PRE-GENESIS", MULTISIG_LOCKING_SCRIPT,
@@ -179,7 +179,7 @@ class SighashMultisigSimpleCaseTest(GenesisHeightBasedSimpleTestsCase):
                              "GENESIS", make_multsig_unlock_with_new),
         SimpleTestDefinition("GENESIS", MULTISIG_LOCKING_SCRIPT,
                              "GENESIS", make_multsig_unlock_with_old,
-                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Signature must use SIGHASH_FORKID)',
+                             p2p_reject_reason=b'genesis-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
                              block_reject_reason=b'blk-bad-inputs'),
     ]
 
