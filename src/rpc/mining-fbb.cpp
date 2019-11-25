@@ -60,7 +60,12 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
     }
 
-    auto assembler { mining::CMiningFactory::GetAssembler(config) };
+    if(!mining::g_miningFactory)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "No mining factory available");
+    }
+
+    auto assembler { mining::g_miningFactory->GetAssembler() };
 
     // Update block
     static CBlockIndex *pindexPrev = nullptr;

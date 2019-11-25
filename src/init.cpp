@@ -209,6 +209,8 @@ void Shutdown() {
     UnregisterValidationInterface(peerLogic.get());
     peerLogic.reset();
 
+    mining::g_miningFactory.reset();
+
     if (g_connman) {
         // call Stop first as CConnman members are using g_connman global
         // variable and they must be shut down before the variable is reset to
@@ -2551,6 +2553,10 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     if (!connman.Start(scheduler, strNodeError, connOptions)) {
         return InitError(strNodeError);
     }
+
+    // Create mining factory
+    assert(!mining::g_miningFactory);
+    mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(config);
 
     // Step 12: finished
 

@@ -76,6 +76,8 @@ BasicTestingSetup::~BasicTestingSetup() {
         g_connman->Stop();
         g_connman.reset();
     }
+
+    mining::g_miningFactory.reset();
 }
 
 TestingSetup::TestingSetup(const std::string &chainName)
@@ -118,6 +120,8 @@ TestingSetup::TestingSetup(const std::string &chainName)
             config, 0x1337, 0x1337, std::chrono::milliseconds{0});
     connman = g_connman.get();
     RegisterNodeSignals(GetNodeSignals());
+
+    mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(config);
 }
 
 TestingSetup::~TestingSetup() {
@@ -152,8 +156,9 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey) {
     const Config &config = GlobalConfig::GetConfig();
     CBlockIndex* pindexPrev {nullptr};
+    mining::CMiningFactory miningFactory {config};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-            mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+            miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
     CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock &block = *blockRef;
 

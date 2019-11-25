@@ -9,18 +9,26 @@
 namespace mining
 {
 
-// Get an appropriate block assembler
-BlockAssemblerRef CMiningFactory::GetAssembler(const Config& config)
+// Constructor
+CMiningFactory::CMiningFactory(const Config& config)
+: mConfig{config}
 {
-    switch(config.GetMiningCandidateBuilder())
+    if(config.GetMiningCandidateBuilder() == CMiningFactory::BlockAssemblerType::JOURNALING)
+    {
+        // Create a journaling block assembler
+        mJournalingAssembler = std::make_shared<JournalingBlockAssembler>(config);
+    }
+}
+
+// Get an appropriate block assembler
+BlockAssemblerRef CMiningFactory::GetAssembler() const
+{
+    switch(mConfig.GetMiningCandidateBuilder())
     {
         case(CMiningFactory::BlockAssemblerType::LEGACY):
-            return std::make_shared<LegacyBlockAssembler>(config);
+            return std::make_shared<LegacyBlockAssembler>(mConfig);
         case(CMiningFactory::BlockAssemblerType::JOURNALING):
-		{
-			static BlockAssemblerRef journalingAssembler{ std::make_shared<JournalingBlockAssembler>(config) };
-			return journalingAssembler;
-		}
+			return mJournalingAssembler;
         default:
             break;
     }
