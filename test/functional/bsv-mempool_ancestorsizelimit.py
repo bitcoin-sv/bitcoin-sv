@@ -129,6 +129,7 @@ class MempoolSizeLimitTest(BitcoinTestFramework):
                 utxo = utxos.pop(0)
                 connection.message_count.clear()
                 (tx, sent_value, txSize) = self.chain_transaction(self.nodes[0], utxo['txid'], utxo['vout'], utxo['amount'], 1, connection)
+                chain_of_descendant_txns.append(tx.sha256)
                 connection.wait_for_reject()
                 break
 
