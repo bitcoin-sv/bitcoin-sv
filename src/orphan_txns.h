@@ -48,7 +48,8 @@ class COrphanTxns {
 
     COrphanTxns(
         size_t maxCollectedOutpoints,
-        size_t maxExtraTxnsForCompactBlock);
+        size_t maxExtraTxnsForCompactBlock,
+        size_t maxTxSizePolicy);
     ~COrphanTxns() = default;
 
     // Forbid copying/assignment
@@ -121,6 +122,7 @@ class COrphanTxns {
     mutable std::shared_mutex mExtraTxnsForCompactMtx {};
     size_t mExtraTxnsForCompactIdx {0};
     size_t mMaxExtraTxnsForCompactBlock {0};
+    size_t mMaxStandardTxSize {0};
 
     /** Control txns limit by a time slot */
     int64_t mNextSweep {0};

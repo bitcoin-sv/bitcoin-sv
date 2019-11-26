@@ -19,6 +19,7 @@ namespace {
     // Use a default configuration
     size_t maxCollectedOutpoints = COrphanTxns::DEFAULT_MAX_COLLECTED_OUTPOINTS;
     size_t maxExtraTxnsForCompactBlock = COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN;
+    size_t maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     // Create txn inputs
     std::vector<CTxIn> CreateTxnInputs(size_t nNumOfInputs, uint256 txid=InsecureRand256()) {
         std::vector<CTxIn> vin;
@@ -109,7 +110,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_creation) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     BOOST_REQUIRE(orphanTxns);
 }
@@ -120,7 +122,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_addtxn_erasetxns) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
@@ -138,7 +141,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_number) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     size_t nTxnsNumber=100;
     CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
@@ -161,7 +165,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
@@ -182,7 +187,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     size_t nTxnsNumber=10;
     // Create orphan transactions:
@@ -208,7 +214,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     size_t nTxnsNumber=10;
     size_t nNodesNumber=10;
@@ -235,7 +242,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_maxcollectedoutpoints) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 nMaxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     // Create txn with a max number of outpoints the OrphanTxn can collect
     auto txn1 = CreateOrphanTxn(
@@ -302,7 +310,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 nMaxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     // Create txn1
     auto txn1 = CreateOrphanTxn(
@@ -381,7 +390,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     size_t nTxnsNumber=5;
     // Create orphan transactions:
@@ -440,7 +450,8 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     std::shared_ptr<COrphanTxns> orphanTxns {
         std::make_shared<COrphanTxns>(
                 maxCollectedOutpoints,
-                maxExtraTxnsForCompactBlock)
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
     };
     // Create orphan transaction of type 1-2 (one input - two outputs):
     auto txn1 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs(1), CreateTxnOutputs(2));

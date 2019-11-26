@@ -72,8 +72,10 @@ static const uint64_t DEFAULT_BLOCK_PRIORITY_PERCENTAGE = 5;
 /** Default for -blockmintxfee, which sets the minimum feerate for a transaction
  * in blocks created by mining code **/
 static const Amount DEFAULT_BLOCK_MIN_TX_FEE(1000);
-/** The maximum size for transactions we're willing to relay/mine */
-static const unsigned int MAX_STANDARD_TX_SIZE = 100000;
+/** The maximum size for transactions we're willing to relay/mine - before genesis*/
+static const uint64_t MAX_TX_SIZE_POLICY_BEFORE_GENESIS = 100000 - 1; // -1 because pre genesis policy validation was >=
+/** The default size for transactions we're willing to relay/mine */
+static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = MAX_TX_SIZE_POLICY_BEFORE_GENESIS;
 /** Maximum number of signature check operations in an IsStandard() P2SH script
  */
 static const unsigned int MAX_P2SH_SIGOPS = 15;

@@ -30,6 +30,7 @@ void GlobalConfig::Reset()
     maxGeneratedBlockSizeBefore = 0;
     maxGeneratedBlockSizeAfter = 0;
     maxGeneratedBlockSizeOverridden =  false;
+    maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
@@ -183,6 +184,61 @@ bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage, std::string* e
 
 uint8_t GlobalConfig::GetBlockPriorityPercentage() const {
     return blockPriorityPercentage;
+}
+
+bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
+{
+    if (maxTxSizePolicyIn < 0)
+    {
+        if (err)
+        {
+            *err = "Policy value for max tx size must not be less than 0";
+        }
+        return false;
+    }
+    if (maxTxSizePolicyIn == 0)
+    {
+        maxTxSizePolicy = MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
+        return true;
+    }
+    uint64_t maxTxSizePolicyInUnsigned = static_cast<uint64_t>(maxTxSizePolicyIn);
+    if (maxTxSizePolicyInUnsigned > MAX_TX_SIZE)
+    {
+        if (err)
+        {
+            *err = "Policy value for max tx size must not exceed consensus limit of " + std::to_string(MAX_TX_SIZE);
+        }
+        return false;
+    }
+    else if (maxTxSizePolicyInUnsigned < MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
+    {
+        if (err)
+        {
+            *err = "Policy value for max tx size must not be less than " + std::to_string(MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+        }
+        return false;
+    }
+
+    maxTxSizePolicy = maxTxSizePolicyInUnsigned;
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const
+{
+    if (!isGenesisEnabled) // no changes before genesis
+    {
+        if (isConsensus)
+        {
+            return MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
+        }
+        return MAX_TX_SIZE_POLICY_BEFORE_GENESIS;
+    }
+
+    if (isConsensus)
+    {
+        return MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
+    }
+    return maxTxSizePolicy;
 }
 
 void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {

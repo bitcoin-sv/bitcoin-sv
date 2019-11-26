@@ -927,6 +927,11 @@ std::string HelpMessage(HelpMessageMode mode) {
               " mempool (min 10ms, default: %dms)"),
             DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION.count()));
 
+    strUsage +=
+        HelpMessageOpt("-maxtxsizepolicy=<n>",
+            strprintf(_("Set maximum transaction size in bytes we relay and mine (default: %u, min: %u, 0 = unlimited) after Genesis is activated"),
+                DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS, MAX_TX_SIZE_POLICY_BEFORE_GENESIS));
+
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
@@ -1738,6 +1743,15 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure ancestor limit count.
     if(gArgs.IsArgSet("-limitancestorcount")) {
         config.SetLimitAncestorCount(gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT));
+    }
+
+    // configure max transaction size policy
+    if (gArgs.IsArgSet("-maxtxsizepolicy"))
+    {
+        int64_t maxTxSizePolicy = gArgs.GetArg("-maxtxsizepolicy", DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
+        if (std::string err; !config.SetMaxTxSizePolicy(maxTxSizePolicy, &err)) {
+            return InitError(err);
+        }
     }
 
     // Configure descendant limit size.

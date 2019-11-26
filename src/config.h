@@ -45,6 +45,9 @@ public:
     virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
 
+    virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
+
     virtual void SetExcessUTXOCharge(Amount amt) = 0;
     virtual Amount GetExcessUTXOCharge() const = 0;
 
@@ -136,6 +139,9 @@ public:
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override;
     uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
+
+    bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
+    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const  override;
 
     void SetExcessUTXOCharge(Amount) override;
     Amount GetExcessUTXOCharge() const override;
@@ -229,6 +235,8 @@ private:
     uint64_t maxGeneratedBlockSizeAfter;
     bool maxGeneratedBlockSizeOverridden;
 
+    uint64_t maxTxSizePolicy;
+
     uint64_t dataCarrierSize;
     uint64_t limitDescendantCount;
     uint64_t limitAncestorCount;
@@ -290,6 +298,17 @@ public:
         return false;
     }
     uint8_t GetBlockPriorityPercentage() const override { return 0; }
+
+    bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
+    {
+        if (err)
+        {
+            *err = "This is dummy config";
+        }
+        maxTxSizePolicy = value;
+        return false;
+    }
+    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
 
     void SetChainParams(std::string net);
     const CChainParams &GetChainParams() const override { return *chainParams; }
@@ -413,6 +432,7 @@ private:
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
     bool acceptP2SH { DEFAULT_ACCEPT_P2SH };
     uint64_t genesisActivationHeight;
+    uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
 };
 
 #endif

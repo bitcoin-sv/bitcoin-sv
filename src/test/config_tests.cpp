@@ -153,6 +153,48 @@ BOOST_AUTO_TEST_CASE(max_block_size_related_defaults) {
 
 }
 
+BOOST_AUTO_TEST_CASE(max_policy_tx_size) {
+
+    GlobalConfig config;
+    std::string reason;
+    int64_t newMaxTxSizePolicy{ MAX_TX_SIZE_POLICY_BEFORE_GENESIS + 1 };
+
+
+    // default pre genesis policy tx size
+    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+
+    // default post genesis policy tx size
+    BOOST_CHECK(config.GetMaxTxSize(true, false) == DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
+
+    // can not set policy tx size < pre genesis policy tx size
+    BOOST_CHECK(!config.SetMaxTxSizePolicy(MAX_TX_SIZE_POLICY_BEFORE_GENESIS - 1, &reason));
+
+    // can not set policy tx size > consensus policy tx size
+    BOOST_CHECK(!config.SetMaxTxSizePolicy(MAX_TX_SIZE + 1, &reason));
+
+    // can not set policy tx size < 0
+    BOOST_CHECK(!config.SetMaxTxSizePolicy(- 1, &reason));
+
+
+    // set new max policy tx size
+    BOOST_CHECK(config.SetMaxTxSizePolicy(newMaxTxSizePolicy, &reason));
+
+    // pre genesis policy tx size
+    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+
+    // post genesis policy tx size
+    BOOST_CHECK(config.GetMaxTxSize(true, false) == static_cast<uint64_t>(newMaxTxSizePolicy));
+
+
+    // set unlimited policy tx size
+    BOOST_CHECK(config.SetMaxTxSizePolicy(0, &reason));
+
+    // pre genesis policy tx size
+    BOOST_CHECK(config.GetMaxTxSize(false, false) == MAX_TX_SIZE_POLICY_BEFORE_GENESIS);
+
+    // post genesis policy tx size
+    BOOST_CHECK(config.GetMaxTxSize(true, false) == MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS);
+}
 
 BOOST_AUTO_TEST_CASE(hex_to_array) {
     const std::string hexstr = "0a0b0C0D";//Lower and Upper char should both work
