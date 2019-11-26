@@ -448,9 +448,12 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
     """
     while timeout > 0:
         pool = set(rpc_connections[0].getrawmempool())
+        non_final_pool = set(rpc_connections[0].getrawnonfinalmempool())
         num_match = 1
         for i in range(1, len(rpc_connections)):
-            if set(rpc_connections[i].getrawmempool()) == pool:
+            pool_match = set(rpc_connections[i].getrawmempool()) == pool
+            non_final_pool_match = set(rpc_connections[i].getrawnonfinalmempool()) == non_final_pool
+            if pool_match and non_final_pool_match:
                 num_match = num_match + 1
         if num_match == len(rpc_connections):
             return

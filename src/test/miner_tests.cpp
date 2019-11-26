@@ -96,7 +96,7 @@ CBlockIndex CreateBlockIndex(int nHeight) {
 
 bool TestSequenceLocks(const CTransaction &tx, int flags) {
     std::shared_lock lock(mempool.smtx);
-    return CheckSequenceLocks(tx, mempool, flags);
+    return CheckSequenceLocks(tx, mempool, config, flags);
 }
 
 // Test suite for ancestor feerate transaction selection.
@@ -712,7 +712,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     {
         // Locktime fails.
-        GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(!ContextualCheckTransactionForCurrentBlock(
                         config,
@@ -733,7 +732,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransaction(
             config, CTransaction(tx), state, chainActive.Tip()->nHeight + 2,
-            chainActive.Tip()->GetMedianTimePast()));
+            chainActive.Tip()->GetMedianTimePast(), false));
     }
 
     // Absolute time locked.
@@ -746,7 +745,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     {
         // Locktime fails.
-        GlobalConfig config;
         CValidationState state;
         BOOST_CHECK(!ContextualCheckTransactionForCurrentBlock(
                         config,
@@ -767,7 +765,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         CValidationState state;
         BOOST_CHECK(ContextualCheckTransaction(
             config, CTransaction(tx), state, chainActive.Tip()->nHeight + 1,
-            chainActive.Tip()->GetMedianTimePast() + 1));
+            chainActive.Tip()->GetMedianTimePast() + 1, false));
     }
 
     // mempool-dependent transactions (not added)

@@ -144,7 +144,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
     nMaxGeneratedBlockSize = ComputeMaxGeneratedBlockSize(pindexPrevNew);
 
     nLockTimeCutoff =
-        (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
+        (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, nHeight)) & LOCKTIME_MEDIAN_TIME_PAST)
             ? pindexPrevNew->GetMedianTimePast()
             : GetAdjustedTime();
 
@@ -235,7 +235,7 @@ bool LegacyBlockAssembler::TestPackageTransactions(
     for (const CTxMemPool::txiter it : package) {
         CValidationState state;
         if (!ContextualCheckTransaction(mConfig, it->GetTx(), state, nHeight,
-                                        nLockTimeCutoff)) {
+                                        nLockTimeCutoff, false)) {
             return false;
         }
 
@@ -285,7 +285,7 @@ bool LegacyBlockAssembler::TestForBlock(CTxMemPool::txiter it) {
     // is always enforced as long as reorgs keep the mempool consistent.
     CValidationState state;
     if (!ContextualCheckTransaction(mConfig, it->GetTx(), state, nHeight,
-                                    nLockTimeCutoff)) {
+                                    nLockTimeCutoff, false)) {
         return false;
     }
 

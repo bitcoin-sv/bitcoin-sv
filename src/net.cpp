@@ -884,7 +884,7 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
     }
 
     results.reserve(n);
-    auto endIt = std::next(begin(mInvList), n);
+    auto endIt = std::next(std::begin(mInvList), n);
     std::move(std::begin(mInvList), endIt, std::back_inserter(results));
     mInvList.erase(std::begin(mInvList), endIt);
 
@@ -3269,6 +3269,11 @@ void CConnman::EnqueueTxnForValidator(std::shared_ptr<CTxInputData> pTxInputData
 /* Support for a vector */
 void CConnman::EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData) {
     mTxnValidator->newTransaction(std::move(vTxInputData));
+}
+
+/** Resubmit a transaction for validation */
+void CConnman::ResubmitTxnForValidator(TxInputDataSPtr pTxInputData) {
+    mTxnValidator->resubmitTransaction(std::move(pTxInputData));
 }
 
 /** Check if the txn is already known */

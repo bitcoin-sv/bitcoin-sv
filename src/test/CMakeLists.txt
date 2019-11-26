@@ -133,6 +133,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	testutil.cpp
     threadpool_tests.cpp
 	timedata_tests.cpp
+    time_locked_mempool_tests.cpp
 	transaction_tests.cpp
 	txvalidationcache_tests.cpp
 	uint256_tests.cpp

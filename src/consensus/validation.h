@@ -35,6 +35,7 @@ private:
     bool fMissingInputs {false};
     bool fDoubleSpendDetected {false};
     bool fMempoolConflictDetected {false};
+    bool nonFinal {false};
 
 public:
     bool DoS(int level, bool ret = false, unsigned int chRejectCodeIn = 0,
@@ -83,10 +84,13 @@ public:
     bool IsMempoolConflictDetected() { return fMempoolConflictDetected; }
 
     bool CorruptionPossible() const { return corruptionPossible; }
+    bool IsNonFinal() const { return nonFinal; }
+
     void SetCorruptionPossible() { corruptionPossible = true; }
     void SetMissingInputs() { fMissingInputs = true; }
     void SetDoubleSpendDetected() { fDoubleSpendDetected = true; }
     void SetMempoolConflictDetected() { fMempoolConflictDetected = true; }
+    void SetNonFinal(bool nf = true) { nonFinal = nf; }
 
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }

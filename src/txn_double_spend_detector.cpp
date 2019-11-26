@@ -10,7 +10,8 @@
 bool CTxnDoubleSpendDetector::insertTxnInputs(
     const TxInputDataSPtr& pTxInputData,
     const CTxMemPool& pool,
-    CValidationState& state) {
+    CValidationState& state,
+    bool isFinal) {
 
     const CTransactionRef& ptx = pTxInputData->mpTx;
     const CTransaction &tx = *ptx;
@@ -27,7 +28,7 @@ bool CTxnDoubleSpendDetector::insertTxnInputs(
     // before other txn is detected as a double spend txn.
     // It might happen when two transactions have a common input but the first one
     // has less inputs than the second one.
-    if (pool.CheckTxConflicts(tx)) {
+    if (pool.CheckTxConflicts(ptx, isFinal)) {
         state.SetMempoolConflictDetected();
         return false;
     }

@@ -12,6 +12,8 @@
 #include "primitives/transaction.h"
 #include "random.h"
 #include "sync.h"
+#include "time_locked_mempool.h"
+#include "tx_mempool_info.h"
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -365,23 +367,6 @@ struct ancestor_score {};
 class CBlockPolicyEstimator;
 
 /**
- * Information about a mempool transaction.
- */
-struct TxMempoolInfo {
-    /** The transaction itself */
-    CTransactionRef tx;
-
-    /** Time the transaction entered the mempool. */
-    int64_t nTime;
-
-    /** Feerate of the transaction. */
-    CFeeRate feeRate;
-
-    /** The fee delta. */
-    Amount nFeeDelta;
-};
-
-/**
  * Reason why a transaction was removed from the mempool, this is passed to the
  * notification signal.
  */
@@ -522,6 +507,9 @@ private:
     // Our journal builder
     mining::CJournalBuilderPtr mJournalBuilder;
 
+    // Sub-pool for time locked txns
+    CTimeLockedMempool mTimeLockedPool {};
+
 public:
     // public only for testing
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
@@ -608,8 +596,7 @@ public:
      * are in the mapNextTx array, journal is in agreement with mempool).
      * If sanity-checking is turned off, check does nothing.
      */
-    void Check(
-        const int64_t nSpendHeight,
+    void CheckMempool(
         const CCoinsViewCache *pcoins,
         const mining::CJournalChangeSetPtr& changeSet) const;
 
@@ -704,6 +691,9 @@ public:
 
     // Get a reference to the journal builder
     const mining::CJournalBuilderPtr& getJournalBuilder() const { return mJournalBuilder; }
+
+    // Get a reference to the time-locked (non-final txn) mempool
+    CTimeLockedMempool& getNonFinalPool() { return mTimeLockedPool; }
 
 public:
     /**
@@ -806,8 +796,9 @@ public:
     /**
      * Check for conflicts with in-mempool transactions.
      * @param tx A reference to the given txn
+     * @param nonFinal A flag to indicate if tx is a non-final transaction
      */
-    bool CheckTxConflicts(const CTransaction &tx) const;
+    bool CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const;
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */

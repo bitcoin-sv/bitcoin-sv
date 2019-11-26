@@ -326,6 +326,8 @@ public:
     void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
     /* Support for a vector */
     void EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData);
+    /** Resubmit a transaction for validation */
+    void ResubmitTxnForValidator(TxInputDataSPtr pTxInputData);
     /** Check if the given txn is already known by the Validator */
     bool CheckTxnExistsInValidatorsQueue(const uint256& txHash) const;
     /* Find node by it's id */

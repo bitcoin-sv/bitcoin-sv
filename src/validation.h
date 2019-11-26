@@ -97,9 +97,10 @@ static const uint64_t DEFAULT_ANCESTOR_SIZE_LIMIT = DEFAULT_ANCESTOR_LIMIT * MAX
 /** Default for -limitdescendantsize, maximum kilobytes of in-mempool
  * descendants */
 static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT * MAX_TX_SIZE;
-/** Default for -mempoolexpiry, expiration time for mempool transactions in
- * hours */
+/** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
+/** Default for -nonfinalmempoolexpiry, expiration time for non-final mempool transactions in hours */
+static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
 /** Used to calculate how many bytes of transactions to store for processing during reorg
  *  The value is multiplied with default block size to calculate actual bytes.
  */
@@ -802,6 +803,11 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 } // namespace Consensus
 
 /**
+ * Test whether the given transaction is final for the given height and time.
+ */
+bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
+
+/**
  * Test whether the LockPoints height and time are still valid on the current
  * chain.
  */
@@ -831,6 +837,7 @@ bool SequenceLocks(const CTransaction &tx, int flags,
 bool CheckSequenceLocks(
     const CTransaction &tx,
     const CTxMemPool &pool,
+    const Config& config,
     int flags,
     LockPoints *lp = nullptr,
     bool useExistingLockPoints = false);
@@ -911,7 +918,7 @@ bool CheckBlock(
  */
 bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
                                 CValidationState &state, int nHeight,
-                                int64_t nLockTimeCutoff);
+                                int64_t nLockTimeCutoff, bool fromBlock);
 
 /**
  * This is a variant of ContextualCheckTransaction which computes the contextual
@@ -1000,12 +1007,12 @@ extern CCoinsViewCache *pcoinsTip;
 extern CBlockTreeDB *pblocktree;
 
 /**
- * Return the spend height, which is one more than the inputs.GetBestBlock().
+ * Return the MTP and spend height, which is one more than the inputs.GetBestBlock().
  * While checking, GetBestBlock() refers to the parent block. (protected by
  * cs_main)
  * This is also true for mempool checks.
  */
-int GetSpendHeight(const CCoinsViewCache &inputs);
+std::pair<int,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs);
 
 /**
  * Reject codes greater or equal to this can be returned by AcceptToMemPool for
@@ -1019,6 +1026,8 @@ static const unsigned int REJECT_HIGHFEE = 0x100;
 static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 /** Transaction conflicts with a transaction already known */
 static const unsigned int REJECT_CONFLICT = 0x102;
+/** No space for transaction */
+static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
 
 /** Dump the mempool to disk. */
 void DumpMempool();

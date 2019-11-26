@@ -13,7 +13,8 @@ const enumTableT<TxSource>& enumTable(TxSource)
         { TxSource::reorg,        "reorg" },
         { TxSource::wallet,       "wallet" },
         { TxSource::rpc,          "rpc" },
-        { TxSource::p2p,          "p2p" }
+        { TxSource::p2p,          "p2p" },
+        { TxSource::finalised,    "finalised" }
     };
     return table;
 }

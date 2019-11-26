@@ -81,6 +81,8 @@ static const unsigned int MAX_P2SH_SIGOPS = 15;
 static const unsigned int MAX_STANDARD_TX_SIGOPS = MAX_TX_SIGOPS_COUNT / 5;
 /** Default for -maxmempool, maximum megabytes of mempool memory usage */
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 300;
+/** Default for -maxnonfinalmempool, maximum megabytes of non-final mempool memory usage */
+static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
 /** Default for -incrementalrelayfee, which sets the minimum feerate increase
  * for mempool limiting or BIP 125 replacement **/
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
@@ -124,11 +126,15 @@ inline unsigned int StandardScriptVerifyFlags(bool genesisEnabled,
     return scriptFlags;
 }
 
-
-/** Used as the flags parameter to sequence and nLocktime checks in
- * non-consensus code. */
-static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS =
-    LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
+/** Get the flags to use for non-final transaction checks */
+inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
+{
+    unsigned int flags { LOCKTIME_MEDIAN_TIME_PAST };
+    if(!genesisEnabled) {
+        flags |= LOCKTIME_VERIFY_SEQUENCE;
+    }
+    return flags;
+}
 
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType);
 

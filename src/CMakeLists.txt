@@ -252,9 +252,11 @@ add_library(server
 	script/sigcache.cpp
 	script/ismine.cpp
 	timedata.cpp
+    time_locked_mempool.cpp
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+    tx_mempool_info.cpp
 	txn_double_spend_detector.cpp
 	txn_propagator.cpp
 	txn_validation_data.cpp

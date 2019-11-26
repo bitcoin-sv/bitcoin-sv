@@ -15,7 +15,8 @@ enum class TxSource
     reorg,
     wallet,
     rpc,
-    p2p
+    p2p,
+    finalised
 };
 // Enable enum_cast for TxSource, so we can log informatively
 const enumTableT<TxSource>& enumTable(TxSource);

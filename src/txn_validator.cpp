@@ -149,6 +149,27 @@ void CTxnValidator::newTransaction(TxInputDataSPtrVec vTxInputData) {
     }
 }
 
+/** Resubmit a transaction for reprocessing */
+void CTxnValidator::resubmitTransaction(TxInputDataSPtr pTxInputData) {
+    const TxId& txid = pTxInputData->mpTx->GetId();
+    const TxType& txtype = pTxInputData->mTxType;
+
+    // Check if exists in mStdTxns
+    if (TxType::standard == txtype || TxType::unknown == txtype) {
+        std::unique_lock lock { mStdTxnsMtx };
+        if(!isTxnKnownInSetNL(txid, mStdTxns)) {
+            mStdTxns.emplace_back(std::move(pTxInputData));
+        }
+    }
+    // Check if exists in mNonStdTxns
+    else if (TxType::nonstandard == txtype) {
+        std::unique_lock lock { mNonStdTxnsMtx };
+        if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
+            mNonStdTxns.emplace_back(std::move(pTxInputData));
+        }
+    }
+}
+
 /** Process a new txn in synchronous mode */
 CValidationState CTxnValidator::processValidation(
     const TxInputDataSPtr& pTxInputData,
