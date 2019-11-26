@@ -85,7 +85,7 @@ public:
     virtual void SetAcceptP2SH(bool acceptP2SHIn) = 0;
     virtual bool GetAcceptP2SH() const = 0;
 
-    virtual void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) = 0;
+    virtual bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetGenesisActivationHeight() const = 0;
 
     virtual bool SetMaxConcurrentAsyncTasksPerNode(
@@ -180,7 +180,7 @@ public:
     void SetAcceptP2SH(bool acceptP2SHIn) override;
     bool GetAcceptP2SH() const override;
 
-    void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) override;
+    bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override;
     uint64_t GetGenesisActivationHeight() const override;
 
     bool SetMaxConcurrentAsyncTasksPerNode(
@@ -352,7 +352,7 @@ public:
     void SetAcceptP2SH(bool acceptP2SHIn) override { acceptP2SH = acceptP2SHIn; }
     bool GetAcceptP2SH() const override { return acceptP2SH; }
 
-    void SetGenesisActivationHeight(uint64_t genesisActivationHeightIn) override { genesisActivationHeight = genesisActivationHeightIn; }
+    bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn); return true; }
     uint64_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
 
     bool SetMaxConcurrentAsyncTasksPerNode(

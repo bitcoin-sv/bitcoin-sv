@@ -14,11 +14,9 @@ static const uint64_t ONE_KILOBYTE = 1000;
 static const uint64_t ONE_MEGABYTE = ONE_KILOBYTE * 1000;
 /** 1GB */
 static const uint64_t ONE_GIGABYTE = ONE_MEGABYTE * 1000;
-/** The maximum allowed size for a transaction, in bytes */
-static const uint64_t MAX_TX_SIZE = ONE_MEGABYTE;
-/** The maximum allowed size for a transaction, in bytes before Genesis*/
-static const uint64_t MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = MAX_TX_SIZE; // TODO CORE-324
-/** The maximum allowed size for a transaction, in bytes after Genesis (max value of uint32) */
+/** The maximum allowed size for a transaction before Genesis, in bytes*/
+static const uint64_t MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = ONE_MEGABYTE;
+/** The maximum allowed size for a transaction after Genesis (max value of uint32), in bytes */
 static const uint64_t MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = UINT32_MAX; // 4GB - limited by maximum P2P message size
 /** The maximum allowed size for a block, before the UAHF */
 static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;

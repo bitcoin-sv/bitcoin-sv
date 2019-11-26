@@ -247,7 +247,7 @@ static void MutateTxAddInput(CMutableTransaction &tx,
     TxId txid(uint256S(strTxid));
 
     static const unsigned int minTxOutSz = 9;
-    static const unsigned int maxVout = MAX_TX_SIZE / minTxOutSz;
+    static const unsigned int maxVout = MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS / minTxOutSz; // bitcoin-tx tool can build txs with more vouts than pre Genesis nodes  would accept
 
     // extract and validate vout
     std::string strVout = vStrInputParts[1];

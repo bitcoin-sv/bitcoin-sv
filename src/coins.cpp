@@ -29,6 +29,9 @@ bool CCoinsView::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
 CCoinsViewCursor *CCoinsView::Cursor() const {
     return nullptr;
 }
+CCoinsViewCursor* CCoinsView::Cursor(const TxId &txId) const {
+    return nullptr;
+}
 
 CCoinsViewBacked::CCoinsViewBacked(CCoinsView *viewIn) : base(viewIn) {}
 bool CCoinsViewBacked::GetCoin(const COutPoint &outpoint, Coin &coin) const {
@@ -52,6 +55,9 @@ bool CCoinsViewBacked::BatchWrite(CCoinsMap &mapCoins,
 }
 CCoinsViewCursor *CCoinsViewBacked::Cursor() const {
     return base->Cursor();
+}
+CCoinsViewCursor* CCoinsViewBacked::Cursor(const TxId &txId) const {
+    return base->Cursor(txId);
 }
 size_t CCoinsViewBacked::EstimateSize() const {
     return base->EstimateSize();
@@ -280,6 +286,11 @@ CCoinsViewCursor* CCoinsViewCache::Cursor() const {
     return base->Cursor();
 }
 
+CCoinsViewCursor* CCoinsViewCache::Cursor(const TxId &txId) const {
+    std::unique_lock<std::mutex> lock{ mCoinsViewCacheMtx };
+    return base->Cursor(txId);
+}
+
 std::vector<uint256> CCoinsViewCache::GetHeadBlocks() const {
     std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     return base->GetHeadBlocks();
@@ -393,17 +404,46 @@ double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight,
     return tx.ComputePriority(dResult);
 }
 
-// TODO: merge with similar definition in undo.h.
-static const size_t MAX_OUTPUTS_PER_TX =
-    MAX_TX_SIZE / ::GetSerializeSize(CTxOut(), SER_NETWORK, PROTOCOL_VERSION);
+static const int MAX_VIEW_ITERATIONS = 100;
 
-const Coin &AccessByTxid(const CCoinsViewCache &view, const TxId &txid) {
-    for (uint32_t n = 0; n < MAX_OUTPUTS_PER_TX; n++) {
-        const Coin &alternate = view.AccessCoin(COutPoint(txid, n));
+const Coin AccessByTxid(const CCoinsViewCache& view, const TxId& txid)
+{
+    // wtih MAX_VIEW_ITERATIONS we are avoiding for loop to MAX_OUTPUTS_PER_TX (in millions after genesis)
+    // performance testing indicates that after 100 look up by cursor becomes faster
+
+    for (int n = 0; n < MAX_VIEW_ITERATIONS; n++) {
+        const Coin& alternate = view.AccessCoin(COutPoint(txid, n));
         if (!alternate.IsSpent()) {
             return alternate;
         }
     }
 
+    // for large output indexes delegate search to db cursor/iterator by key prefix (txId)
+
+    COutPoint key;
+    Coin coin;
+
+    std::unique_ptr<CCoinsViewCursor> cursor{ view.Cursor(txid) };
+
+    if (cursor->Valid())
+    {
+        cursor->GetKey(key);
+    }
+    while (cursor->Valid() && key.GetTxId() == txid)
+    {
+        if (!cursor->GetValue(coin))
+        {
+            return coinEmpty;
+        }
+        if (!coin.IsSpent())
+        {
+            return coin;
+        }
+        cursor->Next();
+        if (cursor->Valid())
+        {
+            cursor->GetKey(key);
+        }
+    }
     return coinEmpty;
 }

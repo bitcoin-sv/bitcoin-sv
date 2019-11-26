@@ -16,7 +16,7 @@ from test_framework.mininode import *
 from test_framework.script import CScript, OP_TRUE, OP_RETURN
 from test_framework.blocktools import *
 
-from test_framework.cdefs import (ONE_MEGABYTE, MAX_TX_SIZE,REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME, 
+from test_framework.cdefs import (ONE_MEGABYTE, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME, 
 REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE, REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER)
 
 DEFAULT_ACTIVATION_TIME = REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME # can be orverriden on command line
@@ -62,8 +62,8 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
     # Ensure funding and returns given number of spend anyone transactions without submitting them
     def make_transactions(self, num_transactions, add_op_return_size = 0): # TODO: Consolidate with bsv-broadcast_delay.py
         
-        # Sanity check - estimate size  of funding transaction and check that it os not be too big
-        assert(200 + num_transactions *  20 < MAX_TX_SIZE)
+        # Sanity check - estimate size  of funding transaction and check that it is not too big
+        assert(200 + num_transactions *  20 < MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS)
         
         node = self.nodes[0]
         # Generate and age some blocks to have enough spendable coins 

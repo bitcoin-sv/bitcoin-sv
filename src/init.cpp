@@ -1756,20 +1756,18 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure descendant limit size.
     if(gArgs.IsArgSet("-limitdescendantsize")) {
-        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", (MAX_TX_SIZE * config.GetLimitDescendantCount()) / 1000) * 1000);
+        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000);
     }
 
     // Configure ancestor limit size.
     if(gArgs.IsArgSet("-limitancestorsize")) {
-        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", (MAX_TX_SIZE * config.GetLimitAncestorCount()) / 1000) * 1000);
+        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000);
     }
 
     // Configure genesis activation height.
-    uint64_t genesisActivationHeight = gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight);
-    if(genesisActivationHeight <= 0) {
-        return InitError(_("Genesis activation height cannot be configured with a zero or negative value."));
-    } else {
-        config.SetGenesisActivationHeight(genesisActivationHeight);
+    int64_t genesisActivationHeight = gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight);
+    if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
+        return InitError(err);
     }
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &

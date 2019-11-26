@@ -375,7 +375,7 @@ BOOST_AUTO_TEST_CASE(test_consensus_sigops_limit) {
         GetMaxBlockSigOpsCount(std::numeric_limits<uint32_t>::max()),
         4295 * MAX_BLOCK_SIGOPS_PER_MB);
 }
-void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount)
+void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64_t maxTxSize)
 {
     CMutableTransaction tx;
     tx.nVersion = 1;
@@ -388,8 +388,8 @@ void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount)
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, false));
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, true));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, false));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, true));
     }
 
     // Get just before the limit.
@@ -399,8 +399,8 @@ void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount)
 
     {
         CValidationState state;
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, false));
-        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, true));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, false));
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, true));
     }
 
     // And go over.
@@ -408,8 +408,8 @@ void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount)
 
     {
         CValidationState state;
-        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, false));
-        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, true));
+        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, false));
+        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, true));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txn-sigops");
     }
 }
@@ -421,7 +421,7 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
     /* Case 1: Genesis is not enabled, consensus - MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS */
     uint64_t maxTxSigOpsCountConsensus = testConfig.GetMaxTxSigOpsCount(false, true);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountConsensus, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS);
-    TestMaxSigOps(testConfig, maxTxSigOpsCountConsensus);
+    TestMaxSigOps(testConfig, maxTxSigOpsCountConsensus, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
 
     /* Case 2: Genesis is enabled, consensus - MAX_TX_SIGOPS_COUNT_AFTER_GENESIS */
     maxTxSigOpsCountConsensus = testConfig.GetMaxTxSigOpsCount(true, true);

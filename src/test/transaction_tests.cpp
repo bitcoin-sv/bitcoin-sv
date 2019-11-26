@@ -107,8 +107,8 @@ void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
             CValidationState state;
 
             fValid = tx.IsCoinBase() 
-                                    ? CheckCoinbase(tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, false)
-                                    : CheckRegularTransaction(tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, false);
+                                    ? CheckCoinbase(tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false)
+                                    : CheckRegularTransaction(tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false);
 
             if(!(fValid && state.IsValid())) {
                 if(should_be_valid) {
@@ -224,13 +224,13 @@ BOOST_AUTO_TEST_CASE(basic_transaction_tests) {
     CMutableTransaction tx;
     stream >> tx;
     CValidationState state;
-    BOOST_CHECK_MESSAGE(CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, false) &&
+    BOOST_CHECK_MESSAGE(CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false) &&
                             state.IsValid(),
                         "Simple deserialized transaction should be valid.");
 
     // Check that duplicate txins fail
     tx.vin.push_back(tx.vin[0]);
-    BOOST_CHECK_MESSAGE(!CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, false) ||
+    BOOST_CHECK_MESSAGE(!CheckRegularTransaction(CTransaction(tx), state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false) ||
                             !state.IsValid(),
                         "Transaction with duplicate txins should be invalid.");
 }

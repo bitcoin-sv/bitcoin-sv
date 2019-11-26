@@ -31,6 +31,30 @@ bool operator==(const Coin &a, const Coin &b) {
            a.GetTxOut() == b.GetTxOut();
 }
 
+// Dummy cursor that returns no data
+class CCoinsViewCursorEmpty : public CCoinsViewCursor {
+public:
+    CCoinsViewCursorEmpty(const uint256& hashBlockIn)
+        : CCoinsViewCursor(hashBlockIn) { }
+    ~CCoinsViewCursorEmpty() {}
+
+    bool GetKey(COutPoint& key) const override {        
+        return false;
+    }
+    bool GetValue(Coin& coin) const override {        
+        return false;
+    }
+    unsigned int GetValueSize() const override {
+        return 0;
+    };
+
+    bool Valid() const override {        
+        return false;
+    };
+    void Next() override {        
+    };
+};
+
 class CCoinsViewTest : public CCoinsView {
     uint256 hashBestBlock_;
     std::map<COutPoint, Coin> map_;
@@ -73,6 +97,12 @@ public:
             hashBestBlock_ = hashBlock;
         }
         return true;
+    }
+
+    CCoinsViewCursor* Cursor(const TxId& txId) const override
+    {
+        CCoinsViewCursorEmpty* cc = new CCoinsViewCursorEmpty(GetBestBlock());
+        return cc;
     }
 };
 

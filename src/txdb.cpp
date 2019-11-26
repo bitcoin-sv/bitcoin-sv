@@ -198,6 +198,29 @@ CCoinsViewCursor *CCoinsViewDB::Cursor() const {
     return i;
 }
 
+// Same as CCoinsViewCursor::Cursor() with added Seek() to key txId
+CCoinsViewCursor* CCoinsViewDB::Cursor(const TxId &txId) const {
+    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(
+        const_cast<CDBWrapper&>(db).NewIterator(), GetBestBlock());
+    
+    COutPoint op = COutPoint(txId, 0);
+    CoinEntry key = CoinEntry(&op);
+
+    i->pcursor->Seek(key);
+
+    // Cache key of first record
+    if (i->pcursor->Valid()) {
+        CoinEntry entry(&i->keyTmp.second);
+        i->pcursor->GetKey(entry);
+        i->keyTmp.first = entry.key;
+    }
+    else {
+        // Make sure Valid() and GetKey() return false
+        i->keyTmp.first = 0;
+    }
+    return i;
+}
+
 bool CCoinsViewDBCursor::GetKey(COutPoint &key) const {
     // Return cached key
     if (keyTmp.first == DB_COIN) {
