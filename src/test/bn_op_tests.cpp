@@ -29,6 +29,8 @@ BOOST_AUTO_TEST_SUITE(bn_op_tests)
 
 BOOST_AUTO_TEST_CASE(bint_unary_ops)
 {
+    const Config& config = GlobalConfig::GetConfig();
+
     using polynomial = vector<int>;
     using test_args = tuple<int64_t, polynomial, opcodetype, polynomial>;
     // clang-format off
@@ -94,8 +96,16 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
         ScriptError error;
         auto source = task::CCancellationSource::Make();
         stack_type stack;
-        const auto status = EvalScript(source->GetToken(), stack, script, flags,
-                                       BaseSignatureChecker{}, &error);
+        const auto status =
+            EvalScript(
+                config,
+                true,
+                source->GetToken(),
+                stack,
+                script,
+                flags,
+                BaseSignatureChecker{},
+                &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());

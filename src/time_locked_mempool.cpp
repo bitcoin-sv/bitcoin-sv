@@ -61,7 +61,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
 
                 // For full belt-and-braces safety, resubmit newly final transaction for revalidation
                 std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainActiveHeight + 1, reason) };
+                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainActive.Height() + 1, reason) };
                 g_connman->ResubmitTxnForValidator(
                     std::make_shared<CTxInputData>(
                         TxSource::finalised,
@@ -287,7 +287,7 @@ bool CTimeLockedMempool::loadMempool() const
                     mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT)
                 };
                 std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActiveHeight + 1, reason) };
+                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActive.Height() + 1, reason) };
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
