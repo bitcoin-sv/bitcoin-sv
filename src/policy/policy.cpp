@@ -149,6 +149,8 @@ std::optional<bool> AreInputsStandard(
             // redeemScript
             auto res =
                 EvalScript(
+                    config,
+                    false,
                     token,
                     stack,
                     tx.vin[i].scriptSig,

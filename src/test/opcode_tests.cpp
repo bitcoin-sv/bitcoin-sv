@@ -11,6 +11,7 @@
 #include "script/script_num.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
+#include "config.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -28,6 +29,7 @@ BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
  */
 static void CheckTestResultForAllFlags(const stacktype &original_stack, const CScript &script, const stacktype &expected,
         uint32_t upgradeFlag = 0) {
+    const Config& config = GlobalConfig::GetConfig();
     BaseSignatureChecker sigchecker;
     auto source = task::CCancellationSource::Make();
 
@@ -36,6 +38,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
         stacktype stack{original_stack};
         auto r =
             EvalScript(
+                config, true,
                 source->GetToken(),
                 stack,
                 script,
@@ -50,6 +53,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
             stack = original_stack;
             r =
                 EvalScript(
+                    config, true,
                     source->GetToken(),
                     stack,
                     script,
@@ -65,12 +69,14 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
 static void CheckError(uint32_t flags, const stacktype &original_stack,
                        const CScript &script, ScriptError expected_error, uint32_t upgradeFlag = 0) {
     BaseSignatureChecker sigchecker;
+    const Config& config = GlobalConfig::GetConfig();
     ScriptError err = SCRIPT_ERR_OK;
     stacktype stack{original_stack};
 
     auto source = task::CCancellationSource::Make();
     auto r =
         EvalScript(
+            config, true,
             source->GetToken(),
             stack,
             script,
@@ -86,6 +92,7 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
         stack = original_stack;
         r =
             EvalScript(
+                config, true,
                 source->GetToken(),
                 stack,
                 script,
@@ -1070,11 +1077,13 @@ static void CheckTestForOpCodeLimit(const CScript &script,
                                     const BaseSignatureChecker& sigchecker,
                                     const stacktype &original_stack = {})
 { 
+    const Config& config = GlobalConfig::GetConfig();
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
         stacktype stack{original_stack};
         auto r =
             EvalScript(
+                config, true,
                 task::CCancellationSource::Make(),
                 stack,
                 script,

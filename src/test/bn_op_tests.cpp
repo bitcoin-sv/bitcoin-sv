@@ -13,6 +13,7 @@
 #include "taskcancellation.h"
 
 #include <vector>
+#include "config.h"
 
 using namespace std;
 
@@ -28,6 +29,8 @@ BOOST_AUTO_TEST_SUITE(bn_op_tests)
 
 BOOST_AUTO_TEST_CASE(bint_bint_op)
 {
+    const Config& config = GlobalConfig::GetConfig();
+
     using polynomial = vector<int>;
     using test_args =
         tuple<int64_t, polynomial, polynomial, opcodetype, polynomial>;
@@ -119,6 +122,8 @@ BOOST_AUTO_TEST_CASE(bint_bint_op)
         auto source = task::CCancellationSource::Make();
         const auto status =
             EvalScript(
+                config, 
+                true,
                 source->GetToken(),
                 stack,
                 script,
@@ -139,6 +144,8 @@ BOOST_AUTO_TEST_CASE(bint_bint_op)
 
 BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 {
+    const Config& config = GlobalConfig::GetConfig();
+
     using polynomial = vector<int>;
     using test_args =
         tuple<int64_t, polynomial, polynomial, opcodetype, polynomial>;
@@ -176,6 +183,8 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         auto source = task::CCancellationSource::Make();
         const auto status =
             EvalScript(
+                config,
+                true,
                 source->GetToken(),
                 stack,
                 script,
@@ -205,6 +214,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 
 BOOST_AUTO_TEST_CASE(operands_too_large)
 {
+    const Config& config = GlobalConfig::GetConfig();
     using test_args =
         tuple<int, int, opcodetype, bool, ScriptError>;
     const auto max_arg_len{500};
@@ -306,6 +316,8 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
         auto source = task::CCancellationSource::Make();
         const auto status =
             EvalScript(
+                config,
+                false,
                 source->GetToken(),
                 stack,
                 script,
@@ -320,6 +332,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
 
 BOOST_AUTO_TEST_CASE(op_bin2num)
 {
+    const Config& config = GlobalConfig::GetConfig();
     // clang-format off
     vector<tuple<vector<uint8_t>, vector<uint8_t>>> test_data = {
         { {}, {}},
@@ -353,6 +366,7 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
         ScriptError error;
         const auto status =
             EvalScript(
+                config, false,
                 task::CCancellationSource::Make()->GetToken(),
                 stack, script, flags, BaseSignatureChecker{}, &error);
 
@@ -367,6 +381,7 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
 
 BOOST_AUTO_TEST_CASE(op_num2bin)
 {
+    const Config& config = GlobalConfig::GetConfig();
     // clang-format off
     vector<tuple<vector<uint8_t>, 
                  vector<uint8_t>,
@@ -427,6 +442,7 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
         ScriptError error;
         const auto status =
             EvalScript(
+                config, false,
                 task::CCancellationSource::Make()->GetToken(),
                 stack, script, flags, BaseSignatureChecker{}, &error);
 
@@ -443,6 +459,8 @@ BOOST_AUTO_TEST_CASE(op_depth)
     //                            std::numeric_limits<int32_t>::max() - 2000};
     vector<size_t> test_data = {0, 1, 20'000};
 
+    const Config& config = GlobalConfig::GetConfig();
+
     for(const auto i : test_data)
     {
         stack_type stack;
@@ -457,7 +475,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
         const auto flags{SCRIPT_GENESIS};
         // uint32_t flags(1 << 17);
         ScriptError error;
-        const auto status = EvalScript(token, stack, script, flags,
+        const auto status = EvalScript(config, false, token, stack, script, flags,
                                        BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(true, status.value());

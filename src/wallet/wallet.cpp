@@ -2914,7 +2914,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             }
 
             // Fill in dummy signatures for fee calculation.
-            if (!DummySignTx(txNew, setCoins)) {
+            if (!DummySignTx(config, txNew, setCoins)) {
                 strFailReason = _("Signing transaction failed");
                 return false;
             }
@@ -3010,7 +3010,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     coin.first->tx->vout[coin.second].scriptPubKey;
                 SignatureData sigdata;
                 
-                if (!ProduceSignature(
+                if (!ProduceSignature(config, true,
                         TransactionSignatureCreator(
                             this, &txNewConst, nIn,
                             coin.first->tx->vout[coin.second].nValue,

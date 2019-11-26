@@ -27,6 +27,7 @@
 #include <cstdio>
 
 #include <boost/algorithm/string.hpp>
+#include "config.h"
 
 static bool fCreateBlank;
 static std::map<std::string, UniValue> registers;
@@ -557,7 +558,7 @@ static Amount AmountFromValue(const UniValue &value) {
     return amount;
 }
 
-static void MutateTxSign(CMutableTransaction &tx, const std::string &flagStr) {
+static void MutateTxSign(const Config& config, CMutableTransaction& tx, const std::string& flagStr) {
     SigHashType sigHashType = SigHashType().withForkId();
 
     if ((flagStr.size() > 0) && !findSigHashFlags(sigHashType, flagStr)) {
@@ -685,7 +686,9 @@ static void MutateTxSign(CMutableTransaction &tx, const std::string &flagStr) {
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
             (i < mergedTx.vout.size())) {
-            ProduceSignature(MutableTransactionSignatureCreator(
+            ProduceSignature(config, 
+                             true, 
+                             MutableTransactionSignatureCreator(
                                  &keystore, &mergedTx, i, amount, sigHashType),
                              true, assumeUtxoAfterGenesis, 
                              prevPubKey, sigdata);
@@ -693,7 +696,8 @@ static void MutateTxSign(CMutableTransaction &tx, const std::string &flagStr) {
 
         // ... and merge in other signatures:
         for (const CTransaction &txv : txVariants) {
-            sigdata = CombineSignatures(
+            sigdata = CombineSignatures(config, 
+                true,
                 prevPubKey,
                 MutableTransactionSignatureChecker(&mergedTx, i, amount),
                 sigdata, 
@@ -706,6 +710,7 @@ static void MutateTxSign(CMutableTransaction &tx, const std::string &flagStr) {
         auto source = task::CCancellationSource::Make();
         auto res =
             VerifyScript(
+                config, true,
                 source->GetToken(),
                 txin.scriptSig,
                 prevPubKey,
@@ -734,9 +739,9 @@ public:
     ~Secp256k1Init() { ECC_Stop(); }
 };
 
-static void MutateTx(CMutableTransaction &tx, const std::string &command,
-                     const std::string &commandVal,
-                     const CChainParams &chainParams) {
+static void MutateTx(const Config& config, CMutableTransaction& tx, const std::string& command,
+                     const std::string& commandVal,
+                     const CChainParams& chainParams) {
     std::unique_ptr<Secp256k1Init> ecc;
 
     if (command == "nversion") {
@@ -764,7 +769,7 @@ static void MutateTx(CMutableTransaction &tx, const std::string &command,
             ecc.reset(new Secp256k1Init());
         }
 
-        MutateTxSign(tx, commandVal);
+        MutateTxSign(config, tx, commandVal);
     } else if (command == "load") {
         RegisterLoad(commandVal);
     } else if (command == "set") {
@@ -833,6 +838,7 @@ static int CommandLineRawTx(int argc, char *argv[],
                             const CChainParams &chainParams) {
     std::string strPrint;
     int nRet = 0;
+    const Config &config = GlobalConfig::GetConfig();
     try {
         // Skip switches; Permit common stdin convention "-"
         while (argc > 1 && IsSwitchChar(argv[1][0]) && (argv[1][1] != 0)) {
@@ -877,7 +883,7 @@ static int CommandLineRawTx(int argc, char *argv[],
                 value = arg.substr(eqpos + 1);
             }
 
-            MutateTx(tx, key, value, chainParams);
+            MutateTx(config, tx, key, value, chainParams);
         }
 
         OutputTx(CTransaction(tx));

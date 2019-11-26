@@ -17,6 +17,7 @@
 #include "taskcancellation.h"
 #include "uint256.h"
 #include "consensus/consensus.h"
+#include "config.h"
 
 typedef std::vector<uint8_t> valtype;
 
@@ -406,6 +407,8 @@ inline bool IsValidMaxOpsPerScript(int nOpCount) {
 }
 
 std::optional<bool> EvalScript(
+    const Config& config,
+    bool consensus,
     const task::CCancellationToken& token,
     std::vector<valtype>& stack,
     const CScript& script,
@@ -1974,6 +1977,8 @@ size_t TransactionSignatureChecker::GetOutTxSize() const {
 }
 
 std::optional<bool> VerifyScript(
+    const Config& config,
+    bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
@@ -1993,7 +1998,7 @@ std::optional<bool> VerifyScript(
     }
 
     std::vector<valtype> stack, stackCopy;
-    if (auto res = EvalScript(token, stack, scriptSig, flags, checker, serror);
+    if (auto res = EvalScript(config, consensus, token, stack, scriptSig, flags, checker, serror);
         !res.has_value() || !res.value())
     {
         return res;
@@ -2001,7 +2006,7 @@ std::optional<bool> VerifyScript(
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
         stackCopy = stack;
     }
-    if (auto res = EvalScript(token, stack, scriptPubKey, flags, checker, serror);
+    if (auto res = EvalScript(config, consensus, token, stack, scriptPubKey, flags, checker, serror);
         !res.has_value() || !res.value())
     {
         return res;
@@ -2036,7 +2041,7 @@ std::optional<bool> VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
 
-        if (auto res = EvalScript(token, stack, pubKey2, flags, checker, serror);
+        if (auto res = EvalScript(config, consensus, token, stack, pubKey2, flags, checker, serror);
             !res.has_value() || !res.value())
         {
             return res;

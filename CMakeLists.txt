@@ -4,6 +4,11 @@
 
 cmake_minimum_required(VERSION 3.5)
 project(BitcoinSV)
+#Reduce warnings on MSVC, to closer match GCC compiler settings
+if(POLICY CMP0092 AND MSVC)
+   cmake_policy(SET CMP0092 NEW)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W2")
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

@@ -97,7 +97,16 @@ public:
         : TransactionSignatureChecker(&txTo, nInIn, amount), txTo(*txToIn) {}
 };
 
+/**
+* EvalScript function evaluates scripts against predefined limits that are
+* set by either policy rules or consensus rules. Consensus parameter determines if
+* consensus rules (value=true) must be used or if policy rules(value=false) should be used.
+* Consensus should be true when validating scripts of transactions that are part of block
+* and it should be false when validating scripts of transactions that are validated for acceptance to mempool
+*/
 std::optional<bool> EvalScript(
+    const Config& config,
+    bool consensus,
     const task::CCancellationToken& token,
     std::vector<std::vector<uint8_t>>& stack,
     const CScript& script,
@@ -105,6 +114,8 @@ std::optional<bool> EvalScript(
     const BaseSignatureChecker& checker,
     ScriptError* error = nullptr);
 std::optional<bool> VerifyScript(
+    const Config& config,
+    bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,

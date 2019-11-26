@@ -10,6 +10,7 @@
 #include "script/script.h"
 #include "script/sign.h"
 #include "script/standard.h"
+#include "config.h"
 
 typedef std::vector<uint8_t> valtype;
 
@@ -95,7 +96,9 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
         // TODO: This could be optimized some by doing some work after the above
         // solver
         SignatureData sigs;
-        return ProduceSignature(DummySignatureCreator(&keystore),  true, isGenesisEnsbled,
+        
+        const Config &config = GlobalConfig::GetConfig();
+        return ProduceSignature(config, true, DummySignatureCreator(&keystore), true, isGenesisEnsbled,
                                 scriptPubKey, sigs)
                    ? ISMINE_WATCH_SOLVABLE
                    : ISMINE_WATCH_UNSOLVABLE;

@@ -89,6 +89,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
     auto source = task::CCancellationSource::Make();
     auto res =
         VerifyScript(
+            testConfig, true,
             source->GetToken(),
             s,
             a_and_b,
@@ -103,6 +104,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
         s = sign_multisig(a_and_b, keys, txTo[0], 0);
         res =
             VerifyScript(
+                testConfig, true,
                 source->GetToken(),
                 s,
                 a_and_b,
@@ -118,6 +120,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
         s = sign_multisig(a_and_b, keys, txTo[0], 0);
         res =
             VerifyScript(
+                testConfig, true,
                 source->GetToken(),
                 s,
                 a_and_b,
@@ -136,6 +139,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
         if (i == 0 || i == 1) {
             res =
                 VerifyScript(
+                    testConfig, true,
                     source->GetToken(),
                     s,
                     a_or_b,
@@ -147,6 +151,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
         } else {
             res =
                 VerifyScript(
+                    testConfig, true,
                     source->GetToken(),
                     s,
                     a_or_b,
@@ -162,6 +167,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
     s << OP_0 << OP_1;
     res =
         VerifyScript(
+            testConfig, true,
             source->GetToken(),
             s,
             a_or_b,
@@ -179,6 +185,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             if (i < j && i < 3 && j < 3) {
                 res =
                     VerifyScript(
+                        testConfig, true,
                         source->GetToken(),
                         s,
                         escrow,
@@ -191,6 +198,7 @@ BOOST_AUTO_TEST_CASE(multisig_verify) {
             } else {
                 res =
                     VerifyScript(
+                        testConfig, true,
                         source->GetToken(),
                         s,
                         escrow,
@@ -423,11 +431,11 @@ BOOST_AUTO_TEST_CASE(multisig_Sign) {
     }
 
     for (int i = 0; i < 3; i++) {
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, true, true, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, true, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, true, false, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, false, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
