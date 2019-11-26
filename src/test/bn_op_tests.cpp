@@ -27,7 +27,89 @@ constexpr auto max64{std::numeric_limits<int64_t>::max()};
 
 BOOST_AUTO_TEST_SUITE(bn_op_tests)
 
-BOOST_AUTO_TEST_CASE(bint_bint_op)
+BOOST_AUTO_TEST_CASE(bint_unary_ops)
+{
+    using polynomial = vector<int>;
+    using test_args = tuple<int64_t, polynomial, opcodetype, polynomial>;
+    // clang-format off
+    vector<test_args> test_data = {
+        {0, {-2}, OP_1ADD, {-1}},
+        {0, {-1}, OP_1ADD, {0}},
+        {0, {0}, OP_1ADD, {1}},
+        {0, {1}, OP_1ADD, {2}},
+        {max64, {1, 0}, OP_1ADD, {1, 1}},
+        {max64, {1, 1}, OP_1ADD, {1, 2}},
+
+        {0, {-1}, OP_1SUB, {-2}},
+        {0, {0}, OP_1SUB, {-1}},
+        {0, {1}, OP_1SUB, {0}},
+        {0, {2}, OP_1SUB, {1}},
+        {min64, {1, 0}, OP_1SUB, {1, -1}},
+        
+        {0, {-1}, OP_NEGATE, {1}},
+        {0, {0}, OP_NEGATE, {0}},
+        {0, {1}, OP_NEGATE, {-1}},
+        {max64, {1, 0}, OP_NEGATE, {-1, 0}},
+        {max64, {1, 1}, OP_NEGATE, {-1, -1}},
+        {min64, {1, 0}, OP_NEGATE, {-1, 0}},
+        {min64, {1, -1}, OP_NEGATE, {-1, 1}},
+      
+        {0, {-1}, OP_ABS, {1}},
+        {0, {0}, OP_ABS, {0}},
+        {0, {1}, OP_ABS, {1}},
+        {max64, {1, 1}, OP_ABS, {1, 1}},
+        {min64, {1, 1}, OP_ABS, {-1, -1}},
+        
+        {0, {-1}, OP_NOT, {0}},
+        {0, {0}, OP_NOT, {1}},
+        {0, {1}, OP_NOT, {0}},
+        {max64, {1, 1}, OP_NOT, {0}},
+        {min64, {1, 1}, OP_NOT, {0}},
+        
+        {0, {-1}, OP_0NOTEQUAL, {1}},
+        {0, {0}, OP_0NOTEQUAL, {0}},
+        {0, {1}, OP_0NOTEQUAL, {1}},
+        {max64, {1, 1}, OP_0NOTEQUAL, {1}},
+        {min64, {1, 1}, OP_0NOTEQUAL, {1}},
+    };
+    // clang-format on
+
+    for(const auto [n, arg_poly, op_code, exp_poly] : test_data)
+    {
+        const bint bn{n};
+
+        vector<uint8_t> args;
+        args.push_back(OP_PUSHDATA1);
+
+        const bint arg = polynomial_value(begin(arg_poly), end(arg_poly), bn);
+        const auto arg_serialized{arg.serialize()};
+        args.push_back(arg_serialized.size());
+        copy(begin(arg_serialized), end(arg_serialized), back_inserter(args));
+
+        args.push_back(op_code);
+
+        CScript script(args.begin(), args.end());
+
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        ScriptError error;
+        auto source = task::CCancellationSource::Make();
+        stack_type stack;
+        const auto status = EvalScript(source->GetToken(), stack, script, flags,
+                                       BaseSignatureChecker{}, &error);
+        BOOST_CHECK_EQUAL(true, status.value());
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+        BOOST_CHECK_EQUAL(1, stack.size());
+        const auto frame = stack[0];
+        const auto actual =
+            frame.empty() ? bint{0}
+                          : bsv::deserialize<bint>(begin(frame), end(frame));
+        const bint expected =
+            polynomial_value(begin(exp_poly), end(exp_poly), bn);
+        BOOST_CHECK_EQUAL(expected, actual);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(bint_binary_ops)
 {
     const Config& config = GlobalConfig::GetConfig();
 
@@ -35,7 +117,8 @@ BOOST_AUTO_TEST_CASE(bint_bint_op)
     using test_args =
         tuple<int64_t, polynomial, polynomial, opcodetype, polynomial>;
     vector<test_args> test_data = {
-        {max64, {1, 0, 0}, {1, 0, 0}, OP_ADD, {2, 0, 0}},
+        {max64, {1, 1}, {1, 1}, OP_ADD, {2, 2}},
+        {max64, {1, 1, 1}, {1, 0, 0}, OP_ADD, {2, 1, 1}},
         {min64, {1, 0, 0}, {1, 0, 0}, OP_ADD, {2, 0, 0}},
         {max64, {-1, 0, 0}, {1, 0, 0}, OP_ADD, {0}},
         {min64, {1, 0, 0}, {-1, 0, 0}, OP_ADD, {0}},
@@ -104,14 +187,16 @@ BOOST_AUTO_TEST_CASE(bint_bint_op)
         args.push_back(OP_PUSHDATA1);
         const bint arg1 =
             polynomial_value(begin(arg_0_poly), end(arg_0_poly), bn);
-        args.push_back(arg1.size_bytes());
-        bsv::serialize(arg1, back_inserter(args));
+        const auto arg1_serialized{arg1.serialize()};
+        args.push_back(arg1_serialized.size());
+        copy(begin(arg1_serialized), end(arg1_serialized), back_inserter(args));
 
         args.push_back(OP_PUSHDATA1);
         const bint arg2 =
             polynomial_value(begin(arg_1_poly), end(arg_1_poly), bn);
-        args.push_back(arg2.size_bytes());
-        bsv::serialize(arg2, back_inserter(args));
+        const auto arg2_serialized{arg2.serialize()};
+        args.push_back(arg2_serialized.size());
+        copy(begin(arg2_serialized), end(arg2_serialized), back_inserter(args));
 
         args.push_back(op_code);
 
@@ -150,6 +235,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
     using test_args =
         tuple<int64_t, polynomial, polynomial, opcodetype, polynomial>;
     vector<test_args> test_data = {
+        {max64, {1, 1}, {1, 1}, OP_NUMEQUALVERIFY, {0}},
         {max64, {1, 0, 0}, {1, 0, 0}, OP_NUMEQUALVERIFY, {0}},
         {max64, {1, 0, 0}, {-1, 0, 0}, OP_NUMEQUALVERIFY, {0}},
         {max64, {2, 0, 0}, {-1, 0, 0}, OP_NUMEQUALVERIFY, {0}},
@@ -165,14 +251,16 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         args.push_back(OP_PUSHDATA1);
         const bint arg1 =
             polynomial_value(begin(arg_0_poly), end(arg_0_poly), bn);
-        args.push_back(arg1.size_bytes());
-        bsv::serialize(arg1, back_inserter(args));
+        const auto arg1_serialized{arg1.serialize()};
+        args.push_back(arg1_serialized.size());
+        copy(begin(arg1_serialized), end(arg1_serialized), back_inserter(args));
 
         args.push_back(OP_PUSHDATA1);
         const bint arg2 =
             polynomial_value(begin(arg_1_poly), end(arg_1_poly), bn);
-        args.push_back(arg2.size_bytes());
-        bsv::serialize(arg2, back_inserter(args));
+        const auto arg2_serialized{arg2.serialize()};
+        args.push_back(arg2_serialized.size());
+        copy(begin(arg2_serialized), end(arg2_serialized), back_inserter(args));
 
         args.push_back(op_code);
 
@@ -304,7 +392,6 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
         const bint arg1{bsv::deserialize<bint>(tmp1.begin(), tmp1.end())};
         args.push_back(arg1_size & 0xff);
         args.push_back((arg1_size / 256) & 0xff);
-        // args.push_back(arg1.size_bytes());
         bsv::serialize(arg1, back_inserter(args));
         
         args.push_back(op_code);
@@ -473,7 +560,6 @@ BOOST_AUTO_TEST_CASE(op_depth)
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_GENESIS};
-        // uint32_t flags(1 << 17);
         ScriptError error;
         const auto status = EvalScript(config, false, token, stack, script, flags,
                                        BaseSignatureChecker{}, &error);
