@@ -471,20 +471,36 @@ bool CheckSequenceLocks(
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx) {
+uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled, bool& sigOpCountError) 
+{
+    sigOpCountError = false;
     uint64_t nSigOps = 0;
-    for (const auto &txin : tx.vin) {
-        nSigOps += txin.scriptSig.GetSigOpCount(false);
+    for (const auto &txin : tx.vin) 
+    {
+        // After Genesis, this should return 0, since only push data is allowed in input scripts:
+        nSigOps += txin.scriptSig.GetSigOpCount(false, isGenesisEnabled, sigOpCountError);
+        if (sigOpCountError)
+        {
+            return nSigOps;
+        }
     }
-    for (const auto &txout : tx.vout) {
-        nSigOps += txout.scriptPubKey.GetSigOpCount(false);
+
+    for (const auto &txout : tx.vout) 
+    {
+        nSigOps += txout.scriptPubKey.GetSigOpCount(false, isGenesisEnabled, sigOpCountError);
+        if (sigOpCountError)
+        {
+            return nSigOps;
+        }
     }
     return nSigOps;
 }
 
 uint64_t GetP2SHSigOpCount(const Config &config,
                            const CTransaction &tx,
-                           const CCoinsViewCache &inputs) {
+                           const CCoinsViewCache &inputs,
+                           bool& sigOpCountError) {
+    sigOpCountError = false;
     if (tx.IsCoinBase()) {
         return 0;
     }
@@ -511,22 +527,33 @@ uint64_t GetP2SHSigOpCount(const Config &config,
         }
         const CTxOut &prevout = coin.GetTxOut();
         if (prevout.scriptPubKey.IsPayToScriptHash()) {
-            nSigOps += prevout.scriptPubKey.GetSigOpCount(i.scriptSig);
+            nSigOps += prevout.scriptPubKey.GetSigOpCount(i.scriptSig, genesisEnabled, sigOpCountError);
+            if (sigOpCountError) {
+                return nSigOps;
+            }
         }
     }
     return nSigOps;
 }
 
-uint64_t GetTransactionSigOpCount(const Config &config,
+uint64_t GetTransactionSigOpCount(const Config &config, 
                                   const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, bool checkP2SH) {
-    uint64_t nSigOps = GetSigOpCountWithoutP2SH(tx);
+                                  const CCoinsViewCache &inputs, 
+                                  bool checkP2SH,
+                                  bool isGenesisEnabled, 
+                                  bool& sigOpCountError) {
+    sigOpCountError = false;
+    uint64_t nSigOps = GetSigOpCountWithoutP2SH(tx, isGenesisEnabled, sigOpCountError);
+    if (sigOpCountError) {
+        return nSigOps;
+    }
+
     if (tx.IsCoinBase()) {
         return nSigOps;
     }
 
     if (checkP2SH) {
-        nSigOps += GetP2SHSigOpCount(config, tx, inputs);
+        nSigOps += GetP2SHSigOpCount(config, tx, inputs, sigOpCountError);
     }
 
     return nSigOps;
@@ -534,7 +561,8 @@ uint64_t GetTransactionSigOpCount(const Config &config,
 
 static bool CheckTransactionCommon(const CTransaction& tx,
                                    CValidationState& state,
-                                   uint64_t maxTxSigOpsCountConsensus) {
+                                   uint64_t maxTxSigOpsCountConsensus,
+                                   bool isGenesisEnabled) {
     // Basic checks that don't depend on any context
     if (tx.vin.empty()) {
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
@@ -568,22 +596,23 @@ static bool CheckTransactionCommon(const CTransaction& tx,
                              "bad-txns-txouttotal-toolarge");
         }
     }
-
-    if (GetSigOpCountWithoutP2SH(tx) > maxTxSigOpsCountConsensus) {
+    bool sigOpCountError;
+    uint64_t nSigOpCount = GetSigOpCountWithoutP2SH(tx, isGenesisEnabled, sigOpCountError);
+    if (sigOpCountError || nSigOpCount > maxTxSigOpsCountConsensus) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
     }
 
     return true;
 }
 
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus)
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, bool isGenesisEnabled)
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
                          "first tx is not coinbase");
     }
 
-    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus)) {
+    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
         // CheckTransactionCommon fill in the state.
         return false;
     }
@@ -595,12 +624,13 @@ bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t max
     return true;
 }
 
-bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus) {
+bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus, bool isGenesisEnabled)
+{
     if (tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-tx-coinbase");
     }
-    
-    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus)) {
+
+    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
         // CheckTransactionCommon fill in the state.
         return false;
     }
@@ -1067,8 +1097,12 @@ CTxnValResult TxnValidation(
     CValidationState state;
     std::vector<COutPoint> vCoinsToUncache {};
 
+    // First check against policy limits. If this check fails, then banscore will be increased. 
+    // We re-test the transaction with policy rules later in this method (without banning if rules are violated)
+    bool isGenesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
+    uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(isGenesisEnabled, true);
     // Coinbase is only valid in a block, not as a loose transaction.
-    if (!CheckRegularTransaction(tx, state, config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, chainActive.Height() + 1), true))) {
+    if (!CheckRegularTransaction(tx, state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
         return Result{state, pTxInputData};
     }
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
@@ -1201,14 +1235,14 @@ CTxnValResult TxnValidation(
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }
-    const int64_t nSigOpsCount {
-        static_cast<int64_t>(
-                GetTransactionSigOpCount(config, tx, view, true))
+    bool sigOpCountError;
+    const uint64_t nSigOpsCount{
+                GetTransactionSigOpCount(config, tx, view, true, isGenesisEnabled, sigOpCountError)
     };
     // Check that the transaction doesn't have an excessive number of
     // sigops, making it impossible to mine. We consider this an invalid rather
     // than merely non-standard transaction.
-    if (nSigOpsCount > static_cast<int64_t>(config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, chainActive.Height() + 1), false))) {
+    if (sigOpCountError || nSigOpsCount > config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, chainActive.Height() + 1), false)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "bad-txns-too-many-sigops",
                   false,
@@ -3117,7 +3151,7 @@ static bool ConnectBlock(
         nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->nHeight));
     }
     const uint32_t flags = GetBlockScriptFlags(config, pindex->pprev);
-
+    bool isGenesisEnabled = IsGenesisEnabled(config, pindex->nHeight);
     int64_t nTime2 = GetTimeMicros();
     nTimeForks += nTime2 - nTime1;
     LogPrint(BCLog::BENCH, "    - Fork checks: %.2fms [%.2fs]\n",
@@ -3153,7 +3187,7 @@ static bool ConnectBlock(
     vPos.reserve(block.vtx.size());
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
 
-    uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, pindex->nHeight), true);
+    uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(isGenesisEnabled, true);
 
     for (size_t i = 0; i < block.vtx.size(); i++) {
         const CTransaction &tx = *(block.vtx[i]);
@@ -3186,8 +3220,9 @@ static bool ConnectBlock(
         // GetTransactionSigOpCount counts 2 types of sigops:
         // * legacy (always)
         // * p2sh (when P2SH enabled)
-        auto txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH);
-        if (txSigOpsCount > maxTxSigOpsCountConsensus) {
+        bool sigOpCountError;
+        uint64_t txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH, isGenesisEnabled, sigOpCountError);
+        if (sigOpCountError || txSigOpsCount > maxTxSigOpsCountConsensus) {
             return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
         }
 
@@ -4723,10 +4758,11 @@ bool CheckBlock(const Config &config, const CBlock &block,
                          "size limits failed");
     }
 
-    uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, blockHeight), true);
+    bool isGenesisEnabled = IsGenesisEnabled(config, blockHeight);
+    uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(isGenesisEnabled, true);
 
     // And a valid coinbase.
-    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensus)) {
+    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
         return state.Invalid(false, state.GetRejectCode(),
                              state.GetRejectReason(),
                              strprintf("Coinbase check failed (txid %s) %s",
@@ -4746,8 +4782,9 @@ bool CheckBlock(const Config &config, const CBlock &block,
     while (true) {
         // Count the sigops for the current transaction. If the total sigops
         // count is too high, the the block is invalid.
-        nSigOps += GetSigOpCountWithoutP2SH(*tx);
-        if (nSigOps > nMaxSigOpsCount) {
+        bool sigOpCountError;
+        nSigOps += GetSigOpCountWithoutP2SH(*tx, isGenesisEnabled, sigOpCountError);
+        if (sigOpCountError || nSigOps > nMaxSigOpsCount) {
             return state.DoS(100, false, REJECT_INVALID, "bad-blk-sigops",
                              false, "out-of-bounds SigOpCount");
         }
@@ -4764,7 +4801,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
         // the coinbase, the loop is arranged such as this only runs after at
         // least one increment.
         tx = block.vtx[i].get();
-        if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensus)) {
+        if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensus, isGenesisEnabled)) {
             return state.Invalid(
                 false, state.GetRejectCode(), state.GetRejectReason(),
                 strprintf("Transaction check failed (txid %s) %s",

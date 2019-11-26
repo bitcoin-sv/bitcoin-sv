@@ -74,13 +74,25 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
     LogPrintf("JournalingBlockAssembler::CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",
         serializeSize, block->vtx.size() - 1, mBlockFees, mBlockSigOps);
 
+    bool isGenesisEnabled = IsGenesisEnabled(mConfig, chainActive.Height() + 1);
+    bool sigOpCountError;
+
     // Build template
     std::unique_ptr<CBlockTemplate> blockTemplate { std::make_unique<CBlockTemplate>(block) };
     blockTemplate->vTxFees = mTxFees;
     blockTemplate->vTxSigOpsCount = mTxSigOpsCount;
     blockTemplate->vTxFees[0] = -1 * mBlockFees;
-    blockTemplate->vTxSigOpsCount[0] = GetSigOpCountWithoutP2SH(*block->vtx[0]);
 
+    int64_t txSigOpCount = static_cast<int64_t>(GetSigOpCountWithoutP2SH(*block->vtx[0], isGenesisEnabled, sigOpCountError));
+    // This can happen if supplied coinbase scriptPubKeyIn contains multisig with too many public keys
+    if (sigOpCountError)
+    {
+        blockTemplate = nullptr;
+    }
+    else
+    {
+        blockTemplate->vTxSigOpsCount[0] = txSigOpCount;
+    }
     // Can now update callers pindexPrev
     pindexPrev = pindexPrevNew;
     mRecentlyUpdated = false;

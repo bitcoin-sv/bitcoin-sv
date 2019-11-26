@@ -22,9 +22,6 @@
 // Maximum number of bytes pushable to the stack
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
 
-// Maximum number of public keys per multisig
-static const int MAX_PUBKEYS_PER_MULTISIG = 20;
-
 // Maximum script length in bytes
 static const int MAX_SCRIPT_SIZE = 10000;
 
@@ -381,14 +378,20 @@ public:
      * pay-to-script-hash, that changed: CHECKMULTISIGs serialized in scriptSigs
      * are counted more accurately, assuming they are of the form
      *  ... OP_N CHECKMULTISIG ...
+     *
+     * After Genesis all sigops are counted accuratelly no matter how the flag is 
+     * set. More than 16 pub keys are supported, but the size of the number representing
+     * number of public keys must not be bigger than CScriptNum::MAXIMUM_ELEMENT_SIZE bytes.
+     * If the size is bigger than that, or if the number of public keys is negative,
+     * sigOpCountError is set to true,
      */
-    unsigned int GetSigOpCount(bool fAccurate) const;
+    uint64_t GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sigOpCountError) const;
 
     /**
      * Accurately count sigOps, including sigOps in pay-to-script-hash
      * transactions:
      */
-    unsigned int GetSigOpCount(const CScript &scriptSig) const;
+    uint64_t GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const;
 
     bool IsPayToScriptHash() const;
     bool IsWitnessProgram(int &version, std::vector<uint8_t> &program) const;

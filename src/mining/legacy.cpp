@@ -160,8 +160,22 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
 
     FillBlockHeader(blockref, pindexPrevNew, scriptPubKeyIn);
 
+    bool isGenesisEnabled = IsGenesisEnabled(mConfig, nHeight);
+    bool sigOpCountError;
+
     pblocktemplate->vTxFees[0] = -1 * mBlockFees;
-    pblocktemplate->vTxSigOpsCount[0] = GetSigOpCountWithoutP2SH(*pblock->vtx[0]);
+
+    int64_t txSigOpCount = static_cast<int64_t>(GetSigOpCountWithoutP2SH(*pblock->vtx[0], isGenesisEnabled, sigOpCountError));
+    // This can happen if supplied coinbase scriptPubKeyIn contains multisig with too many public keys
+    if (sigOpCountError)
+    {
+        // invalid coinbase transaction, block creation will fail
+        pblocktemplate = nullptr;
+    }
+    else
+    {
+        pblocktemplate->vTxSigOpsCount[0] = txSigOpCount;
+    }
 
     uint64_t nSerializeSize = GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
     LogPrintf("CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",

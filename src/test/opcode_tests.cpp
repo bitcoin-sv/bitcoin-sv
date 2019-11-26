@@ -1055,11 +1055,11 @@ BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests) {
 /**
  * Test opcode limits.
  */
-static size_t NonPushOpCodeCount(const CScript& script)
+static uint64_t NonPushOpCodeCount(const CScript& script)
 { 
     CScript::const_iterator pc = script.begin(); 
     CScript::const_iterator pend = script.end(); 
-    size_t cnt = 0; 
+    uint64_t cnt = 0;
     opcodetype opcode; 
     valtype value; 
     while (pc < pend) 
@@ -1069,7 +1069,8 @@ static size_t NonPushOpCodeCount(const CScript& script)
              ++cnt;
     }
     // Include multisig opcode count as well.
-    return cnt + script.GetSigOpCount(true);
+    bool sigOpCountError;
+    return cnt + script.GetSigOpCount(true, false, sigOpCountError);
 } 
  
 static void CheckTestForOpCodeLimit(const CScript &script,

@@ -106,6 +106,9 @@ public:
     virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const = 0;
 
+    virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const = 0;
+
     virtual bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxTransactionValidationDuration() const = 0;
 };
@@ -194,6 +197,9 @@ public:
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override;
     uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override;
 
+    bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* error = nullptr) override;
+    uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override;
+
     bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxTransactionValidationDuration() const override;
 
@@ -244,6 +250,7 @@ private:
     uint64_t maxOpsPerScriptPolicy;
 
     uint64_t maxTxSigOpsCountPolicy;
+    uint64_t maxPubKeysPerMultiSig;
 
     std::chrono::milliseconds mMaxTransactionValidationDuration;
 };
@@ -373,6 +380,19 @@ public:
     }
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+
+    bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) override { return true; }
+    uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override
+    {
+        if (isGenesisEnabled)
+        {
+            return MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS;
+        }
+        else
+        {
+            return MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS;
+        }
+    }
 
     bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override
     {
