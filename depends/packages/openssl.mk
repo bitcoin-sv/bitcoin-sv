@@ -6,7 +6,7 @@ $(package)_sha256_hash=2836875a0f89c03d0fdf483941512613a50cfb421d6fd94b9f41d7279
 
 define $(package)_set_vars
 $(package)_config_env=AR="$($(package)_ar)" RANLIB="$($(package)_ranlib)" CC="$($(package)_cc)"
-$(package)_config_opts=--prefix=$($(package)_staging_prefix_dir) --openssldir=$(host_prefix)/etc/openssl
+$(package)_config_opts=--prefix=$(host_prefix) --openssldir=$(host_prefix)
 $(package)_config_opts+=no-camellia
 $(package)_config_opts+=no-capieng
 $(package)_config_opts+=no-cast
@@ -57,13 +57,12 @@ define $(package)_config_cmds
 endef
 
 define $(package)_build_cmds
-  $(MAKE) -j1
+  $(MAKE) -j6
 endef
 
 define $(package)_stage_cmds
-  $(MAKE) install_sw
+  $(MAKE) DESTDIR=$($(package)_staging_dir) install_sw
 endef
 
 define $(package)_postprocess_cmds
-  rm -rf share bin etc
 endef
