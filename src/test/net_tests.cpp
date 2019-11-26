@@ -203,10 +203,9 @@ BOOST_AUTO_TEST_CASE(test_getSubVersionEB) {
 }
 
 BOOST_AUTO_TEST_CASE(test_userAgentLength) {
-    GlobalConfig config;
-    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
-    config.SetMaxBlockSize(8000000);
+    testConfig.SetMaxBlockSize(8000000);
     std::string long_uacomment = "very very very very very very very very very "
                                  "very very very very very very very very very "
                                  "very very very very very very very very very "
@@ -217,8 +216,8 @@ BOOST_AUTO_TEST_CASE(test_userAgentLength) {
                                  "very very very very very very long comment";
     gArgs.ForceSetMultiArg("-uacomment", long_uacomment);
 
-    BOOST_CHECK_EQUAL(userAgent(config).size(), MAX_SUBVERSION_LENGTH);
-    BOOST_CHECK(userAgent(config).find(
+    BOOST_CHECK_EQUAL(userAgent(testConfig).size(), MAX_SUBVERSION_LENGTH);
+    BOOST_CHECK(userAgent(testConfig).find(
                       "; very very very very very "
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "

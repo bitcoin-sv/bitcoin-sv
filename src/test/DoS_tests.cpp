@@ -250,7 +250,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         tx.vout[0].nValue = 1 * CENT;
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
-        SignSignature(keystore, false, false, *txPrev, tx, 0, SigHashType());
+        SignSignature(testConfig, keystore, false, false, *txPrev, tx, 0, SigHashType());
         // Add txn input data to the queue
         orphanTxns->addTxn(
             std::make_shared<CTxInputData>(
@@ -285,7 +285,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         for (size_t j = 0; j < tx.vin.size(); j++) {
             tx.vin[j].prevout = COutPoint(txPrev->GetId(), j);
         }
-        SignSignature(keystore, false, false, *txPrev, tx, 0, SigHashType());
+        SignSignature(testConfig, keystore, false, false, *txPrev, tx, 0, SigHashType());
         // Re-use same signature for other inputs
         // (they don't have to be valid for this test)
         for (unsigned int j = 1; j < tx.vin.size(); j++)

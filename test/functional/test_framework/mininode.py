@@ -1406,6 +1406,8 @@ class NodeConnCB():
         self.message_count = defaultdict(int)
         self.msg_timestamp = {}
         self.last_message = {}
+        self.time_index = 0
+        self.msg_index = defaultdict(int)
 
         # A count of the number of ping messages we've sent to the node
         self.ping_counter = 1
@@ -1438,6 +1440,8 @@ class NodeConnCB():
                 self.message_count[command] += 1
                 self.last_message[command] = message
                 self.msg_timestamp[command] = time.time()
+                self.msg_index[command] = self.time_index
+                self.time_index +=1
                 getattr(self, 'on_' + command)(conn, message)
             except:
                 print("ERROR delivering %s (%s)" % (repr(message),

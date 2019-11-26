@@ -12,6 +12,7 @@
 #include "script/standard.h"
 #include "taskcancellation.h"
 #include "uint256.h"
+#include "config.h"
 #include "validation.h"
 
 typedef std::vector<uint8_t> valtype;
@@ -142,8 +143,8 @@ static CScript PushAll(const std::vector<valtype> &values) {
     return result;
 }
 
-bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, bool utxoAfterGenesis,
-                      const CScript &fromPubKey, SignatureData &sigdata) {
+bool ProduceSignature(const Config& config, bool consensus, const BaseSignatureCreator& creator, bool genesisEnabled, bool utxoAfterGenesis,
+                      const CScript& fromPubKey, SignatureData& sigdata) {
     CScript script = fromPubKey;
     bool solved = true;
     std::vector<valtype> result;
@@ -173,7 +174,7 @@ bool ProduceSignature(const BaseSignatureCreator &creator, bool genesisEnabled, 
 
     uint32_t flags = StandardScriptVerifyFlags(genesisEnabled, utxoAfterGenesis);
     return solved &&
-           VerifyScript(source->GetToken(), sigdata.scriptSig, fromPubKey,
+           VerifyScript(config, consensus, source->GetToken(), sigdata.scriptSig, fromPubKey,
                         flags, creator.Checker()).value();
 }
 
@@ -191,9 +192,9 @@ void UpdateTransaction(CMutableTransaction &tx, unsigned int nIn,
     tx.vin[nIn].scriptSig = data.scriptSig;
 }
 
-bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
-                   bool utxoAfterGenesis, const CScript &fromPubKey,
-                   CMutableTransaction &txTo, unsigned int nIn,
+bool SignSignature(const Config& config, const CKeyStore& keystore, bool genesisEnabled,
+                   bool utxoAfterGenesis, const CScript& fromPubKey,
+                   CMutableTransaction& txTo, unsigned int nIn,
                    const Amount amount, SigHashType sigHashType) {
     assert(nIn < txTo.vin.size());
 
@@ -202,12 +203,14 @@ bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
                                         sigHashType);
 
     SignatureData sigdata;
-    bool ret = ProduceSignature(creator, genesisEnabled, utxoAfterGenesis, fromPubKey, sigdata);
+    //Consensus parameter can be set to false or true here, because MULTISIG OP is a nonstandard transaction. 
+    //Method SignSignature handles only standard transactions
+    bool ret = ProduceSignature(config, false, creator, genesisEnabled, utxoAfterGenesis, fromPubKey, sigdata);
     UpdateTransaction(txTo, nIn, sigdata);
     return ret;
 }
 
-bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
+bool SignSignature(const Config &config, const CKeyStore &keystore, bool genesisEnabled,
                    bool utxoAfterGenesis, const CTransaction &txFrom,
                    CMutableTransaction &txTo, unsigned int nIn,
                    SigHashType sigHashType) {
@@ -216,7 +219,7 @@ bool SignSignature(const CKeyStore &keystore, bool genesisEnabled,
     assert(txin.prevout.GetN() < txFrom.vout.size());
     const CTxOut &txout = txFrom.vout[txin.prevout.GetN()];
 
-    return SignSignature(keystore, genesisEnabled, utxoAfterGenesis,
+    return SignSignature(config, keystore, genesisEnabled, utxoAfterGenesis,
                          txout.scriptPubKey, txTo, nIn, txout.nValue,
                          sigHashType);
 }
@@ -285,9 +288,9 @@ struct Stacks {
     Stacks() {}
     explicit Stacks(const std::vector<valtype> &scriptSigStack_)
         : script(scriptSigStack_) {}
-    explicit Stacks(const SignatureData &data) {
+    explicit Stacks(const Config& config, bool consensus, const SignatureData &data) {
         auto source = task::CCancellationSource::Make();
-        EvalScript(source->GetToken(), script, data.scriptSig,
+        EvalScript(config, consensus, source->GetToken(), script, data.scriptSig,
                    MANDATORY_SCRIPT_VERIFY_FLAGS, BaseSignatureChecker());
     }
 
@@ -353,17 +356,17 @@ static Stacks CombineSignatures(const CScript &scriptPubKey,
     }
 }
 
-SignatureData CombineSignatures(const CScript &scriptPubKey,
-                                const BaseSignatureChecker &checker,
-                                const SignatureData &scriptSig1,
-                                const SignatureData &scriptSig2,
+SignatureData CombineSignatures(const Config& config, bool consensus, const CScript& scriptPubKey,
+                                const BaseSignatureChecker& checker,
+                                const SignatureData& scriptSig1,
+                                const SignatureData& scriptSig2,
                                 bool utxoAfterGenesis) {
     txnouttype txType;
     std::vector<std::vector<uint8_t>> vSolutions;
     Solver(scriptPubKey, utxoAfterGenesis, txType, vSolutions);
 
     return CombineSignatures(scriptPubKey, checker, txType, vSolutions,
-                             Stacks(scriptSig1), Stacks(scriptSig2))
+                             Stacks(config, consensus, scriptSig1), Stacks(config, consensus, scriptSig2))
         .Output();
 }
 

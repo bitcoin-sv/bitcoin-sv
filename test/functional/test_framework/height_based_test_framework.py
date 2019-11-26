@@ -127,7 +127,7 @@ class SimpleTestDefinition:
         self.funding_tx = create_transaction(parent_tx,
                                              output_ndx,
                                              CScript(),
-                                             parent_tx.vout[output_ndx].nValue - 500,
+                                             parent_tx.vout[output_ndx].nValue - (500 + len(self.locking_script)),
                                              self.locking_script)
         return self.funding_tx
 

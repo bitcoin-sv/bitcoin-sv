@@ -943,7 +943,7 @@ public:
     bool AddAccountingEntry(const CAccountingEntry &);
     bool AddAccountingEntry(const CAccountingEntry &, CWalletDB *pwalletdb);
     template <typename ContainerType>
-    bool DummySignTx(CMutableTransaction &txNew, const ContainerType &coins);
+    bool DummySignTx(const Config& config, CMutableTransaction& txNew, const ContainerType& coins);
 
     static CFeeRate minTxFee;
     static CFeeRate fallbackFee;
@@ -1206,8 +1206,8 @@ public:
 // ContainerType is meant to hold pair<CWalletTx *, int>, and be iterable so
 // that each entry corresponds to each vIn, in order.
 template <typename ContainerType>
-bool CWallet::DummySignTx(CMutableTransaction &txNew,
-                          const ContainerType &coins) {
+bool CWallet::DummySignTx(const Config& config, CMutableTransaction& txNew,
+                          const ContainerType& coins) {
     // Fill in dummy signatures for fee calculation.
     int nIn = 0;
     for (const auto &coin : coins) {
@@ -1215,7 +1215,7 @@ bool CWallet::DummySignTx(CMutableTransaction &txNew,
             coin.first->tx->vout[coin.second].scriptPubKey;
         SignatureData sigdata;
 
-        if (!ProduceSignature(DummySignatureCreator(this), true, false, scriptPubKey,
+        if (!ProduceSignature(config, false, DummySignatureCreator(this), true, false, scriptPubKey,
                               sigdata)) {
             return false;
         } else {

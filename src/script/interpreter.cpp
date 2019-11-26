@@ -17,6 +17,7 @@
 #include "taskcancellation.h"
 #include "uint256.h"
 #include "consensus/consensus.h"
+#include "config.h"
 
 typedef std::vector<uint8_t> valtype;
 
@@ -401,11 +402,16 @@ static bool IsInvalidBranchingOpcode(opcodetype opcode) {
     return opcode == OP_VERNOTIF || opcode == OP_VERIF;
 }
 
-inline bool IsValidMaxOpsPerScript(int nOpCount) {
-    return (nOpCount <= MAX_OPS_PER_SCRIPT);
+inline bool IsValidMaxOpsPerScript(uint64_t nOpCount,
+                                   const Config &config, 
+                                   bool isGenesisEnabled, bool consensus) 
+{
+    return (nOpCount <= config.GetMaxOpsPerScript(isGenesisEnabled, consensus));
 }
 
 std::optional<bool> EvalScript(
+    const Config& config,
+    bool consensus,
     const task::CCancellationToken& token,
     std::vector<valtype>& stack,
     const CScript& script,
@@ -433,8 +439,7 @@ std::optional<bool> EvalScript(
     {
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     }
-
-    int nOpCount = 0;
+    uint64_t nOpCount = 0;
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
     const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
     const int big_ints_byte_limit{500}; // To do: Make configurable
@@ -469,7 +474,7 @@ std::optional<bool> EvalScript(
             //
             // Push values are not taken into consideration.
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount)) {
+            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount, config, flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
 
@@ -1346,7 +1351,7 @@ std::optional<bool> EvalScript(
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
                         nOpCount += nKeysCount;
-                        if (!IsValidMaxOpsPerScript(nOpCount)) {
+                        if (!IsValidMaxOpsPerScript(nOpCount, config, flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
                             return set_error(serror, SCRIPT_ERR_OP_COUNT);
                         }
                         int ikey = ++i;
@@ -1974,6 +1979,8 @@ size_t TransactionSignatureChecker::GetOutTxSize() const {
 }
 
 std::optional<bool> VerifyScript(
+    const Config& config,
+    bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
     const CScript& scriptPubKey,
@@ -1993,7 +2000,7 @@ std::optional<bool> VerifyScript(
     }
 
     std::vector<valtype> stack, stackCopy;
-    if (auto res = EvalScript(token, stack, scriptSig, flags, checker, serror);
+    if (auto res = EvalScript(config, consensus, token, stack, scriptSig, flags, checker, serror);
         !res.has_value() || !res.value())
     {
         return res;
@@ -2001,7 +2008,7 @@ std::optional<bool> VerifyScript(
     if ((flags & SCRIPT_VERIFY_P2SH)  && !(flags & SCRIPT_UTXO_AFTER_GENESIS)) {
         stackCopy = stack;
     }
-    if (auto res = EvalScript(token, stack, scriptPubKey, flags, checker, serror);
+    if (auto res = EvalScript(config, consensus, token, stack, scriptPubKey, flags, checker, serror);
         !res.has_value() || !res.value())
     {
         return res;
@@ -2036,7 +2043,7 @@ std::optional<bool> VerifyScript(
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
         popstack(stack);
 
-        if (auto res = EvalScript(token, stack, pubKey2, flags, checker, serror);
+        if (auto res = EvalScript(config, consensus, token, stack, pubKey2, flags, checker, serror);
             !res.has_value() || !res.value())
         {
             return res;

@@ -41,7 +41,10 @@ class BsvProtoconfViolationTest(BitcoinTestFramework):
         logger.info("Received time of verack: {} ".format(test_node.msg_timestamp["verack"]))
         logger.info("Received time of protoconf: {} ".format(test_node.msg_timestamp["protoconf"]))
 
-        assert_greater_than(test_node.msg_timestamp["protoconf"], test_node.msg_timestamp["verack"])
+        logger.info("Received msg_index of verack: {} ".format(test_node.msg_index["verack"]))
+        logger.info("Received msg_index of protoconf: {} ".format(test_node.msg_index["protoconf"]))
+
+        assert_greater_than(test_node.msg_index["protoconf"], test_node.msg_index["verack"])
 
         # 2. Test that protoconf can only be sent once (if is sent twice --> disconnection)
         assert_equal(len(self.nodes[0].listbanned()), 0)# Before, there are zero banned node

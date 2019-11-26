@@ -73,9 +73,11 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
 ScriptError VerifyWithFlag(const CTransaction &output,
                            const CMutableTransaction &input, int flags) {
     ScriptError error;
+    const Config& config = GlobalConfig::GetConfig();
     CTransaction inputi(input);
     auto ret =
         VerifyScript(
+            config, true,
             task::CCancellationSource::Make(),
             inputi.vin[0].scriptSig,
             output.vout[0].scriptPubKey,

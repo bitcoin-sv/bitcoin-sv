@@ -155,8 +155,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test) {
                     : stack.back()->AccessCoin(COutPoint(txid, 0));
             BOOST_CHECK(coin == entry);
 
-            Config &config = GlobalConfig::GetConfig();
-            config.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);
+            testConfig.SetGenesisActivationHeight(testConfig.GetChainParams().GetConsensus().genesisHeight);
 
             if (InsecureRandRange(5) == 0 || coin.IsSpent()) {
                 CTxOut txout;
@@ -164,7 +163,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test) {
                 if (InsecureRandRange(16) == 0 && coin.IsSpent()) {
                     txout.scriptPubKey.assign(1 + InsecureRandBits(6),
                                               OP_RETURN);
-                    BOOST_CHECK(txout.scriptPubKey.IsUnspendable(IsGenesisEnabled(config, 1)));
+                    BOOST_CHECK(txout.scriptPubKey.IsUnspendable(IsGenesisEnabled(testConfig, 1)));
                     added_an_unspendable_entry = true;
                 } else {
                     // Random sizes so we can test memory usage accounting
@@ -175,7 +174,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test) {
 
                 Coin newcoin(txout, 1, false);
                 stack.back()->AddCoin(COutPoint(txid, 0), newcoin,
-                                      !coin.IsSpent() || insecure_rand() & 1, config.GetGenesisActivationHeight());
+                                      !coin.IsSpent() || insecure_rand() & 1, testConfig.GetGenesisActivationHeight());
             } else {
                 removed_an_entry = true;
                 coin.Clear();
@@ -424,7 +423,7 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test) {
             // restore inputs
             if (!tx.IsCoinBase()) {
                 const COutPoint &out = tx.vin[0].prevout;
-                UndoCoinSpend(undo.vprevout[0], *(stack.back()), out, GlobalConfig::GetConfig());
+                UndoCoinSpend(undo.vprevout[0], *(stack.back()), out, testConfig);
             }
 
             // Store as a candidate for reconnection

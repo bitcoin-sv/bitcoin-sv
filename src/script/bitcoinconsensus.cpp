@@ -10,6 +10,7 @@
 #include "script/interpreter.h"
 #include "taskcancellation.h"
 #include "version.h"
+#include "config.h"
 
 namespace {
 
@@ -72,11 +73,11 @@ static bool verify_flags(unsigned int flags) {
     return (flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
 }
 
-static int verify_script(const uint8_t *scriptPubKey,
+static int verify_script(const Config& config, const uint8_t* scriptPubKey,
                          unsigned int scriptPubKeyLen, Amount amount,
-                         const uint8_t *txTo, unsigned int txToLen,
+                         const uint8_t* txTo, unsigned int txToLen,
                          unsigned int nIn, unsigned int flags,
-                         bitcoinconsensus_error *err) {
+                         bitcoinconsensus_error* err) {
     if (!verify_flags(flags)) {
         return bitcoinconsensus_ERR_INVALID_FLAGS;
     }
@@ -96,6 +97,7 @@ static int verify_script(const uint8_t *scriptPubKey,
 
         auto res =
           VerifyScript(
+              config, true,
               source->GetToken(),
               tx.vin[nIn].scriptSig,
               CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), flags,
@@ -113,7 +115,8 @@ int bitcoinconsensus_verify_script_with_amount(
     const uint8_t *txTo, unsigned int txToLen, unsigned int nIn,
     unsigned int flags, bitcoinconsensus_error *err) {
     Amount am(amount);
-    return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
+    const Config& config = GlobalConfig::GetConfig();
+    return ::verify_script(config, scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
                            nIn, flags, err);
 }
 
@@ -128,7 +131,8 @@ int bitcoinconsensus_verify_script(const uint8_t *scriptPubKey,
     }
 
     Amount am(0);
-    return ::verify_script(scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
+    const Config& config = GlobalConfig::GetConfig();
+    return ::verify_script(config, scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
                            nIn, flags, err);
 }
 

@@ -746,6 +746,7 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
     return CheckInputs(
                 token,
                 config,
+                false,          /*false is used because transactions taken from mempool will be using policy rules which will be set individually by miners*/
                 tx,
                 state,
                 view,
@@ -1304,6 +1305,7 @@ CTxnValResult TxnValidation(
         CheckInputs(
             source->GetToken(),
             config,
+            false,
             tx,
             state,
             view,
@@ -1379,6 +1381,7 @@ CTxnValResult TxnValidation(
             CheckInputs(
                 source->GetToken(),
                 config,
+                false,
                 tx,
                 state,
                 view,
@@ -2470,6 +2473,8 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     return
         VerifyScript(
+            config,
+            consensus,
             token,
             scriptSig,
             scriptPubKey,
@@ -2552,6 +2557,7 @@ static int GetInputScriptBlockHeight(int coinHeight) {
 std::optional<bool> CheckInputs(
     const task::CCancellationToken& token,
     const Config& config,
+    bool consensus,
     const CTransaction& tx,
     CValidationState& state,
     const CCoinsViewCache& inputs,
@@ -2621,7 +2627,7 @@ std::optional<bool> CheckInputs(
         //       direction (when  a block is mined or when there is a reorg). This will be fixed as part of CORE-204)
         
         // Verify signature
-        CScriptCheck check(scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
+        CScriptCheck check(config, consensus, scriptPubKey, amount, tx, i, flags | perInputScriptFlags, sigCacheStore,
                            txdata);
         if (pvChecks) {
             pvChecks->push_back(std::move(check));
@@ -2644,6 +2650,7 @@ std::optional<bool> CheckInputs(
                 // and non-upgraded nodes.
                 // FIXME: CORE-257 has to check if genesis check is necessary also in check2
                 CScriptCheck check2(
+                    config, consensus,
                     scriptPubKey, amount, tx, i,
                     (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS),
                     sigCacheStore, txdata);
@@ -3205,6 +3212,7 @@ static bool ConnectBlock(
                 CheckInputs(
                     token,
                     config,
+                    true,
                     tx,
                     state,
                     view,

@@ -45,7 +45,7 @@ FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
 extern void noui_connect();
 
-BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
+BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetConfig()) {
     SHA256AutoDetect();
     RandomInit();
     ECC_Start();
@@ -60,7 +60,8 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
     fCheckBlockIndex = true;
     SelectParams(chainName);
     noui_connect();
-
+    testConfig.Reset(); // make sure that we start every test with a clean config
+    testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
@@ -85,9 +86,6 @@ TestingSetup::TestingSetup(const std::string &chainName)
 
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
-    GlobalConfig &config = GlobalConfig::GetConfig();
-    config.Reset(); // make sure that we start every test with a clean config
-    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     RegisterAllRPCCommands(tableRPC);
     ClearDatadirCache();
     pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
@@ -99,7 +97,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
     pblocktree = new CBlockTreeDB(1 << 20, true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
-    if (!InitBlockIndex(config)) {
+    if (!InitBlockIndex(testConfig)) {
         throw std::runtime_error("InitBlockIndex failed.");
     }
     {
@@ -108,20 +106,20 @@ TestingSetup::TestingSetup(const std::string &chainName)
         CValidationState dummyState;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
-        if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
+        if (!ActivateBestChain(source->GetToken(), testConfig, dummyState, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }
-    InitScriptCheckQueues(config, threadGroup);
+    InitScriptCheckQueues(testConfig, threadGroup);
 
     // Deterministic randomness for tests.
     g_connman =
         std::make_unique<CConnman>(
-            config, 0x1337, 0x1337, std::chrono::milliseconds{0});
+          testConfig, 0x1337, 0x1337, std::chrono::milliseconds{0});
     connman = g_connman.get();
     RegisterNodeSignals(GetNodeSignals());
 
-    mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(config);
+    mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(testConfig);
 }
 
 TestingSetup::~TestingSetup() {

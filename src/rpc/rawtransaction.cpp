@@ -1009,7 +1009,7 @@ static UniValue signrawtransaction(const Config &config,
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if ((sigHashType.getBaseType() != BaseSigHashType::SINGLE) ||
             (i < mergedTx.vout.size())) {
-            ProduceSignature(MutableTransactionSignatureCreator(
+            ProduceSignature(config, true, MutableTransactionSignatureCreator(
                                  &keystore, &mergedTx, i, amount, sigHashType),
                              genesisEnabled, utxoAfterGenesis, prevPubKey, sigdata);
         }
@@ -1018,6 +1018,8 @@ static UniValue signrawtransaction(const Config &config,
         for (const CMutableTransaction &txv : txVariants) {
             if (txv.vin.size() > i) {
                 sigdata = CombineSignatures(
+                    config, 
+                    true,
                     prevPubKey,
                     TransactionSignatureChecker(&txConst, i, amount), sigdata,
                     DataFromTransaction(txv, i),
@@ -1031,6 +1033,8 @@ static UniValue signrawtransaction(const Config &config,
         auto source = task::CCancellationSource::Make();
         auto res =
             VerifyScript(
+                config,
+                true,
                 source->GetToken(),
                 txin.scriptSig,
                 prevPubKey,

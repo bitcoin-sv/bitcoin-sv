@@ -7,6 +7,7 @@
 // only local node policy logic
 
 #include "policy/policy.h"
+#include "script/script_num.h"
 
 #include "taskcancellation.h"
 #include "tinyformat.h"
@@ -40,8 +41,9 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
     if (whichType == TX_SCRIPTHASH && !config.GetAcceptP2SH()) {
         return false;
     } else if (whichType == TX_MULTISIG) {
-        uint8_t m = vSolutions.front()[0];
-        uint8_t n = vSolutions.back()[0];
+        // we don't require minimal encoding here because Solver method is already checking minimal encoding
+        int m = CScriptNum(vSolutions.front(), false).getint();
+        int n = CScriptNum(vSolutions.back(), false).getint();
         // Support up to x-of-3 multisig txns as standard
         if (n < 1 || n > 3) return false;
         if (m < 1 || m > n) return false;
@@ -147,6 +149,8 @@ std::optional<bool> AreInputsStandard(
             // redeemScript
             auto res =
                 EvalScript(
+                    config,
+                    false,
                     token,
                     stack,
                     tx.vin[i].scriptSig,

@@ -37,7 +37,7 @@ typedef std::vector<uint8_t> valtype;
 
 BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
 
-void RunTests(UniValue& tests, bool should_be_valid){
+void RunTests(Config& globalConfig, UniValue& tests, bool should_be_valid){
     for (size_t idx = 0; idx < tests.size(); idx++) {
         UniValue test = tests[idx];
         std::string strTest = test.write();
@@ -136,7 +136,9 @@ void RunTests(UniValue& tests, bool should_be_valid){
                         amount = Amount(mapprevOutValues[tx.vin[i].prevout]);
                     }
 
-                    is_valid = VerifyScript(task::CCancellationSource::Make()->GetToken(),
+                    is_valid = VerifyScript(globalConfig,
+                                            true,
+                                            task::CCancellationSource::Make()->GetToken(),
                                             tx.vin[i].scriptSig,
                                             mapprevOutScriptPubKeys[tx.vin[i].prevout],
                                             verify_flags, 
@@ -170,7 +172,7 @@ BOOST_AUTO_TEST_CASE(tx_valid) {
         std::string(json_tests::tx_valid,
                     json_tests::tx_valid + sizeof(json_tests::tx_valid)));
 
-    RunTests(tests, true);
+    RunTests(testConfig, tests, true);
 }
 
 BOOST_AUTO_TEST_CASE(tx_invalid) {
@@ -188,7 +190,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid) {
         std::string(json_tests::tx_invalid,
                     json_tests::tx_invalid + sizeof(json_tests::tx_invalid)));
 
-    RunTests(tests, false);
+    RunTests(testConfig, tests, false);
 }
 
 BOOST_AUTO_TEST_CASE(basic_transaction_tests) {
@@ -279,7 +281,6 @@ BOOST_AUTO_TEST_CASE(test_Get) {
     CCoinsViewCache coins(&coinsDummy);
     std::vector<CMutableTransaction> dummyTransactions =
         SetupDummyInputs(keystore, coins);
-    DummyConfig config;
 
     CMutableTransaction t1;
     t1.vin.resize(3);
@@ -298,7 +299,7 @@ BOOST_AUTO_TEST_CASE(test_Get) {
     BOOST_CHECK(
         AreInputsStandard(
             task::CCancellationSource::Make()->GetToken(),
-            config,
+            testConfig,
             CTransaction(t1),
             coins,
             0));
@@ -309,6 +310,7 @@ BOOST_AUTO_TEST_CASE(test_Get) {
 void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
                           CTransactionRef &output, CMutableTransaction &input,
                           bool successBeforeGenesis, bool successAfterGenesis) {
+    const Config& config = GlobalConfig::GetConfig();
     CMutableTransaction outputm;
     outputm.nVersion = 1;
     outputm.vin.resize(1);
@@ -332,10 +334,10 @@ void CreateCreditAndSpend(const CKeyStore &keystore, const CScript &outscript,
     inputm.vout.resize(1);
     inputm.vout[0].nValue = Amount(1);
     inputm.vout[0].scriptPubKey = CScript();
-    bool retAfter = SignSignature(keystore, true, true, *output, inputm, 0,
+    bool retAfter = SignSignature(config, keystore, true, true, *output, inputm, 0,
                                    SigHashType().withForkId());
     BOOST_CHECK_EQUAL(retAfter, successAfterGenesis);
-    bool retBefore = SignSignature(keystore, true, false, *output, inputm, 0,
+    bool retBefore = SignSignature(config, keystore, true, false, *output, inputm, 0,
                                    SigHashType().withForkId());
     BOOST_CHECK_EQUAL(retBefore, successBeforeGenesis);
     CDataStream ssin(SER_NETWORK, PROTOCOL_VERSION);
@@ -351,11 +353,13 @@ void CheckWithFlag(const CTransactionRef &output,
                    const CMutableTransaction &input, int flags,
                    bool successBeforeGenesis, bool successAfterGenesis) {
     ScriptError error;
+    const Config& config = GlobalConfig::GetConfig();
     CTransaction inputi(input);
     auto s1 = ScriptToAsmStr(inputi.vin[0].scriptSig);
     auto s2 = ScriptToAsmStr(output->vout[0].scriptPubKey);
 
     bool retBefore = VerifyScript(
+        config, true,
         task::CCancellationSource::Make()->GetToken(),
         inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
         flags | SCRIPT_ENABLE_SIGHASH_FORKID,
@@ -365,6 +369,7 @@ void CheckWithFlag(const CTransactionRef &output,
                         std::string("failed before genesis result: ") + (retBefore ? "true":"false"));
     
     bool retAfter = VerifyScript(
+        config, true,
         task::CCancellationSource::Make()->GetToken(),
         inputi.vin[0].scriptSig, output->vout[0].scriptPubKey,
         flags | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
@@ -390,8 +395,10 @@ static CScript PushAll(const std::vector<valtype> &values) {
 }
 
 void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
+    const Config& config = GlobalConfig::GetConfig();
     std::vector<valtype> stack;
     EvalScript(
+        config, true,
         task::CCancellationSource::Make()->GetToken(),
         stack,
         script,
@@ -444,7 +451,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     // sign all inputs
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         bool hashSigned =
-            SignSignature(keystore, true, true, scriptPubKey, mtx, i, Amount(1000),
+            SignSignature(testConfig, keystore, true, true, scriptPubKey, mtx, i, Amount(1000),
                           sigHashes.at(i % sigHashes.size()));
         BOOST_CHECK_MESSAGE(hashSigned, "Failed to sign test transaction");
     }
@@ -473,10 +480,9 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         std::vector<CScriptCheck> vChecks;
         CTxOut &out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
-        CScriptCheck check(out.scriptPubKey, out.nValue, tx, i,
-                           MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata);
-        vChecks.push_back(CScriptCheck());
-        check.swap(vChecks.back());
+        vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, i,
+                             MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata);
+        
         control.Add(vChecks);
     }
 
@@ -584,7 +590,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     CheckWithFlag(output2, input2, 0, false, false);
     BOOST_CHECK(*output1 == *output2);
     UpdateTransaction(
-        input1, 0, CombineSignatures(output1->vout[0].scriptPubKey,
+        input1, 0, CombineSignatures(testConfig, true, output1->vout[0].scriptPubKey,
                                      MutableTransactionSignatureChecker(
                                          &input1, 0, output1->vout[0].nValue),
                                      DataFromTransaction(input1, 0),
@@ -605,7 +611,7 @@ BOOST_AUTO_TEST_CASE(test_witness) {
     CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH, false, true);
     BOOST_CHECK(*output1 == *output2);
     UpdateTransaction(
-        input1, 0, CombineSignatures(output1->vout[0].scriptPubKey,
+        input1, 0, CombineSignatures(testConfig, true, output1->vout[0].scriptPubKey,
                                      MutableTransactionSignatureChecker(
                                          &input1, 0, output1->vout[0].nValue),
                                      DataFromTransaction(input1, 0),
@@ -623,8 +629,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     std::vector<CMutableTransaction> dummyTransactions =
         SetupDummyInputs(keystore, coins);
 
-    DummyConfig config(CBaseChainParams::MAIN);
-    config.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);
+    testConfig.SetGenesisActivationHeight(testConfig.GetChainParams().GetConsensus().genesisHeight);
 
     CMutableTransaction t;
     t.vin.resize(1);
@@ -637,45 +642,45 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     t.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
 
     std::string reason;
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
 
     // Check dust with default relay fee:
     Amount nDustThreshold = 3 * 182 * dustRelayFee.GetFeePerK() / 1000;
     BOOST_CHECK_EQUAL(nDustThreshold, Amount(546));
     // dust:
     t.vout[0].nValue = nDustThreshold - Amount(1);
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
     // not dust:
     t.vout[0].nValue = nDustThreshold;
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
 
     // Check dust with odd relay fee to verify rounding:
     // nDustThreshold = 182 * 1234 / 1000 * 3
     dustRelayFee = CFeeRate(Amount(1234));
     // dust:
     t.vout[0].nValue = Amount(672 - 1);
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
     // not dust:
     t.vout[0].nValue = Amount(672);
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
     dustRelayFee = CFeeRate(DUST_RELAY_TX_FEE);
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
 
     // OP_TRUE, OP_RETURN is not a standard transaction
     t.vout[0].scriptPubKey = CScript() << OP_TRUE << OP_RETURN;
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
 
     // OP_FALSE OP_RETURN is standard before and after genesis upgrade:
     t.vout[0].scriptPubKey = CScript() << OP_FALSE << OP_RETURN;
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), config.GetGenesisActivationHeight() - 1 , reason));
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), config.GetGenesisActivationHeight(), reason));
+    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight() - 1 , reason));
+    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight(), reason));
 
     // OP_RETURN is standard only before Genesis upgrade:
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
-    BOOST_CHECK(IsStandardTx(config, CTransaction(t), config.GetGenesisActivationHeight() - 1 , reason));
-    BOOST_CHECK(!IsStandardTx(config, CTransaction(t), config.GetGenesisActivationHeight(), reason));
+    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight() - 1 , reason));
+    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), testConfig.GetGenesisActivationHeight(), reason));
 
 }
 

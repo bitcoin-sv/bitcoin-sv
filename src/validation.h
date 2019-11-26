@@ -32,6 +32,7 @@
 #include <chrono>
 #include <cstdint>
 #include <exception>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -769,6 +770,7 @@ uint64_t GetTransactionSigOpCount(const Config &config,
 std::optional<bool> CheckInputs(
     const task::CCancellationToken& token,
     const Config& config,
+    bool consensus,
     const CTransaction& tx,
     CValidationState& state,
     const CCoinsViewCache& view,
@@ -850,38 +852,25 @@ class CScriptCheck {
 private:
     CScript scriptPubKey;
     Amount amount;
-    const CTransaction *ptxTo;
-    unsigned int nIn;
-    uint32_t nFlags;
-    bool cacheStore;
-    ScriptError error;
+    const CTransaction *ptxTo = 0;
+    unsigned int nIn = 0;
+    uint32_t nFlags = 0;
+    bool cacheStore = false;
+    ScriptError error = SCRIPT_ERR_UNKNOWN_ERROR;
     PrecomputedTransactionData txdata;
+    std::reference_wrapper<const Config> config;
+    bool consensus = false;
 
 public:
-    CScriptCheck()
-        : amount(0), ptxTo(0), nIn(0), nFlags(0), cacheStore(false),
-          error(SCRIPT_ERR_UNKNOWN_ERROR), txdata() {}
-
-    CScriptCheck(const CScript &scriptPubKeyIn, const Amount amountIn,
+    CScriptCheck(const Config &configIn, bool consensusIn, const CScript &scriptPubKeyIn, const Amount amountIn,
                  const CTransaction &txToIn, unsigned int nInIn,
                  uint32_t nFlagsIn, bool cacheIn,
-                 const PrecomputedTransactionData &txdataIn)
+                 const PrecomputedTransactionData& txdataIn)
         : scriptPubKey(scriptPubKeyIn), amount(amountIn), ptxTo(&txToIn),
           nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn),
-          error(SCRIPT_ERR_UNKNOWN_ERROR), txdata(txdataIn) {}
+          error(SCRIPT_ERR_UNKNOWN_ERROR), txdata(txdataIn), config(configIn), consensus(consensusIn) {}
 
     std::optional<bool> operator()(const task::CCancellationToken& token);
-
-    void swap(CScriptCheck &check) {
-        scriptPubKey.swap(check.scriptPubKey);
-        std::swap(ptxTo, check.ptxTo);
-        std::swap(amount, check.amount);
-        std::swap(nIn, check.nIn);
-        std::swap(nFlags, check.nFlags);
-        std::swap(cacheStore, check.cacheStore);
-        std::swap(error, check.error);
-        std::swap(txdata, check.txdata);
-    }
 
     ScriptError GetScriptError() const { return error; }
 };

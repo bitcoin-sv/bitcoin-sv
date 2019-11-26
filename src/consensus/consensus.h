@@ -26,6 +26,13 @@ static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
 static const int64_t MAX_BLOCK_SIGOPS_PER_MB = 20000;
 /** allowed number of signature check operations per transaction. */
 static const uint64_t MAX_TX_SIGOPS_COUNT = 20000;
+
+// Maximum number of non-push operations per script before GENESIS
+static const uint64_t MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = 500;
+
+// Maximum number of non-push operations per script after GENESIS
+static const uint64_t MAX_OPS_PER_SCRIPT_AFTER_GENESIS = UINT32_MAX;
+
 /**
  * Coinbase transaction outputs can only be spent after this number of new
  * blocks (network rule).

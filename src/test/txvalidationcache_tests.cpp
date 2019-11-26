@@ -106,6 +106,7 @@ namespace {
                 CheckInputs(
                     source->GetToken(),
                     config,
+                    true,
                     tx,
                     state,
                     pcoinsTip,
@@ -136,6 +137,7 @@ namespace {
                     CheckInputs(
                         source->GetToken(),
                         config,
+                        true,
                         tx,
                         state,
                         pcoinsTip,
@@ -154,6 +156,7 @@ namespace {
                     CheckInputs(
                         source->GetToken(),
                         config,
+                        true,
                         tx,
                         state,
                         pcoinsTip,
@@ -298,6 +301,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
             !CheckInputs(
                 source->GetToken(),
                 config,
+                true,
                 spend_tx,
                 state,
                 pcoinsTip,
@@ -317,6 +321,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
             CheckInputs(
                 source->GetToken(),
                 config,
+                true,
                 spend_tx,
                 state,
                 pcoinsTip,
@@ -404,6 +409,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
             CheckInputs(
                 source->GetToken(),
                 config,
+                true,
                 transaction,
                 state,
                 pcoinsTip,
@@ -452,6 +458,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
             CheckInputs(
                 source->GetToken(),
                 config,
+                true,
                 transaction,
                 state,
                 pcoinsTip,
@@ -480,13 +487,13 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         // Sign
         SignatureData sigdata;
-        ProduceSignature(
+        ProduceSignature(config, true,
             MutableTransactionSignatureCreator(&keystore, &tx, 0, 11 * CENT,
                                                SigHashType().withForkId()),
             true, false, spend_tx.vout[0].scriptPubKey, sigdata);
 
         UpdateTransaction(tx, 0, sigdata);
-        ProduceSignature(
+        ProduceSignature(config, true,
             MutableTransactionSignatureCreator(&keystore, &tx, 1, 11 * CENT,
                                                SigHashType().withForkId()),
             true, false, spend_tx.vout[3].scriptPubKey, sigdata);
@@ -516,6 +523,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
             !CheckInputs(
                 source->GetToken(),
                 config,
+                true,
                 transaction,
                 state,
                 pcoinsTip,
@@ -533,6 +541,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
             CheckInputs(
                 source->GetToken(),
                 config,
+                true,
                 transaction,
                 state,
                 pcoinsTip,
