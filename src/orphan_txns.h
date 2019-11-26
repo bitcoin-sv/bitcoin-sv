@@ -23,6 +23,12 @@ struct IterComparator {
     }
 };
 
+struct CTxnIdComparator {
+    bool operator ()(const TxInputDataSPtr& lhs, const TxInputDataSPtr& rhs) const {
+        return lhs->mpTx->GetId() < rhs->mpTx->GetId();
+    }
+};
+
 class COrphanTxns;
 using OrphanTxnsSPtr = std::shared_ptr<COrphanTxns>;
 using CompactExtraTxnsVec = std::vector<std::pair<uint256, CTransactionRef>>;
