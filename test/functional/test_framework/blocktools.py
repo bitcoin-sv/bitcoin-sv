@@ -7,7 +7,7 @@
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN
 from .util import assert_equal, assert_raises_rpc_error, hash256
-from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT)
+from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
 
 from collections import deque
 
@@ -266,7 +266,7 @@ class ChainManager():
                         script_length = script_length // 2
                     else:
                         script_length = 500000
-                tx_sigops = min(extra_sigops, script_length, MAX_TX_SIGOPS_COUNT)
+                tx_sigops = min(extra_sigops, script_length, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
                 extra_sigops -= tx_sigops
                 script_pad_len = script_length - tx_sigops
                 script_output = CScript([b'\x00' * script_pad_len] + [OP_CHECKSIG] * tx_sigops)

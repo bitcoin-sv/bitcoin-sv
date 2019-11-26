@@ -533,8 +533,8 @@ uint64_t GetTransactionSigOpCount(const Config &config,
 }
 
 static bool CheckTransactionCommon(const CTransaction& tx,
-                                   CValidationState& state)
-{
+                                   CValidationState& state,
+                                   uint64_t maxTxSigOpsCountConsensus) {
     // Basic checks that don't depend on any context
     if (tx.vin.empty()) {
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vin-empty");
@@ -569,21 +569,21 @@ static bool CheckTransactionCommon(const CTransaction& tx,
         }
     }
 
-    if (GetSigOpCountWithoutP2SH(tx) > MAX_TX_SIGOPS_COUNT) {
+    if (GetSigOpCountWithoutP2SH(tx) > maxTxSigOpsCountConsensus) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
     }
 
     return true;
 }
 
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state)
+bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensus)
 {
     if (!tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
                          "first tx is not coinbase");
     }
 
-    if (!CheckTransactionCommon(tx, state)) {
+    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus)) {
         // CheckTransactionCommon fill in the state.
         return false;
     }
@@ -595,13 +595,12 @@ bool CheckCoinbase(const CTransaction& tx, CValidationState& state)
     return true;
 }
 
-bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state)
-{
+bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus) {
     if (tx.IsCoinBase()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-tx-coinbase");
     }
-
-    if (!CheckTransactionCommon(tx, state)) {
+    
+    if (!CheckTransactionCommon(tx, state, maxTxSigOpsCountConsensus)) {
         // CheckTransactionCommon fill in the state.
         return false;
     }
@@ -1069,7 +1068,7 @@ CTxnValResult TxnValidation(
     std::vector<COutPoint> vCoinsToUncache {};
 
     // Coinbase is only valid in a block, not as a loose transaction.
-    if (!CheckRegularTransaction(tx, state)) {
+    if (!CheckRegularTransaction(tx, state, config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, chainActive.Height() + 1), true))) {
         return Result{state, pTxInputData};
     }
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
@@ -1207,11 +1206,9 @@ CTxnValResult TxnValidation(
                 GetTransactionSigOpCount(config, tx, view, true))
     };
     // Check that the transaction doesn't have an excessive number of
-    // sigops, making it impossible to mine. Since the coinbase transaction
-    // itself can contain sigops MAX_STANDARD_TX_SIGOPS is less than
-    // MAX_BLOCK_SIGOPS_PER_MB; we still consider this an invalid rather
+    // sigops, making it impossible to mine. We consider this an invalid rather
     // than merely non-standard transaction.
-    if (nSigOpsCount > MAX_STANDARD_TX_SIGOPS) {
+    if (nSigOpsCount > static_cast<int64_t>(config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, chainActive.Height() + 1), false))) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "bad-txns-too-many-sigops",
                   false,
@@ -2996,7 +2993,7 @@ static bool ConnectBlock(
     // Check it again in case a previous version let a bad block in
     BlockValidationOptions validationOptions =
         BlockValidationOptions(!fJustCheck, !fJustCheck);
-    if (!CheckBlock(config, block, state, validationOptions)) {
+    if (!CheckBlock(config, block, state, pindex->nHeight, validationOptions)) {
         return error("%s: Consensus::CheckBlock: %s", __func__,
                      FormatStateMessage(state));
     }
@@ -3156,6 +3153,8 @@ static bool ConnectBlock(
     vPos.reserve(block.vtx.size());
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
 
+    uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, pindex->nHeight), true);
+
     for (size_t i = 0; i < block.vtx.size(); i++) {
         const CTransaction &tx = *(block.vtx[i]);
 
@@ -3188,7 +3187,7 @@ static bool ConnectBlock(
         // * legacy (always)
         // * p2sh (when P2SH enabled)
         auto txSigOpsCount = GetTransactionSigOpCount(config, tx, view, flags & SCRIPT_VERIFY_P2SH);
-        if (txSigOpsCount > MAX_TX_SIGOPS_COUNT) {
+        if (txSigOpsCount > maxTxSigOpsCountConsensus) {
             return state.DoS(100, false, REJECT_INVALID, "bad-txn-sigops");
         }
 
@@ -4668,6 +4667,7 @@ static bool CheckBlockHeader(
 
 bool CheckBlock(const Config &config, const CBlock &block,
                 CValidationState &state,
+                int blockHeight,
                 BlockValidationOptions validationOptions) {
     // These are checks that are independent of context.
     if (block.fChecked) {
@@ -4723,8 +4723,10 @@ bool CheckBlock(const Config &config, const CBlock &block,
                          "size limits failed");
     }
 
+    uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(IsGenesisEnabled(config, blockHeight), true);
+
     // And a valid coinbase.
-    if (!CheckCoinbase(*block.vtx[0], state)) {
+    if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensus)) {
         return state.Invalid(false, state.GetRejectCode(),
                              state.GetRejectReason(),
                              strprintf("Coinbase check failed (txid %s) %s",
@@ -4762,7 +4764,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
         // the coinbase, the loop is arranged such as this only runs after at
         // least one increment.
         tx = block.vtx[i].get();
-        if (!CheckRegularTransaction(*tx, state)) {
+        if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensus)) {
             return state.Invalid(
                 false, state.GetRejectCode(), state.GetRejectReason(),
                 strprintf("Transaction check failed (txid %s) %s",
@@ -4977,6 +4979,32 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
 }
 
 /**
+ * If found, returns an index of a previous block. 
+ */
+static const CBlockIndex* FindPreviousBlockIndex(const CBlockHeader &block, CValidationState &state)
+{
+    AssertLockHeld(cs_main);
+
+    CBlockIndex* ppindex = nullptr;
+
+    BlockMap::iterator mi = mapBlockIndex.find(block.hashPrevBlock);
+    if (mi == mapBlockIndex.end())
+    {
+        state.DoS(10, error("%s: prev block not found", __func__), 0, "prev-blk-not-found");
+    }
+
+    ppindex = (*mi).second;
+
+    if (!ppindex || ppindex->nStatus.isInvalid())
+    {
+        state.DoS(100, error("%s: prev block invalid", __func__), REJECT_INVALID, "bad-prevblk");
+        ppindex = nullptr;
+    }
+
+    return ppindex;
+}
+
+/**
  * If the provided block header is valid, add it to the block index.
  *
  * Returns true if the block is succesfully added to the block index.
@@ -5010,21 +5038,13 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
                          hash.ToString(), FormatStateMessage(state));
         }
 
-        // Get prev block index
-        CBlockIndex *pindexPrev = nullptr;
-        BlockMap::iterator mi = mapBlockIndex.find(block.hashPrevBlock);
-        if (mi == mapBlockIndex.end()) {
-            return state.DoS(10, error("%s: prev block not found", __func__), 0,
-                             "prev-blk-not-found");
+        const CBlockIndex *pindexPrev = FindPreviousBlockIndex(block, state);
+        if (!pindexPrev)
+        {
+            // Error state is logged in FindPreviousBlockIndex
+            return false;
         }
 
-        pindexPrev = (*mi).second;
-        if (pindexPrev->nStatus.isInvalid()) {
-            return state.DoS(100, error("%s: prev block invalid", __func__),
-                             REJECT_INVALID, "bad-prevblk");
-        }
-
-        assert(pindexPrev);
         if (fCheckpointsEnabled &&
             !CheckIndexAgainstCheckpoint(pindexPrev, state, chainparams,
                                          hash)) {
@@ -5178,7 +5198,7 @@ static bool AcceptBlock(const Config &config,
         *fNewBlock = true;
     }
 
-    if (!CheckBlock(config, block, state) ||
+    if (!CheckBlock(config, block, state, pindex->nHeight) ||
         !ContextualCheckBlock(config, block, state, pindex->pprev)) {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->nStatus = pindex->nStatus.withFailed();
@@ -5237,8 +5257,19 @@ bool VerifyNewBlock(const Config &config,
 
     CValidationState state;
     BlockValidationOptions validationOptions{false, true};
+    const CBlockIndex *pindexPrev = nullptr;
 
-    bool ret = CheckBlock(config, *pblock, state, validationOptions);
+    {
+        LOCK(cs_main);
+        
+        pindexPrev = FindPreviousBlockIndex(*pblock, state);
+        if (!pindexPrev)
+        {
+            return false;
+        }
+    }
+
+    bool ret = CheckBlock(config, *pblock, state, pindexPrev->nHeight + 1, validationOptions);
 
     GetMainSignals().BlockChecked(*pblock, state);
 
@@ -5267,9 +5298,21 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
         const CChainParams &chainparams = config.GetChainParams();
 
         CValidationState state;
+        const CBlockIndex *pindexPrev = nullptr;
+
+        {
+            LOCK(cs_main);
+            // We need previous block index to calculate current block height used by CheckBlock. This check is later repeated in AcceptBlockHeader
+            pindexPrev = FindPreviousBlockIndex(*pblock, state);
+            if (!pindexPrev)
+            {
+                return {};
+            }
+        }
+
         // Ensure that CheckBlock() passes before calling AcceptBlock, as
         // belt-and-suspenders.
-        bool ret = CheckBlock(config, *pblock, state);
+        bool ret = CheckBlock(config, *pblock, state, pindexPrev->nHeight + 1);
 
         LOCK(cs_main);
 
@@ -5363,7 +5406,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
         return error("%s: Consensus::ContextualCheckBlockHeader: %s", __func__,
                      FormatStateMessage(state));
     }
-    if (!CheckBlock(config, block, state, validationOptions)) {
+    if (!CheckBlock(config, block, state, indexDummy.nHeight, validationOptions)) {
         return error("%s: Consensus::CheckBlock: %s", __func__,
                      FormatStateMessage(state));
     }
@@ -5724,7 +5767,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
         }
 
         // check level 1: verify block validity
-        if (nCheckLevel >= 1 && !CheckBlock(config, block, state)) {
+        if (nCheckLevel >= 1 && !CheckBlock(config, block, state, pindex->nHeight)) {
             return error("%s: *** found bad block at %d, hash=%s (%s)\n",
                          __func__, pindex->nHeight,
                          pindex->GetBlockHash().ToString(),

@@ -79,8 +79,7 @@ uint256 hashRecentRejectsChainTip;
  */
 struct QueuedBlock {
     uint256 hash;
-    //!< Optional.
-    const CBlockIndex *pindex;
+    const CBlockIndex& blockIndex;
     //!< Whether this block has validated headers at the time of request.
     bool fValidatedHeaders;
     //!< Optional, used for CMPCTBLOCK downloads
@@ -410,7 +409,7 @@ static bool
 MarkBlockAsInFlight(const Config &config, NodeId nodeid, const uint256 &hash,
                     const Consensus::Params &consensusParams,
 					const CNodeStatePtr& state,
-                    const CBlockIndex *pindex = nullptr,
+                    const CBlockIndex& pindex,
                     std::list<QueuedBlock>::iterator **pit = nullptr) {
 
     AssertLockHeld(cs_main);
@@ -432,7 +431,7 @@ MarkBlockAsInFlight(const Config &config, NodeId nodeid, const uint256 &hash,
     assert(state);
     std::list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(
         state->vBlocksInFlight.end(),
-        {hash, pindex, pindex != nullptr,
+        {hash, pindex, true,
          std::unique_ptr<PartiallyDownloadedBlock>(
              pit ? new PartiallyDownloadedBlock(config, &mempool) : nullptr)});
     state->nBlocksInFlight++;
@@ -442,7 +441,7 @@ MarkBlockAsInFlight(const Config &config, NodeId nodeid, const uint256 &hash,
         state->nDownloadingSince = GetTimeMicros();
     }
 
-    if (state->nBlocksInFlightValidHeaders == 1 && pindex != nullptr) {
+    if (state->nBlocksInFlightValidHeaders == 1) {
         nPeersWithValidatedDownloads++;
     }
 
@@ -708,9 +707,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
                               ? state->pindexLastCommonBlock->nHeight
                               : -1;
     for (const QueuedBlock &queue : state->vBlocksInFlight) {
-        if (queue.pindex) {
-            stats.vHeightInFlight.push_back(queue.pindex->nHeight);
-        }
+        stats.vHeightInFlight.push_back(queue.blockIndex.nHeight);
     }
     return true;
 }
@@ -2550,7 +2547,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
                         pindex->GetBlockHash(),
                         chainparams.GetConsensus(),
                         nodestate,
-                        pindex);
+                        *pindex);
                     LogPrint(BCLog::NET,
                              "Requesting block %s from  peer=%d\n",
                              pindex->GetBlockHash().ToString(), pfrom->id);
@@ -2605,7 +2602,7 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
         }
 
         PartiallyDownloadedBlock &partialBlock = *it->second.second->partialBlock;
-        ReadStatus status = partialBlock.FillBlock(*pblock, resp.txn);
+        ReadStatus status = partialBlock.FillBlock(*pblock, resp.txn, it->second.second->blockIndex.nHeight);
         if(status == READ_STATUS_INVALID) {
             // Reset in-flight state in case of whitelist.
             MarkBlockAsReceived(resp.blockhash);
@@ -2805,7 +2802,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                         pindex->GetBlockHash(),
                         chainparams.GetConsensus(),
                         nodestate,
-                        pindex,
+                        *pindex,
                         &queuedBlockIt))
                 {
                     if(!(*queuedBlockIt)->partialBlock)
@@ -2870,7 +2867,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                     return true;
                 }
                 std::vector<CTransactionRef> dummy;
-                status = tempBlock.FillBlock(*pblock, dummy);
+                status = tempBlock.FillBlock(*pblock, dummy, pindex->nHeight);
                 if(status == READ_STATUS_OK) {
                     fBlockReconstructed = true;
                 }
@@ -4199,7 +4196,7 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
                 pindex->GetBlockHash(),
                 consensusParams,
                 state,
-                pindex);
+                *pindex);
             LogPrint(BCLog::NET, "Requesting block %s (%d) peer=%d\n",
                      pindex->GetBlockHash().ToString(), pindex->nHeight,
                      pto->id);

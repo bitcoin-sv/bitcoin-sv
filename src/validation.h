@@ -789,8 +789,8 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
 /** Transaction validation functions */
 
 /** Context-independent validity checks for coinbase and non-coinbase transactions */
-bool CheckRegularTransaction(const CTransaction& tx, CValidationState& state);
-bool CheckCoinbase(const CTransaction& tx, CValidationState& state);
+bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus);
+bool CheckCoinbase(const CTransaction &tx, CValidationState &state, uint64_t maxTxSigOpsCountConsensus);
 
 namespace Consensus {
 
@@ -896,7 +896,7 @@ void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData me
  * transactions are valid, block is a valid size, etc.)
  */
 bool CheckBlock(
-    const Config &Config, const CBlock &block, CValidationState &state,
+    const Config &Config, const CBlock &block, CValidationState &state, int blockHeight,
     BlockValidationOptions validationOptions = BlockValidationOptions());
 
 /**

@@ -237,7 +237,8 @@ public:
              const std::vector<std::pair<uint256, CTransactionRef>> &extra_txn);
     bool IsTxAvailable(size_t index) const;
     ReadStatus FillBlock(CBlock &block,
-                         const std::vector<CTransactionRef> &vtx_missing);
+                         const std::vector<CTransactionRef> &vtx_missing,
+                         int blockHeight);
 };
 
 #endif
