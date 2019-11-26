@@ -177,6 +177,13 @@ bool CTimeLockedMempool::exists(const uint256& id) const
     return index.find(id) != index.end();
 }
 
+// Is the given txn ID for one we held until recently?
+bool CTimeLockedMempool::recentlyRemoved(const uint256& id) const
+{
+    std::shared_lock lock { mMtx };
+    return mRecentlyRemoved.contains(id);
+}
+
 // Fetch the full entry we have for the given txn ID
 TxMempoolInfo CTimeLockedMempool::getInfo(const uint256& id) const
 {
@@ -407,6 +414,9 @@ void CTimeLockedMempool::removeNL(const CTransactionRef& txn)
     // Remove from main index
     auto& index { mTransactionMap.get<TagTxID>() };
     index.erase(txn);
+
+    // Track removal in bloom filter
+    mRecentlyRemoved.insert(txn->GetId());
 
     // Remove UTXOs locked by that transacrion
     for(const CTxIn& input : txn->vin)

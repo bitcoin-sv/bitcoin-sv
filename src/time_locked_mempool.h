@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <bloom.h>
 #include <consensus/validation.h>
 #include <primitives/transaction.h>
 #include <tx_mempool_info.h>
@@ -56,6 +57,9 @@ class CTimeLockedMempool final
 
     // Is the given txn ID for one currently held?
     bool exists(const uint256& id) const;
+
+    // Is the given txn ID for one we held until recently?
+    bool recentlyRemoved(const uint256& id) const;
 
     // Fetch the full entry we have for the given txn ID
     TxMempoolInfo getInfo(const uint256& id) const;
@@ -166,6 +170,13 @@ class CTimeLockedMempool final
     // Map of UTXOs spent by time-locked transactions
     using OutPointMap = std::map<COutPoint, CTransactionRef>;
     OutPointMap                 mUTXOMap {};
+
+    // Bloom filter for tracking recently seen txns that we have finished with and
+    // removed from the pool.
+    // Memory overhead approx 110K. If we start seeing a large number of
+    // non-final transactions used in the real world we may need to increase the
+    // size of this filter.
+    CRollingBloomFilter         mRecentlyRemoved { 10000, 0.000001 };
 
     // Our mutex
     mutable std::shared_mutex   mMtx {};
