@@ -13,10 +13,11 @@ The situation looks like this:
        6   7
 
 1. 2,3,4,5 are send for parallel validation
-2. let 5 to finish its validation and send blocks 6,7.
-   Because there are only 4 validation slots block 2 validation is terminated and
-   swapped with block 7.
-3. let block7 that should be active in the end
+2. block 5 will not be considered as there are already maxparallelblocksperpeer
+   siblings being processed
+3. send blocks 6,7. Because there are only 4 validation slots block 2 validation
+   is terminated and swapped with block 7.
+3. let through block7 that should be active in the end
 
 The log file is checked to verify termination
 """
@@ -40,7 +41,6 @@ from bsv_pbv_common import (
     wait_for_not_validating_blocks
 )
 
-
 class PBVTerminate(BitcoinTestFramework):
 
     def set_test_params(self):
@@ -48,7 +48,7 @@ class PBVTerminate(BitcoinTestFramework):
         self.num_nodes = 1
         self.chain = ChainManager()
         self.extra_args = [["-whitelist=127.0.0.1",
-                            "-maxparallelblocks=4",
+                            "-maxparallelblocks=3",
                             "-maxparallelblocksperpeer=3"]]
 
     def run_test(self):
@@ -150,8 +150,14 @@ class PBVTerminate(BitcoinTestFramework):
 
         node3.send_message(msg_block(block5))
         self.log.info(f"block5 hash: {block5.hash}")
-        self.nodes[0].waitforblockheight(102)
-        assert_equal(block5.hash, self.nodes[0].getbestblockhash())
+
+        # check log file for logging about which block validation was terminated
+        termination_log_found = False
+        for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
+            if f"Block {block2.hash} will not be considered by the current tip activation as the maximum parallel block" in line:
+                termination_log_found = True
+                self.log.info("Found line: %s", line.strip())
+                break
 
         self.log.info(f"block6 hash: {block6.hash}")
         self.nodes[0].waitaftervalidatingblock(block6.hash, "add")

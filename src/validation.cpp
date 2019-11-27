@@ -4331,15 +4331,37 @@ bool ActivateBestChain(
                 // validation
                 if(blockValidationStatus.isAncestorInValidation(*pindexMostWork))
                 {
-                    if(pblock)
-                    {
-                        LogPrintf(
-                            "Block %s will not be considered by the current"
-                            " tip activation as a different activation is"
-                            " already validating it's ancestor and moving"
-                            " towards this block.\n",
-                            pblock->GetHash().GetHex());
-                    }
+                    LogPrintf(
+                        "Block %s will not be considered by the current"
+                        " tip activation as a different activation is"
+                        " already validating it's ancestor and moving"
+                        " towards this block.\n",
+                        pindexMostWork->phashBlock->GetHex());
+
+                    break;
+                }
+
+                // make sure that we don't start validating a sibling if we
+                // have already filled up all block validation queues as that
+                // would cause blocking on wait for a idle validator - this is
+                // p2p related where we have maxParallelBlocks + 1 async worker
+                // threads and we always want to have one extra worker thread
+                // for blocks with more work that will be able to steal a
+                // validation queue from the worse blocks that are already being
+                // validated (preventing poisonous blocks from blocking all
+                // worker threads without the possibility of terminating their
+                // validation once a better block arrives)
+                if(blockValidationStatus.areNSiblingsInValidation(
+                    *pindexMostWork,
+                    config.GetMaxParallelBlocks()))
+                {
+                    LogPrintf(
+                        "Block %s will not be considered by the current"
+                        " tip activation as the maximum parallel block"
+                        " validations are already running on siblings"
+                        " - block will be re-considered if this branch is"
+                        " built upon by subsequent accepted blocks.\n",
+                        pindexMostWork->phashBlock->GetHex());
 
                     break;
                 }
@@ -4622,9 +4644,7 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
         (pindexNew->pprev
              ? std::max(pindexNew->pprev->nTimeMax, pindexNew->nTime)
              : pindexNew->nTime);
-    pindexNew->nChainWork =
-        (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) +
-        GetBlockProof(*pindexNew);
+    pindexNew->SetChainWork();
     pindexNew->RaiseValidity(BlockValidity::TREE);
     if (pindexBestHeader == nullptr ||
         pindexBestHeader->nChainWork < pindexNew->nChainWork) {
@@ -5450,6 +5470,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
     indexDummy.phashBlock = &dummyHash;
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
+    indexDummy.SetChainWork();
 
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(config, block, state, pindexPrev,
@@ -5466,7 +5487,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
                      FormatStateMessage(state));
     }
     auto source = task::CCancellationSource::Make();
-    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, pindexPrev->nChainWork, true))
+    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, indexDummy.nChainWork, true))
     {
         return false;
     }
@@ -5638,8 +5659,7 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
     for (const std::pair<int, CBlockIndex *> &item : vSortedByHeight) {
         CBlockIndex *pindex = item.second;
-        pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) +
-                             GetBlockProof(*pindex);
+        pindex->SetChainWork();
         pindex->nTimeMax =
             (pindex->pprev ? std::max(pindex->pprev->nTimeMax, pindex->nTime)
                            : pindex->nTime);
