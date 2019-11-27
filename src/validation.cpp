@@ -1116,8 +1116,7 @@ CTxnValResult TxnValidation(
     //          coin by providing OP_1 unlock script
     std::string reason;
     bool fStandard = IsStandardTx(config, tx, chainActive.Height() + 1, reason);
-    // Update txn's type.
-    pTxInputData->mTxType = fStandard ? TxType::standard : TxType::nonstandard;
+
     if (fRequireStandard && !fStandard) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                   reason);
@@ -1224,6 +1223,7 @@ CTxnValResult TxnValidation(
 
         if (!res.has_value())
         {
+            state.SetValidationTimeoutExceeded();
             state.DoS(0, false, REJECT_NONSTANDARD,
                      "too-long-validation-time",
                       false);
@@ -1349,6 +1349,7 @@ CTxnValResult TxnValidation(
 
     if (!res.has_value())
     {
+        state.SetValidationTimeoutExceeded();
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-validation-time",
                   false,
@@ -1391,6 +1392,7 @@ CTxnValResult TxnValidation(
             txdata);
     if (!res.has_value())
     {
+        state.SetValidationTimeoutExceeded();
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-validation-time",
                   false,
@@ -1424,6 +1426,7 @@ CTxnValResult TxnValidation(
                 txdata);
         if (!res.has_value())
         {
+            state.SetValidationTimeoutExceeded();
             state.DoS(0, false, REJECT_NONSTANDARD,
                      "too-long-validation-time",
                       false,
