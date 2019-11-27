@@ -928,7 +928,7 @@ std::optional<bool> EvalScript(
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        CScriptNum bn(stacktop(-1).size());
+                        CScriptNum bn(bsv::bint{stacktop(-1).size()});
                         stack.push_back(bn.getvch());
                     } break;
 
