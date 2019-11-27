@@ -927,6 +927,15 @@ std::string HelpMessage(HelpMessageMode mode) {
               " mempool (min 5ms, default: %dms)"),
             DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()));
 
+    strUsage += HelpMessageOpt(
+        "-nonstdtxnvalidationmaxduration=<n>",
+        strprintf(
+            _("Set the single non-standard transaction validation duration threshold in"
+              " milliseconds after which the non-standard transaction validation will"
+              " terminate with error and the transaction is not accepted to"
+              " mempool (min 10ms, default: %dms)"),
+            DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()));
+
     strUsage +=
         HelpMessageOpt("-maxtxsizepolicy=<n>",
             strprintf(_("Set maximum transaction size in bytes we relay and mine (default: %u, min: %u, 0 = unlimited) after Genesis is activated"),
@@ -1801,6 +1810,15 @@ bool AppInitParameterInteraction(Config &config) {
         gArgs.GetArg(
             "-stdtxnvalidationmaxduration",
             DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()),
+        &err))
+    {
+        return InitError(err);
+    }
+
+    if(std::string err; !config.SetMaxNonStdTxnValidationDuration(
+        gArgs.GetArg(
+            "-nonstdtxnvalidationmaxduration",
+            DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()),
         &err))
     {
         return InitError(err);

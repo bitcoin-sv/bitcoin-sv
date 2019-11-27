@@ -54,6 +54,7 @@ void GlobalConfig::Reset()
     maxPubKeysPerMultiSig = DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS;
 
     mMaxStdTxnValidationDuration = DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
+    mMaxNonStdTxnValidationDuration = DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -548,6 +549,30 @@ bool GlobalConfig::SetMaxStdTxnValidationDuration(int ms, std::string* err)
 std::chrono::milliseconds GlobalConfig::GetMaxStdTxnValidationDuration() const
 {
     return mMaxStdTxnValidationDuration;
+}
+
+bool GlobalConfig::SetMaxNonStdTxnValidationDuration(int ms, std::string* err)
+{
+    if(ms < 10)
+    {
+        if(err)
+        {
+            *err =
+                strprintf(
+                    _("Per transaction max validation duration must be at least 10ms"));
+        }
+
+        return false;
+    }
+
+    mMaxNonStdTxnValidationDuration = std::chrono::milliseconds{ms};
+
+    return true;
+}
+
+std::chrono::milliseconds GlobalConfig::GetMaxNonStdTxnValidationDuration() const
+{
+    return mMaxNonStdTxnValidationDuration;
 }
 
 DummyConfig::DummyConfig()

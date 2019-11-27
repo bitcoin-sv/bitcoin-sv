@@ -115,6 +115,9 @@ public:
 
     virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
+
+    virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -210,6 +213,9 @@ public:
     bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
     std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override;
 
+    bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
+    std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -262,6 +268,7 @@ private:
     uint64_t maxPubKeysPerMultiSig;
 
     std::chrono::milliseconds mMaxStdTxnValidationDuration;
+    std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
 };
 
 // Dummy for subclassing in unittests
@@ -426,6 +433,20 @@ public:
     std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override
     {
         return DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
+    }
+
+    bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override
+    {
+        if(err)
+        {
+            *err = "This is dummy config";
+        }
+
+        return false;
+    }
+    std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override
+    {
+        return DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
     }
 
 private:
