@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <bloom.h>
 #include <consensus/validation.h>
 #include <primitives/transaction.h>
 #include <tx_mempool_info.h>
@@ -57,6 +58,9 @@ class CTimeLockedMempool final
     // Is the given txn ID for one currently held?
     bool exists(const uint256& id) const;
 
+    // Is the given txn ID for one we held until recently?
+    bool recentlyRemoved(const uint256& id) const;
+
     // Fetch the full entry we have for the given txn ID
     TxMempoolInfo getInfo(const uint256& id) const;
 
@@ -74,6 +78,9 @@ class CTimeLockedMempool final
     size_t getNumTxns() const;
     // Estimate total memory usage
     size_t estimateMemoryUsage() const;
+
+    // Load or reload our config
+    void loadConfig();
 
   private:
 
@@ -160,12 +167,22 @@ class CTimeLockedMempool final
     TxnMultiIndex               mTransactionMap {};
     // Estimate of heap memory used by transactions in the TxnMultiIndex
     size_t                      mTxnMemoryUsage {0};
-    // Cached max memory target
-    size_t                      mMaxMemory {0};
 
     // Map of UTXOs spent by time-locked transactions
     using OutPointMap = std::map<COutPoint, CTransactionRef>;
     OutPointMap                 mUTXOMap {};
+
+    // Bloom filter for tracking recently seen txns that we have finished with and
+    // removed from the pool.
+    // Memory overhead approx 110K. If we start seeing a large number of
+    // non-final transactions used in the real world we may need to increase the
+    // size of this filter.
+    CRollingBloomFilter         mRecentlyRemoved { 10000, 0.000001 };
+
+    // Cached configuration values
+    size_t                      mMaxMemory {0};     // Max memory target
+    int64_t                     mPeriodRunFreq {0}; // Run frequency for periodic checks
+    int64_t                     mPurgeAge {0};      // Age at which we purge unfinalised txns
 
     // Our mutex
     mutable std::shared_mutex   mMtx {};

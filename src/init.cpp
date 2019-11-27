@@ -2084,6 +2084,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
               config.GetPerBlockScriptValidatorThreadsCount());
     InitScriptCheckQueues(config, threadGroup);
 
+    // Late configuration for globaly constructed objects
+    mempool.getNonFinalPool().loadConfig();
+
     // Start the lightweight task scheduler thread
     CScheduler::Function serviceLoop =
         boost::bind(&CScheduler::serviceQueue, &scheduler);

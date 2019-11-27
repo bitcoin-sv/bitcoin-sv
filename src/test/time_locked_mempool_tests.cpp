@@ -29,6 +29,12 @@ namespace MempoolTesting
             return mMempool.exists(txn->GetId());
         }
 
+        // Check if the specified transaction is in the recently removed list
+        bool isRecentlyRemoved(const CTransactionRef& txn)
+        {
+            return mMempool.recentlyRemoved(txn->GetId());
+        }
+
         // Check if the specified UTXO is tracked in the time-locked pool
         bool isOutpointInMempool(const COutPoint& out)
         {
@@ -116,6 +122,7 @@ BOOST_AUTO_TEST_CASE(MempoolAddTest)
 
     // A time-locked mempool to test
     CTimeLockedMempool tlMempool {};
+    tlMempool.loadConfig();
     MempoolTesting::CTimeLockedMempoolTester tester { tlMempool };
 
     // Some time locked transactions
@@ -130,6 +137,7 @@ BOOST_AUTO_TEST_CASE(MempoolAddTest)
         tlMempool.addOrUpdateTransaction({txnRef}, state);
         BOOST_CHECK(state.IsValid());
         BOOST_CHECK(tester.isInMempool(txnRef));
+        BOOST_CHECK(!tester.isRecentlyRemoved(txnRef));
         BOOST_CHECK(tester.getMemUsed() > startingMem);
 
         for(const auto& input : txnRef->vin)
@@ -156,18 +164,23 @@ BOOST_AUTO_TEST_CASE(MempoolAddTest)
     tlMempool.addOrUpdateTransaction({largeRef}, state);
     BOOST_CHECK(state.IsValid());
     BOOST_CHECK(tester.isInMempool(largeRef));
+    BOOST_CHECK(!tester.isRecentlyRemoved(largeRef));
+    CTransactionRef oldLargeRef { largeRef };
     large = CreateRandomTransaction(5000);
     largeRef = MakeTransactionRef(large);
     tlMempool.addOrUpdateTransaction({largeRef}, state);
     BOOST_CHECK(!state.IsValid());
     BOOST_CHECK(state.GetRejectCode() == REJECT_MEMPOOL_FULL);
     BOOST_CHECK(!tester.isInMempool(largeRef));
+    BOOST_CHECK(tester.isRecentlyRemoved(largeRef));
+    BOOST_CHECK(!tester.isRecentlyRemoved(oldLargeRef));
 }
 
 BOOST_AUTO_TEST_CASE(DoubleSpendTest)
 {
     // A time-locked mempool to test
     CTimeLockedMempool tlMempool {};
+    tlMempool.loadConfig();
     MempoolTesting::CTimeLockedMempoolTester tester { tlMempool };
 
     // Add some time locked transactions
@@ -198,6 +211,7 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
 {
     // The time locked pool tester
     CTimeLockedMempool tlMempool {};
+    tlMempool.loadConfig();
     MempoolTesting::CTimeLockedMempoolTester tester { tlMempool };
 
     // Build transaction to use in tests
@@ -209,6 +223,8 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
     CTransactionRef txnRef { MakeTransactionRef(original) };
     CValidationState state { NonFinalState() };
     tlMempool.addOrUpdateTransaction({txnRef}, state);
+
+    CTransactionRef lastUpdate {nullptr};
 
     // Update that decreases nSequence
     {
@@ -224,7 +240,10 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
         BOOST_CHECK_EQUAL(startingMem, tester.getMemUsed());
         BOOST_CHECK(!state.IsValid());
         BOOST_CHECK(!tester.isInMempool(updateRef));
-        BOOST_CHECK(tester.isInMempool(MakeTransactionRef(original)));
+        BOOST_CHECK(tester.isInMempool(originalRef));
+        BOOST_CHECK(!tester.isRecentlyRemoved(updateRef));
+        BOOST_CHECK(!tester.isRecentlyRemoved(originalRef));
+        lastUpdate = updateRef;
     }
 
     // Update that doesn't change nSequence
@@ -239,7 +258,10 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
         tlMempool.addOrUpdateTransaction({updateRef}, state);
         BOOST_CHECK_EQUAL(startingMem, tester.getMemUsed());
         BOOST_CHECK(!state.IsValid());
-        BOOST_CHECK(tester.isInMempool(MakeTransactionRef(original)));
+        BOOST_CHECK(tester.isInMempool(originalRef));
+        BOOST_CHECK(!tester.isRecentlyRemoved(originalRef));
+        BOOST_CHECK(!tester.isRecentlyRemoved(updateRef));
+        lastUpdate = updateRef;
     }
     
     // Update that increases nSequence
@@ -256,7 +278,10 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
         BOOST_CHECK_EQUAL(startingMem, tester.getMemUsed());
         BOOST_CHECK(state.IsValid());
         BOOST_CHECK(tester.isInMempool(updateRef));
-        BOOST_CHECK(!tester.isInMempool(MakeTransactionRef(original)));
+        BOOST_CHECK(!tester.isInMempool(originalRef));
+        BOOST_CHECK(tester.isRecentlyRemoved(originalRef));
+        BOOST_CHECK(!tester.isRecentlyRemoved(updateRef));
+        lastUpdate = updateRef;
     }
 
     // Update that finalises nSequence
@@ -274,6 +299,10 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
         BOOST_CHECK(state.IsValid());
         BOOST_CHECK(!tester.isInMempool(updateRef));
         BOOST_CHECK(!tester.isInMempool(originalRef));
+        BOOST_CHECK(tester.isRecentlyRemoved(originalRef));
+        BOOST_CHECK(tester.isRecentlyRemoved(lastUpdate));
+        BOOST_CHECK(!tester.isRecentlyRemoved(updateRef));
+        lastUpdate = updateRef;
     }
 }
  

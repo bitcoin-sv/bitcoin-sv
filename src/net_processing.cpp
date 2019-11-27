@@ -1089,6 +1089,8 @@ bool IsTxnKnown(const CInv &inv) {
         // diminishing returns with 2 onward.
         return g_connman->CheckTxnInRecentRejects(inv.hash) ||
                mempool.Exists(inv.hash) ||
+               mempool.getNonFinalPool().exists(inv.hash) ||
+               mempool.getNonFinalPool().recentlyRemoved(inv.hash) ||
                g_connman->CheckOrphanTxnExists(inv.hash) ||
                g_connman->CheckTxnExistsInValidatorsQueue(inv.hash) ||
                // It is safe to refer to pcoinsTip (without holding cs_main) as:
