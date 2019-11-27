@@ -827,7 +827,7 @@ std::optional<bool> EvalScript(
 
                     case OP_DEPTH: {
                         // -- stacksize
-                        CScriptNum bn(stack.size());
+                        const CScriptNum bn(bsv::bint{stack.size()});
                         stack.push_back(bn.getvch());
                     } break;
 
