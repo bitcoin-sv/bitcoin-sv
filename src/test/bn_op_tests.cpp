@@ -627,4 +627,49 @@ BOOST_AUTO_TEST_CASE(op_depth)
     }
 }
 
+BOOST_AUTO_TEST_CASE(op_size)
+{
+    const Config& config = GlobalConfig::GetConfig();
+
+    using polynomial = vector<int>;
+    using test_args = tuple<int64_t, polynomial>;
+    // clang-format off
+    vector<test_args> test_data = {
+        {2, {1, 1}},
+        {max64, {1, 1} },
+    };
+
+    for(const auto [n, arg_poly] : test_data)
+    {
+        const bint bn{n};
+
+        vector<uint8_t> args;
+        args.push_back(OP_PUSHDATA1);
+
+        const bint arg = polynomial_value(begin(arg_poly), end(arg_poly), bn);
+        const auto arg_serialized{arg.serialize()};
+        args.push_back(arg_serialized.size());
+        copy(begin(arg_serialized), end(arg_serialized), back_inserter(args));
+
+        args.push_back(OP_SIZE);
+
+        CScript script(args.begin(), args.end());
+
+        const auto cancellation_source{task::CCancellationSource::Make()};
+        const auto token{cancellation_source->GetToken()};
+        const auto flags{SCRIPT_GENESIS};
+        ScriptError error;
+        stack_type stack;
+        const auto status = EvalScript(config, false, token, stack, script,
+                                       flags, BaseSignatureChecker{}, &error);
+
+        BOOST_CHECK_EQUAL(true, status.value());
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+        BOOST_CHECK_EQUAL(2, stack.size());
+        const auto expected{stack[0].size()};
+        const auto actual{bsv::deserialize(begin(stack[1]), end(stack[1]))};
+        BOOST_CHECK_EQUAL(expected, actual);
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
