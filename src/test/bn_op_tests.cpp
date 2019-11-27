@@ -598,12 +598,9 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
 
 BOOST_AUTO_TEST_CASE(op_depth)
 {
-    // vector<size_t> test_data = {0, 1, 2,
-    //                            std::numeric_limits<int32_t>::max() - 2000};
-    vector<size_t> test_data = {0, 1, 20'000};
+    const Config &config = GlobalConfig::GetConfig();
 
-    const Config& config = GlobalConfig::GetConfig();
-
+    const vector<size_t> test_data = {0, 1, 20'000};
     for(const auto i : test_data)
     {
         stack_type stack;
