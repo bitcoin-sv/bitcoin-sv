@@ -122,6 +122,7 @@ BOOST_AUTO_TEST_CASE(MempoolAddTest)
 
     // A time-locked mempool to test
     CTimeLockedMempool tlMempool {};
+    tlMempool.loadConfig();
     MempoolTesting::CTimeLockedMempoolTester tester { tlMempool };
 
     // Some time locked transactions
@@ -179,6 +180,7 @@ BOOST_AUTO_TEST_CASE(DoubleSpendTest)
 {
     // A time-locked mempool to test
     CTimeLockedMempool tlMempool {};
+    tlMempool.loadConfig();
     MempoolTesting::CTimeLockedMempoolTester tester { tlMempool };
 
     // Add some time locked transactions
@@ -209,6 +211,7 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
 {
     // The time locked pool tester
     CTimeLockedMempool tlMempool {};
+    tlMempool.loadConfig();
     MempoolTesting::CTimeLockedMempoolTester tester { tlMempool };
 
     // Build transaction to use in tests

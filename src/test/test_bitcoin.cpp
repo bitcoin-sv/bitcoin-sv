@@ -62,6 +62,8 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     noui_connect();
     testConfig.Reset(); // make sure that we start every test with a clean config
     testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+
+    mempool.getNonFinalPool().loadConfig();
 }
 
 BasicTestingSetup::~BasicTestingSetup() {

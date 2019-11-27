@@ -79,6 +79,9 @@ class CTimeLockedMempool final
     // Estimate total memory usage
     size_t estimateMemoryUsage() const;
 
+    // Load or reload our config
+    void loadConfig();
+
   private:
 
     // Save file version ID
@@ -164,8 +167,6 @@ class CTimeLockedMempool final
     TxnMultiIndex               mTransactionMap {};
     // Estimate of heap memory used by transactions in the TxnMultiIndex
     size_t                      mTxnMemoryUsage {0};
-    // Cached max memory target
-    size_t                      mMaxMemory {0};
 
     // Map of UTXOs spent by time-locked transactions
     using OutPointMap = std::map<COutPoint, CTransactionRef>;
@@ -177,6 +178,11 @@ class CTimeLockedMempool final
     // non-final transactions used in the real world we may need to increase the
     // size of this filter.
     CRollingBloomFilter         mRecentlyRemoved { 10000, 0.000001 };
+
+    // Cached configuration values
+    size_t                      mMaxMemory {0};     // Max memory target
+    int64_t                     mPeriodRunFreq {0}; // Run frequency for periodic checks
+    int64_t                     mPurgeAge {0};      // Age at which we purge unfinalised txns
 
     // Our mutex
     mutable std::shared_mutex   mMtx {};

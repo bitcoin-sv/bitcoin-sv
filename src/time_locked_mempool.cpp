@@ -17,8 +17,10 @@ using namespace mining;
 
 CTimeLockedMempool::CTimeLockedMempool()
 {
-    // Get max memory size in bytes
-    mMaxMemory = gArgs.GetArg("-maxmempoolnonfinal", DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE) * 1024 * 1024;
+    // Set some sane default values for config
+    mMaxMemory = DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE * 1024 * 1024;
+    mPeriodRunFreq = DEFAULT_NONFINAL_CHECKS_FREQ;
+    mPurgeAge = DEFAULT_NONFINAL_MEMPOOL_EXPIRY * 60 * 60;
 }
 
 // Add or update a time-locked transaction
@@ -203,8 +205,7 @@ TxMempoolInfo CTimeLockedMempool::getInfo(const uint256& id) const
 // Launch periodic checks for finalised txns
 void CTimeLockedMempool::startPeriodicChecks(CScheduler& scheduler)
 {
-    auto runFreq { gArgs.GetArg("-checknonfinalfreq", DEFAULT_NONFINAL_CHECKS_FREQ) };
-    scheduler.scheduleEvery(std::bind(&CTimeLockedMempool::periodicChecks, this), runFreq);
+    scheduler.scheduleEvery(std::bind(&CTimeLockedMempool::periodicChecks, this), mPeriodRunFreq);
 }
 
 // Dump to disk
@@ -250,9 +251,6 @@ void CTimeLockedMempool::dumpMempool() const
 // Load from disk
 bool CTimeLockedMempool::loadMempool() const
 {
-    // Get expiry limit for non-final txns
-    int64_t purgeAge { gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * 60 * 60 };
-    
     try
     {
         FILE* filestr { fsbridge::fopen(GetDataDir() / "non-final-mempool.dat", "rb") };
@@ -287,7 +285,7 @@ bool CTimeLockedMempool::loadMempool() const
             file >> tx;
             file >> nTime;
 
-            if(nTime + purgeAge > nNow)
+            if(nTime + mPurgeAge > nNow)
             {
                 // Mempool Journal ChangeSet
                 CJournalChangeSetPtr changeSet {
@@ -354,6 +352,19 @@ size_t CTimeLockedMempool::estimateMemoryUsage() const
 {
     std::shared_lock lock { mMtx };
     return estimateMemoryUsageNL();
+}
+
+// Load or reload our config
+void CTimeLockedMempool::loadConfig()
+{
+    std::unique_lock lock { mMtx };
+
+    // Get max memory size in bytes
+    mMaxMemory = gArgs.GetArg("-maxmempoolnonfinal", DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE) * 1024 * 1024;
+    // Get periodic checks run frequency
+    mPeriodRunFreq = gArgs.GetArg("-checknonfinalfreq", DEFAULT_NONFINAL_CHECKS_FREQ);
+    // Get configured purge age (convert hours to seconds)
+    mPurgeAge = gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * 60 * 60;
 }
 
 // Fetch all transactions updated by the given new transaction.
@@ -524,9 +535,6 @@ size_t CTimeLockedMempool::estimateMemoryUsageNL() const
 // Do periodic checks for finalised txns and txns to purge
 void CTimeLockedMempool::periodicChecks()
 {
-    // Get configured purge age (convert hours to seconds)
-    int64_t purgeAge { gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * 60 * 60 };
-
     // Get current time
     int64_t now { GetTime() };
 
@@ -574,7 +582,7 @@ void CTimeLockedMempool::periodicChecks()
             );
         }
         // Purge age passed?
-        else if(timeInPool >= purgeAge)
+        else if(timeInPool >= mPurgeAge)
         {
             LogPrint(BCLog::MEMPOOL, "Purging expired non-final transaction: %s\n",
                 txn->GetId().ToString());
