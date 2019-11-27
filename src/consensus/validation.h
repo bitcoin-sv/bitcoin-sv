@@ -36,6 +36,7 @@ private:
     bool fDoubleSpendDetected {false};
     bool fMempoolConflictDetected {false};
     bool nonFinal {false};
+    bool fValidationTimeoutExceeded {false};
 
 public:
     bool DoS(int level, bool ret = false, unsigned int chRejectCodeIn = 0,
@@ -80,17 +81,19 @@ public:
         return false;
     }
     bool IsMissingInputs() const { return fMissingInputs; }
-    bool IsDoubleSpendDetected() { return fDoubleSpendDetected; }
-    bool IsMempoolConflictDetected() { return fMempoolConflictDetected; }
+    bool IsDoubleSpendDetected() const { return fDoubleSpendDetected; }
+    bool IsMempoolConflictDetected() const { return fMempoolConflictDetected; }
 
     bool CorruptionPossible() const { return corruptionPossible; }
     bool IsNonFinal() const { return nonFinal; }
+    bool IsValidationTimeoutExceeded() const { return fValidationTimeoutExceeded; };
 
     void SetCorruptionPossible() { corruptionPossible = true; }
     void SetMissingInputs() { fMissingInputs = true; }
     void SetDoubleSpendDetected() { fDoubleSpendDetected = true; }
     void SetMempoolConflictDetected() { fMempoolConflictDetected = true; }
     void SetNonFinal(bool nf = true) { nonFinal = nf; }
+    void SetValidationTimeoutExceeded() { fValidationTimeoutExceeded = true; };
 
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
