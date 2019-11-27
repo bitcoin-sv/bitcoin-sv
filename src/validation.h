@@ -295,8 +295,8 @@ static const unsigned int MIN_BLOCKS_TO_KEEP = 288;
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
 
-/** Default for treating transactions with P2SH in output as non-standard */
-static const bool DEFAULT_ACCEPT_P2SH = true;
+/** By default transactions with P2SH in output are rejected after Genesis */
+static const bool DEFAULT_ACCEPT_P2SH = false;
 
 // Flush modes to update on-disk chain state
 enum FlushStateMode {

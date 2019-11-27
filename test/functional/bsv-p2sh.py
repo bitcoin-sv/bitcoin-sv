@@ -148,8 +148,8 @@ class P2SH(ComparisonTestFramework):
         # we are at gensis height
         assert node.getblockcount() == self.genesisactivationheight
 
-        # P2SH transactions are not treated as standard any more and they cant enter the mempool
-        assert_raises_rpc_error(-26, "scriptpubkey",
+        # P2SH transactions are rejected and cant enter the mempool
+        assert_raises_rpc_error(-26, "bad-txns-vout-p2sh",
                                 node.sendrawtransaction, ToHex(new_P2SH_tx()))
 
         # Create new private key that would fail with the old redeem script, the same behavior as before genesis

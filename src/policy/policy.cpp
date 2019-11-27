@@ -36,11 +36,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
         return false;
     }
 
-    // P2SH will be disabled in Genesis.
-    // In preparation for genesis, node can already treat transactions with P2SH in output as non-standard.
-    if (whichType == TX_SCRIPTHASH && !config.GetAcceptP2SH()) {
-        return false;
-    } else if (whichType == TX_MULTISIG) {
+    if (whichType == TX_MULTISIG) {
         // we don't require minimal encoding here because Solver method is already checking minimal encoding
         int m = CScriptNum(vSolutions.front(), false).getint();
         int n = CScriptNum(vSolutions.back(), false).getint();

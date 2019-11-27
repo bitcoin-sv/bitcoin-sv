@@ -1074,6 +1074,24 @@ static bool DoesNonFinalSpendNonFinal(const CTransaction& txn)
     return false;
 }
 
+/**
+* Check if transaction with at least one P2SH output should be rejected. By default, such transactions are rejected after Genesis is activated.
+*/
+static bool CheckIsTransactionWithP2SHOutputAfterGenesis(const CTransaction& tx, const Config& config, int nHeight)
+{
+    if (!config.GetAcceptP2SH() && IsGenesisEnabled(config, nHeight))
+    {
+        for (const CTxOut &txout : tx.vout)
+        {
+            if (txout.scriptPubKey.IsPayToScriptHash())
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 CTxnValResult TxnValidation(
     const TxInputDataSPtr& pTxInputData,
     const Config& config,
@@ -1096,6 +1114,12 @@ CTxnValResult TxnValidation(
 
     CValidationState state;
     std::vector<COutPoint> vCoinsToUncache {};
+
+    if (CheckIsTransactionWithP2SHOutputAfterGenesis(tx, config, chainActive.Height() + 1))
+    {
+        state.DoS(0, false, REJECT_INVALID, "bad-txns-vout-p2sh");
+        return Result{state, pTxInputData};
+    }
 
     // First check against policy limits. If this check fails, then banscore will be increased. 
     // We re-test the transaction with policy rules later in this method (without banning if rules are violated)
