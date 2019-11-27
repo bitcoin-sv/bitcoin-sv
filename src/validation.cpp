@@ -3025,6 +3025,7 @@ static bool ConnectBlock(
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &view,
+    const arith_uint256& mostWorkOnChain,
     bool fJustCheck = false)
 {
     AssertLockHeld(cs_main);
@@ -3175,7 +3176,7 @@ static bool ConnectBlock(
 
     auto control =
         fScriptChecks
-        ? scriptCheckQueuePool->GetChecker(pindex->nChainWork, token, &checkPoolToken)
+        ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
         : NullScriptChecker{};
 
     std::vector<int> prevheights;
@@ -3857,7 +3858,8 @@ static bool ConnectTip(
     const std::shared_ptr<const CBlock> &pblock,
     ConnectTrace &connectTrace,
     DisconnectedBlockTransactions &disconnectpool,
-    const CJournalChangeSetPtr& changeSet)
+    const CJournalChangeSetPtr& changeSet,
+    const arith_uint256& mostWorkOnChain)
 {
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
@@ -3898,7 +3900,8 @@ static bool ConnectTip(
                 blockConnecting,
                 state,
                 pindexNew,
-                view);
+                view,
+                mostWorkOnChain);
 
         // re-enable tracing of events if it was disabled
         connectTrace.TracePoolEntryRemovedEvents(true);
@@ -4108,7 +4111,8 @@ static bool ActivateBestChainStep(
                         : std::shared_ptr<const CBlock>(),
                     connectTrace,
                     disconnectpool,
-                    changeSet))
+                    changeSet,
+                    pindexMostWork->nChainWork))
             {
                 if (state.IsInvalid()) {
                     // The block violates a consensus rule.
@@ -5462,7 +5466,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
                      FormatStateMessage(state));
     }
     auto source = task::CCancellationSource::Make();
-    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, true))
+    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, pindexPrev->nChainWork, true))
     {
         return false;
     }
@@ -5890,7 +5894,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
                     pindex->nHeight, pindex->GetBlockHash().ToString());
             }
             auto source = task::CCancellationSource::Make();
-            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins)) {
+            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins, pindex->nChainWork)) {
                 return error(
                     "VerifyDB(): *** found unconnectable block at %d, hash=%s",
                     pindex->nHeight, pindex->GetBlockHash().ToString());
