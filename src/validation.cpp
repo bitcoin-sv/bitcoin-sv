@@ -1081,10 +1081,6 @@ CTxnValResult TxnValidation(
     TxnDoubleSpendDetectorSPtr dsDetector,
     bool fReadyForFeeEstimation) {
 
-    auto source =
-        task::CTimedCancellationSource::Make(
-            config.GetMaxTransactionValidationDuration());
-
     using Result = CTxnValResult;
 
     const CTransactionRef& ptx = pTxInputData->mpTx;

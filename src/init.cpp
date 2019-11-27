@@ -919,13 +919,13 @@ std::string HelpMessage(HelpMessageMode mode) {
 
 
     strUsage += HelpMessageOpt(
-        "-txnvalidationmaxduration=<n>",
+        "-stdtxnvalidationmaxduration=<n>",
         strprintf(
-            _("Set the single transaction validation duration threshold in"
-              " milliseconds after which the transaction validation will"
+            _("Set the single standard transaction validation duration threshold in"
+              " milliseconds after which the standard transaction validation will"
               " terminate with error and the transaction is not accepted to"
-              " mempool (min 10ms, default: %dms)"),
-            DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION.count()));
+              " mempool (min 5ms, default: %dms)"),
+            DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()));
 
     strUsage +=
         HelpMessageOpt("-maxtxsizepolicy=<n>",
@@ -1797,10 +1797,10 @@ bool AppInitParameterInteraction(Config &config) {
         fPruneMode = true;
     }
 
-    if(std::string err; !config.SetMaxTransactionValidationDuration(
+    if(std::string err; !config.SetMaxStdTxnValidationDuration(
         gArgs.GetArg(
-            "-txnvalidationmaxduration",
-            DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION.count()),
+            "-stdtxnvalidationmaxduration",
+            DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()),
         &err))
     {
         return InitError(err);

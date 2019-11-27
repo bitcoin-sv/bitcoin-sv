@@ -53,7 +53,7 @@ void GlobalConfig::Reset()
     maxTxSigOpsCountPolicy = DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
     maxPubKeysPerMultiSig = DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS;
 
-    mMaxTransactionValidationDuration = DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION;
+    mMaxStdTxnValidationDuration = DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -526,28 +526,28 @@ uint64_t GlobalConfig::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus)
     return maxOpsPerScriptPolicy;
 }
 
-bool GlobalConfig::SetMaxTransactionValidationDuration(int ms, std::string* err)
+bool GlobalConfig::SetMaxStdTxnValidationDuration(int ms, std::string* err)
 {
-    if(ms < 10)
+    if(ms < 5)
     {
         if(err)
         {
             *err =
                 strprintf(
-                    _("Per transaction max validation duration must be at least 10ms"));
+                    _("Per transaction max validation duration must be at least 5ms"));
         }
 
         return false;
     }
 
-    mMaxTransactionValidationDuration = std::chrono::milliseconds{ms};
+    mMaxStdTxnValidationDuration = std::chrono::milliseconds{ms};
 
     return true;
 }
 
-std::chrono::milliseconds GlobalConfig::GetMaxTransactionValidationDuration() const
+std::chrono::milliseconds GlobalConfig::GetMaxStdTxnValidationDuration() const
 {
-    return mMaxTransactionValidationDuration;
+    return mMaxStdTxnValidationDuration;
 }
 
 DummyConfig::DummyConfig()

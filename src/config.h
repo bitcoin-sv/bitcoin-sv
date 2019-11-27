@@ -11,6 +11,7 @@
 #include "net.h"
 #include "policy/policy.h"
 #include "script/standard.h"
+#include "txn_validation_config.h"
 #include "validation.h"
 
 #include <boost/noncopyable.hpp>
@@ -112,8 +113,8 @@ public:
     virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const = 0;
 
-    virtual bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) = 0;
-    virtual std::chrono::milliseconds GetMaxTransactionValidationDuration() const = 0;
+    virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -206,8 +207,8 @@ public:
     bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* error = nullptr) override;
     uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override;
 
-    bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override;
-    std::chrono::milliseconds GetMaxTransactionValidationDuration() const override;
+    bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
+    std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override;
 
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
@@ -260,7 +261,7 @@ private:
     uint64_t maxTxSigOpsCountPolicy;
     uint64_t maxPubKeysPerMultiSig;
 
-    std::chrono::milliseconds mMaxTransactionValidationDuration;
+    std::chrono::milliseconds mMaxStdTxnValidationDuration;
 };
 
 // Dummy for subclassing in unittests
@@ -413,7 +414,7 @@ public:
         }
     }
 
-    bool SetMaxTransactionValidationDuration(int ms, std::string* err = nullptr) override
+    bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) override
     {
         if(err)
         {
@@ -422,9 +423,9 @@ public:
 
         return false;
     }
-    std::chrono::milliseconds GetMaxTransactionValidationDuration() const override
+    std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override
     {
-        return DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION;
+        return DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
     }
 
 private:
