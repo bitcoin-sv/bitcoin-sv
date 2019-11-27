@@ -12,17 +12,17 @@
 #include "script/script_flags.h"
 #include "taskcancellation.h"
 
-#include <vector>
 #include "config.h"
+#include <vector>
 
 using namespace std;
 
 using frame_type = vector<uint8_t>;
 using stack_type = vector<frame_type>;
-    
+
 using bsv::bint;
 
-constexpr auto min64{std::numeric_limits<int64_t>::min()+1};
+constexpr auto min64{std::numeric_limits<int64_t>::min() + 1};
 constexpr auto max64{std::numeric_limits<int64_t>::max()};
 
 BOOST_AUTO_TEST_SUITE(bn_op_tests)
@@ -97,15 +97,8 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
         auto source = task::CCancellationSource::Make();
         stack_type stack;
         const auto status =
-            EvalScript(
-                config,
-                true,
-                source->GetToken(),
-                stack,
-                script,
-                flags,
-                BaseSignatureChecker{},
-                &error);
+            EvalScript(config, false, source->GetToken(), stack, script, flags,
+                       BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
@@ -216,15 +209,86 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
         ScriptError error;
         auto source = task::CCancellationSource::Make();
         const auto status =
-            EvalScript(
-                config, 
-                true,
-                source->GetToken(),
-                stack,
-                script,
-                flags,
-                BaseSignatureChecker{},
-                &error);
+            EvalScript(config, true, source->GetToken(), stack, script, flags,
+                       BaseSignatureChecker{}, &error);
+        BOOST_CHECK_EQUAL(true, status.value());
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+        BOOST_CHECK_EQUAL(1, stack.size());
+        const auto frame = stack[0];
+        const auto actual =
+            frame.empty() ? bint{0}
+                          : bsv::deserialize<bint>(begin(frame), end(frame));
+        bint expected = polynomial_value(begin(exp_poly), end(exp_poly), bn);
+        BOOST_CHECK_EQUAL(expected, actual);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(bint_ternary_ops)
+{
+    const Config& config = GlobalConfig::GetConfig();
+
+    using polynomial = vector<int>;
+    using test_args = tuple<int64_t, polynomial, polynomial, polynomial,
+                            opcodetype, polynomial>;
+    vector<test_args> test_data = {
+        {0, {-1}, {0}, {2}, OP_WITHIN, {0}}, // too low
+        {0, {0}, {0}, {2}, OP_WITHIN, {1}},  // lower boundary
+        {0, {1}, {0}, {2}, OP_WITHIN, {1}},  // in-between
+        {0, {2}, {0}, {2}, OP_WITHIN, {0}},  // upper boundary
+        {0, {4}, {0}, {2}, OP_WITHIN, {0}},  // too high
+
+        {max64, {1, -1}, {1, 0}, {1, 2}, OP_WITHIN, {0}}, // too low
+        {max64, {1, 0}, {1, 0}, {1, 2}, OP_WITHIN, {1}},  // lower boundary
+        {max64, {1, 1}, {1, 0}, {1, 2}, OP_WITHIN, {1}},  // in-between
+        {max64, {1, 2}, {1, 0}, {1, 2}, OP_WITHIN, {0}},  // upper boundary
+        {max64, {1, 4}, {1, 0}, {1, 2}, OP_WITHIN, {0}},  // too high
+
+        {max64, {2, -1}, {2, 0}, {2, 2}, OP_WITHIN, {0}}, // too low
+        {max64, {2, 0}, {2, 0}, {2, 2}, OP_WITHIN, {1}},  // lower boundary
+        {max64, {2, 1}, {2, 0}, {2, 2}, OP_WITHIN, {1}},  // in-between
+        {max64, {2, 2}, {2, 0}, {2, 2}, OP_WITHIN, {0}},  // upper boundary
+        {max64, {2, 4}, {2, 0}, {2, 2}, OP_WITHIN, {0}},  // too high
+    };
+
+    for(const auto [n, arg_0_poly, arg_1_poly, arg_2_poly, op_code, exp_poly] :
+        test_data)
+    {
+        stack_type stack;
+
+        const bint bn{n};
+        vector<uint8_t> args;
+
+        args.push_back(OP_PUSHDATA1);
+        const bint arg1 =
+            polynomial_value(begin(arg_0_poly), end(arg_0_poly), bn);
+        const auto arg1_serialized{arg1.serialize()};
+        args.push_back(arg1_serialized.size());
+        copy(begin(arg1_serialized), end(arg1_serialized), back_inserter(args));
+
+        args.push_back(OP_PUSHDATA1);
+        const bint arg2 =
+            polynomial_value(begin(arg_1_poly), end(arg_1_poly), bn);
+        const auto arg2_serialized{arg2.serialize()};
+        args.push_back(arg2_serialized.size());
+        copy(begin(arg2_serialized), end(arg2_serialized), back_inserter(args));
+
+        args.push_back(OP_PUSHDATA1);
+        const bint arg3 =
+            polynomial_value(begin(arg_2_poly), end(arg_2_poly), bn);
+        const auto arg3_serialized{arg3.serialize()};
+        args.push_back(arg3_serialized.size());
+        copy(begin(arg3_serialized), end(arg3_serialized), back_inserter(args));
+
+        args.push_back(op_code);
+
+        CScript script(args.begin(), args.end());
+
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        ScriptError error;
+        auto source = task::CCancellationSource::Make();
+        const auto status =
+            EvalScript(config, true, source->GetToken(), stack, script, flags,
+                       BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
@@ -280,15 +344,8 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         ScriptError error;
         auto source = task::CCancellationSource::Make();
         const auto status =
-            EvalScript(
-                config,
-                true,
-                source->GetToken(),
-                stack,
-                script,
-                flags,
-                BaseSignatureChecker{},
-                &error);
+            EvalScript(config, true, source->GetToken(), stack, script, flags,
+                       BaseSignatureChecker{}, &error);
         if(status.value())
         {
             BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -313,8 +370,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 BOOST_AUTO_TEST_CASE(operands_too_large)
 {
     const Config& config = GlobalConfig::GetConfig();
-    using test_args =
-        tuple<int, int, opcodetype, bool, ScriptError>;
+    using test_args = tuple<int, int, opcodetype, bool, ScriptError>;
     const auto max_arg_len{500};
     // clang-format off
     vector<test_args> test_data = {
@@ -381,7 +437,8 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
     };
     // clang-format on
 
-    for(const auto [arg0_size, arg1_size, op_code, exp_status, exp_script_error] : test_data)
+    for(const auto [arg0_size, arg1_size, op_code, exp_status,
+                    exp_script_error] : test_data)
     {
         stack_type stack;
 
@@ -403,7 +460,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
         args.push_back(arg1_size & 0xff);
         args.push_back((arg1_size / 256) & 0xff);
         bsv::serialize(arg1, back_inserter(args));
-        
+
         args.push_back(op_code);
 
         CScript script(args.begin(), args.end());
@@ -412,18 +469,11 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
         ScriptError error;
         auto source = task::CCancellationSource::Make();
         const auto status =
-            EvalScript(
-                config,
-                false,
-                source->GetToken(),
-                stack,
-                script,
-                flags,
-                BaseSignatureChecker{},
-                &error);
+            EvalScript(config, false, source->GetToken(), stack, script, flags,
+                       BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_script_error, error);
-        BOOST_CHECK_EQUAL(status.value() ? 1:2, stack.size());
+        BOOST_CHECK_EQUAL(status.value() ? 1 : 2, stack.size());
     }
 }
 
@@ -461,11 +511,9 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
 
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        const auto status =
-            EvalScript(
-                config, false,
-                task::CCancellationSource::Make()->GetToken(),
-                stack, script, flags, BaseSignatureChecker{}, &error);
+        const auto status = EvalScript(
+            config, false, task::CCancellationSource::Make()->GetToken(), stack,
+            script, flags, BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
@@ -526,7 +574,7 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
         args.push_back(OP_PUSHDATA1);
         args.push_back(arg1.size());
         copy(begin(arg1), end(arg1), back_inserter(args));
-        
+
         args.push_back(OP_PUSHDATA1);
         args.push_back(arg2.size());
         copy(begin(arg2), end(arg2), back_inserter(args));
@@ -537,11 +585,9 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
 
         uint32_t flags{};
         ScriptError error;
-        const auto status =
-            EvalScript(
-                config, false,
-                task::CCancellationSource::Make()->GetToken(),
-                stack, script, flags, BaseSignatureChecker{}, &error);
+        const auto status = EvalScript(
+            config, false, task::CCancellationSource::Make()->GetToken(), stack,
+            script, flags, BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
@@ -571,8 +617,8 @@ BOOST_AUTO_TEST_CASE(op_depth)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_GENESIS};
         ScriptError error;
-        const auto status = EvalScript(config, false, token, stack, script, flags,
-                                       BaseSignatureChecker{}, &error);
+        const auto status = EvalScript(config, false, token, stack, script,
+                                       flags, BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);

@@ -1241,10 +1241,28 @@ std::optional<bool> EvalScript(
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        CScriptNum bn1(stacktop(-3), fRequireMinimal);
-                        CScriptNum bn2(stacktop(-2), fRequireMinimal);
-                        CScriptNum bn3(stacktop(-1), fRequireMinimal);
-                        bool fValue = (bn2 <= bn1 && bn1 < bn3);
+                        const auto& top_3{stacktop(-3)};
+                        const CScriptNum bn1{
+                            top_3, fRequireMinimal,
+                            utxo_after_genesis
+                                ? top_3.size()
+                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            utxo_after_genesis};
+                        const auto& top_2{stacktop(-2)};
+                        const CScriptNum bn2{
+                            top_2, fRequireMinimal,
+                            utxo_after_genesis
+                                ? top_2.size()
+                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            utxo_after_genesis};
+                        const auto& top_1{stacktop(-1)};
+                        const CScriptNum bn3{
+                            top_1, fRequireMinimal,
+                            utxo_after_genesis
+                                ? top_1.size()
+                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            utxo_after_genesis};
+                        const bool fValue = (bn2 <= bn1 && bn1 < bn3);
                         popstack(stack);
                         popstack(stack);
                         popstack(stack);
