@@ -633,7 +633,6 @@ BOOST_AUTO_TEST_CASE(op_size)
 
     using polynomial = vector<int>;
     using test_args = tuple<int64_t, polynomial>;
-    // clang-format off
     vector<test_args> test_data = {
         {2, {1, 1}},
         {max64, {1, 1} },
@@ -657,7 +656,7 @@ BOOST_AUTO_TEST_CASE(op_size)
 
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
-        const auto flags{SCRIPT_GENESIS};
+        const auto flags{0};
         ScriptError error;
         stack_type stack;
         const auto status = EvalScript(config, false, token, stack, script,
@@ -669,6 +668,45 @@ BOOST_AUTO_TEST_CASE(op_size)
         const auto expected{stack[0].size()};
         const auto actual{bsv::deserialize(begin(stack[1]), end(stack[1]))};
         BOOST_CHECK_EQUAL(expected, actual);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_pick)
+{
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<opcodetype, size_t>;
+    vector<test_args> test_data = {
+        {OP_0, 2},
+        {OP_1, 1},
+        {OP_2, 0},
+    };
+
+    for(const auto [op_code, i] : test_data)
+    {
+        vector<uint8_t> args;
+
+        args.push_back(OP_0);
+        args.push_back(OP_1);
+        args.push_back(OP_2);
+        args.push_back(op_code);
+        args.push_back(OP_PICK);
+
+        CScript script(args.begin(), args.end());
+
+        const auto cancellation_source{task::CCancellationSource::Make()};
+        const auto token{cancellation_source->GetToken()};
+        const auto flags{0};
+        ScriptError error;
+        stack_type stack;
+        const auto status = EvalScript(config, false, token, stack, script,
+                                       flags, BaseSignatureChecker{}, &error);
+
+        BOOST_CHECK_EQUAL(true, status.value());
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+        BOOST_CHECK_EQUAL(4, stack.size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[i]), end(stack[i]),
+                                      begin(stack[3]), end(stack[3]));
     }
 }
 
