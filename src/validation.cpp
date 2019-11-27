@@ -5029,17 +5029,18 @@ static const CBlockIndex* FindPreviousBlockIndex(const CBlockHeader &block, CVal
     CBlockIndex* ppindex = nullptr;
 
     BlockMap::iterator mi = mapBlockIndex.find(block.hashPrevBlock);
-    if (mi == mapBlockIndex.end())
+    if (mi != mapBlockIndex.end())
+    {
+        ppindex = (*mi).second;
+        if (ppindex->nStatus.isInvalid())
+        {
+            state.DoS(100, error("%s: prev block invalid", __func__), REJECT_INVALID, "bad-prevblk");
+            ppindex = nullptr;
+        }
+    }
+    else
     {
         state.DoS(10, error("%s: prev block not found", __func__), 0, "prev-blk-not-found");
-    }
-
-    ppindex = (*mi).second;
-
-    if (!ppindex || ppindex->nStatus.isInvalid())
-    {
-        state.DoS(100, error("%s: prev block invalid", __func__), REJECT_INVALID, "bad-prevblk");
-        ppindex = nullptr;
     }
 
     return ppindex;
