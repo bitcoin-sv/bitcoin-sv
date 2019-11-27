@@ -1056,34 +1056,55 @@ void PeerLogicValidation::BlockChecked(const CBlock &block,
 //
 // Messages
 //
-bool AlreadyHave(const CInv &inv) EXCLUSIVE_LOCKS_REQUIRED(cs_main) {
+bool AlreadyHave(const CInv &inv) {
     switch (inv.type) {
         case MSG_TX: {
-            if (chainActive.Tip()->GetBlockHash() !=
-                hashRecentRejectsChainTip) {
-                // If the chain tip has changed previously rejected transactions
-                // might be now valid, e.g. due to a nLockTime'd tx becoming
-                // valid, or a double-spend. Reset the rejects filter and give
-                // those txs a second chance.
-                hashRecentRejectsChainTip = chainActive.Tip()->GetBlockHash();
-                g_connman->ResetRecentRejects();
-            }
-
-            // Use pcoinsTip->HaveCoinInCache as a quick approximation to
-            // exclude requesting or processing some txs which have already been
-            // included in a block. As this is best effort, we only check for
-            // output 0 and 1. This works well enough in practice and we get
-            // diminishing returns with 2 onward.
-            return g_connman->CheckTxnInRecentRejects(inv.hash) ||
-                   mempool.Exists(inv.hash) ||
-                   mempool.getNonFinalPool().exists(inv.hash) ||
-                   g_connman->CheckOrphanTxnExists(inv.hash) ||
-                   g_connman->CheckTxnExistsInValidatorsQueue(inv.hash) ||
-                   pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 0)) ||
-                   pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 1));
+            return IsTxnKnown(inv);
         }
-        case MSG_BLOCK:
-            return mapBlockIndex.count(inv.hash);
+        case MSG_BLOCK: {
+            return IsBlockKnown(inv);
+        }
+    }
+    // Don't know what it is, just say we already got one
+    return true;
+}
+
+bool IsTxnKnown(const CInv &inv) {
+    if (MSG_TX == inv.type) {
+        const uint256& activeTipBlockHash {
+            chainActiveSharedData.GetChainActiveTipBlockHash()
+        };
+        if (activeTipBlockHash != hashRecentRejectsChainTip) {
+            // If the chain tip has changed previously rejected transactions
+            // might be now valid, e.g. due to a nLockTime'd tx becoming
+            // valid, or a double-spend. Reset the rejects filter and give
+            // those txs a second chance.
+            hashRecentRejectsChainTip = activeTipBlockHash;
+            g_connman->ResetRecentRejects();
+        }
+        // Use pcoinsTip->HaveCoinInCache as a quick approximation to
+        // exclude requesting or processing some txs which have already been
+        // included in a block. As this is best effort, we only check for
+        // output 0 and 1. This works well enough in practice and we get
+        // diminishing returns with 2 onward.
+        return g_connman->CheckTxnInRecentRejects(inv.hash) ||
+               mempool.Exists(inv.hash) ||
+               g_connman->CheckOrphanTxnExists(inv.hash) ||
+               g_connman->CheckTxnExistsInValidatorsQueue(inv.hash) ||
+               // It is safe to refer to pcoinsTip (without holding cs_main) as:
+               // - pcoinsTip is initialized before CConnman object is created
+               // - HaveCoinInCache is protected by an internal mtx
+               pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 0)) ||
+               pcoinsTip->HaveCoinInCache(COutPoint(inv.hash, 1));
+    }
+    // Don't know what it is, just say we already got one
+    return true;
+}
+
+bool IsBlockKnown(const CInv &inv) {
+    if (MSG_BLOCK == inv.type) {
+        LOCK(cs_main);
+        return mapBlockIndex.count(inv.hash);
     }
     // Don't know what it is, just say we already got one
     return true;
@@ -2336,10 +2357,10 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
         mapAlreadyAskedFor.erase(inv.hash);
     }
     // Enqueue txn for validation if it is not known
-    if(!AlreadyHave(inv)) {
+    if (!IsTxnKnown(inv)) {
         // Check if the given txn is standard.
         std::string sReason;
-        bool fStandard = IsStandardTx(config, tx, chainActiveHeight + 1, sReason);
+        bool fStandard = IsStandardTx(config, tx, chainActiveSharedData.GetChainActiveHeight() + 1, sReason);
         // Forward transaction to the validator thread.
         connman.EnqueueTxnForValidator(
 					std::make_shared<CTxInputData>(

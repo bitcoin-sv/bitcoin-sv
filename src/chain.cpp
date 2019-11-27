@@ -77,6 +77,27 @@ CBlockIndex *CChain::FindEarliestAtLeast(int64_t nTime) const {
     return (lower == vChain.end() ? nullptr : *lower);
 }
 
+/**
+ * class CChainActiveSharedData.
+ */
+void CChainActiveSharedData::SetChainActiveHeight(int height) {
+    mChainActiveHeight = height;
+}
+
+int CChainActiveSharedData::GetChainActiveHeight() const {
+    return mChainActiveHeight;
+}
+
+void CChainActiveSharedData::SetChainActiveTipBlockHash(uint256 blockHash) {
+    std::unique_lock lock { mMainMtx };
+    mChainActiveTipBlockHash = blockHash;
+}
+
+uint256 CChainActiveSharedData::GetChainActiveTipBlockHash() const {
+    std::shared_lock lock { mMainMtx };
+    return mChainActiveTipBlockHash;
+}
+
 /** Turn the lowest '1' bit in the binary representation of a number into a '0'.
  */
 static inline int InvertLowestOne(int n) {

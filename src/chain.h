@@ -16,6 +16,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <shared_mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -783,6 +784,26 @@ public:
      * Find the earliest block with timestamp equal or greater than the given.
      */
     CBlockIndex *FindEarliestAtLeast(int64_t nTime) const;
+};
+
+/**
+ * class CChainActiveSharedData.
+ *
+ * TODO: This class becomes redundant once CChain offers mt support.
+ * For the time being, it is needed to share activeHeight & activeTipBlockHash
+ * between different threads without a need to hold cs_main.
+ */
+class CChainActiveSharedData {
+    std::atomic_int mChainActiveHeight {};
+    uint256 mChainActiveTipBlockHash { uint256() };
+    mutable std::shared_mutex mMainMtx {};
+
+public:
+    void SetChainActiveHeight(int height);
+    int GetChainActiveHeight() const;
+
+    void SetChainActiveTipBlockHash(uint256 blockHash);
+    uint256 GetChainActiveTipBlockHash() const;
 };
 
 #endif // BITCOIN_CHAIN_H
