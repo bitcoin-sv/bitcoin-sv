@@ -278,7 +278,7 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
                     insert(
                         std::make_shared<CTxInputData>(
                                            pTxInputData->mTxSource,   // tx source
-                                           pTxInputData->mTxType,     // tx type
+                                           pTxInputData->mTxValidationPriority,     // tx validation priority
                                            pTxInputData->mpTx,        // a pointer to the tx
                                            GetTime(),                 // nAcceptTime
                                            pTxInputData->mfLimitFree, // fLimitFree

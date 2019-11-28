@@ -1115,6 +1115,11 @@ CTxnValResult TxnValidation(
     if (fStandard) {
         state.SetStandardTx();
     }
+    // Set validation timeout for txn.
+    auto source =
+        task::CTimedCancellationSource::Make(
+            pTxInputData->mTxValidationPriority == TxValidationPriority::high
+                ? config.GetMaxStdTxnValidationDuration() : config.GetMaxNonStdTxnValidationDuration());
 
     if (fRequireStandard && !fStandard) {
         state.DoS(0, false, REJECT_NONSTANDARD,
@@ -1974,7 +1979,7 @@ static void UpdateMempoolForReorg(const Config &config,
             vTxInputData.emplace_back(
                     std::make_shared<CTxInputData>(
                                         TxSource::reorg,  // tx source
-                                        TxType::unknown,  // tx type (we don't need to check it)
+                                        TxValidationPriority::normal,  // tx validation priority
                                         *it,              // a pointer to the tx
                                         GetTime(),        // nAcceptTime
                                         false));          // fLimitFree
@@ -6683,7 +6688,7 @@ bool LoadMempool(const Config &config)
                     txValidator->processValidation(
                                         std::make_shared<CTxInputData>(
                                                             TxSource::file, // tx source
-                                                            TxType::unknown,  // tx type (we don't need to check it)
+                                                            TxValidationPriority::normal,  // tx validation priority
                                                             tx,    // a pointer to the tx
                                                             nTime, // nAcceptTime
                                                             true),  // fLimitFree

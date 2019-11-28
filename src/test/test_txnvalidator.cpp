@@ -64,7 +64,7 @@ namespace {
         // Return txn's input data
         return std::make_shared<CTxInputData>(
                                    source,   // tx source
-                                   TxType::unknown, // tx type
+                                   TxValidationPriority::normal, // tx validation priority
                                    MakeTransactionRef(spend),// a pointer to the tx
                                    GetTime(),// nAcceptTime
                                    false,    // mfLimitFree
@@ -81,7 +81,7 @@ namespace {
                 emplace_back(
                         std::make_shared<CTxInputData>(
                                             source,   // tx source
-                                            TxType::unknown, // tx type
+                                            TxValidationPriority::normal, // tx validation priority
                                             MakeTransactionRef(elem),  // a pointer to the tx
                                             GetTime(),// nAcceptTime
                                             false,    // mfLimitFree

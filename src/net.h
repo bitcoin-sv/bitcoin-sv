@@ -309,7 +309,7 @@ public:
             results.emplace_back(
                 make_task(
                     mValidatorThreadPool,
-                    txn->mTxType == TxType::nonstandard ? CTask::Priority::Low : CTask::Priority::High,
+                    txn->mTxValidationPriority == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High,
                     func,
                     txn,
                     config,

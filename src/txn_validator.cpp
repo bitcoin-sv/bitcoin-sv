@@ -117,9 +117,9 @@ size_t CTxnValidator::GetTransactionsInQueueCount() const {
 void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
 
     const TxId& txid = pTxInputData->mpTx->GetId();
-    const TxType& txtype = pTxInputData->mTxType;
+    const TxValidationPriority& txpriority = pTxInputData->mTxValidationPriority;
     // Check if exists in mStdTxns
-    if (TxType::standard == txtype || TxType::unknown == txtype) {
+    if (TxValidationPriority::high == txpriority || TxValidationPriority::normal == txpriority) {
         std::unique_lock lock { mStdTxnsMtx };
         if (!isTxnKnownInSetNL(txid, mStdTxns)) {
             // Check if exists in mProcessingQueue
@@ -131,7 +131,7 @@ void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
         }
     }
     // Check if exists in mNonStdTxns
-    else if (TxType::nonstandard == txtype) {
+    else if (TxValidationPriority::low == txpriority) {
         std::unique_lock lock { mNonStdTxnsMtx };
         if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
             // Check if exists in mProcessingQueue
@@ -155,17 +155,17 @@ void CTxnValidator::newTransaction(TxInputDataSPtrVec vTxInputData) {
 /** Resubmit a transaction for reprocessing */
 void CTxnValidator::resubmitTransaction(TxInputDataSPtr pTxInputData) {
     const TxId& txid = pTxInputData->mpTx->GetId();
-    const TxType& txtype = pTxInputData->mTxType;
+    const TxValidationPriority& txpriority = pTxInputData->mTxValidationPriority;
 
     // Check if exists in mStdTxns
-    if (TxType::standard == txtype || TxType::unknown == txtype) {
+    if (TxValidationPriority::high == txpriority || TxValidationPriority::normal == txpriority) {
         std::unique_lock lock { mStdTxnsMtx };
         if(!isTxnKnownInSetNL(txid, mStdTxns)) {
             mStdTxns.emplace_back(std::move(pTxInputData));
         }
     }
     // Check if exists in mNonStdTxns
-    else if (TxType::nonstandard == txtype) {
+    else if (TxValidationPriority::low == txpriority) {
         std::unique_lock lock { mNonStdTxnsMtx };
         if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
             mNonStdTxns.emplace_back(std::move(pTxInputData));

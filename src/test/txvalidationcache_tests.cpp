@@ -34,7 +34,7 @@ namespace {
             auto pTxInputData {
                 std::make_shared<CTxInputData>(
                                     TxSource::rpc,            // tx source
-                                    TxType::unknown,          // tx type
+                                    TxValidationPriority::normal,   // tx validation priority
                                     MakeTransactionRef(tx),   // a pointer to the tx
                                     GetTime(),                // nAcceptTime
                                     false)                    // fLimitFree

@@ -69,7 +69,7 @@ namespace {
         // Return txn's input data
         return std::make_shared<CTxInputData>(
                                    source,   // tx source
-                                   TxType::unknown, // tx type
+                                   TxValidationPriority::normal, // tx validation priority
                                    MakeTransactionRef(tx),// a pointer to the tx
                                    0,        // nAcceptTime
                                    false,    // mfLimitFree
