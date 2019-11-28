@@ -583,7 +583,7 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
 
         CScript script(args.begin(), args.end());
 
-        uint32_t flags{};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         const auto status = EvalScript(
             config, false, task::CCancellationSource::Make()->GetToken(), stack,
@@ -656,7 +656,7 @@ BOOST_AUTO_TEST_CASE(op_size)
 
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
-        const auto flags{0};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         stack_type stack;
         const auto status = EvalScript(config, false, token, stack, script,
@@ -695,7 +695,7 @@ BOOST_AUTO_TEST_CASE(op_pick)
 
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
-        const auto flags{0};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         stack_type stack;
         const auto status = EvalScript(config, false, token, stack, script,
@@ -734,7 +734,7 @@ BOOST_AUTO_TEST_CASE(op_roll)
 
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
-        const auto flags{0};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         stack_type stack;
         const auto status = EvalScript(config, false, token, stack, script,
@@ -764,6 +764,52 @@ BOOST_AUTO_TEST_CASE(op_roll)
         }
         else
             BOOST_CHECK(false);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_split)
+{
+    const Config& config = GlobalConfig::GetConfig();
+
+    using data = vector<uint8_t>;
+    using test_args = tuple<size_t, opcodetype, data, data>;
+    // clang-format off
+    vector<test_args> test_data = 
+    {
+        {0, OP_0, {}, {0, 1}},
+        {1, {OP_1}, {0}, {1}},
+        {2, {OP_2}, {0, 1}, {}},
+    };
+    // clang-format on
+
+    for (const auto [i, pos, lhs, rhs] : test_data) {
+        vector<uint8_t> args;
+        args.push_back(0x2);
+        args.push_back(0x0);
+        args.push_back(0x1);
+        args.push_back(pos);
+
+        args.push_back(OP_SPLIT);
+
+        CScript script(args.begin(), args.end());
+
+        const auto cancellation_source{task::CCancellationSource::Make()};
+        const auto token{cancellation_source->GetToken()};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        ScriptError error;
+        stack_type stack;
+        const auto status = EvalScript(config, false, token, stack, script,
+                                       flags, BaseSignatureChecker{}, &error);
+
+        BOOST_CHECK_EQUAL(true, status.value());
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+        BOOST_CHECK_EQUAL(2, stack.size());
+        BOOST_CHECK_EQUAL(2 - i, stack[1].size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[1]), end(stack[1]),
+                                      begin(rhs), end(rhs));
+        BOOST_CHECK_EQUAL(i, stack[0].size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]),
+                                      begin(lhs), end(lhs));
     }
 }
 
