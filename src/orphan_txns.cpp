@@ -152,7 +152,7 @@ CompactExtraTxnsVec COrphanTxns::getCompactExtraTxns() const {
     return mExtraTxnsForCompact;
 }
 
-unsigned int COrphanTxns::limitTxnsSize(unsigned int nMaxOrphanTxnsSize,
+unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
                                           bool fSkipRndEviction) {
     unsigned int nEvicted {0};
     uint64_t nOrphanTxnsSize {0};
