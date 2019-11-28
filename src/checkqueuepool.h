@@ -188,7 +188,7 @@ public:
     ~CCheckQueuePool()
     {
         {
-            std::unique_lock lock{mIdleQueuesLock};
+            std::unique_lock lock{mQueuesLock};
 
             for(auto& checker : mRunningCheckers)
             {
@@ -199,7 +199,7 @@ public:
         while(true)
         {
             {
-                std::unique_lock lock{mIdleQueuesLock};
+                std::unique_lock lock{mQueuesLock};
                 if(mRunningCheckers.empty())
                 {
                     break;
@@ -229,7 +229,7 @@ public:
         const task::CCancellationToken& token,
         std::optional<task::CCancellationToken>* checkerPoolToken = nullptr)
     {
-        std::unique_lock lock{mIdleQueuesLock};
+        std::unique_lock lock{mQueuesLock};
 
         if(mIdleQueues.empty())
         {
@@ -286,7 +286,7 @@ public:
 private:
     void ReturnQueueToPool(CCheckQueue<T>& queue)
     {
-        std::unique_lock lock{mIdleQueuesLock};
+        std::unique_lock lock{mQueuesLock};
 
         // returned queue is supposed to be unused
         assert(queue.IsIdle());
@@ -320,7 +320,7 @@ private:
                 std::chrono::steady_clock::now();
     };
 
-    std::mutex mIdleQueuesLock;
+    std::mutex mQueuesLock;
     std::condition_variable mIdleQueuesCV;
     std::queue<CCheckQueue<T>*> mIdleQueues;
     std::vector<std::unique_ptr<CCheckQueue<T>>> mScriptCheckQueue;
