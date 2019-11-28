@@ -1112,6 +1112,9 @@ CTxnValResult TxnValidation(
     //          coin by providing OP_1 unlock script
     std::string reason;
     bool fStandard = IsStandardTx(config, tx, chainActive.Height() + 1, reason);
+    if (fStandard) {
+        state.SetStandardTx();
+    }
 
     if (fRequireStandard && !fStandard) {
         state.DoS(0, false, REJECT_NONSTANDARD,
@@ -1521,7 +1524,6 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
     const TxSource source = txStatus.mTxInputData->mTxSource;
-    const TxType type = txStatus.mTxInputData->mTxType;
     std::string sTxnStatusMsg;
     if (state.IsMissingInputs()) {
         sTxnStatusMsg = "detected orphan";
@@ -1533,7 +1535,7 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     LogPrint(BCLog::TXNVAL,
             "%s: %s txn= %s %s\n",
              enum_cast<std::string>(source),
-             enum_cast<std::string>(type),
+             state.IsStandardTx() ? "standard" : "nonstandard",
              tx.GetId().ToString(),
              sTxnStatusMsg);
 }
@@ -1549,7 +1551,6 @@ static void LogTxnCommitStatus(
     const CValidationState& state = txStatus.mState;
     const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
     const TxSource source = txStatus.mTxInputData->mTxSource;
-    const TxType type = txStatus.mTxInputData->mTxType;
     const std::string csPeerId {
         TxSource::p2p == source ? (pNode ? std::to_string(pNode->GetId()) : "-1")  : ""
     };
@@ -1571,7 +1572,7 @@ static void LogTxnCommitStatus(
     LogPrint(state.IsValid() ? BCLog::MEMPOOL : BCLog::MEMPOOLREJ,
             "%s: %s txn= %s %s (poolsz %u txn, %u kB) %s\n",
              enum_cast<std::string>(source),
-             enum_cast<std::string>(type),
+             state.IsStandardTx() ? "standard" : "nonstandard",
              tx.GetId().ToString(),
              sTxnStatusMsg,
              nMempoolSize,
