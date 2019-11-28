@@ -1061,10 +1061,10 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "reconstructions (default: %u)"),
             COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN));
     strUsage += HelpMessageOpt(
-        "-maxorphantx=<n>",
-        strprintf(_("Keep at most <n> unconnectable "
-                    "transactions in memory (default: %u)"),
-            COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+        "-maxorphantxsize=<n>",
+        strprintf(_("Keep at most <n> MB of unconnectable "
+                    "transactions in memory (default: %u MB)"),
+          COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxcollectedoutpoints=<n>",
         strprintf(_("Keep at most <n> collected "

@@ -1713,13 +1713,14 @@ static void HandleOrphanAndRejectedP2PTxns(
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
         // DoS prevention: do not allow mpOrphanTxns to grow unbounded
-        unsigned int nMaxOrphanTxns {
+        // Multiplying and dividing by ONE_MEGABYTE, because users provide value in MB, internally we use B
+        unsigned int nMaxOrphanTxnsSize {
             static_cast<unsigned int>(
-                    std::max(gArgs.GetArg("-maxorphantx",
-                                        COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS),
-                             (int64_t)0))
+                    std::max(gArgs.GetArg("-maxorphantxsize",
+                                        COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE),
+                             (int64_t)0)) * ONE_MEGABYTE
         };
-        unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsNumber(nMaxOrphanTxns);
+        unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsSize(nMaxOrphanTxnsSize);
         if (nEvicted > 0) {
             LogPrint(BCLog::MEMPOOL,
                     "%s: mapOrphan overflow, removed %u tx\n",
