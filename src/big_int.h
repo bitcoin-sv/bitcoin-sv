@@ -62,6 +62,7 @@ namespace bsv
 
         friend bool is_negative(const bint&);
 
+        friend long to_long(const bint&);
         friend std::size_t to_size_t_limited(const bint&);
 
         std::vector<uint8_t> serialize() const;
@@ -172,6 +173,7 @@ namespace bsv
     bint abs(const bint&);
     std::string to_string(const bint&);
     std::size_t to_size_t_limited(const bint&);
+    long to_long(const bint&);
 
     template <typename O>
     inline void serialize(const bint& n, O o)

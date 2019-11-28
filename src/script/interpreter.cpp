@@ -1004,8 +1004,15 @@ std::optional<bool> EvalScript(
                         }
 
                         const valtype vch1 = stacktop(-2);
-                        CScriptNum n(stacktop(-1), fRequireMinimal);
-                        if (n < 0) {
+                        const auto& top{stacktop(-1)};
+                        const CScriptNum n{
+                            top, fRequireMinimal,
+                            utxo_after_genesis
+                                ? top.size()
+                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            utxo_after_genesis};
+                        if(n < 0)
+                        {
                             return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE);
                         }
 

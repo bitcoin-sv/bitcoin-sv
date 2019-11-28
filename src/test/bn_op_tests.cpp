@@ -813,4 +813,49 @@ BOOST_AUTO_TEST_CASE(op_split)
     }
 }
 
+BOOST_AUTO_TEST_CASE(op_lshift)
+{
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<opcodetype, vector<uint8_t>>;
+    // clang-format off
+    vector<test_args> test_data = 
+    {
+        {OP_0, {0x0, 0x1}},
+        {OP_1, {0x0, 0x2}},
+        {OP_2, {0x0, 0x4}},
+        {OP_8, {0x1, 0x0}},
+        {OP_16, {0x0, 0x0}},
+    };
+    // clang-format on
+
+    for(const auto [pos, expected] : test_data)
+    {
+        vector<uint8_t> args;
+        args.push_back(0x2);
+        args.push_back(0x0);
+        args.push_back(0x1);
+        args.push_back(pos);
+
+        args.push_back(OP_LSHIFT);
+
+        CScript script(args.begin(), args.end());
+
+        const auto cancellation_source{task::CCancellationSource::Make()};
+        const auto token{cancellation_source->GetToken()};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        ScriptError error;
+        stack_type stack;
+        const auto status = EvalScript(config, false, token, stack, script,
+                                       flags, BaseSignatureChecker{}, &error);
+
+        BOOST_CHECK_EQUAL(true, status.value());
+        BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
+        BOOST_CHECK_EQUAL(1, stack.size());
+        BOOST_CHECK_EQUAL(2, stack[0].size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]),
+                                      begin(expected), end(expected));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
