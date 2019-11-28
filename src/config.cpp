@@ -60,6 +60,8 @@ void GlobalConfig::Reset()
     maxStackMemoryUsagePolicy = DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS;
     maxStackMemoryUsageConsensus = DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS;
     maxScriptSizePolicy = DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS;
+
+    maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -704,6 +706,60 @@ uint64_t GlobalConfig::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consen
     }
 
     return maxStackMemoryUsagePolicy;
+}
+
+bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err)
+{
+    if (maxScriptNumLengthIn < 0)
+    {
+        if (err)
+        {
+            *err = "Policy value for maximum script number length must not be less than 0.";
+        }
+        return false;
+    }
+
+    uint64_t maxScriptNumLengthUnsigned = static_cast<uint64_t>(maxScriptNumLengthIn);
+    if (maxScriptNumLengthUnsigned > MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+    {
+        if (err)
+        {
+            *err = "Policy value for maximum script number length must not exceed consensus limit of " + std::to_string(MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS) + ".";
+        }
+        return false;
+    }
+    else if (maxScriptNumLengthUnsigned == 0)
+    {
+        maxScriptNumLengthPolicy = MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
+    }
+    else if (maxScriptNumLengthUnsigned < MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
+    {
+        if (err)
+        {
+            *err = "Policy value for maximum script number length must not be less than " + std::to_string(MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS) + ".";
+        }
+        return false;
+    }
+    else
+    {
+        maxScriptNumLengthPolicy = maxScriptNumLengthUnsigned;
+    }
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const
+{
+    if (!isGenesisEnabled)
+    {
+        return MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS; // no changes before genesis
+    }
+
+    if (isConsensus)
+    {
+        return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // use new limit after genesis
+    }
+    return maxScriptNumLengthPolicy; // use policy
 }
 
 DummyConfig::DummyConfig()

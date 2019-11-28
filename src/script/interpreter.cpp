@@ -423,14 +423,14 @@ std::optional<bool> EvalScript(
 
     const bool genesis_rules_enabled{(flags & SCRIPT_GENESIS) != 0};
     const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
+    const uint64_t maxScriptNumLength = config.GetMaxScriptNumLength(utxo_after_genesis, consensus);
+
     if(script.size() > config.GetMaxScriptSize(utxo_after_genesis, consensus))
     {
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     }
     uint64_t nOpCount = 0;
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-    const int big_ints_byte_limit{500}; // To do: Make configurable
-                                        // MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520
 
     // if OP_RETURN is found in executed branches after genesis is activated,
     // we still have to check if the rest of the script is valid
@@ -868,9 +868,7 @@ std::optional<bool> EvalScript(
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum sn{
                             top, fRequireMinimal,
-                            utxo_after_genesis
-                                ? top.size()
-                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            maxScriptNumLength,
                             utxo_after_genesis};
                         stack.pop_back();
                         if(sn < 0 || sn >= stack.size())
@@ -997,9 +995,7 @@ std::optional<bool> EvalScript(
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum n{
                             top, fRequireMinimal,
-                            utxo_after_genesis
-                                ? top.size()
-                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            maxScriptNumLength,
                             utxo_after_genesis};
                         if(n < 0)
                         {
@@ -1023,9 +1019,7 @@ std::optional<bool> EvalScript(
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum n{
                             top, fRequireMinimal,
-                            utxo_after_genesis
-                                ? top.size()
-                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            maxScriptNumLength,
                             utxo_after_genesis};
                         if(n < 0)
                         {
@@ -1087,9 +1081,7 @@ std::optional<bool> EvalScript(
                         }
                         const auto &top{stack.stacktop(-1).GetElement()};
                         CScriptNum bn{top, fRequireMinimal,
-                                      utxo_after_genesis
-                                          ? top.size()
-                                          : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                                      maxScriptNumLength,
                                       utxo_after_genesis};
                         switch (opcode) {
                             case OP_1ADD:
@@ -1147,23 +1139,14 @@ std::optional<bool> EvalScript(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
 
-                        const auto& arg_2 = stack.stacktop(-2);
-                        if (arg_2.size() > big_ints_byte_limit)
-                            return set_error(serror, SCRIPT_ERR_INVALID_OPERAND_SIZE);
-                        
+                        const auto& arg_2 = stack.stacktop(-2);                        
                         const auto& arg_1 = stack.stacktop(-1);
-                        if (arg_1.size() > big_ints_byte_limit)
-                            return set_error(serror, SCRIPT_ERR_INVALID_OPERAND_SIZE);
 
                         CScriptNum bn1(arg_2.GetElement(), fRequireMinimal,
-                                       utxo_after_genesis
-                                           ? stack.stacktop(-2).size()
-                                           : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                                       maxScriptNumLength,
                                        utxo_after_genesis);
                         CScriptNum bn2(arg_1.GetElement(), fRequireMinimal,
-                                       utxo_after_genesis
-                                           ? stack.stacktop(-1).size()
-                                           : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                                       maxScriptNumLength,
                                        utxo_after_genesis);
                         CScriptNum bn;
                         switch (opcode) {
@@ -1258,23 +1241,17 @@ std::optional<bool> EvalScript(
                         const auto& top_3{stack.stacktop(-3).GetElement()};
                         const CScriptNum bn1{
                             top_3, fRequireMinimal,
-                            utxo_after_genesis
-                                ? top_3.size()
-                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            maxScriptNumLength,
                             utxo_after_genesis};
                         const auto& top_2{stack.stacktop(-2).GetElement()};
                         const CScriptNum bn2{
                             top_2, fRequireMinimal,
-                            utxo_after_genesis
-                                ? top_2.size()
-                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            maxScriptNumLength,
                             utxo_after_genesis};
                         const auto& top_1{stack.stacktop(-1).GetElement()};
                         const CScriptNum bn3{
                             top_1, fRequireMinimal,
-                            utxo_after_genesis
-                                ? top_1.size()
-                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            maxScriptNumLength,
                             utxo_after_genesis};
                         const bool fValue = (bn2 <= bn1 && bn1 < bn3);
                         stack.pop_back();
@@ -1389,8 +1366,10 @@ std::optional<bool> EvalScript(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
 
+                        // initialize to max size of CScriptNum::MAXIMUM_ELEMENT_SIZE (4 bytes) 
+                        // because only 4 byte integers are supported by  OP_CHECKMULTISIG / OP_CHECKMULTISIGVERIFY
                         int64_t nKeysCountSigned =
-                            CScriptNum(stack.stacktop(-i).GetElement(), fRequireMinimal).getint();
+                            CScriptNum(stack.stacktop(-i).GetElement(), fRequireMinimal, CScriptNum::MAXIMUM_ELEMENT_SIZE).getint();
                         if (nKeysCountSigned < 0) {
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
@@ -1417,7 +1396,7 @@ std::optional<bool> EvalScript(
                         }
 
                         int64_t nSigsCountSigned =
-                            CScriptNum(stack.stacktop(-i).GetElement(), fRequireMinimal).getint();
+                            CScriptNum(stack.stacktop(-i).GetElement(), fRequireMinimal, CScriptNum::MAXIMUM_ELEMENT_SIZE).getint();
 
                         if (nSigsCountSigned < 0) {
                             return set_error(serror, SCRIPT_ERR_SIG_COUNT);
@@ -1566,9 +1545,7 @@ std::optional<bool> EvalScript(
                         const auto& top{stack.stacktop(-1).GetElement()};
                         const CScriptNum n{
                             top, fRequireMinimal,
-                            utxo_after_genesis
-                                ? top.size()
-                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            maxScriptNumLength,
                             utxo_after_genesis};
                         if(n < 0 || n > data.size())
                             return set_error(serror,
@@ -1602,9 +1579,7 @@ std::optional<bool> EvalScript(
                         const auto& arg_1 = stack.stacktop(-1).GetElement();
                         const CScriptNum n{
                             arg_1, fRequireMinimal,
-                            utxo_after_genesis
-                                ? arg_1.size()
-                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            maxScriptNumLength,
                             utxo_after_genesis};
                         if(n < 0 || n > std::numeric_limits<int32_t>::max())
                             return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
@@ -1653,9 +1628,7 @@ std::optional<bool> EvalScript(
                         n.MinimallyEncode();
 
                         // The resulting number must be a valid number.
-                        if (!n.IsMinimallyEncoded(utxo_after_genesis
-                                      ? n.size()
-                                      : CScriptNum::MAXIMUM_ELEMENT_SIZE))
+                        if (!n.IsMinimallyEncoded(maxScriptNumLength))
                         {
                             return set_error(serror,
                                              SCRIPT_ERR_INVALID_NUMBER_RANGE);
