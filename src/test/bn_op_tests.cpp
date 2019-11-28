@@ -715,14 +715,13 @@ BOOST_AUTO_TEST_CASE(op_roll)
 {
     const Config& config = GlobalConfig::GetConfig();
 
-    using test_args = tuple<opcodetype, size_t, size_t, size_t>;
-    vector<test_args> test_data = {
-        {OP_0, 2, 1, 0},
-        //{OP_1, 1, 2, 0},
-        //{OP_2, 0, 2, 1},
+    vector<opcodetype> test_data{
+        OP_0,
+        OP_1,
+        OP_2,
     };
 
-    for(const auto [op_code, i, j, k] : test_data)
+    for(const auto op_code : test_data)
     {
         vector<uint8_t> args;
         args.push_back(OP_0);
@@ -754,7 +753,7 @@ BOOST_AUTO_TEST_CASE(op_roll)
         else if(op_code == OP_1)
         {
             BOOST_CHECK_EQUAL(1, stack[2][0]);
-            BOOST_CHECK_EQUAL(, stack[1][0]);
+            BOOST_CHECK_EQUAL(2, stack[1][0]);
             BOOST_CHECK(stack[0].empty());
         }
         else if(op_code == OP_2)
@@ -764,7 +763,7 @@ BOOST_AUTO_TEST_CASE(op_roll)
             BOOST_CHECK_EQUAL(1, stack[0][0]);
         }
         else
-            BOOST_FAIL();
+            BOOST_CHECK(false);
     }
 }
 
