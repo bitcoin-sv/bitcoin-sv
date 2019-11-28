@@ -48,6 +48,7 @@ def _extractConsensusValue(name):
 
 UINT32_MAX = 2**32-1
 # This constant is currently needed to evaluate some that are formulas
+ONE_KILOBYTE = 1000
 ONE_MEGABYTE = 1000000
 ONE_GIGABYTE = 1000000000
 
@@ -122,6 +123,13 @@ ELEMENT_OVERHEAD = _extractLimitedStackValue('ELEMENT_OVERHEAD')
 # Maximum script length in bytes before Genesis
 MAX_SCRIPT_SIZE_BEFORE_GENESIS = _extractConsensusValue('MAX_SCRIPT_SIZE_BEFORE_GENESIS')
 
+# Maximum length of numbers used in scripts before genesis
+MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = _extractConsensusValue('MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS')
+
+# Maximum length of numbers used in scripts after genesis
+MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = _extractConsensusValue('MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS')
+DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS  = _extractPolicyValue('DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS')
+
 if __name__ == "__main__":
     # Output values if run standalone to verify
     print("REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = %d" % REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME)
@@ -142,3 +150,7 @@ if __name__ == "__main__":
     print("ELEMENT_OVERHEAD = %d" % ELEMENT_OVERHEAD)
     print("MAX_SCRIPT_SIZE_BEFORE_GENESIS = %d" % MAX_SCRIPT_SIZE_BEFORE_GENESIS)
 
+    print("MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = %d" % MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
+    print("MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = %d" % MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
+    print("DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS = %d" % DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS)
+    
