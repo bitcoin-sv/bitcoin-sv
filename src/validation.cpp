@@ -1079,7 +1079,8 @@ CTxnValResult TxnValidation(
     const Config& config,
     CTxMemPool& pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fReadyForFeeEstimation) {
+    bool fReadyForFeeEstimation,
+    bool fUseTimedCancellationSource) {
 
     using Result = CTxnValResult;
 
@@ -1115,11 +1116,14 @@ CTxnValResult TxnValidation(
     if (fStandard) {
         state.SetStandardTx();
     }
-    // Set validation timeout for txn.
+    // Set txn validation timeout if required.
     auto source =
-        task::CTimedCancellationSource::Make(
-            pTxInputData->mTxValidationPriority == TxValidationPriority::high
-                ? config.GetMaxStdTxnValidationDuration() : config.GetMaxNonStdTxnValidationDuration());
+        fUseTimedCancellationSource ?
+            task::CTimedCancellationSource::Make(
+                (TxValidationPriority::high == pTxInputData->mTxValidationPriority ||
+                 TxValidationPriority::normal == pTxInputData->mTxValidationPriority)
+                    ? config.GetMaxStdTxnValidationDuration() : config.GetMaxNonStdTxnValidationDuration())
+            : task::CCancellationSource::Make();
 
     if (fRequireStandard && !fStandard) {
         state.DoS(0, false, REJECT_NONSTANDARD,
@@ -1482,7 +1486,8 @@ CTxnValResult TxnValidationProcessingTask(
     const Config& config,
     CTxMemPool& pool,
     CTxnHandlers& handlers,
-    bool fReadyForFeeEstimation) {
+    bool fReadyForFeeEstimation,
+    bool fUseTimedCancellationSource) {
 
     // Execute validation for the given txn
     CTxnValResult result {
@@ -1491,7 +1496,8 @@ CTxnValResult TxnValidationProcessingTask(
                 config,
                 pool,
                 handlers.mpTxnDoubleSpendDetector,
-                fReadyForFeeEstimation)
+                fReadyForFeeEstimation,
+                fUseTimedCancellationSource)
     };
     // Process validated results
     ProcessValidatedTxn(pool, result, handlers, false);

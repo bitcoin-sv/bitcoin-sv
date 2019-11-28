@@ -194,13 +194,14 @@ CValidationState CTxnValidator::processValidation(
     LOCK(cs_main);
     std::unique_lock lock { mMainMtx };
     CTxnValResult result {};
-    // Execute txn validation
+    // Execute txn validation (timed cancellation is not set).
     result = TxnValidation(
                 pTxInputData,
                 mConfig,
                 mMempool,
                 mpTxnDoubleSpendDetector,
-                IsCurrentForFeeEstimation());
+                IsCurrentForFeeEstimation(),
+                false);
     // Special handlers
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
@@ -259,13 +260,17 @@ void CTxnValidator::processValidation(
     };
     // Process a set of given txns
     do {
-        // Execute parallel validation
-        auto vCurrAcceptedTxns {
-            processNewTransactionsNL(vTxInputData, handlers, fReadyForFeeEstimation)
+        // Execute parallel validation.
+        // The result is a pair of two vectors:
+        // - the first one contains accepted (by the mempool) txns
+        // - the second one contains detected low priority txns
+        // There will be no detected non-standard txns as timed cancellation is not set.
+        auto result {
+            processNewTransactionsNL(vTxInputData, handlers, fReadyForFeeEstimation, false)
         };
         vAcceptedTxns.insert(vAcceptedTxns.end(),
-            std::make_move_iterator(vCurrAcceptedTxns.begin()),
-            std::make_move_iterator(vCurrAcceptedTxns.end()));
+            std::make_move_iterator(result.first.begin()),
+            std::make_move_iterator(result.first.end()));
         // Get dependent orphans (if any exists)
         vTxInputData = handlers.mpOrphanTxns->collectDependentTxnsForRetry();
         vTxInputDataSize = vTxInputData.size();
@@ -328,6 +333,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
             if(mRunning) {
                 // Catch an exception if it occurs
                 try {
+                    // The result is a pair of two vectors:
+                    // - the first one contains accepted (by the mempool) txns
+                    // - the second one contains detected low priority txns
+                    std::pair<TxInputDataSPtrVec, TxInputDataSPtrVec> result {};
                     {
                         // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
                         // An asynchronous interface locks mtxs in the following order:
@@ -385,12 +394,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 // Check fee estimation requirements
                                 bool fReadyForFeeEstimation = IsCurrentForFeeEstimation();
                                 // Validate txns and try to submit them to the mempool
-                                std::vector<TxInputDataSPtr> vAcceptedTxns {
+                                result =
                                     processNewTransactionsNL(
                                             mProcessingQueue,
                                             handlers,
-                                            fReadyForFeeEstimation)
-                                };
+                                            fReadyForFeeEstimation,
+                                            true);
                                 // Trim mempool if it's size exceeds the limit.
                                 std::vector<TxId> vRemovedTxIds {
                                     LimitMempoolSize(
@@ -400,13 +409,24 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                         nMempoolExpiry)
                                 };
                                 // Execute post processing steps.
-                                postProcessingStepsNL(vAcceptedTxns, vRemovedTxIds, handlers);
+                                postProcessingStepsNL(result.first, vRemovedTxIds, handlers);
                                 // After we've (potentially) uncached entries, ensure our coins cache is
                                 // still within its size limits
                                 CValidationState dummyState;
                                 FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
                             }
                         }
+                    }
+                    // If there are any low priority transactions then move them to the low priority queue.
+                    size_t nDetectedLowPriorityTxnsNum = result.second.size();
+                    if (nDetectedLowPriorityTxnsNum) {
+                        std::unique_lock lock { mNonStdTxnsMtx };
+                        mNonStdTxns.insert(mNonStdTxns.end(),
+                            std::make_move_iterator(result.second.begin()),
+                            std::make_move_iterator(result.second.end()));
+                        LogPrint(BCLog::TXNVAL,
+                                "The number of standard txns for which validation timeout occured: %d\n",
+                                 nDetectedLowPriorityTxnsNum);
                     }
                     // Clear processing queue.
                     {
@@ -442,11 +462,11 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
 /**
 * Process all new transactions.
 */
-std::vector<TxInputDataSPtr>
-CTxnValidator::processNewTransactionsNL(
+std::pair<TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
     CTxnHandlers& handlers,
-    bool fReadyForFeeEstimation) {
+    bool fReadyForFeeEstimation,
+    bool fUseTimedCancellationSource) {
 
     // Trigger parallel validation
     auto results {
@@ -456,36 +476,51 @@ CTxnValidator::processNewTransactionsNL(
                     const Config* config,
                     CTxMemPool *pool,
                     CTxnHandlers& handlers,
-                    bool fReadyForFeeEstimation) {
+                    bool fReadyForFeeEstimation,
+                    bool fUseTimedCancellationSource) {
                     return TxnValidationProcessingTask(
                                 pTxInputData,
                                *config,
                                *pool,
                                 handlers,
-                                fReadyForFeeEstimation);
+                                fReadyForFeeEstimation,
+                                fUseTimedCancellationSource);
                 },
                 &mConfig,
                 &mMempool,
                 txns,
                 handlers,
-                fReadyForFeeEstimation)
+                fReadyForFeeEstimation,
+                fUseTimedCancellationSource)
     };
-    // Process validation results
+    // All txns accepted by the mempool and not removed from there.
     std::vector<TxInputDataSPtr> vAcceptedTxns {};
+    // If there is any standard 'high' priority txn for which validation timeout occured, then
+    // change it's priority to 'low' and forward it to the low priority queue.
+    std::vector<TxInputDataSPtr> vDetectedLowPriorityTxns {};
+    // Process validation results
     for(auto& result : results) {
-        postValidationStepsNL(result.get(), vAcceptedTxns);
+        postValidationStepsNL(result.get(), vAcceptedTxns, vDetectedLowPriorityTxns);
     }
-    return vAcceptedTxns;
+    return {vAcceptedTxns, vDetectedLowPriorityTxns};
 }
 
 void CTxnValidator::postValidationStepsNL(
     const CTxnValResult& txStatus,
-    std::vector<TxInputDataSPtr>& vAcceptedTxns) const {
+    std::vector<TxInputDataSPtr>& vAcceptedTxns,
+    std::vector<TxInputDataSPtr>& vDetectedLowPriorityTxns) const {
 
     const CValidationState& state = txStatus.mState;
     if (state.IsValid()) {
         // Txns accepted by the mempool
         vAcceptedTxns.emplace_back(txStatus.mTxInputData);
+    } else if (state.IsValidationTimeoutExceeded()) {
+        // If validation timeout occured for 'high' priority txn then change it's priority to 'low'.
+        TxValidationPriority& txpriority = txStatus.mTxInputData->mTxValidationPriority;
+        if (TxValidationPriority::high == txpriority) {
+            txpriority = TxValidationPriority::low;
+            vDetectedLowPriorityTxns.emplace_back(txStatus.mTxInputData);
+        }
     }
 }
 

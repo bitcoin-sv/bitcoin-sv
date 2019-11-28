@@ -659,6 +659,7 @@ void CommitTxToMempool(
  * @param pool A reference to the mempool
  * @param dsDetector A reference to a double spend detector
  * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
+ * @param fUseTimedCancellationSource A flag to check if timed cancellation source should be used
  * @return A result of validation.
  */
 CTxnValResult TxnValidation(
@@ -666,7 +667,8 @@ CTxnValResult TxnValidation(
     const Config &config,
     CTxMemPool &pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fReadyForFeeEstimation);
+    bool fReadyForFeeEstimation,
+    bool fUseTimedCancellationSource);
 
 /**
  * Batch processing support for txns validation.
@@ -676,6 +678,7 @@ CTxnValResult TxnValidation(
  * @param pool A reference to the mempool
  * @param handlers Txn handlers
  * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
+ * @param fUseTimedCancellationSource A flag to check if timed cancellation source should be used
  * @return A vector of validation results
  */
 CTxnValResult TxnValidationProcessingTask(
@@ -683,7 +686,8 @@ CTxnValResult TxnValidationProcessingTask(
     const Config &config,
     CTxMemPool &pool,
     CTxnHandlers& handlers,
-    bool fReadyForFeeEstimation);
+    bool fReadyForFeeEstimation,
+    bool fUseTimedCancellationSource);
 
 /**
  * Process validated txn. Submit txn to the mempool if it is valid.
