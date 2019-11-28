@@ -877,13 +877,20 @@ std::optional<bool> EvalScript(
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
-                        int n =
-                            CScriptNum(stacktop(-1), fRequireMinimal).getint();
+                        const auto& top{stacktop(-1)};
+                        const CScriptNum sn{
+                            top, fRequireMinimal,
+                            utxo_after_genesis
+                                ? top.size()
+                                : CScriptNum::MAXIMUM_ELEMENT_SIZE,
+                            utxo_after_genesis};
                         popstack(stack);
-                        if (n < 0 || n >= (int)stack.size()) {
+                        if(sn < 0 || sn >= stack.size())
+                        {
                             return set_error(
                                 serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
                         }
+                        const auto n{sn.to_size_t_limited()};
                         valtype vch = stacktop(-n - 1);
                         if (opcode == OP_ROLL) {
                             stack.erase(stack.end() - n - 1);
