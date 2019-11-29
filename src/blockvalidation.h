@@ -111,6 +111,24 @@ public:
                 });
     }
 
+    bool areNSiblingsInValidation(
+        const CBlockIndex& index,
+        int thresholdNumber) const
+    {
+        std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};
+
+        int count =
+            std::count_if(
+                mCurrentlyValidatingBlocks.begin(),
+                mCurrentlyValidatingBlocks.end(),
+                [&index](const CBlockIndex* other)
+                {
+                    return index.nHeight == other->nHeight;
+                });
+
+        return count >= thresholdNumber;
+    }
+
     bool areBlocksInValidation() const
     {
         std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};

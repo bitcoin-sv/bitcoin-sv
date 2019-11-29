@@ -465,6 +465,8 @@ void UnloadBlockIndex();
  * Initialize script checking pool.
  */
 void InitScriptCheckQueues(const Config& config, boost::thread_group& threadGroup);
+//! Shutdown script checking pool.
+void ShutdownScriptCheckQueues();
 
 /**
  * Check whether we are doing an initial block download (synchronizing from disk

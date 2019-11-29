@@ -6,16 +6,20 @@
 
 #include "random.h"
 #include "reverselock.h"
+#include "util.h"
 
 #include <boost/bind.hpp>
 #include <cassert>
+#include <chrono>
+#include <thread>
 #include <utility>
 
 CScheduler::CScheduler()
     : nThreadsServicingQueue(0), stopRequested(false), stopWhenEmpty(false) {}
 
-CScheduler::~CScheduler() {
-    assert(nThreadsServicingQueue == 0);
+CScheduler::~CScheduler()
+{
+    stop();
 }
 
 #if BOOST_VERSION < 105000
@@ -28,66 +32,60 @@ toPosixTime(const boost::chrono::system_clock::time_point &t) {
 
 void CScheduler::serviceQueue() {
     boost::unique_lock<boost::mutex> lock(newTaskMutex);
-    ++nThreadsServicingQueue;
 
     // newTaskMutex is locked throughout this loop EXCEPT when the thread is
     // waiting or when the user's function is called.
     while (!shouldStop()) {
-        try {
-            if (!shouldStop() && taskQueue.empty()) {
-                reverse_lock<boost::unique_lock<boost::mutex>> rlock(lock);
-                // Use this chance to get a tiny bit more entropy
-                RandAddSeedSleep();
-            }
-            while (!shouldStop() && taskQueue.empty()) {
-                // Wait until there is something to do.
-                newTaskScheduled.wait(lock);
-            }
+        if (!shouldStop() && taskQueue.empty()) {
+            reverse_lock<boost::unique_lock<boost::mutex>> rlock(lock);
+            // Use this chance to get a tiny bit more entropy
+            RandAddSeedSleep();
+        }
+        while (!shouldStop() && taskQueue.empty()) {
+            // Wait until there is something to do.
+            newTaskScheduled.wait(lock);
+        }
 
 // Wait until either there is a new task, or until the time of the first item on
 // the queue:
 
 // wait_until needs boost 1.50 or later; older versions have timed_wait:
 #if BOOST_VERSION < 105000
-            while (!shouldStop() && !taskQueue.empty() &&
-                   newTaskScheduled.timed_wait(
-                       lock, toPosixTime(taskQueue.begin()->first))) {
-                // Keep waiting until timeout
-            }
+        while (!shouldStop() && !taskQueue.empty() &&
+               newTaskScheduled.timed_wait(
+                   lock, toPosixTime(taskQueue.begin()->first))) {
+            // Keep waiting until timeout
+        }
 #else
-            // Some boost versions have a conflicting overload of wait_until
-            // that returns void. Explicitly use a template here to avoid
-            // hitting that overload.
-            while (!shouldStop() && !taskQueue.empty()) {
-                boost::chrono::system_clock::time_point timeToWaitFor =
-                    taskQueue.begin()->first;
-                if (newTaskScheduled.wait_until<>(lock, timeToWaitFor) ==
-                    boost::cv_status::timeout) {
-                    // Exit loop after timeout, it means we reached the time of
-                    // the event
-                    break;
-                }
+        // Some boost versions have a conflicting overload of wait_until
+        // that returns void. Explicitly use a template here to avoid
+        // hitting that overload.
+        while (!shouldStop() && !taskQueue.empty()) {
+            boost::chrono::system_clock::time_point timeToWaitFor =
+                taskQueue.begin()->first;
+            if (newTaskScheduled.wait_until<>(lock, timeToWaitFor) ==
+                boost::cv_status::timeout) {
+                // Exit loop after timeout, it means we reached the time of
+                // the event
+                break;
             }
+        }
 #endif
-            // If there are multiple threads, the queue can empty while we're
-            // waiting (another thread may service the task we were waiting on).
-            if (shouldStop() || taskQueue.empty()) continue;
+        // If there are multiple threads, the queue can empty while we're
+        // waiting (another thread may service the task we were waiting on).
+        if (shouldStop() || taskQueue.empty()) continue;
 
-            Function f = taskQueue.begin()->second;
-            taskQueue.erase(taskQueue.begin());
+        Function f = taskQueue.begin()->second;
+        taskQueue.erase(taskQueue.begin());
 
-            {
-                // Unlock before calling f, so it can reschedule itself or
-                // another task without deadlocking:
-                reverse_lock<boost::unique_lock<boost::mutex>> rlock(lock);
-                f();
-            }
-        } catch (...) {
-            --nThreadsServicingQueue;
-            throw;
+        {
+            // Unlock before calling f, so it can reschedule itself or
+            // another task without deadlocking:
+            reverse_lock<boost::unique_lock<boost::mutex>> rlock(lock);
+            f();
         }
     }
-    --nThreadsServicingQueue;
+
     newTaskScheduled.notify_one();
 }
 
@@ -100,6 +98,32 @@ void CScheduler::stop(bool drain) {
             stopRequested = true;
     }
     newTaskScheduled.notify_all();
+
+    std::chrono::steady_clock::time_point begin =
+        std::chrono::steady_clock::now();
+    using namespace std::chrono_literals;
+
+    // Try to gracefully terminate running threads
+    //
+    // serviceQueue function calls were most likely terminated beforehand by
+    // boost::thread_pool interrupt_all call but we should be certain that it
+    // really exited
+    while(std::chrono::steady_clock::now() - begin < 10s)
+    {
+        if(nThreadsServicingQueue == 0)
+        {
+            break;
+        }
+
+        std::this_thread::sleep_for(100ms);
+    }
+
+    if(nThreadsServicingQueue != 0)
+    {
+        LogPrintf(
+            "WARNING: CScheduler workers did not exit within allotted time,"
+            " continuing with exit.\n");
+    }
 }
 
 void CScheduler::schedule(CScheduler::Function f,
@@ -141,4 +165,24 @@ CScheduler::getQueueInfo(boost::chrono::system_clock::time_point &first,
         last = taskQueue.rbegin()->first;
     }
     return result;
+}
+
+void CScheduler::startServiceThread(boost::thread_group& threadGroup)
+{
+    ++nThreadsServicingQueue;
+    threadGroup.create_thread(
+        [this]()
+        {
+            try
+            {
+                TraceThread("scheduler", [this]{serviceQueue();});
+            }
+            catch(...)
+            {
+                --nThreadsServicingQueue;
+                throw;
+            }
+
+            --nThreadsServicingQueue;
+        });
 }

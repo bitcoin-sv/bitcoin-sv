@@ -1012,44 +1012,43 @@ void PeerLogicValidation::BlockChecked(const CBlock &block,
     LOCK(cs_main);
 
     const uint256 hash(block.GetHash());
-    std::map<uint256, std::pair<NodeId, bool>>::iterator it =
-        mapBlockSource.find(hash);
-
-    int nDoS = 0;
-    if (state.IsInvalid(nDoS)) {
-        // Try to obtain an access to the node's state data.
-        const CNodeStateRef nodestateRef { GetState(it->second.first) };
-        const CNodeStatePtr& nodestate { nodestateRef.get() };
-        // Don't send reject message with code 0 or an internal reject code.
-        if (it != mapBlockSource.end() && nodestate &&
-            state.GetRejectCode() > 0 &&
-            state.GetRejectCode() < REJECT_INTERNAL) {
-            CBlockReject reject = {
-                uint8_t(state.GetRejectCode()),
-                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH),
-                hash};
-            nodestate->rejects.push_back(reject);
-            if (nDoS > 0 && it->second.second) {
-                Misbehaving(it->second.first, nDoS, state.GetRejectReason());
+    auto it = mapBlockSource.find(hash);
+    
+    if(it != mapBlockSource.end())
+    {
+        int nDoS = 0;
+        if (state.IsInvalid(nDoS)) {
+            // Try to obtain an access to the node's state data.
+            const CNodeStateRef nodestateRef { GetState(it->second.first) };
+            const CNodeStatePtr& nodestate { nodestateRef.get() };
+            // Don't send reject message with code 0 or an internal reject code.
+            if (it != mapBlockSource.end() && nodestate &&
+                state.GetRejectCode() > 0 &&
+                state.GetRejectCode() < REJECT_INTERNAL) {
+                CBlockReject reject = {
+                    uint8_t(state.GetRejectCode()),
+                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH),
+                    hash};
+                nodestate->rejects.push_back(reject);
+                if (nDoS > 0 && it->second.second) {
+                    Misbehaving(it->second.first, nDoS, state.GetRejectReason());
+                }
             }
         }
-    }
-    // Check that:
-    // 1. The block is valid
-    // 2. We're not in initial block download
-    // 3. This is currently the best block we're aware of. We haven't updated
-    //    the tip yet so we have no way to check this directly here. Instead we
-    //    just check that there are currently no other blocks in flight.
-    else if (state.IsValid() && !IsInitialBlockDownload() &&
-             mapBlocksInFlight.count(hash) == mapBlocksInFlight.size()) {
-        if (it != mapBlockSource.end()) {
+        // Check that:
+        // 1. The block is valid
+        // 2. We're not in initial block download
+        // 3. This is currently the best block we're aware of. We haven't updated
+        //    the tip yet so we have no way to check this directly here. Instead we
+        //    just check that there are currently no other blocks in flight.
+        else if (state.IsValid() && !IsInitialBlockDownload() &&
+                 mapBlocksInFlight.count(hash) == mapBlocksInFlight.size()) {
             MaybeSetPeerAsAnnouncingHeaderAndIDs(it->second.first, *connman);
         }
-    }
 
-    if (it != mapBlockSource.end()) {
         mapBlockSource.erase(it);
     }
+    // else block came from for e.g. RPC so we don't have the source node
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2122,6 +2121,7 @@ static bool ProcessGetBlocks(
     const CChainParams& chainparams,
     const CGetBlockMessageRequest& req)
 {
+    LOCK(cs_main);
 
     // We might have announced the currently-being-connected tip using a
     // compact block, which resulted in the peer sending a getblocks
@@ -2135,8 +2135,6 @@ static bool ProcessGetBlocks(
 
     const CBlockLocator& locator = req.GetLocator();
     const uint256& hashStop = req.GetHashStop();
-
-    LOCK(cs_main);
 
     // Find the last block the caller has in the main chain
     const CBlockIndex* pindex =

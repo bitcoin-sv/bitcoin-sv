@@ -2936,6 +2936,11 @@ void InitScriptCheckQueues(const Config& config, boost::thread_group& threadGrou
             config.GetPerBlockScriptValidationMaxBatchSize());
 }
 
+void ShutdownScriptCheckQueues()
+{
+    scriptCheckQueuePool.reset();
+}
+
 // Returns the script flags which should be checked for a given block
 static uint32_t GetBlockScriptFlags(const Config &config,
                                     const CBlockIndex *pChainTip) {
@@ -3021,6 +3026,7 @@ static bool ConnectBlock(
     CValidationState &state,
     CBlockIndex *pindex,
     CCoinsViewCache &view,
+    const arith_uint256& mostWorkOnChain,
     bool fJustCheck = false)
 {
     AssertLockHeld(cs_main);
@@ -3171,7 +3177,7 @@ static bool ConnectBlock(
 
     auto control =
         fScriptChecks
-        ? scriptCheckQueuePool->GetChecker(pindex->nChainWork, token, &checkPoolToken)
+        ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
         : NullScriptChecker{};
 
     std::vector<int> prevheights;
@@ -3853,7 +3859,8 @@ static bool ConnectTip(
     const std::shared_ptr<const CBlock> &pblock,
     ConnectTrace &connectTrace,
     DisconnectedBlockTransactions &disconnectpool,
-    const CJournalChangeSetPtr& changeSet)
+    const CJournalChangeSetPtr& changeSet,
+    const arith_uint256& mostWorkOnChain)
 {
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
@@ -3894,7 +3901,8 @@ static bool ConnectTip(
                 blockConnecting,
                 state,
                 pindexNew,
-                view);
+                view,
+                mostWorkOnChain);
 
         // re-enable tracing of events if it was disabled
         connectTrace.TracePoolEntryRemovedEvents(true);
@@ -4104,7 +4112,8 @@ static bool ActivateBestChainStep(
                         : std::shared_ptr<const CBlock>(),
                     connectTrace,
                     disconnectpool,
-                    changeSet))
+                    changeSet,
+                    pindexMostWork->nChainWork))
             {
                 if (state.IsInvalid()) {
                     // The block violates a consensus rule.
@@ -4323,15 +4332,37 @@ bool ActivateBestChain(
                 // validation
                 if(blockValidationStatus.isAncestorInValidation(*pindexMostWork))
                 {
-                    if(pblock)
-                    {
-                        LogPrintf(
-                            "Block %s will not be considered by the current"
-                            " tip activation as a different activation is"
-                            " already validating it's ancestor and moving"
-                            " towards this block.\n",
-                            pblock->GetHash().GetHex());
-                    }
+                    LogPrintf(
+                        "Block %s will not be considered by the current"
+                        " tip activation as a different activation is"
+                        " already validating it's ancestor and moving"
+                        " towards this block.\n",
+                        pindexMostWork->phashBlock->GetHex());
+
+                    break;
+                }
+
+                // make sure that we don't start validating a sibling if we
+                // have already filled up all block validation queues as that
+                // would cause blocking on wait for a idle validator - this is
+                // p2p related where we have maxParallelBlocks + 1 async worker
+                // threads and we always want to have one extra worker thread
+                // for blocks with more work that will be able to steal a
+                // validation queue from the worse blocks that are already being
+                // validated (preventing poisonous blocks from blocking all
+                // worker threads without the possibility of terminating their
+                // validation once a better block arrives)
+                if(blockValidationStatus.areNSiblingsInValidation(
+                    *pindexMostWork,
+                    config.GetMaxParallelBlocks()))
+                {
+                    LogPrintf(
+                        "Block %s will not be considered by the current"
+                        " tip activation as the maximum parallel block"
+                        " validations are already running on siblings"
+                        " - block will be re-considered if this branch is"
+                        " built upon by subsequent accepted blocks.\n",
+                        pindexMostWork->phashBlock->GetHex());
 
                     break;
                 }
@@ -4614,9 +4645,7 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
         (pindexNew->pprev
              ? std::max(pindexNew->pprev->nTimeMax, pindexNew->nTime)
              : pindexNew->nTime);
-    pindexNew->nChainWork =
-        (pindexNew->pprev ? pindexNew->pprev->nChainWork : 0) +
-        GetBlockProof(*pindexNew);
+    pindexNew->SetChainWork();
     pindexNew->RaiseValidity(BlockValidity::TREE);
     if (pindexBestHeader == nullptr ||
         pindexBestHeader->nChainWork < pindexNew->nChainWork) {
@@ -5442,6 +5471,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
     indexDummy.phashBlock = &dummyHash;
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
+    indexDummy.SetChainWork();
 
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(config, block, state, pindexPrev,
@@ -5458,7 +5488,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
                      FormatStateMessage(state));
     }
     auto source = task::CCancellationSource::Make();
-    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, true))
+    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, indexDummy.nChainWork, true))
     {
         return false;
     }
@@ -5630,8 +5660,7 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
     for (const std::pair<int, CBlockIndex *> &item : vSortedByHeight) {
         CBlockIndex *pindex = item.second;
-        pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) +
-                             GetBlockProof(*pindex);
+        pindex->SetChainWork();
         pindex->nTimeMax =
             (pindex->pprev ? std::max(pindex->pprev->nTimeMax, pindex->nTime)
                            : pindex->nTime);
@@ -5886,7 +5915,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
                     pindex->nHeight, pindex->GetBlockHash().ToString());
             }
             auto source = task::CCancellationSource::Make();
-            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins)) {
+            if (!ConnectBlock(source->GetToken(), false, config, block, state, pindex, coins, pindex->nChainWork)) {
                 return error(
                     "VerifyDB(): *** found unconnectable block at %d, hash=%s",
                     pindex->nHeight, pindex->GetBlockHash().ToString());

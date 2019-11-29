@@ -170,13 +170,16 @@ public:
 
         mScriptCheckQueue.reserve(poolSize);
 
+        constexpr auto baseThreadName{"bitcoin-scriptch_"};
         for(size_t queueNum=0; queueNum<poolSize; ++queueNum)
         {
             auto& queue =
                 mScriptCheckQueue.emplace_back(
-                    std::make_unique<CCheckQueue<T>>(batchSize));
-
-            SpawnQueueWorkerThreads(*queue, threadGroup, threadCount, queueNum);
+                    std::make_unique<CCheckQueue<T>>(
+                        batchSize,
+                        threadGroup,
+                        threadCount,
+                        baseThreadName + std::to_string(queueNum)));
 
             mIdleQueues.push(queue.get());
         }
@@ -184,13 +187,25 @@ public:
 
     ~CCheckQueuePool()
     {
-        for(auto& checker : mRunningCheckers)
         {
-            checker.mPrematureCheckerTerminationSource->Cancel();
+            std::unique_lock lock{mQueuesLock};
+
+            for(auto& checker : mRunningCheckers)
+            {
+                checker.mPrematureCheckerTerminationSource->Cancel();
+            }
         }
 
-        while(!mRunningCheckers.empty())
+        while(true)
         {
+            {
+                std::unique_lock lock{mQueuesLock};
+                if(mRunningCheckers.empty())
+                {
+                    break;
+                }
+            }
+
             using namespace std::chrono_literals;
             std::this_thread::sleep_for(100ms);
         }
@@ -214,7 +229,7 @@ public:
         const task::CCancellationToken& token,
         std::optional<task::CCancellationToken>* checkerPoolToken = nullptr)
     {
-        std::unique_lock lock{mIdleQueuesLock};
+        std::unique_lock lock{mQueuesLock};
 
         if(mIdleQueues.empty())
         {
@@ -271,7 +286,7 @@ public:
 private:
     void ReturnQueueToPool(CCheckQueue<T>& queue)
     {
-        std::unique_lock lock{mIdleQueuesLock};
+        std::unique_lock lock{mQueuesLock};
 
         // returned queue is supposed to be unused
         assert(queue.IsIdle());
@@ -296,27 +311,6 @@ private:
         mIdleQueuesCV.notify_one();
     }
 
-    void SpawnQueueWorkerThreads(
-        CCheckQueue<T>& queue,
-        boost::thread_group& threadGroup,
-        size_t threadCount,
-        size_t queueNum)
-    {
-        for(size_t workerNum=0; workerNum<threadCount; ++workerNum)
-        {
-            threadGroup.create_thread(
-                [&queue, workerNum, queueNum]()
-                {
-                    RenameThread(
-                        strprintf(
-                            "bitcoin-scriptch_%d_%d",
-                            queueNum,
-                            workerNum).c_str());
-                    queue.Thread();
-                });
-        }
-    }
-
     struct CRunningChecker
     {
         std::shared_ptr<task::CCancellationSource> mPrematureCheckerTerminationSource;
@@ -326,7 +320,7 @@ private:
                 std::chrono::steady_clock::now();
     };
 
-    std::mutex mIdleQueuesLock;
+    std::mutex mQueuesLock;
     std::condition_variable mIdleQueuesCV;
     std::queue<CCheckQueue<T>*> mIdleQueues;
     std::vector<std::unique_ptr<CCheckQueue<T>>> mScriptCheckQueue;

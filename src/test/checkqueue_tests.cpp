@@ -11,6 +11,7 @@
 #include <array>
 #include <atomic>
 #include <future>
+#include <mutex>
 #include <thread>
 
 namespace
@@ -80,10 +81,8 @@ BOOST_AUTO_TEST_CASE(check_queue_termination)
             [&running]
             {
                 running = true;
-                CCheckQueue<CDummyValidator> check{4};
-
                 boost::thread_group threadGroup;
-                threadGroup.create_thread([&check]{check.Thread();});
+                CCheckQueue<CDummyValidator> check{4, threadGroup, 1, ""};
 
                 // worker threads expect to be terminated by the interrupt signal
                 threadGroup.interrupt_all();
@@ -102,10 +101,8 @@ BOOST_AUTO_TEST_CASE(check_queue_termination)
 
 BOOST_AUTO_TEST_CASE(removal_of_threads_during_processing)
 {
-    CCheckQueue<CBlockingValidator> check{4};
-
     boost::thread_group threadGroup;
-    threadGroup.create_thread([&check]{check.Thread();});
+    CCheckQueue<CBlockingValidator> check{4, threadGroup, 1, ""};
 
     constexpr size_t checksNumber = 20;
 
@@ -140,10 +137,8 @@ BOOST_AUTO_TEST_CASE(removal_of_threads_during_processing)
 
 BOOST_AUTO_TEST_CASE(premature_validation_cancellation)
 {
-    CCheckQueue<CCancellingValidator> check{4};
-
     boost::thread_group threadGroup;
-    threadGroup.create_thread([&check]{check.Thread();});
+    CCheckQueue<CCancellingValidator> check{4, threadGroup, 1, ""};
     std::vector<CCancellingValidator> checks(20);
 
     auto source = task::CCancellationSource::Make();
@@ -192,15 +187,23 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
     auto checker3 = scriptCheckQueuePool.GetChecker(3, source->GetToken());
     auto checker4 = scriptCheckQueuePool.GetChecker(4, source->GetToken());
 
+    // we need a lock since we access checkerWorst from two threads and checker
+    // is not thread safe
+    std::mutex worstWaitSyncLock;
+
     // queue is returned to the pool only after checker goes out of scope or
     // Wait() is called on it so we need to run it on a different thread
     auto future =
         std::async(
             std::launch::async,
-            [&checkerWorst, token = std::move(worstCancellationToken.value())]
+            [
+                &worstWaitSyncLock,
+                &checkerWorst,
+                token = std::move(worstCancellationToken.value())]
             {
                 // wait until pool requests the cancellation
                 while(!token.IsCanceled());
+                std::lock_guard lock{worstWaitSyncLock};
                 BOOST_CHECK(!checkerWorst.Wait().has_value());
             });
 
@@ -208,7 +211,10 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
     // should be terminated by the pool without blocking
     auto checkerBest = scriptCheckQueuePool.GetChecker(5, source->GetToken());
 
-    BOOST_CHECK(!checkerWorst.Wait().has_value());
+    {
+        std::lock_guard lock{worstWaitSyncLock};
+        BOOST_CHECK(!checkerWorst.Wait().has_value());
+    }
     BOOST_CHECK(checker2.Wait().value());
     BOOST_CHECK(checker3.Wait().value());
     BOOST_CHECK(checker4.Wait().value());
@@ -220,21 +226,16 @@ BOOST_AUTO_TEST_CASE(premature_implicit_cancellation_and_reusing_the_worst_check
 
 BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_wait_before_session)
 {
-    boost::thread_group threadGroup;
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
     BOOST_CHECK_THROW(scriptCheckQueue.Wait(), std::runtime_error);
     scriptCheckQueue.StartCheckingSession(
         task::CCancellationSource::Make()->GetToken());
     scriptCheckQueue.Wait();
-
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 }
 
 BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_before_session)
 {
-    boost::thread_group threadGroup;
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
     std::vector check{CDummyValidator{}};
@@ -244,14 +245,10 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_before_session)
         task::CCancellationSource::Make()->GetToken());
     scriptCheckQueue.Add(check);
     scriptCheckQueue.Wait();
-
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 }
 
 BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_after_wait)
 {
-    boost::thread_group threadGroup;
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
     std::vector check{CDummyValidator{}};
@@ -262,14 +259,10 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_add_after_wait)
     check = {CDummyValidator{}};
     scriptCheckQueue.Wait();
     BOOST_CHECK_THROW(scriptCheckQueue.Add(check), std::runtime_error);
-
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 }
 
 BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_second_session_before_wait)
 {
-    boost::thread_group threadGroup;
     CCheckQueue<CDummyValidator> scriptCheckQueue{128};
 
     scriptCheckQueue.StartCheckingSession(
@@ -281,9 +274,6 @@ BOOST_AUTO_TEST_CASE(checkqueue_invalid_use__call_second_session_before_wait)
     scriptCheckQueue.Wait();
     scriptCheckQueue.StartCheckingSession(
         task::CCancellationSource::Make()->GetToken());
-
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 }
 
 BOOST_AUTO_TEST_SUITE_END()

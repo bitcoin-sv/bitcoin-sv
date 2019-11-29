@@ -386,10 +386,14 @@ bool GlobalConfig::SetMaxConcurrentAsyncTasksPerNode(
     if (maxConcurrentAsyncTasksPerNode < 1
         || maxConcurrentAsyncTasksPerNode > mMaxParallelBlocks)
     {
-        *error =
-            strprintf(
-            _("Max parallel tasks per node count must be at least 1 and at most"
-                " maxParallelBlocks"));
+        if(error)
+        {
+            *error =
+                strprintf(
+                _("Max parallel tasks per node count must be at least 1 and at most"
+                    " maxParallelBlocks"));
+        }
+
         return false;
     }
 
@@ -413,10 +417,14 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
         constexpr int max = 100;
         if (maxParallelBlocks < 1 || maxParallelBlocks > max)
         {
-            *error =
-                strprintf(
-                _("Max parallel blocks count must be at least 1 and at most %d"),
-                max);
+            if(error)
+            {
+                *error =
+                    strprintf(
+                    _("Max parallel blocks count must be at least 1 and at most %d"),
+                    max);
+            }
+
             return false;
         }
 
@@ -438,10 +446,14 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
         else if (perValidatorThreadsCount < 0
             || perValidatorThreadsCount > MAX_SCRIPTCHECK_THREADS)
         {
-            *error =
-                strprintf(
-                    _("Per block script validation threads count must be at "
-                      "least 0 and at most %d"), MAX_SCRIPTCHECK_THREADS);
+            if(error)
+            {
+                *error =
+                    strprintf(
+                        _("Per block script validation threads count must be at "
+                          "least 0 and at most %d"), MAX_SCRIPTCHECK_THREADS);
+            }
+
             return false;
         }
 
@@ -452,11 +464,15 @@ bool GlobalConfig::SetBlockScriptValidatorsParams(
         if (perValidatorThreadMaxBatchSize < 1
             || perValidatorThreadMaxBatchSize > std::numeric_limits<uint8_t>::max())
         {
-            *error =
-                strprintf(
-                    _("Per block script validation max batch size must be at "
-                      "least 1 and at most %d"),
-                    std::numeric_limits<uint8_t>::max());
+            if(error)
+            {
+                *error =
+                    strprintf(
+                        _("Per block script validation max batch size must be at "
+                          "least 1 and at most %d"),
+                        std::numeric_limits<uint8_t>::max());
+            }
+
             return false;
         }
         mPerBlockScriptValidationMaxBatchSize = perValidatorThreadMaxBatchSize;

@@ -286,6 +286,8 @@ struct CDiskBlockMetaData
     }
 };
 
+arith_uint256 GetBlockProof(const CBlockIndex &block);
+
 /**
  * The block chain is a tree shaped structure starting with the genesis block at
  * the root, with each block potentially having multiple candidates to be the
@@ -463,6 +465,13 @@ public:
         }
     }
 
+    void SetChainWork()
+    {
+        nChainWork =
+            (pprev ? pprev->nChainWork : 0) +
+            GetBlockProof(*this);
+    }
+
     void ClearFileInfo()
     {
         nStatus =
@@ -607,8 +616,6 @@ struct BlockHasher {
 
 typedef std::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
 extern BlockMap mapBlockIndex;
-
-arith_uint256 GetBlockProof(const CBlockIndex &block);
 
 /**
  * Return the time it would take to redo the work difference between from and

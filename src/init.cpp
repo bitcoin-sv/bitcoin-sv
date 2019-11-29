@@ -211,6 +211,8 @@ void Shutdown() {
 
     mining::g_miningFactory.reset();
 
+    ShutdownScriptCheckQueues();
+
     if (g_connman) {
         // call Stop first as CConnman members are using g_connman global
         // variable and they must be shut down before the variable is reset to
@@ -2088,10 +2090,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     mempool.getNonFinalPool().loadConfig();
 
     // Start the lightweight task scheduler thread
-    CScheduler::Function serviceLoop =
-        boost::bind(&CScheduler::serviceQueue, &scheduler);
-    threadGroup.create_thread(boost::bind(&TraceThread<CScheduler::Function>,
-                                          "scheduler", serviceLoop));
+    scheduler.startServiceThread(threadGroup);
 
     /* Start the RPC server already.  It will be started in "warmup" mode
      * and not really process calls already (but it will signify connections
@@ -2573,7 +2572,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 
     threadGroup.create_thread(
-        boost::bind(&ThreadImport, std::ref(config), vImportFiles));
+        [&config, vImportFiles]
+        {
+            TraceThread(
+                "import_files",
+                [&config, &vImportFiles]{ThreadImport(config, vImportFiles);});
+        });
 
     // Wait for genesis block to be processed
     {
