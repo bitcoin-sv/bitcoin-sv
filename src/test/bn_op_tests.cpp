@@ -104,8 +104,8 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
         BOOST_CHECK_EQUAL(1, stack.size());
         const auto frame = stack.front();
         const auto actual =
-            frame.empty() ? bint{0}
-                          : bsv::deserialize<bint>(begin(frame), end(frame));
+            frame.empty() ? bint{0} 
+                          : bsv::bint::deserialize(frame.GetElement());
         const bint expected =
             polynomial_value(begin(exp_poly), end(exp_poly), bn);
         BOOST_CHECK_EQUAL(expected, actual);
@@ -217,7 +217,7 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
         const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
-                          : bsv::deserialize<bint>(begin(frame), end(frame));
+                          : bsv::bint::deserialize(frame.GetElement());
         bint expected = polynomial_value(begin(exp_poly), end(exp_poly), bn);
         BOOST_CHECK_EQUAL(expected, actual);
     }
@@ -295,7 +295,7 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
         const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
-                          : bsv::deserialize<bint>(begin(frame), end(frame));
+                          : bsv::bint::deserialize(frame.GetElement());
         bint expected = polynomial_value(begin(exp_poly), end(exp_poly), bn);
         BOOST_CHECK_EQUAL(expected, actual);
     }
@@ -359,7 +359,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
             auto actual =
                 frame.empty()
                     ? bint{0}
-                    : bsv::deserialize<bint>(begin(frame), end(frame));
+                    : bsv::bint::deserialize(frame.GetElement());
             bint expected =
                 polynomial_value(begin(exp_poly), end(exp_poly), bn);
             BOOST_CHECK_EQUAL(expected, actual);
