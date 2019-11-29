@@ -1714,11 +1714,11 @@ static void HandleOrphanAndRejectedP2PTxns(
         }
         // DoS prevention: do not allow mpOrphanTxns to grow unbounded
         // Multiplying and dividing by ONE_MEGABYTE, because users provide value in MB, internally we use B
-        unsigned int nMaxOrphanTxnsSize {
-            static_cast<unsigned int>(
+        uint64_t nMaxOrphanTxnsSize {
+            static_cast<uint64_t>(
                     std::max(gArgs.GetArg("-maxorphantxsize",
                                         COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE),
-                             (int64_t)0)) * ONE_MEGABYTE
+                             (int64_t)0) * ONE_MEGABYTE)
         };
         unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsSize(nMaxOrphanTxnsSize);
         if (nEvicted > 0) {
