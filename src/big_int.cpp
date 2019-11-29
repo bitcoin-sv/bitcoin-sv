@@ -25,6 +25,7 @@ bsv::bint::bint() : value_{nullptr} {}
 
 bsv::bint::bint(const int i) : value_(BN_new(), empty_bn_deleter())
 {
+    static_assert(sizeof(int) < sizeof(long));
     assert(value_);
 
     if(i < 0)
