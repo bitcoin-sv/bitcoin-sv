@@ -260,7 +260,12 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
     }
 
     // Check sig ops count
-    uint64_t maxBlockSigOps { GetMaxBlockSigOpsCount(blockSizeWithTx) };
+    uint64_t maxBlockSigOps = mConfig.GetMaxBlockSigOps(false, false, blockSizeWithTx);
+    if (pindex)
+    {
+        maxBlockSigOps = mConfig.GetMaxBlockSigOps(IsGenesisEnabled(mConfig, pindex->nHeight + 1), false, blockSizeWithTx);
+    }
+
     uint64_t txnSigOps { static_cast<uint64_t>(entry.getSigOpsCount()) };
     uint64_t blockSigOpsWithTx { mBlockSigOps + txnSigOps };
     if(blockSigOpsWithTx >= maxBlockSigOps)

@@ -360,6 +360,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     const Amount HIGHFEE = COIN;
     const Amount HIGHERFEE = 4 * COIN;
 
+    
     // block sigops > limit: 1000 CHECKMULTISIG + 1
     tx.vin.resize(1);
     // NOTE: OP_NOP is used to force 20 SigOps for the CHECKMULTISIG
@@ -383,6 +384,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
                              nullChangeSet);
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
+    config.SetGenesisActivationHeight(500);
+    configJournal.SetGenesisActivationHeight(500);
     config.SetTestBlockCandidateValidity(false);
     configJournal.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));

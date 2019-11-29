@@ -2,6 +2,7 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "key.h"
@@ -357,23 +358,38 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
     
 }
 
-BOOST_AUTO_TEST_CASE(test_consensus_sigops_limit) {
-    BOOST_CHECK_EQUAL(GetMaxBlockSigOpsCount(1), MAX_BLOCK_SIGOPS_PER_MB);
-    BOOST_CHECK_EQUAL(GetMaxBlockSigOpsCount(123456), MAX_BLOCK_SIGOPS_PER_MB);
-    BOOST_CHECK_EQUAL(GetMaxBlockSigOpsCount(1000000), MAX_BLOCK_SIGOPS_PER_MB);
-    BOOST_CHECK_EQUAL(GetMaxBlockSigOpsCount(1000001),
-                      2 * MAX_BLOCK_SIGOPS_PER_MB);
-    BOOST_CHECK_EQUAL(GetMaxBlockSigOpsCount(1348592),
-                      2 * MAX_BLOCK_SIGOPS_PER_MB);
-    BOOST_CHECK_EQUAL(GetMaxBlockSigOpsCount(2000000),
-                      2 * MAX_BLOCK_SIGOPS_PER_MB);
-    BOOST_CHECK_EQUAL(GetMaxBlockSigOpsCount(2000001),
-                      3 * MAX_BLOCK_SIGOPS_PER_MB);
-    BOOST_CHECK_EQUAL(GetMaxBlockSigOpsCount(2654321),
-                      3 * MAX_BLOCK_SIGOPS_PER_MB);
-    BOOST_CHECK_EQUAL(
-        GetMaxBlockSigOpsCount(std::numeric_limits<uint32_t>::max()),
-        4295 * MAX_BLOCK_SIGOPS_PER_MB);
+BOOST_AUTO_TEST_CASE(test_sigops_limits) {
+    Config& config = GlobalConfig::GetConfig();
+    std::string error;
+    config.SetMaxBlockSigOpsPerMB(3 * MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS);
+    uint64_t expected_res = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
+
+    for (bool gen : {false, true}) {
+        for (bool cons : {true, false}) {
+            if (!gen && !cons) 
+                expected_res = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
+            if (gen && !cons)
+                expected_res = 3 * MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
+            else if (gen && cons)
+                expected_res = MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS;
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1), expected_res);
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 123456), expected_res);
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1000000), expected_res);
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1000001), 2 * expected_res);
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1348592), 2 * expected_res);
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2000000), 2 * expected_res);
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2000001), 3 * expected_res);
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2654321), 3 * expected_res);
+            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, std::numeric_limits<uint32_t>::max()), 4295 * expected_res);
+            
+        }
+    }
+
+    config.SetMaxBlockSigOpsPerMB(3 * MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS, &error);
+    std::string ref = _("Policy value for maxBlockSigOpsPerMB must not exceed consensus limit of ") + std::to_string(MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS);
+    // the error is not thrown, needs to be handled elsewhere
+    BOOST_CHECK_EQUAL(error,ref);
+
 }
 void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64_t maxTxSize)
 {
