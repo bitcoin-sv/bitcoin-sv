@@ -3990,6 +3990,13 @@ static bool ConnectTip(
              (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
 
     connectTrace.BlockConnected(pindexNew, std::move(pthisBlock));
+
+    if ((IsGenesisEnabled(config, pindexNew->nHeight + 1)) &&
+        (!IsGenesisEnabled(config, pindexNew->nHeight)))
+    {
+        mempool.Clear();
+    }
+
     return true;
 }
 
