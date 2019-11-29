@@ -287,18 +287,21 @@ public:
             CTxMemPool *pool,
             TxInputDataSPtrVec& vNewTxns,
             CTxnHandlers& handlers,
-            bool fReadyForFeeEstimation)
+            bool fReadyForFeeEstimation,
+            bool fUseTimedCancellationSource)
         -> std::vector<std::future<typename std::result_of<
             Callable(const TxInputDataSPtr&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
+                bool,
                 bool)>::type>> {
         using resultType = typename std::result_of<
             Callable(const TxInputDataSPtr&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
+                bool,
                 bool)>::type;
         // A variable which stors results
         std::vector<std::future<resultType>> results {};
@@ -309,13 +312,14 @@ public:
             results.emplace_back(
                 make_task(
                     mValidatorThreadPool,
-                    txn->mTxType == TxType::nonstandard ? CTask::Priority::Low : CTask::Priority::High,
+                    txn->mTxValidationPriority == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High,
                     func,
                     txn,
                     config,
                     pool,
                     handlers,
-                    fReadyForFeeEstimation));
+                    fReadyForFeeEstimation,
+                    fUseTimedCancellationSource));
         }
         return results;
     };

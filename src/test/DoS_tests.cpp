@@ -228,7 +228,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         orphanTxns->addTxn(
             std::make_shared<CTxInputData>(
                                 TxSource::p2p, // tx source
-                                TxType::unknown, // tx type
+                                TxValidationPriority::normal, // tx validation priority
                                 MakeTransactionRef(tx),  // a pointer to the tx
                                 GetTime(),     // nAcceptTime
                                 false,         // mfLimitFree
@@ -262,7 +262,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         orphanTxns->addTxn(
             std::make_shared<CTxInputData>(
                                 TxSource::p2p, // tx source
-                                TxType::unknown, // tx type
+                                TxValidationPriority::normal, // tx validation priority
                                 MakeTransactionRef(tx),  // a pointer to the tx
                                 GetTime(),     // nAcceptTime
                                 false,         // mfLimitFree
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         auto pTxInputData {
             std::make_shared<CTxInputData>(
                                 TxSource::p2p, // tx source
-                                TxType::unknown, // tx type
+                                TxValidationPriority::normal, // tx validation priority
                                 MakeTransactionRef(tx),  // a pointer to the tx
                                 GetTime(),     // nAcceptTime
                                 false,         // mfLimitFree

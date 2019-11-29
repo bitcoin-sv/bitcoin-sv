@@ -2365,7 +2365,7 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
         connman.EnqueueTxnForValidator(
 					std::make_shared<CTxInputData>(
                                         TxSource::p2p,  // tx source
-                                        fStandard ? TxType::standard : TxType::nonstandard,  // tx type
+                                        fStandard ? TxValidationPriority::high : TxValidationPriority::low,  // tx validation priority
                                         std::move(ptx), // a pointer to the tx
                                         GetTime(),      // nAcceptTime
                                         true,           // fLimitFree

@@ -54,7 +54,8 @@ void GlobalConfig::Reset()
     maxTxSigOpsCountPolicy = DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
     maxPubKeysPerMultiSig = DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS;
 
-    mMaxTransactionValidationDuration = DEFAULT_MAX_TRANSACTION_VALIDATION_DURATION;
+    mMaxStdTxnValidationDuration = DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
+    mMaxNonStdTxnValidationDuration = DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -543,7 +544,31 @@ uint64_t GlobalConfig::GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus)
     return maxOpsPerScriptPolicy;
 }
 
-bool GlobalConfig::SetMaxTransactionValidationDuration(int ms, std::string* err)
+bool GlobalConfig::SetMaxStdTxnValidationDuration(int ms, std::string* err)
+{
+    if(ms < 5)
+    {
+        if(err)
+        {
+            *err =
+                strprintf(
+                    _("Per transaction max validation duration must be at least 5ms"));
+        }
+
+        return false;
+    }
+
+    mMaxStdTxnValidationDuration = std::chrono::milliseconds{ms};
+
+    return true;
+}
+
+std::chrono::milliseconds GlobalConfig::GetMaxStdTxnValidationDuration() const
+{
+    return mMaxStdTxnValidationDuration;
+}
+
+bool GlobalConfig::SetMaxNonStdTxnValidationDuration(int ms, std::string* err)
 {
     if(ms < 10)
     {
@@ -557,14 +582,14 @@ bool GlobalConfig::SetMaxTransactionValidationDuration(int ms, std::string* err)
         return false;
     }
 
-    mMaxTransactionValidationDuration = std::chrono::milliseconds{ms};
+    mMaxNonStdTxnValidationDuration = std::chrono::milliseconds{ms};
 
     return true;
 }
 
-std::chrono::milliseconds GlobalConfig::GetMaxTransactionValidationDuration() const
+std::chrono::milliseconds GlobalConfig::GetMaxNonStdTxnValidationDuration() const
 {
-    return mMaxTransactionValidationDuration;
+    return mMaxNonStdTxnValidationDuration;
 }
 
 bool GlobalConfig::SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBPolicyIn, std::string* err)

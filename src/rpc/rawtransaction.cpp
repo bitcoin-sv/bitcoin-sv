@@ -1123,7 +1123,7 @@ static UniValue sendrawtransaction(const Config &config,
             txValidator->processValidation(
                             std::make_shared<CTxInputData>(
                                                 TxSource::rpc, // tx source
-                                                TxType::unknown, // tx type (we don't need to check it)
+                                                TxValidationPriority::normal, // tx validation priority
                                                 std::move(tx), // a pointer to the tx
                                                 GetTime(),     // nAcceptTime
                                                 false,         // fLimitFree

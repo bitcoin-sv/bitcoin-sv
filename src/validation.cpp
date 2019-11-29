@@ -1097,11 +1097,8 @@ CTxnValResult TxnValidation(
     const Config& config,
     CTxMemPool& pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fReadyForFeeEstimation) {
-
-    auto source =
-        task::CTimedCancellationSource::Make(
-            config.GetMaxTransactionValidationDuration());
+    bool fReadyForFeeEstimation,
+    bool fUseTimedCancellationSource) {
 
     using Result = CTxnValResult;
 
@@ -1140,8 +1137,18 @@ CTxnValResult TxnValidation(
     //          coin by providing OP_1 unlock script
     std::string reason;
     bool fStandard = IsStandardTx(config, tx, chainActive.Height() + 1, reason);
-    // Update txn's type.
-    pTxInputData->mTxType = fStandard ? TxType::standard : TxType::nonstandard;
+    if (fStandard) {
+        state.SetStandardTx();
+    }
+    // Set txn validation timeout if required.
+    auto source =
+        fUseTimedCancellationSource ?
+            task::CTimedCancellationSource::Make(
+                (TxValidationPriority::high == pTxInputData->mTxValidationPriority ||
+                 TxValidationPriority::normal == pTxInputData->mTxValidationPriority)
+                    ? config.GetMaxStdTxnValidationDuration() : config.GetMaxNonStdTxnValidationDuration())
+            : task::CCancellationSource::Make();
+
     if (fRequireStandard && !fStandard) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                   reason);
@@ -1248,6 +1255,7 @@ CTxnValResult TxnValidation(
 
         if (!res.has_value())
         {
+            state.SetValidationTimeoutExceeded();
             state.DoS(0, false, REJECT_NONSTANDARD,
                      "too-long-validation-time",
                       false);
@@ -1373,6 +1381,7 @@ CTxnValResult TxnValidation(
 
     if (!res.has_value())
     {
+        state.SetValidationTimeoutExceeded();
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-validation-time",
                   false,
@@ -1415,6 +1424,7 @@ CTxnValResult TxnValidation(
             txdata);
     if (!res.has_value())
     {
+        state.SetValidationTimeoutExceeded();
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-validation-time",
                   false,
@@ -1448,6 +1458,7 @@ CTxnValResult TxnValidation(
                 txdata);
         if (!res.has_value())
         {
+            state.SetValidationTimeoutExceeded();
             state.DoS(0, false, REJECT_NONSTANDARD,
                      "too-long-validation-time",
                       false,
@@ -1499,7 +1510,8 @@ CTxnValResult TxnValidationProcessingTask(
     const Config& config,
     CTxMemPool& pool,
     CTxnHandlers& handlers,
-    bool fReadyForFeeEstimation) {
+    bool fReadyForFeeEstimation,
+    bool fUseTimedCancellationSource) {
 
     // Execute validation for the given txn
     CTxnValResult result {
@@ -1508,7 +1520,8 @@ CTxnValResult TxnValidationProcessingTask(
                 config,
                 pool,
                 handlers.mpTxnDoubleSpendDetector,
-                fReadyForFeeEstimation)
+                fReadyForFeeEstimation,
+                fUseTimedCancellationSource)
     };
     // Process validated results
     ProcessValidatedTxn(pool, result, handlers, false);
@@ -1546,7 +1559,6 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
     const TxSource source = txStatus.mTxInputData->mTxSource;
-    const TxType type = txStatus.mTxInputData->mTxType;
     std::string sTxnStatusMsg;
     if (state.IsMissingInputs()) {
         sTxnStatusMsg = "detected orphan";
@@ -1558,7 +1570,7 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
     LogPrint(BCLog::TXNVAL,
             "%s: %s txn= %s %s\n",
              enum_cast<std::string>(source),
-             enum_cast<std::string>(type),
+             state.IsStandardTx() ? "standard" : "nonstandard",
              tx.GetId().ToString(),
              sTxnStatusMsg);
 }
@@ -1574,7 +1586,6 @@ static void LogTxnCommitStatus(
     const CValidationState& state = txStatus.mState;
     const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
     const TxSource source = txStatus.mTxInputData->mTxSource;
-    const TxType type = txStatus.mTxInputData->mTxType;
     const std::string csPeerId {
         TxSource::p2p == source ? (pNode ? std::to_string(pNode->GetId()) : "-1")  : ""
     };
@@ -1596,7 +1607,7 @@ static void LogTxnCommitStatus(
     LogPrint(state.IsValid() ? BCLog::MEMPOOL : BCLog::MEMPOOLREJ,
             "%s: %s txn= %s %s (poolsz %u txn, %u kB) %s\n",
              enum_cast<std::string>(source),
-             enum_cast<std::string>(type),
+             state.IsStandardTx() ? "standard" : "nonstandard",
              tx.GetId().ToString(),
              sTxnStatusMsg,
              nMempoolSize,
@@ -1998,7 +2009,7 @@ static void UpdateMempoolForReorg(const Config &config,
             vTxInputData.emplace_back(
                     std::make_shared<CTxInputData>(
                                         TxSource::reorg,  // tx source
-                                        TxType::unknown,  // tx type (we don't need to check it)
+                                        TxValidationPriority::normal,  // tx validation priority
                                         *it,              // a pointer to the tx
                                         GetTime(),        // nAcceptTime
                                         false));          // fLimitFree
@@ -6736,7 +6747,7 @@ bool LoadMempool(const Config &config)
                     txValidator->processValidation(
                                         std::make_shared<CTxInputData>(
                                                             TxSource::file, // tx source
-                                                            TxType::unknown,  // tx type (we don't need to check it)
+                                                            TxValidationPriority::normal,  // tx validation priority
                                                             tx,    // a pointer to the tx
                                                             nTime, // nAcceptTime
                                                             true),  // fLimitFree

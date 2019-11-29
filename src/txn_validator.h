@@ -98,15 +98,17 @@ class CTxnValidator final
     void threadNewTxnHandler() noexcept;
 
     /** Process all newly arrived transactions. Return txns accepted by the mempool */
-    std::vector<TxInputDataSPtr> processNewTransactionsNL(
+    std::pair<TxInputDataSPtrVec, TxInputDataSPtrVec> processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
         CTxnHandlers& handlers,
-        bool fReadyForFeeEstimation);
+        bool fReadyForFeeEstimation,
+        bool fUseTimedCancellationSource);
 
     /** Post validation step for txns before limit mempool size is done*/
     void postValidationStepsNL(
         const CTxnValResult& txStatus,
-        std::vector<TxInputDataSPtr>& vAcceptedTxns) const;
+        std::vector<TxInputDataSPtr>& vAcceptedTxns,
+        std::vector<TxInputDataSPtr>& vNonStdTxns) const;
 
     /** Post processing step for txns when limit mempool size is done */
     void postProcessingStepsNL(

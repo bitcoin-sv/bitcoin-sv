@@ -19,14 +19,14 @@ const enumTableT<TxSource>& enumTable(TxSource)
     return table;
 }
 
-// Enable enum_cast for TxType, so we can log informatively
-const enumTableT<TxType>& enumTable(TxType)
+// Enable enum_cast for TxValidationPriority, so we can log informatively
+const enumTableT<TxValidationPriority>& enumTable(TxValidationPriority)
 {
-    static enumTableT<TxType> table
+    static enumTableT<TxValidationPriority> table
     {
-        { TxType::unknown,      "unknown" },
-        { TxType::standard,     "standard" },
-        { TxType::nonstandard,  "nonstandard" }
+        { TxValidationPriority::low,      "low" },
+        { TxValidationPriority::normal,   "normal" },
+        { TxValidationPriority::high,     "high" }
     };
     return table;
 }

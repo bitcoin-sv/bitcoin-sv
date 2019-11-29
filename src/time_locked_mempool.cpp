@@ -67,7 +67,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
                 g_connman->ResubmitTxnForValidator(
                     std::make_shared<CTxInputData>(
                         TxSource::finalised,
-                        standard ? TxType::standard : TxType::nonstandard,
+                        standard ? TxValidationPriority::high : TxValidationPriority::low,
                         txn,
                         GetTime()
                     )
@@ -298,7 +298,7 @@ bool CTimeLockedMempool::loadMempool() const
                     txValidator->processValidation(
                                         std::make_shared<CTxInputData>(
                                                             TxSource::file, // tx source
-                                                            standard ? TxType::standard : TxType::nonstandard,
+                                                            standard ? TxValidationPriority::high : TxValidationPriority::low,
                                                             tx,    // a pointer to the tx
                                                             nTime, // nAcceptTime
                                                             true),  // fLimitFree
@@ -575,7 +575,7 @@ void CTimeLockedMempool::periodicChecks()
             g_connman->ResubmitTxnForValidator(
                 std::make_shared<CTxInputData>(
                     TxSource::finalised,
-                    standard ? TxType::standard : TxType::nonstandard,
+                    standard ? TxValidationPriority::high : TxValidationPriority::low,
                     txn,
                     GetTime()
                 )

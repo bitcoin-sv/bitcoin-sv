@@ -22,14 +22,14 @@ enum class TxSource
 const enumTableT<TxSource>& enumTable(TxSource);
 
 // Enumerate possible txn's types
-enum class TxType : int
+enum class TxValidationPriority : int
 {
-    unknown = 0,
-    standard = 1,
-    nonstandard = 2
+    low = 0,
+    normal = 1,
+    high = 2
 };
-// Enable enum_cast for TxType, so we can log informatively
-const enumTableT<TxType>& enumTable(TxType);
+// Enable enum_cast for TxValidationPriority, so we can log informatively
+const enumTableT<TxValidationPriority>& enumTable(TxValidationPriority);
 
 class CNode;
 
@@ -41,7 +41,7 @@ public:
     // Constructor
     CTxInputData(
         TxSource txSource,
-        TxType txType,
+        TxValidationPriority txValidationPriority,
         CTransactionRef ptx,
         int64_t nAcceptTime=0,
         bool fLimitFree=false,
@@ -49,7 +49,7 @@ public:
         std::shared_ptr<CNode> pNode=nullptr,
         bool fOrphan=false)
     : mTxSource(txSource),
-      mTxType(txType),
+      mTxValidationPriority(txValidationPriority),
       mpTx(ptx),
       mnAcceptTime(nAcceptTime),
       mfLimitFree(fLimitFree),
@@ -63,7 +63,7 @@ public:
     ~CTxInputData() = default;
 
     TxSource mTxSource {TxSource::unknown};
-    TxType mTxType {TxType::unknown};
+    TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
     CTransactionRef mpTx {nullptr};
     int64_t mnAcceptTime {0};
     bool mfLimitFree {false};
