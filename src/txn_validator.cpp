@@ -612,7 +612,7 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const {
 }
 
 inline bool CTxnValidator::isSpaceForTxnNL(const TxInputDataSPtr& txn, const std::atomic<uint64_t>& currMemUsage) const {
-    return true;
+    return (currMemUsage + txn->mpTx->GetTotalSize()) <= mMaxQueueMemSize;
 }
 
 void CTxnValidator::enqueueStdTxnNL(const TxInputDataSPtr& txn) {
