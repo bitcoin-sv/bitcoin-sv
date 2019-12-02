@@ -25,18 +25,29 @@ bsv::bint::bint() : value_{nullptr} {}
 
 bsv::bint::bint(const int i) : value_(BN_new(), empty_bn_deleter())
 {
-    static_assert(sizeof(int) < sizeof(long));
     assert(value_);
 
-    if(i < 0)
+    if(i >= 0)
     {
-        const auto s{BN_set_word(value_.get(), -static_cast<long>(i))};
+        const auto s{BN_set_word(value_.get(), i)};
+        assert(s);
+    }
+    else if(i > INT_MIN)
+    {
+        const auto s{BN_set_word(value_.get(), -i)};
         assert(s);
         BN_set_negative(value_.get(), 1);
     }
     else
     {
-        const auto s{BN_set_word(value_.get(), i)};
+        const int ii{i + 1}; // add 1 to avoid overflow in negation
+        auto s{BN_set_word(value_.get(), -ii)};
+        assert(s);
+
+        BN_set_negative(value_.get(), 1);
+
+        // subtract 1 to compensate for earlier addition
+        s = BN_sub(value_.get(), value_.get(), BN_value_one());
         assert(s);
     }
 
