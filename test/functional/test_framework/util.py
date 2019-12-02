@@ -725,3 +725,13 @@ def get_srcdir(calling_script=None):
 
     # No luck, give up.
     return None
+
+def loghash(inhash=None):
+    if inhash:
+        if len(inhash) > 12:
+            return "{" + inhash[:6] + "...." + inhash[-6:] + "}"
+        else:
+            return inhash
+    else:
+        return inhash
+
