@@ -14,7 +14,7 @@ using bsv::bint;
 constexpr int int_min{numeric_limits<int>::min()+1};
 constexpr int int_max{numeric_limits<int>::max()};
 
-constexpr int64_t int64_min{numeric_limits<int64_t>::min()+1};
+constexpr int64_t int64_min{numeric_limits<int64_t>::min() + 1};
 constexpr int64_t int64_max{numeric_limits<int64_t>::max()};
 
 constexpr size_t size_t_min{numeric_limits<size_t>::min() + 1};
@@ -240,11 +240,7 @@ BOOST_AUTO_TEST_CASE(mod)
 
 BOOST_AUTO_TEST_CASE(negate)
 {
-    vector<int64_t> test_data{0, 
-                              1, -1,
-                              int64_max, -int64_max,
-                              int64_min, -int64_min};
-
+    const vector<int64_t> test_data{0, 1, -1, int64_max, -int64_max, int64_min};
     for(const auto n : test_data)
     {
         bint bn(n);

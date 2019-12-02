@@ -25,16 +25,20 @@ bsv::bint::bint() : value_{nullptr} {}
 
 bsv::bint::bint(const int i) : value_(BN_new(), empty_bn_deleter())
 {
-    // Precondition: i > std::numeric_limits<int>::min() 
-    // as negation is out-of-range of int
-    assert(i > std::numeric_limits<int>::min());
+    static_assert(sizeof(int) < sizeof(long));
     assert(value_);
-    const bool negative{i < 0};
-    const auto s{BN_set_word(value_.get(), negative ? -i : i)};
-    assert(s);
 
-    if(negative)
+    if(i < 0)
+    {
+        const auto s{BN_set_word(value_.get(), -static_cast<long>(i))};
+        assert(s);
         BN_set_negative(value_.get(), 1);
+    }
+    else
+    {
+        const auto s{BN_set_word(value_.get(), i)};
+        assert(s);
+    }
 
     // clang-format off
     assert( ((i < 0) && (is_negative(*this))) ||
@@ -377,18 +381,34 @@ std::string bsv::to_string(const bint& n) // used in gdb pretty-printer
     return oss.str();
 }
 
+long bsv::to_long(const bint& n)
+{
+    // Precondition:
+    // Windows/MSVC (sizeof(long) == 4 bytes)
+    // n <= numeric_limit<int32_t>::max() and n>=0
+
+    // Linux/GCC (sizeof(long) == 8 bytes)
+    // n <= numeric_limit<int64_t>::max() and n>=0
+
+    auto* asn1{BN_to_ASN1_INTEGER(n.value_.get(), nullptr)};
+    assert(asn1);
+
+    //-1 means either error or an integer with a value of -1
+    //(we don't want to use ASN1_INTEGER_get_uint64 because it's not supported
+    //in older version of OpenSSL)
+    return ASN1_INTEGER_get(asn1);
+}
+
 std::size_t bsv::to_size_t_limited(const bint& n)
 {
     // Precondition:
-    // n <= numeric_limit<int32_t>::max() and n>=0 <-- applies to Windows/MSVC (sizeof(long) == 4 bytes)
-    // n <= numeric_limit<int64_t>::max() and n>=0 <-- applies to Linux/GCC (sizeof(long) == 8 bytes)
+    // Windows/MSVC (sizeof(long) == 4 bytes)
+    // n <= numeric_limit<int32_t>::max() and n>=0
 
-    auto* asn1{ BN_to_ASN1_INTEGER(n.value_.get(), nullptr) };
-    assert(asn1);
+    // Linux/GCC (sizeof(long) == 8 bytes)
+    // n <= numeric_limit<int64_t>::max() and n>=0
 
-    //-1 means either error or an integer with a value of -1 
-    //(we don't want to use ASN1_INTEGER_get_uint64 because it's not supported in older version of OpenSSL)
-    int64_t i64 = ASN1_INTEGER_get(asn1);
+    const int64_t i64 = to_long(n);
     assert(i64 >= 0); 
     return static_cast<size_t>(i64);
 }
