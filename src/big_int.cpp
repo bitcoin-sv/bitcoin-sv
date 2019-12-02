@@ -60,16 +60,31 @@ bsv::bint::bint(const int i) : value_(BN_new(), empty_bn_deleter())
 
 bsv::bint::bint(const int64_t i) : value_(BN_new(), empty_bn_deleter())
 {
-    // Precondition: i > std::numeric_limits<int64_t>::min() 
-    // as negation is out-of-range of int64_t
-    assert(i > std::numeric_limits<int64_t>::min());
     assert(value_);
-    const bool negative{i < 0};
-    const auto s{BN_set_word(value_.get(), negative ? -i : i)};
-    assert(s);
 
-    if(negative)
+    if(i >= 0)
+    {
+        const auto s{BN_set_word(value_.get(), i)};
+        assert(s);
+    }
+    else if(i > INT64_MIN)
+    {
+        const auto s{BN_set_word(value_.get(), -i)};
+        assert(s);
         BN_set_negative(value_.get(), 1);
+    }
+    else
+    {
+        const int64_t ii{i + 1}; // add 1 to avoid overflow in negation
+        auto s{BN_set_word(value_.get(), -ii)};
+        assert(s);
+
+        BN_set_negative(value_.get(), 1);
+
+        // subtract 1 to compensate for earlier addition
+        s = BN_sub(value_.get(), value_.get(), BN_value_one());
+        assert(s);
+    }
 
     // clang-format off
     assert( ((i < 0) && (is_negative(*this))) ||

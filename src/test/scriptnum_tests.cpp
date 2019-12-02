@@ -16,7 +16,7 @@ using bsv::bint;
 
 namespace
 {
-    constexpr auto min64 = numeric_limits<int64_t>::min()+1;
+    constexpr auto min64 = numeric_limits<int64_t>::min();
     constexpr auto max64 = numeric_limits<int64_t>::max();
 
     vector<int64_t> test_data{min64, -1, 0, 1, max64};
@@ -230,17 +230,21 @@ BOOST_AUTO_TEST_CASE(subtraction)
 
 BOOST_AUTO_TEST_CASE(multiplication)
 {
-    const vector<tuple<int64_t, int64_t, int64_t>> test_data{
+    // clang-format off
+    const vector<tuple<int64_t, int64_t, int64_t>> test_data
+    {
         {1, -1, -1},
         {-1, 1, -1},
-        {0, 1, 0},
+        {0, 1, 0}, 
         {1, 0, 0},
         {1, 1, 1},
         {-1, -1, 1},
         {min64, 1, min64},
-        {min64, -1, max64},
+        {min64 + 1, -1, max64},
         {max64, 1, max64},
-        {max64, -1, min64}};
+        {max64, -1, min64 + 1}
+    };
+    // clang-format on
 
     for(const auto& [n, m, o] : test_data)
     {
@@ -267,13 +271,12 @@ BOOST_AUTO_TEST_CASE(division)
         {1, -1, -1},
         {-1, 1, -1},
         {0, 1, 0},
-        //{1, 0, 0},
         {1, 1, 1},
         {-1, -1, 1},
         {min64, 1, min64},
-        {min64, -1, max64},
+        {min64 + 1, -1, max64},
         {max64, 1, max64},
-        {max64, -1, min64}};
+        {max64, -1, min64 + 1}};
 
     for(const auto& [n, m, o] : test_data)
     {
@@ -354,8 +357,15 @@ BOOST_AUTO_TEST_CASE(and_)
 
 BOOST_AUTO_TEST_CASE(negation)
 {
-    const vector<pair<int64_t, int64_t>> test_data{
-        {0, 0}, {1, -1}, {-1, 1}, {max64, min64}};
+    // clang-format off
+    const vector<pair<int64_t, int64_t>> test_data
+    {
+        {0, 0}, 
+        {1, -1}, 
+        {-1, 1}, 
+        {max64, min64+1}
+    };
+    // clang-format off
 
     for(const auto [n, m] : test_data)
     {
