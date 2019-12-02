@@ -45,6 +45,25 @@ namespace {
         spend_txn.vin[0].scriptSig << vchSig;
         return spend_txn;
     }
+    // Make N unique large (but rubbish) transactions
+    std::vector<CMutableTransaction> MakeNLargeTxns(size_t nNumTxns,
+                                                    CTransaction& foundTxn,
+                                                    CScript& scriptPubKey) {
+        std::vector<CMutableTransaction> res {};
+        for (size_t i=0; i<nNumTxns; i++) {
+            CMutableTransaction txn;
+            txn.nVersion = 1;
+            txn.vin.resize(1);
+            txn.vin[0].prevout = COutPoint(foundTxn.GetId(), i);
+            txn.vout.resize(1000);
+            for(size_t j=0; j<1000; ++j) {
+                txn.vout[j].nValue = 11 * CENT;
+                txn.vout[j].scriptPubKey = scriptPubKey;
+            }
+            res.emplace_back(txn);
+        }
+        return res;
+    }
     // Create N spend txns from a given found txn
     std::vector<CMutableTransaction> CreateNSpendTxns(size_t nSpendTxns,
                                                       CTransaction& foundTxn,
@@ -357,6 +376,31 @@ BOOST_AUTO_TEST_CASE(txnvalidator_dummy_doublespend_via_asynch_api) {
     // Process txn if it is valid.
     ProcessTxnsAsynchApi(spendsN, TxSource::unknown);
     BOOST_CHECK_EQUAL(mempool.Size(), 1);
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_limit_memory_usage)
+{
+    // Make sure validation thread won't run during this test
+    gArgs.ForceSetArg("-txnvalidationasynchrunfreq", "10000");
+    gArgs.ForceSetArg("-txnvalidationqueuesmaxmemory", "1");
+
+    // Create a larger number of txns than will fit in a 1Mb queue
+    std::vector<CMutableTransaction> txns { MakeNLargeTxns(25, coinbaseTxns[0], scriptPubKey) };
+    auto txnsInputs { TxInputDataVec(TxSource::p2p, txns) };
+
+    // Create txn validator
+    std::shared_ptr<CTxnValidator> txnValidator {
+        std::make_shared<CTxnValidator>(
+                GlobalConfig::GetConfig(),
+                mempool,
+                std::make_shared<CTxnDoubleSpendDetector>())
+    };
+
+    // Attempt to enqueue all txns and verify that we stopped when we hit the max size limit
+    txnValidator->newTransaction(txnsInputs);
+    BOOST_CHECK(txnValidator->GetTransactionsInQueueCount() < txns.size());
+    BOOST_CHECK(txnValidator->GetStdQueueMemUsage() <= 1*1024*1024);
+    BOOST_CHECK_EQUAL(txnValidator->GetNonStdQueueMemUsage(), 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
