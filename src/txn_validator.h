@@ -89,6 +89,10 @@ class CTxnValidator final
     /** Get number of transactions that are still unvalidated */
     size_t GetTransactionsInQueueCount() const;
 
+    /** Get memory usage for still unvalidated transactions */
+    uint64_t GetStdQueueMemUsage() const { return mStdTxnsMemSize; }
+    uint64_t GetNonStdQueueMemUsage() const { return mNonStdTxnsMemSize; }
+
     /** Check if the given txn is already queued for processing (or being processed)
      *  in asynch mode by the Validator */
     bool isTxnKnown(const uint256& txid) const;
@@ -139,24 +143,60 @@ class CTxnValidator final
 					return ptxInputData->mpTx->GetId() == txid; });
 	}
 
+    /** Increase memory used counters for queued transactions */
+    void incMemUsedNL(std::atomic<uint64_t>& mem, const TxInputDataSPtr& txn) {
+        mem += txn->mpTx->GetTotalSize();
+    }
+    /** Decrease memory used counters for queued transactions */
+    void decMemUsedNL(std::atomic<uint64_t>& mem, const TxInputDataSPtr& txn) {
+        auto txnSize { txn->mpTx->GetTotalSize() };
+        if(mem <= txnSize) {
+            mem = 0;
+        }
+        else {
+            mem -= txnSize;
+        }
+    }
+
+    /** Return whether there is space in our queues for the given transaction */
+    inline bool isSpaceForTxnNL(const TxInputDataSPtr& txn, const std::atomic<uint64_t>& currMemUsage) const;
+
+    /** Add a standard txn to the queue */
+    void enqueueStdTxnNL(const TxInputDataSPtr& txn);
+    /** Add a non-standard txn to the queue */
+    void enqueueNonStdTxnNL(const TxInputDataSPtr& txn);
+
+    /** Add some txns (standard or non-standard) to the queue */
+    template<typename Iterator, typename Callable>
+    void enqueueTxnsNL(Iterator begin, const Iterator& end, Callable&& func) {
+        std::for_each(begin, end, func);
+    }
+
     template<typename T1, typename T2>
-    void collectTxns(T1& dest, T2& src, size_t nNumOfTxns, size_t nMaxNumOfTxnsToSchedule) {
+    void collectTxns(T1& dest, T2& src, size_t nNumOfTxns, size_t nMaxNumOfTxnsToSchedule, std::atomic<uint64_t>& mem) {
+        auto end { nMaxNumOfTxnsToSchedule > nNumOfTxns ? src.end() : src.begin() + nMaxNumOfTxnsToSchedule };
+
+        // Update memory tracking for collected txns
+        std::for_each(src.begin(), end,
+            [this, &mem](const TxInputDataSPtr& txn) mutable { decMemUsedNL(mem, txn); });
+
+        // Move them to the destination list
         dest.insert(dest.end(),
-	        std::make_move_iterator(src.begin()),
-	        std::make_move_iterator(nMaxNumOfTxnsToSchedule > nNumOfTxns
-                                        ? src.end() : src.begin() + nMaxNumOfTxnsToSchedule));
-        src.erase(
-            src.begin(),
-            nMaxNumOfTxnsToSchedule > nNumOfTxns
-                ? src.end() : src.begin() + nMaxNumOfTxnsToSchedule);
+                    std::make_move_iterator(src.begin()),
+                    std::make_move_iterator(end));
+
+        // Tidy up source
+        src.erase(src.begin(), end);
     }
 
     /** List of new transactions that need processing */
     std::vector<TxInputDataSPtr> mStdTxns {};
+    std::atomic<uint64_t> mStdTxnsMemSize {0};
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
     mutable std::shared_mutex mStdTxnsMtx {};
     /** List of new non-standard transactions that need processing */
     std::deque<TxInputDataSPtr> mNonStdTxns {};
+    std::atomic<uint64_t> mNonStdTxnsMemSize {0};
     /** A dedicated mutex to protect an exclusive access to mStdTxns */
     mutable std::shared_mutex mNonStdTxnsMtx {};
     /** A vector of txns which are currently being processed */

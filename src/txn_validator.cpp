@@ -126,7 +126,7 @@ void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
             std::shared_lock lock2 { mProcessingQueueMtx };
             if (!isTxnKnownInSetNL(txid, mProcessingQueue)) {
                 // Add the given txn to the list of new standard transactions.
-                mStdTxns.emplace_back(std::move(pTxInputData));
+                enqueueStdTxnNL(pTxInputData);
             }
         }
     }
@@ -138,7 +138,7 @@ void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
             std::shared_lock lock2 { mProcessingQueueMtx };
             if (!isTxnKnownInSetNL(txid, mProcessingQueue)) {
                 // Add the given txn to the list of new non-standard transactions.
-                mNonStdTxns.emplace_back(std::move(pTxInputData));
+                enqueueNonStdTxnNL(pTxInputData);
             }
         }
     }
@@ -161,14 +161,14 @@ void CTxnValidator::resubmitTransaction(TxInputDataSPtr pTxInputData) {
     if (TxValidationPriority::high == txpriority || TxValidationPriority::normal == txpriority) {
         std::unique_lock lock { mStdTxnsMtx };
         if(!isTxnKnownInSetNL(txid, mStdTxns)) {
-            mStdTxns.emplace_back(std::move(pTxInputData));
+            enqueueStdTxnNL(pTxInputData);
         }
     }
     // Check if exists in mNonStdTxns
     else if (TxValidationPriority::low == txpriority) {
         std::unique_lock lock { mNonStdTxnsMtx };
         if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
-            mNonStdTxns.emplace_back(std::move(pTxInputData));
+            enqueueNonStdTxnNL(pTxInputData);
         }
     }
 }
@@ -360,21 +360,22 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                             size_t nNumOfStdTxns = mStdTxns.size();
                             size_t nMaxNumOfStdTxnsToSchedule = nMaxStdTxnsPerThreadRatio * nNumStdTxValidationThreads;
                             if (nNumOfStdTxns) {
-                                LogPrint(BCLog::TXNVAL, "Txnval-asynch: The Standard queue, size= %d\n",
-                                         nNumOfStdTxns);
+                                LogPrint(BCLog::TXNVAL, "Txnval-asynch: The Standard queue, size= %d, mem= %ld\n",
+                                         nNumOfStdTxns, mStdTxnsMemSize);
                                 if (nNumOfStdTxns < nMaxNumOfStdTxnsToSchedule) {
                                     mProcessingQueue = std::move_if_noexcept(mStdTxns);
+                                    mStdTxnsMemSize = 0;
                                 } else {
-                                    collectTxns(mProcessingQueue, mStdTxns, nNumOfStdTxns, nMaxNumOfStdTxnsToSchedule);
+                                    collectTxns(mProcessingQueue, mStdTxns, nNumOfStdTxns, nMaxNumOfStdTxnsToSchedule, mStdTxnsMemSize);
                                 }
                             }
                             // Get a required number of non-standard txns if any exists
                             size_t nNumOfNonStdTxns = mNonStdTxns.size();
                             size_t nMaxNumOfNonStdTxnsToSchedule = nMaxNonStdTxnsPerThreadRatio * nNumNonStdTxValidationThreads;
                             if (nNumOfNonStdTxns) {
-                                LogPrint(BCLog::TXNVAL, "Txnval-asynch: The Non-standard queue, size= %d\n",
-                                         nNumOfNonStdTxns);
-                                collectTxns(mProcessingQueue, mNonStdTxns, nNumOfNonStdTxns, nMaxNumOfNonStdTxnsToSchedule);
+                                LogPrint(BCLog::TXNVAL, "Txnval-asynch: The Non-standard queue, size= %d, mem= %ld\n",
+                                         nNumOfNonStdTxns, mNonStdTxnsMemSize);
+                                collectTxns(mProcessingQueue, mNonStdTxns, nNumOfNonStdTxns, nMaxNumOfNonStdTxnsToSchedule, mNonStdTxnsMemSize);
                             }
                         }
                         // Lock processing queue in a shared mode as it might be queried during processing.
@@ -422,13 +423,13 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                     // If there are any low priority transactions then move them to the low priority queue.
                     size_t nDetectedLowPriorityTxnsNum = result.second.size();
                     if (nDetectedLowPriorityTxnsNum) {
-                        std::unique_lock lock { mNonStdTxnsMtx };
-                        mNonStdTxns.insert(mNonStdTxns.end(),
-                            std::make_move_iterator(result.second.begin()),
-                            std::make_move_iterator(result.second.end()));
                         LogPrint(BCLog::TXNVAL,
                                 "The number of standard txns for which validation timeout occured: %d\n",
                                  nDetectedLowPriorityTxnsNum);
+                        std::unique_lock lock { mNonStdTxnsMtx };
+                        enqueueTxnsNL(result.second.begin(), result.second.end(),
+                            [this](const TxInputDataSPtr& txn){ enqueueNonStdTxnNL(txn); }
+                        );
                     }
                     // Clear processing queue.
                     {
@@ -580,9 +581,9 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForRetry() {
     if (nOrphanTxnsNum) {
         // Move p2p orphan txns into the main queue
         std::unique_lock lock { mStdTxnsMtx };
-        mStdTxns.insert(mStdTxns.end(),
-            std::make_move_iterator(vOrphanTxns.begin()),
-            std::make_move_iterator(vOrphanTxns.end()));
+        enqueueTxnsNL(vOrphanTxns.begin(), vOrphanTxns.end(),
+            [this](const TxInputDataSPtr& txn){ enqueueStdTxnNL(txn); }
+        );
     }
     return nOrphanTxnsNum;
 }
@@ -602,3 +603,32 @@ bool CTxnValidator::isTxnKnown(const uint256& txid) const {
     // Txn is already known
     return true;
 }
+
+inline bool CTxnValidator::isSpaceForTxnNL(const TxInputDataSPtr& txn, const std::atomic<uint64_t>& currMemUsage) const {
+    return true;
+}
+
+void CTxnValidator::enqueueStdTxnNL(const TxInputDataSPtr& txn) {
+    if(isSpaceForTxnNL(txn, mStdTxnsMemSize)) {
+        // Add the given txn to the list of new standard transactions.
+        mStdTxns.emplace_back(std::move(txn));
+        // Increase memory tracking
+        incMemUsedNL(mStdTxnsMemSize, txn);
+    }
+    else {
+        LogPrint(BCLog::TXNVAL, "Dropping txn %s due to full std txn queue\n", txn->mpTx->GetId().ToString());
+    }
+}
+
+void CTxnValidator::enqueueNonStdTxnNL(const TxInputDataSPtr& txn) {
+    if(isSpaceForTxnNL(txn, mNonStdTxnsMemSize)) {
+        // Add the given txn to the list of new non-standard transactions.
+        mNonStdTxns.emplace_back(std::move(txn));
+        // Increase memory tracking
+        incMemUsedNL(mNonStdTxnsMemSize, txn);
+    }
+    else {
+        LogPrint(BCLog::TXNVAL, "Dropping txn %s due to full non-std txn queue\n", txn->mpTx->GetId().ToString());
+    }
+}
+
