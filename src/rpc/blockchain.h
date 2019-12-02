@@ -17,6 +17,10 @@ class JSONRPCRequest;
 
 UniValue getblockchaininfo(const Config &config, const JSONRPCRequest &request);
 void getblock(const Config &config, const JSONRPCRequest &request, HTTPRequest *req, bool processedInBatch);
+void getblockbyheight(const Config &config, const JSONRPCRequest &request,
+                      HTTPRequest *req, bool processedInBatch);
+void getblockdata(CBlockIndex *pblockindex, const Config &config, const JSONRPCRequest &jsonRPCReq, 
+                  HTTPRequest *httpReq, bool processedInBatch);
 void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &req,
                           bool showTxDetails, CBlockIndex& blockindex, bool showOnlyCoinBase);
 void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
