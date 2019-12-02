@@ -31,6 +31,8 @@ class CTxnValidator final
   public:
     // Default run frequency in asynch mode
     static constexpr unsigned DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS {100};
+    // Default maximum memory usage (in MB) for the transaction queues
+    static constexpr uint64_t DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES {2048};
 
     // Construction/destruction
     CTxnValidator(
@@ -217,6 +219,9 @@ class CTxnValidator final
 
     // A reference to the configuration
     const Config& mConfig;
+
+    // The maximum transaction queue size in bytes. Applies to both the standard & non-standard queues.
+    uint64_t mMaxQueueMemSize {DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES};
 
     // A reference to the mempool
     CTxMemPool& mMempool;

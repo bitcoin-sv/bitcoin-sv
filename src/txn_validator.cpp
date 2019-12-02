@@ -32,12 +32,19 @@ CTxnValidator::CTxnValidator(
                 gArgs.GetArg("-blockreconstructionextratxn",
                         COrphanTxns::DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN))
     };
-    
+   
     mpOrphanTxnsP2PQ = std::make_shared<COrphanTxns>(
         maxCollectedOutpoints,
         maxExtraTxnsForCompactBlock,
         config.GetMaxTxSize(true, false) /*orphan tx before genesis might not get accepted by mempool */);
     
+    // Max memory usage for transaction queues
+    mMaxQueueMemSize =
+        static_cast<uint64_t>(
+                gArgs.GetArg("-txnvalidationqueuesmaxmemory",
+                        DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES))
+        * 1024 * 1024;
+ 
     // Create a shared object for rejected transaction
     mpTxnRecentRejects = std::make_shared<CTxnRecentRejects>();
     // Launch our thread
