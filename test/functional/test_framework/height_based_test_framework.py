@@ -112,7 +112,8 @@ class HeightBasedTestsCase:
 
 
 class SimpleTestDefinition:
-    def __init__(self, utxo_label, locking_script, label, unlocking_script, p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None):
+    def __init__(self, scenario, utxo_label, locking_script, label, unlocking_script, p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None):
+        self.scenario            = scenario
         self.label               = label
         self.locking_script      = locking_script
         self.unlocking_script    = unlocking_script
@@ -151,6 +152,7 @@ class HeightBasedSimpleTestsCase(HeightBasedTestsCase):
             if t.utxo_label is not None and t.utxo_label == label:
                 tx = t.make_utxo(coinbases(), 0)
                 tx.rehash()
+                self.log.info(f"Created UTXO Tx {tx.hash} for scenario: {t.scenario} and for utxo_label: {t.utxo_label}")
                 txs.append(tx)
         return txs, None
 
@@ -163,6 +165,7 @@ class HeightBasedSimpleTestsCase(HeightBasedTestsCase):
                     tx_collection.add_mempool_tx(utxo_tx)
                 tx = t.make_test_tx()
                 tx.rehash()
+                self.log.info(f"Created Test Tx {tx.hash} for scenario: {t.scenario} and for test_label: {t.label}")
                 tx_collection.add_tx(tx, t.p2p_reject_reason, t.block_reject_reason)
 
 class SimplifiedTestFramework(BitcoinTestFramework):
@@ -230,10 +233,18 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             for tx, reason in zip(txs, reasons):
                 del rejects[:]
                 block, _ = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=block_txs+[tx])
+
+                if tx:
+                    bhash = tip["height"]
+                    self.log.info(f"Created a block {block.hash} to check rejects at height {bhash + 1}")
+                    for txn in block_txs+[tx]:
+                        self.log.info(f".... and added transactions to block {txn.hash}")
+
                 wait_until(lambda: len(rejects) == 1 and rejects[0].data == block.sha256,
                            timeout=10, check_interval=0.2,
                            label=f"Waiting for block with tx {tx.hash[8]}... and reject reason '{reason}' to be rejected " + label)
                 if reason:
+                    self.log.info(f"Expect the block {block.hash} to be rejected")
                     assert rejects[0].reason == reason, f"mismatching rejection reason: got {rejects[0].reason} expected {reason}"
 
     def _new_block_check_accept(self, connection, txs=[], label="", remove_accepted_block=False):
@@ -241,7 +252,14 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         block, coinbase_tx = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=txs)
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash,
                    timeout=10, check_interval=0.2, label="Waiting for block to become current tip " + label)
+
+        bhash = connection.rpc.getblock(connection.rpc.getbestblockhash())["height"]
+        if txs:
+            self.log.info(f"Created a block {block.hash} to check accepts at height {bhash}")
+            for txn in txs:
+                self.log.info(f".... and added transactions to block {txn.hash}")
         if remove_accepted_block:
+            self.log.info(f"Invalidating the block {block.hash} at height {bhash}")
             connection.rpc.invalidateblock(block.hash)
         return coinbase_tx
 
@@ -283,6 +301,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         with connection.cb.temporary_override_callback(on_reject=on_reject):
             for tx, reason in zip(to_reject, reasons):
+                self.log.info(f"Sending and processing the reject tx {tx.hash} for expecting reason {reason}")
                 del rejects[:]
                 connection.send_message(msg_tx(tx))
                 wait_until(lambda: (len(rejects) == 1) and rejects[0].data == tx.sha256,
@@ -293,6 +312,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
     def _process_p2p_accepts(self, connection, to_accept, test_label, height_label):
         for tx in to_accept:
+            self.log.info(f"Sending and processing the accept tx {tx.hash}")
             connection.send_message(msg_tx(tx))
 
         def tt():
@@ -319,6 +339,9 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         tx_col = TxCollection(height=height, label=label)
         test.get_transactions_for_test(tx_col, self._get_new_coinbase)
 
+        if not( tx_col.mempool_txs or tx_col.p2p_invalid_txs or tx_col.p2p_valid_txs or tx_col.block_invalid_txs or tx_col.block_valid_txs ):
+            self.log.info(f"No transactions to test at height {label} height={height}")
+
         if tx_col.mempool_txs:
             self._process_p2p_accepts(conn, tx_col.mempool_txs, test_label=test.NAME, height_label=label + " ADDING MEMPOOL UTXOS")
 
@@ -335,6 +358,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         if tx_col.block_valid_txs:
             self._new_block_check_accept(conn, txs=tx_col.mempool_txs+tx_col.block_valid_txs, label=f"At {test.NAME} {label}")
+            self.log.info(f"Invalidating the block {conn.rpc.getbestblockhash()} to confirm the txs are back to mempool")
             conn.rpc.invalidateblock(conn.rpc.getbestblockhash())
 
         test.post_test(height=height, label=label, coinbases=self._get_new_coinbase, connections=additional_conns)
@@ -387,6 +411,10 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                         self.log.info(f"invalidating {current_height - target_height} blocks")
                         for _ in range(current_height - target_height):
                             conn.rpc.invalidateblock(conn.rpc.getbestblockhash())
+                            bhash = conn.rpc.getbestblockhash()
+                            self.log.info(f"Invalidating best block {bhash} at height {current_height}")
+                            conn.rpc.invalidateblock(bhash)
+
                         self._assert_height(conn, target_height)
 
                     if test_label is not None:
@@ -394,7 +422,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                     elif prep_label is not None:
                         self._do_prepare_for_height(conn, test, prep_label, target_height, additional_conns)
 
-
+                self.log.info(f"Invalidating all blocks till first block {first_block.hash}")
                 conn.rpc.invalidateblock(first_block.hash)
                 del self._coinbases[:]
                 self.log.info(f"Finishing test {test.NAME}")
