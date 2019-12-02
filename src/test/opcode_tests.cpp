@@ -12,6 +12,7 @@
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "config.h"
+#include "script/limitedstack.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -24,18 +25,54 @@ std::array<uint32_t, 3> flagset{{0, STANDARD_SCRIPT_VERIFY_FLAGS, MANDATORY_SCRI
 
 BOOST_FIXTURE_TEST_SUITE(opcode_tests, BasicTestingSetup)
 
+static void CheckStackSize(const std::vector<valtype> &original_stack_elements, const CScript &script,
+    ScriptError expected_error, uint32_t maxStackSize, const std::vector<valtype> &expected_stack_elements={})
+{
+    Config& config = GlobalConfig::GetConfig();
+    BaseSignatureChecker sigchecker;
+    ScriptError err = SCRIPT_ERR_OK;
+    auto source = task::CCancellationSource::Make();
+
+    LimitedStack stack = LimitedStack(original_stack_elements, maxStackSize);
+
+    auto r =
+        EvalScript(
+            config, true,
+            source->GetToken(),
+            stack,
+            script,
+            flagset[0] | 0,
+            sigchecker,
+            &err);
+
+    if (expected_error == SCRIPT_ERR_OK)
+    {
+        LimitedStack expected = LimitedStack(expected_stack_elements, maxStackSize);
+        BOOST_CHECK(r.value());
+        BOOST_CHECK(stack == expected);
+    } else 
+    {
+        BOOST_CHECK(!r.value());
+        BOOST_CHECK_EQUAL(err, expected_error);
+    }
+   
+}
+
 /**
  * General utility functions to check for script passing/failing.
  */
 static void CheckTestResultForAllFlags(const stacktype &original_stack, const CScript &script, const stacktype &expected,
         uint32_t upgradeFlag = 0) {
     const Config& config = GlobalConfig::GetConfig();
+
     BaseSignatureChecker sigchecker;
     auto source = task::CCancellationSource::Make();
 
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
-        stacktype stack{original_stack};
+
+        LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
+        LimitedStack expectedStack = LimitedStack(expected, UINT32_MAX);
         auto r =
             EvalScript(
                 config, true,
@@ -46,11 +83,11 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                 sigchecker,
                 &err);
         BOOST_CHECK(r.value());
-        BOOST_CHECK(stack == expected);
+        BOOST_CHECK(stack == expectedStack);
 
         // Make sure that if we do not pass the upgrade flag, we get the same result
         if (upgradeFlag) {
-            stack = original_stack;
+            stack = LimitedStack(original_stack, UINT32_MAX);
             r =
                 EvalScript(
                     config, true,
@@ -61,7 +98,7 @@ static void CheckTestResultForAllFlags(const stacktype &original_stack, const CS
                     sigchecker,
                     &err);
             BOOST_CHECK(r.value());
-            BOOST_CHECK(stack == expected);
+            BOOST_CHECK(stack == expectedStack);
         }
     }
 }
@@ -71,7 +108,7 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
     BaseSignatureChecker sigchecker;
     const Config& config = GlobalConfig::GetConfig();
     ScriptError err = SCRIPT_ERR_OK;
-    stacktype stack{original_stack};
+    LimitedStack stack = LimitedStack(original_stack, UINT32_MAX);
 
     auto source = task::CCancellationSource::Make();
     auto r =
@@ -84,12 +121,13 @@ static void CheckError(uint32_t flags, const stacktype &original_stack,
             sigchecker,
             &err);
     BOOST_CHECK(!r.value());
+
     BOOST_CHECK_EQUAL(err, expected_error);
 
     // Make sure that if we do not pass the opcodes flags, we get the same result
     if(upgradeFlag)
     {
-        stack = original_stack;
+        stack = LimitedStack(original_stack, UINT32_MAX);
         r =
             EvalScript(
                 config, true,
@@ -279,11 +317,11 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
     RunTestForAllBitwiseOpcodes({}, {}, {}, {}, {});
 
     // Run all variations of zeros and ones.
-    valtype allzeros(MAX_SCRIPT_ELEMENT_SIZE, 0);
-    valtype allones(MAX_SCRIPT_ELEMENT_SIZE, 0xff);
+    valtype allzeros(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, 0);
+    valtype allones(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, 0xff);
 
-    BOOST_CHECK_EQUAL(allzeros.size(), MAX_SCRIPT_ELEMENT_SIZE);
-    BOOST_CHECK_EQUAL(allones.size(), MAX_SCRIPT_ELEMENT_SIZE);
+    BOOST_CHECK_EQUAL(allzeros.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(allones.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
 
     TestBitwiseOpcodes(allzeros, allzeros, allzeros, allzeros);
     TestBitwiseOpcodes(allzeros, allones, allzeros, allones);
@@ -381,8 +419,8 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
         0xc9, 0x4d, 0xb9, 0x07, 0x71, 0x6d, 0xd1, 0x96, 0xc3, 0x88, 0xb6, 0xe6,
         0x0e, 0x8a, 0x8a, 0xd7};
 
-    BOOST_CHECK_EQUAL(a.size(), MAX_SCRIPT_ELEMENT_SIZE);
-    BOOST_CHECK_EQUAL(b.size(), MAX_SCRIPT_ELEMENT_SIZE);
+    BOOST_CHECK_EQUAL(a.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
+    BOOST_CHECK_EQUAL(b.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
 
     valtype aandb{
         0x10, 0x0e, 0x18, 0x01, 0x83, 0x00, 0x1a, 0x00, 0x41, 0x8c, 0x00, 0x00,
@@ -499,7 +537,7 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
 }
 
 BOOST_AUTO_TEST_CASE(invert_test)
-{ 
+{
     CheckUnaryOp({},     OP_INVERT, {});
     CheckUnaryOp({0x00}, OP_INVERT, {0xFF});
     CheckUnaryOp({0xFF}, OP_INVERT, {0x00});
@@ -511,7 +549,7 @@ static void CheckShiftOp(const valtype &x, const valtype &n, opcodetype op, cons
 }
 
 BOOST_AUTO_TEST_CASE(lshift_test)
-{ 
+{
     CheckShiftOp({}, {},     OP_LSHIFT, {}); 
     CheckShiftOp({}, {0x01}, OP_LSHIFT, {}); 
     CheckShiftOp({}, {0x02}, OP_LSHIFT, {}); 
@@ -521,7 +559,7 @@ BOOST_AUTO_TEST_CASE(lshift_test)
     CheckShiftOp({}, {0x0F}, OP_LSHIFT, {}); 
     CheckShiftOp({}, {0x10}, OP_LSHIFT, {}); 
     CheckShiftOp({}, {0x11}, OP_LSHIFT, {}); 
- 
+
     CheckShiftOp({0xFF}, {},     OP_LSHIFT, to_bitpattern("11111111")); 
     CheckShiftOp({0xFF}, {0x01}, OP_LSHIFT, to_bitpattern("11111110")); 
     CheckShiftOp({0xFF}, {0x02}, OP_LSHIFT, to_bitpattern("11111100")); 
@@ -531,7 +569,7 @@ BOOST_AUTO_TEST_CASE(lshift_test)
     CheckShiftOp({0xFF}, {0x06}, OP_LSHIFT, to_bitpattern("11000000")); 
     CheckShiftOp({0xFF}, {0x07}, OP_LSHIFT, to_bitpattern("10000000")); 
     CheckShiftOp({0xFF}, {0x08}, OP_LSHIFT, to_bitpattern("00000000")); 
- 
+
     CheckShiftOp({0xFF}, {0x01}, OP_LSHIFT, {0xFE}); 
     CheckShiftOp({0xFF}, {0x02}, OP_LSHIFT, {0xFC}); 
     CheckShiftOp({0xFF}, {0x03}, OP_LSHIFT, {0xF8}); 
@@ -569,7 +607,7 @@ BOOST_AUTO_TEST_CASE(lshift_test)
     CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_LSHIFT, to_bitpattern("11111010101010101000000000000000"));
 
     // second parameter, n < 0 - should produce error
-    CheckErrorForAllFlags({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_LSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
+    CheckErrorForAllFlags({{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_LSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
 } 
  
 BOOST_AUTO_TEST_CASE(rshift_test) 
@@ -632,7 +670,7 @@ BOOST_AUTO_TEST_CASE(rshift_test)
     CheckShiftOp({0x9F, 0x11, 0xF5, 0x55}, {0x0F}, OP_RSHIFT, to_bitpattern("00000000000000010011111000100011"));
 
     // second parameter, n < 0 - should produce error
-    CheckErrorForAllFlags({valtype{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
+    CheckErrorForAllFlags({{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
 }
 
 /**
@@ -730,9 +768,9 @@ BOOST_AUTO_TEST_CASE(string_opcodes_test) {
         0xbe, 0x6b, 0xb1, 0x4c, 0x46, 0x2a, 0x86, 0xd9, 0x2d, 0x20, 0x29, 0xb4,
         0x44, 0x15, 0xb2, 0x7e};
 
-    BOOST_CHECK_EQUAL(n.size(), MAX_SCRIPT_ELEMENT_SIZE);
+    BOOST_CHECK_EQUAL(n.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
 
-    for (size_t i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE; i++) {
+    for (size_t i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS; i++) {
         valtype a(n.begin(), n.begin() + i);
         valtype b(n.begin() + i, n.end());
 
@@ -787,18 +825,61 @@ static void CheckTypeConversionOp(const valtype &bin, const valtype &num) {
     // Grow and shrink back down using NUM2BIN.
     CheckTestResultForAllFlags({bin},
                                CScript()
-                                   << MAX_SCRIPT_ELEMENT_SIZE << OP_NUM2BIN
+                                   << MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS << OP_NUM2BIN
                                    << bin.size() << OP_NUM2BIN,
                                {rebuilt_bin});
     CheckTestResultForAllFlags({num},
                                CScript()
-                                   << MAX_SCRIPT_ELEMENT_SIZE << OP_NUM2BIN
+                                   << MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS << OP_NUM2BIN
                                    << bin.size() << OP_NUM2BIN,
                                {rebuilt_bin});
 
     // BIN2NUM is indempotent.
     CheckTestResultForAllFlags({bin}, CScript() << OP_BIN2NUM << OP_BIN2NUM,
                                {num});
+}
+
+BOOST_AUTO_TEST_CASE(limited_stack_test) {
+
+    // Calling constructor of LimitedStack throws error as we are pushing too much elements to stack.
+    BOOST_CHECK_THROW(
+        LimitedStack({{0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}}, 6 + 2 * LimitedVector::ELEMENT_OVERHEAD),
+        stack_overflow_error);
+
+    CheckStackSize({{0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}}, CScript() << OP_CAT, SCRIPT_ERR_OK, 7 + 2 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78}});
+
+    CheckStackSize({{0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}}, CScript() << OP_TUCK, SCRIPT_ERR_OK, 11 + 3 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0x12, 0x34, 0x56, 0x78}, {0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}});
+
+    CheckStackSize({{0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78}}, CScript() << OP_TUCK, SCRIPT_ERR_STACK_SIZE, 10 + 3 * LimitedVector::ELEMENT_OVERHEAD);
+
+    CheckStackSize({{0xab}, {0xcd}, {0xef}, {0x12}, {0x34}, {0x56}, {0x78}}, CScript() << OP_2ROT, SCRIPT_ERR_OK, 7 + 7 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}, {0x12}, {0x34}, {0x56}, {0x78}, {0xcd}, {0xef}});
+
+    CheckStackSize({{0xab}, {0xcd}, {0xef}}, CScript() << OP_ROT, SCRIPT_ERR_OK, 3 + 3 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xcd}, {0xef}, {0xab}});
+
+    CheckStackSize({{0xab}, {0xcd}, {0xef}, {0x12}, {0x34}}, CScript() << OP_2SWAP, SCRIPT_ERR_OK, 5 + 5 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}, {0x12}, {0x34}, {0xcd}, {0xef}});
+
+    CheckStackSize({{0xab}, {0xcd}, {0xef}}, CScript() << OP_NIP, SCRIPT_ERR_OK, 3 + 3 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}, {0xef}});
+
+    // OP_OVER: (x1 x2 -- x1 x2 x1)
+    CheckStackSize({{0xab}, {0xcd}}, CScript() << OP_OVER, SCRIPT_ERR_OK, 3 + 3 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}, {0xcd}, {0xab}});
+
+    CheckStackSize({{0xab}, {0xcd}}, CScript() << OP_OVER, SCRIPT_ERR_STACK_SIZE, 2 + 2 * LimitedVector::ELEMENT_OVERHEAD);
+
+    // TOALTSTACK should not modify size
+    CheckStackSize({{0xab}}, CScript() << OP_TOALTSTACK, SCRIPT_ERR_OK, 1 + 2 * LimitedVector::ELEMENT_OVERHEAD, {});
+
+    // FROMALTSTACK cannot be used without TOALTSTACK.
+    CheckStackSize({{0xab}}, CScript() << OP_FROMALTSTACK, SCRIPT_ERR_INVALID_ALTSTACK_OPERATION, 1 + 2 * LimitedVector::ELEMENT_OVERHEAD);
+
+    CheckStackSize({{0xab}}, CScript() << OP_TOALTSTACK << OP_FROMALTSTACK, SCRIPT_ERR_OK, 1 + 2 * LimitedVector::ELEMENT_OVERHEAD,
+        {{0xab}});
 }
 
 static void CheckBin2NumError(const stacktype &original_stack,
@@ -809,6 +890,7 @@ static void CheckBin2NumError(const stacktype &original_stack,
 
 static void CheckNum2BinError(const stacktype &original_stack,
                               ScriptError expected_error) {
+
     CheckErrorForAllFlags(original_stack, CScript() << OP_NUM2BIN,
                           expected_error);
 }
@@ -818,7 +900,7 @@ BOOST_AUTO_TEST_CASE(type_conversion_test) {
     CheckTypeConversionOp(empty, empty);
 
     valtype paddedzero, paddednegzero;
-    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE; i++) {
+    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS; i++) {
         CheckTypeConversionOp(paddedzero, empty);
         paddedzero.push_back(0x00);
 
@@ -830,7 +912,7 @@ BOOST_AUTO_TEST_CASE(type_conversion_test) {
     // Merge leading byte when sign bit isn't used.
     std::vector<uint8_t> k{0x7f}, negk{0xff};
     std::vector<uint8_t> kpadded = k, negkpadded = negk;
-    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE; i++) {
+    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS; i++) {
         CheckTypeConversionOp(kpadded, k);
         kpadded.push_back(0x00);
 
@@ -864,8 +946,8 @@ BOOST_AUTO_TEST_CASE(type_conversion_test) {
                       SCRIPT_ERR_INVALID_NUMBER_RANGE);
 
     // NUM2BIN must not generate oversized push.
-    valtype largezero(MAX_SCRIPT_ELEMENT_SIZE, 0);
-    BOOST_CHECK_EQUAL(largezero.size(), MAX_SCRIPT_ELEMENT_SIZE);
+    valtype largezero(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, 0);
+    BOOST_CHECK_EQUAL(largezero.size(), MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS);
     CheckTypeConversionOp(largezero, {});
 
     CheckNum2BinError({{}, {0x09, 0x02}}, SCRIPT_ERR_PUSH_SIZE);
@@ -1075,13 +1157,13 @@ static uint64_t NonPushOpCodeCount(const CScript& script)
  
 static void CheckTestForOpCodeLimit(const CScript &script,
                                     const size_t expNonPushOpcodeCount,
-                                    const BaseSignatureChecker& sigchecker,
-                                    const stacktype &original_stack = {})
+                                    const BaseSignatureChecker& sigchecker)
 { 
     const Config& config = GlobalConfig::GetConfig();
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
-        stacktype stack{original_stack};
+
+        LimitedStack stack(UINT32_MAX);
         auto r =
             EvalScript(
                 config, true,

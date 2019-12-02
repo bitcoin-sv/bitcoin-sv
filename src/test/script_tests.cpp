@@ -1313,7 +1313,8 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
     static const uint8_t pushdata4[] = {OP_PUSHDATA4, 1, 0, 0, 0, 0x5a};
 
     ScriptError err;
-    std::vector<std::vector<uint8_t>> directStack;
+
+    LimitedStack directStack(UINT32_MAX);
     auto source = task::CCancellationSource::Make();
     auto res =
         EvalScript(
@@ -1327,7 +1328,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 
-    std::vector<std::vector<uint8_t>> pushdata1Stack;
+    LimitedStack pushdata1Stack(UINT32_MAX);
     res =
         EvalScript(
             testConfig, true,
@@ -1341,7 +1342,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
     BOOST_CHECK(pushdata1Stack == directStack);
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 
-    std::vector<std::vector<uint8_t>> pushdata2Stack;
+    LimitedStack pushdata2Stack(UINT32_MAX);
     res =
         EvalScript(
             testConfig, true,
@@ -1355,7 +1356,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
     BOOST_CHECK(pushdata2Stack == directStack);
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 
-    std::vector<std::vector<uint8_t>> pushdata4Stack;
+    LimitedStack pushdata4Stack(UINT32_MAX);
     res =
         EvalScript(
             testConfig, true,
@@ -1366,6 +1367,7 @@ BOOST_AUTO_TEST_CASE(script_PushData) {
             BaseSignatureChecker(),
             &err);
     BOOST_CHECK(res.value());
+
     BOOST_CHECK(pushdata4Stack == directStack);
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
 }
@@ -1853,7 +1855,7 @@ BOOST_AUTO_TEST_CASE(script_standard_push) {
         BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
     }
 
-    for (unsigned int i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE; i++) {
+    for (unsigned int i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS; i++) {
         std::vector<uint8_t> data(i, '\111');
         CScript script;
         script << data;

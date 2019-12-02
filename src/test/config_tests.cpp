@@ -227,4 +227,33 @@ BOOST_AUTO_TEST_CASE(chain_params) {
     BOOST_CHECK_EQUAL(&Params(), &config.GetChainParams());
 }
 
+BOOST_AUTO_TEST_CASE(max_stack_size) {
+
+    std::string reason;
+
+    BOOST_CHECK(testConfig.SetMaxStackMemoryUsage(0, 0));
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), INT64_MAX);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), INT64_MAX);
+
+    BOOST_CHECK(testConfig.SetMaxStackMemoryUsage(0, DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS));
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), INT64_MAX);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS);
+
+    BOOST_CHECK(!testConfig.SetMaxStackMemoryUsage(1000000, 0, &reason));
+
+    BOOST_CHECK(testConfig.SetMaxStackMemoryUsage(200000000, DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS));
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), 200000000);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS);
+
+    BOOST_CHECK(!testConfig.SetMaxStackMemoryUsage(500, 600, &reason));
+
+    BOOST_CHECK(testConfig.SetMaxStackMemoryUsage(600, 500));
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(false, true), INT64_MAX);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(false, false), INT64_MAX);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, true), 600);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxStackMemoryUsage(true, false), 500);
+
+    BOOST_CHECK(!testConfig.SetMaxStackMemoryUsage(-1, -2));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

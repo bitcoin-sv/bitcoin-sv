@@ -140,7 +140,8 @@ std::optional<bool> AreInputsStandard(
         }
 
         if (whichType == TX_SCRIPTHASH) {
-            std::vector<std::vector<uint8_t>> stack;
+            // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
+            LimitedStack stack(UINT32_MAX);
             // convert the scriptSig into a stack, so we can inspect the
             // redeemScript
             auto res =

@@ -3238,7 +3238,7 @@ static void ProcessFilterAddMessage(const CNodePtr& pfrom, CDataStream& vRecv)
     // Nodes must NEVER send a data item > 520 bytes (the max size for a
     // script data object, and thus, the maximum size any matched object can
     // have) in a filteradd message.
-    if(vData.size() > MAX_SCRIPT_ELEMENT_SIZE) {
+    if(vData.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS) {
         Misbehaving(pfrom, 100, "invalid-filteradd");
     }
     else {

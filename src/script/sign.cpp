@@ -15,8 +15,6 @@
 #include "config.h"
 #include "validation.h"
 
-typedef std::vector<uint8_t> valtype;
-
 TransactionSignatureCreator::TransactionSignatureCreator(
     const CKeyStore *keystoreIn, const CTransaction *txToIn, unsigned int nInIn,
     const Amount amountIn, SigHashType sigHashTypeIn)
@@ -289,9 +287,12 @@ struct Stacks {
     explicit Stacks(const std::vector<valtype> &scriptSigStack_)
         : script(scriptSigStack_) {}
     explicit Stacks(const Config& config, bool consensus, const SignatureData &data) {
+        // Pre-genesis limitations are stricter than post-genesis, so LimitedStack can use UINT32_MAX as max size.
+        LimitedStack stack(UINT32_MAX);
         auto source = task::CCancellationSource::Make();
-        EvalScript(config, consensus, source->GetToken(), script, data.scriptSig,
+        EvalScript(config, consensus, source->GetToken(), stack, data.scriptSig,
                    MANDATORY_SCRIPT_VERIFY_FLAGS, BaseSignatureChecker());
+        stack.MoveToValtypes(script);
     }
 
     SignatureData Output() const {

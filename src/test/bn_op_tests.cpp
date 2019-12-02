@@ -95,14 +95,14 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
         auto source = task::CCancellationSource::Make();
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         const auto status =
             EvalScript(config, false, source->GetToken(), stack, script, flags,
                        BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
-        const auto frame = stack[0];
+        const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
                           : bsv::deserialize<bint>(begin(frame), end(frame));
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
 
     for(const auto [n, arg_0_poly, arg_1_poly, op_code, exp_poly] : test_data)
     {
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
 
         const bint bn{n};
         vector<uint8_t> args;
@@ -214,7 +214,7 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
-        const auto frame = stack[0];
+        const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
                           : bsv::deserialize<bint>(begin(frame), end(frame));
@@ -253,7 +253,7 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
     for(const auto [n, arg_0_poly, arg_1_poly, arg_2_poly, op_code, exp_poly] :
         test_data)
     {
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
 
         const bint bn{n};
         vector<uint8_t> args;
@@ -292,7 +292,7 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
-        const auto frame = stack[0];
+        const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
                           : bsv::deserialize<bint>(begin(frame), end(frame));
@@ -317,7 +317,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 
     for(const auto [n, arg_0_poly, arg_1_poly, op_code, exp_poly] : test_data)
     {
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
 
         const bint bn{n};
         vector<uint8_t> args;
@@ -355,8 +355,8 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         {
             BOOST_CHECK_EQUAL(SCRIPT_ERR_NUMEQUALVERIFY, error);
             BOOST_CHECK_EQUAL(1, stack.size());
-            const auto frame = stack[0];
-            const auto actual =
+            auto frame = stack.front();
+            auto actual =
                 frame.empty()
                     ? bint{0}
                     : bsv::deserialize<bint>(begin(frame), end(frame));
@@ -440,7 +440,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
     for(const auto [arg0_size, arg1_size, op_code, exp_status,
                     exp_script_error] : test_data)
     {
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
 
         vector<uint8_t> args;
 
@@ -498,7 +498,7 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
     // clang-format on
     for(auto& [ip, op] : test_data)
     {
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         vector<uint8_t> args;
 
         args.push_back(OP_PUSHDATA1);
@@ -518,8 +518,8 @@ BOOST_AUTO_TEST_CASE(op_bin2num)
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
-        BOOST_CHECK_EQUAL(op.size(), stack[0].size());
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]), begin(op),
+        BOOST_CHECK_EQUAL(op.size(), stack.front().size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()), begin(op),
                                       end(op));
     }
 }
@@ -568,7 +568,7 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
     // clang-format on
     for(auto& [arg1, arg2, exp_status, exp_error, op] : test_data)
     {
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         vector<uint8_t> args;
 
         args.push_back(OP_PUSHDATA1);
@@ -591,7 +591,7 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
 
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_error, error);
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]), begin(op),
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()), begin(op),
                                       end(op));
     }
 }
@@ -603,7 +603,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
     const vector<size_t> test_data = {0, 1, 20'000};
     for(const auto i : test_data)
     {
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         vector<uint8_t> args(i, OP_0);
 
         args.push_back(OP_DEPTH);
@@ -612,7 +612,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
 
         const auto cancellation_source{task::CCancellationSource::Make()};
         const auto token{cancellation_source->GetToken()};
-        const auto flags{SCRIPT_GENESIS};
+        const auto flags{SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS};
         ScriptError error;
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
@@ -622,7 +622,7 @@ BOOST_AUTO_TEST_CASE(op_depth)
         BOOST_CHECK_EQUAL(i + 1, stack.size());
         vector<uint8_t> op;
         bsv::serialize<int>(i, back_inserter(op));
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[i]), end(stack[i]), begin(op),
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(i)), end(stack.at(i)), begin(op),
                                       end(op));
     }
 }
@@ -658,15 +658,15 @@ BOOST_AUTO_TEST_CASE(op_size)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(2, stack.size());
-        const auto expected{stack[0].size()};
-        const auto actual{bsv::deserialize(begin(stack[1]), end(stack[1]))};
+        const auto expected{stack.front().size()};
+        const auto actual{bsv::deserialize(begin(stack.at(1)), end(stack.at(1)))};
         BOOST_CHECK_EQUAL(expected, actual);
     }
 }
@@ -697,7 +697,7 @@ BOOST_AUTO_TEST_CASE(op_pick)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
 
@@ -705,9 +705,9 @@ BOOST_AUTO_TEST_CASE(op_pick)
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(4, stack.size());
         if(op_code == OP_2)
-            BOOST_CHECK(stack[3].empty());
+            BOOST_CHECK(stack.at(3).empty());
         else
-            BOOST_CHECK_EQUAL(stack[i][0], stack[3][0]);
+            BOOST_CHECK_EQUAL(stack.at(i).front(), stack.at(3).front());
     }
 }
 
@@ -736,7 +736,7 @@ BOOST_AUTO_TEST_CASE(op_roll)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
 
@@ -746,21 +746,21 @@ BOOST_AUTO_TEST_CASE(op_roll)
 
         if(op_code == OP_0)
         {
-            BOOST_CHECK_EQUAL(2, stack[2][0]);
-            BOOST_CHECK_EQUAL(1, stack[1][0]);
-            BOOST_CHECK(stack[0].empty());
+            BOOST_CHECK_EQUAL(2, stack.at(2).front());
+            BOOST_CHECK_EQUAL(1, stack.at(1).front());
+            BOOST_CHECK(stack.at(0).empty());
         }
         else if(op_code == OP_1)
         {
-            BOOST_CHECK_EQUAL(1, stack[2][0]);
-            BOOST_CHECK_EQUAL(2, stack[1][0]);
-            BOOST_CHECK(stack[0].empty());
+            BOOST_CHECK_EQUAL(1, stack.at(2).front());
+            BOOST_CHECK_EQUAL(2, stack.at(1).front());
+            BOOST_CHECK(stack.at(0).empty());
         }
         else if(op_code == OP_2)
         {
-            BOOST_CHECK(stack[2].empty());
-            BOOST_CHECK_EQUAL(2, stack[1][0]);
-            BOOST_CHECK_EQUAL(1, stack[0][0]);
+            BOOST_CHECK(stack.at(2).empty());
+            BOOST_CHECK_EQUAL(2, stack.at(1).front());
+            BOOST_CHECK_EQUAL(1, stack.at(0).front());
         }
         else
             BOOST_CHECK(false);
@@ -797,18 +797,18 @@ BOOST_AUTO_TEST_CASE(op_split)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(2, stack.size());
-        BOOST_CHECK_EQUAL(2 - i, stack[1].size());
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[1]), end(stack[1]),
+        BOOST_CHECK_EQUAL(2 - i, stack.at(1).size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.at(1)), end(stack.at(1)),
                                       begin(rhs), end(rhs));
-        BOOST_CHECK_EQUAL(i, stack[0].size());
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]),
+        BOOST_CHECK_EQUAL(i, stack.front().size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
                                       begin(lhs), end(lhs));
     }
 }
@@ -845,15 +845,15 @@ BOOST_AUTO_TEST_CASE(op_lshift)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
-        BOOST_CHECK_EQUAL(2, stack[0].size());
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]),
+        BOOST_CHECK_EQUAL(2, stack.front().size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
                                       begin(expected), end(expected));
     }
 }
@@ -890,15 +890,15 @@ BOOST_AUTO_TEST_CASE(op_rshift)
         const auto token{cancellation_source->GetToken()};
         const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
         ScriptError error;
-        stack_type stack;
+        LimitedStack stack(UINT32_MAX);
         const auto status = EvalScript(config, false, token, stack, script,
                                        flags, BaseSignatureChecker{}, &error);
 
         BOOST_CHECK_EQUAL(true, status.value());
         BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, error);
         BOOST_CHECK_EQUAL(1, stack.size());
-        BOOST_CHECK_EQUAL(2, stack[0].size());
-        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack[0]), end(stack[0]),
+        BOOST_CHECK_EQUAL(2, stack.front().size());
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
                                       begin(expected), end(expected));
     }
 }
