@@ -830,23 +830,6 @@ static UniValue submitblock(const Config &config,
     return processBlock(config, blockptr, submitBlock);
 }
 
-static UniValue estimatefee(const Config &config,
-                            const JSONRPCRequest &request) {
-    // allow 1 parameter because of the backwards compatibility even though it is ignored in the current implementation
-    if (request.fHelp || request.params.size() > 1) {
-        throw std::runtime_error(
-            "estimatefee\n"
-            "\nEstimates the approximate fee per kilobyte needed for a "
-            "transaction\n"
-            "\nResult:\n"
-            "n(numeric) estimated fee-per-kilobyte\n"
-            "\nExample:\n" +
-            HelpExampleCli("estimatefee", ""));
-    }
-
-    return ValueFromAmount(mempool.estimateFee().GetFeePerK());
-}
-
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category   name                     actor (function)       okSafeMode
@@ -859,8 +842,6 @@ static const CRPCCommand commands[] = {
     {"mining",     "submitblock",           submitblock,           true, {"hexdata", "parameters"}},
 
     {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},
-
-    {"util",       "estimatefee",           estimatefee,           true, {}},
 };
 // clang-format on
 
