@@ -946,7 +946,7 @@ std::string HelpMessage(HelpMessageMode mode) {
 
 
     strUsage += HelpMessageOpt(
-        "-stdtxnvalidationmaxduration=<n>",
+        "-maxstdtxvalidationduration=<n>",
         strprintf(
             _("Set the single standard transaction validation duration threshold in"
               " milliseconds after which the standard transaction validation will"
@@ -955,7 +955,7 @@ std::string HelpMessage(HelpMessageMode mode) {
             DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()));
 
     strUsage += HelpMessageOpt(
-        "-nonstdtxnvalidationmaxduration=<n>",
+        "-maxnonstdtxvalidationduration=<n>",
         strprintf(
             _("Set the single non-standard transaction validation duration threshold in"
               " milliseconds after which the non-standard transaction validation will"
@@ -1877,7 +1877,7 @@ bool AppInitParameterInteraction(Config &config) {
 
     if(std::string err; !config.SetMaxStdTxnValidationDuration(
         gArgs.GetArg(
-            "-stdtxnvalidationmaxduration",
+            "-maxstdtxvalidationduration",
             DEFAULT_MAX_STD_TXN_VALIDATION_DURATION.count()),
         &err))
     {
@@ -1886,7 +1886,7 @@ bool AppInitParameterInteraction(Config &config) {
 
     if(std::string err; !config.SetMaxNonStdTxnValidationDuration(
         gArgs.GetArg(
-            "-nonstdtxnvalidationmaxduration",
+            "-maxnonstdtxvalidationduration",
             DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION.count()),
         &err))
     {
