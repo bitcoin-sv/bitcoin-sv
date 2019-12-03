@@ -421,7 +421,6 @@ std::optional<bool> EvalScript(
     LimitedStack altstack {stack.makeChildStack()};
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
-    const bool genesis_rules_enabled{(flags & SCRIPT_GENESIS) != 0};
     const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
     if(script.size() > config.GetMaxScriptSize(utxo_after_genesis, consensus))
     {
