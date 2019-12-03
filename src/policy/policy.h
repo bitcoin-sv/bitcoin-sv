@@ -92,6 +92,8 @@ static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
 /** Default for -incrementalrelayfee, which sets the minimum feerate increase
  * for mempool limiting or BIP 125 replacement **/
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
+/** Default for -maxscriptsizepolicy **/
+static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = MAX_SCRIPT_SIZE_BEFORE_GENESIS;
 /**
  * Min feerate for defining dust. Historically this has been the same as the
  * minRelayTxFee, however changing the dust limit changes which transactions are

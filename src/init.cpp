@@ -402,6 +402,7 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf("Set block height at which genesis should be activated. "
                   "(default: %u).",
                   defaultChainParams->GetConsensus().genesisHeight));
+
     strUsage += HelpMessageOpt(
         "-loadblock=<file>",
         _("Imports blocks from external blk000??.dat file on startup"));
@@ -966,6 +967,12 @@ std::string HelpMessage(HelpMessageMode mode) {
         HelpMessageOpt("-maxtxsizepolicy=<n>",
             strprintf(_("Set maximum transaction size in bytes we relay and mine (default: %u, min: %u, 0 = unlimited) after Genesis is activated"),
                 DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS, MAX_TX_SIZE_POLICY_BEFORE_GENESIS));
+
+    strUsage += HelpMessageOpt(
+        "-maxscriptsizepolicy",
+        strprintf("Set maximum script size in bytes we're willing to relay/mine per script after Genesis is activated. "
+            "(default: %u, 0 = unlimited).",
+            DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS));
 
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
@@ -1831,6 +1838,15 @@ bool AppInitParameterInteraction(Config &config) {
     {
         return InitError(err);
     }
+
+    //Configure max script size after genesis
+    if (gArgs.IsArgSet("-maxscriptsizepolicy")) {
+        int64_t maxScriptSize = gArgs.GetArg("-maxscriptsizepolicy", DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS);
+        if (std::string err; !config.SetMaxScriptSizePolicy(maxScriptSize, &err)) {
+            return InitError(err);
+        }
+    }
+
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &
     // undo files

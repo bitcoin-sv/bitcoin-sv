@@ -9,6 +9,7 @@
 #include "crypto/common.h"
 #include "prevector.h"
 #include "serialize.h"
+#include "consensus/consensus.h"
 
 #include <cassert>
 #include <climits>
@@ -24,9 +25,6 @@ static const unsigned int MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520;
 
 // Maximum number of elements on the stack -- replaced with DEFAULT_STACK_MEMORY_USAGE after Genesis
 static const unsigned int MAX_STACK_ELEMENTS_BEFORE_GENESIS = 1000;
-
-// Maximum script length in bytes
-static const int MAX_SCRIPT_SIZE = 10000;
 
 // Threshold for nLockTime: below this value it is interpreted as block number,
 // otherwise as UNIX timestamp. Thresold is Tue Nov 5 00:53:20 1985 UTC
@@ -423,14 +421,13 @@ public:
             // unlock script pushes non 0 value to the stack.
 
             // We currently only detect OP_FALSE OP_RETURN as provably unspendable.
-            return  (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
-                (size() > MAX_SCRIPT_SIZE);
+            return  (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN);
         }
         else
         {
             return (size() > 0 && *begin() == OP_RETURN) ||
                 (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
-                (size() > MAX_SCRIPT_SIZE);
+                (size() > MAX_SCRIPT_SIZE_BEFORE_GENESIS);
         }
     }
 

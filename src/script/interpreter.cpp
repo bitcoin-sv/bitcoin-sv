@@ -422,13 +422,13 @@ std::optional<bool> EvalScript(
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
     const bool genesis_rules_enabled{(flags & SCRIPT_GENESIS) != 0};
-    if(!genesis_rules_enabled && (script.size() > MAX_SCRIPT_SIZE))
+    const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
+    if(script.size() > config.GetMaxScriptSize(utxo_after_genesis, consensus))
     {
         return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
     }
     uint64_t nOpCount = 0;
     const bool fRequireMinimal = (flags & SCRIPT_VERIFY_MINIMALDATA) != 0;
-    const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
     const int big_ints_byte_limit{500}; // To do: Make configurable
                                         // MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520
 
