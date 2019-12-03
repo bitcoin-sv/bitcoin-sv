@@ -113,7 +113,10 @@ class HeightBasedTestsCase:
 
 
 class SimpleTestDefinition:
-    def __init__(self, utxo_label, locking_script, label, unlocking_script, p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None):
+
+    def __init__(self, utxo_label, locking_script, label, unlocking_script,
+                 p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None,
+                 post_utxo_tx_creation=lambda tx: tx, post_test_tx_creation=lambda tx: tx):
         self.scenario            = None
         self.label               = label
         self.locking_script      = locking_script
@@ -124,6 +127,8 @@ class SimpleTestDefinition:
         self.test_tx_locking_script = test_tx_locking_script or CScript([OP_FALSE, OP_RETURN])
         self.funding_tx = None
         self.test_tx    = None
+        self.post_utxo_tx_creation = post_utxo_tx_creation
+        self.post_test_tx_creation = post_test_tx_creation
 
     def make_utxo(self, parent_tx, output_ndx):
         self.funding_tx = create_transaction(parent_tx,
@@ -131,7 +136,7 @@ class SimpleTestDefinition:
                                              CScript(),
                                              parent_tx.vout[output_ndx].nValue - (500 + len(self.locking_script)),
                                              self.locking_script)
-        return self.funding_tx
+        return self.post_utxo_tx_creation(self.funding_tx)
 
     def make_test_tx(self):
         unlocking_script = b'' if callable(self.unlocking_script) else self.unlocking_script
@@ -142,14 +147,16 @@ class SimpleTestDefinition:
                                           self.test_tx_locking_script)
         if callable(self.unlocking_script):
             self.test_tx.vin[0].scriptSig = self.unlocking_script(self.test_tx, self.funding_tx)
-        return self.test_tx
+        return self.post_test_tx_creation(self.test_tx)
 
 
 class SimpleTestScenarioDefinition(SimpleTestDefinition):
     def __init__(self, scenario, utxo_label, locking_script, label, unlocking_script,
-                 p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None):
+                 p2p_reject_reason=None, block_reject_reason=None, test_tx_locking_script=None,
+                 post_utxo_tx_creation=lambda tx: tx, post_test_tx_creation=lambda tx: tx):
         super(SimpleTestScenarioDefinition, self).__init__(utxo_label, locking_script, label, unlocking_script,
-                                                           p2p_reject_reason, block_reject_reason, test_tx_locking_script)
+                                                           p2p_reject_reason, block_reject_reason, test_tx_locking_script,
+                                                           post_utxo_tx_creation, post_test_tx_creation)
         self.scenario = scenario
 
 
