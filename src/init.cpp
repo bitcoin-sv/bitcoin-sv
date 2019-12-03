@@ -1133,6 +1133,10 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-txnvalidationasynchrunfreq=<n>",
         strprintf("Set run frequency in asynchronous mode (default: %dms)",
             CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS)) ;
+    strUsage += HelpMessageOpt(
+        "-txnvalidationqueuesmaxmemory=<n>",
+        strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d)",
+            CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
 
     strUsage += HelpMessageOpt(
         "-maxpubkeyspermultisigpolicy=<n>",
