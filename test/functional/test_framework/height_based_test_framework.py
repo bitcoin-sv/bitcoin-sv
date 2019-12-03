@@ -299,6 +299,10 @@ class SimplifiedTestFramework(BitcoinTestFramework):
 
         return coinbases, block
 
+    def check_mp(self):
+        mempool = self.nodes[0].rpc.getrawmempool()
+        for tx in mempool:
+            self.log.info(f"Tx {loghash(tx)} is in mempool")
 
     def _process_rpc_rejects(self, connection, to_reject, reasons, error_codes, test_label, height_label):
         for tx, reason, error_code in zip(to_reject, reasons, error_codes):
@@ -324,6 +328,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                            timeout=10, check_interval=0.2,
                            label=f"Waiting tx to be rejected. Reason {reason} At {test_label} {height_label} tx:{tx.hash}")
                 if reason:
+                    self.log.info(f"Tx {loghash(tx.hash)} is rejected as expected for reason {reason}")
                     assert rejects[0].reason == reason, f"Mismatching rejection reason: got {rejects[0].reason} expected {reason}"
 
     def _process_p2p_accepts(self, connection, to_accept, test_label, height_label):
@@ -338,6 +343,8 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         wait_until(tt,
                    timeout=10, check_interval=0.2,
                    label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept) }")
+
+        self.check_mp()
 
     def _assert_height(self, connection, desired_height):
         real_height = connection.rpc.getblock(connection.rpc.getbestblockhash())["height"]
