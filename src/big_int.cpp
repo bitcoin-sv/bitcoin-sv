@@ -25,104 +25,139 @@ bsv::bint::bint() : value_{nullptr} {}
 
 bsv::bint::bint(const int i) : value_(BN_new(), empty_bn_deleter())
 {
-    assert(value_);
+    // assert(value_);
+    if(!value_)
+        throw big_int_error();
 
     if(i >= 0)
     {
         const auto s{BN_set_word(value_.get(), i)};
-        assert(s);
+        // assert(s);
+        if(!s)
+            throw big_int_error();
     }
     else if(i > INT_MIN)
     {
         const auto s{BN_set_word(value_.get(), -i)};
-        assert(s);
+        // assert(s);
+        if(!s)
+            throw big_int_error();
         BN_set_negative(value_.get(), 1);
     }
     else
     {
         const int ii{i + 1}; // add 1 to avoid overflow in negation
         auto s{BN_set_word(value_.get(), -ii)};
-        assert(s);
+        // assert(s);
+        if(!s)
+            throw big_int_error();
 
         BN_set_negative(value_.get(), 1);
 
         // subtract 1 to compensate for earlier addition
         s = BN_sub(value_.get(), value_.get(), BN_value_one());
-        assert(s);
+        // assert(s);
+        if(!s)
+            throw big_int_error();
     }
 
     // clang-format off
-    assert( ((i < 0) && (is_negative(*this))) ||
-            ((i == 0) && (BN_is_zero(value_.get()))) ||
-            ((i > 0) && (!is_negative(*this))) );
+    //assert( ((i < 0) && (is_negative(*this))) ||
+    //        ((i == 0) && (BN_is_zero(value_.get()))) ||
+    //        ((i > 0) && (!is_negative(*this))) );
     // clang-format on
 }
 
 bsv::bint::bint(const int64_t i) : value_(BN_new(), empty_bn_deleter())
 {
-    assert(value_);
+    // assert(value_);
+    if(!value_)
+        throw big_int_error();
 
     if(i >= 0)
     {
         const auto s{BN_set_word(value_.get(), i)};
-        assert(s);
+        // assert(s);
+        if(!s)
+            throw big_int_error();
     }
     else if(i > INT64_MIN)
     {
         const auto s{BN_set_word(value_.get(), -i)};
-        assert(s);
+        // assert(s);
+        if(!s)
+            throw big_int_error();
         BN_set_negative(value_.get(), 1);
     }
     else
     {
         const int64_t ii{i + 1}; // add 1 to avoid overflow in negation
         auto s{BN_set_word(value_.get(), -ii)};
-        assert(s);
+        // assert(s);
+        if(!s)
+            throw big_int_error();
 
         BN_set_negative(value_.get(), 1);
 
         // subtract 1 to compensate for earlier addition
         s = BN_sub(value_.get(), value_.get(), BN_value_one());
-        assert(s);
+        // assert(s);
+        if(!s)
+            throw big_int_error();
     }
 
     // clang-format off
-    assert( ((i < 0) && (is_negative(*this))) ||
-            ((i == 0) && (BN_is_zero(value_.get()))) ||
-            ((i > 0) && (!is_negative(*this))) );
+    //assert( ((i < 0) && (is_negative(*this))) ||
+    //      ((i == 0) && (BN_is_zero(value_.get()))) ||
+    //      ((i > 0) && (!is_negative(*this))) );
     // clang-format on
 }
 
 bsv::bint::bint(const size_t i) : value_(BN_new(), empty_bn_deleter())
 {
+    assert(value_);
+    if(!value_)
+        throw big_int_error();
+
     // Precondition: i > std::numeric_limits<size_t>::min()
     // as negation is out-of-range of size_t
-    assert(i >= std::numeric_limits<size_t>::min());
-    assert(value_);
+    // assert(i >= std::numeric_limits<size_t>::min());
+    // assert(value_);
     const auto s{BN_set_word(value_.get(), i)};
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
 
     // clang-format off
-    assert( ((i == 0) && (BN_is_zero(value_.get())))  ||
-            ((i > 0) && (!is_negative(*this))) );
+    //assert( ((i == 0) && (BN_is_zero(value_.get())))  ||
+    //      ((i > 0) && (!is_negative(*this))) );
     // clang-format on
 }
 
 bsv::bint::bint(const std::string& n) : value_(BN_new(), empty_bn_deleter())
 {
-    assert(value_.get());
-    auto x{value_.get()};
-    const auto s = BN_dec2bn(&x, n.c_str());
-    assert(s);
+    // assert(value_);
+    if(!value_)
+        throw big_int_error();
+
+    auto p{value_.get()};
+    const auto s = BN_dec2bn(&p, n.c_str());
+    // assert(s);
+    if(!s)
+        throw big_int_error();
 }
 
 bsv::bint::bint(const bint& other) : value_(BN_new(), empty_bn_deleter())
 {
-    assert(other.value_.get()); // See Note 2 @ eof
-    assert(value_.get());
+    // assert(other.value_); // See Note 2 @ eof
+    // assert(value_);
+    if(!value_)
+        throw big_int_error();
 
     const auto s = BN_copy(value_.get(), other.value_.get());
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
 }
 
 bsv::bint& bsv::bint::operator=(const bint& other)
@@ -134,7 +169,7 @@ bsv::bint& bsv::bint::operator=(const bint& other)
 
 void bsv::bint::swap(bint& other) noexcept
 {
-    assert(value_.get());
+    // assert(value_);
     using std::swap;
     swap(value_, other.value_);
 }
@@ -152,17 +187,21 @@ bool bsv::operator==(const bint& a, const bint& b)
 // Arithmetic operators
 bsv::bint& bsv::bint::operator+=(const bint& other)
 {
-    assert(value_.get());
+    // assert(value_);
     const auto s = BN_add(value_.get(), value_.get(), other.value_.get());
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
     return *this;
 }
 
 bsv::bint& bsv::bint::operator-=(const bint& other)
 {
-    assert(value_.get());
+    // assert(value_);
     const auto s = BN_sub(value_.get(), value_.get(), other.value_.get());
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
     return *this;
 }
 
@@ -183,33 +222,39 @@ namespace
 
 bsv::bint& bsv::bint::operator*=(const bint& other)
 {
-    assert(value_.get());
+    // assert(value_);
     unique_ctx_ptr ctx{make_unique_ctx_ptr()};
     const auto s{
         BN_mul(value_.get(), value_.get(), other.value_.get(), ctx.get())};
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
     return *this;
 }
 
 bsv::bint& bsv::bint::operator/=(const bint& other)
 {
-    assert(value_.get());
+    // assert(value_);
     bint rem;
     unique_ctx_ptr ctx{make_unique_ctx_ptr()};
     const auto s{BN_div(value_.get(), rem.value_.get(), value_.get(),
                         other.value_.get(), ctx.get())};
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
     return *this;
 }
 
 bsv::bint& bsv::bint::operator%=(const bint& other)
 {
-    assert(value_.get());
+    // assert(value_);
     bint rem;
     unique_ctx_ptr ctx{make_unique_ctx_ptr()};
     const auto s{
         BN_mod(value_.get(), value_.get(), other.value_.get(), ctx.get())};
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
     return *this;
 }
 
@@ -300,7 +345,9 @@ bsv::bint& bsv::bint::operator<<=(const int n)
         return *this;
 
     const auto s{BN_lshift(value_.get(), value_.get(), n)};
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
     return *this;
 }
 
@@ -310,7 +357,9 @@ bsv::bint& bsv::bint::operator>>=(const int n)
         return *this;
 
     const auto s{BN_rshift(value_.get(), value_.get(), n)};
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
     return *this;
 }
 
@@ -333,7 +382,7 @@ uint8_t bsv::bint::lsb() const
 int bsv::bint::spaceship_operator(
     const bint& other) const // auto operator<=>(const bint&) in C++20
 {
-    assert(value_.get());
+    // assert(value_);
     return BN_cmp(value_.get(), other.value_.get());
 }
 
@@ -349,7 +398,9 @@ void bsv::bint::negate()
 void bsv::bint::mask_bits(const int n)
 {
     const auto s{BN_mask_bits(value_.get(), n)};
-    assert(s);
+    // assert(s);
+    if(!s)
+        throw big_int_error();
 }
 
 int bsv::bint::size_bits() const { return BN_num_bits(value_.get()); }
@@ -358,11 +409,12 @@ int bsv::bint::size_bytes() const { return BN_num_bytes(value_.get()); }
 
 bsv::bint::buffer_type bsv::bint::to_bin() const
 {
-    assert(value_.get());
+    // assert(value_);
 
     buffer_type buffer(size_bytes());
-    const auto n{BN_bn2bin(value_.get(), buffer.data())};
-    assert(buffer.size() == static_cast<buffer_type::size_type>(n));
+    BN_bn2bin(value_.get(), buffer.data());
+    // const auto n{BN_bn2bin(value_.get(), buffer.data())};
+    // assert(buffer.size() == static_cast<buffer_type::size_type>(n));
 
     return buffer;
 }
@@ -417,11 +469,13 @@ long bsv::to_long(const bint& n)
     // n <= numeric_limit<int64_t>::max() and n>=0
 
     auto* asn1{BN_to_ASN1_INTEGER(n.value_.get(), nullptr)};
-    assert(asn1);
+    // assert(asn1);
+    if(!asn1)
+        throw big_int_error();
 
     //-1 means either error or an integer with a value of -1
     //(we don't want to use ASN1_INTEGER_get_uint64 because it's not supported
-    //in older version of OpenSSL)
+    // in older version of OpenSSL)
     return ASN1_INTEGER_get(asn1);
 }
 
@@ -435,7 +489,7 @@ std::size_t bsv::to_size_t_limited(const bint& n)
     // n <= numeric_limit<int64_t>::max() and n>=0
 
     const int64_t i64 = to_long(n);
-    assert(i64 >= 0); 
+    // assert(i64 >= 0);
     return static_cast<size_t>(i64);
 }
 
@@ -447,7 +501,7 @@ namespace
 std::vector<uint8_t> bsv::bint::serialize() const
 {
     const auto len{BN_bn2mpi(value_.get(), nullptr)};
-    assert(len >= length_in_bytes);
+    // assert(len >= length_in_bytes);
     vector<unsigned char> result(len);
     BN_bn2mpi(value_.get(), result.data());
     result.erase(begin(result), begin(result) + length_in_bytes);
