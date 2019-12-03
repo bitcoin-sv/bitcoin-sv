@@ -8,7 +8,8 @@
 
 #include <iosfwd>
 
-typedef enum ScriptError_t {
+typedef enum ScriptError_t
+{
     SCRIPT_ERR_OK = 0,
     SCRIPT_ERR_UNKNOWN_ERROR,
     SCRIPT_ERR_EVAL_FALSE,
@@ -74,6 +75,8 @@ typedef enum ScriptError_t {
     /* anti replay */
     SCRIPT_ERR_ILLEGAL_FORKID,
     SCRIPT_ERR_MUST_USE_FORKID,
+
+    SCRIPT_ERR_BIG_INT,
 
     SCRIPT_ERR_ERROR_COUNT
 } ScriptError;

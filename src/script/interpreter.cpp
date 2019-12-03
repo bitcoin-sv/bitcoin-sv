@@ -1680,13 +1680,25 @@ std::optional<bool> EvalScript(
                 return set_error(serror, SCRIPT_ERR_STACK_SIZE);
             }
         }
-    } catch (scriptnum_overflow_error& err) {
+    }
+    catch(scriptnum_overflow_error& err)
+    {
         return set_error(serror, SCRIPT_ERR_SCRIPTNUM_OVERFLOW);
-    } catch (scriptnum_minencode_error& err) {
+    }
+    catch(scriptnum_minencode_error& err)
+    {
         return set_error(serror, SCRIPT_ERR_SCRIPTNUM_MINENCODE);
-    } catch (stack_overflow_error& err) {
+    }
+    catch(stack_overflow_error& err)
+    {
         return set_error(serror, SCRIPT_ERR_STACK_SIZE);
-    } catch (...) {
+    }
+    catch(const bsv::big_int_error&)
+    {
+        return set_error(serror, SCRIPT_ERR_BIG_INT);
+    }
+    catch(...)
+    {
         return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
     }
 

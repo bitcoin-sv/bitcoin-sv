@@ -4,6 +4,7 @@
 #pragma once
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -188,6 +189,12 @@ namespace bsv
         std::vector<uint8_t> v(first, last);
         return bint::deserialize(v);
     }
+
+    class big_int_error : std::runtime_error
+    {
+    public:
+        big_int_error() : std::runtime_error(""){};
+    };
 }
 
 namespace std
