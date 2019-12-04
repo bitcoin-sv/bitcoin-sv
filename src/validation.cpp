@@ -1526,7 +1526,7 @@ CTxnValResult TxnValidationProcessingTask(
     // Process validated results
     ProcessValidatedTxn(pool, result, handlers, false);
     // Forward results to the next processing stage
-    return std::move(result);
+    return result;
 }
 
 static void HandleInvalidP2POrphanTxn(
