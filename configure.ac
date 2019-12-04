@@ -165,6 +165,18 @@ AC_ARG_ENABLE([asm],
   [use_asm=$enableval],
   [use_asm=yes])
 
+AC_ARG_ENABLE([tcmalloc],
+  [AS_HELP_STRING([--enable-tcmalloc],
+  [Link with Google tcmalloc (default is no)])],
+  [use_tcmalloc=$enableval],
+  [use_tcmalloc=no])
+
+AC_ARG_ENABLE([jemalloc],
+  [AS_HELP_STRING([--enable-jemalloc],
+  [Link with jemalloc (default is no)])],
+  [use_jemalloc=$enableval],
+  [use_jemalloc=no])
+
 dnl setup for production/development build
 AC_MSG_CHECKING([whether production or development build])
 if test x$enable_prod_build != xno; then
@@ -556,6 +568,18 @@ if test x$use_lcov = xyes; then
     [AC_MSG_ERROR("lcov testing requested but --coverage linker flag does not work")])
   AX_CHECK_COMPILE_FLAG([--coverage],[CXXFLAGS="$CXXFLAGS --coverage"],
     [AC_MSG_ERROR("lcov testing requested but --coverage flag does not work")])
+fi
+
+if test x$use_tcmalloc = xyes; then
+  AC_MSG_RESULT([Enabling tcmalloc])
+  AC_CHECK_LIB([tcmalloc], [malloc],
+    [CXXFLAGS="$CXXFLAGS -fno-builtin-malloc -fno-builtin-calloc -fno-builtin-realloc -fno-builtin-free"; LIBS="-ltcmalloc $LIBS"],
+    [AC_MSG_ERROR(tcmalloc not found)])
+else
+  if test x$use_jemalloc = xyes; then
+    AC_MSG_RESULT([Enabling jemalloc])
+    AC_CHECK_LIB([jemalloc], [malloc],, [AC_MSG_ERROR(jemalloc not found)])
+  fi
 fi
 
 dnl Check for endianness
@@ -1295,6 +1319,10 @@ echo "  sanitizers    "
 echo "          asan  = $enable_asan"
 echo "          tsan  = $enable_tsan"
 echo "          ubsan = $enable_ubsan"
+echo
+echo "  memory allocators"
+echo "       tcmalloc = $use_tcmalloc"
+echo "       jemalloc = $use_jemalloc"
 echo
 echo "  target os     = $TARGET_OS"
 echo "  build os      = $BUILD_OS"
