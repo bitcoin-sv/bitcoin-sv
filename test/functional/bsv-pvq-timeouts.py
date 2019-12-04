@@ -23,10 +23,23 @@ import random
 # are assigned to process tasks from the other (non empty) queue.
 #
 # The following description clarifies how PVQ behaves in conjunction with designated timeouts.
+# Long-term solution is going to be compliant with the points 1 & 2 (see Long-term section).
+# For the time being, Short-term solution needs to take place which puts all received p2p txns into the 'high' priority queue.
+# If the timeout occurs for the given txn, then it is being forwarded into the 'low' priority queue.
+# This apporach avoids an expensive checks on txn's inputs by the networking thread.
+
+# Short-term:
+# 1/2. Any incoming p2p txn (standard or nonstandard) goes into the 'high' priority queue. If the timeout occurs,
+#    the txn goes to the 'low' priority queue.
+#   - maximumum txn validation duration for a 'high' priority task can be configured by '-maxstdtxvalidationduration' config param.
+#   - maximumum txn validation duration for a 'low' priority task can be configured by '-maxnonstdtxvalidationduration' config param.
+
+# Long-term:
 # 1. Standard txns are handled by 'high' priority validation threads
 #   - maximumum txn validation duration for a 'high' priority task can be configured by '-maxstdtxvalidationduration' config param.
 # 2. Nonstandard txns are handled by 'low' priority validation threads
 #   - maximumum txn validation duration for a 'low' priority task can be configured by '-maxnonstdtxvalidationduration' config param.
+
 # 3. If a standard transaction (from the high-priority queue) takes too much time (it exceeds the timeout),
 #    then it is forwarded to the low-priority queue (to be reprocessed later).
 # 4. node0 is a testing node which receives txns via p2p.
@@ -374,7 +387,7 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 # A number of accepted txns
                 10,
                 # A number of rejected txns during a test (rejected by a 'high' priority queue)
-                10, 
+                10,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -471,9 +484,8 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 10,
-                # A number of rejected txns during a test (rejected by a 'high' priority queue). All txns are nonstandard
-                # (non of them goes to the standard queue)
-                0, 
+                # A number of rejected non-standard txns during a test (rejected by a 'high' priority queue).
+                10,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -504,7 +516,7 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 # A number of accepted txns
                 10,
                 # A number of rejected txns during a test (rejected by a 'high' priority queue).
-                5, 
+                10,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -549,7 +561,7 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 # The total number of rejected msgs should be 15. However, due to mt execution some of them are detected as
                 # 'txn-double-spend-detected' (added to the reject cache) but others as 'txn-mempool-conflict' (witness transactions
                 # not added to the reject cache).
-                10, 
+                10,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -621,10 +633,10 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 # A number of accepted txns
                 5,
                 # A number of rejected txns with reason 'too-long-validation-time'.
-                # The total number of rejected msgs is 5. However, due to mt execution some of them are detected as
+                # The total number of rejected msgs is 15. However, due to mt execution some of them are detected as
                 # 'txn-double-spend-detected' (added to the reject cache) but others as 'txn-mempool-conflict' (witness transactions
                 # not added to the reject cache).
-                0, 
+                10,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
