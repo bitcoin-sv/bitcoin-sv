@@ -47,7 +47,7 @@ class COrphanTxns {
     /** A default max limit for collected outpoints */
     static constexpr unsigned int DEFAULT_MAX_COLLECTED_OUTPOINTS = 300000;
     /** Default for -maxorphantxssize, maximum size of orphan transactions is 10 MB*/
-    static constexpr unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE = 10 * ONE_MEGABYTE;
+    static constexpr uint64_t DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE = 100 * ONE_MEGABYTE;
     /** Default number of orphan+recently-replaced txn to keep around for block
      *  reconstruction */
     static constexpr unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;

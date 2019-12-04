@@ -375,6 +375,21 @@ static void libevent_log_cb(int severity, const char *msg) {
     }
 }
 
+ev_ssize_t GetMaxBodySizeSafe(uint64_t maxBlockSize)
+{    
+    ev_ssize_t maxBodySize{ 0 };
+    constexpr auto maxSsize = std::numeric_limits<ev_ssize_t>::max();
+    if (maxBlockSize > (maxSsize / 2 - MIN_SUPPORTED_BODY_SIZE))
+    {
+        maxBodySize = maxSsize;
+    }
+    else
+    {
+        maxBodySize = MIN_SUPPORTED_BODY_SIZE + 2 * maxBlockSize;
+    }
+    return maxBodySize;
+}
+
 bool InitHTTPServer(Config &config) {
     struct evhttp *http = 0;
     struct event_base *base = 0;
@@ -424,8 +439,7 @@ bool InitHTTPServer(Config &config) {
     evhttp_set_timeout(
         http, gArgs.GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
-    evhttp_set_max_body_size(
-        http, MIN_SUPPORTED_BODY_SIZE + 2 * config.GetMaxBlockSize());
+    evhttp_set_max_body_size(http, GetMaxBodySizeSafe(config.GetMaxBlockSize()));
     evhttp_set_gencb(http, http_request_cb, &config);
 
     // Only POST and OPTIONS are supported, but we return HTTP 405 for the

@@ -424,10 +424,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                        strprintf(_("Do not keep transactions in the non-final mempool "
                                    "longer than <n> hours (default: %u)"),
                                  DEFAULT_NONFINAL_MEMPOOL_EXPIRY));
-    strUsage += HelpMessageOpt(
-		"-maxblocksigopspermbpolicy",
-        strprintf("Set maximum allowed number of signature operations we're willing to relay/mine per MB of block (default: %u) after Genesis.",
-                  MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS));
+
     if (showDebug) {
         strUsage += HelpMessageOpt("-checknonfinalfreq=<n>",
                        strprintf(_("Run checks on non-final transactions every <n> "
@@ -884,12 +881,10 @@ std::string HelpMessage(HelpMessageMode mode) {
                        strprintf(_("Set the maximum block size in bytes we will accept "
                                    "from any source. This is the effective block size "
                                    "hard limit  If not specified, the following defaults are used : "
-                                   "Mainnet: %d before Genesis and %d after, "
-                                   "Testnet: %d before Genesis and %d after."),
-                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis,
-                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfterGenesis,
-                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis,
-                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeAfterGenesis
+                                   "Mainnet: %d before Genesis and unlimited after, "
+                                   "Testnet: %d before Genesis and unlimited after."),
+                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis,                                    
+                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis                                    
                                  ));
     strUsage += HelpMessageOpt(
         "-acceptp2sh", strprintf(_("Relay and mine transactions with P2SH outputs after Genesis is activated. "
@@ -923,9 +918,8 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-maxstackmemoryusageconsensus",
         strprintf(_("Set maximum stack memory usage used for script verification "
                     "we're willing to to accept from any source "
-                    "(default: %u bytes, 0 = unlimited) "
-                    "after Genesis is activated (consensus level)."),
-                  DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS));
+                    "(default: unlimited, 0 = unlimited) "
+                    "after Genesis is activated (consensus level).")));
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusagepolicy",
         strprintf(_("Set maximum stack memory usage used for script verification "
@@ -937,12 +931,10 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage +=
         HelpMessageOpt("-maxopsperscriptpolicy=<n>",
             strprintf(_("Set maximum number of non-push operations "
-                        "we're willing to relay/mine per script (default: %d, 0 = unlimited), after Genesis is activated"),
-                      DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS));
+                        "we're willing to relay/mine per script (default: unlimited, 0 = unlimited), after Genesis is activated")));
     strUsage += HelpMessageOpt(
         "-maxtxsigopscountspolicy=<n>",
-        strprintf("Set maximum allowed number of signature operations we're willing to relay/mine in a single transaction (default: %d, 0 = unlimited) after Genesis is activated.",
-                  DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS));
+        strprintf("Set maximum allowed number of signature operations we're willing to relay/mine in a single transaction (default: unlimited, 0 = unlimited) after Genesis is activated."));
 
 
     strUsage += HelpMessageOpt(
@@ -1007,7 +999,7 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-maxblocksigopspermbpolicy",
         strprintf("Set maximum allowed number of signature operations we're willing to mine per MB of block (default: %u, 0 = unlimited) after Genesis.",
-            MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS));
+            DEFAULT_MAX_BLOCK_SIGOPS_PER_MB_POLICY_AFTER_GENESIS));
 
     if (showDebug) {
         strUsage +=
@@ -1152,8 +1144,7 @@ std::string HelpMessage(HelpMessageMode mode) {
 
     strUsage += HelpMessageOpt(
         "-maxpubkeyspermultisigpolicy=<n>",
-        strprintf("Set maximum allowed number of public keys we're willing to relay/mine in a single CHECK_MULTISIG(VERIFY) operation (default: %d, 0 = unlimited), after Genesis is activated",
-            DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS));
+        strprintf("Set maximum allowed number of public keys we're willing to relay/mine in a single CHECK_MULTISIG(VERIFY) operation (default: unlimited, 0 = unlimited), after Genesis is activated"));
 
     strUsage += HelpMessageOpt(
         "-maxgenesisgracefulperiod=<n>",

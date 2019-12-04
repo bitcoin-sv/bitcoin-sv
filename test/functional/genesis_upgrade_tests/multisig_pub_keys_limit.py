@@ -2,7 +2,7 @@ from genesis_upgrade_tests.test_base import GenesisHeightTestsCaseBase, GenesisH
 from test_framework.height_based_test_framework import SimpleTestDefinition
 from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, COutPoint, CTxIn, CTxOut
-from test_framework.cdefs import DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS
+from test_framework.cdefs import MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS
 from test_framework.script import CScript, OP_FALSE, OP_RETURN, SignatureHashForkId, SignatureHash, SIGHASH_ALL, \
     SIGHASH_FORKID, OP_CHECKSIG, OP_0, OP_1, OP_CHECKMULTISIG, OP_TRUE, OP_DROP
 
@@ -27,25 +27,25 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
     NAME = "Max multi signature test"
     THE_KEY = make_key()
     PUBKEYS10 = makePubKeys(10)
-    PUBKEYS19 = makePubKeys(DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS - 1)
-    PUBKEYS20 = makePubKeys(DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS)
+    PUBKEYS19 = makePubKeys(MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS - 1)
+    PUBKEYS20 = makePubKeys(MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS)
     PUBKEYS99 = makePubKeys(99)
     PUBKEYS100 = makePubKeys(100)
     TESTS = [
 
 
-        SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS, OP_CHECKMULTISIG]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS, OP_CHECKMULTISIG]),
                              "MEMPOOL AT GENESIS", make_unlock_script),
 
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS10 + [THE_KEY.get_pubkey(), 11, OP_CHECKMULTISIG]),
                              "MEMPOOL AT GENESIS", make_unlock_script),
 
-        SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS + 1, OP_CHECKMULTISIG]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
                              "MEMPOOL AT GENESIS", make_unlock_script, 
                              b"genesis-script-verify-flag-failed (Pubkey count negative or limit exceeded)", 
                              b"blk-bad-inputs"),
         
-        SimpleTestDefinition(None, CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS + 1, OP_CHECKMULTISIG]),
+        SimpleTestDefinition(None, CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
                              "MEMPOOL AT GENESIS", make_unlock_script),
 
         SimpleTestDefinition(None, CScript([OP_1] + PUBKEYS10 + [THE_KEY.get_pubkey(), 11, OP_CHECKMULTISIG]),
@@ -58,13 +58,13 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
                              "MEMPOOL AT GENESIS", make_unlock_script, 
                              b"non-mandatory-script-verify-flag (Pubkey count negative or limit exceeded)"),
 
-        SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS, OP_CHECKMULTISIG]),
+        SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script),
 
         SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_1] + PUBKEYS10 + [THE_KEY.get_pubkey(), 11, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script),
 
-        SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS + 1, OP_CHECKMULTISIG]),
+        SimpleTestDefinition("MEMPOOL AT GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script, 
                              b"genesis-script-verify-flag-failed (Pubkey count negative or limit exceeded)", 
                              b"blk-bad-inputs"),
@@ -72,7 +72,7 @@ class MaxMultiSigTest(GenesisHeightBasedSimpleTestsCase):
         SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS10 + [THE_KEY.get_pubkey(), 11, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script),
 
-        SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS + 1, OP_CHECKMULTISIG]),
+        SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script),
 
         SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS99 + [THE_KEY.get_pubkey(), 100, OP_CHECKMULTISIG]),
@@ -94,23 +94,22 @@ class MaxMultiSigTestPolicyNotSet(GenesisHeightBasedSimpleTestsCase):
     ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1']
     NAME = "Max multi signature test with no policy rule set"
     THE_KEY = make_key()
-    PUBKEYS19 = makePubKeys(DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS - 1)
-    PUBKEYS20 = makePubKeys(DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS)
+    PUBKEYS19 = makePubKeys(MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS - 1)
+    PUBKEYS20 = makePubKeys(MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS)
     TESTS = [
 
-        SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS, OP_CHECKMULTISIG]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS, OP_CHECKMULTISIG]),
                              "PRE-GENESIS", make_unlock_script_for_default),
 
-        SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS + 1, OP_CHECKMULTISIG]),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
                              "PRE-GENESIS", make_unlock_script_for_default,
                              b"mandatory-script-verify-flag-failed (Pubkey count negative or limit exceeded)",
                              b"blk-bad-inputs"),
 
-        SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS, OP_CHECKMULTISIG]),
+        SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS19 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS, OP_CHECKMULTISIG]),
                              "GENESIS", make_unlock_script_for_default),
 
-        SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS + 1, OP_CHECKMULTISIG]),
-                             "GENESIS", make_unlock_script_for_default,
-                             b"non-mandatory-script-verify-flag (Pubkey count negative or limit exceeded)")
+        SimpleTestDefinition("GENESIS", CScript([OP_1] + PUBKEYS20 + [THE_KEY.get_pubkey(), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS + 1, OP_CHECKMULTISIG]),
+                             "GENESIS", make_unlock_script_for_default)
 
     ]							 

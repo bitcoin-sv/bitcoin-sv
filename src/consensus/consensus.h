@@ -17,7 +17,7 @@ static const uint64_t ONE_GIGABYTE = ONE_MEGABYTE * 1000;
 /** The maximum allowed size for a transaction before Genesis, in bytes*/
 static const uint64_t MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = ONE_MEGABYTE;
 /** The maximum allowed size for a transaction after Genesis (max value of uint32), in bytes */
-static const uint64_t MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = UINT32_MAX; // 4GB - limited by maximum P2P message size
+static const uint64_t MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS = ONE_GIGABYTE;
 /** The maximum allowed size for a block, before the UAHF */
 static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
 
@@ -25,8 +25,8 @@ static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
  * The maximum allowed number of signature check operations per MB in a block
  * (network rule).
  */
-static const int64_t MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS = 20000;
-static const int64_t MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS = ONE_MEGABYTE; //means 1M sigops/1M bytes = 1sigop/byte which is effectively unlimited
+static const uint64_t MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS = 20000;
+static const uint64_t MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS = ONE_MEGABYTE; //means 1M sigops/1M bytes = 1sigop/byte which is effectively unlimited
 
 /** allowed number of signature check operations per transaction. */
 static const uint64_t MAX_TX_SIGOPS_COUNT = 20000;
@@ -49,7 +49,7 @@ static const uint64_t MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS = 20;
 // Maximum number of public keys per multisig after GENESIS
 // Actual maximum number of public keys that can be stored in script of
 // maximum length is actually smaller (since each compressed pub key takes up 33 bytes).
-static const uint64_t MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS = INT32_MAX;
+static const uint64_t MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS = UINT32_MAX;
 
 // Maximum script length in bytes before Genesis
 static const uint64_t MAX_SCRIPT_SIZE_BEFORE_GENESIS = 10000;
