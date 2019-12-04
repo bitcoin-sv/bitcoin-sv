@@ -104,8 +104,8 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
         BOOST_CHECK_EQUAL(1, stack.size());
         const auto frame = stack.front();
         const auto actual =
-            frame.empty() ? bint{0}
-                          : bsv::deserialize<bint>(begin(frame), end(frame));
+            frame.empty() ? bint{0} 
+                          : bsv::bint::deserialize(frame.GetElement());
         const bint expected =
             polynomial_value(begin(exp_poly), end(exp_poly), bn);
         BOOST_CHECK_EQUAL(expected, actual);
@@ -217,7 +217,7 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
         const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
-                          : bsv::deserialize<bint>(begin(frame), end(frame));
+                          : bsv::bint::deserialize(frame.GetElement());
         bint expected = polynomial_value(begin(exp_poly), end(exp_poly), bn);
         BOOST_CHECK_EQUAL(expected, actual);
     }
@@ -295,7 +295,7 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
         const auto frame = stack.front();
         const auto actual =
             frame.empty() ? bint{0}
-                          : bsv::deserialize<bint>(begin(frame), end(frame));
+                          : bsv::bint::deserialize(frame.GetElement());
         bint expected = polynomial_value(begin(exp_poly), end(exp_poly), bn);
         BOOST_CHECK_EQUAL(expected, actual);
     }
@@ -359,7 +359,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
             auto actual =
                 frame.empty()
                     ? bint{0}
-                    : bsv::deserialize<bint>(begin(frame), end(frame));
+                    : bsv::bint::deserialize(frame.GetElement());
             bint expected =
                 polynomial_value(begin(exp_poly), end(exp_poly), bn);
             BOOST_CHECK_EQUAL(expected, actual);
@@ -369,108 +369,97 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
 
 BOOST_AUTO_TEST_CASE(operands_too_large)
 {
-    const Config& config = GlobalConfig::GetConfig();
+    GlobalConfig& config = GlobalConfig::GetConfig();
     using test_args = tuple<int, int, opcodetype, bool, ScriptError>;
-    const auto max_arg_len{500};
+    const auto max_arg_len{ MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS };
+
+    // set policy for script size, stack memory usage and max number length in scripts 
+    // to default after genesis
+    config.SetMaxScriptSizePolicy(0);
+    config.SetMaxStackMemoryUsage(0, 0);
+    config.SetMaxScriptNumLengthPolicy(max_arg_len);
+
     // clang-format off
     vector<test_args> test_data = {
     {max_arg_len,   max_arg_len,   OP_ADD, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_ADD, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_ADD, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_ADD, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_ADD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_ADD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_ADD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_SUB, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_SUB, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_SUB, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_SUB, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_SUB, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_SUB, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_SUB, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_MUL, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_MUL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_MUL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_MUL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_MUL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_MUL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_MUL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_DIV, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_DIV, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_DIV, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_DIV, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_DIV, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_DIV, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_DIV, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_MOD, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_MOD, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_MOD, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_MOD, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_MOD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_MOD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_MOD, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_BOOLAND, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_BOOLAND, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_BOOLAND, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_BOOLAND, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_BOOLAND, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_BOOLAND, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_BOOLAND, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_BOOLOR, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_BOOLOR, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_BOOLOR, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_BOOLOR, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_BOOLOR, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_BOOLOR, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_BOOLOR, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_NUMEQUAL, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_NUMEQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_NUMEQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_NUMEQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_NUMEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_NUMEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_NUMEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_NUMNOTEQUAL, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_NUMNOTEQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_NUMNOTEQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_NUMNOTEQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_NUMNOTEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_NUMNOTEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_NUMNOTEQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_LESSTHAN, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_LESSTHAN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_LESSTHAN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_LESSTHAN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_LESSTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_LESSTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_LESSTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_LESSTHANOREQUAL, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_LESSTHANOREQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_LESSTHANOREQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_LESSTHANOREQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_LESSTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_LESSTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_LESSTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_GREATERTHAN, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_GREATERTHAN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_GREATERTHAN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_GREATERTHAN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_GREATERTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_GREATERTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_GREATERTHAN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_GREATERTHANOREQUAL, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_GREATERTHANOREQUAL, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_MIN, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_MIN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_MIN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_MIN, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_MIN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_MIN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_MIN, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     {max_arg_len,   max_arg_len,   OP_MAX, true,  SCRIPT_ERR_OK},
-    {max_arg_len+1, max_arg_len,   OP_MAX, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len,   max_arg_len+1, OP_MAX, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
-    {max_arg_len+1, max_arg_len+1, OP_MAX, false, SCRIPT_ERR_INVALID_OPERAND_SIZE},
+    {max_arg_len + 1, max_arg_len,   OP_MAX, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len,   max_arg_len + 1, OP_MAX, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
+    {max_arg_len + 1, max_arg_len + 1, OP_MAX, false, SCRIPT_ERR_SCRIPTNUM_OVERFLOW},
     };
     // clang-format on
 
-    for(const auto [arg0_size, arg1_size, op_code, exp_status,
-                    exp_script_error] : test_data)
+    for (const auto [arg0_size, arg1_size, op_code, exp_status,
+        exp_script_error] : test_data)
     {
         LimitedStack stack(UINT32_MAX);
 
-        vector<uint8_t> args;
+        vector<uint8_t> arg0(arg0_size, 42);
+        vector<uint8_t> arg1(arg1_size, 69);
 
-        args.push_back(OP_PUSHDATA2);
+        CScript script = CScript() << arg0 << arg1 << op_code;
 
-        vector tmp0(arg0_size, 42);
-        const bint arg0{bsv::deserialize<bint>(tmp0.begin(), tmp0.end())};
-
-        args.push_back(arg0_size & 0xff);
-        args.push_back((arg0_size / 256) & 0xff);
-        bsv::serialize(arg0, back_inserter(args));
-
-        args.push_back(OP_PUSHDATA2);
-
-        vector tmp1(arg1_size, 69);
-        const bint arg1{bsv::deserialize<bint>(tmp1.begin(), tmp1.end())};
-        args.push_back(arg1_size & 0xff);
-        args.push_back((arg1_size / 256) & 0xff);
-        bsv::serialize(arg1, back_inserter(args));
-
-        args.push_back(op_code);
-
-        CScript script(args.begin(), args.end());
-
-        const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+        const auto flags{ SCRIPT_UTXO_AFTER_GENESIS };
         ScriptError error;
         auto source = task::CCancellationSource::Make();
         const auto status =
             EvalScript(config, false, source->GetToken(), stack, script, flags,
-                       BaseSignatureChecker{}, &error);
+                BaseSignatureChecker{}, &error);
         BOOST_CHECK_EQUAL(exp_status, status.value());
         BOOST_CHECK_EQUAL(exp_script_error, error);
         BOOST_CHECK_EQUAL(status.value() ? 1 : 2, stack.size());
@@ -598,7 +587,7 @@ BOOST_AUTO_TEST_CASE(op_num2bin)
 
 BOOST_AUTO_TEST_CASE(op_depth)
 {
-    const Config &config = GlobalConfig::GetConfig();
+    const Config& config = GlobalConfig::GetConfig();
 
     const vector<size_t> test_data = {0, 1, 20'000};
     for(const auto i : test_data)

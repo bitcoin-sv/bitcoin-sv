@@ -974,6 +974,11 @@ std::string HelpMessage(HelpMessageMode mode) {
             "(default: %u, 0 = unlimited).",
             DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS));
 
+    strUsage += HelpMessageOpt(
+        "-maxscriptnumlengthpolicy=<n>",
+        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited) after Genesis is activated.",
+            DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS));
+
     strUsage += HelpMessageGroup(_("Block creation options:"));
     strUsage += HelpMessageOpt(
         "-blockmaxsize=<n>",
@@ -1997,6 +2002,16 @@ bool AppInitParameterInteraction(Config &config) {
 
         std::string err;
         if (!config.SetMaxPubKeysPerMultiSigPolicy(value, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+    // Configure maximum length of numbers in scripts
+    if (gArgs.IsArgSet("-maxscriptnumlengthpolicy"))
+    {
+        const int64_t value = gArgs.GetArg("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
+        if (std::string err; !config.SetMaxScriptNumLengthPolicy(value, &err))
         {
             return InitError(err);
         }

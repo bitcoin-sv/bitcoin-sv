@@ -110,17 +110,17 @@ BOOST_AUTO_TEST_CASE(serialize_bint)
 
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(s), end(s), begin(op), end(op));
 
-        const auto ip{deserialize<bint>(op.begin(), op.end())};
+        const auto ip{ bsv::bint::deserialize(op) };
         BOOST_CHECK_EQUAL(bint{n}, ip);
     }
 
     for(const auto& [n, s] : int64_t_test_data)
     {
-        std::list<uint8_t> op;
+        std::vector<uint8_t> op;
         serialize(bint{n}, back_inserter(op));
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(s), end(s), begin(op), end(op));
 
-        const auto ip{deserialize<bint>(op.begin(), op.end())};
+        const auto ip{ bsv::bint::deserialize(op) };
         BOOST_CHECK_EQUAL(bint{n}, ip);
     }
 
@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(serialize_bint)
 
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(s), end(s), begin(op), end(op));
 
-        const auto ip{deserialize<bint>(op.begin(), op.end())};
+        const auto ip{ bsv::bint::deserialize(op) };
         BOOST_CHECK_EQUAL(n, ip);
     }
 }

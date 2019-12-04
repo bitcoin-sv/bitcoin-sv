@@ -127,6 +127,9 @@ public:
 
     virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const = 0;
+
+    virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -235,6 +238,9 @@ public:
     bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override;
     uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override;
 
+    bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) override;
+    uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -296,6 +302,8 @@ private:
     uint64_t maxStackMemoryUsageConsensus;
 
     uint64_t maxScriptSizePolicy;
+
+    uint64_t maxScriptNumLengthPolicy;
 };
 
 // Dummy for subclassing in unittests
@@ -489,6 +497,19 @@ public:
         return true; 
     };
     uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override { return maxScriptSizePolicy; };
+
+    bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) override { return true;  }
+    uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override
+    {
+        if (isGenesisEnabled)
+        {
+            return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
+        }
+        else
+        {
+            return MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS;
+        }
+    }
 
 private:
     std::unique_ptr<CChainParams> chainParams;

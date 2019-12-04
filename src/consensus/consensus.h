@@ -55,6 +55,12 @@ static const uint64_t MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS = INT32_MAX;
 static const uint64_t MAX_SCRIPT_SIZE_BEFORE_GENESIS = 10000;
 // Maximum script length in bytes after Genesis
 static const uint64_t MAX_SCRIPT_SIZE_AFTER_GENESIS = UINT32_MAX; // 4GB - limited by maximum P2P message size  
+// Maximum script number length before Genesis (equal to CScriptNum::MAXIMUM_ELEMENT_SIZE)
+static const uint64_t MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = 4; 
+
+// Maximum script number length after Genesis
+static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = 750 * ONE_KILOBYTE; 
+
 /**
  * Coinbase transaction outputs can only be spent after this number of new
  * blocks (network rule).
