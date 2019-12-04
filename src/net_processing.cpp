@@ -2358,14 +2358,13 @@ static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
     }
     // Enqueue txn for validation if it is not known
     if (!IsTxnKnown(inv)) {
-        // Check if the given txn is standard.
-        std::string sReason;
-        bool fStandard = IsStandardTx(config, tx, chainActiveSharedData.GetChainActiveHeight() + 1, sReason);
         // Forward transaction to the validator thread.
+        // By default, treat a received txn as a 'high' priority txn.
+        // If the validation timeout occurs the txn is moved to the 'low' priority queue.
         connman.EnqueueTxnForValidator(
 					std::make_shared<CTxInputData>(
                                         TxSource::p2p,  // tx source
-                                        fStandard ? TxValidationPriority::high : TxValidationPriority::low,  // tx validation priority
+                                        TxValidationPriority::high,  // tx validation priority
                                         std::move(ptx), // a pointer to the tx
                                         GetTime(),      // nAcceptTime
                                         true,           // fLimitFree
