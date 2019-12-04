@@ -17,9 +17,9 @@
 
 #include "chainparamsseeds.h"
 
-#define GENESIS_ACTIVATION_MAIN                 630000
-#define GENESIS_ACTIVATION_STN                  500000
-#define GENESIS_ACTIVATION_TESTNET              1342000
+#define GENESIS_ACTIVATION_MAIN                 620538
+#define GENESIS_ACTIVATION_STN                  14896
+#define GENESIS_ACTIVATION_TESTNET              1344302
 #define GENESIS_ACTIVATION_REGTEST              10000
 
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
