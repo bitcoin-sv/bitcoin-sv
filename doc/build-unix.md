@@ -41,6 +41,7 @@ Optional dependencies:
  libdb       | Berkeley DB      | Wallet storage (only needed when wallet enabled)
  univalue    | Utility          | JSON parsing and encoding (bundled version will be used unless --with-system-univalue passed to configure)
  libzmq3     | ZMQ notification | Optional, allows generating ZMQ notifications (requires ZMQ version >= 4.x)
+ tcmalloc    | Memory allocator | Alternative memory allocator (may be helpful for nodes on the STN)
 
 For the versions used in the release, see [release-process.md](release-process.md) under *Fetch and build inputs*.
 
@@ -95,6 +96,10 @@ Optional (see --with-miniupnpc and --enable-upnp-default):
 
     sudo apt-get install libminiupnpc-dev
 
+Optional (see --enable-tcmalloc):
+
+    sudo apt-get install libgoogle-perftools-dev
+
 ZMQ dependencies (provides ZMQ API 4.x):
 
     sudo apt-get install libzmq3-dev
@@ -136,6 +141,15 @@ turned off by default.  See the configure options for upnp behavior desired:
 	--without-miniupnpc      No UPnP support miniupnp not required
 	--disable-upnp-default   (the default) UPnP support turned off by default at runtime
 	--enable-upnp-default    UPnP support turned on by default at runtime
+
+Memory allocators
+-----------------
+
+If you see memory usage blow up over time from your bitcoind node (particularly on the STN) you
+may find it useful to try swapping out the default C++ memory allocator for Google tcmalloc.
+See the configure options for specifying the allocator to use:
+
+    --enable-tcmalloc       Link with the Google tcmalloc library
 
 Boost
 -----
