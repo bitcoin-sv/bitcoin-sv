@@ -22,7 +22,7 @@ class SigOpLimitCountDefaultTestCase(GenesisHeightBasedSimpleTestsCase):
 #                                            p2p_reject_reason=b'bad-txns-too-many-sigops'),
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
                              "PRE-GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS + 1)),
-                                            p2p_reject_reason=b'bad-txn-sigops',
+                                            p2p_reject_reason=b'flexible-bad-txn-sigops',
                                             block_reject_reason=b'bad-txn-sigops'),
     ]
 
@@ -62,7 +62,7 @@ class SigOpLimitCountPolicyTestCase(GenesisHeightBasedSimpleTestsCase):
 #                                            p2p_reject_reason=b'bad-txns-too-many-sigops'),
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
                              "PRE-GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS + 1)),
-                                            p2p_reject_reason=b'bad-txn-sigops',
+                                            p2p_reject_reason=b'flexible-bad-txn-sigops',
                                             block_reject_reason=b'bad-txn-sigops'),
     ]
 

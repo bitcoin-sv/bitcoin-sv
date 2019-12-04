@@ -124,6 +124,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
         # Now, invalidate blocks 109 and 108 so that we are in state before genesis.
 
         node.invalidateblock(format(b109_accepted.sha256, 'x'))
+        sleep(1)
 
         # tx0 and tx1 are in mempool (currently valid because it was sent after genesis)
         assert_equal(True, tx0.hash in node.getrawmempool())

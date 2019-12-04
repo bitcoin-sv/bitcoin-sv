@@ -103,6 +103,21 @@ static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = MAX_SCR
  */
 static const Amount DUST_RELAY_TX_FEE(1000);
 
+/*
+* Number of blocks around GENESIS activation (72 blocks before and 72 blocks after) when
+* nodes will not be banned if they send a script that is not valid. That means if a node
+* sends a GENESIS only valid transaction before GENESIS is activated it will not be baned.
+* Same applies for a node that sent a PRE-GENESIS only valid transaction after GENESIS
+* is activated
+*/
+static const int DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 72;
+
+/*
+* Maximum number of blocks for Genesis graceful period on either side of the Genesis 
+* activation block (span of ~100 days)
+*/
+static const int MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 7200;
+
 // Default policy value for maximum number of non-push operations per script
 static const int DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
 
@@ -124,8 +139,7 @@ static const unsigned int STANDARD_SCRIPT_VERIFY_FLAGS =
     MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_VERIFY_DERSIG |
     SCRIPT_VERIFY_MINIMALDATA | SCRIPT_VERIFY_NULLDUMMY |
     SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS | SCRIPT_VERIFY_CLEANSTACK |
-    SCRIPT_VERIFY_NULLFAIL | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
-    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_VERIFY_LOW_S;
+    SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
 
 /** For convenience, standard but not mandatory verify flags. */
 static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS =

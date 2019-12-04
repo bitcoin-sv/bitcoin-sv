@@ -524,9 +524,10 @@ class ComparisonTestFramework(BitcoinTestFramework):
     - 2 binaries: 1 test binary, 1 ref binary
     - n>2 binaries: 1 test binary, n-1 ref binaries"""
 
-    def __init__(self):
+    def __init__(self, destAddress = '127.0.0.1'):
         super(ComparisonTestFramework,self).__init__()
         self.chain = ChainManager()
+        self.destAddr = destAddress
         self._network_thread = None
         if not hasattr(self, "testbinary"):
             self.testbinary = [os.getenv("BITCOIND", "bitcoind")]
@@ -567,6 +568,7 @@ class ComparisonTestFramework(BitcoinTestFramework):
     def init_network(self):
         # Start creating test manager which help to manage test cases
         self.test = TestManager(self, self.options.tmpdir)
+        self.test.destAddr = self.destAddr
         # (Re)start network
         self.restart_network()
 
@@ -580,6 +582,10 @@ class ComparisonTestFramework(BitcoinTestFramework):
             return TestInstance([[self.chain.tip, False]])
         else:
             return TestInstance([[self.chain.tip, reject]])
+
+    def check_mempool(self, rpc, should_be_in_mempool):
+        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=20)
+
 
 
 class SkipTest(Exception):

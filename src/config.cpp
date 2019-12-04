@@ -62,6 +62,7 @@ void GlobalConfig::Reset()
     maxScriptSizePolicy = DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS;
 
     maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS;
+    genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -338,6 +339,40 @@ uint64_t GlobalConfig::GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool cons
     }
 
     return maxPubKeysPerMultiSig;
+}
+
+bool GlobalConfig::SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err)
+{
+    if (genesisGracefulPeriodIn < 0)
+    {
+        if (err)
+        {
+            *err = "Value for Genesis graceful period must not be less than zero.";
+        }
+        return false;
+    }
+
+    uint64_t genesisGracefulPeriodUnsigned = static_cast<uint64_t>(genesisGracefulPeriodIn);
+    if (genesisGracefulPeriodUnsigned > MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD)
+    {
+        if (err)
+        {
+            *err = "Value for maximum number of blocks for Genesis graceful period must not exceed the limit of " + std::to_string(MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD) + ".";
+        }
+        return false;
+    }
+    else
+    {
+        genesisGracefulPeriod = genesisGracefulPeriodUnsigned;
+    }
+
+    return true;
+
+}
+
+uint64_t GlobalConfig::GetGenesisGracefulPeriod() const
+{
+    return genesisGracefulPeriod;
 }
 
 GlobalConfig& GlobalConfig::GetConfig()

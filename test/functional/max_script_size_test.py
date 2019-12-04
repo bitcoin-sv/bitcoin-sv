@@ -201,7 +201,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid': tx4, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS+1, unlock_script=make_unlock_script(target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS+1, last_drop=False))
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(reject_reason=b'mandatory-script-verify-flag-failed (Script is too big)')
+        check_rejected(reject_reason=b'genesis-script-verify-flag-failed (Script is too big)')
 
         node.generate(1)
         # Genesis height
@@ -227,7 +227,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid': tx6, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS + 1, unlock_script=make_unlock_script(target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS + 1, last_drop=False))
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(reject_reason=b'mandatory-script-verify-flag-failed (Script is too big)')
+        check_rejected(reject_reason=b'genesis-script-verify-flag-failed (Script is too big)')
 
         # Create 3 new txes with script sizes :
         # MAX_SCRIPT_SIZE_BEFORE_GENESIS, MAX_SCRIPT_SIZE_BEFORE_GENESIS*5, policyLimit and policyLimit+30 (just under max tx size)
@@ -257,7 +257,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid': tx4, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=ONE_MEGABYTE - 170)
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(reject_reason=b'mandatory-script-verify-flag-failed (Script is too big)')
+        check_rejected(reject_reason=b'non-mandatory-script-verify-flag (Script is too big)')
 
         # Create 3 more txs with large unlocking scripts
         tx1 = new_tx(utxos[12], target_script_size=500, lock_script=CScript([OP_DROP, OP_DROP, OP_TRUE]))
@@ -284,7 +284,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         test_tx = new_tx(utxo, simple=True, target_script_size=ONE_MEGABYTE - 170,
                          unlock_script=make_unlock_script(target_script_size=ONE_MEGABYTE - 170, last_drop=False))
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(reject_reason=b'mandatory-script-verify-flag-failed (Script is too big)')
+        check_rejected(reject_reason=b'non-mandatory-script-verify-flag (Script is too big)')
 
 
 
