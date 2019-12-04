@@ -8,7 +8,7 @@ from test_framework.cdefs import MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS, MAX_SCRIP
 
 class MaxScriptNumLengthTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
     POLICY_VALUE = 100
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-stdtxnvalidationmaxduration=5000', '-maxscriptnumlengthpolicy=' + str(POLICY_VALUE)]
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxscriptnumlengthpolicy=' + str(POLICY_VALUE)]
     NAME = 'Max script num length limit, -maxscriptnumlengthpolicy=' + str(POLICY_VALUE)
 
     TESTS = [
@@ -46,7 +46,7 @@ class MaxScriptNumLengthTestWithPolicy(GenesisHeightBasedSimpleTestsCase):
     ]
 
 class MaxScriptNumLengthTest(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-stdtxnvalidationmaxduration=5000', '-maxscriptsizepolicy=0']
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=5000', '-maxscriptsizepolicy=0']
     NAME = 'Max script num length limit, -maxscriptnumlengthpolicy not defined.'
 
     TESTS = [
