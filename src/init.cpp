@@ -1152,7 +1152,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "for violating Genesis rules in case the calling node is not yet on Genesis height and vice versa. "
                     "Seting 0 will disable Genesis graceful period. Genesis graceful period range :"
                     "(GENESIS_ACTIVATION_HEIGHT - n |...| GENESIS_ACTIVATION_HEIGHT |...| GENESIS_ACTIVATION_HEIGHT + n)"),
-            DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD, MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
+            DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
 
     return strUsage;
 }
