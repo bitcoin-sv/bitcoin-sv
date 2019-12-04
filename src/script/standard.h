@@ -27,7 +27,7 @@ public:
 };
 
 //!< bytes (+1 for OP_RETURN, +2 for the pushdata opcodes)
-static const uint64_t DEFAULT_DATA_CARRIER_SIZE = 100000;
+static const uint64_t DEFAULT_DATA_CARRIER_SIZE = UINT32_MAX;
 extern bool fAcceptDatacarrier;
 
 /**

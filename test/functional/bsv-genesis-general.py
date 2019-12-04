@@ -4,9 +4,7 @@
 
 from genesis_upgrade_tests import tests
 from test_framework.height_based_test_framework import SimplifiedTestFramework
-from genesis_upgrade_tests.tx_size_consensus_limit import TxSizeConsensusCaseTest
 
 if __name__ == "__main__":
     t = SimplifiedTestFramework([t() for t in tests()])
-#    t = SimplifiedTestFramework([TxSizeConsensusCaseTest()])
     t.main()

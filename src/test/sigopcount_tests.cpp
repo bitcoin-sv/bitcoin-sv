@@ -70,26 +70,25 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
                << Serialize(s2);
     BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig2, false, sigOpCountError), 3U);
 
-    // After Genesis
-    uint64_t maxPubKeysPerMultiSigAfterGenesis = testConfig.GetMaxPubKeysPerMultiSig(true, false);
+    uint64_t maxPubKeysPerMultiSig = 100;   // larger than before genesis limit
     std::vector<CPubKey> keysAfterGenesis;
-    for (uint64_t i = 0; i < maxPubKeysPerMultiSigAfterGenesis; i++) {
+    for (uint64_t i = 0; i < maxPubKeysPerMultiSig; i++) {
         CKey k;
         k.MakeNewKey(true);
         keysAfterGenesis.push_back(k.GetPubKey());
     }
 
     CScript s3 = GetScriptForMultisig(1, keysAfterGenesis);
-    BOOST_CHECK_EQUAL(s3.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSigAfterGenesis);
+    BOOST_CHECK_EQUAL(s3.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSig);
 
-    // Test default policy after Genesis
+    // Test policy after Genesis
     testConfig.Reset();
     CScript s4;
-    s4 << OP_1 << ToByteVector(dummy) << DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS - 1 << OP_CHECKMULTISIG;
-    BOOST_CHECK_EQUAL(s4.GetSigOpCount(false, true, sigOpCountError), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS - 1);
+    s4 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig - 1 << OP_CHECKMULTISIG;
+    BOOST_CHECK_EQUAL(s4.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSig - 1);
     CScript s5;
-    s5 << OP_1 << ToByteVector(dummy) << DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS + 1 << OP_CHECKMULTISIG;
-    BOOST_CHECK_EQUAL(s5.GetSigOpCount(false, true, sigOpCountError), DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS + 1);
+    s5 << OP_1 << ToByteVector(dummy) << maxPubKeysPerMultiSig + 1 << OP_CHECKMULTISIG;
+    BOOST_CHECK_EQUAL(s5.GetSigOpCount(false, true, sigOpCountError), maxPubKeysPerMultiSig + 1);
 
     // Test default policy before Genesis with fAccurate == true
     BOOST_CHECK_EQUAL(s4.GetSigOpCount(true, false, sigOpCountError), MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS);

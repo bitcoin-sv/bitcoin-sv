@@ -35,16 +35,16 @@ namespace task{class CCancellationToken;}
 /** Default max block size parameters before and after Genesis 
  */
 static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS = 2 * ONE_GIGABYTE;
-static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = 4 * ONE_GIGABYTE - ONE_MEGABYTE; 
+static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = INT64_MAX; 
 
 static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS = 2 * ONE_GIGABYTE;
-static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = 4 * ONE_GIGABYTE - ONE_MEGABYTE; 
+static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = INT64_MAX;
 
 static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS = 2 * ONE_GIGABYTE;
-static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = 4 * ONE_GIGABYTE - ONE_MEGABYTE; 
+static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = INT64_MAX;
 
 static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS = 2 * ONE_GIGABYTE;
-static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = 4 * ONE_GIGABYTE - ONE_MEGABYTE;
+static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = INT64_MAX;
 
 
 /** Default before and after max generated block size parameters and their activation times.
@@ -75,16 +75,16 @@ static const Amount DEFAULT_BLOCK_MIN_TX_FEE(1000);
 /** The maximum size for transactions we're willing to relay/mine - before genesis*/
 static const uint64_t MAX_TX_SIZE_POLICY_BEFORE_GENESIS = 100000 - 1; // -1 because pre genesis policy validation was >=
 /** The default size for transactions we're willing to relay/mine */
-static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = MAX_TX_SIZE_POLICY_BEFORE_GENESIS;
+static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = 10 * ONE_MEGABYTE;
 /** Default policy value for -maxblocksigopspermbpolicy, maximum number of sigops we're willing to mine per MB of block after Genesis */
-static const unsigned int DEFAULT_MAX_BLOCK_SIGOPS_PER_MB_POLICY_AFTER_GENESIS = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
+static const uint64_t DEFAULT_MAX_BLOCK_SIGOPS_PER_MB_POLICY_AFTER_GENESIS = 30000;
 /** Maximum number of signature check operations in an IsStandard() P2SH script
  */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
 /** The maximum number of sigops we're willing to relay/mine in a single tx before Genesis */
 static const unsigned int MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS = MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS / 5;
 /** Default policy value for -maxtxsigopscountspolicy, maximum number of sigops we're willing to relay/mine in a single tx after Genesis */
-static const unsigned int DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS;
+static const unsigned int DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = UINT32_MAX;
 /** Default for -maxmempool, maximum megabytes of mempool memory usage */
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 300;
 /** Default for -maxnonfinalmempool, maximum megabytes of non-final mempool memory usage */
@@ -93,7 +93,7 @@ static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
  * for mempool limiting or BIP 125 replacement **/
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
 /** Default for -maxscriptsizepolicy **/
-static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = MAX_SCRIPT_SIZE_BEFORE_GENESIS;
+static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
 /**
  * Min feerate for defining dust. Historically this has been the same as the
  * minRelayTxFee, however changing the dust limit changes which transactions are
@@ -119,10 +119,10 @@ static const int DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 72;
 static const int MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 7200;
 
 // Default policy value for maximum number of non-push operations per script
-static const int DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
+static const int DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = UINT32_MAX;
 
 // Default policy value for maximum number of public keys per multisig after GENESIS
-static const uint64_t DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS = MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS;
+static const uint64_t DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS = UINT32_MAX;
 
 /** Maximum stack memory usage (used instead of MAX_SCRIPT_ELEMENT_SIZE and MAX_STACK_ELEMENTS) after Genesis. **/
 static const uint64_t DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS = 100 * ONE_MEGABYTE;

@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
     size_t maxTxSizePolicy {
         static_cast<size_t>(
             gArgs.GetArg("-maxtxsizepolicy",
-                      DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS))
+                      MAX_TX_SIZE_POLICY_BEFORE_GENESIS))
     };
 
     // A common buffer with orphan txns

@@ -75,7 +75,6 @@ class MaxOpsPerScriptTest(GenesisHeightBasedSimpleTestsCase):
                              block_reject_reason=b'blk-bad-inputs'
                              ),                                                                     
         SimpleTestDefinition("GENESIS", CScript([OP_TRUE] + [OP_NOP] * (MAX_OPS_PER_SCRIPT_BEFORE_GENESIS + 1)),
-                             "GENESIS", b"",
-                             p2p_reject_reason=b'non-mandatory-script-verify-flag (Operation limit exceeded)',
+                             "GENESIS", b""
                              ),
     ]
