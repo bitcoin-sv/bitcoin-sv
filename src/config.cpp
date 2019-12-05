@@ -724,8 +724,8 @@ bool GlobalConfig::SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn
         if (err)
         {
             *err = _("Policy value of max stack memory usage must not exceed consensus limit of ") + std::to_string(maxStackMemoryUsageConsensus);
-            return false;
         }
+        return false;
     }
 
     return true;
