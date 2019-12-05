@@ -328,8 +328,8 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                            timeout=10, check_interval=0.2,
                            label=f"Waiting tx to be rejected. Reason {reason} At {test_label} {height_label} tx:{tx.hash}")
                 if reason:
-                    self.log.info(f"Tx {loghash(tx.hash)} is rejected as expected for reason {reason}")
                     assert rejects[0].reason == reason, f"Mismatching rejection reason: got {rejects[0].reason} expected {reason}"
+                    self.log.info(f"Tx {loghash(tx.hash)} is rejected as expected for reason {reason}")
 
     def _process_p2p_accepts(self, connection, to_accept, test_label, height_label):
         for tx in to_accept:
