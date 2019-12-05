@@ -431,7 +431,8 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                     size_t nDetectedLowPriorityTxnsNum = result.second.size();
                     if (nDetectedLowPriorityTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
-                                "The number of standard txns for which validation timeout occured: %d\n",
+                                "Txnval-asynch: Validation timeout occurred for %d txn(s) received from the Standard queue "
+                                "(forwarding them to the Non-standard queue)\n",
                                  nDetectedLowPriorityTxnsNum);
                         std::unique_lock lock { mNonStdTxnsMtx };
                         enqueueTxnsNL(result.second.begin(), result.second.end(),
@@ -447,7 +448,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                     size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForRetry();
                     if (nOrphanP2PTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
-                                "%s: Number of orphan txns scheduled for retry %d\n",
+                                "Txnval-asynch: The number of orphan %s txns that need to be reprocessed is %d\n",
                                  enum_cast<std::string>(TxSource::p2p),
                                  nOrphanP2PTxnsNum);
                     } else {
@@ -505,7 +506,7 @@ std::pair<TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValidator::processNewTrans
     };
     // All txns accepted by the mempool and not removed from there.
     std::vector<TxInputDataSPtr> vAcceptedTxns {};
-    // If there is any standard 'high' priority txn for which validation timeout occured, then
+    // If there is any standard 'high' priority txn for which validation timeout occurred, then
     // change it's priority to 'low' and forward it to the low priority queue.
     std::vector<TxInputDataSPtr> vDetectedLowPriorityTxns {};
     // Process validation results
@@ -525,7 +526,7 @@ void CTxnValidator::postValidationStepsNL(
         // Txns accepted by the mempool
         vAcceptedTxns.emplace_back(txStatus.mTxInputData);
     } else if (state.IsValidationTimeoutExceeded()) {
-        // If validation timeout occured for 'high' priority txn then change it's priority to 'low'.
+        // If validation timeout occurred for 'high' priority txn then change it's priority to 'low'.
         TxValidationPriority& txpriority = txStatus.mTxInputData->mTxValidationPriority;
         if (TxValidationPriority::high == txpriority) {
             txpriority = TxValidationPriority::low;
