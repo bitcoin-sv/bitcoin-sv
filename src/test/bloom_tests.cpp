@@ -144,6 +144,31 @@ BOOST_AUTO_TEST_CASE(bloom_create_insert_key) {
                                   expected.begin(), expected.end());
 }
 
+BOOST_AUTO_TEST_CASE(bloom_filter_limits)
+{
+    std::vector<uint8_t> data(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, 0xab);
+
+    CBloomFilter filterWithShortData;
+    // streamWithShortData represents filter with inserted vector std::vector<uint8_t> data(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS, 0xab)
+    // Insert method does not insert data longer than MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS bytes.
+    // We could not test contains method if insert would fail.
+    CDataStream streamWithShortData(
+        ParseHex("2300080000000000000121200004400001020400100200000400000000100000a000000c130000000000000001"),
+        SER_NETWORK, PROTOCOL_VERSION);
+    streamWithShortData >> filterWithShortData;
+    BOOST_CHECK(filterWithShortData.contains(data));
+
+    CBloomFilter filterWithLongData;
+    // streamWithLongData represents filter with inserted vector std::vector<uint8_t> data(MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS + 1, 0xab)
+    CDataStream streamWithLongData(
+        ParseHex("232020000080000100088000800000000008000804000000880002000800820028000080130000000000000001"),
+        SER_NETWORK, PROTOCOL_VERSION);
+    streamWithLongData >> filterWithLongData;
+    data.push_back(0xab);
+    // Contains method returns false if data.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS.
+    BOOST_CHECK(!filterWithLongData.contains(data));
+}
+
 BOOST_AUTO_TEST_CASE(bloom_match) {
     // Random real transaction
     // (b4749f017444b051c44dfd2720e88f314ff94f3dd6d56d40ef65854fcd7fff6b)
