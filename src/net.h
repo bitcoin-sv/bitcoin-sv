@@ -101,6 +101,9 @@ static const bool DEFAULT_BLOCKSONLY = false;
 **/
 static const unsigned int DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES = 4;
 
+/** Default maximum bytes in all sending queues, used if -excessiveblocksize is not set. */
+static const uint64_t DEFAULT_MAX_SEND_QUEUES_BYTES = 10 * ONE_GIGABYTE;
+
 // Force DNS seed use ahead of UAHF fork, to ensure peers are found
 // as long as seeders are working.
 // TODO: Change this back to false after the forked network is stable.
