@@ -212,7 +212,7 @@ void LimitedStack::push_back(const LimitedVector &element)
 void LimitedStack::push_back(const valtype& element)
 {
     increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.emplace_back(element, *this);
+    stack.push_back(LimitedVector{element, *this});
 }
 
 LimitedVector& LimitedStack::stacktop(int index)
