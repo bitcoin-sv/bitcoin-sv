@@ -1842,6 +1842,10 @@ static void HandleInvalidP2POrphanTxn(
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
+    // Check if the given p2p txn is considered as fully processed (validated)
+    const bool fTxProcessingCompleted =
+        (TxValidationPriority::low == txStatus.mTxInputData->mTxValidationPriority ||
+         !state.IsValidationTimeoutExceeded());
     // Handle invalid orphan txn for which all inputs are known
     if (!state.IsMissingInputs()) {
         int nDoS = 0;
@@ -1850,25 +1854,29 @@ static void HandleInvalidP2POrphanTxn(
             Misbehaving(pNode->GetId(), nDoS, "invalid-orphan-tx");
             // Remove all orphan txns queued from the punished peer
             handlers.mpOrphanTxns->eraseTxnsFromPeer(pNode->GetId());
-        } else {
+        } else if (fTxProcessingCompleted) {
             // Erase an invalid orphan as we don't want to reprocess it again.
             handlers.mpOrphanTxns->eraseTxn(tx.GetId());
         }
-        // Has inputs but not accepted to mempool
-        // Probably non-standard or insufficient fee/priority
-        if (!state.CorruptionPossible()) {
-            // Do not use rejection cache for witness
-            // transactions or witness-stripped transactions, as
-            // they can have been malleated. See
-            // https://github.com/bitcoin/bitcoin/issues/8279
-            // for details.
-            handlers.mpTxnRecentRejects->insert(tx.GetId());
+        // Create and send a reject message when all the following conditions are met:
+        // a) the txn is fully processed
+        // b) a non-internal reject code was returned from txn validation.
+        if (fTxProcessingCompleted) {
+            // Has inputs but not accepted to mempool
+            // Probably non-standard or insufficient fee/priority
+            if (!state.CorruptionPossible()) {
+                // Do not use rejection cache for witness
+                // transactions or witness-stripped transactions, as
+                // they can have been malleated. See
+                // https://github.com/bitcoin/bitcoin/issues/8279
+                // for details.
+                handlers.mpTxnRecentRejects->insert(tx.GetId());
+            }
+            CreateTxRejectMsgForP2PTxn(
+                txStatus.mTxInputData,
+                state.GetRejectCode(),
+                state.GetRejectReason());
         }
-        // Create reject msg if non-internal reject code was returned from txn validation.
-        CreateTxRejectMsgForP2PTxn(
-            txStatus.mTxInputData,
-            state.GetRejectCode(),
-            state.GetRejectReason());
     }
     // No-operation defined for a known orphan with missing inputs.
 }
@@ -1906,52 +1914,58 @@ static void HandleInvalidStateForP2PNonOrphanTxn(
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
-
-    if (!state.CorruptionPossible()) {
-        // Do not use rejection cache for witness transactions or
-        // witness-stripped transactions, as they can have been
-        // malleated. See https://github.com/bitcoin/bitcoin/issues/8279
-        // for details.
-        handlers.mpTxnRecentRejects->insert(tx.GetId());
-        if (RecursiveDynamicUsage(tx) < 100000) {
-            handlers.mpOrphanTxns->addToCompactExtraTxns(ptx);
+    // Check if the given p2p txn is considered as fully processed (validated).
+    if (TxValidationPriority::low == txStatus.mTxInputData->mTxValidationPriority ||
+        !state.IsValidationTimeoutExceeded()) {
+        // Check corruption flag
+        if (!state.CorruptionPossible()) {
+            // Do not use rejection cache for witness transactions or
+            // witness-stripped transactions, as they can have been
+            // malleated. See https://github.com/bitcoin/bitcoin/issues/8279
+            // for details.
+            handlers.mpTxnRecentRejects->insert(tx.GetId());
+            if (RecursiveDynamicUsage(tx) < 100000) {
+                handlers.mpOrphanTxns->addToCompactExtraTxns(ptx);
+            }
         }
-    }
-    bool fWhiteListForceRelay {
-            gArgs.GetBoolArg("-whitelistforcerelay",
-                              DEFAULT_WHITELISTFORCERELAY)
-    };
-    if (pNode->fWhitelisted && fWhiteListForceRelay) {
-        auto nodeId = pNode->GetId();
-        // Always relay transactions received from whitelisted peers,
-        // even if they were already in the mempool or rejected from it
-        // due to policy, allowing the node to function as a gateway for
-        // nodes hidden behind it.
-        //
-        // Never relay transactions that we would assign a non-zero DoS
-        // score for, as we expect peers to do the same with us in that
-        // case.
-        if (nDoS == 0) {
-            LogPrint(BCLog::TXNVAL,
-                    "%s: Force relaying tx %s from whitelisted peer=%d\n",
-                     enum_cast<std::string>(TxSource::p2p),
-                     tx.GetId().ToString(),
-                     nodeId);
-            RelayTransaction(tx, *g_connman);
-         } else {
-            LogPrint(BCLog::TXNVAL,
-                    "%s: Not relaying invalid txn %s from whitelisted peer=%d (%s)\n",
-                     enum_cast<std::string>(TxSource::p2p),
-                     tx.GetId().ToString(),
-                     nodeId,
-                     FormatStateMessage(state));
+        bool fWhiteListForceRelay {
+                gArgs.GetBoolArg("-whitelistforcerelay",
+                                  DEFAULT_WHITELISTFORCERELAY)
+        };
+        if (pNode->fWhitelisted && fWhiteListForceRelay) {
+            auto nodeId = pNode->GetId();
+            // Always relay transactions received from whitelisted peers,
+            // even if they were already in the mempool or rejected from it
+            // due to policy, allowing the node to function as a gateway for
+            // nodes hidden behind it.
+            //
+            // Never relay transactions that we would assign a non-zero DoS
+            // score for, as we expect peers to do the same with us in that
+            // case.
+            if (nDoS == 0) {
+                LogPrint(BCLog::TXNVAL,
+                        "%s: Force relaying tx %s from whitelisted peer=%d\n",
+                         enum_cast<std::string>(TxSource::p2p),
+                         tx.GetId().ToString(),
+                         nodeId);
+                RelayTransaction(tx, *g_connman);
+             } else {
+                LogPrint(BCLog::TXNVAL,
+                        "%s: Not relaying invalid txn %s from whitelisted peer=%d (%s)\n",
+                         enum_cast<std::string>(TxSource::p2p),
+                         tx.GetId().ToString(),
+                         nodeId,
+                         FormatStateMessage(state));
+            }
         }
+        // Create and send a reject message when all the following conditions are met:
+        // a) txn is fully processed
+        // b) a non-internal reject code was returned from txn validation.
+        CreateTxRejectMsgForP2PTxn(
+            txStatus.mTxInputData,
+            state.GetRejectCode(),
+            state.GetRejectReason());
     }
-    // Create reject msg if non-internal reject code was returned from txn validation.
-    CreateTxRejectMsgForP2PTxn(
-        txStatus.mTxInputData,
-        state.GetRejectCode(),
-        state.GetRejectReason());
     if (nDoS > 0) {
         // Punish peer that gave us an invalid tx
         Misbehaving(pNode->GetId(), nDoS, state.GetRejectReason());
@@ -1987,10 +2001,16 @@ static void PostValidationStepsForP2PTxn(
         // is set on transaction level. As a consequence AddToCompactExtraTransactions is not
         // being called for txns added and then removed from the mempool.
 
-        // Send a reject if required
-        CreateTxRejectMsgForP2PTxn(txStatus.mTxInputData,
-                                   state.GetRejectCode(),
-                                   state.GetRejectReason());
+        // Create and send a reject message when all the following conditions are met:
+        // a) the txn is fully processed
+        // b) a non-internal reject code was returned from txn validation.
+        if (TxValidationPriority::low == txStatus.mTxInputData->mTxValidationPriority ||
+            !state.IsValidationTimeoutExceeded()) {
+            CreateTxRejectMsgForP2PTxn(
+                txStatus.mTxInputData,
+                state.GetRejectCode(),
+                state.GetRejectReason());
+        }
     }
 }
 
