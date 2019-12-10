@@ -40,7 +40,6 @@
 #include "protocol.h"
 #include "validationinterface.h"
 
-#include <boost/optional.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
 
@@ -50,6 +49,7 @@
 #error "Bitcoin cannot be compiled without assertions."
 #endif
 
+using namespace std;
 using namespace mining;
 
 // Used only to inform the wallet of when we last received a block.
@@ -111,10 +111,6 @@ std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
 //
 
 namespace {
-
-// An optional boolean result.
-// FIXME: Use std::optional once we get C++17
-using OptBool = boost::optional<bool>;
 
 struct CBlockReject {
     uint8_t chRejectCode;
@@ -2018,8 +2014,12 @@ static void ProcessSendCompactMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 /**
 * Process inventory message.
 */
-static OptBool ProcessInvMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
-    const std::atomic<bool>& interruptMsgProc, CDataStream& vRecv, CConnman& connman)
+static optional<bool>
+ProcessInvMessage(const CNodePtr& pfrom,
+                  const CNetMsgMaker& msgMaker,
+                  const std::atomic<bool>& interruptMsgProc,
+                  CDataStream& vRecv,
+                  CConnman& connman)
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
@@ -2092,9 +2092,13 @@ static OptBool ProcessInvMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
 /**
 * Process get data message.
 */
-static OptBool ProcessGetDataMessage(const Config& config, const CNodePtr& pfrom,
-    const CChainParams& chainparams, const std::atomic<bool>& interruptMsgProc,
-    CDataStream& vRecv, CConnman& connman)
+static optional<bool>
+ProcessGetDataMessage(const Config& config,
+                      const CNodePtr& pfrom,
+                      const CChainParams& chainparams,
+                      const std::atomic<bool>& interruptMsgProc,
+                      CDataStream& vRecv,
+                      CConnman& connman)
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
@@ -2206,9 +2210,13 @@ static void ProcessGetBlocksMessage(
 /**
 * Process getblocktxn message.
 */
-static OptBool ProcessGetBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
-    const CChainParams& chainparams, const std::atomic<bool>& interruptMsgProc,
-    CDataStream& vRecv, CConnman& connman)
+static optional<bool>
+ProcessGetBlockTxnMessage(const Config& config,
+                          const CNodePtr& pfrom,
+                          const CChainParams& chainparams,
+                          const std::atomic<bool>& interruptMsgProc,
+                          CDataStream& vRecv,
+                          CConnman& connman)
 {
     BlockTransactionsRequest req;
     vRecv >> req;
@@ -2258,8 +2266,10 @@ static OptBool ProcessGetBlockTxnMessage(const Config& config, const CNodePtr& p
 /**
 * Process get headers message.
 */
-static OptBool ProcessGetHeadersMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgMaker,
-    CDataStream& vRecv, CConnman& connman)
+static optional<bool> ProcessGetHeadersMessage(const CNodePtr& pfrom,
+                                               const CNetMsgMaker& msgMaker,
+                                               CDataStream& vRecv,
+                                               CConnman& connman)
 {
     CBlockLocator locator;
     uint256 hashStop;
@@ -2328,9 +2338,12 @@ static OptBool ProcessGetHeadersMessage(const CNodePtr& pfrom, const CNetMsgMake
 /**
 * Process tx message.
 */
-static OptBool ProcessTxMessage(const Config& config, const CNodePtr& pfrom,
-    const CNetMsgMaker& msgMaker, const std::string& strCommand,
-    CDataStream& vRecv, CConnman& connman)
+static optional<bool> ProcessTxMessage(const Config& config,
+                                       const CNodePtr& pfrom,
+                                       const CNetMsgMaker& msgMaker,
+                                       const std::string& strCommand,
+                                       CDataStream& vRecv,
+                                       CConnman& connman)
 {
     // Stop processing the transaction early if we are in blocks only mode and
     // peer is either not whitelisted or whitelistrelay is off
@@ -3036,8 +3049,9 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
 /**
 * Process getaddr message.
 */
-static OptBool ProcessGetAddrMessage(const CNodePtr& pfrom,
-    CDataStream& vRecv, CConnman& connman)
+static optional<bool> ProcessGetAddrMessage(const CNodePtr& pfrom,
+                                            CDataStream& vRecv,
+                                            CConnman& connman)
 {
     // This asymmetric behavior for inbound and outbound connections was
     // introduced to prevent a fingerprinting attack: an attacker can send
@@ -3074,8 +3088,9 @@ static OptBool ProcessGetAddrMessage(const CNodePtr& pfrom,
 /**
 * Process mempool message.
 */
-static OptBool ProcessMempoolMessage(const CNodePtr& pfrom,
-    CDataStream& vRecv, CConnman& connman)
+static optional<bool> ProcessMempoolMessage(const CNodePtr& pfrom,
+                                            CDataStream& vRecv,
+                                            CConnman& connman)
 {
 
     if (gArgs.GetBoolArg("-rejectmempoolrequest", DEFAULT_REJECTMEMPOOLREQUEST) && !pfrom->fWhitelisted) {
@@ -3389,16 +3404,21 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::INV) {
-        if(OptBool res { ProcessInvMessage(pfrom, msgMaker, interruptMsgProc, vRecv, connman) }) {
-            // If ProcessInv returned a definite true/false, return that to our caller.
-            return res.get();
+        if (const auto res{ProcessInvMessage(pfrom, msgMaker, interruptMsgProc,
+                                             vRecv, connman)}) {
+            // If ProcessInv returned a definite true/false, return that to our
+            // caller.
+            return res.value();
         }
     }
 
     else if (strCommand == NetMsgType::GETDATA) {
-        if(OptBool res { ProcessGetDataMessage(config, pfrom, chainparams, interruptMsgProc, vRecv, connman) }) {
-            // If ProcessGetData returned a definite true/false, return that to our caller.
-            return res.get();
+        if (const auto res{ProcessGetDataMessage(config, pfrom, chainparams,
+                                                 interruptMsgProc, vRecv,
+                                                 connman)}) {
+            // If ProcessGetData returned a definite true/false, return that to
+            // our caller.
+            return res.value();
         }
     }
 
@@ -3407,23 +3427,30 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::GETBLOCKTXN) {
-        if(OptBool res { ProcessGetBlockTxnMessage(config, pfrom, chainparams, interruptMsgProc, vRecv, connman) }) {
-            // If ProcessGetBlockTxn returned a definite true/false, return that to our caller.
-            return res.get();
+        if (const auto res{ProcessGetBlockTxnMessage(config, pfrom, chainparams,
+                                                     interruptMsgProc, vRecv,
+                                                     connman)}) {
+            // If ProcessGetBlockTxn returned a definite true/false, return that
+            // to our caller.
+            return res.value();
         }
     }
 
     else if (strCommand == NetMsgType::GETHEADERS) {
-        if(OptBool res { ProcessGetHeadersMessage(pfrom, msgMaker, vRecv, connman) }) {
-            // If ProcessGetHeaders returned a definite true/false, return that to our caller.
-            return res.get();
+        if (const auto res{
+                ProcessGetHeadersMessage(pfrom, msgMaker, vRecv, connman)}) {
+            // If ProcessGetHeaders returned a definite true/false, return that
+            // to our caller.
+            return res.value();
         }
     }
 
     else if (strCommand == NetMsgType::TX) {
-        if(OptBool res { ProcessTxMessage(config, pfrom, msgMaker, strCommand, vRecv, connman) }) {
-            // If ProcessTx returned a definite true/false, return that to our caller.
-            return res.get();
+        if (const auto res{ProcessTxMessage(config, pfrom, msgMaker, strCommand,
+                                            vRecv, connman)}) {
+            // If ProcessTx returned a definite true/false, return that to our
+            // caller.
+            return res.value();
         }
     }
 
@@ -3439,10 +3466,8 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     // Ignore headers received while importing
     else if (strCommand == NetMsgType::HEADERS && !fImporting && !fReindex) {
-        if(OptBool res { ProcessHeadersMessage(config, pfrom, msgMaker, chainparams, vRecv, connman) }) {
-            // If ProcessHeaders returned a definite true/false, return that to our caller.
-            return res.get();
-        }
+        return ProcessHeadersMessage(config, pfrom, msgMaker, chainparams,
+                                     vRecv, connman);
     }
 
     // Ignore blocks received while importing
@@ -3451,16 +3476,16 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::GETADDR) {
-        if(OptBool res { ProcessGetAddrMessage(pfrom, vRecv, connman) }) {
+        if (const auto res{ProcessGetAddrMessage(pfrom, vRecv, connman)}) {
             // If ProcessGetAddr returned a definite true/false, return that to our caller.
-            return res.get();
+            return res.value();
         }
     }
 
     else if (strCommand == NetMsgType::MEMPOOL) {
-        if(OptBool res { ProcessMempoolMessage(pfrom, vRecv, connman) }) {
+        if (const auto res{ProcessMempoolMessage(pfrom, vRecv, connman)}) {
             // If ProcessMempool returned a definite true/false, return that to our caller.
-            return res.get();
+            return res.value();
         }
     }
 
