@@ -106,6 +106,7 @@ public:
     void push_back(const LimitedVector &element);
     void push_back(const valtype& element);
 
+    // erase elements from including (top - first). element until excluding (top - last). element
     // first and last should be negative numbers (distance from the top)
     void erase(int first, int last);
 
