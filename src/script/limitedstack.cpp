@@ -260,6 +260,11 @@ void LimitedStack::erase(int index)
 
 void LimitedStack::insert(int position, const LimitedVector& element)
 {
+    if (&element.getStack() != this)
+    {
+        throw std::invalid_argument("Invalid argument - element that is added should have the same parent stack as the one we are adding to.");
+    }
+
     if (position >= 0)
     {
         throw std::invalid_argument("Invalid argument - position should be < 0.");
