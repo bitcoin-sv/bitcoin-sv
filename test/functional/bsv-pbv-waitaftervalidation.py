@@ -2,7 +2,7 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
-Testing RPC functionality with parallel block validation
+Testing RPC functionality with parallel block validation (PBV)
 methods we are testing are:
     getcurrentlyvalidatingblocks
     waitaftervalidatingblock
@@ -26,8 +26,11 @@ from test_framework.mininode import (
     msg_block,
 )
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
-from test_framework.util import p2p_port, assert_equal, wait_until
-
+from test_framework.util import p2p_port, assert_equal
+from bsv_pbv_common import (
+    wait_for_waiting_blocks,
+    wait_for_validating_blocks,
+)
 
 class PBVWaitAfterValidation(BitcoinTestFramework):
 
@@ -81,60 +84,49 @@ class PBVWaitAfterValidation(BitcoinTestFramework):
         tip_block_num = block_count - 1
 
         # adding extra transactions to get different block hashes
-        block_hard1 = self.chain.next_block(block_count, spend=out[0], extra_txns=8)
+        block2_hard = self.chain.next_block(block_count, spend=out[0], extra_txns=8)
         block_count += 1
 
         self.chain.set_tip(tip_block_num)
 
-        easier = self.chain.next_block(block_count, spend=out[0], extra_txns=2)
+        block3_easier = self.chain.next_block(block_count, spend=out[0], extra_txns=2)
         block_count += 1
 
         self.chain.set_tip(tip_block_num)
 
-        block_hard2 = self.chain.next_block(block_count, spend=out[0], extra_txns=10)
+        block4_hard = self.chain.next_block(block_count, spend=out[0], extra_txns=10)
         block_count += 1
 
         # send two "hard" blocks, with waitaftervalidatingblock we artificially
         # extend validation time.
-        self.log.info(f"hard block1 hash: {block_hard1.hash}")
-        self.nodes[0].waitaftervalidatingblock(block_hard1.hash, "add")
-        self.log.info(f"hard block2 hash: {block_hard2.hash}")
-        self.nodes[0].waitaftervalidatingblock(block_hard2.hash, "add")
+        self.log.info(f"hard block2 hash: {block2_hard.hash}")
+        self.nodes[0].waitaftervalidatingblock(block2_hard.hash, "add")
+        self.log.info(f"hard block4 hash: {block4_hard.hash}")
+        self.nodes[0].waitaftervalidatingblock(block4_hard.hash, "add")
         # make sure block hashes are in waiting list
-        def wait_for_hard1_in_waiting_list():
-            waiting_hashes = self.nodes[0].getwaitingblocks()
-            return block_hard1.hash in waiting_hashes and block_hard2.hash in waiting_hashes
-        wait_until(wait_for_hard1_in_waiting_list)
+        wait_for_waiting_blocks({block2_hard.hash, block4_hard.hash}, self.nodes[0], self.log)
 
-        node0.send_message(msg_block(block_hard1))
-        node1.send_message(msg_block(block_hard2))
+        node0.send_message(msg_block(block2_hard))
+        node1.send_message(msg_block(block4_hard))
 
         # make sure we started validating blocks
-        oldArray = []
-        def wait_for_hard1_and_2():
-            nonlocal oldArray
-            validating_blocks = self.nodes[0].getcurrentlyvalidatingblocks()
-            if oldArray != validating_blocks:
-                self.log.info("currently validating blocks: " + str(validating_blocks))
-            oldArray = validating_blocks
-            return block_hard1.hash in validating_blocks and block_hard2.hash in validating_blocks
-        wait_until(wait_for_hard1_and_2)
+        wait_for_validating_blocks({block2_hard.hash, block4_hard.hash}, self.nodes[0], self.log)
 
-        self.log.info(f"easier hash: {easier.hash}")
-        node2.send_message(msg_block(easier))
+        self.log.info(f"easier block3 hash: {block3_easier.hash}")
+        node2.send_message(msg_block(block3_easier))
 
         self.nodes[0].waitforblockheight(102)
-        assert_equal(easier.hash, self.nodes[0].getbestblockhash())
+        assert_equal(block3_easier.hash, self.nodes[0].getbestblockhash())
 
         # now we can remove waiting status from blocks and finish their validation
-        self.nodes[0].waitaftervalidatingblock(block_hard1.hash, "remove")
-        self.nodes[0].waitaftervalidatingblock(block_hard2.hash, "remove")
+        self.nodes[0].waitaftervalidatingblock(block2_hard.hash, "remove")
+        self.nodes[0].waitaftervalidatingblock(block4_hard.hash, "remove")
 
         # wait till validation of block or blocks finishes
         node0.sync_with_ping()
 
         # easier block should still be on tip
-        assert_equal(easier.hash, self.nodes[0].getbestblockhash())
+        assert_equal(block3_easier.hash, self.nodes[0].getbestblockhash())
 
 
 if __name__ == '__main__':
