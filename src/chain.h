@@ -514,20 +514,18 @@ public:
 
     int64_t GetMedianTimePast() const
     {
-        int64_t pmedian[nMedianTimeSpan];
-        int64_t* pbegin = &pmedian[nMedianTimeSpan];
-        int64_t* pend = &pmedian[nMedianTimeSpan];
+        std::vector<int64_t> block_times;
 
         const CBlockIndex* pindex = this;
-        int i{};
-        for(; i < nMedianTimeSpan && pindex; i++, pindex = pindex->pprev)
+        for(int i{}; i < nMedianTimeSpan && pindex; i++, pindex = pindex->pprev)
         {
-            *(--pbegin) = pindex->GetBlockTime();
+            block_times.push_back(pindex->GetBlockTime());
         }
 
-        const auto n{i / 2};
-        std::nth_element(pbegin, pbegin + n, pend);
-        return pbegin[n];
+        const auto n{block_times.size() / 2};
+        std::nth_element(begin(block_times), begin(block_times) + n,
+                         end(block_times));
+        return block_times[n];
     }
 
     /**
