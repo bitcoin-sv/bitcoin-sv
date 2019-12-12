@@ -46,6 +46,11 @@ import random
 # 5. Txns are propageted by callbacks to the node0.
 # 6. Test cases without double sped issue
 # 7. Test cases with double spend money
+# 8. Tx reject message is created, when all the following conditions are met:
+#    a) a low priority txn detected (with or without validation timeout)
+#       or a high priority txn detected but only if validation timeout has not occurred
+#    b) a non-internal reject code was returned from txn validation.
+
 
 # This class might be moved into a different file.
 class switch(object):
@@ -386,8 +391,8 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 10,
-                # A number of rejected txns during a test (rejected by a 'high' priority queue)
-                10,
+                # A number of tx reject messages created during a test
+                0,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -418,7 +423,7 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 10,
-                # A number of rejected txns during a test (rejected by a 'high' priority queue)
+                # A number of tx reject messages created during a test
                 0,
                 # A number of peers connected to the node0
                 1,
@@ -453,8 +458,8 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 0,
-                # A number of rejected txns during a test (rejected by a 'high' and a 'low' priority queues)
-                20, 
+                # A number of tx reject messages created during a test (created by 'low' priority tasks)
+                10,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -484,8 +489,8 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 10,
-                # A number of rejected non-standard txns during a test (rejected by a 'high' priority queue).
-                10,
+                # A number of tx reject messages created during a test
+                0,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -494,8 +499,8 @@ class PVQTimeoutTest(BitcoinTestFramework):
 
             # P2P-Scenario4
             # - 10 txns used, 1 peer connected to node0
-            # - nonstandard txns used
-            # All txns go to the non-standard queue directly.
+            # - standard and nonstandard txns used
+            # All txns go to the standard queue first.
             [
                 # Sync node scenario
                 nodoublespends(),
@@ -515,8 +520,8 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 10,
-                # A number of rejected txns during a test (rejected by a 'high' priority queue).
-                10,
+                # A number of tx reject messages created during a test
+                0,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -557,11 +562,11 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 5,
-                # A number of rejected txns with reason 'too-long-validation-time'.
+                # A number of tx reject messages created during a test.
                 # The total number of rejected msgs should be 15. However, due to mt execution some of them are detected as
                 # 'txn-double-spend-detected' (added to the reject cache) but others as 'txn-mempool-conflict' (witness transactions
                 # not added to the reject cache).
-                10,
+                0,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -598,8 +603,8 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 0,
-                # A number of rejected txns during a test (rejected by a 'high' and a 'low' priority queues)
-                20, 
+                # A number of tx reject messages created during a test.
+                10,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
@@ -632,11 +637,11 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 5,
-                # A number of rejected txns with reason 'too-long-validation-time'.
-                # The total number of rejected msgs is 15. However, due to mt execution some of them are detected as
+                # A number of tx reject messages created during a test.
+                # The total number of rejected txns is 15. However, due to mt execution some of them are detected as
                 # 'txn-double-spend-detected' (added to the reject cache) but others as 'txn-mempool-conflict' (witness transactions
                 # not added to the reject cache).
-                10,
+                0,
                 # A number of peers connected to the node0
                 1,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
