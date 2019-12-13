@@ -121,6 +121,7 @@ namespace bsv
         return negative ? -result : result;
     }
 
+
     // I Models the RandomAccess Iterator concept
     // T Models the Integer concept
     template <typename T, typename I>
@@ -129,10 +130,10 @@ namespace bsv
         // pre-condition: bounded_range(f, l) and f < l
         assert(f != l);
 
-        const auto d{distance(f, l)};
+        const auto d{static_cast<size_t>(distance(f, l))};
 
         T result{0};
-        for(auto i{0}; i < d - 1; ++i)
+        for(size_t i{0}; i < d - 1; ++i)
         {
             T tmp{*f};
             tmp <<= (8 * i);
@@ -141,7 +142,12 @@ namespace bsv
             f = next(f);
         }
 
-        // this is the last byte of input
+        if(d > sizeof(T))
+        {
+            // assert(*f == 0x80);
+            return result;
+        }
+
         bool negative{};
         T tmp{*f};
         if(tmp & 0x80)
@@ -152,7 +158,6 @@ namespace bsv
 
         tmp <<= (8 * (d - 1));
         result |= tmp;
-
         return negative ? -result : result;
     }
 
