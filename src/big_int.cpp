@@ -459,6 +459,21 @@ std::string bsv::to_string(const bint& n) // used in gdb pretty-printer
     return oss.str();
 }
 
+namespace
+{
+    struct empty_asn1_deleter // See note 1
+    {
+        void operator()(ASN1_INTEGER* p) const { ::ASN1_INTEGER_free(p); }
+    };
+    using unique_asn1_ptr = std::unique_ptr<ASN1_INTEGER, empty_asn1_deleter>;
+    static_assert(sizeof(unique_asn1_ptr) == 8);
+
+    unique_asn1_ptr to_asn1(bignum_st* bn)
+    {
+        return unique_asn1_ptr{BN_to_ASN1_INTEGER(bn, nullptr)};
+    }
+}
+
 long bsv::to_long(const bint& n)
 {
     // Precondition:
@@ -468,7 +483,7 @@ long bsv::to_long(const bint& n)
     // Linux/GCC (sizeof(long) == 8 bytes)
     // n <= numeric_limit<int64_t>::max() and n>=0
 
-    auto* asn1{BN_to_ASN1_INTEGER(n.value_.get(), nullptr)};
+    const auto asn1{to_asn1(n.value_.get())};
     // assert(asn1);
     if(!asn1)
         throw big_int_error();
@@ -476,7 +491,7 @@ long bsv::to_long(const bint& n)
     //-1 means either error or an integer with a value of -1
     //(we don't want to use ASN1_INTEGER_get_uint64 because it's not supported
     // in older version of OpenSSL)
-    return ASN1_INTEGER_get(asn1);
+    return ASN1_INTEGER_get(asn1.get());
 }
 
 std::size_t bsv::to_size_t_limited(const bint& n)
