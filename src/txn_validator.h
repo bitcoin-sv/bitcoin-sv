@@ -117,7 +117,7 @@ class CTxnValidator final
 
     /** Post validation step for txns before limit mempool size is done*/
     void postValidationStepsNL(
-        const std::pair<CTxnValResult, bool>& result,
+        const std::pair<CTxnValResult, CTask::Status>& result,
         std::vector<TxInputDataSPtr>& vAcceptedTxns,
         std::vector<TxInputDataSPtr>& vNonStdTxns,
         std::vector<TxInputDataSPtr>& vCancelledTxns) const;
