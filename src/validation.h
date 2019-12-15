@@ -683,13 +683,14 @@ CTxnValResult TxnValidation(
  * @param fUseTimedCancellationSource A flag to check if timed cancellation source should be used
  * @return A vector of validation results
  */
-CTxnValResult TxnValidationProcessingTask(
+std::pair<CTxnValResult, bool> TxnValidationProcessingTask(
     const TxInputDataSPtr& pTxInputData,
     const Config &config,
     CTxMemPool &pool,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource);
+    bool fUseTimedCancellationSource,
+    std::chrono::steady_clock::time_point end);
 
 /**
  * Process validated txn. Submit txn to the mempool if it is valid.
