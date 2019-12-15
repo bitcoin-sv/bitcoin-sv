@@ -544,15 +544,14 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
 }
 
 void CTxnValidator::postValidationStepsNL(
-    //const CTxnValResult& txStatus,
-    const std::pair<CTxnValResult, bool>& result,
+    const std::pair<CTxnValResult, CTask::Status>& result,
     std::vector<TxInputDataSPtr>& vAcceptedTxns,
     std::vector<TxInputDataSPtr>& vDetectedLowPriorityTxns,
     std::vector<TxInputDataSPtr>& vCancelledTxns) const {
 
     const CTxnValResult& txStatus = result.first;
     const CValidationState& state = txStatus.mState;
-    if (!result.second) {
+    if (CTask::Status::Canceled == result.second) {
         vCancelledTxns.emplace_back(txStatus.mTxInputData);
     }
     if (state.IsValid()) {
