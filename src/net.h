@@ -288,25 +288,33 @@ public:
             TxInputDataSPtrVec& vNewTxns,
             CTxnHandlers& handlers,
             bool fReadyForFeeEstimation,
-            bool fUseTimedCancellationSource)
+            bool fUseTimedCancellationSource,
+            std::chrono::milliseconds maxasynctasksrunduration)
         -> std::vector<std::future<typename std::result_of<
             Callable(const TxInputDataSPtr&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
                 bool,
-                bool)>::type>> {
+                bool,
+                std::chrono::steady_clock::time_point)>::type>> {
         using resultType = typename std::result_of<
             Callable(const TxInputDataSPtr&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
                 bool,
-                bool)>::type;
+                bool,
+                std::chrono::steady_clock::time_point)>::type;
         // A variable which stors results
         std::vector<std::future<resultType>> results {};
         // Allocate a buffer for results
         results.reserve(vNewTxns.size());
+        // Set the time point
+        std::chrono::steady_clock::time_point zero_time_point(std::chrono::milliseconds(0));
+        std::chrono::steady_clock::time_point end_time_point =
+            std::chrono::steady_clock::time_point(maxasynctasksrunduration) == zero_time_point
+                ? zero_time_point : std::chrono::steady_clock::now() + maxasynctasksrunduration;
         // Create validation tasks
         for (const TxInputDataSPtr& txn : vNewTxns) {
             results.emplace_back(
@@ -319,7 +327,8 @@ public:
                     pool,
                     handlers,
                     fReadyForFeeEstimation,
-                    fUseTimedCancellationSource));
+                    fUseTimedCancellationSource,
+                    end_time_point));
         }
         return results;
     };

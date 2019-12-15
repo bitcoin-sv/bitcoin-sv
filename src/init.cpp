@@ -1138,6 +1138,10 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf("Set run frequency in asynchronous mode (default: %dms)",
             CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS)) ;
     strUsage += HelpMessageOpt(
+        "-maxtxnvalidatorasynctasksrunduration=<n>",
+        strprintf("Set the maximum validation duration for async tasks in a single run (default: %dms)",
+            CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count())) ;
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d)",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -1895,6 +1899,18 @@ bool AppInitParameterInteraction(Config &config) {
         &err))
     {
         return InitError(err);
+    }
+
+    if (!(config.GetMaxStdTxnValidationDuration() < config.GetMaxNonStdTxnValidationDuration())) {
+        return InitError(
+            strprintf("maxstdtxvalidationduration must be less than maxnonstdtxvalidationduration"));
+    }
+
+    if (!(gArgs.GetArg("-maxtxnvalidatorasynctasksrunduration",
+            CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()) >
+        config.GetMaxNonStdTxnValidationDuration().count())) {
+        return InitError(
+            strprintf("maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration"));
     }
 
     RegisterAllRPCCommands(tableRPC);

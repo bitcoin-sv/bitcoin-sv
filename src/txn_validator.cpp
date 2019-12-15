@@ -268,16 +268,24 @@ void CTxnValidator::processValidation(
     // Process a set of given txns
     do {
         // Execute parallel validation.
-        // The result is a pair of two vectors:
+        // The result is a tuple of three vectors:
         // - the first one contains accepted (by the mempool) txns
         // - the second one contains detected low priority txns
-        // There will be no detected non-standard txns as timed cancellation is not set.
+        // - the third one contains cancelled txns
+        // There will be no detected non-standard and cancelled txns as:
+        // - timed cancellation is not set
+        // - maxasynctasksrunduration is not set to non-zero value
         auto result {
-            processNewTransactionsNL(vTxInputData, handlers, fReadyForFeeEstimation, false)
+            processNewTransactionsNL(
+                vTxInputData,
+                handlers,
+                fReadyForFeeEstimation,
+                false,
+                std::chrono::milliseconds(0))
         };
         vAcceptedTxns.insert(vAcceptedTxns.end(),
-            std::make_move_iterator(result.first.begin()),
-            std::make_move_iterator(result.first.end()));
+            std::make_move_iterator(std::get<0>(result).begin()),
+            std::make_move_iterator(std::get<0>(result).end()));
         // Get dependent orphans (if any exists)
         vTxInputData = handlers.mpOrphanTxns->collectDependentTxnsForRetry();
         vTxInputDataSize = vTxInputData.size();
@@ -328,6 +336,14 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
             static_cast<size_t>(
                     gArgs.GetArg("-maxnonstdtxnsperthreadratio", DEFAULT_MAX_NON_STD_TXNS_PER_THREAD_RATIO))
         };
+        // Get an expected duration for async tasks.
+        std::chrono::milliseconds nMaxTxnValidatorAsyncTasksRunDuration {
+            static_cast<std::chrono::milliseconds>(
+                gArgs.GetArg("-maxtxnvalidatorasynctasksrunduration",
+                    DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count()))
+        };
+        // Ensure, that the last - long running task - won't exceed the limit.
+        nMaxTxnValidatorAsyncTasksRunDuration -= mConfig.GetMaxNonStdTxnValidationDuration();
         // Get mempool limits.
         size_t nMaxMempoolSize = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
         unsigned long nMempoolExpiry = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
@@ -340,10 +356,11 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
             if(mRunning) {
                 // Catch an exception if it occurs
                 try {
-                    // The result is a pair of two vectors:
+                    // The result is a tuple of three vectors:
                     // - the first one contains accepted (by the mempool) txns
                     // - the second one contains detected low priority txns
-                    std::pair<TxInputDataSPtrVec, TxInputDataSPtrVec> result {};
+                    // - the third one contains cancelled txns
+                    std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> result {};
                     {
                         // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
                         // An asynchronous interface locks mtxs in the following order:
@@ -369,17 +386,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                             if (nNumOfStdTxns) {
                                 LogPrint(BCLog::TXNVAL, "Txnval-asynch: The Standard queue, size= %d, mem= %ld\n",
                                          nNumOfStdTxns, mStdTxnsMemSize);
-                                if (nNumOfStdTxns < nMaxNumOfStdTxnsToSchedule) {
-                                    mProcessingQueue = std::move_if_noexcept(mStdTxns);
-                                    mStdTxnsMemSize = 0;
-                                } else {
-                                    collectTxns(mProcessingQueue, mStdTxns, nNumOfStdTxns, nMaxNumOfStdTxnsToSchedule, mStdTxnsMemSize);
-                                }
+                                collectTxns(mProcessingQueue, mStdTxns, nNumOfStdTxns, nMaxNumOfStdTxnsToSchedule, mStdTxnsMemSize);
                             }
                             // Get a required number of non-standard txns if any exists
                             size_t nNumOfNonStdTxns = mNonStdTxns.size();
                             size_t nMaxNumOfNonStdTxnsToSchedule = nMaxNonStdTxnsPerThreadRatio * nNumNonStdTxValidationThreads;
-                            if (nNumOfNonStdTxns) {
+                            if (nNumOfNonStdTxns && (mProcessingQueue.size() < nMaxNumOfStdTxnsToSchedule + nMaxNumOfNonStdTxnsToSchedule)) {
                                 LogPrint(BCLog::TXNVAL, "Txnval-asynch: The Non-standard queue, size= %d, mem= %ld\n",
                                          nNumOfNonStdTxns, mNonStdTxnsMemSize);
                                 collectTxns(mProcessingQueue, mNonStdTxns, nNumOfNonStdTxns, nMaxNumOfNonStdTxnsToSchedule, mNonStdTxnsMemSize);
@@ -406,10 +418,11 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 // Validate txns and try to submit them to the mempool
                                 result =
                                     processNewTransactionsNL(
-                                            mProcessingQueue,
-                                            handlers,
-                                            fReadyForFeeEstimation,
-                                            true);
+                                        mProcessingQueue,
+                                        handlers,
+                                        fReadyForFeeEstimation,
+                                        true,
+                                        nMaxTxnValidatorAsyncTasksRunDuration);
                                 // Trim mempool if it's size exceeds the limit.
                                 std::vector<TxId> vRemovedTxIds {
                                     LimitMempoolSize(
@@ -419,7 +432,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                         nMempoolExpiry)
                                 };
                                 // Execute post processing steps.
-                                postProcessingStepsNL(result.first, vRemovedTxIds, handlers);
+                                postProcessingStepsNL(std::get<0>(result), vRemovedTxIds, handlers);
                                 // After we've (potentially) uncached entries, ensure our coins cache is
                                 // still within its size limits
                                 CValidationState dummyState;
@@ -428,19 +441,27 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         }
                     }
                     // If there are any low priority transactions then move them to the low priority queue.
-                    size_t nDetectedLowPriorityTxnsNum = result.second.size();
+                    size_t nDetectedLowPriorityTxnsNum = std::get<1>(result).size();
                     if (nDetectedLowPriorityTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
                                 "Txnval-asynch: Validation timeout occurred for %d txn(s) received from the Standard queue "
                                 "(forwarding them to the Non-standard queue)\n",
                                  nDetectedLowPriorityTxnsNum);
                         std::unique_lock lock { mNonStdTxnsMtx };
-                        enqueueTxnsNL(result.second.begin(), result.second.end(),
+                        enqueueTxnsNL(std::get<1>(result).begin(), std::get<1>(result).end(),
                             [this](const TxInputDataSPtr& txn){ enqueueNonStdTxnNL(txn); }
                         );
                     }
-                    // Clear processing queue.
-                    {
+                    // Move back into the processing queue any tasks which were cancelled or clean the queue otherwise.
+                    size_t nCancelledTxnsNum = std::get<2>(result).size();
+                    if (nCancelledTxnsNum) {
+                        LogPrint(BCLog::TXNVAL,
+                                "Txnval-asynch: The number of %s txn(s) which were cancelled and moved to the next iteration is %d\n",
+                                 enum_cast<std::string>(TxSource::p2p),
+                                 nCancelledTxnsNum);
+                        std::unique_lock lockPQ { mProcessingQueueMtx };
+                        mProcessingQueue = std::move_if_noexcept(std::get<2>(result));
+                    } else {
                         std::unique_lock lockPQ { mProcessingQueueMtx };
                         mProcessingQueue.clear();
                     }
@@ -473,11 +494,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
 /**
 * Process all new transactions.
 */
-std::pair<TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValidator::processNewTransactionsNL(
+std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource) {
+    bool fUseTimedCancellationSource,
+    std::chrono::milliseconds maxasynctasksrunduration) {
 
     // Trigger parallel validation
     auto results {
@@ -488,40 +510,51 @@ std::pair<TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValidator::processNewTrans
                     CTxMemPool *pool,
                     CTxnHandlers& handlers,
                     bool fReadyForFeeEstimation,
-                    bool fUseTimedCancellationSource) {
+                    bool fUseTimedCancellationSource,
+                    std::chrono::steady_clock::time_point end_time_point) {
                     return TxnValidationProcessingTask(
                                 pTxInputData,
                                *config,
                                *pool,
                                 handlers,
                                 fReadyForFeeEstimation,
-                                fUseTimedCancellationSource);
+                                fUseTimedCancellationSource,
+                                end_time_point);
                 },
                 &mConfig,
                 &mMempool,
                 txns,
                 handlers,
                 fReadyForFeeEstimation,
-                fUseTimedCancellationSource)
+                fUseTimedCancellationSource,
+                maxasynctasksrunduration)
     };
     // All txns accepted by the mempool and not removed from there.
     std::vector<TxInputDataSPtr> vAcceptedTxns {};
     // If there is any standard 'high' priority txn for which validation timeout occurred, then
     // change it's priority to 'low' and forward it to the low priority queue.
     std::vector<TxInputDataSPtr> vDetectedLowPriorityTxns {};
+    // A vector of cancelled txns.
+    std::vector<TxInputDataSPtr> vCancelledTxns {};
     // Process validation results
     for(auto& result : results) {
-        postValidationStepsNL(result.get(), vAcceptedTxns, vDetectedLowPriorityTxns);
+        postValidationStepsNL(result.get(), vAcceptedTxns, vDetectedLowPriorityTxns, vCancelledTxns);
     }
-    return {vAcceptedTxns, vDetectedLowPriorityTxns};
+    return {vAcceptedTxns, vDetectedLowPriorityTxns, vCancelledTxns};
 }
 
 void CTxnValidator::postValidationStepsNL(
-    const CTxnValResult& txStatus,
+    //const CTxnValResult& txStatus,
+    const std::pair<CTxnValResult, bool>& result,
     std::vector<TxInputDataSPtr>& vAcceptedTxns,
-    std::vector<TxInputDataSPtr>& vDetectedLowPriorityTxns) const {
+    std::vector<TxInputDataSPtr>& vDetectedLowPriorityTxns,
+    std::vector<TxInputDataSPtr>& vCancelledTxns) const {
 
+    const CTxnValResult& txStatus = result.first;
     const CValidationState& state = txStatus.mState;
+    if (!result.second) {
+        vCancelledTxns.emplace_back(txStatus.mTxInputData);
+    }
     if (state.IsValid()) {
         // Txns accepted by the mempool
         vAcceptedTxns.emplace_back(txStatus.mTxInputData);
