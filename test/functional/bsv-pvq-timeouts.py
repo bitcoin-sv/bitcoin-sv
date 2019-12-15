@@ -410,11 +410,11 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 # Test case description
                 "P2P-Scenario1_b [nodoublespends]: "
                 "-maxstdtxvalidationduration=10000 "
-                "-maxnonstdtxvalidationduration=10 "
+                "-maxnonstdtxvalidationduration=10001 "
                 "-checkmempool=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=10000',
-                 '-maxnonstdtxvalidationduration=10',
+                 '-maxnonstdtxvalidationduration=10001',
                  '-checkmempool=0'],
                 TxType.standard,
                 # A number of spend money txns used in the test
@@ -466,7 +466,7 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 60
             ],
 
-            # P2P-Scenario3
+            # P2P-Scenario3_a
             # - 10 txns used, 1 peer connected to node0
             # - nonstandard txns used
             # All txns go to the non-standard queue directly.
@@ -474,7 +474,7 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 # Sync node scenario
                 nodoublespends(),
                 # Test case description
-                "P2P-Scenario3 [nodoublespends]: "
+                "P2P-Scenario3_a [nodoublespends]: "
                 "-maxstdtxvalidationduration=5 "
                 "-maxnonstdtxvalidationduration=10000 "
                 "-checkmempool=0",
@@ -489,6 +489,40 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 10,
                 # A number of accepted txns
                 10,
+                # A number of tx reject messages created during a test
+                0,
+                # A number of peers connected to the node0
+                1,
+                # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
+                240
+            ],
+
+            # P2P-Scenario3_b
+            # - 10 txns used, 1 peer connected to node0
+            # - nonstandard txns used
+            # All txns go to the non-standard queue directly.
+            # The test case triggers async tasks cancellation and moves them to the next iteration.
+            [
+                # Sync node scenario
+                nodoublespends(),
+                # Test case description
+                "P2P-Scenario3_b [nodoublespends]: "
+                "-maxstdtxvalidationduration=5 "
+                "-maxnonstdtxvalidationduration=500 "
+                "-maxtxnvalidatorasynctasksrunduration=501 "
+                "-checkmempool=0",
+                # Node's configuration
+                ['-maxstdtxvalidationduration=5',
+                 '-maxnonstdtxvalidationduration=500',
+                 '-maxtxnvalidatorasynctasksrunduration=501',
+                 '-checkmempool=0'],
+                TxType.nonstandard,
+                # A number of spend money txns used in the test
+                30,
+                # A number of inputs in the spend money txn
+                10,
+                # A number of accepted txns
+                30,
                 # A number of tx reject messages created during a test
                 0,
                 # A number of peers connected to the node0
