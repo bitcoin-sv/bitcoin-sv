@@ -57,75 +57,10 @@ namespace bsv
         }
     }
 
-    // I Models the FwdIterator concept
-    // T Models the Integer concept
-    template <typename T, typename I>
-    inline T deserialize(I f, I l, std::forward_iterator_tag)
-    {
-        // pre-condition: bounded_range(f, l) and f < l
-        assert(f != l);
-
-        T result{0};
-        int i{};
-        while(f != l)
-        {
-            T tmp{*f};
-            if(next(f) == l)
-            {
-                // this is the last byte of input
-                if(*f & 0x80)
-                {
-                    // and it's negative
-                    tmp &= 0x7f;
-                    tmp <<= (8 * i);
-                    result |= tmp;
-                    return -result;
-                }
-            }
-            tmp <<= (8 * i);
-            result |= tmp;
-
-            f = next(f);
-            ++i;
-        }
-        return result;
-    }
-
-    // I Models the BidirectionalIterator concept
-    // T Models the Integer concept
-    template <typename T, typename I>
-    inline T deserialize(I f, I l, std::bidirectional_iterator_tag)
-    {
-        // pre-condition: bounded_range(f, l) and f < l
-        assert(f != l);
-
-        l = prev(l);
-        T result{*l};
-        bool negative{};
-        if(*l & 0x80)
-        {
-            result &= 0x7f;
-            negative = true;
-        }
-
-        if(f == l)
-            return negative ? -result : result;
-
-        do
-        {
-            l = prev(l);
-            result <<= 8;
-            result |= T{*l};
-        } while(f != l);
-
-        return negative ? -result : result;
-    }
-
-
     // I Models the RandomAccess Iterator concept
     // T Models the Integer concept
     template <typename T, typename I>
-    inline T deserialize(I f, I l, std::random_access_iterator_tag)
+    inline T deserialize(I f, I l)
     {
         // pre-condition: bounded_range(f, l) and f < l
         assert(f != l);
@@ -143,10 +78,7 @@ namespace bsv
         }
 
         if(d > sizeof(T))
-        {
-            // assert(*f == 0x80);
             return result;
-        }
 
         bool negative{};
         T tmp{*f};
@@ -159,17 +91,6 @@ namespace bsv
         tmp <<= (8 * (d - 1));
         result |= tmp;
         return negative ? -result : result;
-    }
-
-    // I Models the Iterator concept
-    // T Models the Integer concept
-    template <typename T, typename I>
-    inline T deserialize(I f, I l)
-    {
-        // pre-condition: bounded_range(f, l) and f < l
-        assert(f != l);
-        return deserialize<T>(
-            f, l, typename std::iterator_traits<I>::iterator_category());
     }
 
     inline bool IsMinimallyEncoded(const std::vector<uint8_t>& vch,
