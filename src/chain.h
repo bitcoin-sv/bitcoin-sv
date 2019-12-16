@@ -512,19 +512,20 @@ public:
 
     enum { nMedianTimeSpan = 11 };
 
-    int64_t GetMedianTimePast() const {
-        int64_t pmedian[nMedianTimeSpan];
-        int64_t *pbegin = &pmedian[nMedianTimeSpan];
-        int64_t *pend = &pmedian[nMedianTimeSpan];
+    int64_t GetMedianTimePast() const
+    {
+        std::vector<int64_t> block_times;
 
-        const CBlockIndex *pindex = this;
-        for (int i = 0; i < nMedianTimeSpan && pindex;
-             i++, pindex = pindex->pprev) {
-            *(--pbegin) = pindex->GetBlockTime();
+        const CBlockIndex* pindex = this;
+        for(int i{}; i < nMedianTimeSpan && pindex; i++, pindex = pindex->pprev)
+        {
+            block_times.push_back(pindex->GetBlockTime());
         }
 
-        std::sort(pbegin, pend);
-        return pbegin[(pend - pbegin) / 2];
+        const auto n{block_times.size() / 2};
+        std::nth_element(begin(block_times), begin(block_times) + n,
+                         end(block_times));
+        return block_times[n];
     }
 
     /**

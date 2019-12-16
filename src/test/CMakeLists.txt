@@ -60,6 +60,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	bip32_tests.cpp
 	blockcheck_tests.cpp
 	blockencodings_tests.cpp
+	block_info_tests.cpp
 	blockmaxsize_tests.cpp
 	blockfile_reading_tests.cpp
 	blockstatus_tests.cpp
