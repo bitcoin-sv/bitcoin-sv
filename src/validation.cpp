@@ -1160,6 +1160,11 @@ CTxnValResult TxnValidation(
                 return Result{ genesisState, pTxInputData };
             }
         }
+        else
+        {
+            // Not in Genesis grace period, so return original failure reason
+            return Result{state, pTxInputData};
+        }
     }
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
@@ -2768,7 +2773,6 @@ std::optional<bool> CheckInputs(
         }
         else if (!res.value())
         {
-            int genesisActivationHeight = config.GetGenesisActivationHeight();
             bool genesisGracefulPeriod = IsGenesisGracefulPeriod(config, spendHeight);
             const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
 
