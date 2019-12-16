@@ -23,61 +23,64 @@ Genesis height is 600.
 
 6. Move height on to 601 (to create some more spendable outputs post-genesis).
 
-7. Create a transaction with nLockTime in the past & nSequence set to the value
+7. Create txn with empty vin and verify it is rejected with the expected error code
+   (Check for failed test CORE-430)
+
+8. Create a transaction with nLockTime in the past & nSequence set to the value
    that would have (pre-genesis) meant minable at height 604. The transaction should be accepted
    because this is now considered final. Call this txn2.
 
-8. Create 3 transactions with nLockTime in the future & nSequence 0x00000003.
+9. Create 3 transactions with nLockTime in the future & nSequence 0x00000003.
    They should be accepted into the non-final-mempool but not the main mempool.
    Call these txn3, txn4 & txn5.
 
-9. Create a transaction with nLockTime in the future & nSequence equal to 0xFFFFFFFF.
-   The transaction will be considered final, accepted into the main mempool.
-   Call this txn6.
+10. Create a transaction with nLockTime in the future & nSequence equal to 0xFFFFFFFF.
+    The transaction will be considered final, accepted into the main mempool.
+    Call this txn6.
 
-10. Create transaction that tries to double spend UTXOs locked by txn3. It will be discarded
-   (actually it will be rejected but with code txn-mempool-conflict which is internal and so
-   doesn't send message back to client).
+11. Create transaction that tries to double spend UTXOs locked by txn3. It will be discarded
+    (actually it will be rejected but with code txn-mempool-conflict which is internal and so
+    doesn't send message back to client).
 
-11. Move height on. Txn2 and Txn6 will be mined.
+12. Move height on. Txn2 and Txn6 will be mined.
 
-12. Create standard transaction which tries to spend non-final txn3. It will be an orphan.
+13. Create standard transaction which tries to spend non-final txn3. It will be an orphan.
 
-13. Create non-final transaction which tries to spend non-final txn3. It will be rejected.
+14. Create non-final transaction which tries to spend non-final txn3. It will be rejected.
 
-14. Send an update for txn3 with a lower nSequence number. It will be rejected.
+15. Send an update for txn3 with a lower nSequence number. It will be rejected.
 
-15. Send an update for txn3 with a higher nSequence number. It will be accepted.
+16. Send an update for txn3 with a higher nSequence number. It will be accepted.
 
-16. Send multiple updates together for txn3 with higher and different nSequence numbers.
+17. Send multiple updates together for txn3 with higher and different nSequence numbers.
     Just one of the updates will be accepted, but due to PTV we can't be sure which.
 
-17. Send an invalid update in a single txn which wants to update both txn4 and txn5.
+18. Send an invalid update in a single txn which wants to update both txn4 and txn5.
     It will be rejected.
 
-18. Send an invalid update for txn4 which changes the number of inputs.
+19. Send an invalid update for txn4 which changes the number of inputs.
     It will be rejected.
 
-19. Send an update for txn3 with nSequence = 0xFFFFFFFF. It will be finalised and moved
+20. Send an update for txn3 with nSequence = 0xFFFFFFFF. It will be finalised and moved
     into the main mempool.
 
-20. Move time on beyond the nLockTime for txn4. It will be finalised and moved into the
+21. Move time on beyond the nLockTime for txn4. It will be finalised and moved into the
     main mempool.
 
-21. Move time beyond expiry period for txn5. It will be purged.
+22. Move time beyond expiry period for txn5. It will be purged.
 
-22. Mine a time-locked txn with MTP valid for the block it is contained in. Put a txn in the
+23. Mine a time-locked txn with MTP valid for the block it is contained in. Put a txn in the
     mempool that spends that first txn. Reorg so that the first txn is again non-final for
     the new MTP. Both txns will be removed from the mempool.
 
-23. Create and send non-final txn. Send a block that contains a transaction that spends the
+24. Create and send non-final txn. Send a block that contains a transaction that spends the
     some outputs as the earlier non-final txn. The non-final txn will not make it into the
     main mempool.
 
-24. Check that post-genesis if we receive a block containing a txn that pre-genesis would
+25. Check that post-genesis if we receive a block containing a txn that pre-genesis would
     have been BIP68 non-final but now is final, we accept that block ok.
 
-25. Check that post-genesis we will not accept a block containing a non-final transaction
+26. Check that post-genesis we will not accept a block containing a non-final transaction
 
 """
 from test_framework.test_framework import ComparisonTestFramework
@@ -133,7 +136,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         self.genesisactivationheight = 600 
         self.extra_args = [['-debug', '-whitelist=127.0.0.1', '-genesisactivationheight=%d' % self.genesisactivationheight,
                             '-txnpropagationfreq=1', '-txnvalidationasynchrunfreq=1', '-checknonfinalfreq=100',
-                            '-mempoolexpirynonfinal=1']] * self.num_nodes
+                            '-mempoolexpirynonfinal=1', '-maxgenesisgracefulperiod=0']] * self.num_nodes
         self.start_time = int(time.time())
 
     def init_network(self):
@@ -248,6 +251,12 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         spend_tx8 = self.create_transaction(out[18].tx, out[18].n, CScript(), 100000, CScript([OP_TRUE]))
         self.chain.update_block(3, [spend_tx2, spend_tx3, spend_tx4, spend_tx5, spend_tx6])
         yield self.accepted()
+
+        # Check txn with empty vin is rejected with teh expected code (fix for CORE-430).
+        tx2 = self.create_locked_transaction(spend_tx2, 0, CScript(), 1000, CScript([OP_TRUE]), nLockTime, 0x00000001)
+        tx2.vin = []
+        tx2.rehash()
+        yield TestInstance([[tx2, RejectResult(16, b'bad-txns-vin-empty')]])
 
         # At height 601, create a transaction with nLockTime in the past & nSequence set to the value
         # that would have (pre-genesis) meant minable at height 605.
