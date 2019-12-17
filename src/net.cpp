@@ -1359,7 +1359,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
             true);
     pnode->fWhitelisted = whitelisted;
 
-    GetNodeSignals().InitializeNode(*config, pnode, *this);
+    GetNodeSignals().InitializeNode(pnode, *this);
 
     LogPrint(BCLog::NET, "connection from %s accepted\n", addr.ToString());
 
@@ -2242,7 +2242,7 @@ bool CConnman::OpenNetworkConnection(const CAddress &addrConnect,
         pnode->fAddnode = true;
     }
 
-    GetNodeSignals().InitializeNode(*config, pnode, *this);
+    GetNodeSignals().InitializeNode(pnode, *this);
     {
         LOCK(cs_vNodes);
         vNodes.push_back(pnode);
@@ -3404,11 +3404,8 @@ std::string getSubVersionEB(uint64_t MaxBlockSize) {
     return eb;
 }
 
-std::string userAgent(const Config &config) {
-    // format excessive blocksize value
-    std::string eb = getSubVersionEB(config.GetMaxBlockSize());
+std::string userAgent() {
     std::vector<std::string> uacomments;
-    uacomments.push_back("EB" + eb);
 
     // sanitize comments per BIP-0014, format user agent and check total size
     if (gArgs.IsArgSet("-uacomment")) {
