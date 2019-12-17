@@ -60,11 +60,8 @@ void LimitedVector::padRight(size_t size, uint8_t signbit)
 
         stack.get().increaseCombinedStackSize(sizeDifference);
 
-        stackElement.reserve(size);
-        while (stackElement.size() < size - 1) {
-            stackElement.push_back(0x00);
-        }
-        stackElement.push_back(signbit);
+        stackElement.resize(size, 0x00);
+        stackElement.back() = signbit;
     }
 }
 
