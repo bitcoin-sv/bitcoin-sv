@@ -105,14 +105,6 @@ void LegacyBlockAssembler::resetBlock() {
     blockFinished = false;
 }
 
-static const std::vector<uint8_t>
-getExcessiveBlockSizeSig(const Config &config) {
-    std::string cbmsg = "/EB" + getSubVersionEB(config.GetMaxBlockSize()) + "/";
-    const char *cbcstr = cbmsg.c_str();
-    std::vector<uint8_t> vec(cbcstr, cbcstr + cbmsg.size());
-    return vec;
-}
-
 std::unique_ptr<CBlockTemplate>
 LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev)
 {
@@ -629,7 +621,7 @@ void LegacyBlockAssembler::addPriorityTxs() {
     }
 }
 
-void IncrementExtraNonce(const Config &config, CBlock *pblock,
+void IncrementExtraNonce(CBlock *pblock,
                          const CBlockIndex *pindexPrev,
                          unsigned int &nExtraNonce) {
     // Update nExtraNonce
@@ -643,9 +635,7 @@ void IncrementExtraNonce(const Config &config, CBlock *pblock,
     unsigned int nHeight = pindexPrev->nHeight + 1;
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
     txCoinbase.vin[0].scriptSig =
-        (CScript() << nHeight << CScriptNum(nExtraNonce)
-                   << getExcessiveBlockSizeSig(config)) +
-        COINBASE_FLAGS;
+        (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
 
     pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));

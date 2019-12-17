@@ -3376,34 +3376,6 @@ uint64_t CConnman::CalculateKeyedNetGroup(const CAddress &ad) const {
         .Finalize();
 }
 
-/**
- * This function convert MaxBlockSize from byte to
- * MB with a decimal precision one digit rounded down
- * E.g.
- * 1660000 -> 1.6
- * 2010000 -> 2.0
- * 1000000 -> 1.0
- * 230000  -> 0.2
- * 50000   -> 0.0
- *
- *  NB behavior for EB<1MB not standardized yet still
- *  the function applies the same algo used for
- *  EB greater or equal to 1MB
- */
-std::string getSubVersionEB(uint64_t MaxBlockSize) {
-    // Prepare EB string we are going to add to SubVer:
-    // 1) translate from byte to MB and convert to string
-    // 2) limit the EB string to the first decimal digit (floored)
-    std::stringstream ebMBs;
-    ebMBs << (MaxBlockSize / (ONE_MEGABYTE / 10));
-    std::string eb = ebMBs.str();
-    eb.insert(eb.size() - 1, ".", 1);
-    if (eb.substr(0, 1) == ".") {
-        eb = "0" + eb;
-    }
-    return eb;
-}
-
 std::string userAgent() {
     std::vector<std::string> uacomments;
 
