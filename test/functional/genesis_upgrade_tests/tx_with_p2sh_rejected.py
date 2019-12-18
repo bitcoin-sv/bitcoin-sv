@@ -23,8 +23,8 @@ class TxWithP2SHDefaultTestCase(GenesisHeightBasedSimpleTestsCase):
 
 
 class TxWithP2SHAcceptTestCase(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptp2sh=1']
-    NAME = "Accept P2SH outputs when acceptp2sh is set"
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptp2sh_ashashpuzzle=1']
+    NAME = "Accept P2SH outputs when acceptp2sh_ashashpuzzle is set"
 
     TESTS_PRE_GENESIS_ACCEPT = [
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),

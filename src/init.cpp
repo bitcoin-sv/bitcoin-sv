@@ -887,7 +887,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                                     testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis                                    
                                  ));
     strUsage += HelpMessageOpt(
-        "-acceptp2sh", strprintf(_("Relay and mine transactions with P2SH outputs after Genesis is activated. "
+        "-acceptp2sh_ashashpuzzle", strprintf(_("Relay and mine transactions with P2SH outputs after Genesis is activated. "
         "When the value is 0, such transactions are rejected after Genesis. "
         " (default: %d)"),
         DEFAULT_ACCEPT_P2SH));
@@ -1781,9 +1781,9 @@ bool AppInitParameterInteraction(Config &config) {
     }
     
     // Configure if transactions with P2SH in pubkey should be rejected after Genesis.
-    if (gArgs.IsArgSet("-acceptp2sh"))
+    if (gArgs.IsArgSet("-acceptp2sh_ashashpuzzle"))
     {
-        config.SetAcceptP2SH(gArgs.GetBoolArg("-acceptp2sh", DEFAULT_ACCEPT_P2SH));
+        config.SetAcceptP2SH(gArgs.GetBoolArg("-acceptp2sh_ashashpuzzle", DEFAULT_ACCEPT_P2SH));
     }
 
     // Configure data carrier size.
