@@ -1189,11 +1189,18 @@ CTxnValResult TxnValidation(
                     ? config.GetMaxStdTxnValidationDuration() : config.GetMaxNonStdTxnValidationDuration())
             : task::CCancellationSource::Make();
 
-    if (fRequireStandard && !fStandard) {
-        state.DoS(0, false, REJECT_NONSTANDARD,
-                  reason);
-        return Result{state, pTxInputData};
+    bool acceptNonStandardOutput = config.GetAcceptNonStandardOutput(isGenesisEnabled);
+    if(!fStandard)
+    {
+        if (!acceptNonStandardOutput ||
+            (isGenesisEnabled && fRequireStandard && reason != "scriptpubkey"))
+        {
+            state.DoS(0, false, REJECT_NONSTANDARD,
+                      reason);
+            return Result{state, pTxInputData};
+        }
     }
+
     // Only accept nLockTime-using transactions that can be mined in the next
     // block; we don't want our mempool filled up with transactions that can't
     // be mined yet.
@@ -1289,7 +1296,7 @@ CTxnValResult TxnValidation(
     }
 
     // Check for non-standard pay-to-script-hash in inputs
-    if (fRequireStandard)
+    if (!acceptNonStandardOutput)
     {
         auto res =
             AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);

@@ -87,10 +87,10 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
 
     unsigned int nDataSize = 0;
     txnouttype whichType;
+    bool scriptpubkey = false;
     for (const CTxOut &txout : tx.vout) {
         if (!::IsStandard(config, txout.scriptPubKey, nHeight, whichType)) {
-            reason = "scriptpubkey";
-            return false;
+            scriptpubkey = true;
         }
 
         if (whichType == TX_NULL_DATA) {
@@ -107,6 +107,12 @@ bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std
     // cumulative size of all OP_RETURN txout should be smaller than -datacarriersize
     if (nDataSize > config.GetDataCarrierSize()) {
         reason = "datacarrier-size-exceeded";
+        return false;
+    }
+    
+    if(scriptpubkey)
+    {
+        reason = "scriptpubkey";
         return false;
     }
 
