@@ -63,6 +63,8 @@ void GlobalConfig::Reset()
 
     maxScriptNumLengthPolicy = DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS;
     genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD;
+
+    mAcceptNonStandardOutput = true;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -806,6 +808,16 @@ uint64_t GlobalConfig::GetMaxScriptNumLength(bool isGenesisEnabled, bool isConse
         return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS; // use new limit after genesis
     }
     return maxScriptNumLengthPolicy; // use policy
+}
+
+void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
+{
+    mAcceptNonStandardOutput = accept;
+}
+
+bool GlobalConfig::GetAcceptNonStandardOutput(bool isGenesisEnabled) const
+{
+    return isGenesisEnabled ? mAcceptNonStandardOutput : !fRequireStandard;
 }
 
 DummyConfig::DummyConfig()

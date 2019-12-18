@@ -901,6 +901,12 @@ std::string HelpMessage(HelpMessageMode mode) {
                 "testnet/regtest only; ",
                 defaultChainParams->RequireStandard()));
         strUsage += HelpMessageOpt(
+            "-acceptnonstdoutputs",
+            strprintf(
+                "Relay and mine transactions that create or consume non standard"
+                " outputs after Genesis is activated. (default: %u)",
+                GlobalConfig::GetConfig().GetAcceptNonStandardOutput(true)));
+        strUsage += HelpMessageOpt(
             "-dustrelayfee=<amt>",
             strprintf("Fee rate (in %s/kB) used to defined dust, the value of "
                       "an output such that it will cost about 1/3 of its value "
@@ -1963,6 +1969,9 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(
             strprintf("acceptnonstdtxn is not currently supported for %s chain",
                       chainparams.NetworkIDString()));
+
+    config.SetAcceptNonStandardOutput(
+        gArgs.GetBoolArg("-acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
 
 #ifdef ENABLE_WALLET
     if (!CWallet::ParameterInteraction()) return false;
