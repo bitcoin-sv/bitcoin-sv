@@ -588,8 +588,10 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf(_("Factor that will be multiplied with excessiveBlockSize"
             " to limit the maximum bytes in all sending queues. If this"
             " size is exceeded, no response to block related P2P messages is sent."
+            " If -excessiveblocksize is not set, this factor is not used and"
+            " maximum bytes in all sending queues is limited to %u bytes."
             " (default factor: %u)"),
-            DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES));
+            DEFAULT_MAX_SEND_QUEUES_BYTES, DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES));
     strUsage += HelpMessageOpt(
         "-maxtimeadjustment",
         strprintf(_("Maximum allowed median peer time offset adjustment. Local "
