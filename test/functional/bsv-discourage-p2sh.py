@@ -40,25 +40,40 @@ class BSVDiscourageP2SH(BitcoinTestFramework):
         
         self.nodes[0].generate(101)
         self.stop_node(0)
-        
-        with self.run_node_with_connections("reject P2SH", 0, ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptp2sh_ashashpuzzle=0', '-genesisactivationheight=100'], 1) as connections:
+
+        with self.run_node_with_connections("reject P2SH", 0,
+            ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0',
+             '-acceptp2sh_ashashpuzzle=0','-genesisactivationheight=100'], 1) as connections:
             p2sh_tx = self.makeP2SHTransaction()
             self.assert_rejected_transaction(p2sh_tx, connections[0].cb, b'bad-txns-vout-p2sh')
             # check that rejected transaction did not cause disconnection
             connections[0].cb.sync_with_ping()
 
-        with self.run_node_with_connections("treat P2SH as non-standard", 0, ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptp2sh_ashashpuzzle=1', '-genesisactivationheight=100'], 1) as connections:
+        with self.run_node_with_connections("treat P2SH as non-standard", 0,
+            ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0',
+             '-acceptp2sh_ashashpuzzle=1', '-genesisactivationheight=100'], 1) as connections:
             p2sh_tx = self.makeP2SHTransaction()
             self.assert_rejected_transaction(p2sh_tx, connections[0].cb, b'scriptpubkey')
             # check that rejected transaction did not cause disconnection
             connections[0].cb.sync_with_ping()
 
-        with self.run_node_with_connections("accept P2SH as non-standard", 0, ['-whitelist=127.0.0.1', '-acceptnonstdtxn=1', '-acceptp2sh_ashashpuzzle=1', '-genesisactivationheight=100'], 1) as connections:
+        with self.run_node_with_connections("accept P2SH as non-standard while acceptnonstdtxn=0", 0,
+            ['-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=1',
+             '-acceptp2sh_ashashpuzzle=1', '-genesisactivationheight=100'], 1) as connections:
+            pool_size = self.nodes[0].getmempoolinfo()["size"]
             p2sh_tx = self.makeP2SHTransaction()
             connections[0].cb.send_message(msg_tx(p2sh_tx))
             connections[0].cb.sync_with_ping()
-            wait_until(lambda: len(self.nodes[0].getrawmempool()) == 1)
-            assert_equal(set(self.nodes[0].getrawmempool()), {p2sh_tx.hash})
+            wait_until(lambda: len(self.nodes[0].getrawmempool()) == pool_size + 1)
+            assert(p2sh_tx.hash in set(self.nodes[0].getrawmempool()))
+
+        with self.run_node_with_connections("accept P2SH as non-standard", 0, ['-whitelist=127.0.0.1', '-acceptnonstdtxn=1', '-acceptp2sh_ashashpuzzle=1', '-genesisactivationheight=100'], 1) as connections:
+            pool_size = self.nodes[0].getmempoolinfo()["size"]
+            p2sh_tx = self.makeP2SHTransaction()
+            connections[0].cb.send_message(msg_tx(p2sh_tx))
+            connections[0].cb.sync_with_ping()
+            wait_until(lambda: len(self.nodes[0].getrawmempool()) == pool_size + 1)
+            assert(p2sh_tx.hash in set(self.nodes[0].getrawmempool()))
 
 if __name__ == '__main__':
     BSVDiscourageP2SH().main()
