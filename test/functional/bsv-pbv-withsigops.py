@@ -37,7 +37,8 @@ from test_framework.mininode import (
 from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
     p2p_port,
-    wait_until
+    assert_equal,
+    wait_until,
 )
 from test_framework.script import *
 from test_framework.blocktools import create_transaction
@@ -193,27 +194,27 @@ class PBVWithSigOps(BitcoinTestFramework):
         self.log.info(f"block2_hard hash: {block2_hard.hash}")
 
         self.chain.set_tip(block1_num)
-        block3_easy = self.next_block(block_count)
+        block3_easier = self.next_block(block_count)
         add_txns = self.get_hard_transactions(spend, money_to_spend=money_to_spend, num_of_transactions=1000,
                                               num_of_sig_checks=num_of_sig_checks,
                                               expensive_script=expensive_scriptPubKey)
         self.chain.update_block(block_count, add_txns)
-        self.log.info(f"block3_easy hash: {block3_easy.hash}")
+        self.log.info(f"block3_easier hash: {block3_easier.hash}")
 
         node0.send_message(msg_block(block2_hard))
-        node0.send_message(msg_block(block3_easy))
+        node0.send_message(msg_block(block3_easier))
 
         def wait_for_log():
-            line_text1 = f"Block {block2_hard.hash} was not activated as best"
-            line_text2 = "Verify 8000 txins"
-            line_text3 = "Verify 2000 txins"
+            text_activation = f"Block {block2_hard.hash} was not activated as best"
+            text_block2 = "Verify 8000 txins"
+            text_block3 = "Verify 2000 txins"
             results = 0
             for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-                if line_text1 in line:
+                if text_activation in line:
                     results += 1
-                if line_text2 in line:
+                elif text_block2 in line:
                     results += 1
-                if line_text3 in line:
+                elif text_block3 in line:
                     results += 1
             return True if results == 3 else False
 
@@ -221,19 +222,20 @@ class PBVWithSigOps(BitcoinTestFramework):
         # try accounting for slower machines by having a large timeout
         wait_until(wait_for_log, timeout=120)
 
-        line_text1 = f"Block {block2_hard.hash} was not activated as best"
-        line_text2 = "Verify 8000 txins"
-        line_text3 = "Verify 2000 txins"
+        text_activation = f"Block {block2_hard.hash} was not activated as best"
+        text_block2 = "Verify 8000 txins"
+        text_block3 = "Verify 2000 txins"
         for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-            if line_text1 in line:
+            if text_activation in line:
                 self.log.info(f"block2_hard was not activated as block3_easy won the validation race")
-            if line_text2 in line:
-                line = line.split()
-                self.log.info(f"block3_easy took {line[len(line)-1]} to verify")
-            if line_text3 in line:
+            elif text_block2 in line:
                 line = line.split()
                 self.log.info(f"block2_hard took {line[len(line) - 1]} to verify")
+            elif text_block3 in line:
+                line = line.split()
+                self.log.info(f"block3_easy took {line[len(line)-1]} to verify")
 
+        assert_equal(block3_easier.hash, self.nodes[0].getbestblockhash())
         node0.connection.close()
 
 if __name__ == '__main__':
