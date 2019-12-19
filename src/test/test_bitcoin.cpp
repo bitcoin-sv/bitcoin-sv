@@ -169,7 +169,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     }
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
-    IncrementExtraNonce(config, &block, pindexPrev, extraNonce);
+    IncrementExtraNonce(&block, pindexPrev, extraNonce);
 
     while (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
         ++block.nNonce;

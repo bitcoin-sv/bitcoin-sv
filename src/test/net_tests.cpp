@@ -191,21 +191,7 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test) {
     BOOST_CHECK(pnode2->fFeeler == false);
 }
 
-BOOST_AUTO_TEST_CASE(test_getSubVersionEB) {
-    BOOST_CHECK_EQUAL(getSubVersionEB(13800000000), "13800.0");
-    BOOST_CHECK_EQUAL(getSubVersionEB(3800000000), "3800.0");
-    BOOST_CHECK_EQUAL(getSubVersionEB(14000000), "14.0");
-    BOOST_CHECK_EQUAL(getSubVersionEB(1540000), "1.5");
-    BOOST_CHECK_EQUAL(getSubVersionEB(1560000), "1.5");
-    BOOST_CHECK_EQUAL(getSubVersionEB(210000), "0.2");
-    BOOST_CHECK_EQUAL(getSubVersionEB(10000), "0.0");
-    BOOST_CHECK_EQUAL(getSubVersionEB(0), "0.0");
-}
-
 BOOST_AUTO_TEST_CASE(test_userAgentLength) {
-    testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
-
-    testConfig.SetMaxBlockSize(8000000);
     std::string long_uacomment = "very very very very very very very very very "
                                  "very very very very very very very very very "
                                  "very very very very very very very very very "
@@ -216,13 +202,14 @@ BOOST_AUTO_TEST_CASE(test_userAgentLength) {
                                  "very very very very very very long comment";
     gArgs.ForceSetMultiArg("-uacomment", long_uacomment);
 
-    BOOST_CHECK_EQUAL(userAgent(testConfig).size(), MAX_SUBVERSION_LENGTH);
-    BOOST_CHECK(userAgent(testConfig).find(
-                      "; very very very very very "
+    BOOST_CHECK_EQUAL(userAgent().size(), MAX_SUBVERSION_LENGTH);
+
+    BOOST_CHECK(userAgent().find(
+                      "very very very very very "
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "
                       "very very very very very very very very very very very "
-                      "very very very very very very very very)/") != std::string::npos);
+                      "very very very very very very very v)/") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -146,7 +146,7 @@ UniValue generateBlocks(const Config &config,
 
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();
-        IncrementExtraNonce(config, pblock, pindexPrev, nExtraNonce);
+        IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
 
         while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
                !CheckProofOfWork(pblock->GetHash(), pblock->nBits, config)) {
