@@ -21,7 +21,7 @@ class SighashCaseTest(GenesisHeightTestsCaseBase):
 
     NAME = "Sighash algorithm check tx size"
     _UTXO_KEY = make_key()
-    ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1',]
+    ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=10000']
 
     def new_transaction(self, utxo, use_new_sighash_algorithm, target_tx_size):
         ndx, tx_to_spend = utxo
@@ -63,19 +63,19 @@ class SighashCaseTest(GenesisHeightTestsCaseBase):
             tx_old_sighash_max_size = self.new_transaction(utxos.pop(0), use_new_sighash_algorithm=False, target_tx_size=1000000)
             tx_collection.add_tx(tx_old_sighash_max_size)
 
-            # TODO Uncomment these tests after CORE-287 MAX_STANDARD_TX_SIZE is implemented
-            #tx_old_sighash_too_big = self.new_transaction(utxos.pop(0), use_new_sighash_algorithm=False, target_tx_size=1000001)
-            #tx_collection.add_tx(tx_old_sighash_too_big,
-            #                     p2p_reject_reason=b'mandatory-script-verify-flag-failed (Transaction too big for this sighash type)',
-            #                     block_reject_reason=b'blk-bad-inputs')
-            #tx_new_sighash = self.new_transaction(utxos.pop(0), use_new_sighash_algorithm=True, target_tx_size=1500000)
-            #tx_collection.add_tx(tx_new_sighash)
+            tx_old_sighash_too_big = self.new_transaction(utxos.pop(0), use_new_sighash_algorithm=False,
+                                                          target_tx_size=1000001)
+            tx_collection.add_tx(tx_old_sighash_too_big,
+                                 p2p_reject_reason=b'mandatory-script-verify-flag-failed (Transaction too big for this sighash type)',
+                                 block_reject_reason=b'blk-bad-inputs')
+            tx_new_sighash = self.new_transaction(utxos.pop(0), use_new_sighash_algorithm=True, target_tx_size=1500000)
+            tx_collection.add_tx(tx_new_sighash)
 
         if tx_collection.label == "GENESIS":
             post_genesis_utxos, data = self.utxos["GENESIS"]
-            # TODO Uncomment this tests after CORE-287 MAX_STANDARD_TX_SIZE is implemented
-            #tx_new_sighash = self.new_transaction(post_genesis_utxos.pop(0), use_new_sighash_algorithm=True, target_tx_size=1500000)
-            #tx_collection.add_tx(tx_new_sighash)
+            tx_new_sighash = self.new_transaction(post_genesis_utxos.pop(0), use_new_sighash_algorithm=True,
+                                                  target_tx_size=1500000)
+            tx_collection.add_tx(tx_new_sighash)
             tx_old_sighash = self.new_transaction(post_genesis_utxos.pop(0), use_new_sighash_algorithm=False, target_tx_size=500)
             tx_collection.add_tx(tx_old_sighash,
                                  p2p_reject_reason=b'genesis-script-verify-flag-failed (Signature must use SIGHASH_FORKID)',
@@ -95,7 +95,7 @@ def make_unlock_with_new(tx, tx_to_spend):
 
 
 class SighashSimpleCaseTest(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', ]
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1']
     NAME = "Sighash Simple test"
     THE_KEY = make_key()
     P2PK_LOCKING_SCRIPT = CScript([THE_KEY.get_pubkey(), OP_CHECKSIG])
