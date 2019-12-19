@@ -133,6 +133,9 @@ public:
 
     virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
+
+    virtual void SetAcceptNonStandardOutput(bool accept) = 0;
+    virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -247,6 +250,9 @@ public:
     bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override;
     uint64_t GetGenesisGracefulPeriod() const override;
 
+    void SetAcceptNonStandardOutput(bool accept) override;
+    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -311,6 +317,8 @@ private:
     uint64_t maxScriptSizePolicy;
 
     uint64_t maxScriptNumLengthPolicy;
+
+    bool mAcceptNonStandardOutput;
 };
 
 // Dummy for subclassing in unittests
@@ -518,6 +526,12 @@ public:
         {
             return MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS;
         }
+    }
+
+    void SetAcceptNonStandardOutput(bool) override {}
+    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override
+    {
+        return isGenesisEnabled ? true : !fRequireStandard;
     }
 
 private:
