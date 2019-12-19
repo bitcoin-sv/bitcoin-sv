@@ -462,12 +462,12 @@ std::optional<bool> EvalScript(
             //
             // Push values are not taken into consideration.
             // Note how OP_RESERVED does not count towards the opcode limit.
-            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount, config, flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
+            if ((opcode > OP_16) && !IsValidMaxOpsPerScript(++nOpCount, config, utxo_after_genesis, consensus)) {
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
             }
 
             // Some opcodes are disabled.
-            if (IsOpcodeDisabled(opcode) && (!(flags & SCRIPT_UTXO_AFTER_GENESIS) || fExec )) {
+            if (IsOpcodeDisabled(opcode) && (!utxo_after_genesis || fExec )) {
                 return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
             }
 
@@ -514,7 +514,7 @@ std::optional<bool> EvalScript(
                         break;
 
                     case OP_CHECKLOCKTIMEVERIFY: {
-                        if (!(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) || (flags & SCRIPT_UTXO_AFTER_GENESIS)) {
+                        if (!(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY) || utxo_after_genesis) {
                             // not enabled; treat as a NOP2
                             if (flags &
                                 SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) {
@@ -567,7 +567,7 @@ std::optional<bool> EvalScript(
                     }
 
                     case OP_CHECKSEQUENCEVERIFY: {
-                        if (!(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) || (flags & SCRIPT_UTXO_AFTER_GENESIS)) {
+                        if (!(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY) || utxo_after_genesis) {
                             // not enabled; treat as a NOP3
                             if (flags &
                                 SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS) {
@@ -661,7 +661,7 @@ std::optional<bool> EvalScript(
 
                     case OP_ELSE: {
                         // Only one ELSE is allowed in IF after genesis.
-                        if (vfExec.empty() || (vfElse.back() && (flags & SCRIPT_UTXO_AFTER_GENESIS))) {
+                        if (vfExec.empty() || (vfElse.back() && utxo_after_genesis)) {
                             return set_error(serror,
                                              SCRIPT_ERR_UNBALANCED_CONDITIONAL);
                         }
@@ -694,7 +694,7 @@ std::optional<bool> EvalScript(
                     } break;
 
                     case OP_RETURN: {
-                        if (flags & SCRIPT_UTXO_AFTER_GENESIS) {
+                        if (utxo_after_genesis) {
                             if (vfExec.empty()) {
                                 // Terminate the execution as successful. The remaining of the script does not affect the validity (even in
                                 // presence of unbalanced IFs, invalid opcodes etc)
@@ -1374,12 +1374,12 @@ std::optional<bool> EvalScript(
                         }
 
                         uint64_t nKeysCount = static_cast<uint64_t>(nKeysCountSigned);
-                        if (nKeysCount > config.GetMaxPubKeysPerMultiSig(flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
+                        if (nKeysCount > config.GetMaxPubKeysPerMultiSig(utxo_after_genesis, consensus)) {
                             return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
                         }
 
                         nOpCount += nKeysCount;
-                        if (!IsValidMaxOpsPerScript(nOpCount, config, flags & SCRIPT_UTXO_AFTER_GENESIS, consensus)) {
+                        if (!IsValidMaxOpsPerScript(nOpCount, config, utxo_after_genesis, consensus)) {
                             return set_error(serror, SCRIPT_ERR_OP_COUNT);
                         }
                         uint64_t ikey = ++i;
@@ -1635,7 +1635,7 @@ std::optional<bool> EvalScript(
                     } break;
 
                     default: {
-                        if (IsInvalidBranchingOpcode(opcode) && (flags & SCRIPT_UTXO_AFTER_GENESIS) && !fExec)
+                        if (IsInvalidBranchingOpcode(opcode) && utxo_after_genesis && !fExec)
                         {
                             break;
                         }
