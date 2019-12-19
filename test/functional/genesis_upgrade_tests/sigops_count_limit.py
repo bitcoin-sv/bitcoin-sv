@@ -1,6 +1,6 @@
 from genesis_upgrade_tests.test_base import GenesisHeightBasedSimpleTestsCase
 from test_framework.height_based_test_framework import SimpleTestDefinition
-from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN
+from test_framework.script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_DROP
 from test_framework.cdefs import MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS
 
 
@@ -15,11 +15,22 @@ class SigOpLimitCountDefaultTestCase(GenesisHeightBasedSimpleTestsCase):
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
                              "PRE-GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS + 1)),
                                             p2p_reject_reason=b'bad-txns-too-many-sigops'),
-# TODO: this test depends on CORE-165 (MAX_BLOCK_SIGOPS_PER_MB). Sum of all sigops (4000+4001+20000) is compared to MAX_BLOCK_SIGOPS_PER_MB (20000), thus failing with bad-blk-sigops
-#       MAX_BLOCK_SIGOPS_PER_MB should be increased to at least 22002
-#        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
-#                             "PRE-GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS),
-#                                            p2p_reject_reason=b'bad-txns-too-many-sigops'),
+        # Framework puts all the transactions that are considered valid into one block - added 2 transactions
+        # with 1 sigop to drop the density
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
+                             "PRE-GENESIS", b"",
+                             test_tx_locking_script=CScript([OP_CHECKSIG])),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
+                             "PRE-GENESIS", b"",
+                             test_tx_locking_script=CScript([OP_CHECKSIG] + [b"a" * 500, OP_DROP]*1000)),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
+                             "PRE-GENESIS", b"",
+                             test_tx_locking_script=CScript([OP_CHECKSIG] + [b"a" * 500, OP_DROP]*1000)),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
+                             "PRE-GENESIS", b"",
+                             test_tx_locking_script=CScript([OP_CHECKSIG] * MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS),
+                             p2p_reject_reason=b'bad-txns-too-many-sigops'),
+
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
                              "PRE-GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS + 1)),
                                             p2p_reject_reason=b'flexible-bad-txn-sigops',
@@ -27,12 +38,13 @@ class SigOpLimitCountDefaultTestCase(GenesisHeightBasedSimpleTestsCase):
     ]
 
     TESTS_POST_GENESIS_DEFAULT = [
-       
-# TODO: this test depends on CORE-165 (MAX_BLOCK_SIGOPS_PER_MB). Sum of all sigops (4000+4001+20000) is compared to MAX_BLOCK_SIGOPS_PER_MB (20000), thus failing with bad-blk-sigops
-#        MAX_BLOCK_SIGOPS_PER_MB should be increased to at least 22002
-#        SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),
-#                             "GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS),
-#                                        p2p_reject_reason=b'bad-txns-too-many-sigops'),
+        SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),
+                             "GENESIS", b"", test_tx_locking_script=CScript(
+                [OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS + 1))),
+        SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),
+                             "GENESIS", b"", test_tx_locking_script=CScript(
+                [OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS * 1000)),
+                             ),
     ]
 
 
@@ -50,11 +62,24 @@ class SigOpLimitCountPolicyTestCase(GenesisHeightBasedSimpleTestsCase):
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
                              "PRE-GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS + 1)),
                                             p2p_reject_reason=b'bad-txns-too-many-sigops'),
-# TODO: this test depends on CORE-165 (MAX_BLOCK_SIGOPS_PER_MB). Sum of all sigops (4000+4001+20000) is compared to MAX_BLOCK_SIGOPS_PER_MB (20000), thus failing with bad-blk-sigops
-#        MAX_BLOCK_SIGOPS_PER_MB should be increased to at least 22002
-#        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
-#                             "PRE-GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS),
-#                                            p2p_reject_reason=b'bad-txns-too-many-sigops'),
+        # Framework puts all the transactions that are considered valid into one block - added 2 transactions
+        # with 1 sigop to drop the density
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
+                             "PRE-GENESIS", b"",
+                             test_tx_locking_script=CScript([OP_CHECKSIG])),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
+                             "PRE-GENESIS", b"",
+                             test_tx_locking_script=CScript([OP_CHECKSIG] + [b"a" * 500, OP_DROP] * 1000)),
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
+                             "PRE-GENESIS", b"",
+                             test_tx_locking_script=CScript([OP_CHECKSIG] + [b"a" * 500, OP_DROP] * 1000)),
+
+        # Sum of all sigops (4000+4001+20000) is compared to MAX_BLOCK_SIGOPS_PER_MB (20000), thus failing with bad-blk-sigops
+        # MAX_BLOCK_SIGOPS_PER_MB should be increased to at least 22002
+        SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
+                             "PRE-GENESIS", b"",
+                             test_tx_locking_script=CScript([OP_CHECKSIG] * MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS),
+                             p2p_reject_reason=b'bad-txns-too-many-sigops'),
         SimpleTestDefinition("PRE-GENESIS", CScript([OP_TRUE]),
                              "PRE-GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * (MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS + 1)),
                                             p2p_reject_reason=b'flexible-bad-txn-sigops',
@@ -65,11 +90,9 @@ class SigOpLimitCountPolicyTestCase(GenesisHeightBasedSimpleTestsCase):
         
         SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),
                              "GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * 9000)),
-# TODO: this test depends on CORE-165 (MAX_BLOCK_SIGOPS_PER_MB). Sum of all sigops (4001+9000+9001) is compared to MAX_BLOCK_SIGOPS_PER_MB (20000), thus failing with bad-blk-sigops
-#        MAX_BLOCK_SIGOPS_PER_MB should be increased to at least 22002
-#        SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),
-#                             "GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * (9000 + 1)),
-#                                        p2p_reject_reason=b'bad-txns-too-many-sigops'),
+        SimpleTestDefinition("GENESIS", CScript([OP_TRUE]),
+                             "GENESIS", b"", test_tx_locking_script=CScript([OP_CHECKSIG] * (9000 + 1)),
+                             p2p_reject_reason=b'bad-txns-too-many-sigops'),
     ]
 
     TESTS = TESTS_PRE_GENESIS_POLICY + TESTS_POST_GENESIS_POLICY
