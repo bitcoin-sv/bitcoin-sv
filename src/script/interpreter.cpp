@@ -1009,7 +1009,8 @@ std::optional<bool> EvalScript(
                         stack.push_back(LShift(vch1.GetElement(), n.getint()));
                     } break;
 
-                    case OP_RSHIFT: {
+                    case OP_RSHIFT:
+                    {
                         // (x n -- out)
                         if(stack.size() < 2)
                         {
@@ -1019,10 +1020,8 @@ std::optional<bool> EvalScript(
 
                         const LimitedVector vch1 = stack.stacktop(-2);
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum n{
-                            top, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        CScriptNum n{top, fRequireMinimal, maxScriptNumLength,
+                                     utxo_after_genesis};
                         if(n < 0)
                         {
                             return set_error(serror,
@@ -1031,8 +1030,21 @@ std::optional<bool> EvalScript(
 
                         stack.pop_back();
                         stack.pop_back();
-                        stack.push_back(RShift(vch1.GetElement(), n.getint()));
-                    } break;
+                        auto cjg{vch1.GetElement()};
+                        do
+                        {
+                            cjg = RShift(cjg, n.getint());
+                            n -= utxo_after_genesis
+                                     ? CScriptNum{bsv::bint{INT32_MAX}}
+                                     : CScriptNum{INT32_MAX};
+                        } while(n > 0);
+
+                        stack.push_back(cjg);
+                        //    RShift(vch1.GetElement(), n.to_size_t_limited()));
+                        // stack.push_back(RShift(vch1.GetElement(),
+                        // n.getint()));
+                    }
+                    break;
 
                     case OP_EQUAL:
                     case OP_EQUALVERIFY:
