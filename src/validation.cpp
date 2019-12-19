@@ -1157,6 +1157,7 @@ CTxnValResult TxnValidation(
             }
             else
             {
+                genesisState.DoS(state.GetNDoS(), false, REJECT_INVALID, state.GetRejectReason());
                 return Result{ genesisState, pTxInputData };
             }
         }

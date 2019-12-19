@@ -98,6 +98,7 @@ public:
     void SetValidationTimeoutExceeded() { fValidationTimeoutExceeded = true; };
     void SetStandardTx() { fStandardTx = true; };
 
+    int GetNDoS() const { return nDoS; }
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
     std::string GetDebugMessage() const { return strDebugMessage; }
