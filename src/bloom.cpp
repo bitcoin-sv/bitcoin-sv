@@ -58,6 +58,11 @@ CBloomFilter::Hash(unsigned int nHashNum,
 }
 
 void CBloomFilter::insert(const std::vector<uint8_t> &vKey) {
+
+    if (vKey.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)
+    {
+        return;
+    }
     if (isFull) return;
     for (unsigned int i = 0; i < nHashFuncs; i++) {
         unsigned int nIndex = Hash(i, vKey);
@@ -80,6 +85,12 @@ void CBloomFilter::insert(const uint256 &hash) {
 }
 
 bool CBloomFilter::contains(const std::vector<uint8_t> &vKey) const {
+
+    if (vKey.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)
+    {
+        return false;
+    }
+
     if (isFull) {
         return true;
     }
