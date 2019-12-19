@@ -5,7 +5,7 @@
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
-
+from test_framework.mininode import COIN
 
 def get_unspent(listunspent, amount):
     for utx in listunspent:
@@ -151,7 +151,7 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         inputs = [{'txid': utx['txid'], 'vout': utx['vout']}]
         outputs = {
-            self.nodes[0].getnewaddress(): Decimal(5.0) - fee - feeTolerance}
+            self.nodes[0].getnewaddress(): round(Decimal(5.0) - fee - feeTolerance, 8)}
         rawtx = self.nodes[2].createrawtransaction(inputs, outputs)
         dec_tx = self.nodes[2].decoderawtransaction(rawtx)
         assert_equal(utx['txid'], dec_tx['vin'][0]['txid'])
@@ -643,6 +643,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         # result
         assert_equal(len(self.nodes[3].listunspent(1)), 1)
 
+        feeScale = min_relay_tx_fee * COIN
         inputs = []
         outputs = {self.nodes[3].getnewaddress(): 1}
         rawtx = self.nodes[3].createrawtransaction(inputs, outputs)
@@ -652,11 +653,9 @@ class RawTransactionsTest(BitcoinTestFramework):
             rawtx, {"feeRate": 2 * min_relay_tx_fee})
         result3 = self.nodes[3].fundrawtransaction(
             rawtx, {"feeRate": 10 * min_relay_tx_fee})
-        result_fee_rate = result['fee'] * 1000 / count_bytes(result['hex'])
-        assert_fee_amount(
-            result2['fee'], count_bytes(result2['hex']), 2 * result_fee_rate)
-        assert_fee_amount(
-            result3['fee'], count_bytes(result3['hex']), 10 * result_fee_rate)
+        result_fee_rate = result['fee'] * feeScale / count_bytes(result['hex'])
+        assert_fee_amount(result2['fee'], count_bytes(result2['hex']), 2 * result_fee_rate)
+        assert_fee_amount(result3['fee'], count_bytes(result3['hex']), 10 * result_fee_rate)
 
         #
         # Test address reuse option #
