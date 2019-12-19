@@ -27,6 +27,8 @@ private:
     valtype stackElement;
     std::reference_wrapper<LimitedStack> stack;
 
+    LimitedVector(const valtype& stackElementIn, LimitedStack& stackIn);
+
     // WARNING: modifying returned element will NOT adjust stack size
     valtype& GetElementNonConst();
 public:
@@ -34,8 +36,6 @@ public:
     // Memory usage of one stack element (without data). This is a consensus rule. Do not change.
     // It prevents someone from creating stack with millions of empty elements.
     static constexpr unsigned int ELEMENT_OVERHEAD = 32;
-
-    LimitedVector(const valtype& stackElementIn, LimitedStack& stackIn);
 
     // Warning: returned reference is invalidated if parent stack is modified.
     const valtype& GetElement() const;
@@ -106,6 +106,7 @@ public:
     void push_back(const LimitedVector &element);
     void push_back(const valtype& element);
 
+    // erase elements from including (top - first). element until excluding (top - last). element
     // first and last should be negative numbers (distance from the top)
     void erase(int first, int last);
 

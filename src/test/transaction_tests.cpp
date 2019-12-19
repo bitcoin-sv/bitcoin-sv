@@ -408,7 +408,7 @@ void ReplaceRedeemScript(CScript &script, const CScript &redeemScript) {
 
     BOOST_CHECK(stack.size() > 0);
     stack.pop_back();
-    stack.push_back(LimitedVector(std::vector<uint8_t>(redeemScript.begin(), redeemScript.end()), stack));
+    stack.push_back(std::vector<uint8_t>(redeemScript.begin(), redeemScript.end()));
     script = PushAll(stack);
 }
 

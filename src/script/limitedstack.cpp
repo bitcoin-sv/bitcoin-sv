@@ -60,11 +60,8 @@ void LimitedVector::padRight(size_t size, uint8_t signbit)
 
         stack.get().increaseCombinedStackSize(sizeDifference);
 
-        stackElement.reserve(size);
-        while (stackElement.size() < size - 1) {
-            stackElement.push_back(0x00);
-        }
-        stackElement.push_back(signbit);
+        stackElement.resize(size, 0x00);
+        stackElement.back() = signbit;
     }
 }
 
@@ -212,7 +209,7 @@ void LimitedStack::push_back(const LimitedVector &element)
 void LimitedStack::push_back(const valtype& element)
 {
     increaseCombinedStackSize(element.size() + LimitedVector::ELEMENT_OVERHEAD);
-    stack.emplace_back(element, *this);
+    stack.push_back(LimitedVector{element, *this});
 }
 
 LimitedVector& LimitedStack::stacktop(int index)
@@ -260,6 +257,11 @@ void LimitedStack::erase(int index)
 
 void LimitedStack::insert(int position, const LimitedVector& element)
 {
+    if (&element.getStack() != this)
+    {
+        throw std::invalid_argument("Invalid argument - element that is added should have the same parent stack as the one we are adding to.");
+    }
+
     if (position >= 0)
     {
         throw std::invalid_argument("Invalid argument - position should be < 0.");
