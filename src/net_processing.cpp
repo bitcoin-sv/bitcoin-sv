@@ -246,7 +246,7 @@ void UpdatePreferredDownload(const CNodePtr& pnode) {
     nPreferredDownload += state->fPreferredDownload;
 }
 
-void PushNodeVersion(const Config &config, const CNodePtr& pnode, CConnman &connman,
+void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
                      int64_t nTime) {
     ServiceFlags nLocalNodeServices = pnode->GetLocalServices();
     uint64_t nonce = pnode->GetLocalNonce();
@@ -263,7 +263,7 @@ void PushNodeVersion(const Config &config, const CNodePtr& pnode, CConnman &conn
                         CNetMsgMaker(INIT_PROTO_VERSION)
                             .Make(NetMsgType::VERSION, PROTOCOL_VERSION,
                                   (uint64_t)nLocalNodeServices, nTime, addrYou,
-                                  addrMe, nonce, userAgent(config),
+                                  addrMe, nonce, userAgent(),
                                   nNodeStartingHeight, ::fRelayTxes));
 
     if (fLogIPs) {
@@ -287,7 +287,7 @@ void PushProtoconf(const CNodePtr& pnode, CConnman &connman) {
 }
 
 
-void InitializeNode(const Config &config, const CNodePtr& pnode, CConnman &connman) {
+void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
     CAddress addr = pnode->addr;
     std::string addrName = pnode->GetAddrName();
     NodeId nodeid = pnode->GetId();
@@ -300,7 +300,7 @@ void InitializeNode(const Config &config, const CNodePtr& pnode, CConnman &connm
     }
 
     if (!pnode->fInbound) {
-        PushNodeVersion(config, pnode, connman, GetTime());
+        PushNodeVersion(pnode, connman, GetTime());
     }
 }
 
@@ -1627,7 +1627,7 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
 /**
 * Process version messages.
 */
-static bool ProcessVersionMessage(const Config& config, const CNodePtr& pfrom, const std::string& strCommand,
+static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strCommand,
     CDataStream& vRecv, CConnman& connman)
 {
     // Each connection can only send one version message
@@ -1716,7 +1716,7 @@ static bool ProcessVersionMessage(const Config& config, const CNodePtr& pfrom, c
 
     // Be shy and don't send version until we hear
     if(pfrom->fInbound) {
-        PushNodeVersion(config, pfrom, connman, GetAdjustedTime());
+        PushNodeVersion(pfrom, connman, GetAdjustedTime());
     }
 
     connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::VERACK));
@@ -3369,7 +3369,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::VERSION) {
-        return ProcessVersionMessage(config, pfrom, strCommand, vRecv, connman);
+        return ProcessVersionMessage(pfrom, strCommand, vRecv, connman);
     }
 
     else if (pfrom->nVersion == 0) {

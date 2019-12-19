@@ -663,7 +663,7 @@ struct CNodeSignals {
                                  std::atomic<bool> &),
                             CombinerAll>
         SendMessages;
-    boost::signals2::signal<void(const Config &, const CNodePtr& , CConnman &)>
+    boost::signals2::signal<void(const CNodePtr& , CConnman &)>
         InitializeNode;
     boost::signals2::signal<void(NodeId, bool &)> FinalizeNode;
 };
@@ -1155,6 +1155,5 @@ public:
  */
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);
 
-std::string getSubVersionEB(uint64_t MaxBlockSize);
-std::string userAgent(const Config &config);
+std::string userAgent();
 #endif // BITCOIN_NET_H
