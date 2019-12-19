@@ -134,6 +134,12 @@ uint64_t GlobalConfig::GetFactorMaxSendQueuesBytes() const {
 }
 
 uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
+
+    if(!MaxBlockSizeOverridden())
+    {
+        return DEFAULT_MAX_SEND_QUEUES_BYTES;
+    }
+
     // Use the "after upgrade" excessive block size to determine the maximum size of 
     // block related messages that we are prepared to queue
     uint64_t maxBlockSize = GetMaxBlockSize();

@@ -300,4 +300,20 @@ BOOST_AUTO_TEST_CASE(max_stack_size) {
     BOOST_CHECK(!testConfig.SetMaxStackMemoryUsage(-1, -2));
 }
 
+BOOST_AUTO_TEST_CASE(max_send_queues_size) {
+
+    std::string reason;
+
+    BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), DEFAULT_MAX_SEND_QUEUES_BYTES);
+
+    uint64_t testBlockSize = LEGACY_MAX_BLOCK_SIZE + 1;
+    gArgs.ForceSetArg("-excessiveblocksize", to_string(testBlockSize));
+    BOOST_CHECK(testConfig.SetMaxBlockSize(testBlockSize, &reason));
+    BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES);
+
+    uint64_t testFactor = 3;
+    testConfig.SetFactorMaxSendQueuesBytes(testFactor);
+    BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * testFactor);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
