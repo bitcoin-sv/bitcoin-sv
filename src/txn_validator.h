@@ -31,6 +31,10 @@ class CTxnValidator final
   public:
     // Default run frequency in asynch mode
     static constexpr unsigned DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS {100};
+    // Default maximum validation duration for async tasks in a single run
+    static constexpr std::chrono::milliseconds DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION {
+        std::chrono::seconds(60)
+    };
     // Default maximum memory usage (in MB) for the transaction queues
     static constexpr uint64_t DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES {2048};
 
@@ -104,17 +108,19 @@ class CTxnValidator final
     void threadNewTxnHandler() noexcept;
 
     /** Process all newly arrived transactions. Return txns accepted by the mempool */
-    std::pair<TxInputDataSPtrVec, TxInputDataSPtrVec> processNewTransactionsNL(
+    std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
         CTxnHandlers& handlers,
         bool fReadyForFeeEstimation,
-        bool fUseTimedCancellationSource);
+        bool fUseTimedCancellationSource,
+        std::chrono::milliseconds maxasynctasksrunduration);
 
     /** Post validation step for txns before limit mempool size is done*/
     void postValidationStepsNL(
-        const CTxnValResult& txStatus,
+        const std::pair<CTxnValResult, CTask::Status>& result,
         std::vector<TxInputDataSPtr>& vAcceptedTxns,
-        std::vector<TxInputDataSPtr>& vNonStdTxns) const;
+        std::vector<TxInputDataSPtr>& vNonStdTxns,
+        std::vector<TxInputDataSPtr>& vCancelledTxns) const;
 
     /** Post processing step for txns when limit mempool size is done */
     void postProcessingStepsNL(

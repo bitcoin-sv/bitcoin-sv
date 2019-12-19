@@ -1547,14 +1547,20 @@ CTxnValResult TxnValidation(
                   fTxValidForFeeEstimation};
 }
 
-CTxnValResult TxnValidationProcessingTask(
+std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     const TxInputDataSPtr& txInputData,
     const Config& config,
     CTxMemPool& pool,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource) {
+    bool fUseTimedCancellationSource,
+    std::chrono::steady_clock::time_point end_time_point) {
 
+    // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
+    if (!(std::chrono::steady_clock::time_point(std::chrono::milliseconds(0)) == end_time_point) &&
+        !(std::chrono::steady_clock::now() < end_time_point)) {
+        return {{CValidationState(), txInputData}, CTask::Status::Canceled};
+    }
     // Execute validation for the given txn
     CTxnValResult result {
         TxnValidation(
@@ -1568,7 +1574,7 @@ CTxnValResult TxnValidationProcessingTask(
     // Process validated results
     ProcessValidatedTxn(pool, result, handlers, false);
     // Forward results to the next processing stage
-    return result;
+    return {result, CTask::Status::RanToCompletion};
 }
 
 static void HandleInvalidP2POrphanTxn(

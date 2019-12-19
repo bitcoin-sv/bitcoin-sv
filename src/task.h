@@ -25,6 +25,17 @@ class CTask
         High = 2
     };
 
+    // Some pre-defined status levels.
+    enum class Status : int
+    {
+        Canceled = 0,
+        Created = 1,
+        Faulted = 2,
+        RanToCompletion = 3,
+        Running = 4,
+        WaitingToRun = 5
+    };
+
   private:
 
     // Helper method for converting a pre-defined priority level to the underlying
