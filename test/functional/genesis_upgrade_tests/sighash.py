@@ -21,7 +21,8 @@ class SighashCaseTest(GenesisHeightTestsCaseBase):
 
     NAME = "Sighash algorithm check tx size"
     _UTXO_KEY = make_key()
-    ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-maxstdtxvalidationduration=10000']
+    ARGS = GenesisHeightTestsCaseBase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1',
+                                              '-maxstdtxvalidationduration=10000', '-maxnonstdtxvalidationduration=10001']
 
     def new_transaction(self, utxo, use_new_sighash_algorithm, target_tx_size):
         ndx, tx_to_spend = utxo
