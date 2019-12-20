@@ -32,7 +32,7 @@ class TestNode(NodeConnCB):
 class MaxScriptSizeTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
-        self.genesisactivationheight = 208
+        self.genesisactivationheight = 209
         self.maxscriptsize = ONE_MEGABYTE-200
         self.setup_clean_chain = True
 
@@ -203,7 +203,10 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
         check_rejected(reject_reason=b'genesis-script-verify-flag-failed (Script is too big)')
 
+        # The last block at genesisactivationheight - 1 was rejected and therefore reverted
+        # We generate additional block to get to genesis height
         node.generate(1)
+        assert_equal(self.genesisactivationheight - 1, node.getblockchaininfo()['blocks'])
         # Genesis height
         # Check that they the results are same as before -- parents are from before genesis -- should still be unspendable
         utxo = {'txid': tx1, 'vout': 0, 'amount': 200000000}
