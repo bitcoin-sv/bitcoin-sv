@@ -26,7 +26,7 @@ static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
  * (network rule).
  */
 static const uint64_t MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS = 20000;
-static const uint64_t MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS = ONE_MEGABYTE; //means 1M sigops/1M bytes = 1sigop/byte which is effectively unlimited
+static const uint64_t MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS = ONE_MEGABYTE; //means 1M sigops/1M bytes = 1sigop/byte which is effectively unlimited // This value is not used anymore after Genesis
 
 /** allowed number of signature check operations per transaction. */
 static const uint64_t MAX_TX_SIGOPS_COUNT = 20000;
@@ -40,8 +40,6 @@ static const uint64_t MAX_OPS_PER_SCRIPT_AFTER_GENESIS = UINT32_MAX;
 
 /** Allowed number of signature check operations per transaction before Genesis */
 static const uint64_t MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS = 20000;
-/** Allowed number of signature check operations per transaction after Genesis (max value of uint32) */
-static const uint64_t MAX_TX_SIGOPS_COUNT_AFTER_GENESIS = UINT32_MAX;
 
 // Maximum number of public keys per multisig before GENESIS
 static const uint64_t MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS = 20;

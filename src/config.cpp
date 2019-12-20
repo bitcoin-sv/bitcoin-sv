@@ -867,17 +867,17 @@ bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::st
         return false;
     }
     uint64_t maxTxSigOpsCountInUnsigned = static_cast<uint64_t>(maxTxSigOpsCountIn);
-    if (maxTxSigOpsCountInUnsigned > MAX_TX_SIGOPS_COUNT_AFTER_GENESIS)
+    if (maxTxSigOpsCountInUnsigned > MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS)
     {
         if (err)
         {
-            *err = _("Policy value for maximum allowed number of signature operations per transaction must not exceed consensus limit of ") + std::to_string(MAX_TX_SIGOPS_COUNT_AFTER_GENESIS);
+            *err = _("Policy value for maximum allowed number of signature operations per transaction must not exceed limit of ") + std::to_string(MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
         }
         return false;
     }
     if (maxTxSigOpsCountInUnsigned == 0)
     {
-        maxTxSigOpsCountPolicy = MAX_TX_SIGOPS_COUNT_AFTER_GENESIS;
+        maxTxSigOpsCountPolicy = MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
     }
     else
     {
@@ -886,21 +886,18 @@ bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::st
     return true;
 }
 
-uint64_t GlobalConfig::GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const
+uint64_t GlobalConfig::GetMaxTxSigOpsCountConsensusBeforeGenesis() const
+{
+    return MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS;
+}
+
+uint64_t GlobalConfig::GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const
 {
     if (!isGenesisEnabled)
     {
-        if (isConsensus)
-        {
-            return MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS;
-        }
         return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS;
     }
 
-    if (isConsensus)
-    {
-        return MAX_TX_SIGOPS_COUNT_AFTER_GENESIS;
-    }
     return maxTxSigOpsCountPolicy;
 }
 
