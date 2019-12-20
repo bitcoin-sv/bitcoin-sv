@@ -1760,11 +1760,7 @@ void ProcessValidatedTxn(
     // This needs to be done in all cases:
     // - txn validation has failed
     // - txn committed to the mempool or rejected
-    // By checking the flag IsDoubleSpendDetected we only allow to remove inputs
-    // from the detector by the thread which added them.
-    if (!state.IsDoubleSpendDetected()) {
-        handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
-    }
+    handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
 }
 
 static void AskForMissingParents(
