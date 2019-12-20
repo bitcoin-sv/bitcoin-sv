@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs) {
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == nTxnsVinSize);
 }
 
-BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs2) {
+BOOST_AUTO_TEST_CASE(test_detector_conflicts) {
     // Create detector object.
     std::shared_ptr<CTxnDoubleSpendDetector> dsDetector {
         std::make_shared<CTxnDoubleSpendDetector>()
@@ -91,9 +91,23 @@ BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs2) {
     BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData1, mempool, state, true));
     // Assign tx1's input as the first input of tx2 
     const_cast<COutPoint&>(tx2.vin[0].prevout) = const_cast<COutPoint&>(tx1.vin[0].prevout);
-    BOOST_REQUIRE(!dsDetector->insertTxnInputs(txnInputData2, mempool, state, true));
 
+    // Try to remove inputs from a copy of tx1 that was never added
+    // Should not change anything
+    dsDetector->removeTxnInputs(tx2);
     BOOST_CHECK(dsDetector->getKnownSpendsSize() == tx1.vin.size());
+
+    // Try to add conflicted transaction
+    // Should not change anything
+    BOOST_REQUIRE(!dsDetector->insertTxnInputs(txnInputData2, mempool, state, true));
+    BOOST_CHECK(dsDetector->getKnownSpendsSize() == tx1.vin.size());
+
+    // Try to remove inputs from a copy of tx1 that was never added after a try
+    // to add it
+    // Should not change anything
+    dsDetector->removeTxnInputs(tx2);
+    BOOST_CHECK(dsDetector->getKnownSpendsSize() == tx1.vin.size());
+
     // Check if we are able to add tx2 after conflicting inputs were removed
     dsDetector->removeTxnInputs(tx1);
     BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData2, mempool, state, true));

@@ -9,6 +9,7 @@
 #include "uint256.h"
 #include <mutex>
 #include <vector>
+#include <set>
 
 class CTxMemPool;
 class CValidationState;
@@ -38,6 +39,7 @@ class CTxnDoubleSpendDetector {
         bool isFinal);
     /**
      * Remove txn's inputs for known spends.
+     * In case one of the transactions was not added this is a no-op.
      * @param tx A given transaction
      */
     void removeTxnInputs(const CTransaction& tx);
@@ -58,5 +60,6 @@ class CTxnDoubleSpendDetector {
 
   private:
     std::vector<COutPoint> mKnownSpends = {};
+    std::set<const CTransaction*> mKnownSpendsTx;
     mutable std::mutex mMainMtx {};
 };
