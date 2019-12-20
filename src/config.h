@@ -105,7 +105,8 @@ public:
 
     /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
     virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const = 0;
+    virtual uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const = 0;
 
     virtual bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBPolicyIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const = 0;
@@ -217,7 +218,8 @@ public:
     uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override;
 
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override;
-    uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override;
+    uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override;
+    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override;
 
     bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBPolicyIn, std::string* err = nullptr) override;
     uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const override;
@@ -448,7 +450,8 @@ public:
         }
     }
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override { return true; }
-    uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+    uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
 
     bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBaPolicyIn, std::string* err = nullptr) override { return true; }
     uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const override { throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented"); }
