@@ -40,7 +40,6 @@ void GlobalConfig::Reset()
 
     testBlockCandidateValidity = false;
     blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
-    acceptP2SH = DEFAULT_ACCEPT_P2SH;
 
     genesisActivationHeight = 0;
 
@@ -408,14 +407,6 @@ void GlobalConfig::SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemb
 
 mining::CMiningFactory::BlockAssemblerType GlobalConfig::GetMiningCandidateBuilder() const {
     return blockAssemblerType;
-}
-
-void GlobalConfig::SetAcceptP2SH(bool acceptP2SHIn) {
-    acceptP2SH = acceptP2SHIn;
-}
-
-bool GlobalConfig::GetAcceptP2SH() const {
-    return acceptP2SH;
 }
 
 bool GlobalConfig::SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err) {
