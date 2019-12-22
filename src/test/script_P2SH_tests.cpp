@@ -60,7 +60,6 @@ BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(sign) {
 
-    testConfig.SetAcceptP2SH(true);
     testConfig.SetGenesisActivationHeight(10); // arbitrary number, will test at this height and on lower by one
     LOCK(cs_main);
     // Pay-to-script-hash looks like this:
@@ -200,7 +199,6 @@ BOOST_AUTO_TEST_CASE(norecurse) {
 BOOST_AUTO_TEST_CASE(set) {
 
     testConfig.SetGenesisActivationHeight(10); // arbitrary number, will test at this height and on lower by one
-    testConfig.SetAcceptP2SH(true);
 
     LOCK(cs_main);
     // Test the CScript::Set* methods

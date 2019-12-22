@@ -83,9 +83,6 @@ public:
     virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
 
-    virtual void SetAcceptP2SH(bool acceptP2SHIn) = 0;
-    virtual bool GetAcceptP2SH() const = 0;
-
     virtual bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetGenesisActivationHeight() const = 0;
 
@@ -199,9 +196,6 @@ public:
     void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override;
     mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override;
 
-    void SetAcceptP2SH(bool acceptP2SHIn) override;
-    bool GetAcceptP2SH() const override;
-
     bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override;
     uint64_t GetGenesisActivationHeight() const override;
 
@@ -289,7 +283,6 @@ private:
 
     bool testBlockCandidateValidity;
     mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
-    bool acceptP2SH;
 
     uint64_t genesisActivationHeight;
 
@@ -406,9 +399,6 @@ public:
     mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override {
         return mining::CMiningFactory::BlockAssemblerType::LEGACY;
     }
-
-    void SetAcceptP2SH(bool acceptP2SHIn) override { acceptP2SH = acceptP2SHIn; }
-    bool GetAcceptP2SH() const override { return acceptP2SH; }
 
     bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn); return true; }
     uint64_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
@@ -537,7 +527,6 @@ public:
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
-    bool acceptP2SH { DEFAULT_ACCEPT_P2SH };
     uint64_t genesisActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
