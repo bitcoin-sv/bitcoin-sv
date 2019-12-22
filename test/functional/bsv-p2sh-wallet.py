@@ -60,7 +60,7 @@ class P2SH(ComparisonTestFramework):
         self.genesisactivationheight = 150
 
     def setup_network(self):
-        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', f'-genesisactivationheight={self.genesisactivationheight}']]*3
+        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-banscore=1000000', f'-genesisactivationheight={self.genesisactivationheight}']]*3
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
         self.init_network()
@@ -130,27 +130,23 @@ class P2SH(ComparisonTestFramework):
 
         assert node0.getblockcount() >= self.genesisactivationheight, "We must be after genesis"
 
-        block(200)
+        block(150)
         new_tx2 = new_P2SH_tx(scriptPubKey2)
-        self.chain.update_block(200, [new_tx2]) # sending funds to P2SH address AFTER genesis
-        yield self.accepted()
+        self.chain.update_block(150, [new_tx2]) # sending funds to P2SH address AFTER genesis
+        yield self.rejected(RejectResult(16, b'bad-txns-vout-p2sh'))
+
+        self.chain.set_tip(149)
 
         balance1 = node1.getbalance("*", 1, False)
         assert balance1 * COIN == new_tx1.vout[0].nValue, "Wallet has registered pre genesis transaction."
         balance2 = node2.getbalance("*", 1, False)
-        assert balance2 * COIN == new_tx2.vout[0].nValue, "Wallet has registered post genesis transaction."
+        assert balance2 * COIN == 0, "No funds in wallet as transaction is not accepted."
 
         # Pre genesis P2SH transaction can be spent through wallet
         node1.sendtoaddress(node0.getnewaddress(), balance1 - 1)
 
-        # Post genesis P2SH transaction can NOT be spent through wallet
-        assert_raises_rpc_error(-4, "Insufficient funds",
-                                node2.sendtoaddress, node0.getnewaddress(), balance2 - 1)
-
         balance1_new = node1.getbalance("*", 1, False)
         assert balance1 > balance1_new, "Pre genesis P2SH is spent."
-        balance2_new = node2.getbalance("*", 1, False)
-        assert balance2 == balance2_new, "Post genesis P2SH is not spent"
 
 
 

@@ -54,7 +54,7 @@ class P2SH(ComparisonTestFramework):
 
 
     def setup_network(self):
-        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0',
+        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0', '-banscore=1000000',
                             f'-genesisactivationheight={self.genesisactivationheight}', '-maxgenesisgracefulperiod=1']]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
@@ -137,13 +137,15 @@ class P2SH(ComparisonTestFramework):
         yield self.accepted()
 
         assert node.getblockcount() == self.genesisactivationheight - 1
-        # This block will be at genesis height
-        # P2SH transactions are still accepted if they are in the block
+        # This block would be at genesis height
+        # transactions with P2SH output will be rejected
         block(202)
-        p2sh_tx_after_genesis1 = new_P2SH_tx()
-        p2sh_tx_after_genesis2 = new_P2SH_tx()
-        p2sh_tx_after_genesis3 = new_P2SH_tx()
-        self.chain.update_block(202, [p2sh_tx_after_genesis1, p2sh_tx_after_genesis2, p2sh_tx_after_genesis3])
+        p2sh_tx_after_genesis = new_P2SH_tx()
+        self.chain.update_block(202, [p2sh_tx_after_genesis])
+        yield self.rejected(RejectResult(16, b'bad-txns-vout-p2sh'))
+
+        self.chain.set_tip(201)
+        block(203, coinbase_pubkey=self.coinbase_pubkey)
         yield self.accepted()
 
         # we are at gensis height
@@ -168,29 +170,8 @@ class P2SH(ComparisonTestFramework):
         correctkey_tx_id = node.sendrawtransaction(ToHex(correctkey_tx))
         assert_equal(set(node.getrawmempool()), {correctkey_tx_id})
 
-        # But we can not spend P2SH that was created after genesis, nonstandard
-        tx_spends_p2sh_after_genesis = self.spend_p2sh_tx(p2sh_tx_after_genesis1)
-        sign_result = node.signrawtransaction(ToHex(tx_spends_p2sh_after_genesis))
-        assert sign_result['complete'] == False, "Should NOT be able to sign"
-        assert_raises_rpc_error(-26, "bad-txns-nonstandard-inputs",
-                                node.sendrawtransaction, ToHex(tx_spends_p2sh_after_genesis))
-
-        # Tx that spends P2SH afer genesis will be correct if it is in the block already
-        block(203)
-        tx_spends_p2sh_after_genesis2 = self.spend_p2sh_tx(p2sh_tx_after_genesis2)
-        self.chain.update_block(203, [tx_spends_p2sh_after_genesis2])
-        yield self.accepted()
-
-        # The tx that spends post genesis P2SH with wrong sign is valid beacause the hash of the script matches and script itself is not evaluated
-        block(204)
-        tx_spends_p2sh_after_genesis_wrong_key = self.spend_p2sh_tx(p2sh_tx_after_genesis3, privateKey=wrongPrivateKey)
-        self.chain.update_block(204, [tx_spends_p2sh_after_genesis_wrong_key])
-        yield self.accepted()
-
         tx1_raw = node.getrawtransaction(p2sh_txs[0].hash, True)
         assert tx1_raw["vout"][0]["scriptPubKey"]["type"] == "scripthash"
-        tx2_raw = node.getrawtransaction(p2sh_tx_after_genesis1.hash, True)
-        assert tx2_raw["vout"][0]["scriptPubKey"]["type"] == "nonstandard"
 
 
 if __name__ == '__main__':

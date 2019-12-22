@@ -77,6 +77,7 @@ namespace {
                                         bool upgraded_nop) {
         //DummyConfig config(CBaseChainParams::MAIN);
         auto& config = GlobalConfig::GetConfig();
+        auto genesisActivationHeight = config.GetGenesisActivationHeight();
         const CTransaction tx(mutableTx);
         PrecomputedTransactionData txdata(tx);
         auto source = task::CCancellationSource::Make();
@@ -169,6 +170,7 @@ namespace {
                 BOOST_CHECK_EQUAL(scriptchecks.size(), tx.vin.size());
             }
         }
+        config.SetGenesisActivationHeight(genesisActivationHeight);
     }
 }
 
@@ -288,6 +290,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
     LOCK(cs_main);
     auto& config = GlobalConfig::GetConfig();
+    config.SetGenesisActivationHeight(102);
 
     // Test that invalidity under a set of flags doesn't preclude validity under
     // other (eg consensus) flags.
@@ -367,7 +370,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
 
         ValidateCheckInputsForAllFlags(invalid_under_p2sh_tx,
-                                       [](uint32_t flags) -> bool { return flags & SCRIPT_UTXO_AFTER_GENESIS; },
+                                       [](uint32_t flags) -> bool { return (flags & SCRIPT_UTXO_AFTER_GENESIS); },
                                        true, false);
     }
 
