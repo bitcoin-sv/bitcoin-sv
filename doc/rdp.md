@@ -91,7 +91,7 @@ network will be considered economically unviable.
 
 | Severity	| Critical	| High	| Medium	| Low |
 | --------  | --------- | ----- | --------- | --- |
-| Description | Catastrophic impact on the network as a whole; network availability compromised; risk of introducing chain splits; loss of funds | Impacts individual nodes; individual node crashes; potential for a loss of funds | Not easily exploitable; medium impact; no loss of funds | Not easily exploitable; low impact |
+| Description | Catastrophic impact on the network as a whole; network availability compromised; loss of funds | Impacts individual nodes; individual node crashes; potential for a loss of funds | Not easily exploitable; medium impact; no loss of funds | Not easily exploitable; low impact |
 | Reward*	| $100,000 USD | $50,000 USD | $10,000 USD | $1,000 USD |
  
 
@@ -132,6 +132,40 @@ Out-of-scope
 * Findings that have already been reported
 * UI bugs and spelling mistakes on this or any associated website
 * Network level Denial of Service (DoS/DDoS) vulnerabilities
+* Resource exhaustion attacks subject to further caveats detailed below
+
+Resource exhaustion attacks out of scope
+----------------------------------------
+
+We define "resource exhaustion attack" as an exploit designed to consume large amounts of CPU, memory, bandwidth or 
+storage resources whether by normal operation of the Bitcoin SV protocol or by intentionally crafting blocks or 
+transactions with unusual behavioural characteristics.
+
+Bitcoin by design requires that miners competitively push the boundaries of resource limits to ensure ongoing growth in 
+network capacity. As such default settings of various resource limiting features are intentionally defaulted to values 
+which may not be considered safe under unusual situations. It is intended for operators of the Bitcoin SV software to 
+choose and set these limits. Various other mechanisms, both technical and economic, are in place to discourage such 
+attacks either by making them expensive to execute, by minimising their impact on the majority of network operations or 
+by limiting resource usage with configurable consensus or policy limits.
+
+Resource exhaustion attacks, as defined, are out of scope for the bug bounty program.
+
+However, we acknowledge that there is value in documenting all possible attack vectors and will consider disclosures of 
+such attacks for rewards in the "low" category and in exceptional cases in the "medium" category.  Awarding of bounties 
+in this category are subject to the following conditions:
+
+* The award is completely discretionary
+* The attack much not be previously known to us
+* The attack must be demonstrably executable on a version of the software that would otherwise be deemed in scope if not 
+  for the resource exhaustion attack exclusion
+
+For obvious security reasons it would not responsible for the Bitcoin SV team to publicly document known attack vectors. 
+This necessarily requires a degree of good faith however it is strongly in the interest of the Bitcoin SV team to 
+encourage such disclosures and build trust with the security research community through building a track record of 
+making such bounty awards.
+
+Sensitive data
+--------------
 
 Please note, we do not want to receive any sensitive data during any disclosure, such as personally identifiable 
 information (PII) or any data associated with private/public keys.
