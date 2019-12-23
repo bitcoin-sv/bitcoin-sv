@@ -162,7 +162,7 @@ class CheckSigTest(ComparisonTestFramework):
         # Test that a block with MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS checksigs is OK
         MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS=1000000
         lots_of_checksigs = CScript([OP_CHECKSIG] * MAX_BLOCK_SIGOPS_PER_MB)
-        b14 = block(14, spend=out[14], script=lots_of_checksigs, block_size=ONE_MEGABYTE, extra_sigops=MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS-MAX_BLOCK_SIGOPS_PER_MB)
+        b14 = block(14, spend=out[14], script=lots_of_checksigs, block_size=ONE_MEGABYTE+500, extra_sigops=MAX_BLOCK_SIGOPS_PER_MB_POST_GENESIS-MAX_BLOCK_SIGOPS_PER_MB)
         yield self.accepted()
 
 

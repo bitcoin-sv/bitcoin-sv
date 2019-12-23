@@ -239,10 +239,9 @@ class ChainManager():
 
             tx = get_base_transaction()
 
-            # Make it the same format as transaction added for padding and save the size.
-            # It's missing the padding output, so we add a constant to account for it.
+            # Make it the same format as transaction added for padding and save the size.            
             tx.rehash()
-            base_tx_size = len(tx.serialize()) + 18
+            base_tx_size = len(tx.serialize())
 
             # If a specific script is required, add it.
             if script != None:
@@ -262,6 +261,9 @@ class ChainManager():
             # If we have a block size requirement, just fill
             # the block until we get there
             current_block_size = len(block.serialize())
+
+            extra_sigops_orig = extra_sigops
+
             while current_block_size < block_size:
                 # We will add a new transaction. That means the size of
                 # the field enumerating how many transaction go in the block
@@ -273,17 +275,23 @@ class ChainManager():
                 tx = get_base_transaction()
 
                 # Add padding to fill the block.
-                script_length = block_size - current_block_size - base_tx_size
+                script_length = block_size - current_block_size
+                num_loops = 1
                 if script_length > 510000:
                     if script_length < 1000000:
                         # Make sure we don't find ourselves in a position where we
                         # need to generate a transaction smaller than what we expected.
                         script_length = script_length // 2
+                        num_loops = 2
                     else:
+                        num_loops = script_length // 500000
                         script_length = 500000
+                script_length -= base_tx_size + 8 + len(ser_compact_size(script_length)) # <existing tx size> + <amount> + <vector<size><elements>>
                 tx_sigops = min(extra_sigops, script_length, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
+                if tx_sigops * num_loops < extra_sigops:
+                    tx_sigops = min(extra_sigops // num_loops, script_length)
                 extra_sigops -= tx_sigops
-                script_pad_len = script_length - tx_sigops
+                script_pad_len = script_length - tx_sigops - len(ser_compact_size(script_length - tx_sigops))
                 script_output = CScript([b'\x00' * script_pad_len] + [OP_CHECKSIG] * tx_sigops)
 
                 tx.vout.append(CTxOut(0, script_output))
@@ -300,6 +308,10 @@ class ChainManager():
         # Check that the block size is what's expected
         if block_size > 0:
             assert_equal(len(block.serialize()), block_size)
+
+        # check that extra_sigops are included
+        if extra_sigops >  0:
+            raise AssertionError("Can not fit %s extra_sigops in a block size of %s" % (extra_sigops_orig, block_size))
 
         # Do PoW, which is cheap on regnet
         if do_solve_block:
