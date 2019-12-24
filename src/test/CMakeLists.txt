@@ -86,6 +86,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	inv_tests.cpp
     int_serialization_tests.cpp
 	journal_tests.cpp
+	json_tests.cpp
 	jsonutil.cpp
 	key_tests.cpp
 	limitedmap_tests.cpp
@@ -124,6 +125,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	skiplist_tests.cpp
 	streams_tests.cpp
 	stream_serialization_tests.cpp
+	string_writer_tests.cpp
 	taskcancellation_tests.cpp
 	test_bitcoin.cpp
 	test_bitcoin_main.cpp

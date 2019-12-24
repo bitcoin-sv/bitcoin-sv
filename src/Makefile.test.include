@@ -65,6 +65,7 @@ BITCOIN_TESTS =\
   test/inv_tests.cpp \
   test/journal_tests.cpp \
   test/jsonutil.cpp \
+  test/json_tests.cpp \
   test/jsonutil.h \
   test/key_tests.cpp \
   test/limitedmap_tests.cpp \
@@ -106,6 +107,7 @@ BITCOIN_TESTS =\
   test/streams_tests.cpp \
   test/stream_serialization_tests.cpp \
   test/stream_test_helpers.h \
+  test/string_writer_tests.cpp \
   test/taskcancellation_tests.cpp \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
