@@ -12,6 +12,7 @@
 #include "util.h"
 
 #include "test/test_bitcoin.h"
+#include "rpc/tojson.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/test/unit_test.hpp>
@@ -30,13 +31,56 @@ UniValue CallRPC(std::string args) {
     request.strMethod = strMethod;
     request.params = RPCConvertValues(strMethod, vArgs);
     request.fHelp = false;
-    BOOST_CHECK(tableRPC[strMethod]);
-    try {
-        UniValue result = tableRPC[strMethod]->call(config, request);
-        return result;
-    } catch (const UniValue &objError) {
-        throw std::runtime_error(find_value(objError, "message").get_str());
+    if (strMethod == "getrawtransaction") {
+        try {
+            CStringWriter stringWriter;
+            getrawtransaction(config, request, stringWriter, false, []{});
+            stringWriter.Flush();
+            UniValue result(UniValue::VOBJ);
+            result.read(stringWriter.MoveOutString());
+            return result;
+        }
+        catch (const UniValue& objError) {
+            throw std::runtime_error(find_value(objError, "message").get_str());
+        }
     }
+    else if (strMethod == "decoderawtransaction") {
+        try {
+            CStringWriter stringWriter;
+            decoderawtransaction(config, request, stringWriter, false, []{});
+            stringWriter.Flush();
+            UniValue result(UniValue::VOBJ);
+            result.read(stringWriter.MoveOutString());
+            return result;
+        }
+        catch (const UniValue& objError) {
+            throw std::runtime_error(find_value(objError, "message").get_str());
+        }
+    }
+    else
+    {
+        BOOST_CHECK(tableRPC[strMethod]);
+        try {
+            UniValue result = tableRPC[strMethod]->call(config, request);
+            return result;
+        }
+        catch (const UniValue & objError) {
+            throw std::runtime_error(find_value(objError, "message").get_str());
+        }
+    }
+}
+
+// Because some RPC methods now push JSON text in chunks, the JSON response changed.
+// In this cases we first have to search for the "result" element in JSON response 
+// to get the old JSON structure 
+const UniValue& find_value_in_result(const UniValue& obj, const std::string& name)
+{
+    auto& response = find_value(obj, "result");
+    if (response.isNull())
+    {
+        return find_value(obj, name);
+    }
+    return find_value(response, name);
 }
 
 BOOST_FIXTURE_TEST_SUITE(rpc_tests, TestingSetup)
@@ -89,12 +133,9 @@ BOOST_AUTO_TEST_CASE(rpc_rawparams) {
         "9e2bbf32d826a1e222031fd888ac00000000";
     BOOST_CHECK_NO_THROW(
         r = CallRPC(std::string("decoderawtransaction ") + rawtx));
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "size").get_int(), 193);
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "version").get_int(), 1);
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "locktime").get_int(), 0);
-    BOOST_CHECK_THROW(
-        r = CallRPC(std::string("decoderawtransaction ") + rawtx + " extra"),
-        std::runtime_error);
+    BOOST_CHECK_EQUAL(find_value_in_result(r.get_obj(), "size").get_int(), 193);
+    BOOST_CHECK_EQUAL(find_value_in_result(r.get_obj(), "version").get_int(), 1);
+    BOOST_CHECK_EQUAL(find_value_in_result(r.get_obj(), "locktime").get_int(), 0);
 
     BOOST_CHECK_THROW(CallRPC("signrawtransaction"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("signrawtransaction null"), std::runtime_error);
