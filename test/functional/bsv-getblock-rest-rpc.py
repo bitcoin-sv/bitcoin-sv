@@ -13,7 +13,7 @@ Content-length is never set for JSON, because we do not know the length of JSON 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.comptool import TestInstance
 from test_framework.blocktools import *
-from test_framework.util import assert_equal, assert_greater_than, json
+from test_framework.util import assert_equal, assert_greater_than, json, assert_raises_process_error
 from test_framework.cdefs import ONE_MEGABYTE, ONE_GIGABYTE
 from test_framework.mininode import ToHex
 import http.client
@@ -105,6 +105,13 @@ class BSVGetBlock(ComparisonTestFramework):
 
         #rpc json with tx details
         checkJsonBlock(self.nodes[0].getblock(block.hash, 2), True, block.hash)
+
+        #check help
+        getblockHelpMessage = "getblock \"blockhash\" ( verbosity )"
+        assert_equal(getblockHelpMessage in self.nodes[0].help("getblock"), True)
+
+        #check help when wrong parameters are used
+        assert_raises_rpc_error(-1, getblockHelpMessage, self.nodes[0].getblock, "a", "b", "c")
 
         #check getblock errors still work
         assert_raises_rpc_error(
