@@ -198,7 +198,7 @@ void getrawtransaction(const Config& config,
     if (!fVerbose) 
     {
         textWriter.Write("{\"result\": \"");
-        textWriter.Write(EncodeHexTx(*tx, RPCSerializationFlags()));
+        EncodeHexTx(*tx, textWriter, RPCSerializationFlags());
         textWriter.Write("\", \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
         return;
     }
