@@ -183,6 +183,7 @@ add_library(common
 	netbase.cpp
 	primitives/block.cpp
 	protocol.cpp
+	rpc/jsonwriter.cpp
 	scheduler.cpp
 	script/sign.cpp
 	script/standard.cpp

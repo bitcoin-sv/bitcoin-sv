@@ -8,6 +8,7 @@
 #include "univalue.h"
 #include "univalue_escapes.h"
 
+// This method is a copy of a method with the same name in jsonwriter.cpp
 static std::string json_escape(const std::string& inS)
 {
     std::string outS;
