@@ -935,8 +935,12 @@ std::string getVoutTypeForScriptPubKey(const CScript& scriptPubKey, bool isGenes
     t.vout[0].scriptPubKey = scriptPubKey;
     CTransaction t2 { t };
     
+    CStringWriter strWriter;
+    CJSONWriter jWriter(strWriter, false);
+    TxToJSON(t2, uint256(), isGenesisEnabled, 0, jWriter);
+    jWriter.flush();
     UniValue entry(UniValue::VOBJ);
-    TxToUniv(t2, uint256(), isGenesisEnabled, entry);
+    entry.read(strWriter.MoveOutString());
     
     //std::string jsonOutput = entry.write(4); // for debugging;
 

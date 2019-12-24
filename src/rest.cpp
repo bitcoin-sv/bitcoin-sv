@@ -19,6 +19,7 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "version.h"
+#include "rpc/jsonwriter.h"
 
 #include <boost/algorithm/string.hpp>
 #include <univalue.h>
@@ -442,11 +443,14 @@ static bool rest_tx(Config &config, HTTPRequest *req,
         }
 
         case RF_JSON: {
-            UniValue objTx(UniValue::VOBJ);
-            TxToUniv(*tx, hashBlock, isGenesisEnabled, objTx);
-            std::string strJSON = objTx.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
-            req->WriteReply(HTTP_OK, strJSON);
+            req->StartWritingChunks(HTTP_OK);
+            CHttpTextWriter httpWriter(*req);
+            CJSONWriter jWriter(httpWriter, false);
+            TxToJSON(*tx, hashBlock, isGenesisEnabled, 0, jWriter);
+            httpWriter.WriteLine();
+            httpWriter.Flush();
+            req->StopWritingChunks();
             return true;
         }
 
