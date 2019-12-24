@@ -31,6 +31,9 @@ public:
 CScript ParseScript(const std::string &s);
 std::string ScriptToAsmStr(const CScript &script,
                            const bool fAttemptSighashDecode = false);
+void ScriptToAsmStr(const CScript& script,
+                    CTextWriter& textWriter, 
+                    const bool fAttemptSighashDecode = false);
 bool DecodeHexTx(CMutableTransaction &tx, const std::string &strHexTx);
 bool DecodeHexBlk(CBlock &, const std::string &strHexBlk);
 uint256 ParseHashUV(const UniValue &v, const std::string &strName);
@@ -40,6 +43,7 @@ std::vector<uint8_t> ParseHexUV(const UniValue &v, const std::string &strName);
 // core_write.cpp
 std::string FormatScript(const CScript &script);
 std::string EncodeHexTx(const CTransaction &tx, const int serializeFlags = 0);
+void EncodeHexTx(const CTransaction& tx, CTextWriter& writer, const int serializeFlags = 0);
 void ScriptPubKeyToUniv(const CScript &scriptPubKey, bool fIncludeHex, bool isGenesisEnabled, UniValue &out);
 void TxToJSON(const CTransaction& tx,
               const uint256& hashBlock,
