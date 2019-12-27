@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE(rpc_getinfo)
     BOOST_CHECK_NO_THROW(
         r = CallRPC("getinfo");
     );
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int64(), Params().GetDefaultBlockSizeParams().maxBlockSizeAfterGenesis);
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int64(), Params().GetDefaultBlockSizeParams().maxBlockSize);
     BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxminedblocksize").get_int64(), Params().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter);
 }
 

@@ -24,9 +24,8 @@ void GlobalConfig::Reset()
     setDefaultBlockSizeParamsCalled = false;
 
     blockSizeActivationTime = 0;
-    maxBlockSizeBeforeGenesis = 0;
-    maxBlockSizeAfterGenesis = 0;
-    maxBlockSizeOverridden = false;
+    maxBlockSize = 0;
+    defaultBlockSize = 0;
     maxGeneratedBlockSizeBefore = 0;
     maxGeneratedBlockSizeAfter = 0;
     maxGeneratedBlockSizeOverridden =  false;
@@ -76,9 +75,8 @@ uint64_t GlobalConfig::GetPreferredBlockFileSize() const {
 
 void GlobalConfig::SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) {
     blockSizeActivationTime = params.blockSizeActivationTime;
-    maxBlockSizeBeforeGenesis = params.maxBlockSizeBeforeGenesis;
-    maxBlockSizeAfterGenesis = params.maxBlockSizeAfterGenesis;
-    maxBlockSizeOverridden = false;
+    maxBlockSize = params.maxBlockSize;
+    defaultBlockSize = maxBlockSize;
     maxGeneratedBlockSizeBefore = params.maxGeneratedBlockSizeBefore;
     maxGeneratedBlockSizeAfter = params.maxGeneratedBlockSizeAfter;
     maxGeneratedBlockSizeOverridden = false;
@@ -99,31 +97,21 @@ void GlobalConfig::CheckSetDefaultCalled() const
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
-    if (maxSize <= LEGACY_MAX_BLOCK_SIZE) {
+    if (maxSize && maxSize <= LEGACY_MAX_BLOCK_SIZE) {
         if (err)
             *err = _("Excessive block size (excessiveblocksize) must be larger than ") + std::to_string(LEGACY_MAX_BLOCK_SIZE);
         return false;
     }
 
-    maxBlockSizeAfterGenesis = maxSize;
-    maxBlockSizeOverridden = true;
+    // Unlimited value depends on each definition of CChainParams
+    maxBlockSize = maxSize ? maxSize : defaultBlockSize;
 
     return true;
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
     CheckSetDefaultCalled();
-    return maxBlockSizeAfterGenesis;
-}
-
-uint64_t GlobalConfig::GetMaxBlockSize(bool isGenesisEnabled) const 
-{
-    CheckSetDefaultCalled();
-    if (!maxBlockSizeOverridden && !isGenesisEnabled)
-    {
-        return maxBlockSizeBeforeGenesis;
-    }
-    return maxBlockSizeAfterGenesis;
+    return maxBlockSize;
 }
 
 void GlobalConfig::SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytesIn) {
@@ -136,11 +124,6 @@ uint64_t GlobalConfig::GetFactorMaxSendQueuesBytes() const {
 
 uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
 
-    if(!MaxBlockSizeOverridden())
-    {
-        return DEFAULT_MAX_SEND_QUEUES_BYTES;
-    }
-
     // Use the "after upgrade" excessive block size to determine the maximum size of 
     // block related messages that we are prepared to queue
     uint64_t maxBlockSize = GetMaxBlockSize();
@@ -149,10 +132,6 @@ uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
         return UINT64_MAX;
     }
     return factorMaxSendQueuesBytes * maxBlockSize;
-}
-
-bool GlobalConfig::MaxBlockSizeOverridden() const {
-    return maxBlockSizeOverridden;
 }
 
 bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) {
