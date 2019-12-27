@@ -5431,7 +5431,7 @@ static bool AcceptBlock(const Config &config,
 
     // Write block to history file
     try {
-        unsigned int nBlockSize =
+        uint64_t nBlockSize =
             ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
         CDiskBlockPos blockPos;
         if (dbp != nullptr) {
@@ -6292,7 +6292,7 @@ bool InitBlockIndex(const Config &config) {
             const CChainParams &chainparams = config.GetChainParams();
             CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
             // Start new block file
-            unsigned int nBlockSizeWithHeader =
+            uint64_t nBlockSizeWithHeader =
                 ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION)
                 + BLOCKFILE_BLOCK_HEADER_SIZE;
             CDiskBlockPos blockPos;
