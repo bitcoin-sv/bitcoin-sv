@@ -797,9 +797,7 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
 
     // Make sure that default values are not overriden
     BOOST_REQUIRE(!config.MaxGeneratedBlockSizeOverridden());
-    BOOST_REQUIRE(!config.MaxBlockSizeOverridden());
     BOOST_REQUIRE(!configJournal.MaxGeneratedBlockSizeOverridden());
-    BOOST_REQUIRE(!configJournal.MaxBlockSizeOverridden());
 
     uint64_t nDefaultMaxGeneratedBlockSize = config.GetMaxGeneratedBlockSize();
     uint64_t nDefaultMaxBlockSize = config.GetMaxBlockSize();
@@ -886,9 +884,7 @@ BOOST_AUTO_TEST_CASE(BlockAssembler_construction_activate_new_blocksize)
     DefaultBlockSizeParams defaultParams{
         // activation time 
         1000,
-        // max block size before activation
-        5000,
-        // max block size after activation
+        // max block size
         6000,
         // max generated block size before activation
         3000,

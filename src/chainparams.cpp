@@ -233,10 +233,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             MAIN_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before Genesis activation
-            MAIN_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS,
-            // max block size after Genesis activation
-            MAIN_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS,
+            // max block size
+            MAIN_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -332,10 +330,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             STN_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            STN_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS,
-            // max block size after activation
-            STN_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS,
+            // max block size
+            STN_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -454,10 +450,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             TESTNET_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            TESTNET_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS,
-            // max block size after activation
-            TESTNET_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS,
+            // max block size
+            TESTNET_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -560,10 +554,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            REGTEST_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS,
-            // max block size after activation
-            REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS,
+            // max block size
+            REGTEST_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation

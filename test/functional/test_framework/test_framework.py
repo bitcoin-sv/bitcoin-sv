@@ -71,6 +71,7 @@ class BitcoinTestFramework():
         self.setup_clean_chain = False
         self.nodes = []
         self.mocktime = 0
+        self.runNodesWithRequiredParams = True
         self.set_test_params()
 
         assert hasattr(
@@ -255,7 +256,7 @@ class BitcoinTestFramework():
 
         node = self.nodes[i]
 
-        node.start(extra_args, stderr)
+        node.start(self.runNodesWithRequiredParams, extra_args, stderr)
         node.wait_for_rpc_connection()
 
         if self.options.coveragedir is not None:
@@ -269,7 +270,7 @@ class BitcoinTestFramework():
         assert_equal(len(extra_args), self.num_nodes)
         try:
             for i, node in enumerate(self.nodes):
-                node.start(extra_args[i])
+                node.start(self.runNodesWithRequiredParams, extra_args[i])
             for i, node in enumerate(self.nodes):
                 node.wait_for_rpc_connection()
                 if(self.options.waitforpid):

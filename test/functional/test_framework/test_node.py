@@ -73,13 +73,48 @@ class TestNode():
         assert self.rpc_connected and self.rpc is not None, "Error: no RPC connection"
         return self.rpc.__getattr__(*args, **kwargs)
 
-    def start(self, extra_args=None, stderr=None):
+    def setRequiredArgs(self, inputArgs, runNodesWithRequiredParams):
+        """Sets the following required bitcoind arguments with default values if they are not already set.
+           This prevents node from failing in functional tests
+        """
+        if not runNodesWithRequiredParams:
+            return inputArgs
+
+        requiredArgs = ["-maxstackmemoryusageconsensus=0",
+                        "-excessiveblocksize=0"]
+
+        allSetArgs = []
+        #Config file parameters should be checked as well
+        configFilename = os.path.join(self.datadir, "bitcoin.conf")
+        with open(configFilename, 'r', encoding='utf8') as configFile:
+            configFileArg = configFile.readline()
+            while configFileArg:
+                allSetArgs += ["-" + configFileArg.rstrip()]
+                configFileArg = configFile.readline()
+        
+        allSetArgs += inputArgs
+
+        for currentArg in allSetArgs:
+            checkCurentAt = currentArg.find("=")
+            if checkCurentAt == -1:
+                checkCurentAt = len(currentArg)
+            for requiredArg in requiredArgs:
+                checkRequiredAt = requiredArg.find("=")
+                if checkRequiredAt == -1:
+                    checkRequiredAt = len(requiredArg)
+                if requiredArg[:checkRequiredAt] == currentArg[:checkCurentAt]:
+                   requiredArgs.remove(requiredArg)
+                   break
+
+        return inputArgs + requiredArgs
+
+    def start(self, runNodesWithRequiredParams, extra_args=None, stderr=None):
         """Start the node."""
         if extra_args is None:
             extra_args = self.extra_args
         if stderr is None:
             stderr = self.stderr
-        self.process = subprocess.Popen(self.args + extra_args, stderr=stderr)
+        self.process = subprocess.Popen(self.setRequiredArgs(self.args + extra_args, runNodesWithRequiredParams), stderr=stderr)
         self.running = True
         self.log.debug("bitcoind started, waiting for RPC to come up")
 
