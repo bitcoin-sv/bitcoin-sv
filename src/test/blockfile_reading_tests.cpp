@@ -29,7 +29,7 @@ namespace
         CBlockIndex& index,
         CBlockFileInfoStore& blockFileInfoStore)
     {
-        unsigned int nBlockSizeWithHeader =
+        uint64_t nBlockSizeWithHeader =
             ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION)
             + BLOCKFILE_BLOCK_HEADER_SIZE;
         CDiskBlockPos blockPos;

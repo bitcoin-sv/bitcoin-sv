@@ -66,9 +66,9 @@ template <typename... Args> bool error(const char *fmt, const Args &... args) {
 
 void PrintExceptionContinue(const std::exception *pex, const char *pszThread);
 void FileCommit(FILE *file);
-bool TruncateFile(FILE *file, unsigned int length);
+bool TruncateFile(FILE *file, uint64_t length);
 int RaiseFileDescriptorLimit(int nMinFD);
-void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length);
+void AllocateFileRange(FILE *file, unsigned int offset, uint64_t length);
 bool RenameOver(fs::path src, fs::path dest);
 bool TryCreateDirectories(const fs::path &p);
 fs::path GetDefaultDataDir();
