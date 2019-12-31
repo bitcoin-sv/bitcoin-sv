@@ -306,11 +306,12 @@ bool ReadKeyValue(CWallet *pwallet, CDataStream &ssKey, CDataStream &ssValue,
             const Config& config = GlobalConfig::GetConfig();
             // Assume post-Genesis sig-op count as limit. It's unlikely that user stores invalid txs (those with 
             // too high sigop count) in his wallet and would try to use them before Genesis
+            bool genesisEnabled =  wtx.IsGenesisEnabled();
             uint64_t maxTxSigOpsCountConsensus = config.GetMaxTxSigOpsCount(true, true);
-            uint64_t maxTxSizeConsensus = config.GetMaxTxSize(wtx.IsGenesisEnabled(), true);
+            uint64_t maxTxSizeConsensus = config.GetMaxTxSize(genesisEnabled, true);
             bool isValid = wtx.IsCoinBase()
-                               ? CheckCoinbase(wtx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, true)
-                               : CheckRegularTransaction(wtx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, true);
+                               ? CheckCoinbase(wtx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, genesisEnabled)
+                               : CheckRegularTransaction(wtx, state, maxTxSigOpsCountConsensus, maxTxSizeConsensus, genesisEnabled);
             if (wtx.GetId() != hash || !isValid) {
                 return false;
             }
