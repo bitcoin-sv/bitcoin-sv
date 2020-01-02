@@ -1038,23 +1038,46 @@ BOOST_AUTO_TEST_CASE(op_rshift_far)
     std::vector<uint8_t> data(size + 1l, 0x0);
     data[0] = 0x80;
 
-    Config& config = GlobalConfig::GetConfig();
     auto source = task::CCancellationSource::Make();
     LimitedStack stack = LimitedStack({data}, INT64_MAX);
     const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    BaseSignatureChecker sigchecker;
-    ScriptError err = SCRIPT_ERR_OK;
-    const auto r = EvalScript(config, true, source->GetToken(), stack,
-                              CScript() << (size * 8) + 7 << OP_RSHIFT, flags,
-                              sigchecker, &err);
+    ScriptError err;
+    const auto r =
+        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
+                   CScript() << (size * 8) + 7 << OP_RSHIFT, flags,
+                   BaseSignatureChecker{}, &err);
     BOOST_CHECK(r.value());
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
     const auto top = stack.front();
     const auto values = top.GetElement();
-
     const auto it{find_if(begin(values), end(values),
                           [](const auto n) { return n != 0; })};
     BOOST_CHECK_EQUAL(distance(begin(values), it), values.size() - 1);
     BOOST_CHECK_EQUAL(1, values[values.size() - 1]);
+}
+
+BOOST_AUTO_TEST_CASE(op_lshift_far)
+{
+    constexpr vector<uint8_t>::size_type size{INT32_MAX / 8};
+    std::vector<uint8_t> data(size + 1l, 0x0);
+    data[size] = 0x1;
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack = LimitedStack({data}, INT64_MAX);
+    const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    ScriptError err;
+    const auto r =
+        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
+                   CScript() << (size * 8) + 7 << OP_LSHIFT, flags,
+                   BaseSignatureChecker{}, &err);
+    BOOST_CHECK(r.value());
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
+    const auto top = stack.front();
+    const auto values = top.GetElement();
+    const auto it{find_if(begin(values), end(values),
+                          [](const auto n) { return n != 0; })};
+    BOOST_CHECK_EQUAL(distance(begin(values), it), 0);
+    BOOST_CHECK_EQUAL(0x80, values[0]);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
