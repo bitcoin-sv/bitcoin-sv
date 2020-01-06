@@ -556,13 +556,15 @@ bool CanDirectFetch(const Consensus::Params &consensusParams) {
 // Requires cs_main
 bool PeerHasHeader(const CNodeStatePtr& state, const CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
-    assert(state);
 
-    if (state->pindexBestKnownBlock &&
+    if (!pindex) {
+        return false;
+    }
+    else if (state->pindexBestKnownBlock &&
         pindex == state->pindexBestKnownBlock->GetAncestor(pindex->nHeight)) {
         return true;
     }
-    if (state->pindexBestHeaderSent &&
+    else if (state->pindexBestHeaderSent &&
         pindex == state->pindexBestHeaderSent->GetAncestor(pindex->nHeight)) {
         return true;
     }
@@ -3902,12 +3904,12 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
             BlockMap::iterator mi = mapBlockIndex.find(hash);
             assert(mi != mapBlockIndex.end());
             const CBlockIndex *pindex = mi->second;
-            if (pindex != nullptr && chainActive[pindex->nHeight] != pindex) {
+            if (pindex && chainActive[pindex->nHeight] != pindex) {
                 // Bail out if we reorged away from this block
                 fRevertToInv = true;
                 break;
             }
-            if (pindex != nullptr && pBestIndex != nullptr && pindex->pprev != pBestIndex) {
+            if (pindex && pBestIndex && pindex->pprev != pBestIndex) {
                 // This means that the list of blocks to announce don't
                 // connect to each other. This shouldn't really be possible
                 // to hit during regular operation (because reorgs should
@@ -3921,14 +3923,13 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
                 break;
             }
             pBestIndex = pindex;
-            if (fFoundStartingHeader) {
+            if (pindex && fFoundStartingHeader) {
                 // add this to the headers message
                 vHeaders.push_back(pindex->GetBlockHeader());
             } else if (PeerHasHeader(state, pindex)) {
                 // Keep looking for the first new block.
                 continue;
-            } else if (pindex->pprev == nullptr ||
-                       PeerHasHeader(state, pindex->pprev)) {
+            } else if (pindex && (pindex->pprev == nullptr || PeerHasHeader(state, pindex->pprev))) {
                 // Peer doesn't have this header but they do have the prior
                 // one.
                 // Start sending headers.
