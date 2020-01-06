@@ -89,6 +89,7 @@ class HeightBasedTestsCase:
                 tx.vin[0].scriptSig = CScript([OP_TRUE])
 
             tx.rehash()
+            self.log.info(f"Created UTXO Tx {loghash(tx.hash)} with {n_generated_utxos} outputs")
 
         return transactions, None
 
