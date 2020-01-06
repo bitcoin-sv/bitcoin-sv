@@ -675,9 +675,8 @@ BOOST_AUTO_TEST_CASE(rshift_test)
 
 BOOST_AUTO_TEST_CASE(rshift_big_int)
 {
-    // 4gb + 1 byte
-    std::vector<uint8_t> data(4'294'967'297, 0x00);
-    data[1] = 0x80;
+    std::vector<uint8_t> data(INT32_MAX + 1l, 0x00);
+    data[0] = 0x80;
 
     Config& config = GlobalConfig::GetConfig();
     BaseSignatureChecker sigchecker;
@@ -695,14 +694,13 @@ BOOST_AUTO_TEST_CASE(rshift_big_int)
             sigchecker,
             &err);
     BOOST_CHECK(r.value());
-    BOOST_CHECK(stack.front().GetElement()[1] == 0x40);
+    BOOST_CHECK(stack.front().GetElement()[0] == 0x40);
 }
 
 BOOST_AUTO_TEST_CASE(lshift_big_int)
 {
-    // 4gb + 1 byte
-    std::vector<uint8_t> data(4'294'967'297, 0x00);
-    data[1] = 0x40;
+    std::vector<uint8_t> data(INT32_MAX + 2l, 0x00);
+    data[0] = 0x40;
 
     Config& config = GlobalConfig::GetConfig();
     BaseSignatureChecker sigchecker;
@@ -720,7 +718,7 @@ BOOST_AUTO_TEST_CASE(lshift_big_int)
             sigchecker,
             &err);
     BOOST_CHECK(r.value());
-    BOOST_CHECK(stack.front().GetElement()[1] == 0x80);
+    BOOST_CHECK(stack.front().GetElement()[0] == 0x80);
 }
 
 /**
