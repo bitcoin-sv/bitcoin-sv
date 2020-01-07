@@ -49,22 +49,22 @@ inline uint8_t make_lshift_mask(size_t n) {
 
 // shift x right by n bits, implements OP_RSHIFT
 static valtype RShift(const valtype &x, int n) {
-    int bit_shift = n % 8; 
-    int byte_shift = n / 8; 
+    valtype::size_type bit_shift = n % 8;
+    valtype::size_type byte_shift = n / 8;
  
     uint8_t mask = make_rshift_mask(bit_shift); 
     uint8_t overflow_mask = ~mask; 
  
     valtype result(x.size(), 0x00); 
-    for (int i = 0; i < (int)x.size(); i++) {
-        int k = i + byte_shift;
-        if (k < (int)x.size()) {
+    for (valtype::size_type i = 0; i < x.size(); i++) {
+        valtype::size_type k = i + byte_shift;
+        if (k < x.size()) {
             uint8_t val = (x[i] & mask); 
             val >>= bit_shift;
             result[k] |= val; 
         } 
 
-        if (k + 1 < (int)x.size()) {
+        if (k + 1 < x.size()) {
             uint8_t carryval = (x[i] & overflow_mask); 
             carryval <<= 8 - bit_shift; 
             result[k + 1] |= carryval;
@@ -75,27 +75,30 @@ static valtype RShift(const valtype &x, int n) {
 
 // shift x left by n bits, implements OP_LSHIFT
 static valtype LShift(const valtype &x, int n) {
-    int bit_shift = n % 8; 
-    int byte_shift = n / 8; 
- 
+    valtype::size_type bit_shift = n % 8;
+    valtype::size_type byte_shift = n / 8;
+
     uint8_t mask = make_lshift_mask(bit_shift); 
     uint8_t overflow_mask = ~mask; 
- 
-    valtype result(x.size(), 0x00); 
-    for (int i = x.size() -1; i >= 0; i--) {
-        int k = i - byte_shift;
-        if (k >= 0)  {
-            uint8_t val = (x[i] & mask); 
-            val <<= bit_shift;
-            result[k] |= val; 
-        } 
 
-        if (k - 1 >= 0) {
-            uint8_t carryval = (x[i] & overflow_mask); 
-            carryval >>= 8 - bit_shift;
-            result[k - 1] |= carryval;
-        } 
-    } 
+    valtype result(x.size(), 0x00); 
+    for (valtype::size_type index = x.size(); index > 0; index--) {
+        valtype::size_type i = index - 1;
+        // make sure that k is always >= 0
+        if (byte_shift <= i)
+        {
+            valtype::size_type k = i - byte_shift;
+            uint8_t val = (x[i] & mask);
+            val <<= bit_shift;
+            result[k] |= val;
+
+            if (k >= 1) {
+                uint8_t carryval = (x[i] & overflow_mask);
+                carryval >>= 8 - bit_shift;
+                result[k - 1] |= carryval;
+            }
+        }
+    }
     return result; 
 } 
 

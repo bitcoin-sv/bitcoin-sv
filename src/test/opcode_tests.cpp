@@ -673,6 +673,54 @@ BOOST_AUTO_TEST_CASE(rshift_test)
     CheckErrorForAllFlags({{0x12, 0x34}}, CScript() << OP_1NEGATE << OP_RSHIFT, SCRIPT_ERR_INVALID_NUMBER_RANGE);
 }
 
+BOOST_AUTO_TEST_CASE(rshift_big_int)
+{
+    std::vector<uint8_t> data(INT32_MAX + 1l, 0x00);
+    data[0] = 0x80;
+
+    Config& config = GlobalConfig::GetConfig();
+    BaseSignatureChecker sigchecker;
+    auto source = task::CCancellationSource::Make();
+    ScriptError err = SCRIPT_ERR_OK;
+
+    LimitedStack stack = LimitedStack({data}, INT64_MAX);
+    auto r =
+        EvalScript(
+            config, true,
+            source->GetToken(),
+            stack,
+            CScript() << 1 << OP_RSHIFT,
+            flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
+            sigchecker,
+            &err);
+    BOOST_CHECK(r.value());
+    BOOST_CHECK(stack.front().GetElement()[0] == 0x40);
+}
+
+BOOST_AUTO_TEST_CASE(lshift_big_int)
+{
+    std::vector<uint8_t> data(INT32_MAX + 2l, 0x00);
+    data[0] = 0x40;
+
+    Config& config = GlobalConfig::GetConfig();
+    BaseSignatureChecker sigchecker;
+    auto source = task::CCancellationSource::Make();
+    ScriptError err = SCRIPT_ERR_OK;
+
+    LimitedStack stack = LimitedStack({data}, INT64_MAX);
+    auto r =
+        EvalScript(
+            config, true,
+            source->GetToken(),
+            stack,
+            CScript() << 1 << OP_LSHIFT,
+            flagset[0] | SCRIPT_UTXO_AFTER_GENESIS,
+            sigchecker,
+            &err);
+    BOOST_CHECK(r.value());
+    BOOST_CHECK(stack.front().GetElement()[0] == 0x80);
+}
+
 /**
  * String opcodes.
  */
