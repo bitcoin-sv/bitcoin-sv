@@ -259,7 +259,7 @@ static void CleanupScriptCode(CScript &scriptCode,
     }
 }
 
-bool CheckHeightRelatedFlags(bool usesForkIdAlgorithm, uint32_t flags, const BaseSignatureChecker* checker, ScriptError *serror)
+bool CheckHeightRelatedFlags(bool usesForkIdAlgorithm, uint32_t flags, ScriptError *serror)
 {
     bool forkEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
     bool genesisEnabled = flags & SCRIPT_GENESIS;
@@ -287,11 +287,6 @@ bool CheckHeightRelatedFlags(bool usesForkIdAlgorithm, uint32_t flags, const Bas
         if(!forkEnabled) {
             return true;
         } else if (genesisEnabled && !utxoAfterGenesis) {
-            // old sighash algorithm has quadratic complexity so we will not
-            // allow to use it on the large transactions, setting maximal size to the pre-fork limit
-            if (checker && checker->GetOutTxSize() > ONE_MEGABYTE) {
-                return set_error(serror, SCRIPT_ERR_TX_SIZE);
-            }
             return true;
         }
         return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
@@ -300,7 +295,7 @@ bool CheckHeightRelatedFlags(bool usesForkIdAlgorithm, uint32_t flags, const Bas
     return set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 }
 
-bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, const BaseSignatureChecker* checker,
+bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
                             ScriptError *serror) {
     // Empty signature. Not strictly DER encoded, but allowed to provide a
     // compact way to provide an invalid signature for use with CHECK(MULTI)SIG
@@ -321,7 +316,7 @@ bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, 
         if (!GetHashType(vchSig).isDefined()) {
             return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
         }
-        if(!CheckHeightRelatedFlags(GetHashType(vchSig).hasForkId(), flags, checker, serror)){
+        if(!CheckHeightRelatedFlags(GetHashType(vchSig).hasForkId(), flags, serror)){
             return false;
         }
     }
@@ -1344,7 +1339,7 @@ std::optional<bool> EvalScript(
                         LimitedVector &vchSig = stack.stacktop(-2);
                         LimitedVector &vchPubKey = stack.stacktop(-1);
 
-                        if (!CheckSignatureEncoding(vchSig.GetElement(), flags, &checker, serror) ||
+                        if (!CheckSignatureEncoding(vchSig.GetElement(), flags, serror) ||
                             !CheckPubKeyEncoding(vchPubKey.GetElement(), flags, serror)) {
                             // serror is set
                             return false;
@@ -1461,7 +1456,7 @@ std::optional<bool> EvalScript(
                             // CHECKMULTISIG NOT if the STRICTENC flag is set.
                             // See the script_(in)valid tests for details.
 
-                            if (!CheckSignatureEncoding(vchSig.GetElement(), flags, &checker, serror) ||
+                            if (!CheckSignatureEncoding(vchSig.GetElement(), flags, serror) ||
                                 !CheckPubKeyEncoding(vchPubKey.GetElement(), flags, serror)) {
                                 // serror is set
                                 return false;
@@ -2047,10 +2042,6 @@ bool TransactionSignatureChecker::CheckSequence(
     }
 
     return true;
-}
-
-size_t TransactionSignatureChecker::GetOutTxSize() const {
-    return GetSerializeSize(*txTo, SER_NETWORK, PROTOCOL_VERSION);
 }
 
 std::optional<bool> VerifyScript(
