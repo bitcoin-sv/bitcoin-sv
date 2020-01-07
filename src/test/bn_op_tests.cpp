@@ -891,4 +891,145 @@ BOOST_AUTO_TEST_CASE(op_rshift)
                                       begin(expected), end(expected));
     }
 }
+
+namespace
+{
+    const vector<uint8_t> failure = {};
+    const vector<uint8_t> success = {1};
+
+    struct equality_checker : BaseSignatureChecker
+    {
+        bool CheckSig(const std::vector<uint8_t>& scriptsig,
+                      const std::vector<uint8_t>& pubkey,
+                      const CScript&,
+                      bool enabledSighashForkid) const override
+        {
+            return scriptsig == pubkey;
+        }
+
+        bool CheckLockTime(const CScriptNum&) const override { return true; }
+        bool CheckSequence(const CScriptNum&) const override { return true; }
+        size_t GetOutTxSize() const override { return 1; }
+    };
+}
+
+BOOST_AUTO_TEST_CASE(op_checksig)
+{
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args =
+        tuple<opcodetype, opcodetype, bool, ScriptError, vector<uint8_t>>;
+    // clang-format off
+    vector<test_args> test_data = 
+    {
+        // signature, pub_key, exp_status, exp_error, 
+        {OP_1, OP_1, true, SCRIPT_ERR_OK, success },
+        {OP_1, OP_2, true, SCRIPT_ERR_OK, failure }
+    };
+    // clang-format on
+
+    for(const auto [signature, pub_key, exp_status, exp_error, exp_stack_top] :
+        test_data)
+    {
+        vector<uint8_t> args;
+
+        args.push_back(signature);
+        args.push_back(pub_key);
+        args.push_back(OP_CHECKSIG);
+
+        const CScript script(args.begin(), args.end());
+
+        uint32_t flags{};
+        ScriptError error;
+        LimitedStack stack(UINT32_MAX);
+        const equality_checker checker;
+        const auto status = EvalScript(
+            config, false, task::CCancellationSource::Make()->GetToken(), stack,
+            script, flags, checker, &error);
+
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL(1, stack.size());
+        const auto stack_0{stack.at(0)};
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack_0), end(stack_0),
+                                      begin(exp_stack_top), end(exp_stack_top));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(op_checkmultisig)
+{
+    const Config& config = GlobalConfig::GetConfig();
+
+    using test_args = tuple<int, vector<opcodetype>, int, vector<opcodetype>,
+                            bool, ScriptError, vector<uint8_t>>;
+    // clang-format off
+    vector<test_args> test_data = 
+    {
+        // n_signatures, signatures, 
+        // n_public_keys, public_keys, 
+        // exp_status, exp_error, top_stack_value 
+
+        // Success True
+        {1, {OP_1}, 1, {OP_1}, true, SCRIPT_ERR_OK, success },
+        {1, {OP_1}, 2, {OP_1, OP_16}, true, SCRIPT_ERR_OK, success },
+        {1, {OP_1}, 2, {OP_16, OP_1}, true, SCRIPT_ERR_OK, success },
+
+        {2, {OP_1, OP_2}, 2, {OP_1, OP_2}, true, SCRIPT_ERR_OK, success },
+
+        {2, {OP_1, OP_2}, 3, {OP_16, OP_1, OP_2}, true, SCRIPT_ERR_OK, success},
+        {2, {OP_1, OP_2}, 3, {OP_1, OP_16, OP_2}, true, SCRIPT_ERR_OK, success},
+        {2, {OP_1, OP_2}, 3, {OP_1, OP_2, OP_16}, true, SCRIPT_ERR_OK, success},
+
+        {2, {OP_1, OP_2}, 4, {OP_16, OP_1, OP_16, OP_2}, true, SCRIPT_ERR_OK, success},
+
+        // Success false
+        {1, {OP_1}, 1, {OP_16}, true, SCRIPT_ERR_OK, failure},
+
+        {2, {OP_1, OP_2}, 2, {OP_1, OP_16}, true, SCRIPT_ERR_OK, failure},
+        {2, {OP_1, OP_2}, 2, {OP_16, OP_2}, true, SCRIPT_ERR_OK, failure},
+        {2, {OP_1, OP_2}, 2, {OP_2, OP_1}, true, SCRIPT_ERR_OK, failure},
+        
+        // Fails 
+        {2, {OP_1, OP_2}, 1, {OP_1}, false, SCRIPT_ERR_SIG_COUNT, failure},
+        {-1, {OP_1}, 1, {OP_1}, false, SCRIPT_ERR_SIG_COUNT, failure},
+        {1, {OP_1}, -1, {OP_1}, false, SCRIPT_ERR_PUBKEY_COUNT, failure},
+    };
+    // clang-format on
+
+    for(const auto [n_sigs, signatures, n_pub_keys, public_keys, exp_status,
+                    exp_error, exp_stack_top] : test_data)
+    {
+        vector<uint8_t> args{OP_0}; // historic bug start with OP_0
+
+        reverse_copy(begin(signatures), end(signatures), back_inserter(args));
+        args.push_back(1);
+        args.push_back(n_sigs);
+
+        reverse_copy(begin(public_keys), end(public_keys), back_inserter(args));
+        args.push_back(1);
+        args.push_back(n_pub_keys);
+
+        args.push_back(OP_CHECKMULTISIG);
+
+        const CScript script(args.begin(), args.end());
+
+        uint32_t flags{};
+        ScriptError error;
+        LimitedStack stack(UINT32_MAX);
+        const equality_checker checker;
+        const auto status = EvalScript(
+            config, false, task::CCancellationSource::Make()->GetToken(), stack,
+            script, flags, checker, &error);
+
+        BOOST_CHECK_EQUAL(exp_status, status.value());
+        BOOST_CHECK_EQUAL(exp_error, error);
+        BOOST_CHECK_EQUAL(
+            exp_status ? 1 : signatures.size() + public_keys.size() + 3,
+            stack.size());
+        const auto stack_0{stack.at(0)};
+        BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack_0), end(stack_0),
+                                      begin(exp_stack_top), end(exp_stack_top));
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()
