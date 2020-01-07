@@ -15,6 +15,14 @@ bool CTxnDoubleSpendDetector::insertTxnInputs(
 
     const CTransactionRef& ptx = pTxInputData->mpTx;
     const CTransaction &tx = *ptx;
+
+    if (tx.vin.empty()) {
+        // only a coinbase can have empty inputs and those should never get here
+        // unless transaction is invalid and we still try to add it to double
+        // spend detector
+        return false;
+    }
+
     // To avoid race conditions in double spends we need to take this mutex first.
     // This approach guarantees that:
     // a) if dstxn1 is accepted to the mempool then dstxn2 will be rejected as a mempool conflict
@@ -43,21 +51,34 @@ bool CTxnDoubleSpendDetector::insertTxnInputs(
         return false;
     }
     // Store the inputs
+    mKnownSpendsTx.insert(&tx);
     for (const auto& input: tx.vin) {
          mKnownSpends.emplace_back(input.prevout);
     }
     return true;
 }
 
-void CTxnDoubleSpendDetector::removeTxnInputs(const CTransaction &tx) {
-    std::lock_guard lock(mMainMtx);
+void CTxnDoubleSpendDetector::removeTxnInputs(const CTransaction &tx)
+{
     if (tx.vin.empty()) {
+        // skip as such transactions are guaranteed to never have been added
+        // in insertTxnInputs but since we call removeTxnInputs on all transactions
+        // - even the invalid ones - such a transaction could get to this point
         return;
     }
-    const auto& it = std::find(mKnownSpends.begin(), mKnownSpends.end(), tx.vin[0].prevout);
-    if (it != mKnownSpends.end()) {
-        mKnownSpends.erase(it, it + tx.vin.size());
+
+    std::lock_guard lock(mMainMtx);
+    if(mKnownSpendsTx.find(&tx) == mKnownSpendsTx.end())
+    {
+        return;
     }
+
+    // At this point we know that transaction inputs were added to the vector
+    // and that the entries are both not duplicated and are laid out in
+    // consecutive order (guaranteed by the way they were inserted).
+    mKnownSpendsTx.erase(&tx);
+    const auto& it = std::find(mKnownSpends.begin(), mKnownSpends.end(), tx.vin[0].prevout);
+    mKnownSpends.erase(it, it + tx.vin.size());
 }
 
 size_t CTxnDoubleSpendDetector::getKnownSpendsSize() const {
