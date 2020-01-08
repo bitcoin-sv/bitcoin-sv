@@ -13,9 +13,12 @@
 class CScript;
 
 // Following functions are implemented in blockchain.cpp
-std::string headerBlockToJSON(const Config &config, const CBlockHeader &blockHeader,
-                     const CBlockIndex *blockindex);
-UniValue blockheaderToJSON(const CBlockIndex *blockindex);
+void headerBlockToJSON(const Config& config, const CBlockHeader& blockHeader,
+                       const CBlockIndex* blockindex, std::optional<CDiskBlockMetaData> diskBlockMetaData,
+                       const int confirmations, const std::optional<uint256>& nextBlockHash, CJSONWriter& jWriter);
+UniValue blockheaderToJSON(const CBlockIndex *blockindex, 
+                           const int confirmations, 
+                           const std::optional<uint256>& nextBlockHash);
 
 // Following functions are implemented in rawtransaction.cpp
 void getrawtransaction(const Config& config,

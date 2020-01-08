@@ -26,20 +26,6 @@
 // Allow a max of 15 outpoints to be queried at once.
 static const size_t MAX_GETUTXOS_OUTPOINTS = 15;
 
-enum RetFormat {
-    RF_UNDEF,
-    RF_BINARY,
-    RF_HEX,
-    RF_JSON,
-};
-
-static const struct {
-    enum RetFormat rf;
-    const char *name;
-} rf_names[] = {
-    {RF_UNDEF, ""}, {RF_BINARY, "bin"}, {RF_HEX, "hex"}, {RF_JSON, "json"},
-};
-
 namespace {
 
 class CCoin {
@@ -162,19 +148,35 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
     }
 
-    std::vector<const CBlockIndex *> headers;
+    std::optional<uint256> lastBlockHash;
+    int confirmations = -1;
+    std::vector<const CBlockIndex*> headers;
     headers.reserve(count);
     {
         LOCK(cs_main);
+        const CBlockIndex* tip = chainActive.Tip();
         BlockMap::const_iterator it = mapBlockIndex.find(hash);
         const CBlockIndex *pindex =
             (it != mapBlockIndex.end()) ? it->second : nullptr;
+        if (!pindex)
+            return RESTERR(req, HTTP_BAD_REQUEST, "Block not found: " + hashStr);
+        
+        confirmations = tip->nHeight - pindex->nHeight + 1;
+
         while (pindex != nullptr && chainActive.Contains(pindex)) {
             headers.push_back(pindex);
             if (headers.size() == size_t(count)) {
                 break;
             }
             pindex = chainActive.Next(pindex);
+        }
+        // store blockhash of additional header if we are not on chain tip
+        // because each header points to next blockhash
+        if (pindex) {
+            const CBlockIndex* pLast = chainActive.Next(pindex);
+            if (pLast) {
+                lastBlockHash = pLast->GetBlockHash();
+            }
         }
     }
 
@@ -200,8 +202,15 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         }
         case RF_JSON: {
             UniValue jsonHeaders(UniValue::VARR);
-            for (const CBlockIndex *pindex : headers) {
-                jsonHeaders.push_back(blockheaderToJSON(pindex));
+            for (size_t i = 0; i < headers.size(); i++) {
+                std::optional<uint256> nextBlockHash;
+                const CBlockIndex* pindex= headers[i];
+                if (pindex != headers.back()) {
+                    nextBlockHash = headers[i + 1]->GetBlockHash();
+                } else {
+                    nextBlockHash = lastBlockHash;
+                }
+                jsonHeaders.push_back(blockheaderToJSON(pindex, confirmations--, nextBlockHash));
             }
             std::string strJSON = jsonHeaders.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
@@ -233,78 +242,58 @@ static bool rest_block(const Config &config, HTTPRequest *req,
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
     }
 
-    std::unique_ptr<CForwardReadonlyStream> stream;
-    bool hasDiskBlockMetaData;
-    CDiskBlockMetaData metadata;
-    CBlockIndex *pblockindex = nullptr;
+    int confirmations;
+    std::optional<uint256> nextBlockHash;
+    CBlockIndex* pblockindex = nullptr;
     {
         LOCK(cs_main);
 
         if (mapBlockIndex.count(hash) == 0) {
             return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
         }
-
         pblockindex = mapBlockIndex[hash];
         if (fHavePruned && !pblockindex->nStatus.hasData() &&
             pblockindex->nTx > 0) {
             return RESTERR(req, HTTP_NOT_FOUND,
                            hashStr + " not available (pruned data)");
         }
-
-
-        stream = StreamSyncBlockFromDisk(*pblockindex);
-        if (!stream) {
-            return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
-        }
-
-        // obtaining data under cs_main lock
-        hasDiskBlockMetaData = pblockindex->nStatus.hasDiskBlockMetaData();
-        if (hasDiskBlockMetaData) {
-            metadata = pblockindex->GetDiskBlockMetaData();
-        }
+        confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), pblockindex, nextBlockHash);
     }
 
-    switch (rf) {
-        /*
-         * When Content-Length HTTP header is NOT set, libevent will automatically use chunked-encoding transfer.
-         * When Content-Length HTTP header is set, no encoding is done by libevent,
-         * but we still read and write response in chunks to avoid bringing whole data in memory.
-        */
-        case RF_BINARY: {
-            if (hasDiskBlockMetaData) {
-                req->WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
+    try
+    {
+        switch (rf) {
+            /*
+             * When Content-Length HTTP header is NOT set, libevent will automatically use chunked-encoding transfer.
+             * When Content-Length HTTP header is set, no encoding is done by libevent,
+             * but we still read and write response in chunks to avoid bringing whole data in memory.
+            */
+            case RF_BINARY: {
+                writeBlockChunksAndUpdateMetadata(false, *req, *pblockindex, "", false, rf);
+                break;
             }
-            req->WriteHeader("Content-Type", "application/octet-stream");
-            req->StartWritingChunks(HTTP_OK);
-            writeBlockChunksAndUpdateMetadata(false, *req, *stream, *pblockindex);
-            break;
-        }
 
-        case RF_HEX: {
-            if (hasDiskBlockMetaData) {
-                req->WriteHeader("Content-Length", std::to_string(metadata.diskDataSize * 2));
+            case RF_HEX: {
+                writeBlockChunksAndUpdateMetadata(true, *req, *pblockindex, "", false, rf);
+                break;
             }
-            req->WriteHeader("Content-Type", "text/plain");
-            req->StartWritingChunks(HTTP_OK);
-            writeBlockChunksAndUpdateMetadata(true, *req, *stream, *pblockindex);
-            break;
-        }
 
-        case RF_JSON: {
-            req->WriteHeader("Content-Type", "application/json");
-            req->StartWritingChunks(HTTP_OK);
-            writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails, *pblockindex, false);
-            break;
-        }
+            case RF_JSON: {
+                writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails , *pblockindex, false, false, confirmations, nextBlockHash, "");
+                break;
+            }
 
-        default: {
-            return RESTERR(req, HTTP_NOT_FOUND,
-                           "output format not found (available: " +
-                               AvailableDataFormatsString() + ")");
+            default: {
+                return RESTERR(req, HTTP_NOT_FOUND,
+                    "output format not found (available: " +
+                    AvailableDataFormatsString() + ")");
+            }
         }
     }
-
-    req->StopWritingChunks();
+    catch (block_parse_error& ex)
+    {
+        return RESTERR(req, HTTP_NOT_FOUND, std::string(ex.what()));
+    }
 
     return true;
 }

@@ -30,6 +30,7 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "merkletreestore.h"
+#include "rpc/blockchain.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -1729,7 +1730,14 @@ static UniValue getmerkleproof(const Config& config,
     callbackDataObject.pushKV("flags", 2);
     callbackDataObject.pushKV("index", static_cast<uint64_t>(proof.transactionIndex));
     callbackDataObject.pushKV("txOrId", transactionId.GetHex());
-    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex));
+    int confirmations = 0;
+    std::optional<uint256> nextBlockHash;
+    {
+        LOCK(cs_main);
+        confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
+    }
+
+    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash));
     callbackDataObject.pushKV("nodes", merkleProofArray);
     return callbackDataObject;
 }
