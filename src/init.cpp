@@ -999,10 +999,6 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
                     "included in block creation. (default: %s)"),
                   CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)));
-    strUsage += HelpMessageOpt(
-        "-maxblocksigopspermbpolicy",
-        strprintf("Set maximum allowed number of signature operations we're willing to mine per MB of block (default: %u, 0 = unlimited) after Genesis.",
-            DEFAULT_MAX_BLOCK_SIGOPS_PER_MB_POLICY_AFTER_GENESIS));
 
     if (showDebug) {
         strUsage +=
@@ -1825,15 +1821,6 @@ bool AppInitParameterInteraction(Config &config) {
     int64_t genesisActivationHeight = gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight);
     if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
         return InitError(err);
-    }
-
-    // Configure max sigops number per MB
-    if (gArgs.IsArgSet("-maxblocksigopspermbpolicy"))
-    {
-        const uint64_t maxSigopsperMBpostGen = gArgs.GetArg("-maxblocksigopspermbpolicy", DEFAULT_MAX_BLOCK_SIGOPS_PER_MB_POLICY_AFTER_GENESIS);
-        if (std::string err; !config.SetMaxBlockSigOpsPerMB(maxSigopsperMBpostGen, &err)) {
-            return InitError(err);
-        }
     }
 
     if (std::string err; !config.SetMaxStackMemoryUsage(

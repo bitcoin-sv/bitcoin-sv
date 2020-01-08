@@ -3317,8 +3317,9 @@ static bool ConnectBlock(
     uint64_t nSigOpsCount = 0;
     const uint64_t currentBlockSize =
         ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-    const uint64_t nMaxSigOpsCount = config.GetMaxBlockSigOps(IsGenesisEnabled(config, pindex->nHeight), true, currentBlockSize);
-    
+    // Sigops are not counted after Genesis anymore
+    const uint64_t nMaxSigOpsCountConsensusBeforeGenesis = config.GetMaxBlockSigOpsConsensusBeforeGenesis(currentBlockSize);
+
     CDiskTxPos pos(pindex->GetBlockPos(),
                    GetSizeOfCompactSize(block.vtx.size()));
     std::vector<std::pair<uint256, CDiskTxPos>> vPos;
@@ -3367,7 +3368,7 @@ static bool ConnectBlock(
             }
 
             nSigOpsCount += txSigOpsCount;
-            if (nSigOpsCount > nMaxSigOpsCount) {
+            if (nSigOpsCount > nMaxSigOpsCountConsensusBeforeGenesis) {
                 return state.DoS(100, error("ConnectBlock(): too many sigops"),
                     REJECT_INVALID, "bad-blk-sigops");
             }
@@ -4941,7 +4942,8 @@ bool CheckBlock(const Config &config, const CBlock &block,
 
     // Keep track of the sigops count.
     uint64_t nSigOps = 0;
-    auto nMaxSigOpsCount = config.GetMaxBlockSigOps(IsGenesisEnabled(config, blockHeight), true, currentBlockSize);
+    // Sigops are not counted after Genesis anymore
+    auto nMaxSigOpsCountConsensusBeforeGenesis = config.GetMaxBlockSigOpsConsensusBeforeGenesis(currentBlockSize);
 
     // Check transactions
     auto txCount = block.vtx.size();
@@ -4955,7 +4957,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
             // count is too high, the the block is invalid.
             bool sigOpCountError;
             nSigOps += GetSigOpCountWithoutP2SH(*tx, false, sigOpCountError);
-            if (sigOpCountError || nSigOps > nMaxSigOpsCount) {
+            if (sigOpCountError || nSigOps > nMaxSigOpsCountConsensusBeforeGenesis) {
                 return state.DoS(100, false, REJECT_INVALID, "bad-blk-sigops",
                     false, "out-of-bounds SigOpCount");
             }

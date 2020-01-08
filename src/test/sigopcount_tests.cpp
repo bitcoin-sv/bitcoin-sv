@@ -360,36 +360,19 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
 BOOST_AUTO_TEST_CASE(test_sigops_limits) {
     Config& config = GlobalConfig::GetConfig();
     std::string error;
-    config.SetMaxBlockSigOpsPerMB(3 * MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS);
     uint64_t expected_res = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
 
-    for (bool gen : {false, true}) {
-        for (bool cons : {true, false}) {
-            if (!gen && !cons) 
-                expected_res = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
-            if (gen && !cons)
-                expected_res = 3 * MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
-            else if (gen && cons)
-                expected_res = MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS;
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1), expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 123456), expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1000000), expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1000001), 2 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1348592), 2 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2000000), 2 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2000001), 3 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2654321), 3 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, std::numeric_limits<uint32_t>::max()), 4295 * expected_res);
-            
-        }
-    }
-
-    config.SetMaxBlockSigOpsPerMB(3 * MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS, &error);
-    std::string ref = _("Policy value for maxBlockSigOpsPerMB must not exceed consensus limit of ") + std::to_string(MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS);
-    // the error is not thrown, needs to be handled elsewhere
-    BOOST_CHECK_EQUAL(error,ref);
-
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1), expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(123456), expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1000000), expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1000001), 2 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1348592), 2 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(2000000), 2 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(2000001), 3 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(2654321), 3 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(std::numeric_limits<uint32_t>::max()), 4295 * expected_res);
 }
+
 void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64_t maxTxSize)
 {
     CMutableTransaction tx;
@@ -442,11 +425,11 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
     uint64_t maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(false);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS);
 
-    /* Case 3: Genesis is enabled, default policy - DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
+    /* Case 3: Genesis is enabled, default policy - MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
     maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
 
-    /* Case 4: policy is applied with value 0 - returns DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
+    /* Case 4: policy is applied with value 0 - returns MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
     std::string error("");
     BOOST_CHECK(testConfig.SetMaxTxSigOpsCountPolicy(0, &error));
     BOOST_CHECK_EQUAL(error, "");
