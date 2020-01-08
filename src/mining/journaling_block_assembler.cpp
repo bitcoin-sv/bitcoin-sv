@@ -259,18 +259,19 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
         return false;
     }
 
-    // Check sig ops count
-    uint64_t maxBlockSigOps = mConfig.GetMaxBlockSigOps(false, false, blockSizeWithTx);
-    if (pindex)
-    {
-        maxBlockSigOps = mConfig.GetMaxBlockSigOps(IsGenesisEnabled(mConfig, pindex->nHeight + 1), false, blockSizeWithTx);
-    }
+    uint64_t txnSigOps{ static_cast<uint64_t>(entry.getSigOpsCount()) };
+    uint64_t blockSigOpsWithTx{ mBlockSigOps + txnSigOps };
 
-    uint64_t txnSigOps { static_cast<uint64_t>(entry.getSigOpsCount()) };
-    uint64_t blockSigOpsWithTx { mBlockSigOps + txnSigOps };
-    if(blockSigOpsWithTx >= maxBlockSigOps)
+    // After Genesis we don't count sigops anymore
+    if (!IsGenesisEnabled(mConfig, pindex->nHeight + 1))
     {
-        return false;
+        // Check sig ops count
+        uint64_t maxBlockSigOps = mConfig.GetMaxBlockSigOpsConsensusBeforeGenesis(blockSizeWithTx);
+     
+        if (blockSigOpsWithTx >= maxBlockSigOps)
+        {
+            return false;
+        }
     }
 
     // Must check that lock times are still valid

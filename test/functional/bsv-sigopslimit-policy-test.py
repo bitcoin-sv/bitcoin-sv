@@ -42,8 +42,8 @@ class SigopPolicyTest(BitcoinTestFramework):
         # Add & start nodes
         self.add_nodes(self.num_nodes)
         # Create nodes
-        self.start_node(0, ['-genesisactivationheight=%d' % self.genesisactivationheight, "-maxblocksigopspermbpolicy=%d" % self.maxblocksigops])
-        self.start_node(1, ['-genesisactivationheight=%d' % self.genesisactivationheight, '-maxtxsigopscountspolicy=10000', "-maxblocksigopspermbpolicy=0"])
+        self.start_node(0, ['-genesisactivationheight=%d' % self.genesisactivationheight])
+        self.start_node(1, ['-genesisactivationheight=%d' % self.genesisactivationheight, '-maxtxsigopscountspolicy=10000'])
 
         sync_blocks(self.nodes)
 
@@ -129,25 +129,15 @@ class SigopPolicyTest(BitcoinTestFramework):
         # Get to genesis height
         node.generate(2)
         # Now we're adding a block at height 205 - genesis is enabled
-        # Test that we can generate 1MB block with just under 30k sigops (the value we set policy to)
-        # and when adding 1 sigop per transaction to get upto to the new policy limit it fails again
+        # Test that we can generate 1MB block with just under 30k sigops and when adding 1 sigop per transaction 
+        # to get up to to the limit and it should not fail after genesis because we don't count sigops after Genesis
         generate_block_and_check(i_start=40, target_sigops=1493, target_tx_size=49768, len_mem0=20, len_mem1=0)
-        generate_block_and_check(i_start=60, target_sigops=1494, target_tx_size=49768, len_mem0=20, len_mem1=1)
+        generate_block_and_check(i_start=60, target_sigops=1494, target_tx_size=49768, len_mem0=20, len_mem1=0)
 
         # Node 2 does not have the policy limit set, so it defaults to consensus
         conn = conn2
         node = node2
-        hashes = node.generate(200)
-        utxos = node.listunspent()
-        # Before reaching genesis height it works same as node1
-        generate_block_and_check(i_start=0, target_sigops=993, target_tx_size=49768, len_mem0=20, len_mem1=0)
-        generate_block_and_check(i_start=20, target_sigops=994, target_tx_size=49768, len_mem0=20, len_mem1=1)
-        # Get to genesis height
-        node.generate(2)
-        # Now adding 30k sigops passes
-        generate_block_and_check(i_start=40, target_sigops=1493, target_tx_size=49768, len_mem0=20, len_mem1=0)
-        generate_block_and_check(i_start=60, target_sigops=1494, target_tx_size=49768, len_mem0=20, len_mem1=0)
-        node.generate(100)
+        hashes = node.generate(300)
         utxos = node.listunspent()
         # Generate a block with 100 txs, 9999+1 sigops each. The block with sigop/b rate of 0,98 is still valid
         generate_block_and_check(i_start=0, target_sigops=9999, target_tx_size=10000, len_mem0=100, len_mem1=0, num_txs=100)

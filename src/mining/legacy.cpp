@@ -224,9 +224,14 @@ bool LegacyBlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigO
     {
         return false;
     }
-    if (nBlockSigOps + packageSigOps >= mConfig.GetMaxBlockSigOps(IsGenesisEnabled(mConfig, nHeight), false, blockSizeWithPackage))
+    
+    // After Genesis we don't count sigops anymore
+    if (!IsGenesisEnabled(mConfig, nHeight))
     {
-        return false;
+        if (nBlockSigOps + packageSigOps >= mConfig.GetMaxBlockSigOpsConsensusBeforeGenesis(blockSizeWithPackage))
+        {
+            return false;
+        }
     }
     return true;
 }
@@ -273,19 +278,22 @@ bool LegacyBlockAssembler::TestForBlock(CTxMemPool::txiter it) {
         return false;
     }
 
-    auto maxBlockSigOps = mConfig.GetMaxBlockSigOps(IsGenesisEnabled(mConfig, nHeight), false, blockSizeWithTx);
-    if (nBlockSigOps + it->GetSigOpCount() >= maxBlockSigOps) {
-        // If the block has room for no more sig ops then flag that the block is
-        // finished.
-        // TODO: We should consider adding another transaction that isn't very
-        // dense in sigops instead of bailing out so easily.
-        if (nBlockSigOps > maxBlockSigOps - 2) {
-            blockFinished = true;
+    if (!IsGenesisEnabled(mConfig, nHeight))
+    {
+        auto maxBlockSigOps = mConfig.GetMaxBlockSigOpsConsensusBeforeGenesis(blockSizeWithTx);
+        if (nBlockSigOps + it->GetSigOpCount() >= maxBlockSigOps) {
+            // If the block has room for no more sig ops then flag that the block is
+            // finished.
+            // TODO: We should consider adding another transaction that isn't very
+            // dense in sigops instead of bailing out so easily.
+            if (nBlockSigOps > maxBlockSigOps - 2) {
+                blockFinished = true;
+                return false;
+            }
+            // Otherwise attempt to find another tx with fewer sigops to put in the
+            // block.
             return false;
         }
-        // Otherwise attempt to find another tx with fewer sigops to put in the
-        // block.
-        return false;
     }
 
     // Must check that lock times are still valid. This can be removed once MTP
