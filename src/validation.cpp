@@ -3851,9 +3851,9 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
             disconnectpool->addTransaction(tx);
         }
 
-        //  The amount of tranasctions we are willing to store during reorg is calculated based
-        //  of default block size for the network (not our configuration that might be lower)
-        uint64_t maxDisconnectedTxPoolSize = MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR * config.GetChainParams().GetDefaultBlockSizeParams().maxBlockSize;
+
+        //  The amount of transactions we are willing to store during reorg is the same as max mempool size
+        uint64_t maxDisconnectedTxPoolSize = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
         while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
             // Drop the earliest entry, and remove its children from the
             // mempool.
