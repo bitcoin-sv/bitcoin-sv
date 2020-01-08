@@ -3460,7 +3460,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             CNodeState * state = State(pfrom->GetId()); 
             if ( state != nullptr){
                 auto curTime = std::chrono::system_clock::now();
-                auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastInvalidChecksumHeader - curTime).count();
+                auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
                 unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
                 std::chrono::milliseconds checksumInterval(interval); 
                 if (duration < std::chrono::milliseconds(checksumInterval).count()){
@@ -3783,7 +3783,7 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
             }
             // check for high-frequency pushing of header messages
             auto curTime = std::chrono::system_clock::now();
-            auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state.nTimeOfLastHeaderMessage - curTime).count();
+            auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state.nTimeOfLastHeaderMessage).count();
             unsigned int interval = gArgs.GetArg("-invalidheaderinterval", DEFAULT_MIN_TIME_INTERVAL_HEADER_MS );
             std::chrono::milliseconds headerInterval(interval); 
             if (duration < std::chrono::milliseconds(headerInterval).count()){
@@ -3795,8 +3795,8 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
             unsigned int headerFreq = gArgs.GetArg ("-invalidheaderfreq", DEFAULT_INVALID_HEADER_FREQUENCY );
             if (state.dInvalidHeaderFrequency > headerFreq){
                 // MisbehavingNode if the count goes above some chosen value 
-                // 1100 conseqitive invalid checksums received with less than 500ms between them
-                // (this is approximately 2200 messages per second at which point TCP/IP will start to throttle
+                // 1100 consecutive headers announced with less than 500ms between them
+                // (this is approximately 2200 messages per second at which point TCP/IP will start to throttle)
                 Misbehaving(pto, 1, "Invalid Header activity");
                 LogPrintf("Peer %d showing increased activity in message header transmission\n",pto->id);
             }
