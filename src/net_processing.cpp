@@ -3460,7 +3460,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             CNodeState * state = State(pfrom->GetId()); 
             if ( state != nullptr){
                 auto curTime = std::chrono::system_clock::now();
-                auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastInvalidChecksumHeader - curTime).count();
+                auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
                 unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
                 std::chrono::milliseconds checksumInterval(interval); 
                 if (duration < std::chrono::milliseconds(checksumInterval).count()){
