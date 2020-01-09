@@ -987,29 +987,8 @@ std::optional<bool> EvalScript(
                         }
                     } break;
 
-                    case OP_LSHIFT: {
-                        // (x n -- out)
-                        if (stack.size() < 2) {
-                            return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                        }
-
-                        const LimitedVector vch1 = stack.stacktop(-2);
-                        const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum n{
-                            top, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
-                        if(n < 0)
-                        {
-                            return set_error(serror, SCRIPT_ERR_INVALID_NUMBER_RANGE);
-                        }
-
-                        stack.pop_back();
-                        stack.pop_back();
-                        stack.push_back(LShift(vch1.GetElement(), n.getint()));
-                    } break;
-
-                    case OP_RSHIFT: {
+                    case OP_LSHIFT:
+                    {
                         // (x n -- out)
                         if(stack.size() < 2)
                         {
@@ -1019,10 +998,8 @@ std::optional<bool> EvalScript(
 
                         const LimitedVector vch1 = stack.stacktop(-2);
                         const auto& top{stack.stacktop(-1).GetElement()};
-                        const CScriptNum n{
-                            top, fRequireMinimal,
-                            maxScriptNumLength,
-                            utxo_after_genesis};
+                        CScriptNum n{top, fRequireMinimal, maxScriptNumLength,
+                                     utxo_after_genesis};
                         if(n < 0)
                         {
                             return set_error(serror,
@@ -1031,8 +1008,52 @@ std::optional<bool> EvalScript(
 
                         stack.pop_back();
                         stack.pop_back();
-                        stack.push_back(RShift(vch1.GetElement(), n.getint()));
-                    } break;
+                        auto values{vch1.GetElement()};
+                        do
+                        {
+                            values = LShift(values, n.getint());
+                            n -= utxo_after_genesis
+                                     ? CScriptNum{bsv::bint{INT32_MAX}}
+                                     : CScriptNum{INT32_MAX};
+                        } while(n > 0);
+
+                        stack.push_back(values);
+                    }
+                    break;
+
+                    case OP_RSHIFT:
+                    {
+                        // (x n -- out)
+                        if(stack.size() < 2)
+                        {
+                            return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        }
+
+                        const LimitedVector vch1 = stack.stacktop(-2);
+                        const auto& top{stack.stacktop(-1).GetElement()};
+                        CScriptNum n{top, fRequireMinimal, maxScriptNumLength,
+                                     utxo_after_genesis};
+                        if(n < 0)
+                        {
+                            return set_error(serror,
+                                             SCRIPT_ERR_INVALID_NUMBER_RANGE);
+                        }
+
+                        stack.pop_back();
+                        stack.pop_back();
+                        auto values{vch1.GetElement()};
+                        do
+                        {
+                            values = RShift(values, n.getint());
+                            n -= utxo_after_genesis
+                                     ? CScriptNum{bsv::bint{INT32_MAX}}
+                                     : CScriptNum{INT32_MAX};
+                        } while(n > 0);
+
+                        stack.push_back(values);
+                    }
+                    break;
 
                     case OP_EQUAL:
                     case OP_EQUALVERIFY:
