@@ -635,6 +635,21 @@ bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, ui
         return false;
     }
 
+    if (isGenesisEnabled)
+    {
+        bool hasP2SHOutput = std::any_of(tx.vout.begin(), tx.vout.end(), 
+            [](const CTxOut& o){ 
+                return o.scriptPubKey.IsPayToScriptHash(); 
+            }
+        );
+        
+        if(hasP2SHOutput)
+        {
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-vout-p2sh");
+        }
+
+    }
+
     static SaltedOutpointHasher hasher {};
     std::unordered_set<COutPoint, SaltedOutpointHasher> inOutPoints { 1, hasher };
     for (const auto &txin : tx.vin) {
@@ -1077,24 +1092,6 @@ static bool DoesNonFinalSpendNonFinal(const CTransaction& txn)
     return false;
 }
 
-/**
-* Check if transaction with at least one P2SH output should be rejected. By default, such transactions are rejected after Genesis is activated.
-*/
-static bool CheckIsTransactionWithP2SHOutputAfterGenesis(const CTransaction& tx, const Config& config, int nHeight)
-{
-    if (!config.GetAcceptP2SH() && IsGenesisEnabled(config, nHeight))
-    {
-        for (const CTxOut &txout : tx.vout)
-        {
-            if (txout.scriptPubKey.IsPayToScriptHash())
-            {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 static bool IsGenesisGracefulPeriod(const Config& config, int spendHeight)
 {
     uint64_t uSpendHeight = static_cast<uint64_t>(spendHeight);
@@ -1125,12 +1122,6 @@ CTxnValResult TxnValidation(
 
     CValidationState state;
     std::vector<COutPoint> vCoinsToUncache {};
-
-    if (CheckIsTransactionWithP2SHOutputAfterGenesis(tx, config, chainActive.Height() + 1))
-    {
-        state.DoS(0, false, REJECT_INVALID, "bad-txns-vout-p2sh");
-        return Result{state, pTxInputData};
-    }
 
     // First check against consensus limits. If this check fails, then banscore will be increased. 
     // We re-test the transaction with policy rules later in this method (without banning if rules are violated)

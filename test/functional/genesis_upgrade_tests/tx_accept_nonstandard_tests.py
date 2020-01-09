@@ -80,8 +80,8 @@ def make_unlock_modified00(tx, tx_to_spend):
     
     
 class HandleTxsModified11Node(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=1', '-acceptnonstdoutputs=1', '-acceptp2sh_ashashpuzzle=1']
-    NAME = "Accept nonstandard transactions and p2sh transactions before Genesis. Accept nonstandard and p2sh transactions after Genesis"
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=1', '-acceptnonstdoutputs=1']
+    NAME = "Accept nonstandard transactions and p2sh transactions before Genesis. Accept nonstandard and reject p2sh transactions after Genesis"
 
     THE_KEY = make_key()
     P2PK_LOCKING_SCRIPT = CScript([THE_KEY.get_pubkey(), OP_CHECKSIG])
@@ -113,7 +113,9 @@ class HandleTxsModified11Node(GenesisHeightBasedSimpleTestsCase):
 
     TEST_GENESIS_P2SH_TX = [
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
-                             "GENESIS", make_unlock_modified11, test_tx_locking_script=CScript([OP_HASH160, hash160(CScript([OP_TRUE])), OP_EQUAL]))
+                             "GENESIS", make_unlock_modified11, test_tx_locking_script=CScript([OP_HASH160, hash160(CScript([OP_TRUE])), OP_EQUAL]),
+                                        p2p_reject_reason = b'flexible-bad-txns-vout-p2sh',
+                                        block_reject_reason=b'bad-txns-vout-p2sh')
     ]
 
     TESTS = TEST_PRE_GENESIS_STANDARD_TX + TEST_PRE_GENESIS_NONSTANDARD_TX + TEST_PRE_GENESIS_P2SH_TX + TEST_GENESIS_STANDARD_TX + TEST_GENESIS_NONSTANDARD_TX + TEST_GENESIS_P2SH_TX
@@ -155,13 +157,14 @@ class HandleTxsModified10Node(GenesisHeightBasedSimpleTestsCase):
     TEST_GENESIS_P2SH_TX = [
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                              "GENESIS", make_unlock_modified10, test_tx_locking_script=CScript([OP_HASH160, hash160(CScript([OP_TRUE])), OP_EQUAL]),
-                                        p2p_reject_reason=b'bad-txns-vout-p2sh')
+                                        p2p_reject_reason=b'flexible-bad-txns-vout-p2sh',
+                                        block_reject_reason=b'bad-txns-vout-p2sh')
     ]
 
     TESTS = TEST_PRE_GENESIS_STANDARD_TX + TEST_PRE_GENESIS_NONSTANDARD_TX + TEST_PRE_GENESIS_P2SH_TX + TEST_GENESIS_STANDARD_TX + TEST_GENESIS_NONSTANDARD_TX + TEST_GENESIS_P2SH_TX
 
 class HandleTxsModified00Node(GenesisHeightBasedSimpleTestsCase):
-    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0', '-acceptp2sh_ashashpuzzle=1']
+    ARGS = GenesisHeightBasedSimpleTestsCase.ARGS + ['-banscore=1000000', '-whitelist=127.0.0.1', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0']
     NAME = "Reject nonstandard transactions and accept p2sh transactions before Genesis. Reject nonstandard and p2sh transactions after Genesis"
 
     THE_KEY = make_key()
@@ -197,7 +200,8 @@ class HandleTxsModified00Node(GenesisHeightBasedSimpleTestsCase):
     TEST_GENESIS_P2SH_TX = [
         SimpleTestDefinition("GENESIS", P2PK_LOCKING_SCRIPT,
                              "GENESIS", make_unlock_modified00, test_tx_locking_script=CScript([OP_HASH160, hash160(CScript([OP_TRUE])), OP_EQUAL]),
-                                        p2p_reject_reason = b'scriptpubkey')
+                                        p2p_reject_reason = b'flexible-bad-txns-vout-p2sh',
+                                        block_reject_reason=b'bad-txns-vout-p2sh')
     ]
 
     TESTS = TEST_PRE_GENESIS_STANDARD_TX + TEST_PRE_GENESIS_NONSTANDARD_TX + TEST_PRE_GENESIS_P2SH_TX + TEST_GENESIS_STANDARD_TX + TEST_GENESIS_NONSTANDARD_TX + TEST_GENESIS_P2SH_TX
