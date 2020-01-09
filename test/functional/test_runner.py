@@ -66,7 +66,8 @@ LARGE_BLOCK_TESTS = [
     # Use --large-block-tests command line parameter to run them.
     "bsv-genesis-large-blockfile-io.py",    
     "bsv-genesis-large-blockfile-reindex.py",
-    "bsv-genesis-large-blockfile-max-32-bit.py"
+    "bsv-genesis-large-blockfile-max-32-bit.py",
+    "bsv-large-blocks-txindex-data.py"
 ]
 
 # This tests can be only run by explicitly specifying them on command line. 
