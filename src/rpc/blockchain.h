@@ -17,8 +17,12 @@ class JSONRPCRequest;
 
 UniValue getblockchaininfo(const Config &config, const JSONRPCRequest &request);
 void getblock(const Config &config, const JSONRPCRequest &request, HTTPRequest *req, bool processedInBatch);
+void getblockbyheight(const Config &config, const JSONRPCRequest &request,
+                      HTTPRequest *req, bool processedInBatch);
+void getblockdata(CBlockIndex *pblockindex, const Config &config, const JSONRPCRequest &jsonRPCReq, 
+                  HTTPRequest *httpReq, bool processedInBatch);
 void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &req,
-                          bool showTxDetails, CBlockIndex& blockindex);
+                          bool showTxDetails, CBlockIndex& blockindex, bool showOnlyCoinBase);
 void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                           CForwardReadonlyStream& stream, CBlockIndex& blockIndex);
 
@@ -27,7 +31,8 @@ double GetDifficulty(const CBlockIndex *blockindex);
 enum class GetBlockVerbosity {
     RAW_BLOCK = 0,
     DECODE_HEADER = 1,
-    DECODE_TRANSACTIONS = 2
+    DECODE_TRANSACTIONS = 2,
+    DECODE_HEADER_AND_COINBASE = 3
 };
 
 class GetBlockVerbosityNames {
@@ -41,6 +46,9 @@ public:
             return true;
         } else if (name == "DECODE_TRANSACTIONS") {
             result = GetBlockVerbosity::DECODE_TRANSACTIONS;
+            return true;
+        } else if (name == "DECODE_HEADER_AND_COINBASE") {
+            result = GetBlockVerbosity::DECODE_HEADER_AND_COINBASE;
             return true;
         }
         return false;

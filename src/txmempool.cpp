@@ -1014,6 +1014,11 @@ std::string CTxMemPool::CheckJournal() const {
     return checkJournalNL();
 }
 
+void CTxMemPool::clearPrioritisation(const uint256 &hash) {
+    std::unique_lock lock(smtx);
+    clearPrioritisationNL(hash);
+}
+
 std::string CTxMemPool::checkJournalNL() const
 {
     LogPrint(BCLog::JOURNAL, "Checking mempool against journal\n");
