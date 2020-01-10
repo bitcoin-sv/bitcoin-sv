@@ -360,36 +360,19 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost) {
 BOOST_AUTO_TEST_CASE(test_sigops_limits) {
     Config& config = GlobalConfig::GetConfig();
     std::string error;
-    config.SetMaxBlockSigOpsPerMB(3 * MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS);
     uint64_t expected_res = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
 
-    for (bool gen : {false, true}) {
-        for (bool cons : {true, false}) {
-            if (!gen && !cons) 
-                expected_res = MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
-            if (gen && !cons)
-                expected_res = 3 * MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS;
-            else if (gen && cons)
-                expected_res = MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS;
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1), expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 123456), expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1000000), expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1000001), 2 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 1348592), 2 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2000000), 2 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2000001), 3 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, 2654321), 3 * expected_res);
-            BOOST_CHECK_EQUAL(config.GetMaxBlockSigOps(gen, cons, std::numeric_limits<uint32_t>::max()), 4295 * expected_res);
-            
-        }
-    }
-
-    config.SetMaxBlockSigOpsPerMB(3 * MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS, &error);
-    std::string ref = _("Policy value for maxBlockSigOpsPerMB must not exceed consensus limit of ") + std::to_string(MAX_BLOCK_SIGOPS_PER_MB_AFTER_GENESIS);
-    // the error is not thrown, needs to be handled elsewhere
-    BOOST_CHECK_EQUAL(error,ref);
-
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1), expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(123456), expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1000000), expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1000001), 2 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(1348592), 2 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(2000000), 2 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(2000001), 3 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(2654321), 3 * expected_res);
+    BOOST_CHECK_EQUAL(config.GetMaxBlockSigOpsConsensusBeforeGenesis(std::numeric_limits<uint32_t>::max()), 4295 * expected_res);
 }
+
 void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64_t maxTxSize)
 {
     CMutableTransaction tx;
@@ -424,8 +407,8 @@ void TestMaxSigOps(const Config& globalConfig, uint64_t maxTxSigOpsCount, uint64
     {
         CValidationState state;
         BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, false));
-        BOOST_CHECK(!CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, true));
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txn-sigops");
+        BOOST_CHECK(CheckRegularTransaction(CTransaction(tx), state, maxTxSigOpsCount, maxTxSize, true));
     }
 }
 
@@ -434,45 +417,41 @@ BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx)
 
 
     /* Case 1: Genesis is not enabled, consensus - MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS */
-    uint64_t maxTxSigOpsCountConsensus = testConfig.GetMaxTxSigOpsCount(false, true);
-    BOOST_CHECK_EQUAL(maxTxSigOpsCountConsensus, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS);
-    TestMaxSigOps(testConfig, maxTxSigOpsCountConsensus, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
+    uint64_t maxTxSigOpsCountConsensusBeforeGenesis = testConfig.GetMaxTxSigOpsCountConsensusBeforeGenesis();
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountConsensusBeforeGenesis, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS);
+    TestMaxSigOps(testConfig, maxTxSigOpsCountConsensusBeforeGenesis, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS);
 
-    /* Case 2: Genesis is enabled, consensus - MAX_TX_SIGOPS_COUNT_AFTER_GENESIS */
-    maxTxSigOpsCountConsensus = testConfig.GetMaxTxSigOpsCount(true, true);
-    BOOST_CHECK_EQUAL(maxTxSigOpsCountConsensus, MAX_TX_SIGOPS_COUNT_AFTER_GENESIS);
-
-    /* Case 3: Genesis is not enabled, policy - MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS */
-    uint64_t maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCount(false, false);
+    /* Case 2: Genesis is not enabled, policy - MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS */
+    uint64_t maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(false);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS);
 
-    /* Case 4: Genesis is enabled, default policy - DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCount(true, false);
-    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
+    /* Case 3: Genesis is enabled, default policy - MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
 
-    /* Case 5: policy is applied with value 0 - returns MAX_TX_SIGOPS_COUNT_AFTER_GENESIS */
+    /* Case 4: policy is applied with value 0 - returns MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS */
     std::string error("");
     BOOST_CHECK(testConfig.SetMaxTxSigOpsCountPolicy(0, &error));
     BOOST_CHECK_EQUAL(error, "");
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCount(true, false);
-    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_AFTER_GENESIS);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
+    BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS);
 
-    /* Case 6: policy is applied - returns set value */
+    /* Case 5: policy is applied - returns set value */
     BOOST_CHECK(testConfig.SetMaxTxSigOpsCountPolicy(20500, &error));
     BOOST_CHECK_EQUAL(error,"");
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCount(true, false);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
     
-    /* Case 7: Policy is applied with too big value - previous value must not be changed */
-    BOOST_CHECK(!testConfig.SetMaxTxSigOpsCountPolicy(static_cast<int64_t>(MAX_TX_SIGOPS_COUNT_AFTER_GENESIS) + 1, &error));
-    BOOST_CHECK(error.find("Policy value for maximum allowed number of signature operations per transaction must not exceed consensus limit of") != std::string::npos);
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCount(true, false);
+    /* Case 6: Policy is applied with too big value - previous value must not be changed */
+    BOOST_CHECK(!testConfig.SetMaxTxSigOpsCountPolicy(static_cast<int64_t>(MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS) + 1, &error));
+    BOOST_CHECK(error.find("Policy value for maximum allowed number of signature operations per transaction must not exceed limit of") != std::string::npos);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
 
-    /* Case 8: Policy is applied with negative value - previous value must not be changed */
+    /* Case 7: Policy is applied with negative value - previous value must not be changed */
     BOOST_CHECK(!testConfig.SetMaxTxSigOpsCountPolicy(-123, &error));
     BOOST_CHECK_EQUAL(error, "Policy value for maximum allowed number of signature operations per transaction cannot be less than 0");
-    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCount(true, false);
+    maxTxSigOpsCountPolicy = testConfig.GetMaxTxSigOpsCountPolicy(true);
     BOOST_CHECK_EQUAL(maxTxSigOpsCountPolicy, 20500);
 }
 
