@@ -105,10 +105,10 @@ public:
 
     /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
     virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const = 0;
+    virtual uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const = 0;
+    virtual uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const = 0;
 
-    virtual bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBPolicyIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const = 0;
+    virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
 
     virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const = 0;
@@ -217,10 +217,10 @@ public:
     uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override;
 
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override;
-    uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override;
+    uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override;
+    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override;
 
-    bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBPolicyIn, std::string* err = nullptr) override;
-    uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const override;
+    uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override;
 
     bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* error = nullptr) override;
     uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override;
@@ -293,9 +293,6 @@ private:
     int mPerBlockScriptValidationMaxBatchSize;
 
     uint64_t maxOpsPerScriptPolicy;
-
-    uint64_t maxBlockSigOpsPerMBPolicy;
-
 
     uint64_t maxTxSigOpsCountPolicy;
     uint64_t maxPubKeysPerMultiSig;
@@ -448,10 +445,10 @@ public:
         }
     }
     bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override { return true; }
-    uint64_t GetMaxTxSigOpsCount(bool isGenesisEnabled, bool isConsensus) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+    uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
 
-    bool SetMaxBlockSigOpsPerMB(int64_t maxBlockSigOpsPerMBaPolicyIn, std::string* err = nullptr) override { return true; }
-    uint64_t GetMaxBlockSigOps(bool isGenesisEnabled, bool consensus, uint64_t blockSize) const override { throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented"); }
+    uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override { throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented"); }
 
     bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override { return true; }
     uint64_t GetGenesisGracefulPeriod() const override { return DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD; }

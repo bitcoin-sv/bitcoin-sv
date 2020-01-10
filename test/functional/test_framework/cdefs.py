@@ -97,9 +97,11 @@ MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS = _extractConsensusValue('MAX_TX_SIGOPS_COUNT
 # The maximum number of sigops we're willing to relay/mine in a single tx
 # (policy.h constant)
 MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS = _extractPolicyValue('MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS')
+MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = _extractPolicyValue('MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS')
 # The default maximum number of sigops we're willing to relay/mine in a single tx after genesis
 # (policy.h constant)
 DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = _extractPolicyValue('DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS')
+
 
 # The maximum allowed number of signatures per multisis op before genesis
 # (network rule)

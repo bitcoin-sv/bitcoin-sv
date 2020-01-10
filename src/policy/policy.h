@@ -76,15 +76,15 @@ static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500);
 static const uint64_t MAX_TX_SIZE_POLICY_BEFORE_GENESIS = 100000 - 1; // -1 because pre genesis policy validation was >=
 /** The default size for transactions we're willing to relay/mine */
 static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = 10 * ONE_MEGABYTE;
-/** Default policy value for -maxblocksigopspermbpolicy, maximum number of sigops we're willing to mine per MB of block after Genesis */
-static const uint64_t DEFAULT_MAX_BLOCK_SIGOPS_PER_MB_POLICY_AFTER_GENESIS = 30000;
 /** Maximum number of signature check operations in an IsStandard() P2SH script
  */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
 /** The maximum number of sigops we're willing to relay/mine in a single tx before Genesis */
 static const unsigned int MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS = MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS / 5;
+/** The maximum number of sigops we're willing to relay/mine in a single tx after Genesis */
+static const unsigned int MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = UINT32_MAX;
 /** Default policy value for -maxtxsigopscountspolicy, maximum number of sigops we're willing to relay/mine in a single tx after Genesis */
-static const unsigned int DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = UINT32_MAX;
+static const unsigned int DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = MAX_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS;
 /** Default for -maxmempool, maximum megabytes of mempool memory usage */
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 1000;
 /** Default for -maxnonfinalmempool, maximum megabytes of non-final mempool memory usage */
