@@ -323,9 +323,11 @@ static bool HTTPReq_JSONRPC(Config &config, HTTPRequest *req,
         // singleton request
         if (valRequest.isObject()) {
             jreq.parse(valRequest);
-            // getBlock is not present in tableRpc, so we need to explicitly check for it
+            // getBlock and getblockbyheight are not present in tableRpc, so we need to explicitly check for it
             if (jreq.strMethod == "getblock") {
                 getblock(config, jreq, req, false);
+            } else if (jreq.strMethod == "getblockbyheight") {
+                getblockbyheight(config, jreq, req, false);
             } else {
                 UniValue result = tableRPC.execute(config, jreq);
                 strReply = JSONRPCReply(result, NullUniValue, jreq.id);

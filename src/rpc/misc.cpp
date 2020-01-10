@@ -86,6 +86,10 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
             "size we will accept from any source\n"
             "  \"maxminedblocksize\": xxxxx  (numeric) The maximum block size "
             "we will mine\n"
+            "  \"maxstackmemoryusagepolicy\": xxxxx, (numeric) Policy value of "
+            "max stack memory usage\n"
+            "  \"maxStackMemoryUsageConsensus\": xxxxx, (numeric) Consensus value of "
+            "max stack memory usage\n"
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getinfo", "") + HelpExampleRpc("getinfo", ""));
@@ -142,6 +146,10 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     obj.push_back(Pair("maxblocksize", config.GetMaxBlockSize()));
     obj.push_back(Pair("maxminedblocksize", config.GetMaxGeneratedBlockSize()));
+    obj.push_back(Pair("maxstackmemoryusagepolicy", 
+                       config.GetMaxStackMemoryUsage(true, false)));
+    obj.push_back(Pair("maxstackmemoryusageconsensus",
+                       config.GetMaxStackMemoryUsage(true, true)));
     return obj;
 }
 

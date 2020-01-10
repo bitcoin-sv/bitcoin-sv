@@ -854,6 +854,8 @@ public:
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
         NotifyEntryRemoved;
 
+    void clearPrioritisation(const uint256 &hash);
+
 private:
     /**
      * updateForDescendantsNL is used by UpdateTransactionsFromBlock to update the

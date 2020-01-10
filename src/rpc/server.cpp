@@ -406,6 +406,9 @@ static void JSONRPCExecOne(Config &config, JSONRPCRequest jreq,
         if (jreq.strMethod == "getblock") {
             // getblock response is written in multiple chunks
             getblock(config, jreq, &httpReq, true);
+        } else if (jreq.strMethod == "getblock") {
+            // getblockbyheight response is written in multiple chunks
+            getblockbyheight(config, jreq, &httpReq, true);
         } else {
             UniValue result = tableRPC.execute(config, jreq);
             // Response for each RPC method is written as a single chunk.

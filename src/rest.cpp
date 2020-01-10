@@ -286,7 +286,7 @@ static bool rest_block(const Config &config, HTTPRequest *req,
         case RF_JSON: {
             req->WriteHeader("Content-Type", "application/json");
             req->StartWritingChunks(HTTP_OK);
-            writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails, *pblockindex);
+            writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails, *pblockindex, false);
             break;
         }
 

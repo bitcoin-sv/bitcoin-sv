@@ -60,6 +60,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, bool isGenesisEna
                          1 + chainActive.Height() - pindex->nHeight));
                 entry.push_back(Pair("time", pindex->GetBlockTime()));
                 entry.push_back(Pair("blocktime", pindex->GetBlockTime()));
+                entry.push_back(Pair("blockheight", pindex->nHeight));
             } else {
                 entry.push_back(Pair("confirmations", 0));
             }
@@ -143,8 +144,9 @@ static UniValue getrawtransaction(const Config &config,
             "  \"confirmations\" : n,      (numeric) The confirmations\n"
             "  \"time\" : ttt,             (numeric) The transaction time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
-            "  \"blocktime\" : ttt         (numeric) The block time in seconds "
+            "  \"blocktime\" : ttt,        (numeric) The block time in seconds "
             "since epoch (Jan 1 1970 GMT)\n"
+            "  \"blockheight\" : n         (numeric) The block height\n"
             "}\n"
 
             "\nExamples:\n" +
@@ -1062,7 +1064,7 @@ static UniValue signrawtransaction(const Config &config,
 static UniValue sendrawtransaction(const Config &config,
                                    const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() < 1 ||
-        request.params.size() > 2) {
+        request.params.size() > 3) {
         throw std::runtime_error(
             "sendrawtransaction \"hexstring\" ( allowhighfees )\n"
             "\nSubmits raw transaction (serialized, hex-encoded) to local node "
@@ -1073,6 +1075,7 @@ static UniValue sendrawtransaction(const Config &config,
             "transaction)\n"
             "2. allowhighfees    (boolean, optional, default=false) Allow high "
             "fees\n"
+            "3. dontcheckfee     (boolean, optional, default=false) Don't check fee\n"
             "\nResult:\n"
             "\"hex\"             (string) The transaction hash in hex\n"
             "\nExamples:\n"
@@ -1088,7 +1091,8 @@ static UniValue sendrawtransaction(const Config &config,
             "\nAs a json rpc call\n" +
             HelpExampleRpc("sendrawtransaction", "\"signedhex\""));
     }
-    RPCTypeCheck(request.params, {UniValue::VSTR, UniValue::VBOOL});
+    RPCTypeCheck(request.params,
+                 {UniValue::VSTR, UniValue::VBOOL, UniValue::VBOOL});
     // parse hex string from parameter
     CMutableTransaction mtx;
     if (!DecodeHexTx(mtx, request.params[0].get_str())) {
@@ -1102,6 +1106,10 @@ static UniValue sendrawtransaction(const Config &config,
     if (request.params.size() > 1 && request.params[1].get_bool()) {
         nMaxRawTxFee = Amount(0);
     }
+    bool dontCheckFee = false;
+    if (request.params.size() > 2 && request.params[2].get_bool()) {
+        dontCheckFee = true;
+    }
 
     if (!g_connman) {
         throw JSONRPCError(
@@ -1109,6 +1117,10 @@ static UniValue sendrawtransaction(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
     }
     if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
+        if (dontCheckFee) {
+            mempool.PrioritiseTransaction(tx->GetId(), tx->GetId().ToString(),
+                                          0.0, MAX_MONEY);
+        }
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
             mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
@@ -1136,6 +1148,9 @@ static UniValue sendrawtransaction(const Config &config,
         // checking a result from the status variable.
         if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
             if (!status.IsValid()) {
+                if (dontCheckFee) {
+                    mempool.clearPrioritisation(txid);
+                }
                 if (status.IsMissingInputs()) {
                         throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
                 } else if (status.IsInvalid()) {
@@ -1187,7 +1202,7 @@ static const CRPCCommand commands[] = {
     { "rawtransactions",    "createrawtransaction",   createrawtransaction,   true,  {"inputs","outputs","locktime"} },
     { "rawtransactions",    "decoderawtransaction",   decoderawtransaction,   true,  {"hexstring"} },
     { "rawtransactions",    "decodescript",           decodescript,           true,  {"hexstring"} },
-    { "rawtransactions",    "sendrawtransaction",     sendrawtransaction,     false, {"hexstring","allowhighfees"} },
+    { "rawtransactions",    "sendrawtransaction",     sendrawtransaction,     false, {"hexstring","allowhighfees","dontcheckfee"} },
     { "rawtransactions",    "signrawtransaction",     signrawtransaction,     false, {"hexstring","prevtxs","privkeys","sighashtype"} }, /* uses wallet if enabled */
 
     { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
