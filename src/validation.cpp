@@ -3115,6 +3115,7 @@ static uint32_t GetBlockScriptFlags(const Config &config,
 
     if (IsGenesisEnabled(config, pChainTip->nHeight + 1)) {
         flags |= SCRIPT_GENESIS;
+        flags |= SCRIPT_VERIFY_SIGPUSHONLY;
     }
 
     return flags;
