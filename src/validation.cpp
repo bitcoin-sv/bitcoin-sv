@@ -3852,7 +3852,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
 
         //  The amount of tranasctions we are willing to store during reorg is calculated based
         //  of default block size for the network (not our configuration that might be lower)
-        uint64_t maxDisconnectedTxPoolSize = MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR * config.GetChainParams().GetDefaultBlockSizeParams().maxBlockSizeAfterGenesis;
+        uint64_t maxDisconnectedTxPoolSize = MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR * config.GetChainParams().GetDefaultBlockSizeParams().maxBlockSize;
         while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
             // Drop the earliest entry, and remove its children from the
             // mempool.
@@ -5151,8 +5151,7 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     const int64_t nMedianTimePast =
         pindexPrev == nullptr ? 0 : pindexPrev->GetMedianTimePast();
 
-    const uint64_t nMaxBlockSize = 
-        pindexPrev == nullptr ? config.GetMaxBlockSize() : config.GetMaxBlockSize(IsGenesisEnabled(config, nHeight));
+    const uint64_t nMaxBlockSize = config.GetMaxBlockSize();
 
     const uint64_t currentBlockSize =
         ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);

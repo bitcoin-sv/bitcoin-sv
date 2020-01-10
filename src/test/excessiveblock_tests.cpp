@@ -30,7 +30,12 @@ BOOST_AUTO_TEST_CASE(excessiveblock_rpc) {
                       std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock -1"), boost::bad_lexical_cast);
 
-    BOOST_CHECK_THROW(CallRPC("setexcessiveblock 0"), std::runtime_error);
+    // Check that unlimited value is set properly
+    BOOST_CHECK_NO_THROW(CallRPC("setexcessiveblock 0"));
+    UniValue result{};
+    BOOST_CHECK_NO_THROW(result = CallRPC("getexcessiveblock"););
+    BOOST_CHECK_EQUAL(find_value(result.get_obj(), "excessiveBlockSize").get_int64(), Params().GetDefaultBlockSizeParams().maxBlockSize);
+
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 1"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("setexcessiveblock 1000"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC(std::string("setexcessiveblock ") +

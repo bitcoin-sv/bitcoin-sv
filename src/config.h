@@ -31,8 +31,6 @@ public:
     
     virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
-    virtual uint64_t GetMaxBlockSize(bool isGenesisEnabled) const = 0;
-    virtual bool MaxBlockSizeOverridden() const = 0;
     
     virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
@@ -144,8 +142,6 @@ public:
 
     bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override;
     uint64_t GetMaxBlockSize() const override;
-    uint64_t GetMaxBlockSize(bool isGenesisEnabled) const override;
-    bool MaxBlockSizeOverridden() const override;
 
     bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override;
     uint64_t GetMaxGeneratedBlockSize() const override;   
@@ -265,10 +261,11 @@ private:
     bool  setDefaultBlockSizeParamsCalled;
     void  CheckSetDefaultCalled() const;
 
+    // Defines when either maxGeneratedBlockSizeBefore or maxGeneratedBlockSizeAfter is used
     int64_t blockSizeActivationTime;
-    uint64_t maxBlockSizeBeforeGenesis;
-    uint64_t maxBlockSizeAfterGenesis;
-    bool maxBlockSizeOverridden;
+    uint64_t maxBlockSize;
+    // Used when SetMaxBlockSize is called with value 0
+    uint64_t defaultBlockSize;
     uint64_t maxGeneratedBlockSizeBefore;
     uint64_t maxGeneratedBlockSizeAfter;
     bool maxGeneratedBlockSizeOverridden;
@@ -324,8 +321,6 @@ public:
         return false; 
     }
     uint64_t GetMaxBlockSize() const override { return 0; }
-    uint64_t GetMaxBlockSize(bool isGenesisEnabled) const override { return 0; }
-    bool MaxBlockSizeOverridden() const override { return false; }
 
     bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override {
         if (err) *err = "This is dummy config";  
