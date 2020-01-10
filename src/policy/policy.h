@@ -147,6 +147,7 @@ inline unsigned int StandardScriptVerifyFlags(bool genesisEnabled,
     }
     if (genesisEnabled) {
         scriptFlags |= SCRIPT_GENESIS;
+        scriptFlags |= SCRIPT_VERIFY_SIGPUSHONLY;
     }
     return scriptFlags;
 }
