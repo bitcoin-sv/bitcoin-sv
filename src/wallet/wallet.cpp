@@ -2900,6 +2900,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                     txNew.vout.insert(position, newTxOut);
                 }
             } else {
+                nChangePosInOut = -1;
                 reservekey.ReturnKey();
             }
 
