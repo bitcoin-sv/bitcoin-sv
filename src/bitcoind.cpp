@@ -129,6 +129,19 @@ bool AppInit(int argc, char *argv[]) {
         // Fill config with block size data
         config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
+        // maxstackmemoryusageconsensus and excessiveblocksize are required parameters
+        if (!gArgs.IsArgSet("-maxstackmemoryusageconsensus") || !gArgs.IsArgSet("-excessiveblocksize"))
+        {
+            fprintf(stderr, "Mandatory consensus parameter is not set. In order to start bitcoind you must set the "
+                            "following consensus parameters: \"excessiveblocksize\" and "
+                            "\"maxstackmemoryusageconsensus\". In order to start bitcoind with no limits you can set "
+                            "both of these parameters to 0 however it is strongly recommended to ensure you understand "
+                            "the implications of this setting.\n\n"
+                            "For more information of how to choose these settings safely for your use case refer to: "
+                            "https://bitcoinsv.io/choosing-consensus-settings/");
+            return false;
+        }
+
         // Command-line RPC
         bool fCommandLine = false;
         for (int i = 1; i < argc; i++)

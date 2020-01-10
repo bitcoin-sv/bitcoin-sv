@@ -32,19 +32,12 @@ namespace task{class CCancellationToken;}
  */
 
 
-/** Default max block size parameters before and after Genesis 
+/** Default max block size parameters
  */
-static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS = 2 * ONE_GIGABYTE;
-static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = INT64_MAX; 
-
-static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS = 2 * ONE_GIGABYTE;
-static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = INT64_MAX;
-
-static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS = 2 * ONE_GIGABYTE;
-static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = INT64_MAX;
-
-static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE_BEFORE_GENESIS = 2 * ONE_GIGABYTE;
-static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE_AFTER_GENESIS = INT64_MAX;
+static const uint64_t MAIN_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX; 
+static const uint64_t REGTEST_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX;
+static const uint64_t TESTNET_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX;
+static const uint64_t STN_DEFAULT_MAX_BLOCK_SIZE = INT64_MAX;
 
 
 /** Default before and after max generated block size parameters and their activation times.

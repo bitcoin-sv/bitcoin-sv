@@ -588,10 +588,8 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf(_("Factor that will be multiplied with excessiveBlockSize"
             " to limit the maximum bytes in all sending queues. If this"
             " size is exceeded, no response to block related P2P messages is sent."
-            " If -excessiveblocksize is not set, this factor is not used and"
-            " maximum bytes in all sending queues is limited to %u bytes."
             " (default factor: %u)"),
-            DEFAULT_MAX_SEND_QUEUES_BYTES, DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES));
+            DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES));
     strUsage += HelpMessageOpt(
         "-maxtimeadjustment",
         strprintf(_("Maximum allowed median peer time offset adjustment. Local "
@@ -882,12 +880,7 @@ std::string HelpMessage(HelpMessageMode mode) {
         HelpMessageOpt("-excessiveblocksize=<n>",
                        strprintf(_("Set the maximum block size in bytes we will accept "
                                    "from any source. This is the effective block size "
-                                   "hard limit  If not specified, the following defaults are used : "
-                                   "Mainnet: %d before Genesis and unlimited after, "
-                                   "Testnet: %d before Genesis and unlimited after."),
-                                    defaultChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis,                                    
-                                    testnetChainParams->GetDefaultBlockSizeParams().maxBlockSizeBeforeGenesis                                    
-                                 ));
+                                   "hard limit and it is a required parameter (0 = unlimited).")));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
@@ -919,10 +912,9 @@ std::string HelpMessage(HelpMessageMode mode) {
                   DEFAULT_DATA_CARRIER_SIZE));
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusageconsensus",
-        strprintf(_("Set maximum stack memory usage used for script verification "
-                    "we're willing to to accept from any source "
-                    "(default: unlimited, 0 = unlimited) "
-                    "after Genesis is activated (consensus level).")));
+        strprintf(_("Set maximum stack memory usage in bytes used for script verification "
+                    "we're willing to to accept from any source (0 = unlimited) "
+                    "after Genesis is activated (consensus level). This is a required parameter.")));
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusagepolicy",
         strprintf(_("Set maximum stack memory usage used for script verification "
@@ -1741,7 +1733,7 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure excessive block size.
     if(gArgs.IsArgSet("-excessiveblocksize")) {
         const uint64_t nProposedExcessiveBlockSize =
-            gArgs.GetArg("-excessiveblocksize", 0 /*not used*/ );
+            gArgs.GetArg("-excessiveblocksize", 0);
         if (std::string err; !config.SetMaxBlockSize(nProposedExcessiveBlockSize, &err)) {
             return InitError(err);
         }

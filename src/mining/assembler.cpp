@@ -29,10 +29,9 @@ uint64_t BlockAssembler::ComputeMaxGeneratedBlockSize(const CBlockIndex* pindexP
     }
     else
     {
-        bool isGenesisEnabled = IsGenesisEnabled(mConfig, pindexPrev->nHeight + 1);
         auto medianPastTime { pindexPrev->GetMedianTimePast() };
         maxGeneratedBlockSize = mConfig.GetMaxGeneratedBlockSize(medianPastTime);
-        maxBlockSize = mConfig.GetMaxBlockSize(isGenesisEnabled);
+        maxBlockSize = mConfig.GetMaxBlockSize();
     }
 
     // Limit size to between 1K and MaxBlockSize-1K for sanity:
