@@ -909,7 +909,6 @@ namespace
 
         bool CheckLockTime(const CScriptNum&) const override { return true; }
         bool CheckSequence(const CScriptNum&) const override { return true; }
-        size_t GetOutTxSize() const override { return 1; }
     };
 }
 
