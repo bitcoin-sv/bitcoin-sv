@@ -21,14 +21,13 @@ class CPubKey;
 class CScript;
 class CTransaction;
 class uint256;
-class BaseSignatureChecker;
 
 namespace task
 {
   class CCancellationToken;
 }
 
-bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags, const BaseSignatureChecker* checker,
+bool CheckSignatureEncoding(const std::vector<uint8_t> &vchSig, uint32_t flags,
                             ScriptError *serror);
 
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
@@ -51,10 +50,6 @@ public:
 
     virtual bool CheckSequence(const CScriptNum &nSequence) const {
         return false;
-    }
-
-    virtual size_t GetOutTxSize() const {
-        return 0;
     }
 
     virtual ~BaseSignatureChecker() {}
@@ -85,7 +80,6 @@ public:
                   const CScript &scriptCode, bool enabledSighashForkid) const override;
     bool CheckLockTime(const CScriptNum &nLockTime) const override;
     bool CheckSequence(const CScriptNum &nSequence) const override;
-    size_t GetOutTxSize() const override;
 };
 
 class MutableTransactionSignatureChecker : public TransactionSignatureChecker {
