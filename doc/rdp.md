@@ -155,11 +155,11 @@ such attacks for rewards in the "low" category and in exceptional cases in the "
 in this category are subject to the following conditions:
 
 * The award is completely discretionary
-* The attack much not be previously known to us
+* The attack must not be previously known to us
 * The attack must be demonstrably executable on a version of the software that would otherwise be deemed in scope if not 
   for the resource exhaustion attack exclusion
 
-For obvious security reasons it would not responsible for the Bitcoin SV team to publicly document known attack vectors. 
+For obvious security reasons it would not be responsible for the Bitcoin SV team to publicly document known attack vectors. 
 This necessarily requires a degree of good faith however it is strongly in the interest of the Bitcoin SV team to 
 encourage such disclosures and build trust with the security research community through building a track record of 
 making such bounty awards.
