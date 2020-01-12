@@ -185,8 +185,10 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
     stream << tx2;
     int libconsensus_flags = flags & bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL;
     if (libconsensus_flags == flags) {
+        const Config& config = GlobalConfig::GetConfig();
         if (flags & bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID) {
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script_with_amount(
+                                    config,
                                     scriptPubKey.data(), scriptPubKey.size(),
                                     txCredit.vout[0].nValue.GetSatoshis(),
                                     (const uint8_t *)&stream[0], stream.size(),
@@ -194,11 +196,13 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
                                 message);
         } else {
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script_with_amount(
+                                    config,
                                     scriptPubKey.data(), scriptPubKey.size(), 0,
                                     (const uint8_t *)&stream[0], stream.size(),
                                     0, libconsensus_flags, nullptr) == expect,
                                 message);
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script(
+                                    config,
                                     scriptPubKey.data(), scriptPubKey.size(),
                                     (const uint8_t *)&stream[0], stream.size(),
                                     0, libconsensus_flags, nullptr) == expect,
@@ -360,7 +364,7 @@ public:
                                    Amount amount = Amount(0),
                                    uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID) {
 
-        // splitting script of the form: 
+        // splitting script of the form:
         // <script1> OP_CODESEPARATOR <script2> OP_CODESEPARATOR ... <scriptN-1> OP_CODESEPARATOR <scriptN>
         //
         // to the
@@ -373,10 +377,10 @@ public:
 
         std::vector<CScript> separatedScripts;
         separatedScripts.emplace_back();
-        
+
         CScript::const_iterator pc = script.begin();
         std::vector<uint8_t> data;
-        
+
         while (pc < script.end()) {
             opcodetype opcode;
             if (!script.GetOp(pc, opcode, data)){
@@ -387,7 +391,7 @@ public:
                     sc << data;
                 } else {
                     sc << opcode;
-                }   
+                }
             }
             if (opcode == OP_CODESEPARATOR) {
                 separatedScripts.insert(separatedScripts.begin(), CScript());
@@ -1735,7 +1739,7 @@ void TestCombineSigs(bool genesisEnabled, bool utxoAfterGenesis) {
         // after genesis scriptPubKey will be nonstandard, CombineSignature will choose bigger or first SignatureData if they are equal
         BOOST_CHECK(combined.scriptSig == scriptSigCopy);
     } else {
-        // 
+        //
         BOOST_CHECK(combined.scriptSig == scriptSig);
     }
     combined = CombineSignatures(config, true,
@@ -2224,18 +2228,18 @@ BOOST_AUTO_TEST_CASE(script_Solver) {
 }
 
 BOOST_AUTO_TEST_CASE(solver_MultiSig_Decode_Check) {
-    
+
     std::vector<std::vector<uint8_t>> solutions;
     txnouttype txMultiSig = TX_MULTISIG;
     std::vector<uint8_t> pubKey(33, 1);
-    
+
     //Test solver before genesis with 2 pubkeys and 0 sigs
     CScript multisig_OP0_OP2 = CScript() << OP_0 << pubKey << pubKey << OP_2 << OP_CHECKMULTISIG;
     bool result = Solver(multisig_OP0_OP2, false, txMultiSig, solutions);
     BOOST_CHECK(CScriptNum(solutions.front(), true).getint() == 0);
     BOOST_CHECK(CScriptNum(solutions.back(), true).getint() == 2);
 
-    
+
     //Test solver before genesis with 16 pubkeys and 1 sig
     solutions.clear();
     CScript multisig_OP1_OP16 = CScript() << OP_1;

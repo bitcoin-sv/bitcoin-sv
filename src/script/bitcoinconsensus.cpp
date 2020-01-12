@@ -111,16 +111,16 @@ static int verify_script(const Config& config, const uint8_t* scriptPubKey,
 }
 
 int bitcoinconsensus_verify_script_with_amount(
+    const Config& config,
     const uint8_t *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
     const uint8_t *txTo, unsigned int txToLen, unsigned int nIn,
     unsigned int flags, bitcoinconsensus_error *err) {
     Amount am(amount);
-    const Config& config = GlobalConfig::GetConfig();
     return ::verify_script(config, scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
                            nIn, flags, err);
 }
 
-int bitcoinconsensus_verify_script(const uint8_t *scriptPubKey,
+int bitcoinconsensus_verify_script(const Config& config, const uint8_t *scriptPubKey,
                                    unsigned int scriptPubKeyLen,
                                    const uint8_t *txTo, unsigned int txToLen,
                                    unsigned int nIn, unsigned int flags,
@@ -131,7 +131,6 @@ int bitcoinconsensus_verify_script(const uint8_t *scriptPubKey,
     }
 
     Amount am(0);
-    const Config& config = GlobalConfig::GetConfig();
     return ::verify_script(config, scriptPubKey, scriptPubKeyLen, am, txTo, txToLen,
                            nIn, flags, err);
 }
