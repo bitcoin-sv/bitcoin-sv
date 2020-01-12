@@ -12,6 +12,20 @@
 #include <boost/test/unit_test.hpp>
 
 namespace {
+    std::vector<TxSource> vTxSources {
+        TxSource::wallet,
+        TxSource::rpc,
+        TxSource::file,
+        TxSource::p2p,
+        TxSource::reorg,
+        TxSource::unknown,
+        TxSource::finalised
+    };
+    // An exception thrown by GetValueOut .
+    bool GetValueOutException(const std::runtime_error &e) {
+        static std::string expectedException("GetValueOut: value out of range");
+        return expectedException == e.what();
+    }
     // Support for P2P node.
     CService ip(uint32_t i) {
         struct in_addr s;
@@ -126,6 +140,23 @@ namespace {
         txnValidator->newTransaction(TxInputDataVec(source, spends, pNode));
         // Wait for the Validator to process all queued txns.
         txnValidator->waitForEmptyQueue();
+    }
+    // Validate a single txn using synchronous validation interface
+    CValidationState ProcessTxnSynchApi(CMutableTransaction& spend,
+                                        TxSource source,
+                                        std::shared_ptr<CNode> pNode = nullptr) {
+        // Create txn validator
+        std::shared_ptr<CTxnValidator> txnValidator {
+            std::make_shared<CTxnValidator>(
+                    GlobalConfig::GetConfig(),
+                    mempool,
+                    std::make_shared<CTxnDoubleSpendDetector>())
+        };
+        // Clear mempool before validation
+        mempool.Clear();
+        // Mempool Journal ChangeSet
+        mining::CJournalChangeSetPtr changeSet {nullptr};
+        return txnValidator->processValidation(TxInputData(source, spend, pNode), changeSet);
     }
     // Validate txn using synchronous validation interface
     void ProcessTxnsSynchApi(std::vector<CMutableTransaction>& spends,
@@ -401,6 +432,58 @@ BOOST_AUTO_TEST_CASE(txnvalidator_limit_memory_usage)
     BOOST_CHECK(txnValidator->GetTransactionsInQueueCount() < txns.size());
     BOOST_CHECK(txnValidator->GetStdQueueMemUsage() <= 1*1024*1024);
     BOOST_CHECK_EQUAL(txnValidator->GetNonStdQueueMemUsage(), 0);
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_sync_api) {
+    // spendtx_nValue_OutOfRange (a copy of spends2[0]) with unsupported nValue amount.
+    // Set nValue = MAX_MONEY + 1 for the txn to trigger exception when GetValueOut is called.
+    auto spendtx_nValue_OutOfRange = spends2[0];
+    spendtx_nValue_OutOfRange.vout[0].nValue = MAX_MONEY + Amount(1);
+    BOOST_CHECK_EXCEPTION(
+        !MoneyRange(CTransaction(spendtx_nValue_OutOfRange).GetValueOut()),
+        std::runtime_error,
+        GetValueOutException);
+    CValidationState result {};
+    // Test all sources.
+    for (const auto& txsource: vTxSources) {
+        result = ProcessTxnSynchApi(spendtx_nValue_OutOfRange, txsource);
+        BOOST_CHECK(!result.IsValid());
+        BOOST_CHECK_EQUAL(mempool.Size(), 0);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
+    // Create txn validator
+    std::shared_ptr<CTxnValidator> txnValidator {
+        std::make_shared<CTxnValidator>(
+                GlobalConfig::GetConfig(),
+                mempool,
+                std::make_shared<CTxnDoubleSpendDetector>())
+    };
+    // Case1:
+    // spendsN_nValue_OutOfRange (a copy of spendsN) with unsupported nValue amount.
+    {
+        // Set nValue = MAX_MONEY + 1 for each txn to trigger exception when GetValueOut is called.
+        auto spendsN_nValue_OutOfRange = spendsN;
+        for (auto& spend: spendsN_nValue_OutOfRange) {
+            spend.vout[0].nValue = MAX_MONEY + Amount(1);
+            BOOST_CHECK_EXCEPTION(!MoneyRange(CTransaction(spend).GetValueOut()), std::runtime_error, GetValueOutException);
+        }
+        // Schedule txns for processing.
+        txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, spendsN_nValue_OutOfRange));
+        // Wait for the Validator to process all queued txns.
+        txnValidator->waitForEmptyQueue();
+        // Non transaction should be accepted due to nValue (value out of range).
+        BOOST_CHECK_EQUAL(mempool.Size(), 0);
+    }
+    // Case2:
+    // Send the same txns again (with valid nValue).
+    // Check if only one txn (from spendsN) is accepted by the mempool.
+    {
+        txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, spendsN));
+        txnValidator->waitForEmptyQueue();
+        BOOST_CHECK_EQUAL(mempool.Size(), 1);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
