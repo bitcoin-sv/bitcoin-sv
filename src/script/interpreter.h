@@ -19,6 +19,7 @@
 
 class CPubKey;
 class CScript;
+class CScriptConfig;
 class CTransaction;
 class uint256;
 
@@ -100,7 +101,7 @@ public:
 * and it should be false when validating scripts of transactions that are validated for acceptance to mempool
 */
 std::optional<bool> EvalScript(
-    const Config& config,
+    const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
@@ -109,7 +110,7 @@ std::optional<bool> EvalScript(
     const BaseSignatureChecker& checker,
     ScriptError* error = nullptr);
 std::optional<bool> VerifyScript(
-    const Config& config,
+    const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,

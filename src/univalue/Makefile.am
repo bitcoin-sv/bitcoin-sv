@@ -19,7 +19,7 @@ libunivalue_la_SOURCES = \
 libunivalue_la_LDFLAGS = \
 	-version-info $(LIBUNIVALUE_CURRENT):$(LIBUNIVALUE_REVISION):$(LIBUNIVALUE_AGE) \
 	-no-undefined
-libunivalue_la_CXXFLAGS = -I$(top_srcdir)/include
+libunivalue_la_CXXFLAGS = -I$(top_srcdir)/include -std=c++17
 
 TESTS = test/object test/unitester test/no_nul
 

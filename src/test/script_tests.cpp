@@ -186,6 +186,7 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
     if (libconsensus_flags == flags) {
         if (flags & bitcoinconsensus_SCRIPT_ENABLE_SIGHASH_FORKID) {
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script_with_amount(
+                                    config,
                                     scriptPubKey.data(), scriptPubKey.size(),
                                     txCredit.vout[0].nValue.GetSatoshis(),
                                     (const uint8_t *)&stream[0], stream.size(),
@@ -193,11 +194,13 @@ static void DoTest(const CScript &scriptPubKey, const CScript &scriptSig,
                                 message);
         } else {
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script_with_amount(
+                                    config,
                                     scriptPubKey.data(), scriptPubKey.size(), 0,
                                     (const uint8_t *)&stream[0], stream.size(),
                                     0, libconsensus_flags, nullptr) == expect,
                                 message);
             BOOST_CHECK_MESSAGE(bitcoinconsensus_verify_script(
+                                    config,
                                     scriptPubKey.data(), scriptPubKey.size(),
                                     (const uint8_t *)&stream[0], stream.size(),
                                     0, libconsensus_flags, nullptr) == expect,
