@@ -2200,6 +2200,41 @@ bool GetTransaction(const Config &config, const TxId &txid,
 // CBlock and CBlockIndex
 //
 
+/**
+ * Returns size of the header for each block in a block file based on block size.
+ * This method replaces BLOCKFILE_BLOCK_HEADER_SIZE because we need 64 bit number 
+ * to store block size for blocks equal or larger than 32 bit max number.
+ */
+unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize)
+{
+    if (nBlockSize >= std::numeric_limits<unsigned int>::max())
+    {
+        return 16; // 4 bytes disk magic + 4 bytes uint32_t max + 8 bytes block size
+    }
+    else
+    {
+        return 8; // 4 bytes disk magic + 4 bytes block size 
+    }
+}
+
+/** 
+ * Write index header. If size larger thant 32 bit max than write 32 bit max and 64 bit size.
+ * 32 bit max (0xFFFFFFFF) indicates that there is 64 bit size value following.
+ */
+void WriteIndexHeader(CAutoFile& fileout,
+                      const CMessageHeader::MessageMagic& messageStart,
+                      uint64_t nSize)
+{
+    if (nSize >= std::numeric_limits<unsigned int>::max())
+    {
+        fileout << FLATDATA(messageStart) << std::numeric_limits<uint32_t>::max() << nSize;
+    }
+    else
+    {
+        fileout << FLATDATA(messageStart) << static_cast<uint32_t>(nSize);
+    }
+}
+
 static bool WriteBlockToDisk(
     const CBlock &block,
     CDiskBlockPos &pos,
@@ -2212,10 +2247,9 @@ static bool WriteBlockToDisk(
         return error("WriteBlockToDisk: OpenBlockFile failed");
     }
 
-    // Write index header
-    unsigned int nSize = GetSerializeSize(fileout, block);
-    fileout << FLATDATA(messageStart) << nSize;
-
+    // Write index header.
+    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, block));    
+    
     // Write block
     long fileOutPos = ftell(fileout.Get());
     if (fileOutPos < 0) {
@@ -2861,9 +2895,8 @@ bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos,
         return error("%s: OpenUndoFile failed", __func__);
     }
 
-    // Write index header
-    unsigned int nSize = GetSerializeSize(fileout, blockundo);
-    fileout << FLATDATA(messageStart) << nSize;
+    // Write index header. 
+    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, blockundo));
 
     // Write undo data
     long fileOutPos = ftell(fileout.Get());
@@ -5438,7 +5471,7 @@ static bool AcceptBlock(const Config &config,
             blockPos = *dbp;
         }
         if (!pBlockFileInfoStore->FindBlockPos(config, state, blockPos,
-                          nBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE, nHeight,
+                          (nBlockSize + GetBlockFileBlockHeaderSize(nBlockSize)), nHeight,
                           block.GetBlockTime(), fCheckForPruning, dbp != nullptr)) {
             return error("AcceptBlock(): FindBlockPos failed");
         }
@@ -6292,9 +6325,10 @@ bool InitBlockIndex(const Config &config) {
             const CChainParams &chainparams = config.GetChainParams();
             CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
             // Start new block file
+            uint64_t nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
             uint64_t nBlockSizeWithHeader =
-                ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION)
-                + BLOCKFILE_BLOCK_HEADER_SIZE;
+                nBlockSize
+                + GetBlockFileBlockHeaderSize(nBlockSize);
             CDiskBlockPos blockPos;
             CValidationState state;
             if (!pBlockFileInfoStore->FindBlockPos(config, state, blockPos,
@@ -6373,7 +6407,8 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
             nRewind++;
             // Remove former limit.
             blkdat.SetLimit();
-            unsigned int nSize = 0;
+            uint64_t nSize = 0;
+            uint32_t nSizeLegacy = 0;
             try {
                 // Locate a header.
                 uint8_t buf[CMessageHeader::MESSAGE_START_SIZE];
@@ -6384,8 +6419,17 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                            CMessageHeader::MESSAGE_START_SIZE)) {
                     continue;
                 }
-                // Read size.
-                blkdat >> nSize;
+                // Read 32 bit size. If it is equal to 32 max than read also 64 bit size.
+                blkdat >> nSizeLegacy;
+                if (nSizeLegacy == std::numeric_limits<uint32_t>::max())
+                {
+                    blkdat >> nSize;
+                }
+                else
+                {
+                    nSize = nSizeLegacy;
+                }
+
                 if (nSize < 80) {
                     continue;
                 }
