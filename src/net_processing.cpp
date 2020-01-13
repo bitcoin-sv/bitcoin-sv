@@ -1977,7 +1977,7 @@ static void ProcessSendHeadersMessage(const CNodePtr& pfrom)
             // This message should only be received once. If its already set it might
             // indicate a misbehaving node. Increase the banscore
             Misbehaving(pfrom, 1, "Invalid SendHeaders activity");
-            LogPrintf("Peer %d sent SendHeaders more than once\n",pfrom->id);
+            LogPrint(BCLog::NET, "Peer %d sent SendHeaders more than once\n", pfrom->id);
         }
         else {
             state->fPreferHeaders = true;
