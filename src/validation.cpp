@@ -6080,12 +6080,22 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
                 pindex->nHeight, pindex->GetBlockHash().ToString());
         }
 
+        if (shutdownToken.IsCanceled())
+        {
+            return true;
+        }
+
         // check level 1: verify block validity
         if (nCheckLevel >= 1 && !CheckBlock(config, block, state, pindex->nHeight)) {
             return error("%s: *** found bad block at %d, hash=%s (%s)\n",
                          __func__, pindex->nHeight,
                          pindex->GetBlockHash().ToString(),
                          FormatStateMessage(state));
+        }
+
+        if (shutdownToken.IsCanceled())
+        {
+            return true;
         }
 
         // check level 2: verify undo validity
@@ -6100,6 +6110,11 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
                         pindex->nHeight, pindex->GetBlockHash().ToString());
                 }
             }
+        }
+
+        if (shutdownToken.IsCanceled())
+        {
+            return true;
         }
 
         // check level 3: check for inconsistencies during memory-only
