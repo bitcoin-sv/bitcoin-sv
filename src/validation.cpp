@@ -4481,7 +4481,7 @@ bool ActivateBestChain(
         try
         {
             boost::this_thread::interruption_point();
-            if (GetShutdownToken().IsCanceled() || token.IsCanceled()) { // TODO: global shutdown token and input token should be merged/joined togeter. This will be done in the next commit. 
+            if (token.IsCanceled()) {
                 break;
             }
 
@@ -4723,7 +4723,7 @@ bool PreciousBlock(const Config &config, CValidationState &state,
     auto source = task::CCancellationSource::Make();
     // state is used to report errors, not block related invalidity
     // (see description of ActivateBestChain)
-    return ActivateBestChain(source->GetToken(), config, state, changeSet);
+    return ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
 }
 
 bool InvalidateBlock(const Config &config, CValidationState &state,
@@ -4773,7 +4773,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
         auto source = task::CCancellationSource::Make();
         // state is used to report errors, not block related invalidity
         // (see description of ActivateBestChain)
-        ActivateBestChain(source->GetToken(), config, state, changeSet);
+        ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
     }
 
     // Check mempool & journal
@@ -5669,7 +5669,7 @@ bool ProcessNewBlock(const Config &config,
     auto source = task::CCancellationSource::Make();
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            source->GetToken(), config, pblock, fForceProcessing, fNewBlock);
+            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, fForceProcessing, fNewBlock);
 
     if(!bestChainActivation)
     {
@@ -6554,7 +6554,7 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                     CValidationState dummyState;
                     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
                     auto source = task::CCancellationSource::Make();
-                    if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
+                    if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, dummyState, changeSet)) {
                         break;
                     }
                 }

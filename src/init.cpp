@@ -1312,7 +1312,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         CValidationState dummyState;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
-        if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
+        if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), shutdownToken), config, dummyState, changeSet)) {
             LogPrintf("Failed to connect best block");
             StartShutdown();
         }
