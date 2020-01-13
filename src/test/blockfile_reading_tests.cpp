@@ -29,9 +29,10 @@ namespace
         CBlockIndex& index,
         CBlockFileInfoStore& blockFileInfoStore)
     {
+        uint64_t nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
         uint64_t nBlockSizeWithHeader =
-            ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION)
-            + BLOCKFILE_BLOCK_HEADER_SIZE;
+            nBlockSize
+            + GetBlockFileBlockHeaderSize(nBlockSize);
         CDiskBlockPos blockPos;
         CValidationState state;
         bool fCheckForPruning = false;
