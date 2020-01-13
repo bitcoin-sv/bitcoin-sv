@@ -4996,11 +4996,6 @@ static bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
                                         CValidationState &state,
                                         const CChainParams &chainparams,
                                         const uint256 &hash) {
-    if (*pindexPrev->phashBlock ==
-        chainparams.GetConsensus().hashGenesisBlock) {
-        return true;
-    }
-
     int nHeight = pindexPrev->nHeight + 1;
     const CCheckpointData &checkpoints = chainparams.Checkpoints();
 
