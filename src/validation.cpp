@@ -3050,7 +3050,8 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
  */
 static DisconnectResult DisconnectBlock(const CBlock &block,
                                         const CBlockIndex *pindex,
-                                        CCoinsViewCache &view) {
+                                        CCoinsViewCache &view,
+                                        const task::CCancellationToken& shutdownToken) {
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
     if (pos.IsNull()) {
@@ -3063,12 +3064,13 @@ static DisconnectResult DisconnectBlock(const CBlock &block,
         return DISCONNECT_FAILED;
     }
 
-    return ApplyBlockUndo(blockUndo, block, pindex, view);
+    return ApplyBlockUndo(blockUndo, block, pindex, view, shutdownToken);
 }
 
 DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
                                 const CBlock &block, const CBlockIndex *pindex,
-                                CCoinsViewCache &view) {
+                                CCoinsViewCache &view,
+                                const task::CCancellationToken& shutdownToken) {
     bool fClean = true;
 
     if (blockUndo.vtxundo.size() + 1 != block.vtx.size()) {
@@ -3079,6 +3081,12 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
     // Undo transactions in reverse order.
     size_t i = block.vtx.size();
     while (i-- > 0) {
+
+        if (shutdownToken.IsCanceled())
+        {
+            return DISCONNECT_FAILED;
+        }
+
         const CTransaction &tx = *(block.vtx[i]);
         uint256 txid = tx.GetId();
 
@@ -3894,7 +3902,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     {
         CCoinsViewCache view(pcoinsTip);
         assert(view.GetBestBlock() == pindexDelete->GetBlockHash());
-        if (DisconnectBlock(block, pindexDelete, view) != DISCONNECT_OK) {
+        // Use new private CancellationSource that can not be cancelled
+        if (DisconnectBlock(block, pindexDelete, view, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
             return error("DisconnectTip(): DisconnectBlock %s failed",
                          pindexDelete->GetBlockHash().ToString());
         }
@@ -6099,8 +6108,8 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
             (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <=
                 nCoinCacheUsage) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
-            DisconnectResult res = DisconnectBlock(block, pindex, coins);
-            if (res == DISCONNECT_FAILED) {
+            DisconnectResult res = DisconnectBlock(block, pindex, coins, shutdownToken);
+            if (res == DISCONNECT_FAILED && !shutdownToken.IsCanceled()) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in "
                              "block data at %d, hash=%s",
                              pindex->nHeight,
@@ -6243,7 +6252,8 @@ bool ReplayBlocks(const Config &config, CCoinsView *view) {
             }
             LogPrintf("Rolling back %s (%i)\n",
                       pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
-            DisconnectResult res = DisconnectBlock(block, pindexOld, cache);
+            // Use new private CancellationSource that can not be cancelled
+            DisconnectResult res = DisconnectBlock(block, pindexOld, cache, task::CCancellationSource::Make()->GetToken());
             if (res == DISCONNECT_FAILED) {
                 return error(
                     "RollbackBlock(): DisconnectBlock failed at %d, hash=%s",

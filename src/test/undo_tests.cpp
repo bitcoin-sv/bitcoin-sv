@@ -34,7 +34,7 @@ static void UndoBlock(const CBlock &block, CCoinsViewCache &view,
                       const CChainParams &chainparams, uint32_t nHeight) {
     CBlockIndex pindex;
     pindex.nHeight = nHeight;
-    ApplyBlockUndo(blockUndo, block, &pindex, view);
+    ApplyBlockUndo(blockUndo, block, &pindex, view, task::CCancellationSource::Make()->GetToken());
 }
 
 static bool HasSpendableCoin(const CCoinsViewCache &view, const uint256 &txid) {

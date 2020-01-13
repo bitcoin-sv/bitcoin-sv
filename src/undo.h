@@ -12,6 +12,7 @@
 #include "consensus/consensus.h"
 #include "primitives/transaction.h"
 #include "serialize.h"
+#include "taskcancellation.h"
 
 class CBlock;
 class CBlockIndex;
@@ -140,6 +141,7 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
  */
 DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
                                 const CBlock &block, const CBlockIndex *pindex,
-                                CCoinsViewCache &coins);
+                                CCoinsViewCache &coins,
+                                const task::CCancellationToken& shutdownToken);
 
 #endif // BITCOIN_UNDO_H
