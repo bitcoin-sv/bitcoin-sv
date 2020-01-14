@@ -60,6 +60,19 @@ NON_SCRIPTS = [
     "bsv_pbv_common.py"
 ]
 
+LARGE_BLOCK_TESTS = [
+    # Tests for block files larger than 4GB. 
+    # This tests take really long time to execute so they are excluded by default. 
+    # Use --large-block-tests command line parameter to run them.
+    "bsv-genesis-large-blockfile-io.py",    
+    "bsv-genesis-large-blockfile-reindex.py",
+    "bsv-genesis-large-blockfile-max-32-bit.py"
+]
+
+# This tests can be only run by explicitly specifying them on command line. 
+# This is usefull for tests that take really long time to execute.
+EXCLUDED_TESTS = LARGE_BLOCK_TESTS
+
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
     # When a test is listed here, then it will be run without parameters
@@ -129,18 +142,18 @@ def main():
     parser.add_argument('--buildconfig', '-b',
                         default="", help="Optional name of directory that contains binary and is located inside build directory. Used on Windows where "
                         "the build directory can contain outputs for multiple configurations. Example: -b RelWithDebInfo.")
-    parser.add_argument('--watch', '-W', type=str,
+    parser.add_argument('--watch', type=str,
                         default=None, help="Showing specified file in the console and monitoring its changes, usefull "
                                            "for live viewing of the log files. If it is of the form 'nodeX' where X is integer, "
                                            "it will show bitcoind.log file of the specified node")
-
+    parser.add_argument('--large-block-tests', action='store_true', help="Runs large block file tests.")
     args, unknown_args = parser.parse_known_args()
 
     # Create a set to store arguments and create the passon string
     tests = set(arg for arg in unknown_args if arg[:2] != "--")
     passon_args = [arg for arg in unknown_args if arg[:2] == "--"]
     passon_args.append("--configfile=%s" % configfile)
-
+    
     # Set up logging
     logging_level = logging.INFO if args.quiet else logging.DEBUG
     logging.basicConfig(format='%(message)s', level=logging_level)
@@ -166,6 +179,11 @@ def main():
     # Build list of tests
     all_scripts = get_all_scripts_from_disk(tests_dir, NON_SCRIPTS)
 
+    # Check for large block tests parameter 
+    if args.large_block_tests:
+        tests = LARGE_BLOCK_TESTS
+        args.jobs = 1
+
     if tests:
         # Individual tests have been specified. Run specified tests that exist
         # in the all_scripts list. Accept the name with or without .py
@@ -181,6 +199,11 @@ def main():
         cutoff = EXTENDED_CUTOFF
         if args.extended:
             cutoff = sys.maxsize
+        # Exclude tests specified in EXCLUDED_TESTS. 
+        # This tests should be specified in command line to execute 
+        for exclude_test in EXCLUDED_TESTS:
+            if exclude_test in test_list:
+                test_list.remove(exclude_test)
 
     # Remove the test cases that the user has explicitly asked to exclude.
     if args.exclude:
