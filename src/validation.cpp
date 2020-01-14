@@ -3312,7 +3312,7 @@ static bool ConnectBlock(
 
     std::vector<int> prevheights;
     Amount nFees(0);
-    int nInputs = 0;
+    size_t nInputs = 0;
 
     // Sigops counting. We need to do it again because of P2SH.
     uint64_t nSigOpsCount = 0;
@@ -3492,7 +3492,7 @@ static bool ConnectBlock(
     int64_t nTime4 = GetTimeMicros();
     nTimeVerify += nTime4 - nTime2;
     LogPrint(BCLog::BENCH,
-             "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n",
+             "    - Verify %zu txins: %.2fms (%.3fms/txin) [%.2fs]\n",
              nInputs - 1, 0.001 * (nTime4 - nTime2),
              nInputs <= 1 ? 0 : 0.001 * (nTime4 - nTime2) / (nInputs - 1),
              nTimeVerify * 0.000001);
@@ -5937,7 +5937,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
     CCoinsViewCache coins(coinsview);
     CBlockIndex *pindexState = chainActive.Tip();
     CBlockIndex *pindexFailure = nullptr;
-    int nGoodTransactions = 0;
+    size_t nGoodTransactions = 0;
     CValidationState state;
     int reportDone = 0;
     LogPrintf("[0%%]...");
@@ -6029,7 +6029,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
 
     if (pindexFailure) {
         return error("VerifyDB(): *** coin database inconsistencies found "
-                     "(last %i blocks, %i good transactions before that)\n",
+                     "(last %i blocks, %zu good transactions before that)\n",
                      chainActive.Height() - pindexFailure->nHeight + 1,
                      nGoodTransactions);
     }
@@ -6063,7 +6063,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
     }
 
     LogPrintf("[DONE].\n");
-    LogPrintf("No coin database inconsistencies in last %i blocks (%i "
+    LogPrintf("No coin database inconsistencies in last %i blocks (%zu "
               "transactions)\n",
               chainActive.Height() - pindexState->nHeight, nGoodTransactions);
 
