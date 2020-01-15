@@ -530,9 +530,6 @@ static UniValue getnetworkinfo(const Config &config,
             "relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
-            "  \"excessutxocharge\": x.xxxxxxxx,        (numeric) minimum "
-            "charge for excess utxos in " +
-            CURRENCY_UNIT + "\n"
                             "  \"localaddresses\": [                    "
                             "(array) list of local addresses\n"
                             "  {\n"
@@ -572,8 +569,6 @@ static UniValue getnetworkinfo(const Config &config,
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee",
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
-    obj.push_back(Pair("excessutxocharge",
-                       ValueFromAmount(config.GetExcessUTXOCharge())));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);

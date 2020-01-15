@@ -15,7 +15,6 @@ GlobalConfig::GlobalConfig() {
 
 void GlobalConfig::Reset()
 {
-    excessUTXOCharge = Amount {};
     feePerKB = CFeeRate {};
     blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
@@ -778,14 +777,6 @@ int DummyConfig::GetPerBlockScriptValidatorThreadsCount() const
 int DummyConfig::GetPerBlockScriptValidationMaxBatchSize() const
 {
     return DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
-}
-
-void GlobalConfig::SetExcessUTXOCharge(Amount fee) {
-    excessUTXOCharge = fee;
-}
-
-Amount GlobalConfig::GetExcessUTXOCharge() const {
-    return excessUTXOCharge;
 }
 
 void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {

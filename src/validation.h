@@ -80,8 +80,6 @@ static const bool DEFAULT_WHITELISTFORCERELAY = true;
 static const bool DEFAULT_REJECTMEMPOOLREQUEST = false;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static const Amount DEFAULT_MIN_RELAY_TX_FEE(250);
-/** Default for -excessutxocharge for transactions transactions */
-static const Amount DEFAULT_UTXO_FEE(0);
 //! -maxtxfee default
 static const Amount DEFAULT_TRANSACTION_MAXFEE(COIN / 10);
 //! Discourage users to set fees higher than this amount (in satoshis) per kB
