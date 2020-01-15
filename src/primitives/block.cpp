@@ -7,6 +7,7 @@
 
 #include "crypto/common.h"
 #include "hash.h"
+#include "script/script_num.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
@@ -27,14 +28,13 @@ std::string CBlock::ToString() const {
     return s.str();
 }
 
-// Returns the block's height as specified in its coinbase transaction
-uint64_t CBlock::GetHeightFromCoinbase() const
+uint64_t CBlock::GetHeightFromCoinbase()
+    const // Returns the block's height as specified in its coinbase transaction
 {
     const CScript &sig = vtx[0]->vin[0].scriptSig;
 
     // Get length of height number
-    if(sig.empty())
-        throw std::runtime_error("Empty coinbase scriptSig");
+    if (sig.empty()) throw std::runtime_error("Empty coinbase scriptSig");
     uint8_t numlen = sig[0];
 
     // Parse height as CScriptNum
@@ -43,7 +43,7 @@ uint64_t CBlock::GetHeightFromCoinbase() const
     if ((numlen >= OP_1) && (numlen <= OP_16))
         return numlen - OP_1 + 1;
 
-    if(sig.size() - 1 < numlen)
+    if (sig.size() - 1 < numlen)
         throw std::runtime_error("Badly formatted height in coinbase");
     std::vector<unsigned char> heightScript(numlen);
     copy(sig.begin() + 1, sig.begin() + 1 + numlen, heightScript.begin());

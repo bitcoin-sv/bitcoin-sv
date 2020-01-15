@@ -85,10 +85,12 @@ public:
         READWRITE(nFlags);
     }
 
+    // only elements with size up to MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS are inserted
     void insert(const std::vector<uint8_t> &vKey);
     void insert(const COutPoint &outpoint);
     void insert(const uint256 &hash);
 
+    // only elements with size up to MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS are matched
     bool contains(const std::vector<uint8_t> &vKey) const;
     bool contains(const COutPoint &outpoint) const;
     bool contains(const uint256 &hash) const;

@@ -34,13 +34,20 @@ BITCOIN_TESTS =\
   test/base58_tests.cpp \
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
+  test/big_int_tests.cpp \
   test/blockcheck_tests.cpp \
   test/blockencodings_tests.cpp \
+  test/blockfile_reading_tests.cpp \
+  test/block_info_tests.cpp \
   test/blockmaxsize_tests.cpp \
   test/blockstatus_tests.cpp \
+  test/blockvalidationstatus_tests.cpp \
   test/bloom_tests.cpp \
+  test/bn_helpers.h \
+  test/bn_op_tests.cpp \
   test/bswap_tests.cpp \
   test/checkpoints_tests.cpp \
+  test/checkqueue_tests.cpp \
   test/coins_tests.cpp \
   test/compress_tests.cpp \
   test/config_tests.cpp \
@@ -54,18 +61,20 @@ BITCOIN_TESTS =\
   test/excessiveblock_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
+  test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
   test/journal_tests.cpp \
   test/jsonutil.cpp \
   test/jsonutil.h \
   test/key_tests.cpp \
   test/limitedmap_tests.cpp \
+  test/limitedstack_tests.cpp \
+  test/locked_ref_tests.cpp \
   test/m_candidates_tests.cpp \
   test/main_tests.cpp \
   test/mempool_tests.cpp \
   test/merkle_tests.cpp \
   test/miner_tests.cpp \
-  test/mod_pri_queue_tests.cpp \
   test/object_stream_deserialization_tests.cpp \
   test/opcode_tests.cpp \
   test/multisig_tests.cpp \
@@ -97,17 +106,20 @@ BITCOIN_TESTS =\
   test/streams_tests.cpp \
   test/stream_serialization_tests.cpp \
   test/stream_test_helpers.h \
+  test/taskcancellation_tests.cpp \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
   test/test_bitcoin_main.cpp \
   test/test_double_spend_detector.cpp \
   test/test_orphantxns.cpp \
   test/test_recent_rejects.cpp \
+  test/test_txnvalidation_utils.cpp \
   test/test_txnvalidator.cpp \
   test/testutil.cpp \
   test/testutil.h \
   test/threadpool_tests.cpp \
   test/timedata_tests.cpp \
+  test/time_locked_mempool_tests.cpp \
   test/transaction_tests.cpp \
   test/txvalidationcache_tests.cpp \
   test/uint256_tests.cpp \
@@ -136,7 +148,7 @@ test_test_bitcoin_LDADD += $(LIBBITCOIN_SERVER) $(LIBBITCOIN_CLI) $(LIBBITCOIN_C
   $(LIBLEVELDB) $(LIBLEVELDB_SSE42) $(LIBMEMENV) $(BOOST_LIBS) $(BOOST_UNIT_TEST_FRAMEWORK_LIB) $(LIBSECP256K1) $(EVENT_LIBS) $(EVENT_PTHREADS_LIBS) $(AIO_LIBS)
 test_test_bitcoin_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
-test_test_bitcoin_LDADD += $(LIBBITCOIN_CONSENSUS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
+test_test_bitcoin_LDADD += $(LIBBITCOIN_CONSENSUS) $(BDB_LIBS) $(OPENSSL_LIBS) $(MINIUPNPC_LIBS)
 test_test_bitcoin_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -static
 
 if ENABLE_ZMQ
@@ -159,7 +171,7 @@ test_test_bitcoin_fuzzy_LDADD = \
   $(LIBBITCOIN_CRYPTO) \
   $(LIBSECP256K1)
 
-test_test_bitcoin_fuzzy_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS) $(AIO_LIBS)
+test_test_bitcoin_fuzzy_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS) $(AIO_LIBS)
 #
 
 nodist_test_test_bitcoin_SOURCES = $(GENERATED_TEST_FILES)

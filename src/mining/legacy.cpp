@@ -18,6 +18,7 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"
+#include "script/script_num.h"
 #include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"
@@ -104,14 +105,6 @@ void LegacyBlockAssembler::resetBlock() {
     blockFinished = false;
 }
 
-static const std::vector<uint8_t>
-getExcessiveBlockSizeSig(const Config &config) {
-    std::string cbmsg = "/EB" + getSubVersionEB(config.GetMaxBlockSize()) + "/";
-    const char *cbcstr = cbmsg.c_str();
-    std::vector<uint8_t> vec(cbcstr, cbcstr + cbmsg.size());
-    return vec;
-}
-
 std::unique_ptr<CBlockTemplate>
 LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev)
 {
@@ -143,7 +136,7 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
     nMaxGeneratedBlockSize = ComputeMaxGeneratedBlockSize(pindexPrevNew);
 
     nLockTimeCutoff =
-        (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
+        (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, nHeight)) & LOCKTIME_MEDIAN_TIME_PAST)
             ? pindexPrevNew->GetMedianTimePast()
             : GetAdjustedTime();
 
@@ -159,8 +152,22 @@ LegacyBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*
 
     FillBlockHeader(blockref, pindexPrevNew, scriptPubKeyIn);
 
+    bool isGenesisEnabled = IsGenesisEnabled(mConfig, nHeight);
+    bool sigOpCountError;
+
     pblocktemplate->vTxFees[0] = -1 * mBlockFees;
-    pblocktemplate->vTxSigOpsCount[0] = GetSigOpCountWithoutP2SH(*pblock->vtx[0]);
+
+    int64_t txSigOpCount = static_cast<int64_t>(GetSigOpCountWithoutP2SH(*pblock->vtx[0], isGenesisEnabled, sigOpCountError));
+    // This can happen if supplied coinbase scriptPubKeyIn contains multisig with too many public keys
+    if (sigOpCountError)
+    {
+        // invalid coinbase transaction, block creation will fail
+        pblocktemplate = nullptr;
+    }
+    else
+    {
+        pblocktemplate->vTxSigOpsCount[0] = txSigOpCount;
+    }
 
     uint64_t nSerializeSize = GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION);
     LogPrintf("CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",
@@ -213,12 +220,18 @@ void LegacyBlockAssembler::onlyUnconfirmed(CTxMemPool::setEntries &testSet) {
 
 bool LegacyBlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOps) {
     auto blockSizeWithPackage = nBlockSize + packageSize;
-    if (blockSizeWithPackage >= nMaxGeneratedBlockSize) {
+    if (blockSizeWithPackage >= nMaxGeneratedBlockSize)
+    {
         return false;
     }
-    if (nBlockSigOps + packageSigOps >=
-        GetMaxBlockSigOpsCount(blockSizeWithPackage)) {
-        return false;
+    
+    // After Genesis we don't count sigops anymore
+    if (!IsGenesisEnabled(mConfig, nHeight))
+    {
+        if (nBlockSigOps + packageSigOps >= mConfig.GetMaxBlockSigOpsConsensusBeforeGenesis(blockSizeWithPackage))
+        {
+            return false;
+        }
     }
     return true;
 }
@@ -234,7 +247,7 @@ bool LegacyBlockAssembler::TestPackageTransactions(
     for (const CTxMemPool::txiter it : package) {
         CValidationState state;
         if (!ContextualCheckTransaction(mConfig, it->GetTx(), state, nHeight,
-                                        nLockTimeCutoff)) {
+                                        nLockTimeCutoff, false)) {
             return false;
         }
 
@@ -265,26 +278,29 @@ bool LegacyBlockAssembler::TestForBlock(CTxMemPool::txiter it) {
         return false;
     }
 
-    auto maxBlockSigOps = GetMaxBlockSigOpsCount(blockSizeWithTx);
-    if (nBlockSigOps + it->GetSigOpCount() >= maxBlockSigOps) {
-        // If the block has room for no more sig ops then flag that the block is
-        // finished.
-        // TODO: We should consider adding another transaction that isn't very
-        // dense in sigops instead of bailing out so easily.
-        if (nBlockSigOps > maxBlockSigOps - 2) {
-            blockFinished = true;
+    if (!IsGenesisEnabled(mConfig, nHeight))
+    {
+        auto maxBlockSigOps = mConfig.GetMaxBlockSigOpsConsensusBeforeGenesis(blockSizeWithTx);
+        if (nBlockSigOps + it->GetSigOpCount() >= maxBlockSigOps) {
+            // If the block has room for no more sig ops then flag that the block is
+            // finished.
+            // TODO: We should consider adding another transaction that isn't very
+            // dense in sigops instead of bailing out so easily.
+            if (nBlockSigOps > maxBlockSigOps - 2) {
+                blockFinished = true;
+                return false;
+            }
+            // Otherwise attempt to find another tx with fewer sigops to put in the
+            // block.
             return false;
         }
-        // Otherwise attempt to find another tx with fewer sigops to put in the
-        // block.
-        return false;
     }
 
     // Must check that lock times are still valid. This can be removed once MTP
     // is always enforced as long as reorgs keep the mempool consistent.
     CValidationState state;
     if (!ContextualCheckTransaction(mConfig, it->GetTx(), state, nHeight,
-                                    nLockTimeCutoff)) {
+                                    nLockTimeCutoff, false)) {
         return false;
     }
 
@@ -613,7 +629,7 @@ void LegacyBlockAssembler::addPriorityTxs() {
     }
 }
 
-void IncrementExtraNonce(const Config &config, CBlock *pblock,
+void IncrementExtraNonce(CBlock *pblock,
                          const CBlockIndex *pindexPrev,
                          unsigned int &nExtraNonce) {
     // Update nExtraNonce
@@ -627,9 +643,7 @@ void IncrementExtraNonce(const Config &config, CBlock *pblock,
     unsigned int nHeight = pindexPrev->nHeight + 1;
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
     txCoinbase.vin[0].scriptSig =
-        (CScript() << nHeight << CScriptNum(nExtraNonce)
-                   << getExcessiveBlockSizeSig(config)) +
-        COINBASE_FLAGS;
+        (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
 
     pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));

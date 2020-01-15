@@ -81,8 +81,9 @@ public:
         READWRITE(vtx);
     }
 
-    // Returns the block's height as specified in its coinbase transaction
-    uint64_t GetHeightFromCoinbase() const;
+    uint64_t
+    GetHeightFromCoinbase() const; // Returns the block's height as specified in
+                                   // its coinbase transaction
 
     void SetNull() {
         CBlockHeader::SetNull();

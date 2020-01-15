@@ -114,10 +114,13 @@ class MempoolSizeLimitTest(BitcoinTestFramework):
         # For loop will take less than MAX_DESCENDANTS iterations.
         # That way we make sure that exception is not caused by descendant limit count.
         MAX_DESCENDANTS = 25
+        # Keep txids from the produced chain.
+        chain_of_descendant_txns = []
         for i in range(MAX_DESCENDANTS):
             utxo = utxos.pop(0)
             (tx, sent_value, txSize) = self.chain_transaction(self.nodes[0], utxo['txid'], utxo['vout'], utxo['amount'], 1, connection)
             descendantsSize = descendantsSize + txSize
+            chain_of_descendant_txns.append(tx.sha256)
 
             # Check if next sent transaction will cause too many descendants in a mempool.
             # The same exception is thrown either if the count of descendants is too large or the size of all descendants is too large.
@@ -126,11 +129,13 @@ class MempoolSizeLimitTest(BitcoinTestFramework):
                 utxo = utxos.pop(0)
                 connection.message_count.clear()
                 (tx, sent_value, txSize) = self.chain_transaction(self.nodes[0], utxo['txid'], utxo['vout'], utxo['amount'], 1, connection)
+                chain_of_descendant_txns.append(tx.sha256)
                 connection.wait_for_reject()
                 break
 
         assert_equal(len(rejected_txs), 2)
-        assert_equal(rejected_txs[1].data, tx.sha256)
+        # Evaluation order of siblings is random
+        assert(rejected_txs[1].data in chain_of_descendant_txns)
         assert_equal(rejected_txs[1].reason, b'too-long-mempool-chain')
 
 if __name__ == '__main__':

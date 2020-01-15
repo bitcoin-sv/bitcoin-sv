@@ -70,7 +70,7 @@ public:
 };
 
 static const size_t MAX_INPUTS_PER_TX =
-    MAX_TX_SIZE / ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
+    MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS / ::GetSerializeSize(CTxIn(), SER_NETWORK, PROTOCOL_VERSION);
 
 /** Restore the UTXO in a Coin at a given COutPoint */
 class CTxUndo {
@@ -132,7 +132,7 @@ enum DisconnectResult {
  * @return A DisconnectResult
  */
 DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
-                               const COutPoint &out);
+                               const COutPoint &out, const Config &config);
 
 /**
  * Undo a block from the block and the undoblock data.

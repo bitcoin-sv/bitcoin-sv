@@ -26,7 +26,7 @@
 
 #include "prevector.h"
 
-static const uint64_t MAX_SIZE = 0x02000000;
+static const uint64_t MAX_SIZE = std::numeric_limits<uint32_t>::max();
 
 /**
  * Dummy data type to identify deserializing constructors.
@@ -642,14 +642,19 @@ inline void Serialize(Stream &os, const prevector<N, T> &v) {
     Serialize_impl(os, v, T());
 }
 
+constexpr size_t STARTING_CHUNK_SIZE = 16000000; // 16MB
+constexpr size_t CHUNK_GROWTH_RATE = 3;
+
 template <typename Stream, unsigned int N, typename T>
 void Unserialize_impl(Stream &is, prevector<N, T> &v, const uint8_t &) {
     // Limit size per read so bogus size value won't cause out of memory
     v.clear();
     size_t nSize = ReadCompactSize(is);
     size_t i = 0;
+    size_t chunkSize = STARTING_CHUNK_SIZE;
     while (i < nSize) {
-        size_t blk = std::min(nSize - i, size_t(1 + 4999999 / sizeof(T)));
+        size_t blk = std::min(nSize - i, size_t(1 + (chunkSize - 1) / sizeof(T)));
+        chunkSize *= CHUNK_GROWTH_RATE;
         v.resize(i + blk);
         is.read((char *)&v[i], blk * sizeof(T));
         i += blk;
@@ -662,8 +667,10 @@ void Unserialize_impl(Stream &is, prevector<N, T> &v, const V &) {
     size_t nSize = ReadCompactSize(is);
     size_t i = 0;
     size_t nMid = 0;
+    size_t chunkSize = STARTING_CHUNK_SIZE;
     while (nMid < nSize) {
-        nMid += std::min(nSize, size_t(1 + 4999999 / sizeof(T)));
+        nMid += std::min(nSize, size_t(1 + (chunkSize - 1) / sizeof(T)));
+        chunkSize *= CHUNK_GROWTH_RATE;
         if (nMid > nSize) {
             nMid = nSize;
         }
@@ -710,8 +717,10 @@ void Unserialize_impl(Stream &is, std::vector<T, A> &v, const uint8_t &) {
     v.clear();
     size_t nSize = ReadCompactSize(is);
     size_t i = 0;
+    size_t chunkSize = STARTING_CHUNK_SIZE;
     while (i < nSize) {
-        size_t blk = std::min(nSize - i, size_t(1 + 4999999 / sizeof(T)));
+        size_t blk = std::min(nSize - i, size_t(1 + (chunkSize - 1) / sizeof(T)));
+        chunkSize *= CHUNK_GROWTH_RATE;
         v.resize(i + blk);
         is.read((char *)&v[i], blk * sizeof(T));
         i += blk;
@@ -725,8 +734,10 @@ void Unserialize_impl(Stream &is, std::vector<T, A> &v, const V &) {
     size_t nSize = ReadCompactSize(is);
     size_t i = 0;
     size_t nMid = 0;
+    size_t chunkSize = STARTING_CHUNK_SIZE;
     while (nMid < nSize) {
-        nMid += std::min(nSize, size_t(1 + 4999999 / sizeof(T)));
+        nMid += std::min(nSize, size_t(1 + (chunkSize - 1) / sizeof(T)));
+        chunkSize *= CHUNK_GROWTH_RATE;
         if (nMid > nSize) {
             nMid = nSize;
         }

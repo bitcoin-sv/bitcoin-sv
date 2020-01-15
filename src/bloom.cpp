@@ -58,6 +58,11 @@ CBloomFilter::Hash(unsigned int nHashNum,
 }
 
 void CBloomFilter::insert(const std::vector<uint8_t> &vKey) {
+
+    if (vKey.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)
+    {
+        return;
+    }
     if (isFull) return;
     for (unsigned int i = 0; i < nHashFuncs; i++) {
         unsigned int nIndex = Hash(i, vKey);
@@ -80,6 +85,12 @@ void CBloomFilter::insert(const uint256 &hash) {
 }
 
 bool CBloomFilter::contains(const std::vector<uint8_t> &vKey) const {
+
+    if (vKey.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS)
+    {
+        return false;
+    }
+
     if (isFull) {
         return true;
     }
@@ -162,7 +173,10 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
                            BLOOM_UPDATE_P2PUBKEY_ONLY) {
                     txnouttype type;
                     std::vector<std::vector<uint8_t>> vSolutions;
-                    if (Solver(txout.scriptPubKey, type, vSolutions) &&
+
+                    // called as script is before genesis, should be the same as after genesis
+                    // because we don't deal with  P2SH or data carrier
+                    if (Solver(txout.scriptPubKey, false, type, vSolutions) &&
                         (type == TX_PUBKEY || type == TX_MULTISIG)) {
                         insert(COutPoint(txid, i));
                     }

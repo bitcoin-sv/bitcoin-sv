@@ -21,6 +21,7 @@
 #include "rpc/server.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
+#include "taskcancellation.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
@@ -44,7 +45,7 @@ FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
 extern void noui_connect();
 
-BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
+BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetConfig()) {
     SHA256AutoDetect();
     RandomInit();
     ECC_Start();
@@ -59,12 +60,27 @@ BasicTestingSetup::BasicTestingSetup(const std::string &chainName) {
     fCheckBlockIndex = true;
     SelectParams(chainName);
     noui_connect();
+    testConfig.Reset(); // make sure that we start every test with a clean config
+    testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
+    mempool.getNonFinalPool().loadConfig();
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
     ECC_Stop();
-    g_connman.reset();
+
+    if(g_connman)
+    {
+        g_connman->Interrupt();
+        // call Stop first as CConnman members are using g_connman global
+        // variable and they must be shut down before the variable is reset to
+        // nullptr (which happens before the destructor is called making Stop
+        // call inside CConnman destructor too late)
+        g_connman->Stop();
+        g_connman.reset();
+    }
+
+    mining::g_miningFactory.reset();
 }
 
 TestingSetup::TestingSetup(const std::string &chainName)
@@ -72,9 +88,6 @@ TestingSetup::TestingSetup(const std::string &chainName)
 
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
-    GlobalConfig &config = GlobalConfig::GetConfig();
-    config.Reset(); // make sure that we start every test with a clean config
-    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
     RegisterAllRPCCommands(tableRPC);
     ClearDatadirCache();
     pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
@@ -86,27 +99,29 @@ TestingSetup::TestingSetup(const std::string &chainName)
     pblocktree = new CBlockTreeDB(1 << 20, true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
     pcoinsTip = new CCoinsViewCache(pcoinsdbview);
-    if (!InitBlockIndex(config)) {
+    if (!InitBlockIndex(testConfig)) {
         throw std::runtime_error("InitBlockIndex failed.");
     }
     {
-        CValidationState state;
+        // dummyState is used to report errors, not block related invalidity - ignore it
+        // (see description of ActivateBestChain)
+        CValidationState dummyState;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
-        if (!ActivateBestChain(config, state, changeSet)) {
+        auto source = task::CCancellationSource::Make();
+        if (!ActivateBestChain(source->GetToken(), testConfig, dummyState, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
         }
     }
-    nScriptCheckThreads = 3;
-    for (int i = 0; i < nScriptCheckThreads - 1; i++) {
-        threadGroup.create_thread([i]() { return ThreadScriptCheck(i); });
-    }
+    InitScriptCheckQueues(testConfig, threadGroup);
 
     // Deterministic randomness for tests.
     g_connman =
         std::make_unique<CConnman>(
-            config, 0x1337, 0x1337, std::chrono::milliseconds{0});
+          testConfig, 0x1337, 0x1337, std::chrono::milliseconds{0});
     connman = g_connman.get();
     RegisterNodeSignals(GetNodeSignals());
+
+    mining::g_miningFactory = std::make_unique<mining::CMiningFactory>(testConfig);
 }
 
 TestingSetup::~TestingSetup() {
@@ -141,8 +156,9 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey) {
     const Config &config = GlobalConfig::GetConfig();
     CBlockIndex* pindexPrev {nullptr};
+    mining::CMiningFactory miningFactory {config};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-            mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptPubKey, pindexPrev);
+            miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
     CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock &block = *blockRef;
 
@@ -153,7 +169,7 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     }
     // IncrementExtraNonce creates a valid coinbase and merkleRoot
     unsigned int extraNonce = 0;
-    IncrementExtraNonce(config, &block, pindexPrev, extraNonce);
+    IncrementExtraNonce(&block, pindexPrev, extraNonce);
 
     while (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
         ++block.nNonce;

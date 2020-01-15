@@ -7,7 +7,7 @@
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN
 from .util import assert_equal, assert_raises_rpc_error, hash256
-from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT)
+from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
 
 from collections import deque
 
@@ -136,6 +136,21 @@ def get_legacy_sigopcount_tx(tx, fAccurate=True):
         count += CScript(j.scriptSig).GetSigOpCount(fAccurate)
     return count
 
+def calc_needed_data_size(script_op_codes, target_size):
+    def pushdata_size(sz):
+        if sz < 0x4c:
+            return 1  # OP_PUSHDATA
+        elif sz <= 0xff:
+            return 2  # OP_PUSHDATA1
+        elif sz <= 0xffff:
+            return 3  # OP_PUSHDATA2
+        elif sz <= 0xffffffff:
+            return 5  # OP_PUSHDATA4
+        else:
+            raise ValueError("Data too long to encode in a PUSHDATA op")
+
+    return target_size - (len(script_op_codes) + pushdata_size(target_size))
+
 
 ### Helper to build chain
 
@@ -185,7 +200,7 @@ class ChainManager():
     def set_tip(self, number):
         self.tip = self.blocks[number]
 
-    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True):
+    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None):
         if self.tip == None:
             base_block_hash = self._genesis_hash
             block_time = int(time.time()) + 1
@@ -194,7 +209,7 @@ class ChainManager():
             block_time = self.tip.nTime + 1
         # First create the coinbase
         height = self.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height)
+        coinbase = create_coinbase(height=height, pubkey=coinbase_pubkey)
         coinbase.vout[0].nValue += additional_coinbase_value
         coinbase.rehash()
         if spend == None:
@@ -224,10 +239,9 @@ class ChainManager():
 
             tx = get_base_transaction()
 
-            # Make it the same format as transaction added for padding and save the size.
-            # It's missing the padding output, so we add a constant to account for it.
+            # Make it the same format as transaction added for padding and save the size.            
             tx.rehash()
-            base_tx_size = len(tx.serialize()) + 18
+            base_tx_size = len(tx.serialize())
 
             # If a specific script is required, add it.
             if script != None:
@@ -247,6 +261,9 @@ class ChainManager():
             # If we have a block size requirement, just fill
             # the block until we get there
             current_block_size = len(block.serialize())
+
+            extra_sigops_orig = extra_sigops
+
             while current_block_size < block_size:
                 # We will add a new transaction. That means the size of
                 # the field enumerating how many transaction go in the block
@@ -258,17 +275,23 @@ class ChainManager():
                 tx = get_base_transaction()
 
                 # Add padding to fill the block.
-                script_length = block_size - current_block_size - base_tx_size
+                script_length = block_size - current_block_size
+                num_loops = 1
                 if script_length > 510000:
                     if script_length < 1000000:
                         # Make sure we don't find ourselves in a position where we
                         # need to generate a transaction smaller than what we expected.
                         script_length = script_length // 2
+                        num_loops = 2
                     else:
+                        num_loops = script_length // 500000
                         script_length = 500000
-                tx_sigops = min(extra_sigops, script_length, MAX_TX_SIGOPS_COUNT)
+                script_length -= base_tx_size + 8 + len(ser_compact_size(script_length)) # <existing tx size> + <amount> + <vector<size><elements>>
+                tx_sigops = min(extra_sigops, script_length, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
+                if tx_sigops * num_loops < extra_sigops:
+                    tx_sigops = min(extra_sigops // num_loops, script_length)
                 extra_sigops -= tx_sigops
-                script_pad_len = script_length - tx_sigops
+                script_pad_len = script_length - tx_sigops - len(ser_compact_size(script_length - tx_sigops))
                 script_output = CScript([b'\x00' * script_pad_len] + [OP_CHECKSIG] * tx_sigops)
 
                 tx.vout.append(CTxOut(0, script_output))
@@ -285,6 +308,10 @@ class ChainManager():
         # Check that the block size is what's expected
         if block_size > 0:
             assert_equal(len(block.serialize()), block_size)
+
+        # check that extra_sigops are included
+        if extra_sigops >  0:
+            raise AssertionError("Can not fit %s extra_sigops in a block size of %s" % (extra_sigops_orig, block_size))
 
         # Do PoW, which is cheap on regnet
         if do_solve_block:

@@ -34,12 +34,16 @@ import time
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+from test_framework.mininode import CTransaction, CTxOut, CTxIn, COutPoint, ToHex, FromHex
+from test_framework.script import CScript, OP_TRUE
 
 
 class MempoolPersistTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 3
-        self.extra_args = [[], ["-persistmempool=0"], []]
+        self.extra_args = [["-genesisactivationheight=100"],
+                           ["-persistmempool=0", "-genesisactivationheight=100"],
+                           ["-genesisactivationheight=100"]]
 
     def run_test(self):
         chain_height = self.nodes[0].getblockcount()
@@ -49,26 +53,55 @@ class MempoolPersistTest(BitcoinTestFramework):
         self.nodes[0].generate(1)
         self.sync_all()
 
-        self.log.debug("Send 5 transactions from node2 (to its own address)")
-        for i in range(5):
+        # Create funding transaction that pays to outputs that don't require signatures.
+        out_value = 10000
+        ftx = CTransaction()
+        ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
+        ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
+        ftxHex = self.nodes[2].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[2].signrawtransaction(ftxHex)['hex']
+        self.nodes[2].sendrawtransaction(ftxHex)
+        ftx = FromHex(CTransaction(), ftxHex)
+        ftx.rehash()
+
+        # Create & send a couple of non-final txns.
+        for i in range(2):
+            parent_txid = ftx.sha256
+            send_value = out_value - 500;
+            non_final_tx = CTransaction()
+            non_final_tx.vin.append(CTxIn(COutPoint(parent_txid, i), b'', 0x01))
+            non_final_tx.vout.append(CTxOut(int(send_value), CScript([OP_TRUE])))
+            non_final_tx.nLockTime = int(time.time()) + 300
+            non_final_txHex = self.nodes[2].signrawtransaction(ToHex(non_final_tx))['hex']
+            self.nodes[2].sendrawtransaction(non_final_txHex)
+        self.sync_all()
+        self.log.debug("Verify that all nodes have 2 transactions in their non-final mempools")
+        assert_equal(len(self.nodes[0].getrawnonfinalmempool()), 2)
+        assert_equal(len(self.nodes[1].getrawnonfinalmempool()), 2)
+        assert_equal(len(self.nodes[2].getrawnonfinalmempool()), 2)
+
+        self.log.debug("Send another 4 transactions from node2 (to its own address)")
+        for i in range(4):
             self.nodes[2].sendtoaddress(
                 self.nodes[2].getnewaddress(), Decimal("10"))
         self.sync_all()
 
-        self.log.debug(
-            "Verify that node0 and node1 have 5 transactions in their mempools")
+        self.log.debug("Verify that all nodes have 5 transactions in their main mempools")
         assert_equal(len(self.nodes[0].getrawmempool()), 5)
         assert_equal(len(self.nodes[1].getrawmempool()), 5)
+        assert_equal(len(self.nodes[2].getrawmempool()), 5)
 
         self.log.debug(
-            "Stop-start node0 and node1. Verify that node0 has the transactions in its mempool and node1 does not.")
+            "Stop-start node0 and node1. Verify that node0 has the transactions in its mempools and node1 does not.")
         self.stop_nodes()
         self.start_node(0)
         self.start_node(1)
         # Give bitcoind a second to reload the mempool
         time.sleep(1)
         wait_until(lambda: len(self.nodes[0].getrawmempool()) == 5)
+        wait_until(lambda: len(self.nodes[0].getrawnonfinalmempool()) == 2)
         assert_equal(len(self.nodes[1].getrawmempool()), 0)
+        assert_equal(len(self.nodes[1].getrawnonfinalmempool()), 0)
 
         self.log.debug(
             "Stop-start node0 with -persistmempool=0. Verify that it doesn't load its mempool.dat file.")
@@ -77,12 +110,14 @@ class MempoolPersistTest(BitcoinTestFramework):
         # Give bitcoind a second to reload the mempool
         time.sleep(1)
         assert_equal(len(self.nodes[0].getrawmempool()), 0)
+        assert_equal(len(self.nodes[0].getrawnonfinalmempool()), 0)
 
         self.log.debug(
             "Stop-start node0. Verify that it has the transactions in its mempool.")
         self.stop_nodes()
         self.start_node(0)
         wait_until(lambda: len(self.nodes[0].getrawmempool()) == 5)
+        wait_until(lambda: len(self.nodes[0].getrawnonfinalmempool()) == 2)
 
 
 if __name__ == '__main__':

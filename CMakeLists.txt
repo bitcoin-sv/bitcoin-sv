@@ -4,6 +4,25 @@
 
 cmake_minimum_required(VERSION 3.5)
 project(BitcoinSV)
+#Reduce warnings on MSVC, to closer match GCC compiler settings
+if(POLICY CMP0092 AND MSVC)
+   cmake_policy(SET CMP0092 NEW)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W2")
+endif()
+
+# remove ndebug from flags for bitcoind release/relwithdebinfo to work
+add_definitions(-UNDEBUG)
+foreach (flags
+    CMAKE_CXX_FLAGS_RELEASE
+    CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    CMAKE_CXX_FLAGS_MINSIZEREL
+    CMAKE_C_FLAGS_RELEASE
+    CMAKE_C_FLAGS_RELWITHDEBINFO
+    CMAKE_C_FLAGS_MINSIZEREL)
+    string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
+        "${flags}" "${${flags}}")
+endforeach()
+
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

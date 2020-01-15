@@ -15,10 +15,21 @@ enum class TxSource
     reorg,
     wallet,
     rpc,
-    p2p
+    p2p,
+    finalised
 };
 // Enable enum_cast for TxSource, so we can log informatively
 const enumTableT<TxSource>& enumTable(TxSource);
+
+// Enumerate possible txn's types
+enum class TxValidationPriority : int
+{
+    low = 0,
+    normal = 1,
+    high = 2
+};
+// Enable enum_cast for TxValidationPriority, so we can log informatively
+const enumTableT<TxValidationPriority>& enumTable(TxValidationPriority);
 
 class CNode;
 
@@ -30,6 +41,7 @@ public:
     // Constructor
     CTxInputData(
         TxSource txSource,
+        TxValidationPriority txValidationPriority,
         CTransactionRef ptx,
         int64_t nAcceptTime=0,
         bool fLimitFree=false,
@@ -37,6 +49,7 @@ public:
         std::shared_ptr<CNode> pNode=nullptr,
         bool fOrphan=false)
     : mTxSource(txSource),
+      mTxValidationPriority(txValidationPriority),
       mpTx(ptx),
       mnAcceptTime(nAcceptTime),
       mfLimitFree(fLimitFree),
@@ -50,6 +63,7 @@ public:
     ~CTxInputData() = default;
 
     TxSource mTxSource {TxSource::unknown};
+    TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
     CTransactionRef mpTx {nullptr};
     int64_t mnAcceptTime {0};
     bool mfLimitFree {false};
@@ -60,4 +74,5 @@ public:
 
 using TxInputDataSPtr = std::shared_ptr<CTxInputData>;
 using TxInputDataSPtrVec = std::vector<TxInputDataSPtr>;
-using TxInputDataSPtrRefVec = std::vector<std::reference_wrapper<TxInputDataSPtr>>;
+using TxInputDataSPtrRef = std::reference_wrapper<TxInputDataSPtr>;
+using TxInputDataSPtrRefVec = std::vector<TxInputDataSPtrRef>;

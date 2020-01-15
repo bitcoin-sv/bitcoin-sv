@@ -14,6 +14,7 @@
 #include "ui_interface.h"
 #include "uint256.h"
 #include "util.h"
+#include "validation.h" // required for IsGenesisEnabled()
 
 #include <boost/thread.hpp>
 
@@ -191,6 +192,29 @@ CCoinsViewCursor *CCoinsViewDB::Cursor() const {
         i->pcursor->GetKey(entry);
         i->keyTmp.first = entry.key;
     } else {
+        // Make sure Valid() and GetKey() return false
+        i->keyTmp.first = 0;
+    }
+    return i;
+}
+
+// Same as CCoinsViewCursor::Cursor() with added Seek() to key txId
+CCoinsViewCursor* CCoinsViewDB::Cursor(const TxId &txId) const {
+    CCoinsViewDBCursor* i = new CCoinsViewDBCursor(
+        const_cast<CDBWrapper&>(db).NewIterator(), GetBestBlock());
+    
+    COutPoint op = COutPoint(txId, 0);
+    CoinEntry key = CoinEntry(&op);
+
+    i->pcursor->Seek(key);
+
+    // Cache key of first record
+    if (i->pcursor->Valid()) {
+        CoinEntry entry(&i->keyTmp.second);
+        i->pcursor->GetKey(entry);
+        i->keyTmp.first = entry.key;
+    }
+    else {
         // Make sure Valid() and GetKey() return false
         i->keyTmp.first = 0;
     }
@@ -421,7 +445,7 @@ bool CCoinsViewDB::Upgrade() {
         TxId id(key.second);
         for (size_t i = 0; i < old_coins.vout.size(); ++i) {
             if (!old_coins.vout[i].IsNull() &&
-                !old_coins.vout[i].scriptPubKey.IsUnspendable()) {
+                !old_coins.vout[i].scriptPubKey.IsUnspendable(IsGenesisEnabled(GlobalConfig::GetConfig(), old_coins.nHeight))) {
                 Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight,
                              old_coins.fCoinBase);
                 COutPoint outpoint(id, i);

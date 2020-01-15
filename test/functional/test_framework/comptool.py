@@ -43,6 +43,9 @@ class RejectResult():
     def __repr__(self):
         return '%i:%s' % (self.code, self.reason or '*')
 
+class DiscardResult():
+    """Outcome that expects the silent discarding of a transaction."""
+    pass
 
 class TestNode(NodeConnCB):
 
@@ -185,6 +188,8 @@ class TestManager():
         self.block_store = BlockStore(datadir)
         self.tx_store = TxStore(datadir)
         self.ping_counter = 1
+        self.destAddr = '127.0.0.1'
+        self.waitForPingTimeout = 60
 
     def add_all_connections(self, nodes):
         for i in range(len(nodes)):
@@ -192,7 +197,7 @@ class TestManager():
             test_node = TestNode(self.block_store, self.tx_store)
             self.test_nodes.append(test_node)
             self.connections.append(
-                NodeConn('127.0.0.1', p2p_port(i), nodes[i], test_node))
+                NodeConn(self.destAddr, p2p_port(i), nodes[i], test_node))
             # Make sure the TestNode (callback class) has a reference to its
             # associated NodeConn
             test_node.add_connection(self.connections[-1])
@@ -211,7 +216,11 @@ class TestManager():
 
     def wait_for_pings(self, counter, timeout=60):
         def received_pongs():
-            return all(node.received_ping_response(counter) for node in self.test_nodes)
+            if all(node.received_ping_response(counter) for node in self.test_nodes):
+                # after we receive pong we need to check that there are no async
+                # block/transaction processes still running
+                return all(sum(c.rpc.getblockchainactivity().values()) for c in self.connections) == 0
+            return False
         wait_until(received_pongs, lock=mininode_lock, timeout=timeout)
 
     # sync_blocks: Wait for all connections to request the blockhash given
@@ -227,6 +236,10 @@ class TestManager():
         # --> error if not requested
         wait_until(blocks_requested, attempts=20 *
                    num_blocks, lock=mininode_lock)
+
+        # Wait for all the blocks to finish processing
+        [c.cb.send_ping(self.ping_counter) for c in self.connections]
+        self.wait_for_pings(self.ping_counter, timeout=timeout)
 
         # Send getheaders message
         [c.cb.send_getheaders() for c in self.connections]
@@ -261,29 +274,59 @@ class TestManager():
         with mininode_lock:
             [c.cb.lastInv.sort() for c in self.connections]
 
+    def __check_results_outcome_none(self):
+        with mininode_lock:
+            for c in self.connections:
+                if c.cb.bestblockhash != self.connections[0].cb.bestblockhash:
+                    return False
+        return True
+
+    def __check_results_outcome_RejectResult(self, blockhash, outcome):
+        # Check that block was rejected w/ code
+        with mininode_lock:
+            for c in self.connections:
+                if c.cb.bestblockhash == blockhash:
+                    return ('Block was not rejected: %064x' % (blockhash), False)
+
+                if not blockhash in c.cb.block_reject_map:
+                    return ('Block not in reject map: %064x' % (blockhash), True)
+
+                if not outcome.match(c.cb.block_reject_map[blockhash]):
+                    return ('Block rejected with %s instead of expected %s: %064x' % (
+                        c.cb.block_reject_map[blockhash], outcome, blockhash), False)
+        return ('', False)
+
+    def __check_results_else(self, blockhash, outcome):
+        with mininode_lock:
+            for c in self.connections:
+                if ((c.cb.bestblockhash == blockhash) != outcome):
+                    return False
+        return True
+
     # Verify that the tip of each connection all agree with each other, and
     # with the expected outcome (if given)
     def check_results(self, blockhash, outcome):
-        with mininode_lock:
-            for c in self.connections:
-                if outcome is None:
-                    if c.cb.bestblockhash != self.connections[0].cb.bestblockhash:
-                        return False
-                # Check that block was rejected w/ code
-                elif isinstance(outcome, RejectResult):
-                    if c.cb.bestblockhash == blockhash:
-                        return False
-                    if blockhash not in c.cb.block_reject_map:
-                        logger.error(
-                            'Block not in reject map: %064x' % (blockhash))
-                        return False
-                    if not outcome.match(c.cb.block_reject_map[blockhash]):
-                        logger.error('Block rejected with %s instead of expected %s: %064x' % (
-                            c.cb.block_reject_map[blockhash], outcome, blockhash))
-                        return False
-                elif ((c.cb.bestblockhash == blockhash) != outcome):
-                    return False
-            return True
+        if outcome is None:
+            return self.__check_results_outcome_none()
+        elif isinstance(outcome, RejectResult):
+            error = ''
+            for counter in range(0, 10):
+                (error, retry) = self.__check_results_outcome_RejectResult(blockhash, outcome)
+
+                if not error:
+                    return True
+                elif not retry:
+                    break
+
+                # sleep for a while as the rejection message might have
+                # not been received yet due to the asynchronous nature
+                # of that message
+                time.sleep(0.5)
+
+            logger.error(error)
+            return False
+
+        return self.__check_results_else(blockhash, outcome)
 
     # Either check that the mempools all agree with each other, or that
     # txhash's presence in the mempool matches the outcome specified.
@@ -309,6 +352,11 @@ class TestManager():
                         logger.error('Tx rejected with %s instead of expected %s: %064x' % (
                             c.cb.tx_reject_map[txhash], outcome, txhash))
                         return False
+                elif isinstance(outcome, DiscardResult):
+                    if txhash in c.cb.tx_reject_map:
+                        logger.error('Tx in reject map: %064x' % (txhash))
+                        return False
+                    return not txhash in c.cb.lastInv
                 elif ((txhash in c.cb.lastInv) != outcome):
                     return False
             return True
@@ -372,7 +420,7 @@ class TestManager():
                              for c in self.connections]
                             [c.cb.send_ping(self.ping_counter)
                              for c in self.connections]
-                            self.wait_for_pings(self.ping_counter)
+                            self.wait_for_pings(self.ping_counter, self.waitForPingTimeout)
                             self.ping_counter += 1
                         if (not self.check_results(tip, outcome)):
                             raise AssertionError(

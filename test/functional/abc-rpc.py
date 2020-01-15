@@ -7,12 +7,11 @@
 
 import time
 import random
-import re
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (assert_equal, assert_raises_rpc_error)
 from test_framework.cdefs import (ONE_MEGABYTE,
                                   LEGACY_MAX_BLOCK_SIZE,
-                                  REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER)
+                                  REGTEST_DEFAULT_MAX_BLOCK_SIZE)
 
 
 class ABC_RPC_Test (BitcoinTestFramework):
@@ -24,18 +23,11 @@ class ABC_RPC_Test (BitcoinTestFramework):
         self.extra_args = [['-norelaypriority',
                             '-whitelist=127.0.0.1']]
 
-    def check_subversion(self, pattern_str):
-        # Check that the subversion is set as expected
-        netinfo = self.nodes[0].getnetworkinfo()
-        subversion = netinfo['subversion']
-        pattern = re.compile(pattern_str)
-        assert(pattern.match(subversion))
-
     def test_excessiveblock(self):
-        # Check that we start with REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER
+        # Check that we start with REGTEST_DEFAULT_MAX_BLOCK_SIZE
         getsize = self.nodes[0].getexcessiveblock()
         ebs = getsize['excessiveBlockSize']
-        assert_equal(ebs, REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER)
+        assert_equal(ebs, REGTEST_DEFAULT_MAX_BLOCK_SIZE)
 
         # Check that setting to legacy size is ok
         self.nodes[0].setexcessiveblock(LEGACY_MAX_BLOCK_SIZE + 1)
@@ -57,24 +49,18 @@ class ABC_RPC_Test (BitcoinTestFramework):
         getsize = self.nodes[0].getexcessiveblock()
         ebs = getsize['excessiveBlockSize']
         assert_equal(ebs, 2 * ONE_MEGABYTE)
-        # Check for EB correctness in the subver string
-        self.check_subversion("/Bitcoin SV:.*\(EB2\.0; .*\)/")
 
         # Check setting to 13MB
         self.nodes[0].setexcessiveblock(13 * ONE_MEGABYTE)
         getsize = self.nodes[0].getexcessiveblock()
         ebs = getsize['excessiveBlockSize']
         assert_equal(ebs, 13 * ONE_MEGABYTE)
-        # Check for EB correctness in the subver string
-        self.check_subversion("/Bitcoin SV:.*\(EB13\.0; .*\)/")
 
         # Check setting to 13.14MB
         self.nodes[0].setexcessiveblock(13140000)
         getsize = self.nodes[0].getexcessiveblock()
         ebs = getsize['excessiveBlockSize']
         assert_equal(ebs, 13.14 * ONE_MEGABYTE)
-        # check for EB correctness in the subver string
-        self.check_subversion("/Bitcoin SV:.*\(EB13\.1; .*\)/")
 
     def run_test(self):
         self.genesis_hash = int(self.nodes[0].getbestblockhash(), 16)

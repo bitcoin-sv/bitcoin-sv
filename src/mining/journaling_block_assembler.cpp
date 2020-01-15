@@ -1,12 +1,12 @@
 // Copyright (c) 2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
+#include <mining/journaling_block_assembler.h>
 
 #include <chainparams.h>
 #include <config.h>
 #include <consensus/validation.h>
 #include <logging.h>
 #include <mining/journal_builder.h>
-#include <mining/journaling_block_assembler.h>
 #include <timedata.h>
 #include <txmempool.h>
 #include <util.h>
@@ -21,25 +21,21 @@ JournalingBlockAssembler::JournalingBlockAssembler(const Config& config)
 {
     // Create a new starting block
     newBlock();
-
     // Initialise our starting position
     mJournalPos = CJournal::ReadLock{mJournal}.begin();
 
     // Launch our main worker thread
-    mThread = std::thread(&JournalingBlockAssembler::threadBlockUpdate, this);
+    future_ = std::async(std::launch::async,
+                         &JournalingBlockAssembler::threadBlockUpdate, this);
 }
 
 // Destruction
 JournalingBlockAssembler::~JournalingBlockAssembler()
 {
-    // Shutdown thread
-    {
-        std::unique_lock<std::mutex> lock { mRunningMtx };
-        mRunning = false;
-        mCV.notify_one();
-    }
-    mThread.join();
+    promise_.set_value(); // Tell worker to finish
+    future_.wait();       // Wait for worker to finish
 }
+
 
 // Construct a new block template with coinbase to scriptPubKeyIn
 std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, CBlockIndex*& pindexPrev)
@@ -78,13 +74,25 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
     LogPrintf("JournalingBlockAssembler::CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",
         serializeSize, block->vtx.size() - 1, mBlockFees, mBlockSigOps);
 
+    bool isGenesisEnabled = IsGenesisEnabled(mConfig, chainActive.Height() + 1);
+    bool sigOpCountError;
+
     // Build template
     std::unique_ptr<CBlockTemplate> blockTemplate { std::make_unique<CBlockTemplate>(block) };
     blockTemplate->vTxFees = mTxFees;
     blockTemplate->vTxSigOpsCount = mTxSigOpsCount;
     blockTemplate->vTxFees[0] = -1 * mBlockFees;
-    blockTemplate->vTxSigOpsCount[0] = GetSigOpCountWithoutP2SH(*block->vtx[0]);
 
+    int64_t txSigOpCount = static_cast<int64_t>(GetSigOpCountWithoutP2SH(*block->vtx[0], isGenesisEnabled, sigOpCountError));
+    // This can happen if supplied coinbase scriptPubKeyIn contains multisig with too many public keys
+    if (sigOpCountError)
+    {
+        blockTemplate = nullptr;
+    }
+    else
+    {
+        blockTemplate->vTxSigOpsCount[0] = txSigOpCount;
+    }
     // Can now update callers pindexPrev
     pindexPrev = pindexPrevNew;
     mRecentlyUpdated = false;
@@ -105,13 +113,12 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
     try
     {
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler thread starting\n");
-
-        while(mRunning)
+        const auto future{promise_.get_future()};
+        while(true)
         {
             // Run every few seconds or until stopping
-            std::unique_lock<std::mutex> lock { mRunningMtx };
-            mCV.wait_for(lock, mRunFrequency);
-            if(mRunning)
+            const auto status = future.wait_for(mRunFrequency);
+            if(status == std::future_status::timeout)
             {
                 // Get chain tip
                 const CBlockIndex* pindex {nullptr};
@@ -124,6 +131,8 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
                 std::unique_lock<std::mutex> lock { mMtx };
                 updateBlock(pindex);
             }
+            else if(status == std::future_status::ready)
+                break;
         }
 
         LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler thread stopping\n");
@@ -144,7 +153,8 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
         // Update chain state
         if(pindex)
         {
-            mLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST) ?
+            int height { pindex->nHeight + 1 };
+            mLockTimeCutoff = (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, height)) & LOCKTIME_MEDIAN_TIME_PAST) ?
                 pindex->GetMedianTimePast() : GetAdjustedTime();
         }
 
@@ -249,20 +259,26 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
         return false;
     }
 
-    // Check sig ops count
-    uint64_t maxBlockSigOps { GetMaxBlockSigOpsCount(blockSizeWithTx) };
-    uint64_t txnSigOps { static_cast<uint64_t>(entry.getSigOpsCount()) };
-    uint64_t blockSigOpsWithTx { mBlockSigOps + txnSigOps };
-    if(blockSigOpsWithTx >= maxBlockSigOps)
+    uint64_t txnSigOps{ static_cast<uint64_t>(entry.getSigOpsCount()) };
+    uint64_t blockSigOpsWithTx{ mBlockSigOps + txnSigOps };
+
+    // After Genesis we don't count sigops anymore
+    if (!IsGenesisEnabled(mConfig, pindex->nHeight + 1))
     {
-        return false;
+        // Check sig ops count
+        uint64_t maxBlockSigOps = mConfig.GetMaxBlockSigOpsConsensusBeforeGenesis(blockSizeWithTx);
+     
+        if (blockSigOpsWithTx >= maxBlockSigOps)
+        {
+            return false;
+        }
     }
 
     // Must check that lock times are still valid
     if(pindex)
     {
         CValidationState state {};
-        if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->nHeight + 1, mLockTimeCutoff))
+        if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->nHeight + 1, mLockTimeCutoff, false))
         {
             return false;
         }

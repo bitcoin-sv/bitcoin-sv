@@ -8,12 +8,15 @@
 #include "amount.h"
 #include "consensus/consensus.h"
 #include "mining/factory.h"
+#include "net.h"
 #include "policy/policy.h"
 #include "script/standard.h"
+#include "txn_validation_config.h"
 #include "validation.h"
 
 #include <boost/noncopyable.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -28,8 +31,6 @@ public:
     
     virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
-    virtual uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const = 0;
-    virtual bool MaxBlockSizeOverridden() const = 0;
     
     virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
@@ -42,6 +43,9 @@ public:
     virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) = 0;
     virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
+
+    virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
 
     virtual void SetExcessUTXOCharge(Amount amt) = 0;
     virtual Amount GetExcessUTXOCharge() const = 0;
@@ -77,8 +81,56 @@ public:
     virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
 
-    virtual void SetAcceptP2SH(bool acceptP2SHIn) = 0;
-    virtual bool GetAcceptP2SH() const = 0;
+    virtual bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetGenesisActivationHeight() const = 0;
+
+    virtual bool SetMaxConcurrentAsyncTasksPerNode(
+        int maxConcurrentAsyncTasksPerNode,
+        std::string* error = nullptr) = 0;
+    virtual int GetMaxConcurrentAsyncTasksPerNode() const = 0;
+
+    virtual bool SetBlockScriptValidatorsParams(
+        int maxParallelBlocks,
+        int perValidatorThreadsCount,
+        int perValidatorThreadMaxBatchSize,
+        std::string* error = nullptr) = 0;
+    virtual int GetMaxParallelBlocks() const = 0;
+    virtual int GetPerBlockScriptValidatorThreadsCount() const = 0;
+    virtual int GetPerBlockScriptValidationMaxBatchSize() const = 0;
+
+    virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
+    virtual uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const = 0;
+
+    /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
+    virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const = 0;
+    virtual uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const = 0;
+
+    virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
+
+    virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const = 0;
+
+    virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
+
+    virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
+
+    virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const = 0;
+
+    virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const = 0;
+
+    virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const = 0;
+
+    virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
+    virtual uint64_t GetGenesisGracefulPeriod() const = 0;
+
+    virtual void SetAcceptNonStandardOutput(bool accept) = 0;
+    virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -90,11 +142,9 @@ public:
 
     bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override;
     uint64_t GetMaxBlockSize() const override;
-    uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override;
-    bool MaxBlockSizeOverridden() const override;
 
     bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override;
-    uint64_t GetMaxGeneratedBlockSize() const override;
+    uint64_t GetMaxGeneratedBlockSize() const override;   
     uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const override;
     bool MaxGeneratedBlockSizeOverridden() const override;
 
@@ -104,6 +154,9 @@ public:
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override;
     uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
+
+    bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
+    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const  override;
 
     void SetExcessUTXOCharge(Amount) override;
     Amount GetExcessUTXOCharge() const override;
@@ -139,8 +192,56 @@ public:
     void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override;
     mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override;
 
-    void SetAcceptP2SH(bool acceptP2SHIn) override;
-    bool GetAcceptP2SH() const override;
+    bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override;
+    uint64_t GetGenesisActivationHeight() const override;
+
+    bool SetMaxConcurrentAsyncTasksPerNode(
+        int maxConcurrentAsyncTasksPerNode,
+        std::string* error = nullptr) override;
+    int GetMaxConcurrentAsyncTasksPerNode() const override;
+
+    bool SetBlockScriptValidatorsParams(
+        int maxParallelBlocks,
+        int perValidatorThreadsCount,
+        int perValidatorThreadMaxBatchSize,
+        std::string* error = nullptr) override;
+    int GetMaxParallelBlocks() const override;
+    int GetPerBlockScriptValidatorThreadsCount() const override;
+    int GetPerBlockScriptValidationMaxBatchSize() const override;
+
+    bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) override;
+    uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override;
+
+    bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override;
+    uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override;
+    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override;
+
+    uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override;
+
+    bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* error = nullptr) override;
+    uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override;
+
+    bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
+    std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override;
+
+    bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override;
+    std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override;
+
+    bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) override;
+    uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override;
+
+    
+    bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override;
+    uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override;
+
+    bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) override;
+    uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override;
+
+    bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override;
+    uint64_t GetGenesisGracefulPeriod() const override;
+
+    void SetAcceptNonStandardOutput(bool accept) override;
+    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
 
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
@@ -160,13 +261,16 @@ private:
     bool  setDefaultBlockSizeParamsCalled;
     void  CheckSetDefaultCalled() const;
 
+    // Defines when either maxGeneratedBlockSizeBefore or maxGeneratedBlockSizeAfter is used
     int64_t blockSizeActivationTime;
-    uint64_t maxBlockSizeBefore;
-    uint64_t maxBlockSizeAfter;
-    bool maxBlockSizeOverridden;
+    uint64_t maxBlockSize;
+    // Used when SetMaxBlockSize is called with value 0
+    uint64_t defaultBlockSize;
     uint64_t maxGeneratedBlockSizeBefore;
     uint64_t maxGeneratedBlockSizeAfter;
     bool maxGeneratedBlockSizeOverridden;
+
+    uint64_t maxTxSizePolicy;
 
     uint64_t dataCarrierSize;
     uint64_t limitDescendantCount;
@@ -176,7 +280,32 @@ private:
 
     bool testBlockCandidateValidity;
     mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
-    bool acceptP2SH;
+
+    uint64_t genesisActivationHeight;
+
+    int mMaxConcurrentAsyncTasksPerNode;
+
+    int mMaxParallelBlocks;
+    int mPerBlockScriptValidatorThreadsCount;
+    int mPerBlockScriptValidationMaxBatchSize;
+
+    uint64_t maxOpsPerScriptPolicy;
+
+    uint64_t maxTxSigOpsCountPolicy;
+    uint64_t maxPubKeysPerMultiSig;
+    uint64_t genesisGracefulPeriod;
+
+    std::chrono::milliseconds mMaxStdTxnValidationDuration;
+    std::chrono::milliseconds mMaxNonStdTxnValidationDuration;
+
+    uint64_t maxStackMemoryUsagePolicy;
+    uint64_t maxStackMemoryUsageConsensus;
+
+    uint64_t maxScriptSizePolicy;
+
+    uint64_t maxScriptNumLengthPolicy;
+
+    bool mAcceptNonStandardOutput;
 };
 
 // Dummy for subclassing in unittests
@@ -192,8 +321,6 @@ public:
         return false; 
     }
     uint64_t GetMaxBlockSize() const override { return 0; }
-    uint64_t GetMaxBlockSize(int64_t nMedianTimePast) const override { return 0; }
-    bool MaxBlockSizeOverridden() const override { return false; }
 
     bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override {
         if (err) *err = "This is dummy config";  
@@ -214,6 +341,17 @@ public:
         return false;
     }
     uint8_t GetBlockPriorityPercentage() const override { return 0; }
+
+    bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
+    {
+        if (err)
+        {
+            *err = "This is dummy config";
+        }
+        maxTxSizePolicy = value;
+        return false;
+    }
+    uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
 
     void SetChainParams(std::string net);
     const CChainParams &GetChainParams() const override { return *chainParams; }
@@ -254,13 +392,136 @@ public:
         return mining::CMiningFactory::BlockAssemblerType::LEGACY;
     }
 
-    void SetAcceptP2SH(bool acceptP2SHIn) override { acceptP2SH = acceptP2SHIn; }
-    bool GetAcceptP2SH() const override { return acceptP2SH; }
+    bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn); return true; }
+    uint64_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
+
+    bool SetMaxConcurrentAsyncTasksPerNode(
+        int maxConcurrentAsyncTasksPerNode,
+        std::string* error = nullptr) override
+    {
+        if(error)
+        {
+            *error = "This is dummy config";
+        }
+
+        return false;
+    }
+    int GetMaxConcurrentAsyncTasksPerNode() const override;
+
+    bool SetBlockScriptValidatorsParams(
+        int maxParallelBlocks,
+        int perValidatorThreadsCount,
+        int perValidatorThreadMaxBatchSize,
+        std::string* error = nullptr) override
+    {
+        if(error)
+        {
+            *error = "This is dummy config";
+        }
+
+        return false;
+    }
+    int GetMaxParallelBlocks() const override;
+    int GetPerBlockScriptValidatorThreadsCount() const override;
+    int GetPerBlockScriptValidationMaxBatchSize() const override;
+    bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr)  override { return true; }
+    uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const override { return UINT32_MAX; }
+
+    bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) override { return true;  }
+    uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const override
+    {
+        if (isGenesisEnabled)
+        {
+            return MAX_OPS_PER_SCRIPT_AFTER_GENESIS;
+        }
+        else
+        {
+            return MAX_OPS_PER_SCRIPT_BEFORE_GENESIS;
+        }
+    }
+    bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) override { return true; }
+    uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+    uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const override { return MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS; }
+
+    uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const override { throw std::runtime_error("DummyCofig::GetMaxBlockSigOps not implemented"); }
+
+    bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) override { return true; }
+    uint64_t GetGenesisGracefulPeriod() const override { return DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD; }
+
+    bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) override { return true; }
+    uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const override
+    {
+        if (isGenesisEnabled)
+        {
+            return MAX_PUBKEYS_PER_MULTISIG_AFTER_GENESIS;
+        }
+        else
+        {
+            return MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS;
+        }
+    }
+
+    bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) override
+    {
+        if(err)
+        {
+            *err = "This is dummy config";
+        }
+
+        return false;
+    }
+    std::chrono::milliseconds GetMaxStdTxnValidationDuration() const override
+    {
+        return DEFAULT_MAX_STD_TXN_VALIDATION_DURATION;
+    }
+
+    bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override
+    {
+        if(err)
+        {
+            *err = "This is dummy config";
+        }
+
+        return false;
+    }
+    std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const override
+    {
+        return DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION;
+    }
+
+    bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override 
+    {
+        if (err) *err = "This is dummy config";
+        maxScriptSizePolicy = static_cast<uint64_t>(maxScriptSizePolicyIn);
+        return true; 
+    };
+    uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const override { return maxScriptSizePolicy; };
+
+    bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) override { return true;  }
+    uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const override
+    {
+        if (isGenesisEnabled)
+        {
+            return MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS;
+        }
+        else
+        {
+            return MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS;
+        }
+    }
+
+    void SetAcceptNonStandardOutput(bool) override {}
+    bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override
+    {
+        return isGenesisEnabled ? true : !fRequireStandard;
+    }
 
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
-    bool acceptP2SH { DEFAULT_ACCEPT_P2SH };
+    uint64_t genesisActivationHeight;
+    uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
+    uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
 };
 
 #endif

@@ -16,22 +16,22 @@ BlockAssembler::BlockAssembler(const Config& config)
 {
 }
 
-uint64_t BlockAssembler::ComputeMaxGeneratedBlockSize(const CBlockIndex* pindex) const
+uint64_t BlockAssembler::ComputeMaxGeneratedBlockSize(const CBlockIndex* pindexPrev) const
 {
     // Block resource limits
     uint64_t maxGeneratedBlockSize {};
     uint64_t maxBlockSize {};
 
-    if(pindex == nullptr)
+    if(pindexPrev == nullptr)
     {
         maxGeneratedBlockSize = mConfig.GetMaxGeneratedBlockSize();
         maxBlockSize = mConfig.GetMaxBlockSize();
     }
     else
     {
-        auto medianPastTime { pindex->GetMedianTimePast() };
+        auto medianPastTime { pindexPrev->GetMedianTimePast() };
         maxGeneratedBlockSize = mConfig.GetMaxGeneratedBlockSize(medianPastTime);
-        maxBlockSize = mConfig.GetMaxBlockSize(medianPastTime);
+        maxBlockSize = mConfig.GetMaxBlockSize();
     }
 
     // Limit size to between 1K and MaxBlockSize-1K for sanity:

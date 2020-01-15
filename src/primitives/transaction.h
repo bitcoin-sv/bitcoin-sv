@@ -146,6 +146,7 @@ public:
     std::string ToString() const;
 };
 
+class Config; // declared in config.h, but including the header file here brings in additional problem
 /**
  * An output of a transaction.  It contains the public key that the next input
  * must be able to sign with to claim it.
@@ -175,7 +176,7 @@ public:
 
     bool IsNull() const { return (nValue == Amount(-1)); }
 
-    Amount GetDustThreshold(const CFeeRate &minRelayTxFee) const {
+    Amount GetDustThreshold(const CFeeRate &minRelayTxFee, bool isGenesisEnabled) const {
         /**
          * "Dust" is defined in terms of CTransaction::minRelayTxFee, which has
          * units satoshis-per-kilobyte. If you'd pay more than 1/3 in fees to
@@ -187,7 +188,7 @@ public:
          * spend: so dust is a spendable txout less than 294*minRelayTxFee/1000
          * (in satoshis).
          */
-        if (scriptPubKey.IsUnspendable()) return Amount(0);
+        if (scriptPubKey.IsUnspendable(isGenesisEnabled)) return Amount(0);
 
         size_t nSize = GetSerializeSize(*this, SER_DISK, 0);
 
@@ -197,8 +198,8 @@ public:
         return 3 * minRelayTxFee.GetFee(nSize);
     }
 
-    bool IsDust(const CFeeRate &minRelayTxFee) const {
-        return (nValue < GetDustThreshold(minRelayTxFee));
+    bool IsDust(const CFeeRate &minRelayTxFee, bool isGenesisEnabled) const {
+        return (nValue < GetDustThreshold(minRelayTxFee, isGenesisEnabled));
     }
 
     friend bool operator==(const CTxOut &a, const CTxOut &b) {

@@ -32,8 +32,8 @@
  * The data type T must be movable by memmove/realloc(). Once we switch to C++,
  * move constructors can be used instead.
  */
-template <unsigned int N, typename T, typename Size = uint32_t,
-          typename Diff = int32_t>
+template <unsigned int N, typename T, typename Size = uint64_t,
+          typename Diff = int64_t>
 class prevector {
 public:
     typedef Size size_type;

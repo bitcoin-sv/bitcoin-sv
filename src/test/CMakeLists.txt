@@ -56,15 +56,20 @@ add_test_to_suite(bitcoin test_bitcoin
 	base32_tests.cpp
 	base58_tests.cpp
 	base64_tests.cpp
+    big_int_tests.cpp
 	bip32_tests.cpp
 	blockcheck_tests.cpp
 	blockencodings_tests.cpp
+	block_info_tests.cpp
 	blockmaxsize_tests.cpp
 	blockfile_reading_tests.cpp
 	blockstatus_tests.cpp
+	blockvalidationstatus_tests.cpp
 	bloom_tests.cpp
+    bn_op_tests.cpp
 	bswap_tests.cpp
 	checkpoints_tests.cpp
+	checkqueue_tests.cpp
 	coins_tests.cpp
 	compress_tests.cpp
 	config_tests.cpp
@@ -79,16 +84,18 @@ add_test_to_suite(bitcoin test_bitcoin
 	getarg_tests.cpp
 	hash_tests.cpp
 	inv_tests.cpp
+    int_serialization_tests.cpp
 	journal_tests.cpp
 	jsonutil.cpp
 	key_tests.cpp
 	limitedmap_tests.cpp
+	limitedstack_tests.cpp
+	locked_ref_tests.cpp
 	m_candidates_tests.cpp
 	main_tests.cpp
 	mempool_tests.cpp
 	merkle_tests.cpp
 	miner_tests.cpp
-    mod_pri_queue_tests.cpp
 	object_stream_deserialization_tests.cpp
 	opcode_tests.cpp
 	multisig_tests.cpp
@@ -117,15 +124,18 @@ add_test_to_suite(bitcoin test_bitcoin
 	skiplist_tests.cpp
 	streams_tests.cpp
 	stream_serialization_tests.cpp
+	taskcancellation_tests.cpp
 	test_bitcoin.cpp
 	test_bitcoin_main.cpp
 	test_double_spend_detector.cpp
 	test_orphantxns.cpp
 	test_recent_rejects.cpp
+	test_txnvalidation_utils.cpp
 	test_txnvalidator.cpp
 	testutil.cpp
     threadpool_tests.cpp
 	timedata_tests.cpp
+    time_locked_mempool_tests.cpp
 	transaction_tests.cpp
 	txvalidationcache_tests.cpp
 	uint256_tests.cpp

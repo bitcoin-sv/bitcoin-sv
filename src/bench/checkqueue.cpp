@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "checkqueue.h"
+#include "checkqueuepool.h"
 #include "bench.h"
 #include "prevector.h"
 #include "random.h"
@@ -11,27 +11,33 @@
 
 #include <boost/thread/thread.hpp>
 
+#include <optional>
 #include <vector>
 
 // This Benchmark tests the CheckQueue with the lightest weight Checks, so it
 // should make any lock contention particularly visible
-static const int MIN_CORES = 2;
+static const size_t MIN_CORES = 2;
 static const size_t BATCHES = 101;
 static const size_t BATCH_SIZE = 30;
 static const int PREVECTOR_SIZE = 28;
 static const unsigned int QUEUE_BATCH_SIZE = 128;
 static void CCheckQueueSpeed(benchmark::State &state) {
     struct FakeJobNoWork {
-        bool operator()() { return true; }
+        std::optional<bool> operator()(const task::CCancellationToken&)
+        {
+            return true;
+        }
         void swap(FakeJobNoWork &x){};
     };
-    CCheckQueue<FakeJobNoWork> queue{QUEUE_BATCH_SIZE};
     boost::thread_group tg;
-    for (auto x = 0; x < std::max(MIN_CORES, GetNumCores()); ++x) {
-        tg.create_thread([&] { queue.Thread(); });
-    }
+    checkqueue::CCheckQueuePool<FakeJobNoWork, int> pool{
+        1, /* validator count */
+        tg,
+        std::max(MIN_CORES, static_cast<size_t>(GetNumCores())), // validation threads count
+        QUEUE_BATCH_SIZE};
+    auto source = task::CCancellationSource::Make();
     while (state.KeepRunning()) {
-        CCheckQueueControl<FakeJobNoWork> control(&queue);
+        auto control = pool.GetChecker(0, source->GetToken());
 
         // We call Add a number of times to simulate the behavior of adding a
         // block of transactions at once.
@@ -64,18 +70,23 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::State &state) {
         PrevectorJob(FastRandomContext &insecure_rand) {
             p.resize(insecure_rand.randrange(PREVECTOR_SIZE * 2));
         }
-        bool operator()() { return true; }
+        std::optional<bool> operator()(const task::CCancellationToken&)
+        {
+            return true;
+        }
         void swap(PrevectorJob &x) { p.swap(x.p); };
     };
-    CCheckQueue<PrevectorJob> queue{QUEUE_BATCH_SIZE};
     boost::thread_group tg;
-    for (auto x = 0; x < std::max(MIN_CORES, GetNumCores()); ++x) {
-        tg.create_thread([&] { queue.Thread(); });
-    }
+    checkqueue::CCheckQueuePool<PrevectorJob, int> pool{
+        1, /* validator count */
+        tg,
+        std::max(MIN_CORES, static_cast<size_t>(GetNumCores())), // validation threads count
+        QUEUE_BATCH_SIZE};
+    auto source = task::CCancellationSource::Make();
     while (state.KeepRunning()) {
         // Make insecure_rand here so that each iteration is identical.
         FastRandomContext insecure_rand(true);
-        CCheckQueueControl<PrevectorJob> control(&queue);
+        auto control = pool.GetChecker(0, source->GetToken());
         std::vector<std::vector<PrevectorJob>> vBatches(BATCHES);
         for (auto &vChecks : vBatches) {
             vChecks.reserve(BATCH_SIZE);

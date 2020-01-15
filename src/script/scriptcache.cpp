@@ -12,12 +12,15 @@
 #include "sync.h"
 #include "util.h"
 #include "validation.h"
+#include <mutex>
 
-CCriticalSection cs_script_cache;
-static CuckooCache::cache<uint256, SignatureCacheHasher> scriptExecutionCache;
+std::mutex cs_script_cache;
+static auto scriptExecutionCache =
+    std::make_unique<CuckooCache::cache<uint256, SignatureCacheHasher>>();
 static uint256 scriptExecutionCacheNonce(GetRandHash());
 
-void InitScriptExecutionCache() {
+static void InitScriptExecutionCacheUnlocked() 
+{
     // nMaxCacheSize is unsigned. If -maxscriptcachesize is set to zero,
     // setup_bytes creates the minimum possible cache (2 elements).
     size_t nMaxCacheSize =
@@ -26,10 +29,23 @@ void InitScriptExecutionCache() {
                                        DEFAULT_MAX_SCRIPT_CACHE_SIZE)),
                  MAX_MAX_SCRIPT_CACHE_SIZE) *
         (size_t(1) << 20);
-    size_t nElems = scriptExecutionCache.setup_bytes(nMaxCacheSize);
+    size_t nElems = scriptExecutionCache->setup_bytes(nMaxCacheSize);
     LogPrintf("Using %zu MiB out of %zu requested for script execution cache, "
               "able to store %zu elements\n",
               (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, nElems);
+}
+
+void InitScriptExecutionCache()
+{
+    std::lock_guard lock{cs_script_cache};
+    InitScriptExecutionCacheUnlocked();
+}
+
+void ClearCache() 
+{
+    std::lock_guard lock{cs_script_cache};
+    scriptExecutionCache = std::make_unique<CuckooCache::cache<uint256, SignatureCacheHasher>>();
+    InitScriptExecutionCacheUnlocked();
 }
 
 uint256 GetScriptCacheKey(const CTransaction &tx, uint32_t flags) {
@@ -48,11 +64,11 @@ uint256 GetScriptCacheKey(const CTransaction &tx, uint32_t flags) {
 }
 
 bool IsKeyInScriptCache(uint256 key, bool erase) {
-    LOCK(cs_script_cache);
-    return scriptExecutionCache.contains(key, erase);
+    std::lock_guard lock{cs_script_cache};
+    return scriptExecutionCache->contains(key, erase);
 }
 
 void AddKeyInScriptCache(uint256 key) {
-    LOCK(cs_script_cache);
-    scriptExecutionCache.insert(key);
+    std::lock_guard lock{cs_script_cache};
+    scriptExecutionCache->insert(key);
 }

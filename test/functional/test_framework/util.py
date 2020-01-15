@@ -230,7 +230,7 @@ def satoshi_round(amount):
     return Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
 
 
-def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=None):
+def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=None, check_interval=0.05, label="wait_until"):
     if attempts == float('inf') and timeout == float('inf'):
         timeout = 60
     attempt = 0
@@ -245,11 +245,11 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
             if predicate():
                 return
         attempt += 1
-        time.sleep(0.05)
+        time.sleep(check_interval)
 
     # Print the cause of the timeout
-    assert_greater_than(attempts, attempt)
-    assert_greater_than(timeout, time.time())
+    assert attempts >= attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
+    assert timeout >= time.time(), f"{label} : timeout exceeded {timeout}"
     raise RuntimeError('Unreachable')
 
 # RPC/P2P connection constants and functions
@@ -448,9 +448,12 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
     """
     while timeout > 0:
         pool = set(rpc_connections[0].getrawmempool())
+        non_final_pool = set(rpc_connections[0].getrawnonfinalmempool())
         num_match = 1
         for i in range(1, len(rpc_connections)):
-            if set(rpc_connections[i].getrawmempool()) == pool:
+            pool_match = set(rpc_connections[i].getrawmempool()) == pool
+            non_final_pool_match = set(rpc_connections[i].getrawnonfinalmempool()) == non_final_pool
+            if pool_match and non_final_pool_match:
                 num_match = num_match + 1
         if num_match == len(rpc_connections):
             return
@@ -674,7 +677,7 @@ def mine_large_block(node, utxos=None):
     if len(utxos) < num:
         utxos.clear()
         utxos.extend(node.listunspent())
-    fee = 100 * node.getnetworkinfo()["relayfee"]
+    fee = 200 * node.getnetworkinfo()["relayfee"]
     create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
     node.generate(1)
 

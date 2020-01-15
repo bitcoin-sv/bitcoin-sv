@@ -3,11 +3,12 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 from time import sleep
 
-from test_framework.cdefs import MAX_STANDARD_TX_SIZE
+from test_framework.cdefs import MAX_TX_SIZE_POLICY_BEFORE_GENESIS
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 from test_framework.mininode import *
 from test_framework.script import CScript, OP_RETURN, OP_FALSE
+from test_framework.blocktools import calc_needed_data_size
 
 # Test the functionality -datacarriersize works as expected. It should accept both OP_RETURN and OP_FALSE, OP_RETURN
 # 1. Set -datacarriersize to 500B.
@@ -20,25 +21,14 @@ class DataCarrierSizeTest(BitcoinTestFramework):
         self.num_nodes = 1
         self.num_peers = 1
         self.dataCarrierSize = 500;
+        self.genesisHeight = 1000
 
     def setup_network(self):
         self.setup_nodes()
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
-        self.start_node(0)
-
-    
-
-    def calc_needed_data_size(self,script_op_codes, target_size):
-        def pushdata_size(sz):
-            if sz < 0x4c: return 1  # OP_PUSHDATA
-            elif sz <= 0xff: return 2  # OP_PUSHDATA1
-            elif sz <= 0xffff: return 3  # OP_PUSHDATA2
-            elif sz <= 0xffffffff: return 5 # OP_PUSHDATA4
-            else: raise ValueError("Data too long to encode in a PUSHDATA op")
-
-        return target_size - (len(script_op_codes) + pushdata_size(target_size))
+        self.start_node(0)    
 
     @staticmethod
     def _split_int(n, n_parts):
@@ -51,7 +41,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
     def fill_outputs(self, tx, n_outputs, script_op_codes, fund, total_bytes):
         for amount, n_bytes in zip(self._split_int(fund, n_outputs), self._split_int(total_bytes, n_outputs)):
-            script = CScript(script_op_codes + [b"a" * self.calc_needed_data_size(script_op_codes, n_bytes)])
+            script = CScript(script_op_codes + [b"a" * calc_needed_data_size(script_op_codes, n_bytes)])
             assert len(script) == n_bytes
             tx.vout.append(CTxOut(amount, script))
 
@@ -72,7 +62,7 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
         while True:
             tx = CTransaction()
-            # as we cannot call fundrawtransaction with transaction bigger than MAX_STANDARD_TX_SIZE
+            # as we cannot call fundrawtransaction with transaction bigger than MAX_TX_SIZE_POLICY_BEFORE_GENESIS
             # a bit smaller transacton is used to generate inputs
             self.fill_outputs(tx, n_outputs, script_op_codes, fund, total_bytes - 3000)
             tx_hex = self.nodes[0].fundrawtransaction(ToHex(tx), {'changePosition': 0})['hex']
@@ -103,7 +93,8 @@ class DataCarrierSizeTest(BitcoinTestFramework):
     def check_datacarriersize(self, script_op_codes, n_outputs, dataCarrierSize, description):
 
         # dataCarrierSize parameter is used for checking the size of the whole script (CScript).
-        with self.run_node_with_connections(description, 0, ['-datacarriersize=%d' % dataCarrierSize, '-acceptnonstdtxn=false'], self.num_peers) as connections:
+        with self.run_node_with_connections(description, 0,
+            ['-datacarriersize=%d' % dataCarrierSize, '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'], self.num_peers) as connections:
 
             connection = connections[0]
             rejected_txs = []
@@ -129,9 +120,10 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             assert_equal(rejected_txs[0].data, tx_invalid.sha256)
             assert_equal(rejected_txs[0].reason, b'datacarrier-size-exceeded')
 
-    def check_max_standard_tx_size(self, script_op_codes, n_outputs, description):
+    def check_max_tx_size_policy(self, script_op_codes, n_outputs, description):
 
-        with self.run_node_with_connections(description, 0, ['-datacarriersize=%d' % (MAX_STANDARD_TX_SIZE * 2), '-acceptnonstdtxn=false'], self.num_peers) as connections:
+        with self.run_node_with_connections(description, 0,
+            ['-datacarriersize=%d' % (MAX_TX_SIZE_POLICY_BEFORE_GENESIS * 2),  '-genesisactivationheight=%d' % self.genesisHeight, '-acceptnonstdtxn=false'], self.num_peers) as connections:
 
             connection = connections[0]
             rejected_txs = []
@@ -141,14 +133,14 @@ class DataCarrierSizeTest(BitcoinTestFramework):
 
             connection.cb.on_reject = on_reject
 
-            # Create one transaction with a byte less than MAX_STANDARD_TX_SIZE
+            # Create one transaction with size of MAX_TX_SIZE_POLICY_BEFORE_GENESIS
             tx_valid = self.make_tx_total_size(n_outputs, script_op_codes,
-                                               10000, MAX_STANDARD_TX_SIZE - 1)
+                                               10000, MAX_TX_SIZE_POLICY_BEFORE_GENESIS)
             connection.send_message(msg_tx(tx_valid))
 
-            # and one with MAX_STANDARD_TX_SIZE
+            # and one with size of MAX_TX_SIZE_POLICY_BEFORE_GENESIS + 1
             tx_invalid = self.make_tx_total_size(n_outputs, script_op_codes,
-                                                 10000, MAX_STANDARD_TX_SIZE)
+                                                 10000, MAX_TX_SIZE_POLICY_BEFORE_GENESIS + 1)
             connection.send_message(msg_tx(tx_invalid))
 
             # Wait for rejection.
@@ -172,8 +164,8 @@ class DataCarrierSizeTest(BitcoinTestFramework):
         self.check_datacarriersize([OP_FALSE, OP_RETURN], 3, dataCarrierSize, "script with three OP_FALSE, OP_RETURN op codes")
 
         self.stop_node(0)
-        self.check_max_standard_tx_size([OP_RETURN]          , 1, "script with one OP_RETURN op code")
-        self.check_max_standard_tx_size([OP_FALSE, OP_RETURN], 3, "script with three OP_FALSE, OP_RETURN op codes")
+        self.check_max_tx_size_policy([OP_RETURN]          , 1, "script with one OP_RETURN op code")
+        self.check_max_tx_size_policy([OP_FALSE, OP_RETURN], 3, "script with three OP_FALSE, OP_RETURN op codes")
 
 if __name__ == '__main__':
     DataCarrierSizeTest().main()

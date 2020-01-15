@@ -86,6 +86,10 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
             "size we will accept from any source\n"
             "  \"maxminedblocksize\": xxxxx  (numeric) The maximum block size "
             "we will mine\n"
+            "  \"maxstackmemoryusagepolicy\": xxxxx, (numeric) Policy value of "
+            "max stack memory usage\n"
+            "  \"maxStackMemoryUsageConsensus\": xxxxx, (numeric) Consensus value of "
+            "max stack memory usage\n"
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getinfo", "") + HelpExampleRpc("getinfo", ""));
@@ -142,6 +146,10 @@ static UniValue getinfo(const Config &config, const JSONRPCRequest &request) {
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     obj.push_back(Pair("maxblocksize", config.GetMaxBlockSize()));
     obj.push_back(Pair("maxminedblocksize", config.GetMaxGeneratedBlockSize()));
+    obj.push_back(Pair("maxstackmemoryusagepolicy", 
+                       config.GetMaxStackMemoryUsage(true, false)));
+    obj.push_back(Pair("maxstackmemoryusageconsensus",
+                       config.GetMaxStackMemoryUsage(true, true)));
     return obj;
 }
 
@@ -175,7 +183,10 @@ public:
             std::vector<CTxDestination> addresses;
             txnouttype whichType;
             int nRequired;
-            ExtractDestinations(subscript, whichType, addresses, nRequired);
+            // DescribeAddressVisitor is used by RPC call validateaddress, which only takes address as input. 
+            // We have no block height available - treat all transactions as post-Genesis except P2SH to be able to spend them.
+            bool isGenesisEnabled = subscript.IsPayToScriptHash() ? false : true; 
+            ExtractDestinations(subscript, isGenesisEnabled, whichType, addresses, nRequired);
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(
                 Pair("hex", HexStr(subscript.begin(), subscript.end())));
@@ -359,10 +370,10 @@ CScript createmultisig_redeemScript(CWallet *const pwallet,
     }
 
     CScript result = GetScriptForMultisig(nRequired, pubkeys);
-    if (result.size() > MAX_SCRIPT_ELEMENT_SIZE) {
+    if (result.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS) {
         throw std::runtime_error(
             strprintf("redeemScript exceeds size limit: %d > %d", result.size(),
-                      MAX_SCRIPT_ELEMENT_SIZE));
+                      MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS));
     }
 
     return result;

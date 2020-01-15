@@ -12,17 +12,13 @@
 /**
  * A class used to share txn handlers during validation.
  */
-class CTxnHandlers {
- public:
-    CTxnHandlers() = default;
-    ~CTxnHandlers() = default;
-
+struct CTxnHandlers {
     /** Mempool Journal ChangeSet */
     const mining::CJournalChangeSetPtr& mJournalChangeSet;
     /** Double Spend Detector */
     TxnDoubleSpendDetectorSPtr mpTxnDoubleSpendDetector {nullptr};
     /** Handle orphan transactions */
-    OrphanTxnsSPtr mpOrphanTxnsP2PQ {nullptr};
+    OrphanTxnsSPtr mpOrphanTxns {nullptr};
     /** Filter for transactions that were recently rejected */
     TxnRecentRejectsSPtr mpTxnRecentRejects {nullptr};
 };

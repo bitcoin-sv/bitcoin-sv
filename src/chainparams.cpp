@@ -7,6 +7,7 @@
 #include "consensus/merkle.h"
 
 #include "policy/policy.h"
+#include "script/script_num.h"
 
 #include "tinyformat.h"
 #include "util.h"
@@ -16,6 +17,10 @@
 
 #include "chainparamsseeds.h"
 
+#define GENESIS_ACTIVATION_MAIN                 620538
+#define GENESIS_ACTIVATION_STN                  14896
+#define GENESIS_ACTIVATION_TESTNET              1344302
+#define GENESIS_ACTIVATION_REGTEST              10000
 
 static CBlock CreateGenesisBlock(const char *pszTimestamp,
                                  const CScript &genesisOutputScript,
@@ -123,6 +128,9 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 504031;
 
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_MAIN;
+
         /**
          * The message start string is designed to be unlikely to occur in
          * normal data. The characters are rarely used upper ASCII, not valid as
@@ -225,10 +233,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             MAIN_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            MAIN_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
-            // max block size after activation
-            MAIN_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max block size
+            MAIN_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             MAIN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -280,6 +286,9 @@ public:
         // November 13, 2017 hard fork
         consensus.daaHeight = 2200;     // must be > 2016 - see assert in pow.cpp:268
 
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_STN;
+
         /**
          * The message start string is designed to be unlikely to occur in
          * normal data. The characters are rarely used upper ASCII, not valid as
@@ -321,10 +330,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             STN_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            STN_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
-            // max block size after activation
-            STN_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max block size
+            STN_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -378,6 +385,9 @@ public:
 
         // November 13, 2017 hard fork
         consensus.daaHeight = 1188697;
+
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_TESTNET;
 
         diskMagic[0] = 0x0b;
         diskMagic[1] = 0x11;
@@ -440,10 +450,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             TESTNET_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            TESTNET_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
-            // max block size after activation
-            TESTNET_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max block size
+            TESTNET_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             TESTNET_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation
@@ -497,6 +505,9 @@ public:
         // November 13, 2017 hard fork is always on on regtest.
         consensus.daaHeight = 0;
 
+        // February 2020, Genesis Upgrade
+        consensus.genesisHeight = GENESIS_ACTIVATION_REGTEST;
+
         diskMagic[0] = 0xfa;
         diskMagic[1] = 0xbf;
         diskMagic[2] = 0xb5;
@@ -543,10 +554,8 @@ public:
         defaultBlockSizeParams = DefaultBlockSizeParams{
             // activation time 
             REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME,
-            // max block size before activation
-            REGTEST_DEFAULT_MAX_BLOCK_SIZE_BEFORE,
-            // max block size after activation
-            REGTEST_DEFAULT_MAX_BLOCK_SIZE_AFTER,
+            // max block size
+            REGTEST_DEFAULT_MAX_BLOCK_SIZE,
             // max generated block size before activation
             REGTEST_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE,
             // max generated block size after activation

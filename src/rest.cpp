@@ -286,7 +286,7 @@ static bool rest_block(const Config &config, HTTPRequest *req,
         case RF_JSON: {
             req->WriteHeader("Content-Type", "application/json");
             req->StartWritingChunks(HTTP_OK);
-            writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails, *pblockindex);
+            writeBlockJsonChunksAndUpdateMetadata(config, *req, showTxDetails, *pblockindex, false);
             break;
         }
 
@@ -418,7 +418,8 @@ static bool rest_tx(Config &config, HTTPRequest *req,
 
     CTransactionRef tx;
     uint256 hashBlock = uint256();
-    if (!GetTransaction(config, txid, tx, hashBlock, true)) {
+    bool isGenesisEnabled;
+    if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled)) {
         return RESTERR(req, HTTP_NOT_FOUND, hashStr + " not found");
     }
 
@@ -442,7 +443,7 @@ static bool rest_tx(Config &config, HTTPRequest *req,
 
         case RF_JSON: {
             UniValue objTx(UniValue::VOBJ);
-            TxToUniv(*tx, hashBlock, objTx);
+            TxToUniv(*tx, hashBlock, isGenesisEnabled, objTx);
             std::string strJSON = objTx.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
             req->WriteReply(HTTP_OK, strJSON);
@@ -660,7 +661,8 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
                 // include the script in a json output
                 UniValue o(UniValue::VOBJ);
-                ScriptPubKeyToUniv(coin.out.scriptPubKey, o, true);
+                int height = (coin.nHeight == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.nHeight;
+                ScriptPubKeyToUniv(coin.out.scriptPubKey, true, IsGenesisEnabled(config, height), o);
                 utxo.push_back(Pair("scriptPubKey", o));
                 utxos.push_back(utxo);
             }

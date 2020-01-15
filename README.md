@@ -1,9 +1,8 @@
 Bitcoin SV
 ===========
 
-*Note: version 0.2.2 is an optional beta release for the BSV mainnet; however it is a required update
-for the Scaling Test Network. We encourage miners to test this release carefully
-and maintain a v0.2.1 node available on standby.*
+*Note: version 1.0.0.beta1 is an optional beta release for testing the Genesis hard-fork. We do not recommend
+running this on the main network at this time. For more information on the Genesis hard fork, see https://bitcoinsv.io/genesis-hard-fork/*
 
 What is Bitcoin SV?
 -------------------

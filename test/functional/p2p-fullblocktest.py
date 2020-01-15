@@ -1059,18 +1059,18 @@ class FullBlockTest(ComparisonTestFramework):
         #
         #       bytearray[0-19,998]     : OP_CHECKSIG
         #       bytearray[19,999]       : OP_PUSHDATA4
-        #       bytearray[20,000-20,003]: 521  (max_script_element_size+1, in little-endian format)
+        #       bytearray[20,000-20,003]: 521  (max_script_element_size_before_genesis+1, in little-endian format)
         #       bytearray[20,004-20,525]: unread data (script_element)
         #       bytearray[20,526]       : OP_CHECKSIG (this puts us over the limit)
         #
         tip(72)
         b73 = block(73)
         size = MAX_BLOCK_SIGOPS_PER_MB - 1 + \
-            MAX_SCRIPT_ELEMENT_SIZE + 1 + 5 + 1
+            MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS + 1 + 5 + 1
         a = bytearray([OP_CHECKSIG] * size)
         a[MAX_BLOCK_SIGOPS_PER_MB - 1] = int("4e", 16)  # OP_PUSHDATA4
 
-        element_size = MAX_SCRIPT_ELEMENT_SIZE + 1
+        element_size = MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS + 1
         a[MAX_BLOCK_SIGOPS_PER_MB] = element_size % 256
         a[MAX_BLOCK_SIGOPS_PER_MB + 1] = element_size // 256
         a[MAX_BLOCK_SIGOPS_PER_MB + 2] = 0
@@ -1097,7 +1097,7 @@ class FullBlockTest(ComparisonTestFramework):
         tip(72)
         b74 = block(74)
         size = MAX_BLOCK_SIGOPS_PER_MB - 1 + \
-            MAX_SCRIPT_ELEMENT_SIZE + 42  # total = 20,561
+            MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS + 42  # total = 20,561
         a = bytearray([OP_CHECKSIG] * size)
         a[MAX_BLOCK_SIGOPS_PER_MB] = 0x4e
         a[MAX_BLOCK_SIGOPS_PER_MB + 1] = 0xfe
@@ -1110,7 +1110,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         tip(72)
         b75 = block(75)
-        size = MAX_BLOCK_SIGOPS_PER_MB - 1 + MAX_SCRIPT_ELEMENT_SIZE + 42
+        size = MAX_BLOCK_SIGOPS_PER_MB - 1 + MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS + 42
         a = bytearray([OP_CHECKSIG] * size)
         a[MAX_BLOCK_SIGOPS_PER_MB - 1] = 0x4e
         a[MAX_BLOCK_SIGOPS_PER_MB] = 0xff
@@ -1126,7 +1126,7 @@ class FullBlockTest(ComparisonTestFramework):
         # counted
         tip(75)
         b76 = block(76)
-        size = MAX_BLOCK_SIGOPS_PER_MB - 1 + MAX_SCRIPT_ELEMENT_SIZE + 1 + 5
+        size = MAX_BLOCK_SIGOPS_PER_MB - 1 + MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS + 1 + 5
         a = bytearray([OP_CHECKSIG] * size)
         a[MAX_BLOCK_SIGOPS_PER_MB -
             1] = 0x4e  # PUSHDATA4, but leave the following bytes as just checksigs

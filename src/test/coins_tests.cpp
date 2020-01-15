@@ -10,11 +10,13 @@
 #include "undo.h"
 #include "utilstrencodings.h"
 #include "validation.h"
+#include "chainparams.h"
 
 #include <map>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
+#include <config.h>
 
 namespace {
 
@@ -28,6 +30,30 @@ bool operator==(const Coin &a, const Coin &b) {
     return a.IsCoinBase() == b.IsCoinBase() && a.GetHeight() == b.GetHeight() &&
            a.GetTxOut() == b.GetTxOut();
 }
+
+// Dummy cursor that returns no data
+class CCoinsViewCursorEmpty : public CCoinsViewCursor {
+public:
+    CCoinsViewCursorEmpty(const uint256& hashBlockIn)
+        : CCoinsViewCursor(hashBlockIn) { }
+    ~CCoinsViewCursorEmpty() {}
+
+    bool GetKey(COutPoint& key) const override {        
+        return false;
+    }
+    bool GetValue(Coin& coin) const override {        
+        return false;
+    }
+    unsigned int GetValueSize() const override {
+        return 0;
+    };
+
+    bool Valid() const override {        
+        return false;
+    };
+    void Next() override {        
+    };
+};
 
 class CCoinsViewTest : public CCoinsView {
     uint256 hashBestBlock_;
@@ -71,6 +97,12 @@ public:
             hashBestBlock_ = hashBlock;
         }
         return true;
+    }
+
+    CCoinsViewCursor* Cursor(const TxId& txId) const override
+    {
+        CCoinsViewCursorEmpty* cc = new CCoinsViewCursorEmpty(GetBestBlock());
+        return cc;
     }
 };
 
@@ -153,13 +185,15 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test) {
                     : stack.back()->AccessCoin(COutPoint(txid, 0));
             BOOST_CHECK(coin == entry);
 
+            testConfig.SetGenesisActivationHeight(testConfig.GetChainParams().GetConsensus().genesisHeight);
+
             if (InsecureRandRange(5) == 0 || coin.IsSpent()) {
                 CTxOut txout;
                 txout.nValue = Amount(int64_t(insecure_rand()));
                 if (InsecureRandRange(16) == 0 && coin.IsSpent()) {
                     txout.scriptPubKey.assign(1 + InsecureRandBits(6),
                                               OP_RETURN);
-                    BOOST_CHECK(txout.scriptPubKey.IsUnspendable());
+                    BOOST_CHECK(txout.scriptPubKey.IsUnspendable(IsGenesisEnabled(testConfig, 1)));
                     added_an_unspendable_entry = true;
                 } else {
                     // Random sizes so we can test memory usage accounting
@@ -170,7 +204,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test) {
 
                 Coin newcoin(txout, 1, false);
                 stack.back()->AddCoin(COutPoint(txid, 0), newcoin,
-                                      !coin.IsSpent() || insecure_rand() & 1);
+                                      !coin.IsSpent() || insecure_rand() & 1, testConfig.GetGenesisActivationHeight());
             } else {
                 removed_an_entry = true;
                 coin.Clear();
@@ -419,7 +453,7 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test) {
             // restore inputs
             if (!tx.IsCoinBase()) {
                 const COutPoint &out = tx.vin[0].prevout;
-                UndoCoinSpend(undo.vprevout[0], *(stack.back()), out);
+                UndoCoinSpend(undo.vprevout[0], *(stack.back()), out, testConfig);
             }
 
             // Store as a candidate for reconnection
@@ -742,7 +776,7 @@ void CheckAddCoinBase(Amount base_value, Amount cache_value,
         CTxOut output;
         output.nValue = modify_value;
         test.cache.AddCoin(OUTPOINT, Coin(std::move(output), 1, coinbase),
-                           coinbase);
+                           coinbase, GlobalConfig::GetConfig().GetGenesisActivationHeight());
         test.cache.SelfTest();
         GetCoinMapEntry(test.cache.map(), result_value, result_flags);
     } catch (std::logic_error &e) {

@@ -26,6 +26,7 @@ from codecs import encode
 from collections import defaultdict
 import copy
 import hashlib
+from contextlib import contextmanager
 from io import BytesIO
 import logging
 import random
@@ -41,7 +42,7 @@ from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB
 from test_framework.util import hex_str_to_bytes, bytes_to_hex_str, wait_until
 
 BIP0031_VERSION = 60000
-MY_VERSION = 70014  # past bip-31 for ping/pong
+MY_VERSION = 70015 # INVALID_CB_NO_BAN_VERSION
 MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 # from version 70001 onwards, fRelay should be appended to version messages (BIP37)
 MY_RELAY = 1
@@ -77,8 +78,15 @@ mininode_socket_map = dict()
 # access to any data shared with the NodeConnCB or NodeConn.
 mininode_lock = RLock()
 
-# Serialization/deserialization tools
+# ports used by chain type
+NETWORK_PORTS = {
+    "mainnet" : 8333,
+    "testnet3" : 18333,
+    "stn" : 9333,
+    "regtest" : 18444
+}
 
+# Serialization/deserialization tools
 
 def sha256(s):
     return hashlib.new('sha256', s).digest()
@@ -344,9 +352,9 @@ class CProtoconf():
 
 
 class CBlockLocator():
-    def __init__(self):
+    def __init__(self, have=[]):
         self.nVersion = MY_VERSION
-        self.vHave = []
+        self.vHave = have
 
     def deserialize(self, f):
         self.nVersion = struct.unpack("<i", f.read(4))[0]
@@ -1220,8 +1228,8 @@ class msg_sendheaders():
 class msg_getheaders():
     command = b"getheaders"
 
-    def __init__(self):
-        self.locator = CBlockLocator()
+    def __init__(self, locator_have=[]):
+        self.locator = CBlockLocator(locator_have)
         self.hashstop = 0
 
     def deserialize(self, f):
@@ -1313,8 +1321,8 @@ class msg_feefilter():
 class msg_sendcmpct():
     command = b"sendcmpct"
 
-    def __init__(self):
-        self.announce = False
+    def __init__(self, announce=False):
+        self.announce = announce
         self.version = 1
 
     def deserialize(self, f):
@@ -1398,6 +1406,8 @@ class NodeConnCB():
         self.message_count = defaultdict(int)
         self.msg_timestamp = {}
         self.last_message = {}
+        self.time_index = 0
+        self.msg_index = defaultdict(int)
 
         # A count of the number of ping messages we've sent to the node
         self.ping_counter = 1
@@ -1430,6 +1440,8 @@ class NodeConnCB():
                 self.message_count[command] += 1
                 self.last_message[command] = message
                 self.msg_timestamp[command] = time.time()
+                self.msg_index[command] = self.time_index
+                self.time_index +=1
                 getattr(self, 'on_' + command)(conn, message)
             except:
                 print("ERROR delivering %s (%s)" % (repr(message),
@@ -1581,14 +1593,33 @@ class NodeConnCB():
 
     # Sync up with the node
     def sync_with_ping(self, timeout=60):
+        # use ping to guarantee that previously sent p2p messages were processed
         self.send_message(msg_ping(nonce=self.ping_counter))
 
         def test_function():
             if not self.last_message.get("pong"):
                 return False
-            return self.last_message["pong"].nonce == self.ping_counter
+            if self.last_message["pong"].nonce != self.ping_counter:
+                return False
+            # after we receive pong we need to check that there are no async
+            # block/transaction processes still running
+            activity = self.connection.rpc.getblockchainactivity()
+            return sum(activity.values()) == 0
+
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
         self.ping_counter += 1
+
+    @contextmanager
+    def temporary_override_callback(self, **callbacks):
+        old_callbacks = {cb_name: getattr(self, cb_name) for cb_name in callbacks.keys()}
+        for cb_name, cb in callbacks.items():
+            setattr(self, cb_name, cb)
+
+        yield
+
+        for cb_name, cb in old_callbacks.items():
+            setattr(self, cb_name, cb)
+
 
 # The actual NodeConn class
 # This class provides an interface for a p2p connection to a specified node
@@ -1624,6 +1655,7 @@ class NodeConn(asyncore.dispatcher):
     MAGIC_BYTES = {
         "mainnet": b"\xe3\xe1\xf3\xe8",
         "testnet3": b"\xf4\xe5\xf3\xf4",
+        "stn": b"\xfb\xce\xc4\xf9",
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
@@ -1632,7 +1664,7 @@ class NodeConn(asyncore.dispatcher):
         self.dstaddr = dstaddr
         self.dstport = dstport
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sendbuf = b""
+        self.sendbuf = bytearray()
         self.recvbuf = b""
         self.ver_send = 209
         self.ver_recv = 209
@@ -1675,7 +1707,7 @@ class NodeConn(asyncore.dispatcher):
                      (self.dstaddr, self.dstport))
         self.state = "closed"
         self.recvbuf = b""
-        self.sendbuf = b""
+        self.sendbuf = bytearray()
         try:
             self.close()
         except:
@@ -1718,7 +1750,7 @@ class NodeConn(asyncore.dispatcher):
             except:
                 self.handle_close()
                 return
-            self.sendbuf = self.sendbuf[sent:]
+            del self.sendbuf[:sent]
 
     def got_data(self):
         try:

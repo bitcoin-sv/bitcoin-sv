@@ -47,7 +47,7 @@ public:
     virtual bool GetTemplateUpdated() { return false; }
 
 protected:
-    uint64_t ComputeMaxGeneratedBlockSize(const CBlockIndex* pindex) const;
+    uint64_t ComputeMaxGeneratedBlockSize(const CBlockIndex* pindexPrev) const;
 
     // Fill in header fields for a new block template
     void FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex, const CScript& scriptPubKeyIn) const;

@@ -20,6 +20,7 @@
 #include "netbase.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
+#include "taskcancellation.h"
 #include "txn_propagator.h"
 #include "txn_validator.h"
 #include "ui_interface.h"
@@ -398,10 +399,18 @@ CNodePtr CConnman::ConnectNode(CAddress addrConnect, const char *pszDest,
             GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE)
                 .Write(id)
                 .Finalize();
-        CNodePtr pnode { std::make_shared<CNode>(
-            id, nLocalServices, GetBestHeight(), hSocket, addrConnect,
-            CalculateKeyedNetGroup(addrConnect), nonce, pszDest ? pszDest : "", false)
-        };
+        CNodePtr pnode =
+            CNode::Make(
+                id,
+                nLocalServices,
+                GetBestHeight(),
+                hSocket,
+                addrConnect,
+                CalculateKeyedNetGroup(addrConnect),
+                nonce,
+                mAsyncTaskPool,
+                pszDest ? pszDest : "",
+                false);
         pnode->nServicesExpected = ServiceFlags(addrConnect.nServices & nRelevantServices);
 
         return pnode;
@@ -619,6 +628,72 @@ void CConnman::AddWhitelistedRange(const CSubNet &subnet) {
     vWhitelistedRange.push_back(subnet);
 }
 
+CConnman::CAsyncTaskPool::CAsyncTaskPool(const Config& config)
+    : mPool{
+        "CAsyncTaskPool",
+        // +1 so that we have more async threads than there are block checker
+        // queues so that a better block can terminate one of the existing
+        // blocked block check queues on exhaustion
+        static_cast<size_t>(config.GetMaxParallelBlocks()) + 1}
+    , mPerInstanceSoftAsyncTaskLimit{config.GetMaxConcurrentAsyncTasksPerNode()}
+{/**/}
+
+CConnman::CAsyncTaskPool::~CAsyncTaskPool()
+{
+    for(auto& task : mRunningTasks)
+    {
+        task.mCancellationSource->Cancel();
+    }
+    for(auto& task : mRunningTasks)
+    {
+        task.mFuture.wait();
+    }
+}
+
+void CConnman::CAsyncTaskPool::AddToPool(
+    const std::shared_ptr<CNode>& node,
+    std::function<void(std::weak_ptr<CNode>)> function,
+    std::shared_ptr<task::CCancellationSource> source)
+{
+    mRunningTasks.emplace_back(
+        node->GetId(),
+        make_task(
+            mPool,
+            function,
+            std::weak_ptr<CNode>{node}),
+        std::move(source));
+}
+
+void CConnman::CAsyncTaskPool::HandleCompletedAsyncProcessing()
+{
+    using namespace std::literals::chrono_literals;
+
+    for(size_t i=0; i<mRunningTasks.size();)
+    {
+        if(mRunningTasks[i].mFuture.wait_for(1ms) == std::future_status::ready)
+        {
+            try
+            {
+                mRunningTasks[i].mFuture.get();
+            }
+            catch(const std::exception& e)
+            {
+                PrintExceptionContinue(&e, "ProcessMessages()");
+            }
+            catch(...)
+            {
+                PrintExceptionContinue(nullptr, "ProcessMessages()");
+            }
+
+            mRunningTasks.erase(std::next(mRunningTasks.begin(), i));
+        }
+        else
+        {
+            ++i;
+        }
+    }
+}
+
 std::string CNode::GetAddrName() const {
     LOCK(cs_addrName);
     return addrName;
@@ -629,6 +704,16 @@ void CNode::MaybeSetAddrName(const std::string &addrNameIn) {
     if (addrName.empty()) {
         addrName = addrNameIn;
     }
+}
+
+void CNode::RunAsyncProcessing(
+    std::function<void(std::weak_ptr<CNode>)> function,
+    std::shared_ptr<task::CCancellationSource> source)
+{
+    mAsyncTaskPool.AddToPool(
+        shared_from_this(),
+        function,
+        source);
 }
 
 CService CNode::GetAddrLocal() const {
@@ -742,12 +827,8 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
 
     if(!fRelayTxes)
     {
-        // Peer has requested we not relay txns
-        if(!mInvList.empty())
-        {
-            // Clear any txns we have queued for this peer
-            mInvList = InvList{ CompareTxnSendingDetails{&mempool} };
-        }
+        // Clear any txns we have queued for this peer
+        mInvList.clear();
     }
     else
     {
@@ -760,10 +841,10 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
             // Check and update bloom filters
             if(filterInventoryKnown.contains(txn.getInv().hash))
                 continue;
-            if(pfilter && !pfilter->IsRelevantAndUpdate(*(txn.getTxnRef())))
+            if(!mFilter.IsRelevantAndUpdate(*(txn.getTxnRef())))
                 continue;
 
-            mInvList.emplace(txn);
+            mInvList.emplace_back(txn);
             filterInventoryKnown.insert(txn.getInv().hash);
         }
     }
@@ -778,7 +859,12 @@ void CNode::RemoveTxnsFromInventory(const std::vector<CTxnSendingDetails>& txns)
 {
     // Remove them
     LOCK(cs_mInvList);
-    mInvList.erase(txns);
+    for (const auto& el : txns)
+    {
+         mInvList.erase(std::remove_if(mInvList.begin(), mInvList.end(), [&el](const CTxnSendingDetails& i) {
+             return i.getInv() == el.getInv(); }),
+                mInvList.end());
+      }
 }
 
 /** Fetch the next N items from our inventory */
@@ -786,25 +872,21 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
 {
     std::vector<CTxnSendingDetails> results {};
 
-    // Try and lock the mempool (for txn ordering) and our inventory list,
-    // if we fail to take either then don't hold up the caller by waiting.
-    std::shared_lock lock(mempool.smtx, std::defer_lock);
-    bool mempoolLocked {false};
-    if (lock.try_lock()) {
-        mempoolLocked = true;
-    }
     TRY_LOCK(cs_mInvList, invLocked);
-    if(!mempoolLocked || !invLocked)
-        return results;
-
-    for(size_t i = 0; i < n; ++i)
+    if(!invLocked)
     {
-        if(mInvList.empty())
-            break;
-
-        results.emplace_back(std::move(mInvList.top()));
-        mInvList.pop();
+        return results;
     }
+ 
+    if (n > mInvList.size())
+    {
+        n = mInvList.size();
+    }
+
+    results.reserve(n);
+    auto endIt = std::next(std::begin(mInvList), n);
+    std::move(std::begin(mInvList), endIt, std::back_inserter(results));
+    mInvList.erase(std::begin(mInvList), endIt);
 
     return results;
 }
@@ -995,7 +1077,6 @@ struct NodeEvictionCandidate {
     int64_t nLastTXTime;
     bool fRelevantServices;
     bool fRelayTxes;
-    bool fBloomFilter;
     CAddress addr;
     uint64_t nKeyedNetGroup;
 };
@@ -1042,10 +1123,6 @@ static bool CompareNodeTXTime(const NodeEvictionCandidate &a,
         return b.fRelayTxes;
     }
 
-    if (a.fBloomFilter != b.fBloomFilter) {
-        return a.fBloomFilter;
-    }
-
     return a.nTimeConnected > b.nTimeConnected;
 }
 
@@ -1074,7 +1151,6 @@ bool CConnman::AttemptToEvictConnection() {
                 node->nLastTXTime,
                 (node->nServices & nRelevantServices) == nRelevantServices,
                 node->fRelayTxes,
-                node->pfilter != nullptr,
                 node->addr,
                 node->nKeyedNetGroup};
             vEvictionCandidates.push_back(candidate);
@@ -1269,11 +1345,21 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
                          .Write(id)
                          .Finalize();
 
-    CNodePtr pnode { std::make_shared<CNode>(id, nLocalServices, GetBestHeight(), hSocket, addr,
-        CalculateKeyedNetGroup(addr), nonce, "", true) };
+    CNodePtr pnode =
+        CNode::Make(
+            id,
+            nLocalServices,
+            GetBestHeight(),
+            hSocket,
+            addr,
+            CalculateKeyedNetGroup(addr),
+            nonce,
+            mAsyncTaskPool,
+            "",
+            true);
     pnode->fWhitelisted = whitelisted;
 
-    GetNodeSignals().InitializeNode(*config, pnode, *this);
+    GetNodeSignals().InitializeNode(pnode, *this);
 
     LogPrint(BCLog::NET, "connection from %s accepted\n", addr.ToString());
 
@@ -2156,7 +2242,7 @@ bool CConnman::OpenNetworkConnection(const CAddress &addrConnect,
         pnode->fAddnode = true;
     }
 
-    GetNodeSignals().InitializeNode(*config, pnode, *this);
+    GetNodeSignals().InitializeNode(pnode, *this);
     {
         LOCK(cs_vNodes);
         vNodes.push_back(pnode);
@@ -2211,9 +2297,14 @@ namespace
     };
 }
 
-void CConnman::ThreadMessageHandler() {
-    while (!flagInterruptMsgProc) {
-        std::vector<CNodePtr> vNodesCopy;
+void CConnman::ThreadMessageHandler()
+{
+    std::vector<CNodePtr> vNodesCopy;
+
+    while (!flagInterruptMsgProc)
+    {
+        vNodesCopy.clear();
+
         {
             LOCK(cs_vNodes);
             vNodesCopy = vNodes;
@@ -2221,8 +2312,13 @@ void CConnman::ThreadMessageHandler() {
 
         bool fMoreWork = false;
 
-        for (const CNodePtr& pnode : vNodesCopy) {
-            if (pnode->fDisconnect) {
+        mAsyncTaskPool.HandleCompletedAsyncProcessing();
+
+        for (const CNodePtr& pnode : vNodesCopy)
+        {
+            if (pnode->fDisconnect ||
+                mAsyncTaskPool.HasReachedSoftAsyncTaskLimit(pnode->GetId()))
+            {
                 continue;
             }
 
@@ -2247,6 +2343,7 @@ void CConnman::ThreadMessageHandler() {
             bool fMoreNodeWork = GetNodeSignals().ProcessMessages(
                 *config, pnode, *this, flagInterruptMsgProc);
             fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
+
             if (flagInterruptMsgProc) {
                 return;
             }
@@ -2469,7 +2566,11 @@ CConnman::CConnman(
     : config(&configIn)
     , nSeed0(nSeed0In)
     , nSeed1(nSeed1In)
+    , mValidatorThreadPool{"TxnValidatorPool",
+         static_cast<size_t>(gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs())),
+         static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
     , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
+    , mAsyncTaskPool{configIn}
 {
     fNetworkActive = true;
     setBannedIsDirty = false;
@@ -2946,17 +3047,29 @@ unsigned int CConnman::GetSendBufferSize() const {
     return nSendBufferMaxSize;
 }
 
-CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn,
-             int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn,
-             uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn,
-             const std::string &addrNameIn, bool fInboundIn)
-    : hSocket(hSocketIn), nTimeConnected(GetSystemTimeInSeconds()), addr(addrIn),
-      fInbound(fInboundIn), id(idIn), nKeyedNetGroup(nKeyedNetGroupIn),
-      nLocalHostNonce(nLocalHostNonceIn), nLocalServices(nLocalServicesIn),
-      nMyStartingHeight(nMyStartingHeightIn)
+CNode::CNode(
+    NodeId idIn,
+    ServiceFlags nLocalServicesIn,
+    int nMyStartingHeightIn,
+    SOCKET hSocketIn,
+    const CAddress& addrIn,
+    uint64_t nKeyedNetGroupIn,
+    uint64_t nLocalHostNonceIn,
+    CConnman::CAsyncTaskPool& asyncTaskPool,
+    const std::string& addrNameIn,
+    bool fInboundIn)
+    : hSocket(hSocketIn)
+    , nTimeConnected(GetSystemTimeInSeconds())
+    , addr(addrIn)
+    , fInbound(fInboundIn)
+    , id(idIn)
+    , nKeyedNetGroup(nKeyedNetGroupIn)
+    , nLocalHostNonce(nLocalHostNonceIn)
+    , nLocalServices(nLocalServicesIn)
+    , nMyStartingHeight(nMyStartingHeightIn)
+    , mAsyncTaskPool{asyncTaskPool}
 {
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
-    pfilter = new CBloomFilter();
 
     for (const std::string &msg : getAllNetMessageTypes()) {
         mapRecvBytesPerMsgCmd[msg] = 0;
@@ -2970,13 +3083,9 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn,
     }
 }
 
-CNode::~CNode() {
+CNode::~CNode()
+{
     CloseSocket(hSocket);
-
-    LOCK(cs_filter);
-    if (pfilter) {
-        delete pfilter;
-    }
 }
 
 auto CNode::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)
@@ -3162,6 +3271,11 @@ void CConnman::EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData)
     mTxnValidator->newTransaction(std::move(vTxInputData));
 }
 
+/** Resubmit a transaction for validation */
+void CConnman::ResubmitTxnForValidator(TxInputDataSPtr pTxInputData) {
+    mTxnValidator->resubmitTransaction(std::move(pTxInputData));
+}
+
 /** Check if the txn is already known */
 bool CConnman::CheckTxnExistsInValidatorsQueue(const uint256& txid) const {
     return mTxnValidator->isTxnKnown(txid);
@@ -3262,39 +3376,8 @@ uint64_t CConnman::CalculateKeyedNetGroup(const CAddress &ad) const {
         .Finalize();
 }
 
-/**
- * This function convert MaxBlockSize from byte to
- * MB with a decimal precision one digit rounded down
- * E.g.
- * 1660000 -> 1.6
- * 2010000 -> 2.0
- * 1000000 -> 1.0
- * 230000  -> 0.2
- * 50000   -> 0.0
- *
- *  NB behavior for EB<1MB not standardized yet still
- *  the function applies the same algo used for
- *  EB greater or equal to 1MB
- */
-std::string getSubVersionEB(uint64_t MaxBlockSize) {
-    // Prepare EB string we are going to add to SubVer:
-    // 1) translate from byte to MB and convert to string
-    // 2) limit the EB string to the first decimal digit (floored)
-    std::stringstream ebMBs;
-    ebMBs << (MaxBlockSize / (ONE_MEGABYTE / 10));
-    std::string eb = ebMBs.str();
-    eb.insert(eb.size() - 1, ".", 1);
-    if (eb.substr(0, 1) == ".") {
-        eb = "0" + eb;
-    }
-    return eb;
-}
-
-std::string userAgent(const Config &config) {
-    // format excessive blocksize value
-    std::string eb = getSubVersionEB(config.GetMaxBlockSize());
+std::string userAgent() {
     std::vector<std::string> uacomments;
-    uacomments.push_back("EB" + eb);
 
     // sanitize comments per BIP-0014, format user agent and check total size
     if (gArgs.IsArgSet("-uacomment")) {

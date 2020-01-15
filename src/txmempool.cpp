@@ -713,6 +713,7 @@ void CTxMemPool::RemoveForReorg(
             !CheckSequenceLocks(
                 tx,
                 *this,
+                config,
                 flags,
                 &lp,
                 validLP)) {
@@ -838,8 +839,7 @@ void CTxMemPool::Clear() {
     clearNL();
 }
 
-void CTxMemPool::Check(
-    const int64_t nSpendHeight,
+void CTxMemPool::CheckMempool(
     const CCoinsViewCache *pcoins,
     const mining::CJournalChangeSetPtr& changeSet) const {
 
@@ -850,6 +850,9 @@ void CTxMemPool::Check(
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency) {
         return;
     }
+
+    // Get spend height and MTP
+    const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(*pcoins);
 
     std::shared_lock lock(smtx);
 
@@ -960,6 +963,9 @@ void CTxMemPool::Check(
             assert(fCheckResult);
             UpdateCoins(tx, mempoolDuplicate, 1000000);
         }
+
+        // Check we haven't let any non-final txns in
+        assert(IsFinalTx(tx, nSpendHeight, medianTimePast));
     }
 
     unsigned int stepsSinceLastRemove = 0;
@@ -1006,6 +1012,11 @@ void CTxMemPool::Check(
 std::string CTxMemPool::CheckJournal() const {
     std::shared_lock lock(smtx);
     return checkJournalNL();
+}
+
+void CTxMemPool::clearPrioritisation(const uint256 &hash) {
+    std::unique_lock lock(smtx);
+    clearPrioritisationNL(hash);
 }
 
 std::string CTxMemPool::checkJournalNL() const
@@ -1158,13 +1169,6 @@ void CTxMemPool::QueryHashes(std::vector<uint256> &vtxid) {
     }
 }
 
-static TxMempoolInfo
-GetInfo(CTxMemPool::indexed_transaction_set::const_iterator it) {
-    return TxMempoolInfo{it->GetSharedTx(), it->GetTime(),
-                         CFeeRate(it->GetFee(), it->GetTxSize()),
-                         it->GetModifiedFee() - it->GetFee()};
-}
-
 std::vector<TxMempoolInfo> CTxMemPool::InfoAll() const {
     std::shared_lock lock(smtx);
     return InfoAllNL();
@@ -1175,7 +1179,7 @@ std::vector<TxMempoolInfo> CTxMemPool::InfoAllNL() const {
     std::vector<TxMempoolInfo> ret;
     ret.reserve(mapTx.size());
     for (auto it : iters) {
-        ret.push_back(GetInfo(it));
+        ret.push_back(TxMempoolInfo{*it});
     }
     return ret;
 }
@@ -1200,7 +1204,7 @@ TxMempoolInfo CTxMemPool::Info(const uint256 &txid) const {
         return TxMempoolInfo();
     }
 
-    return GetInfo(i);
+    return { *i };
 }
 
 CFeeRate CTxMemPool::EstimateFee(int nBlocks) const {
@@ -1362,7 +1366,7 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
     // Estimate the overhead of mapTx to be 15 pointers + an allocation, as no
     // exact formula for boost::multi_index_contained is implemented.
     return memusage::MallocUsage(sizeof(CTxMemPoolEntry) +
-                                 15 * sizeof(void *)) *
+                                 12 * sizeof(void *)) *
                mapTx.size() +
            memusage::DynamicUsage(mapNextTx) +
            memusage::DynamicUsage(mapDeltas) +
@@ -1402,13 +1406,24 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
     return stage.size();
 }
 
-bool CTxMemPool::CheckTxConflicts(const CTransaction &tx) const {
+bool CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
+ {
     std::shared_lock lock(smtx);
-    for (const CTxIn &txin : tx.vin) {
+
+    // Check our locked UTXOs
+    for (const CTxIn &txin : tx->vin) {
         if (mapNextTx.find(txin.prevout) != mapNextTx.end()) {
             return true;
         }
     }
+
+    if(isFinal)
+    {
+        // Check non-final pool locked UTXOs
+        return mTimeLockedPool.checkForDoubleSpend(tx) &&
+            !mTimeLockedPool.finalisesExistingTransaction(tx);
+    }
+
     return false;
 }
 

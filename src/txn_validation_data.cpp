@@ -13,7 +13,20 @@ const enumTableT<TxSource>& enumTable(TxSource)
         { TxSource::reorg,        "reorg" },
         { TxSource::wallet,       "wallet" },
         { TxSource::rpc,          "rpc" },
-        { TxSource::p2p,          "p2p" }
+        { TxSource::p2p,          "p2p" },
+        { TxSource::finalised,    "finalised" }
+    };
+    return table;
+}
+
+// Enable enum_cast for TxValidationPriority, so we can log informatively
+const enumTableT<TxValidationPriority>& enumTable(TxValidationPriority)
+{
+    static enumTableT<TxValidationPriority> table
+    {
+        { TxValidationPriority::low,      "low" },
+        { TxValidationPriority::normal,   "normal" },
+        { TxValidationPriority::high,     "high" }
     };
     return table;
 }

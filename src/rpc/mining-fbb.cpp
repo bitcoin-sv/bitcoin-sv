@@ -60,7 +60,12 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Bitcoin is downloading blocks...");
     }
 
-    auto assembler { mining::CMiningFactory::GetAssembler(config) };
+    if(!mining::g_miningFactory)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "No mining factory available");
+    }
+
+    auto assembler { mining::g_miningFactory->GetAssembler() };
 
     // Update block
     static CBlockIndex *pindexPrev = nullptr;
@@ -339,7 +344,6 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         // Ensure we run full checks on submitted block
         block->fChecked = false;
 
-        LOCK(cs_main);
         auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr) 
         {
             return ProcessNewBlock(config, blockptr, true, nullptr);

@@ -20,7 +20,6 @@ static UniValue getexcessiveblock(const Config &config,
             "\nReturn the excessive block size."
             "\nResult\n"
             "  excessiveBlockSize (integer) block size in bytes\n"
-            "  overridden (boolean) true if the block size is overriden from the default\n"
             "\nExamples:\n" +
             HelpExampleCli("getexcessiveblock", "") +
             HelpExampleRpc("getexcessiveblock", ""));
@@ -28,7 +27,6 @@ static UniValue getexcessiveblock(const Config &config,
 
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("excessiveBlockSize", config.GetMaxBlockSize()));
-    ret.push_back(Pair("overridden", config.MaxBlockSizeOverridden()));
     return ret;
 }
 
@@ -64,7 +62,15 @@ static UniValue setexcessiveblock(Config &config,
 
     // settingsToUserAgentString();
     std::ostringstream ret;
-    ret << "Excessive Block set to " << ebs << " bytes.";
+    ret << "Excessive Block set to ";
+    if (ebs)
+    {
+        ret << ebs << " bytes.";
+    }
+    else
+    {
+        ret << "unlimited size.";
+    }
     return UniValue(ret.str());
 }
 

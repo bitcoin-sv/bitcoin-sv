@@ -15,11 +15,18 @@
 struct COrphanTxnEntry {
     TxInputDataSPtr pTxInputData {nullptr};
     int64_t nTimeExpire {};
+    unsigned int size{};
 };
 
 struct IterComparator {
     template <typename I> bool operator()(const I &a, const I &b) const {
         return &(*a) < &(*b);
+    }
+};
+
+struct CTxnIdComparator {
+    bool operator ()(const TxInputDataSPtr& lhs, const TxInputDataSPtr& rhs) const {
+        return lhs->mpTx->GetId() < rhs->mpTx->GetId();
     }
 };
 
@@ -39,16 +46,16 @@ class COrphanTxns {
   public:
     /** A default max limit for collected outpoints */
     static constexpr unsigned int DEFAULT_MAX_COLLECTED_OUTPOINTS = 300000;
-    /** Default for -maxorphantx, maximum number of orphan transactions kept in
-     *  memory */
-    static constexpr unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 5000;
+    /** Default for -maxorphantxssize, maximum size of orphan transactions is 10 MB*/
+    static constexpr uint64_t DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE = 100 * ONE_MEGABYTE;
     /** Default number of orphan+recently-replaced txn to keep around for block
      *  reconstruction */
     static constexpr unsigned int DEFAULT_BLOCK_RECONSTRUCTION_EXTRA_TXN = 100;
 
     COrphanTxns(
         size_t maxCollectedOutpoints,
-        size_t maxExtraTxnsForCompactBlock);
+        size_t maxExtraTxnsForCompactBlock,
+        size_t maxTxSizePolicy);
     ~COrphanTxns() = default;
 
     // Forbid copying/assignment
@@ -75,8 +82,8 @@ class COrphanTxns {
     std::vector<uint256> getTxnsHash(const COutPoint& prevout) const;
     /** Get extra transactions needed by block's reconstruction */
     CompactExtraTxnsVec getCompactExtraTxns() const;
-    /** Limit a number of orphan transaction */
-    unsigned int limitTxnsNumber(unsigned int nMaxOrphanTxns, bool fSkipRndEviction=false);
+    /** Limit a number of orphan transactions size */
+    unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, bool fSkipRndEviction=false);
     /** Collect dependent transactions which might be processed later */
     std::vector<TxInputDataSPtr> collectDependentTxnsForRetry();
     /** Collect txn's outpoints which will be used to find any dependant orphan txn */
@@ -121,6 +128,7 @@ class COrphanTxns {
     mutable std::shared_mutex mExtraTxnsForCompactMtx {};
     size_t mExtraTxnsForCompactIdx {0};
     size_t mMaxExtraTxnsForCompactBlock {0};
+    size_t mMaxStandardTxSize {0};
 
     /** Control txns limit by a time slot */
     int64_t mNextSweep {0};

@@ -5,10 +5,12 @@
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from test_framework.mininode import *
-from test_framework.script import CScript, OP_TRUE
+from test_framework.script import CScript, OP_TRUE, OP_RETURN
 from test_framework.blocktools import create_block, create_coinbase
+from enum import Enum
 import datetime
 import contextlib
+import random
 
 # This test is to verify/check a processing of P2P txns depending on node's configuration.
 # It tries to emulate a behavior of a single node in a kind of end-to-end scenario (limited env).
@@ -38,6 +40,11 @@ class switch(object):
         else:
             return False
 
+class TxType(Enum):
+    standard = 1
+    nonstandard = 2
+    std_and_nonstd = 3 # standard and non-standard txns
+
 class NetworkThreadPinging(Thread):
     def __init__(self, conn):
         super().__init__()
@@ -56,8 +63,8 @@ class NetworkThreadPinging(Thread):
 
 class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
 
-    # Ensure funding and returns given number of spend money transcations without submitting them
-    def make_transactions(self, num_txns, create_double_spends=False):
+    # Create given number of spend money transcations without submitting them
+    def make_transactions(self, txtype, num_txns, create_double_spends=False):
 
         # Calculate how many found txns are needed to create a required spend money txns (num_txns)
         # - a fund txns are of type 1 - N (N=vouts_num_per_fund_txn)
@@ -84,10 +91,15 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
             return ftx, ftxHex
 
         # Create a spend txn
-        def make_spend_txn(fund_txn_hash, out_value, vout_idx):
+        def make_spend_txn(txtype, fund_txn_hash, out_value, vout_idx):
             spend_tx = CTransaction()
             spend_tx.vin.append(CTxIn(COutPoint(fund_txn_hash, vout_idx), b''))
-            spend_tx.vout.append(CTxOut(out_value-1000, CScript([OP_TRUE])))
+            # Standard transaction
+            if TxType.standard == txtype:
+                spend_tx.vout.append(CTxOut(out_value-1000, CScript([OP_RETURN])))
+            # Non-standard transaction
+            elif TxType.nonstandard == txtype:
+                spend_tx.vout.append(CTxOut(out_value-1000, CScript([OP_TRUE])))
             spend_tx.rehash()
             return spend_tx
 
@@ -119,12 +131,21 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
         #
         # Create transactions that depend on funding transactions that has just been submitted:
         #
+        txtype_to_create = txtype
         spend_txs = []
         for i in range(len(fund_txns)):
             for fund_txn_vout_idx in range(fund_txn_num_vouts):
-                spend_tx = make_spend_txn(fund_txns[i].sha256, out_value, fund_txn_vout_idx)
-                if create_double_spends and len(spend_txs) >= num_txns // 2:
-                    spend_tx.vin.append(CTxIn(COutPoint(fund_txns[0].sha256, 0), b''))
+                # If standard and non-standard txns are required then create equal (in size) sets.
+                if TxType.std_and_nonstd == txtype:
+                    if fund_txn_vout_idx % 2:
+                        txtype_to_create = TxType.standard
+                    else:
+                        txtype_to_create = TxType.nonstandard
+                spend_tx = make_spend_txn(txtype_to_create, fund_txns[i].sha256, out_value, fund_txn_vout_idx)
+                if create_double_spends and len(spend_txs) < num_txns // 2:
+                    # The first half of the array are double spend txns
+                    spend_tx.vin.append(CTxIn(COutPoint(fund_txns[len(fund_txns) - i - 1].sha256, 0), b''))
+                    spend_tx.rehash()
                 spend_txs.append(spend_tx)
         return spend_txs
 
@@ -242,8 +263,8 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 if case(): # default
                     raise Exception('The value of sync_node_type={} is not defined'.format(sync_node_type))
 
-        def runTestWithParams(sync_node_type, description, args, number_of_txns, number_of_peers, timeout):
-            # In case of double spends only half of the set will be valid.
+        def runTestWithParams(sync_node_type, description, args, txtype, number_of_txns, number_of_peers, timeout, shuffle_txns=False):
+            # In case of double spends only a half of the set will be valid.
             # A number of txns required to create a set of double spends should be an even number
             create_double_spends = (doublespends() == sync_node_type)
             expected_txns_num = number_of_txns
@@ -254,8 +275,11 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
             # Start the node0
             self.start_node(0, args)
             # Create a required number of spend money txns.
-            result_txns = self.make_transactions(number_of_txns, create_double_spends)
+            result_txns = self.make_transactions(txtype, number_of_txns, create_double_spends)
             spend_txns = result_txns[0:number_of_txns]
+            # Shuffle spend txns if required
+            if shuffle_txns:
+                random.shuffle(spend_txns)
             # Check if the test has got an enough amount of spend money transactions.
             assert_equal(len(spend_txns), number_of_txns)
             # Create a given number of callbacks to the node0.
@@ -292,12 +316,15 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay (default), "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq (default) " # txn validator config
-                "-txnspertaskthreshold (default)",       # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=150',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=100',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
+                TxType.standard,
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
@@ -319,13 +346,16 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "P2P-Scenario2 [nodoublespends]: "
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
-                "-txnvalidationasynchrunfreq=200 " # txn validator config
-                "-txnspertaskthreshold (default)", # txn validator config
+                "-txnvalidationasynchrunfreq=200 "        # txn validator config
+                "-numstdtxvalidationthreads=6 "           # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",       # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=200',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
@@ -349,15 +379,18 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "P2P-Scenario3 [nodoublespends]: "
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
-                "-txnvalidationasynchrunfreq=200 " # txn validator config
-                "-txnspertaskthreshold (default)"  # txn validator config
-                "-persistmempool=0",
+                "-txnvalidationasynchrunfreq=200 "       # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 "       # txn validator thread pool config
+                "-persistmempool=0 ",
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=200',
-                 '-txnspertaskthreshold=10',
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2',
                  '-persistmempool=0'],
+                TxType.std_and_nonstd,
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node0
@@ -368,7 +401,7 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
         ]
         # Execute test cases.
         for test_case in test_cases:
-            runTestWithParams(test_case[0], test_case[1], test_case[2], test_case[3], test_case[4], test_case[5])
+            runTestWithParams(test_case[0], test_case[1], test_case[2], test_case[3], test_case[4], test_case[5], test_case[6])
 
         #
         # Double spends: A definition of test cases dependent on node0's configuration.
@@ -391,18 +424,23 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay (default), "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq (default) " # txn validator config
-                "-txnspertaskthreshold (default) ",      # txn validator congig
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=150',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=100',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node0
                 2,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
-                240
+                240,
+                # Shuffle input txns
+                False
             ],
 
             # P2P-Scenario2
@@ -421,22 +459,27 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
                 "-txnvalidationasynchrunfreq=200"        # txn validator config
-                "-txnspertaskthreshold (default) ",      # txn validator congig
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=200',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 1000,
                 # A number of peers connected to the node
                 5,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
-                720
+                720,
+                # Shuffle input txns
+                False
             ],
             
             # P2P-Scenario3
-            # - 5K txns used, 10 peers connected to node0
+            # - 5K txns used, 20 peers connected to node0
             # - A config -txnvalidationasynchrunfreq=10 is set to increase a chance for double spend txn to be rejected
             #   by validation (not to put all double spend txns into the same validator's queue) what means
             #   to not be rejected by double spend detector when the txn is being queued.
@@ -449,24 +492,126 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
                 "P2P-Scenario3 [doublespends]: "
                 "-broadcastdelay=0, "
                 "-txnpropagationfreq (default), "
-                "-txnvalidationasynchrunfreq=10"         # txn validator congig
-                "-txnspertaskthreshold (default) ",      # txn validator congig
+                "-txnvalidationasynchrunfreq=10"         # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
                 # Node's configuration
                 ['-broadcastdelay=0',
                  '-txnpropagationfreq=250',
                  '-txnvalidationasynchrunfreq=10',
-                 '-txnspertaskthreshold=10'],
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
                 # A number of spend money txns used in the test
                 5000,
                 # A number of peers connected to the node
                 20,
                 # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
-                920
+                920,
+                # Shuffle input txns
+                False
+            ],
+
+            # P2P-Scenario4
+            # - 5K txns used, a half of them are double spends, 1 peer connected to node0
+            # - The first 2.5K txns are double spends
+            [
+                # Sync node scenario
+                doublespends(),
+                # Test case description
+                "P2P-Scenario4 [doublespends]: "
+                "-broadcastdelay=0, "
+                "-txnpropagationfreq (default), "
+                "-txnvalidationasynchrunfreq (default)"  # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
+                # Node's configuration
+                ['-broadcastdelay=0',
+                 '-txnpropagationfreq=250',
+                 '-txnvalidationasynchrunfreq=100',
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
+                TxType.standard,
+                # A number of spend money txns used in the test
+                5000,
+                # A number of peers connected to the node
+                1,
+                # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
+                920,
+                # Shuffle input txns
+                False
+            ],
+
+            # P2P-Scenario5
+            # - 5K txns used, a half of them are double spends, 1 peer connected to node0
+            # - All txns are shuffled as we want to achieve a random distribution of the input set.
+            # - This test case disables mempool checks (for each and every txn) on the regtest
+            [
+                # Sync node scenario
+                doublespends(),
+                # Test case description
+                "P2P-Scenario5 [doublespends]: "
+                "-checkmempool=0"
+                "-broadcastdelay=0, "
+                "-txnpropagationfreq (default), "
+                "-txnvalidationasynchrunfreq (default)"  # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
+                # Node's configuration
+                ['-checkmempool=0',
+                 '-broadcastdelay=0',
+                 '-txnpropagationfreq=250',
+                 '-txnvalidationasynchrunfreq=100',
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
+                TxType.std_and_nonstd,
+                # A number of spend money txns used in the test
+                5000,
+                # A number of peers connected to the node
+                1,
+                # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
+                240,
+                # Shuffle input txns
+                True
+            ],
+
+            # P2P-Scenario6
+            # - 30K txns used, a half of them are double spends, 4 peer connected to node0
+            # - The first 15K txns are double spends
+            # - We don't wont to shuffle txns as it reduces a number of txns detected as double spends
+            # - This test case disables mempool checks (for each and every txn) on the regtest
+            [
+                # Sync node scenario
+                doublespends(),
+                # Test case description
+                "P2P-Scenario6 [doublespends]: "
+                "-checkmempool=0"
+                "-broadcastdelay=0, "
+                "-txnpropagationfreq (default), "
+                "-txnvalidationasynchrunfreq (default)"  # txn validator config
+                "-numstdtxvalidationthreads=6 "          # txn validator thread pool config
+                "-numnonstdtxvalidationthreads=2 ",      # txn validator thread pool config
+                # Node's configuration
+                ['-checkmempool=0',
+                 '-broadcastdelay=0',
+                 '-txnpropagationfreq=250',
+                 '-txnvalidationasynchrunfreq=100',
+                 '-numstdtxvalidationthreads=6',
+                 '-numnonstdtxvalidationthreads=2'],
+                TxType.nonstandard,
+                # A number of spend money txns used in the test
+                30000,
+                # A number of peers connected to the node
+                4,
+                # A timeout for the test case (if a number of txns used is large then the timeout needs to be increased)
+                920,
+                # Shuffle input txns
+                False
             ]
         ]
         # Execute test cases.
         for test_case in test_cases:
-            runTestWithParams(test_case[0], test_case[1], test_case[2], test_case[3], test_case[4], test_case[5])
+            runTestWithParams(test_case[0], test_case[1], test_case[2], test_case[3], test_case[4], test_case[5], test_case[6], test_case[7])
 
 if __name__ == '__main__':
     TxnValidatorP2PTxnsTest().main()

@@ -1,7 +1,10 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
 // Copyright (c) 2019 Bitcoin Association
-// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+// Distributed under the Open BSV software license, see the accompanying file
+// LICENSE.
 
+#include "chainparams.h"
+#include "config.h"
 #include "core_io.h"
 #include "key.h"
 #include "keystore.h"
@@ -12,8 +15,7 @@
 #include "script/sign.h"
 #include "test/test_bitcoin.h"
 #include "validation.h"
-#include "chainparams.h"
-#include "config.h"
+#include "taskcancellation.h"
 
 #include <vector>
 
@@ -27,6 +29,7 @@ static std::vector<uint8_t> Serialize(const CScript &s) {
 
 static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
                    bool fStrict, ScriptError &err) {
+    const Config& config = GlobalConfig::GetConfig();
     // Create dummy to/from transactions:
     CMutableTransaction txFrom;
     txFrom.vout.resize(1);
@@ -39,20 +42,25 @@ static bool Verify(const CScript &scriptSig, const CScript &scriptPubKey,
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = Amount(1);
 
-    return VerifyScript(
-        scriptSig, scriptPubKey,
-        (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
-            SCRIPT_ENABLE_SIGHASH_FORKID,
-        MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
-        &err);
+    auto res =
+        VerifyScript(
+            config, true,
+            task::CCancellationSource::Make()->GetToken(),
+            scriptSig,
+            scriptPubKey,
+            (fStrict ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE) |
+                SCRIPT_ENABLE_SIGHASH_FORKID,
+            MutableTransactionSignatureChecker(&txTo, 0, txFrom.vout[0].nValue),
+            &err);
+
+    return res.value();
 }
 
 BOOST_FIXTURE_TEST_SUITE(script_P2SH_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(sign) {
 
-    DummyConfig config(CBaseChainParams::MAIN);
-    config.SetAcceptP2SH(true);
+    testConfig.SetGenesisActivationHeight(10); // arbitrary number, will test at this height and on lower by one
     LOCK(cs_main);
     // Pay-to-script-hash looks like this:
     // scriptSig:    <sig> <sig...> <serialized_script>
@@ -89,7 +97,13 @@ BOOST_AUTO_TEST_CASE(sign) {
         txFrom.vout[i + 4].scriptPubKey = standardScripts[i];
         txFrom.vout[i + 4].nValue = COIN;
     }
-    BOOST_CHECK(IsStandardTx(config, CTransaction(txFrom), reason));
+    
+    BOOST_CHECK(IsStandardTx(
+        testConfig, CTransaction(txFrom),
+        testConfig.GetGenesisActivationHeight() - 1, reason));
+    BOOST_CHECK(!IsStandardTx(
+        testConfig, CTransaction(txFrom),
+        testConfig.GetGenesisActivationHeight(), reason));
 
     CMutableTransaction txTo[8]; // Spending transactions
     for (int i = 0; i < 8; i++) {
@@ -97,18 +111,41 @@ BOOST_AUTO_TEST_CASE(sign) {
         txTo[i].vout.resize(1);
         txTo[i].vin[0].prevout = COutPoint(txFrom.GetId(), i);
         txTo[i].vout[0].nValue = Amount(1);
-        BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey),
-                            strprintf("IsMine %d", i));
+        BOOST_CHECK_MESSAGE(
+            IsMine(keystore, txFrom.vout[i].scriptPubKey),
+            strprintf("IsMine %d", i));
     }
     for (int i = 0; i < 8; i++) {
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, CTransaction(txFrom),
+        
+        bool isP2SH = (i < 4); // first four tx are P2SH, other are P2PKH
+        if (isP2SH) {
+            // If UTOX is created after Genesis, we do not recognize P2SH outputs and 
+            // therefore we are not able to sign them.
+            BOOST_CHECK_MESSAGE(!SignSignature(testConfig, keystore, true, true,
+                                              CTransaction(txFrom), txTo[i], 0,
+                                              SigHashType().withForkId()),
+                                strprintf("SignSignature %d", i));
+        } else {
+            BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, true,
+                                              CTransaction(txFrom), txTo[i], 0,
+                                              SigHashType().withForkId()),
+                                strprintf("SignSignature %d", i));
+        }
+        
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, false,
+                                          CTransaction(txFrom),
                                           txTo[i], 0,
+                                          SigHashType().withForkId()),
+                           strprintf("SignSignature %d", i));
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, false, false,
+                                          CTransaction(txFrom), txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
     }
     // All of the above should be OK, and the txTos have valid signatures
     // Check to make sure signature verification fails if we use the wrong
     // ScriptSig:
+    auto source = task::CCancellationSource::Make();
     for (int i = 0; i < 8; i++) {
         CTransaction tx(txTo[i]);
         PrecomputedTransactionData txdata(tx);
@@ -116,16 +153,16 @@ BOOST_AUTO_TEST_CASE(sign) {
             CScript sigSave = txTo[i].vin[0].scriptSig;
             txTo[i].vin[0].scriptSig = txTo[j].vin[0].scriptSig;
             const CTxOut &output = txFrom.vout[txTo[i].vin[0].prevout.GetN()];
-            bool sigOK = CScriptCheck(
+            auto sigOK = CScriptCheck(testConfig, true,
                 output.scriptPubKey, output.nValue, CTransaction(txTo[i]), 0,
                 SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC |
                     SCRIPT_ENABLE_SIGHASH_FORKID,
-                false, txdata)();
+                false, txdata)(source->GetToken());
             if (i == j) {
-                BOOST_CHECK_MESSAGE(sigOK,
+                BOOST_CHECK_MESSAGE(sigOK.value(),
                                     strprintf("VerifySignature %d %d", i, j));
             } else {
-                BOOST_CHECK_MESSAGE(!sigOK,
+                BOOST_CHECK_MESSAGE(!sigOK.value(),
                                     strprintf("VerifySignature %d %d", i, j));
             }
             txTo[i].vin[0].scriptSig = sigSave;
@@ -161,8 +198,7 @@ BOOST_AUTO_TEST_CASE(norecurse) {
 
 BOOST_AUTO_TEST_CASE(set) {
 
-    DummyConfig config(CBaseChainParams::MAIN);
-    config.SetAcceptP2SH(true);
+    testConfig.SetGenesisActivationHeight(10); // arbitrary number, will test at this height and on lower by one
 
     LOCK(cs_main);
     // Test the CScript::Set* methods
@@ -198,7 +234,9 @@ BOOST_AUTO_TEST_CASE(set) {
         txFrom.vout[i].scriptPubKey = outer[i];
         txFrom.vout[i].nValue = CENT;
     }
-    BOOST_CHECK(IsStandardTx(config, CTransaction(txFrom), reason));
+    BOOST_CHECK(IsStandardTx(testConfig, CTransaction(txFrom), testConfig.GetGenesisActivationHeight() - 1, reason));
+    BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(txFrom), testConfig.GetGenesisActivationHeight(), reason));
+    BOOST_CHECK(reason == "scriptpubkey");
 
     // Spending transactions
     CMutableTransaction txTo[4];
@@ -208,15 +246,34 @@ BOOST_AUTO_TEST_CASE(set) {
         txTo[i].vin[0].prevout = COutPoint(txFrom.GetId(), i);
         txTo[i].vout[0].nValue = 1 * CENT;
         txTo[i].vout[0].scriptPubKey = inner[i];
-        BOOST_CHECK_MESSAGE(IsMine(keystore, txFrom.vout[i].scriptPubKey),
-                            strprintf("IsMine %d", i));
+        BOOST_CHECK_MESSAGE(
+            IsMine(keystore, txFrom.vout[i].scriptPubKey),
+            strprintf("IsMine %d", i));
     }
     for (int i = 0; i < 4; i++) {
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, CTransaction(txFrom),
+        BOOST_CHECK_MESSAGE(!SignSignature(testConfig, keystore, true, true, CTransaction(txFrom),
+                                           txTo[i], 0,
+                                           SigHashType().withForkId()),
+                            strprintf("SignSignature %d", i));
+        BOOST_CHECK_MESSAGE(!SignSignature(testConfig, keystore, false, true, CTransaction(txFrom),
+                                           txTo[i], 0,
+                                           SigHashType().withForkId()),
+                            strprintf("SignSignature %d", i));
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, true, false, CTransaction(txFrom),
                                           txTo[i], 0,
                                           SigHashType().withForkId()),
                             strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(IsStandardTx(config, CTransaction(txTo[i]), reason),
+        BOOST_CHECK_MESSAGE(SignSignature(testConfig, keystore, false, false, CTransaction(txFrom),
+                                          txTo[i], 0,
+                                          SigHashType().withForkId()),
+                            strprintf("SignSignature %d", i));
+        BOOST_CHECK_MESSAGE(IsStandardTx(testConfig, CTransaction(txTo[i]),
+                                         testConfig.GetGenesisActivationHeight(),
+                                         reason),
+                            strprintf("txTo[%d].IsStandard", i));
+        BOOST_CHECK_MESSAGE(IsStandardTx(testConfig, CTransaction(txTo[i]),
+                                         testConfig.GetGenesisActivationHeight() - 1,
+                                          reason),
                             strprintf("txTo[%d].IsStandard", i));
     }
 }
@@ -329,6 +386,10 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     for (int i = 0; i < 3; i++)
         keys.push_back(key[i].GetPubKey());
 
+    auto& tempConfig = testConfig;
+    auto activateGenesis = [&tempConfig]() {tempConfig.SetGenesisActivationHeight(1); };
+    auto deactivateGenesis = [&tempConfig]() {tempConfig.SetGenesisActivationHeight(1000); };
+
     CMutableTransaction txFrom;
     txFrom.vout.resize(7);
 
@@ -387,7 +448,7 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         GetScriptForDestination(CScriptID(twentySigops));
     txFrom.vout[6].nValue = Amount(6000);
 
-    AddCoins(coins, CTransaction(txFrom), 0);
+    AddCoins(coins, CTransaction(txFrom), 10, 0);
 
     CMutableTransaction txTo;
     txTo.vout.resize(1);
@@ -399,12 +460,27 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
         txTo.vin[i].prevout = COutPoint(txFrom.GetId(), i);
     }
 
-    BOOST_CHECK(SignSignature(keystore, CTransaction(txFrom), txTo, 0,
+    BOOST_CHECK(!SignSignature(testConfig, keystore, true, true, CTransaction(txFrom), txTo, 0,
+                               SigHashType().withForkId())); // is P2SH
+    BOOST_CHECK(SignSignature(testConfig, keystore, true, true, CTransaction(txFrom), txTo, 1,
+                               SigHashType().withForkId())); // is not P2SH
+    BOOST_CHECK(SignSignature(testConfig, keystore, true, true, CTransaction(txFrom), txTo, 2,
+                               SigHashType().withForkId())); // is not P2SH
+
+    BOOST_CHECK(SignSignature(testConfig, keystore, true, false, CTransaction(txFrom), txTo, 0,
                               SigHashType().withForkId()));
-    BOOST_CHECK(SignSignature(keystore, CTransaction(txFrom), txTo, 1,
+    BOOST_CHECK(SignSignature(testConfig, keystore, true, false, CTransaction(txFrom), txTo, 1,
                               SigHashType().withForkId()));
-    BOOST_CHECK(SignSignature(keystore, CTransaction(txFrom), txTo, 2,
+    BOOST_CHECK(SignSignature(testConfig, keystore, true, false, CTransaction(txFrom), txTo, 2,
                               SigHashType().withForkId()));
+
+    BOOST_CHECK(SignSignature(testConfig, keystore, false, false, CTransaction(txFrom), txTo, 0,
+                              SigHashType().withForkId()));
+    BOOST_CHECK(SignSignature(testConfig, keystore, false, false, CTransaction(txFrom), txTo, 1,
+                              SigHashType().withForkId()));
+    BOOST_CHECK(SignSignature(testConfig, keystore, false, false, CTransaction(txFrom), txTo, 2,
+                              SigHashType().withForkId()));
+
     // SignSignature doesn't know how to sign these. We're not testing
     // validating signatures, so just create dummy signatures that DO include
     // the correct P2SH scripts:
@@ -414,9 +490,18 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     txTo.vin[4].scriptSig << std::vector<uint8_t>(fifteenSigops.begin(),
                                                   fifteenSigops.end());
 
-    BOOST_CHECK(::AreInputsStandard(CTransaction(txTo), coins));
+
+    auto source = task::CCancellationSource::Make();
+
+    bool sigOpCountError;
+    activateGenesis();
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0).value());
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins, sigOpCountError), 0U);
+    
+    deactivateGenesis();
+    BOOST_CHECK(::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txTo), coins, 0).value());
     // 22 P2SH sigops for all inputs (1 for vin[0], 6 for vin[3], 15 for vin[4]
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(CTransaction(txTo), coins), 22U);
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txTo), coins, sigOpCountError), 22U);
 
     CMutableTransaction txToNonStd1;
     txToNonStd1.vout.resize(1);
@@ -428,8 +513,13 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     txToNonStd1.vin[0].scriptSig
         << std::vector<uint8_t>(sixteenSigops.begin(), sixteenSigops.end());
 
-    BOOST_CHECK(!::AreInputsStandard(CTransaction(txToNonStd1), coins));
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(CTransaction(txToNonStd1), coins), 16U);
+    activateGenesis();
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0).value());
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins, sigOpCountError), 0U);
+    
+    deactivateGenesis();
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd1), coins, 0).value());
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd1), coins, sigOpCountError), 16U);
 
     CMutableTransaction txToNonStd2;
     txToNonStd2.vout.resize(1);
@@ -441,8 +531,13 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard) {
     txToNonStd2.vin[0].scriptSig
         << std::vector<uint8_t>(twentySigops.begin(), twentySigops.end());
 
-    BOOST_CHECK(!::AreInputsStandard(CTransaction(txToNonStd2), coins));
-    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(CTransaction(txToNonStd2), coins), 20U);
+    activateGenesis();
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0).value());
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins, sigOpCountError), 0U);
+
+    deactivateGenesis();
+    BOOST_CHECK(!::AreInputsStandard(source->GetToken(), testConfig, CTransaction(txToNonStd2), coins, 0).value());
+    BOOST_CHECK_EQUAL(GetP2SHSigOpCount(testConfig, CTransaction(txToNonStd2), coins, sigOpCountError), 20U);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

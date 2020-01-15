@@ -128,12 +128,17 @@ UniValue generateBlocks(const Config &config,
         nHeightEnd = nHeightStart + nGenerate;
     }
 
+    if(!mining::g_miningFactory)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "No mining factory available");
+    }
+
     unsigned int nExtraNonce = 0;
     UniValue blockHashes(UniValue::VARR);
     CBlockIndex* pindexPrev {nullptr};
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
-            mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(coinbaseScript->reserveScript, pindexPrev));
+            mining::g_miningFactory->GetAssembler()->CreateNewBlock(coinbaseScript->reserveScript, pindexPrev));
 
         if (!pblocktemplate.get()) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
@@ -141,7 +146,7 @@ UniValue generateBlocks(const Config &config,
 
         CBlockRef blockRef = pblocktemplate->GetBlockRef();
         CBlock *pblock = blockRef.get();
-        IncrementExtraNonce(config, pblock, pindexPrev, nExtraNonce);
+        IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
 
         while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount &&
                !CheckProofOfWork(pblock->GetHash(), pblock->nBits, config)) {
@@ -583,8 +588,11 @@ static UniValue getblocktemplate(const Config &config,
         nStart = GetTime();
 
         // Create new block
+        if(!mining::g_miningFactory) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "No mining factory available");
+        }
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = mining::CMiningFactory::GetAssembler(config)->CreateNewBlock(scriptDummy, pindexPrev);
+        pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptDummy, pindexPrev);
         if (!pblocktemplate) {
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
         }
@@ -668,7 +676,7 @@ static UniValue getblocktemplate(const Config &config,
     auto defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
     // FIXME: Allow for mining block greater than 1M.
     result.push_back(
-        Pair("sigoplimit", GetMaxBlockSigOpsCount(defaultmaxBlockSize)));
+        Pair("sigoplimit", INT64_MAX));
     result.push_back(Pair("sizelimit", defaultmaxBlockSize));
     result.push_back(Pair("curtime", pblock->GetBlockTime()));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));

@@ -25,6 +25,7 @@ UniValue CallRPC(std::string args) {
     vArgs.erase(vArgs.begin());
     GlobalConfig config;
     config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    config.SetGenesisActivationHeight(1);
     JSONRPCRequest request;
     request.strMethod = strMethod;
     request.params = RPCConvertValues(strMethod, vArgs);
@@ -47,8 +48,8 @@ BOOST_AUTO_TEST_CASE(rpc_getinfo)
     BOOST_CHECK_NO_THROW(
         r = CallRPC("getinfo");
     );
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int(), Params().GetDefaultBlockSizeParams().maxBlockSizeAfter);
-    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxminedblocksize").get_int(), Params().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter);
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxblocksize").get_int64(), Params().GetDefaultBlockSizeParams().maxBlockSize);
+    BOOST_CHECK_EQUAL(find_value(r.get_obj(), "maxminedblocksize").get_int64(), Params().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter);
 }
 
 BOOST_AUTO_TEST_CASE(rpc_rawparams) {

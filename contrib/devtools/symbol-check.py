@@ -37,10 +37,10 @@ import os
 #   (glibc)    GLIBC_2_19
 #
 MAX_VERSIONS = {
-    'GCC':          (4,8,0),
+    'GCC':          (8,0,0),
     'CXXABI':       (1,3,7),
     'GLIBCXX':      (3,4,18),
-    'GLIBC':        (2,19),
+    'GLIBC':        (2,25),
     'LIBATOMIC':    (1,0)
 }
 # See here for a description of _IO_stdin_used:

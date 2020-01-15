@@ -9,6 +9,7 @@
 #include "crypto/common.h"
 #include "prevector.h"
 #include "serialize.h"
+#include "consensus/consensus.h"
 
 #include <cassert>
 #include <climits>
@@ -19,17 +20,11 @@
 #include <string>
 #include <vector>
 
-// Maximum number of bytes pushable to the stack
-static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520;
+// Maximum number of bytes pushable to the stack -- replaced with DEFAULT_STACK_MEMORY_USAGE after Genesis
+static const unsigned int MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS = 520;
 
-// Maximum number of non-push operations per script
-static const int MAX_OPS_PER_SCRIPT = 500;
-
-// Maximum number of public keys per multisig
-static const int MAX_PUBKEYS_PER_MULTISIG = 20;
-
-// Maximum script length in bytes
-static const int MAX_SCRIPT_SIZE = 10000;
+// Maximum number of elements on the stack -- replaced with DEFAULT_STACK_MEMORY_USAGE after Genesis
+static const unsigned int MAX_STACK_ELEMENTS_BEFORE_GENESIS = 1000;
 
 // Threshold for nLockTime: below this value it is interpreted as block number,
 // otherwise as UNIX timestamp. Thresold is Tue Nov 5 00:53:20 1985 UTC
@@ -188,236 +183,16 @@ enum opcodetype {
 };
 
 const char *GetOpName(opcodetype opcode);
+std::ostream& operator<<(std::ostream&, const opcodetype&);
 
-class scriptnum_overflow_error : public std::overflow_error {
-public:
-    explicit scriptnum_overflow_error(const std::string &str)
-        : std::overflow_error(str) {}
-};
-
-class scriptnum_minencode_error : public std::runtime_error {
-public:
-    explicit scriptnum_minencode_error(const std::string &str)
-        : std::runtime_error(str) {}
-};
-
-
-class CScriptNum {
-    /**
-     * Numeric opcodes (OP_1ADD, etc) are restricted to operating on 4-byte
-     * integers. The semantics are subtle, though: operands must be in the range
-     * [-2^31 +1...2^31 -1], but results may overflow (and are valid as long as
-     * they are not used in a subsequent numeric operation). CScriptNum enforces
-     * those semantics by storing results as an int64 and allowing out-of-range
-     * values to be returned as a vector of bytes but throwing an exception if
-     * arithmetic is done or the result is interpreted as an integer.
-     */
-public:
-    static const size_t MAXIMUM_ELEMENT_SIZE = 4;
-
-    explicit CScriptNum(const int64_t &n) { m_value = n; }
-
-    explicit CScriptNum(const std::vector<uint8_t> &vch, bool fRequireMinimal,
-                        const size_t nMaxNumSize = MAXIMUM_ELEMENT_SIZE) {
-        if (vch.size() > nMaxNumSize) {
-            throw scriptnum_overflow_error("script number overflow");
-        }
-        if (fRequireMinimal && !IsMinimallyEncoded(vch, nMaxNumSize)) {
-            throw scriptnum_minencode_error("non-minimally encoded script number");
-        }
-        m_value = set_vch(vch);
-    }
-
-    static bool IsMinimallyEncoded(
-        const std::vector<uint8_t> &vch,
-        const size_t nMaxNumSize = CScriptNum::MAXIMUM_ELEMENT_SIZE);
-
-    static bool MinimallyEncode(std::vector<uint8_t> &data);
-
-    inline bool operator==(const int64_t &rhs) const { return m_value == rhs; }
-    inline bool operator!=(const int64_t &rhs) const { return m_value != rhs; }
-    inline bool operator<=(const int64_t &rhs) const { return m_value <= rhs; }
-    inline bool operator<(const int64_t &rhs) const { return m_value < rhs; }
-    inline bool operator>=(const int64_t &rhs) const { return m_value >= rhs; }
-    inline bool operator>(const int64_t &rhs) const { return m_value > rhs; }
-
-    inline bool operator==(const CScriptNum &rhs) const {
-        return operator==(rhs.m_value);
-    }
-    inline bool operator!=(const CScriptNum &rhs) const {
-        return operator!=(rhs.m_value);
-    }
-    inline bool operator<=(const CScriptNum &rhs) const {
-        return operator<=(rhs.m_value);
-    }
-    inline bool operator<(const CScriptNum &rhs) const {
-        return operator<(rhs.m_value);
-    }
-    inline bool operator>=(const CScriptNum &rhs) const {
-        return operator>=(rhs.m_value);
-    }
-    inline bool operator>(const CScriptNum &rhs) const {
-        return operator>(rhs.m_value);
-    }
-
-    inline CScriptNum operator+(const int64_t &rhs) const {
-        return CScriptNum(m_value + rhs);
-    }
-    inline CScriptNum operator-(const int64_t &rhs) const {
-        return CScriptNum(m_value - rhs);
-    }
-    inline CScriptNum operator+(const CScriptNum &rhs) const {
-        return operator+(rhs.m_value);
-    }
-    inline CScriptNum operator-(const CScriptNum &rhs) const {
-        return operator-(rhs.m_value);
-    }
-
-    inline CScriptNum operator/(const int64_t &rhs) const {
-        return CScriptNum(m_value / rhs);
-    }
-    inline CScriptNum operator/(const CScriptNum &rhs) const {
-        return operator/(rhs.m_value);
-    }
-
-    inline CScriptNum operator*(const int64_t &rhs) const {
-        return CScriptNum(m_value * rhs);
-    }
-    inline CScriptNum operator*(const CScriptNum &rhs) const {
-        return operator*(rhs.m_value);
-    }
-
-    inline CScriptNum operator%(const int64_t &rhs) const {
-        return CScriptNum(m_value % rhs);
-    }
-    inline CScriptNum operator%(const CScriptNum &rhs) const {
-        return operator%(rhs.m_value);
-    }
-
-    inline CScriptNum &operator+=(const CScriptNum &rhs) {
-        return operator+=(rhs.m_value);
-    }
-    inline CScriptNum &operator-=(const CScriptNum &rhs) {
-        return operator-=(rhs.m_value);
-    }
-
-    inline CScriptNum operator&(const int64_t &rhs) const {
-        return CScriptNum(m_value & rhs);
-    }
-    inline CScriptNum operator&(const CScriptNum &rhs) const {
-        return operator&(rhs.m_value);
-    }
-
-    inline CScriptNum &operator&=(const CScriptNum &rhs) {
-        return operator&=(rhs.m_value);
-    }
-
-    inline CScriptNum operator-() const {
-        assert(m_value != std::numeric_limits<int64_t>::min());
-        return CScriptNum(-m_value);
-    }
-
-    inline CScriptNum &operator=(const int64_t &rhs) {
-        m_value = rhs;
-        return *this;
-    }
-
-    inline CScriptNum &operator+=(const int64_t &rhs) {
-        assert(
-            rhs == 0 ||
-            (rhs > 0 && m_value <= std::numeric_limits<int64_t>::max() - rhs) ||
-            (rhs < 0 && m_value >= std::numeric_limits<int64_t>::min() - rhs));
-        m_value += rhs;
-        return *this;
-    }
-
-    inline CScriptNum &operator-=(const int64_t &rhs) {
-        assert(
-            rhs == 0 ||
-            (rhs > 0 && m_value >= std::numeric_limits<int64_t>::min() + rhs) ||
-            (rhs < 0 && m_value <= std::numeric_limits<int64_t>::max() + rhs));
-        m_value -= rhs;
-        return *this;
-    }
-
-    inline CScriptNum &operator&=(const int64_t &rhs) {
-        m_value &= rhs;
-        return *this;
-    }
-
-    int getint() const {
-        if (m_value > std::numeric_limits<int>::max())
-            return std::numeric_limits<int>::max();
-        else if (m_value < std::numeric_limits<int>::min())
-            return std::numeric_limits<int>::min();
-        return m_value;
-    }
-
-    std::vector<uint8_t> getvch() const { return serialize(m_value); }
-
-    static std::vector<uint8_t> serialize(const int64_t &value) {
-        if (value == 0) return std::vector<uint8_t>();
-
-        std::vector<uint8_t> result;
-        const bool neg = value < 0;
-        uint64_t absvalue = neg ? -(static_cast<uint64_t> (value) ): value;
-
-        while (absvalue) {
-            result.push_back(absvalue & 0xff);
-            absvalue >>= 8;
-        }
-
-        // - If the most significant byte is >= 0x80 and the value is positive,
-        // push a new zero-byte to make the significant byte < 0x80 again.
-        // - If the most significant byte is >= 0x80 and the value is negative,
-        // push a new 0x80 byte that will be popped off when converting to an
-        // integral.
-        // - If the most significant byte is < 0x80 and the value is negative,
-        // add 0x80 to it, since it will be subtracted and interpreted as a
-        // negative when converting to an integral.
-        if (result.back() & 0x80) {
-            result.push_back(neg ? 0x80 : 0);
-        } else if (neg) {
-            result.back() |= 0x80;
-        }
-
-        return result;
-    }
-
-private:
-    static int64_t set_vch(const std::vector<uint8_t> &vch) {
-        if (vch.empty()) return 0;
-
-        int64_t result = 0;
-        for (size_t i = 0; i != vch.size(); ++i)
-            result |= static_cast<int64_t>(vch[i]) << 8 * i;
-
-        // If the input vector's most significant byte is 0x80, remove it from
-        // the result's msb and return a negative.
-        if (vch.back() & 0x80)
-            return -((int64_t)(result & ~(0x80ULL << (8 * (vch.size() - 1)))));
-
-        return result;
-    }
-
-    int64_t m_value;
-};
+class CScriptNum;
 
 typedef prevector<28, uint8_t> CScriptBase;
 
 /** Serialized script, used inside transaction inputs and outputs */
 class CScript : public CScriptBase {
 protected:
-    CScript &push_int64(int64_t n) {
-        if (n == -1 || (n >= 1 && n <= 16)) {
-            push_back(n + (OP_1 - 1));
-        } else if (n == 0) {
-            push_back(OP_0);
-        } else {
-            *this << CScriptNum::serialize(n);
-        }
-        return *this;
-    }
+    CScript &push_int64(int64_t);
 
 public:
     CScript() {}
@@ -462,10 +237,7 @@ public:
         return *this;
     }
 
-    CScript &operator<<(const CScriptNum &b) {
-        *this << b.getvch();
-        return *this;
-    }
+    CScript &operator<<(const CScriptNum &);
 
     CScript &operator<<(const std::vector<uint8_t> &b) {
         if (b.size() < OP_PUSHDATA1) {
@@ -607,14 +379,20 @@ public:
      * pay-to-script-hash, that changed: CHECKMULTISIGs serialized in scriptSigs
      * are counted more accurately, assuming they are of the form
      *  ... OP_N CHECKMULTISIG ...
+     *
+     * After Genesis all sigops are counted accuratelly no matter how the flag is 
+     * set. More than 16 pub keys are supported, but the size of the number representing
+     * number of public keys must not be bigger than CScriptNum::MAXIMUM_ELEMENT_SIZE bytes.
+     * If the size is bigger than that, or if the number of public keys is negative,
+     * sigOpCountError is set to true,
      */
-    unsigned int GetSigOpCount(bool fAccurate) const;
+    uint64_t GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sigOpCountError) const;
 
     /**
      * Accurately count sigOps, including sigOps in pay-to-script-hash
      * transactions:
      */
-    unsigned int GetSigOpCount(const CScript &scriptSig) const;
+    uint64_t GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const;
 
     bool IsPayToScriptHash() const;
     bool IsWitnessProgram(int &version, std::vector<uint8_t> &program) const;
@@ -628,11 +406,44 @@ public:
      * Returns whether the script is guaranteed to fail at execution, regardless
      * of the initial stack. This allows outputs to be pruned instantly when
      * entering the UTXO set.
+     * nHeight reflects the height of the block that script was mined in
+     * For Genesis OP_RETURN this can return false negatives. For example if we have:
+     *   <some complex script that always return OP_FALSE> OP_RETURN
+     * this function will return false even though the ouput is unspendable.
+     * 
      */
-    bool IsUnspendable() const {
+
+    bool IsUnspendable(bool isGenesisEnabled) const {
+        if (isGenesisEnabled)
+        {
+            // Genesis restored OP_RETURN functionality. It no longer uncoditionally fails execution
+            // The top stack value determines if execution suceeds, and OP_RETURN lock script might be spendable if 
+            // unlock script pushes non 0 value to the stack.
+
+            // We currently only detect OP_FALSE OP_RETURN as provably unspendable.
+            return  (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN);
+        }
+        else
+        {
+            return (size() > 0 && *begin() == OP_RETURN) ||
+                (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
+                (size() > MAX_SCRIPT_SIZE_BEFORE_GENESIS);
+        }
+    }
+
+    /**
+     * Returns whether the script looks like a known OP_RETURN script. This is similar to IsUnspendable()
+     * but it does not require nHeight. 
+     * Use cases:
+     *   - decoding transactions to avoid parsing OP_RETURN as other data
+     *   - used in wallet for:
+     *   -   for extracting addresses (we do not now how to do that for OP_RETURN) 
+     *   -   logging unsolvable transactions that contain OP_RETURN
+     */
+    bool IsKnownOpReturn() const
+    {
         return (size() > 0 && *begin() == OP_RETURN) ||
-               (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN) ||
-               (size() > MAX_SCRIPT_SIZE);
+            (size() > 1 && *begin() == OP_FALSE && *(begin() + 1) == OP_RETURN);        
     }
 
     void clear() {
@@ -640,6 +451,9 @@ public:
         CScriptBase().swap(*this);
     }
 };
+
+std::ostream &operator<<(std::ostream &, const CScript &);
+std::string to_string(const CScript&);
 
 struct CScriptWitness {
     // Note that this encodes the data elements being pushed, rather than

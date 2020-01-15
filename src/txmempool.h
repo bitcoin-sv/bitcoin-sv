@@ -12,6 +12,8 @@
 #include "primitives/transaction.h"
 #include "random.h"
 #include "sync.h"
+#include "time_locked_mempool.h"
+#include "tx_mempool_info.h"
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -360,27 +362,9 @@ public:
 // Multi_index tag names
 struct descendant_score {};
 struct entry_time {};
-struct mining_score {};
 struct ancestor_score {};
 
 class CBlockPolicyEstimator;
-
-/**
- * Information about a mempool transaction.
- */
-struct TxMempoolInfo {
-    /** The transaction itself */
-    CTransactionRef tx;
-
-    /** Time the transaction entered the mempool. */
-    int64_t nTime;
-
-    /** Feerate of the transaction. */
-    CFeeRate feeRate;
-
-    /** The fee delta. */
-    Amount nFeeDelta;
-};
 
 /**
  * Reason why a transaction was removed from the mempool, this is passed to the
@@ -422,12 +406,13 @@ public:
  *
  * Transactions are added when they are seen on the network (or created by the
  * local node), but not all transactions seen are added to the pool. For
- * example, the following new transactions will not be added to the mempool:
+ * example, the following new transactions may not be added to the mempool:
  * - a transaction which doesn't meet the minimum fee requirements.
  * - a new transaction that double-spends an input of a transaction already in
- * the pool where the new transaction does not meet the Replace-By-Fee
- * requirements as defined in BIP 125.
+ * the pool
  * - a non-standard transaction.
+ * However, note that the determination of whether a transaction is to be added to
+ * the pool is not made in this class.
  *
  * CTxMemPool::mapTx, and CTxMemPoolEntry bookkeeping:
  *
@@ -435,17 +420,22 @@ public:
  * - transaction hash
  * - feerate [we use max(feerate of tx, feerate of tx with all descendants)]
  * - time in mempool
- * - mining score (feerate modified by any fee deltas from
- * PrioritiseTransaction)
+ * - mining score (feerate modified by any fee deltas from PrioritiseTransaction)
+ *
+ * Note: mapTx will become private and may be modified extensively in the future. It will
+ * not be part of the public definition of this class.
  *
  * Note: the term "descendant" refers to in-mempool transactions that depend on
  * this one, while "ancestor" refers to in-mempool transactions that a given
  * transaction depends on.
  *
+ * Note: the feerate sort (referenced below) will be removed in future.
  * In order for the feerate sort to remain correct, we must update transactions
  * in the mempool when new descendants arrive. To facilitate this, we track the
  * set of in-mempool direct parents and direct children in mapLinks. Within each
  * CTxMemPoolEntry, we track the size and fees of all descendants.
+ *
+ * Note: tracking of ancestors and descendants may be removed in the future.
  *
  * Usually when a new transaction is added to the mempool, it has no in-mempool
  * children (because any such children would be an orphan). So in
@@ -517,10 +507,14 @@ private:
     // Our journal builder
     mining::CJournalBuilderPtr mJournalBuilder;
 
+    // Sub-pool for time locked txns
+    CTimeLockedMempool mTimeLockedPool {};
+
 public:
     // public only for testing
     static const int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
 
+    // DEPRECATED - this will become private and ultimately changed or removed
     typedef boost::multi_index_container<
         CTxMemPoolEntry, boost::multi_index::indexed_by<
                              // sorted by txid
@@ -536,11 +530,6 @@ public:
                                  boost::multi_index::tag<entry_time>,
                                  boost::multi_index::identity<CTxMemPoolEntry>,
                                  CompareTxMemPoolEntryByEntryTime>,
-                             // sorted by score (for mining prioritization)
-                             boost::multi_index::ordered_unique<
-                                 boost::multi_index::tag<mining_score>,
-                                 boost::multi_index::identity<CTxMemPoolEntry>,
-                                 CompareTxMemPoolEntryByScore>,
                              // sorted by fee rate with ancestors
                              boost::multi_index::ordered_non_unique<
                                  boost::multi_index::tag<ancestor_score>,
@@ -548,21 +537,29 @@ public:
                                  CompareTxMemPoolEntryByAncestorFee>>>
         indexed_transaction_set;
 
+    // DEPRECATED - this will become private and ultimately changed or removed
     mutable std::shared_mutex smtx;
+    // DEPRECATED - this will become private and ultimately changed or removed
     indexed_transaction_set mapTx;
 
+    // DEPRECATED - this will become private and ultimately changed or removed
     typedef indexed_transaction_set::nth_index<0>::type::iterator txiter;
     //!< All tx hashes/entries in mapTx, in random order
+    // DEPRECATED - this will become private and ultimately changed or removed
     std::vector<std::pair<uint256, txiter>> vTxHashes;
 
+    // DEPRECATED - this will become private and ultimately changed or removed
     struct CompareIteratorByHash {
         bool operator()(const txiter &a, const txiter &b) const {
             return a->GetTx().GetId() < b->GetTx().GetId();
         }
     };
+    // DEPRECATED - this will become private and ultimately changed or removed
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
 
+    // DEPRECATED - this will become private and ultimately changed or removed
     const setEntries &GetMemPoolParentsNL(txiter entry) const;
+    // DEPRECATED - this will become private and ultimately changed or removed
     const setEntries &GetMemPoolChildrenNL(txiter entry) const;
 
 private:
@@ -583,7 +580,9 @@ private:
     getSortedDepthAndScoreNL() const;
 
 public:
+    // DEPRECATED - this will become private and ultimately changed or removed
     indirectmap<COutPoint, const CTransaction *> mapNextTx;
+    // DEPRECATED - this will become private and ultimately changed or removed
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
     /** Create a new CTxMemPool.
@@ -597,8 +596,7 @@ public:
      * are in the mapNextTx array, journal is in agreement with mempool).
      * If sanity-checking is turned off, check does nothing.
      */
-    void Check(
-        const int64_t nSpendHeight,
+    void CheckMempool(
         const CCoinsViewCache *pcoins,
         const mining::CJournalChangeSetPtr& changeSet) const;
 
@@ -623,17 +621,6 @@ public:
 
     void AddUnchecked(
             const uint256 &hash,
-            const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
-            const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
-            size_t* pnMempoolSize = nullptr,
-            size_t* pnDynamicMemoryUsage = nullptr);
-    // A non-locking version of AddUnchecked
-    // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
-    // It needs to be called explicitly by a user if AddUncheckedNL is used.
-    void AddUncheckedNL(
-            const uint256& hash,
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             const mining::CJournalChangeSetPtr& changeSet,
@@ -665,6 +652,7 @@ public:
             const uint256 &hasha,
             const uint256 &hashb);
     // A non-locking version of CompareDepthAndScore
+    // DEPRECATED - this will become private and ultimately changed or removed
     bool CompareDepthAndScoreNL(
             const uint256 &hasha,
             const uint256 &hashb);
@@ -672,6 +660,7 @@ public:
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
     // A non-locking version of IsSpent
+    // DEPRECATED - this will become private and ultimately changed or removed
     bool IsSpentNL(const COutPoint &outpoint);
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
@@ -694,6 +683,7 @@ public:
             double &dPriorityDelta,
             Amount &nFeeDelta) const;
     // A non-locking version of ApplyDeltas
+    // DEPRECATED - this will become private and ultimately changed or removed
     void ApplyDeltasNL(
             const uint256& hash,
             double &dPriorityDelta,
@@ -701,6 +691,9 @@ public:
 
     // Get a reference to the journal builder
     const mining::CJournalBuilderPtr& getJournalBuilder() const { return mJournalBuilder; }
+
+    // Get a reference to the time-locked (non-final txn) mempool
+    CTimeLockedMempool& getNonFinalPool() { return mTimeLockedPool; }
 
 public:
     /**
@@ -752,6 +745,7 @@ public:
             std::string &errString,
             bool fSearchForParents = true) const;
     // A non-locking version of CalculateMemPoolAncestors
+    // DEPRECATED - this will become private and ultimately changed or removed
     bool CalculateMemPoolAncestorsNL(
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
@@ -770,6 +764,7 @@ public:
             txiter it,
             setEntries &setDescendants);
     // A non-locking version of CalculateDescendants
+    // DEPRECATED - this will become private and ultimately changed or removed
     void CalculateDescendantsNL(
             txiter it,
             setEntries &setDescendants);
@@ -801,8 +796,9 @@ public:
     /**
      * Check for conflicts with in-mempool transactions.
      * @param tx A reference to the given txn
+     * @param nonFinal A flag to indicate if tx is a non-final transaction
      */
-    bool CheckTxConflicts(const CTransaction &tx) const;
+    bool CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const;
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
@@ -816,20 +812,24 @@ public:
 
     bool Exists(const uint256& hash) const;
     // A non-locking version of Exists
+    // DEPRECATED - this will become private and ultimately changed or removed
     bool ExistsNL(const uint256& hash) const;
 
     bool Exists(const COutPoint &outpoint) const;
     // A non-locking version of Exists
+    // DEPRECATED - this will become private and ultimately changed or removed
     bool ExistsNL(const COutPoint &outpoint) const;
 
     CTransactionRef Get(const uint256& hash) const;
     // A non-locking version of Get
+    // DEPRECATED - this will become private and ultimately changed or removed
     CTransactionRef GetNL(const uint256& hash) const;
 
     TxMempoolInfo Info(const uint256& hash) const;
 
     std::vector<TxMempoolInfo> InfoAll() const;
     // A non-locking version of InfoAll
+    // DEPRECATED - this will become private and ultimately changed or removed
     std::vector<TxMempoolInfo> InfoAllNL() const;
 
     /**
@@ -849,12 +849,12 @@ public:
     bool ReadFeeEstimates(CAutoFile &filein);
 
     size_t DynamicMemoryUsage() const;
-    // A non-locking version of DynamicMemoryUsage.
-    size_t DynamicMemoryUsageNL() const;
 
     boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
         NotifyEntryRemoved;
+
+    void clearPrioritisation(const uint256 &hash);
 
 private:
     /**
@@ -874,6 +874,18 @@ private:
             txiter updateIt,
             cacheMap &cachedDescendants,
             const std::set<uint256> &setExclude);
+
+    // A non-locking version of AddUnchecked
+    // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
+    // It needs to be called explicitly by a user if AddUncheckedNL is used.
+    void AddUncheckedNL(
+            const uint256& hash,
+            const CTxMemPoolEntry &entry,
+            setEntries &setAncestors,
+            const mining::CJournalChangeSetPtr& changeSet,
+            bool validFeeEstimate = true,
+            size_t* pnMempoolSize = nullptr,
+            size_t* pnDynamicMemoryUsage = nullptr);
 
     /**
      * Update ancestors of hash to add/remove it as a descendant transaction.
@@ -948,6 +960,9 @@ private:
 
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;
+
+    // A non-locking version of DynamicMemoryUsage.
+    size_t DynamicMemoryUsageNL() const;
 };
 
 /**

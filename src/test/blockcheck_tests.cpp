@@ -19,7 +19,7 @@ static void RunCheckOnBlockImpl(const GlobalConfig &config, const CBlock &block,
     block.fChecked = false;
     BlockValidationOptions validationOptions =
         BlockValidationOptions(false, false);
-    bool fValid = CheckBlock(config, block, state, validationOptions);
+    bool fValid = CheckBlock(config, block, state, 0, validationOptions);
 
     BOOST_CHECK_EQUAL(fValid, expected);
     BOOST_CHECK_EQUAL(fValid, state.IsValid());
@@ -43,13 +43,12 @@ BOOST_AUTO_TEST_CASE(blockfail) {
     SelectParams(CBaseChainParams::MAIN);
 
     // Set max blocksize to default in case other tests left it dirty
-    GlobalConfig config;
-    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
-    config.SetMaxBlockSize(128*ONE_MEGABYTE);
-    auto nDefaultMaxBlockSize = config.GetMaxBlockSize();
+    testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+    testConfig.SetMaxBlockSize(128*ONE_MEGABYTE);
+    auto nDefaultMaxBlockSize = testConfig.GetMaxBlockSize();
 
     CBlock block;
-    RunCheckOnBlock(config, block, "bad-cb-missing");
+    RunCheckOnBlock(testConfig, block, "bad-cb-missing");
 
     CMutableTransaction tx;
 
@@ -62,20 +61,20 @@ BOOST_AUTO_TEST_CASE(blockfail) {
 
     block.vtx.resize(1);
     block.vtx[0] = MakeTransactionRef(tx);
-    RunCheckOnBlock(config, block);
+    RunCheckOnBlock(testConfig, block);
 
     // No coinbase
     tx.vin[0].prevout = COutPoint(InsecureRand256(), 0);
     block.vtx[0] = MakeTransactionRef(tx);
 
-    RunCheckOnBlock(config, block, "bad-cb-missing");
+    RunCheckOnBlock(testConfig, block, "bad-cb-missing");
 
     // Invalid coinbase
     tx = CMutableTransaction(coinbaseTx);
     tx.vin[0].scriptSig.resize(0);
     block.vtx[0] = MakeTransactionRef(tx);
 
-    RunCheckOnBlock(config, block, "bad-cb-length");
+    RunCheckOnBlock(testConfig, block, "bad-cb-length");
 
     // Oversize block.
     tx = CMutableTransaction(coinbaseTx);
@@ -89,7 +88,7 @@ BOOST_AUTO_TEST_CASE(blockfail) {
     }
 
     // Check that at this point, we still accept the block.
-    RunCheckOnBlock(config, block);
+    RunCheckOnBlock(testConfig, block);
 
     // And that serialisation works for large blocks
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
@@ -102,7 +101,7 @@ BOOST_AUTO_TEST_CASE(blockfail) {
     // allowed block size.
     tx.vin[0].prevout = COutPoint(InsecureRand256(), 0);
     block.vtx.push_back(MakeTransactionRef(tx));
-    RunCheckOnBlock(config, block, "bad-blk-length");
+    RunCheckOnBlock(testConfig, block, "bad-blk-length");
 
 	// Bounds checking within GetHeightFromCoinbase()
     block.vtx.resize(1);

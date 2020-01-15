@@ -12,7 +12,7 @@
 BOOST_FIXTURE_TEST_SUITE(protocol_tests, TestingSetup)
 
 class OurConfig : public DummyConfig {
-    uint64_t GetMaxBlockSize() const override { return Params().GetDefaultBlockSizeParams().maxBlockSizeAfter;  }
+    uint64_t GetMaxBlockSize() const override { return Params().GetDefaultBlockSizeParams().maxBlockSize;  }
 };
 
 

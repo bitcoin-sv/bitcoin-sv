@@ -21,6 +21,9 @@ static const int64_t MAX_MAX_SCRIPT_CACHE_SIZE = 16384;
 /** Initializes the script-execution cache */
 void InitScriptExecutionCache();
 
+/** Clear cache content */
+void ClearCache();
+
 /** Compute the cache key for a given transaction and flags. */
 uint256 GetScriptCacheKey(const CTransaction &tx, uint32_t flags);
 

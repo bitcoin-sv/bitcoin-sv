@@ -109,6 +109,7 @@ add_library(util
 	support/lockedpool.cpp
 	sync.cpp
 	threadinterrupt.cpp
+	threadpriority.cpp
 	uint256.cpp
 	util.cpp
 	utilmoneystr.cpp
@@ -193,12 +194,15 @@ target_link_libraries(common util secp256k1)
 # libbitcoinconsensus
 add_library(bitcoinconsensus
 	arith_uint256.cpp
+    big_int.cpp
 	hash.cpp
 	primitives/transaction.cpp
 	pubkey.cpp
 	script/bitcoinconsensus.cpp
 	script/interpreter.cpp
+	script/limitedstack.cpp
 	script/script.cpp
+	script/script_num.cpp
 	script/script_error.cpp
 	uint256.cpp
 	utilstrencodings.cpp
@@ -249,9 +253,11 @@ add_library(server
 	script/sigcache.cpp
 	script/ismine.cpp
 	timedata.cpp
+    time_locked_mempool.cpp
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+    tx_mempool_info.cpp
 	txn_double_spend_detector.cpp
 	txn_propagator.cpp
 	txn_validation_data.cpp

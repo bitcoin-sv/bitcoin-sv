@@ -243,16 +243,22 @@ public:
      *  0  : in memory pool, waiting to be included in a block
      * >=1 : this many blocks deep in the main chain
      */
-    int GetDepthInMainChain(const CBlockIndex *&pindexRet) const;
-    int GetDepthInMainChain() const {
-        const CBlockIndex *pindexRet;
-        return GetDepthInMainChain(pindexRet);
-    }
+    int GetDepthInMainChain() const;
     bool IsInMainChain() const {
-        const CBlockIndex *pindexRet;
-        return GetDepthInMainChain(pindexRet) > 0;
+        return GetDepthInMainChain() > 0;
     }
     int GetBlocksToMaturity() const;
+    /**
+     * Return height of transaction in blockchain. If in mempool returs MEMPOOL_HEIGHT
+     */
+    int GetHeightInMainChain() const;
+    /**
+    * Return is the transaction height larger or equal to the genesis activation height. 
+    * If in mempool, we assume that it will be mined in next block.
+    */
+    bool IsGenesisEnabled() const;
+
+
     /**
      * Pass this transaction to the mempool. Fails if absolute fee exceeds
      * absurd fee.
@@ -937,7 +943,7 @@ public:
     bool AddAccountingEntry(const CAccountingEntry &);
     bool AddAccountingEntry(const CAccountingEntry &, CWalletDB *pwalletdb);
     template <typename ContainerType>
-    bool DummySignTx(CMutableTransaction &txNew, const ContainerType &coins);
+    bool DummySignTx(const Config& config, CMutableTransaction& txNew, const ContainerType& coins);
 
     static CFeeRate minTxFee;
     static CFeeRate fallbackFee;
@@ -1141,6 +1147,11 @@ public:
      */
     bool SetHDMasterKey(const CPubKey &key,
                         CHDChain *possibleOldChain = nullptr);
+
+    /**
+     * Extract single destination from script even if it is p2sh (multisig not supported)
+     */
+    static bool ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet);
 };
 
 /** A key allocated from the key pool. */
@@ -1195,8 +1206,8 @@ public:
 // ContainerType is meant to hold pair<CWalletTx *, int>, and be iterable so
 // that each entry corresponds to each vIn, in order.
 template <typename ContainerType>
-bool CWallet::DummySignTx(CMutableTransaction &txNew,
-                          const ContainerType &coins) {
+bool CWallet::DummySignTx(const Config& config, CMutableTransaction& txNew,
+                          const ContainerType& coins) {
     // Fill in dummy signatures for fee calculation.
     int nIn = 0;
     for (const auto &coin : coins) {
@@ -1204,7 +1215,7 @@ bool CWallet::DummySignTx(CMutableTransaction &txNew,
             coin.first->tx->vout[coin.second].scriptPubKey;
         SignatureData sigdata;
 
-        if (!ProduceSignature(DummySignatureCreator(this), scriptPubKey,
+        if (!ProduceSignature(config, false, DummySignatureCreator(this), true, false, scriptPubKey,
                               sigdata)) {
             return false;
         } else {

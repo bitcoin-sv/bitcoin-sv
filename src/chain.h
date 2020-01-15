@@ -14,6 +14,9 @@
 #include "uint256.h"
 #include "logging.h"
 
+#include <atomic>
+#include <chrono>
+#include <shared_mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -283,6 +286,8 @@ struct CDiskBlockMetaData
     }
 };
 
+arith_uint256 GetBlockProof(const CBlockIndex &block);
+
 /**
  * The block chain is a tree shaped structure starting with the genesis block at
  * the root, with each block potentially having multiple candidates to be the
@@ -371,6 +376,10 @@ public:
         nBits = 0;
         nNonce = 0;
         mDiskBlockMetaData = {};
+
+        // set to maximum time by default to indicate that validation has not
+        // yet been completed
+        mValidationCompletionTime = SteadyClockTimePoint::max();
     }
 
     CBlockIndex() { SetNull(); }
@@ -405,6 +414,7 @@ public:
         nStatus = other.nStatus;
         nTx = other.nTx;
         mDiskBlockMetaData = other.mDiskBlockMetaData;
+        mValidationCompletionTime = other.mValidationCompletionTime;
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -455,6 +465,13 @@ public:
         }
     }
 
+    void SetChainWork()
+    {
+        nChainWork =
+            (pprev ? pprev->nChainWork : 0) +
+            GetBlockProof(*this);
+    }
+
     void ClearFileInfo()
     {
         nStatus =
@@ -495,19 +512,39 @@ public:
 
     enum { nMedianTimeSpan = 11 };
 
-    int64_t GetMedianTimePast() const {
-        int64_t pmedian[nMedianTimeSpan];
-        int64_t *pbegin = &pmedian[nMedianTimeSpan];
-        int64_t *pend = &pmedian[nMedianTimeSpan];
+    int64_t GetMedianTimePast() const
+    {
+        std::vector<int64_t> block_times;
 
-        const CBlockIndex *pindex = this;
-        for (int i = 0; i < nMedianTimeSpan && pindex;
-             i++, pindex = pindex->pprev) {
-            *(--pbegin) = pindex->GetBlockTime();
+        const CBlockIndex* pindex = this;
+        for(int i{}; i < nMedianTimeSpan && pindex; i++, pindex = pindex->pprev)
+        {
+            block_times.push_back(pindex->GetBlockTime());
         }
 
-        std::sort(pbegin, pend);
-        return pbegin[(pend - pbegin) / 2];
+        const auto n{block_times.size() / 2};
+        std::nth_element(begin(block_times), begin(block_times) + n,
+                         end(block_times));
+        return block_times[n];
+    }
+
+    /**
+     * Pretend that validation to SCRIPT level was instantanious. This is used
+     * for precious blocks where we wish to treat a certain block as if it was
+     * the first block with a certain amount of work.
+     */
+    void IgnoreValidationTime()
+    {
+        mValidationCompletionTime = SteadyClockTimePoint::min();
+    }
+
+    /**
+     * Get tie breaker time for checking which of the blocks with same amount of
+     * work was validated to SCRIPT level first.
+     */
+    auto GetValidationCompletionTime() const
+    {
+        return mValidationCompletionTime;
     }
 
     std::string ToString() const {
@@ -534,6 +571,11 @@ public:
             return false;
         }
 
+        if (ValidityChangeRequiresValidationTimeSetting(nUpTo))
+        {
+            mValidationCompletionTime = std::chrono::steady_clock::now();
+        }
+
         nStatus = nStatus.withValidity(nUpTo);
         return true;
     }
@@ -547,6 +589,23 @@ public:
 
 protected:
     CDiskBlockMetaData mDiskBlockMetaData;
+
+    using SteadyClockTimePoint =
+        std::chrono::time_point<std::chrono::steady_clock>;
+    // Time when the block validation has been completed to SCRIPT level.
+    // This is a memmory only variable after reboot we can set it to
+    // SteadyClockTimePoint::min() (best possible candidate value) since after
+    // the validation we only care that best tip is valid and not which that
+    // best tip is (it's a race condition during validation anyway).
+    SteadyClockTimePoint mValidationCompletionTime;
+
+private:
+    bool ValidityChangeRequiresValidationTimeSetting(BlockValidity nUpTo) const
+    {
+        return
+            nUpTo == BlockValidity::SCRIPTS
+            && mValidationCompletionTime == SteadyClockTimePoint::max();
+    }
 };
 
 /**
@@ -558,8 +617,6 @@ struct BlockHasher {
 
 typedef std::unordered_map<uint256, CBlockIndex *, BlockHasher> BlockMap;
 extern BlockMap mapBlockIndex;
-
-arith_uint256 GetBlockProof(const CBlockIndex &block);
 
 /**
  * Return the time it would take to redo the work difference between from and
@@ -608,6 +665,11 @@ public:
         if (nStatus.hasUndo()) {
             READWRITE(VARINT(nUndoPos));
         }
+        if(nStatus.getValidity() == BlockValidity::SCRIPTS)
+        {
+            mValidationCompletionTime =
+                CBlockIndex::SteadyClockTimePoint::min();
+        }
 
         // block header
         READWRITE(this->nVersion);
@@ -653,6 +715,7 @@ public:
 class CChain {
 private:
     std::vector<CBlockIndex *> vChain;
+    std::atomic<CBlockIndex*> mChainTip = nullptr;
 
 public:
     /**
@@ -666,9 +729,7 @@ public:
     /**
      * Returns the index entry for the tip of this chain, or nullptr if none.
      */
-    CBlockIndex *Tip() const {
-        return vChain.size() > 0 ? vChain[vChain.size() - 1] : nullptr;
-    }
+    CBlockIndex* Tip() const { return mChainTip; }
 
     /**
      * Returns the index entry at a particular height in this chain, or nullptr
@@ -705,10 +766,13 @@ public:
     }
 
     /**
-     * Return the maximal height in the chain. Is equal to chain.Tip() ?
-     * chain.Tip()->nHeight : -1.
+     * Return the maximal height in the chain or -1 if tip is not set.
      */
-    int Height() const { return vChain.size() - 1; }
+    int Height() const
+    {
+        const CBlockIndex* tip = mChainTip;
+        return tip ? tip->nHeight : -1;
+    }
 
     /** Set/initialize a chain with a given tip. */
     void SetTip(CBlockIndex *pindex);
@@ -728,6 +792,26 @@ public:
      * Find the earliest block with timestamp equal or greater than the given.
      */
     CBlockIndex *FindEarliestAtLeast(int64_t nTime) const;
+};
+
+/**
+ * class CChainActiveSharedData.
+ *
+ * TODO: This class becomes redundant once CChain offers mt support.
+ * For the time being, it is needed to share activeHeight & activeTipBlockHash
+ * between different threads without a need to hold cs_main.
+ */
+class CChainActiveSharedData {
+    std::atomic_int mChainActiveHeight {};
+    uint256 mChainActiveTipBlockHash { uint256() };
+    mutable std::shared_mutex mMainMtx {};
+
+public:
+    void SetChainActiveHeight(int height);
+    int GetChainActiveHeight() const;
+
+    void SetChainActiveTipBlockHash(uint256 blockHash);
+    uint256 GetChainActiveTipBlockHash() const;
 };
 
 #endif // BITCOIN_CHAIN_H

@@ -16,7 +16,7 @@ import time
 from test_framework.key import CECKey
 from test_framework.script import *
 import struct
-from test_framework.cdefs import MAX_STANDARD_TX_SIGOPS
+from test_framework.cdefs import MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS
 
 # Error for too many sigops in one TX
 TXNS_TOO_MANY_SIGOPS_ERROR = b'bad-txns-too-many-sigops'
@@ -225,12 +225,12 @@ class FullBlockTest(ComparisonTestFramework):
         yield accepted()
 
         # Sigops p2sh limit for the mempool test
-        p2sh_sigops_limit_mempool = MAX_STANDARD_TX_SIGOPS - \
+        p2sh_sigops_limit_mempool = MAX_TX_SIGOPS_COUNT_POLICY_BEFORE_GENESIS - \
             redeem_script.GetSigOpCount(True)
         # Too many sigops in one p2sh script
         too_many_p2sh_sigops_mempool = CScript(
             [OP_CHECKSIG] * (p2sh_sigops_limit_mempool + 1))
-
+        
         # A transaction with this output script can't get into the mempool
         assert_raises_rpc_error(-26, RPC_TXNS_TOO_MANY_SIGOPS_ERROR, node.sendrawtransaction,
                                 ToHex(spend_p2sh_tx(p2sh_tx, too_many_p2sh_sigops_mempool)))

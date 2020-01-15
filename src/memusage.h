@@ -6,10 +6,12 @@
 #define BITCOIN_MEMUSAGE_H
 
 #include "indirectmap.h"
+#include "prevector.h"
 
 #include <cstdlib>
 
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 

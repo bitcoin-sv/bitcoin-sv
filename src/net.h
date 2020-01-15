@@ -16,7 +16,6 @@
 #include "fs.h"
 #include "hash.h"
 #include "limitedmap.h"
-#include "mod_pri_queue.h"
 #include "netaddress.h"
 #include "protocol.h"
 #include "random.h"
@@ -37,6 +36,8 @@
 #include <memory>
 #include <optional>
 #include <thread>
+#include <vector>
+#include <functional>
 
 #ifndef WIN32
 #include <arpa/inet.h>
@@ -56,6 +57,11 @@ using CNodePtr = std::shared_ptr<CNode>;
 namespace boost {
 class thread_group;
 } // namespace boost
+
+namespace task
+{
+    class CCancellationSource;
+}
 
 /** Time between pings automatically sent out for latency probing and keepalive
  * (in seconds). */
@@ -108,6 +114,12 @@ static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);
 // NOTE: When adjusting this, update rpcnet:setban's help ("24h")
 static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
 
+/**
+ * Default maximum amount of concurrent async tasks per node before node message
+ * processing is skipped until the amount is freed up again.
+ */
+constexpr size_t DEFAULT_NODE_ASYNC_TASKS_LIMIT = 3;
+
 typedef int64_t NodeId;
 
 struct AddedNodeInfo {
@@ -115,6 +127,28 @@ struct AddedNodeInfo {
     CService resolvedAddress;
     bool fConnected;
     bool fInbound;
+};
+
+class CGetBlockMessageRequest
+{
+public:
+    CGetBlockMessageRequest(CDataStream& vRecv)
+        : mRequestTime{std::chrono::system_clock::now()}
+    {
+        vRecv >> mLocator >> mHashStop;
+    }
+
+    auto GetRequestTime() const
+        -> const std::chrono::time_point<std::chrono::system_clock>&
+    {
+        return mRequestTime;
+    }
+    const CBlockLocator& GetLocator() const {return mLocator;}
+    const uint256& GetHashStop() const {return mHashStop;}
+private:
+    std::chrono::time_point<std::chrono::system_clock> mRequestTime;
+    CBlockLocator mLocator;
+    uint256 mHashStop;
 };
 
 class CTransaction;
@@ -245,74 +279,56 @@ public:
         return results;
     };
 
-    /** Call the specified function for parallel validation (batch processing) */
+    /** Call the specified function for parallel validation */
     template <typename Callable>
-    auto ParallelTxValidationBatchProcessing(
+    auto ParallelTxnValidation(
             Callable&& func,
-            size_t nTxnsPerTaskThreshold,
             const Config* config,
             CTxMemPool *pool,
             TxInputDataSPtrVec& vNewTxns,
             CTxnHandlers& handlers,
-            bool fReadyForFeeEstimation)
+            bool fReadyForFeeEstimation,
+            bool fUseTimedCancellationSource,
+            std::chrono::milliseconds maxasynctasksrunduration)
         -> std::vector<std::future<typename std::result_of<
-            Callable(const TxInputDataSPtrRefVec&,
+            Callable(const TxInputDataSPtr&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
-                bool)>::type>> {
+                bool,
+                bool,
+                std::chrono::steady_clock::time_point)>::type>> {
         using resultType = typename std::result_of<
-            Callable(const TxInputDataSPtrRefVec&,
+            Callable(const TxInputDataSPtr&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
-                bool)>::type;
+                bool,
+                bool,
+                std::chrono::steady_clock::time_point)>::type;
         // A variable which stors results
         std::vector<std::future<resultType>> results {};
-        size_t numThreads = mValidatorThreadPool.getPoolSize();
-        // Calculate txns per thread ratio.
-        size_t nTxnsPerTaskRatio {vNewTxns.size() / numThreads};
-        // Calculate number of txns for batch processing (per thread)
-        size_t nBatchSize {0};
-        bool fSingleTask = !nTxnsPerTaskThreshold || (nTxnsPerTaskRatio < nTxnsPerTaskThreshold);
-        if (fSingleTask) {
-            nBatchSize = vNewTxns.size();
-        } else {
-            nBatchSize = vNewTxns.size() / numThreads;
-            if (vNewTxns.size() % numThreads) {
-                ++nBatchSize;
-            }
-        }
         // Allocate a buffer for results
-        results.reserve(fSingleTask ? 1 : numThreads);
-        auto chunkBeginIter = vNewTxns.begin();
-        auto chunkEndIter = vNewTxns.begin();
-        size_t currChunkBeginPos {0};
-        // Lambda function which creats a task with batch txns
-        auto create_batch_task {
-            [&](const TxInputDataSPtrRefVec& vBatchTxns) {
-                results.emplace_back(
-                        make_task(mValidatorThreadPool, func,
-                            vBatchTxns,
-                            config,
-                            pool,
-                            handlers,
-                            fReadyForFeeEstimation));
-                }
-        };
-        // Calculate a chunk of txns & create a task which executes a batch processing.
-        while (currChunkBeginPos + nBatchSize <= vNewTxns.size()) {
-            std::advance(chunkEndIter, nBatchSize);
-            const TxInputDataSPtrRefVec vBatchTxns(chunkBeginIter, chunkEndIter);
-            create_batch_task(vBatchTxns);
-            chunkBeginIter = chunkEndIter;
-            currChunkBeginPos += nBatchSize;
-        }
-        // Last chunk
-        size_t nLastChunkSize = vNewTxns.size() - currChunkBeginPos;
-        if (nLastChunkSize) {
-            const TxInputDataSPtrRefVec vBatchTxns(chunkBeginIter, vNewTxns.end());
-            create_batch_task(vBatchTxns);
+        results.reserve(vNewTxns.size());
+        // Set the time point
+        std::chrono::steady_clock::time_point zero_time_point(std::chrono::milliseconds(0));
+        std::chrono::steady_clock::time_point end_time_point =
+            std::chrono::steady_clock::time_point(maxasynctasksrunduration) == zero_time_point
+                ? zero_time_point : std::chrono::steady_clock::now() + maxasynctasksrunduration;
+        // Create validation tasks
+        for (const TxInputDataSPtr& txn : vNewTxns) {
+            results.emplace_back(
+                make_task(
+                    mValidatorThreadPool,
+                    txn->mTxValidationPriority == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High,
+                    func,
+                    txn,
+                    config,
+                    pool,
+                    handlers,
+                    fReadyForFeeEstimation,
+                    fUseTimedCancellationSource,
+                    end_time_point));
         }
         return results;
     };
@@ -321,7 +337,10 @@ public:
     std::shared_ptr<CTxnValidator> getTxnValidator();
     /** Enqueue a new transaction for validation */
     void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
+    /* Support for a vector */
     void EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData);
+    /** Resubmit a transaction for validation */
+    void ResubmitTxnForValidator(TxInputDataSPtr pTxInputData);
     /** Check if the given txn is already known by the Validator */
     bool CheckTxnExistsInValidatorsQueue(const uint256& txHash) const;
     /* Find node by it's id */
@@ -427,6 +446,61 @@ public:
     unsigned int GetReceiveFloodSize() const;
 
     void WakeMessageHandler();
+
+    // Task pool for executing async node tasks. Task queue size is implicitly
+    // limited by maximum allowed connections (DEFAULT_MAX_PEER_CONNECTIONS)
+    // times maximum async requests that a node may have active at any given
+    // time.
+    class CAsyncTaskPool
+    {
+    public:
+        CAsyncTaskPool(const Config& config);
+        ~CAsyncTaskPool();
+
+        void AddToPool(
+            const std::shared_ptr<CNode>& node,
+            std::function<void(std::weak_ptr<CNode>)> function,
+            std::shared_ptr<task::CCancellationSource> source);
+
+        bool HasReachedSoftAsyncTaskLimit(NodeId id)
+        {
+            return
+                std::count_if(
+                    mRunningTasks.begin(),
+                    mRunningTasks.end(),
+                    [id](const CRunningTask& container)
+                    {
+                        return container.mId == id;
+                    }) >= mPerInstanceSoftAsyncTaskLimit;
+        }
+
+        /**
+         * Node can be used to execute some code on a different thread to return
+         * control back to CConnman. Each node stores its pending futures that are
+         * removed once the task is done.
+         */
+        void HandleCompletedAsyncProcessing();
+
+    private:
+        struct CRunningTask
+        {
+            CRunningTask(
+                NodeId id,
+                std::future<void>&& future,
+                std::shared_ptr<task::CCancellationSource>&& cancellationSource)
+                : mId{id}
+                , mFuture{std::move(future)}
+                , mCancellationSource{std::move(cancellationSource)}
+            {/**/}
+            NodeId mId;
+            std::future<void> mFuture;
+            std::shared_ptr<task::CCancellationSource> mCancellationSource;
+        };
+
+        CThreadPool<CQueueAdaptor> mPool;
+        std::vector<CRunningTask> mRunningTasks;
+        int mPerInstanceSoftAsyncTaskLimit;
+    };
 
 private:
     struct ListenSocket {
@@ -549,7 +623,7 @@ private:
 
     /** Transaction validator */
     std::shared_ptr<CTxnValidator> mTxnValidator {};
-    CThreadPool<CQueueAdaptor> mValidatorThreadPool { "ValidatorPool" };
+    CThreadPool<CDualQueueAdaptor> mValidatorThreadPool;
 
     CThreadInterrupt interruptNet;
 
@@ -560,6 +634,9 @@ private:
     std::thread threadMessageHandler;
 
     std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
+
+    CAsyncTaskPool mAsyncTaskPool;
+    uint8_t mNodeAsyncTaskLimit;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);
@@ -592,7 +669,7 @@ struct CNodeSignals {
                                  std::atomic<bool> &),
                             CombinerAll>
         SendMessages;
-    boost::signals2::signal<void(const Config &, const CNodePtr& , CConnman &)>
+    boost::signals2::signal<void(const CNodePtr& , CConnman &)>
         InitializeNode;
     boost::signals2::signal<void(NodeId, bool &)> FinalizeNode;
 };
@@ -762,7 +839,8 @@ public:
 };
 
 /** Information about a peer */
-class CNode {
+class CNode : public std::enable_shared_from_this<CNode>
+{
     friend class CConnman;
 
 public:
@@ -796,6 +874,7 @@ public:
 
     CCriticalSection cs_sendProcessing {};
 
+    std::optional<CGetBlockMessageRequest> mGetBlockMessageRequest;
     std::deque<CInv> vRecvGetData {};
     uint64_t nRecvBytes {0};
     std::atomic<int> nRecvVersion {INIT_PROTO_VERSION};
@@ -836,7 +915,7 @@ public:
     bool fSentAddr {false};
     CSemaphoreGrant grantOutbound {};
     CCriticalSection cs_filter {};
-    CBloomFilter *pfilter {nullptr};
+    CBloomFilter mFilter;
     const NodeId id {};
 
     const uint64_t nKeyedNetGroup {0};
@@ -907,10 +986,13 @@ public:
     /** protoconfReceived is false by default and set to true when protoconf is received from peer **/
     bool protoconfReceived {false};
 
-    CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn,
-          SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn,
-          uint64_t nLocalHostNonceIn, const std::string &addrNameIn = "",
-          bool fInboundIn = false);
+    /** Constructor for producing CNode shared pointer instances */
+    template<typename ... Args>
+    static std::shared_ptr<CNode> Make(Args&& ... args)
+    {
+        return std::shared_ptr<CNode>(new CNode{std::forward<Args>(args)...});
+    }
+
     ~CNode();
 
     CNode(CNode&&) = delete;
@@ -919,6 +1001,18 @@ public:
     CNode& operator=(const CNode&) = delete;
 
 private:
+    CNode(
+        NodeId id,
+        ServiceFlags nLocalServicesIn,
+        int nMyStartingHeightIn,
+        SOCKET hSocketIn,
+        const CAddress& addrIn,
+        uint64_t nKeyedNetGroupIn,
+        uint64_t nLocalHostNonceIn,
+        CConnman::CAsyncTaskPool& asyncTaskPool,
+        const std::string &addrNameIn = "",
+        bool fInboundIn = false);
+
     /**
      * Storage for the last chunk being sent to the peer. This variable contains
      * data for the duration of sending the chunk. Once the chunk is sent it is
@@ -944,11 +1038,11 @@ private:
     CService addrLocal {};
     mutable CCriticalSection cs_addrLocal {};
 
-    /** List of priority sorted inventory msgs for transactions to send */
-    using InvList = CModPriQueue<CTxnSendingDetails, std::vector<CTxnSendingDetails>, CompareTxnSendingDetails>;
-    InvList mInvList { CompareTxnSendingDetails{&mempool} };
+    /** Deque of inventory msgs for transactions to send */
+    std::deque<CTxnSendingDetails> mInvList;
     CCriticalSection cs_mInvList {};
 
+    CConnman::CAsyncTaskPool& mAsyncTaskPool;
 
 public:
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
@@ -1032,6 +1126,33 @@ public:
     std::string GetAddrName() const;
     //! Sets the addrName only if it was not previously set
     void MaybeSetAddrName(const std::string &addrNameIn);
+
+    /**
+     * Run node related task asynchronously.
+     * Tasks may live longer than CNode instance exists as they are gracefully
+     * terminated before completion only when CConnman instance is terminated
+     * (CConnman destructor implicitly calls CAsyncTaskPool destructor which
+     * terminates the tasks).
+     *
+     * The reason for task lifetime extension past CNode lifetime is that the
+     * network connection can be dropped which destroys CNode instance while
+     * on the other hand tasks should not be bound to this external event - for
+     * example current tasks call ActivateBestChain() which should finish even
+     * if connection is dropped (not related to a specific node).
+     *
+     * NOTE: Function should never capture bare pointer or shared pointer
+     *       reference to this node internally as that can lead to unwanted
+     *       lifetime extension (tasks may run longer than node is kept alive).
+     *       For this reason the weak pointer that is provided as call parameter
+     *       should be used instead.
+     *       In current tasks the weak pointer is used only for updating
+     *       CNode::nLastBlockTime which is relevant only while node instance
+     *       exists and has no side effects when we can't perform it after the
+     *       node instance no longer exists.
+     */
+    void RunAsyncProcessing(
+        std::function<void(std::weak_ptr<CNode>)> function,
+        std::shared_ptr<task::CCancellationSource> source);
 };
 
 /**
@@ -1040,6 +1161,5 @@ public:
  */
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);
 
-std::string getSubVersionEB(uint64_t MaxBlockSize);
-std::string userAgent(const Config &config);
+std::string userAgent();
 #endif // BITCOIN_NET_H

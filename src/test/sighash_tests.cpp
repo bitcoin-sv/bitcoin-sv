@@ -220,7 +220,7 @@ BOOST_AUTO_TEST_CASE(sighash_from_data) {
             stream >> tx;
 
             CValidationState state;
-            BOOST_CHECK_MESSAGE(CheckRegularTransaction(*tx, state), strTest);
+            BOOST_CHECK_MESSAGE(CheckRegularTransaction(*tx, state, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS, MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS, false), strTest);
             BOOST_CHECK(state.IsValid());
 
             std::vector<uint8_t> raw = ParseHex(raw_script);

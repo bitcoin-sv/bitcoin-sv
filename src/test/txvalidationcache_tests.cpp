@@ -1,6 +1,7 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
 // Copyright (c) 2019 Bitcoin Association
-// Distributed under the Open BSV software license, see the accompanying file LICENSE.
+// Distributed under the Open BSV software license, see the accompanying file
+// LICENSE.
 
 #include "config.h"
 #include "consensus/validation.h"
@@ -33,6 +34,7 @@ namespace {
             auto pTxInputData {
                 std::make_shared<CTxInputData>(
                                     TxSource::rpc,            // tx source
+                                    TxValidationPriority::normal,   // tx validation priority
                                     MakeTransactionRef(tx),   // a pointer to the tx
                                     GetTime(),                // nAcceptTime
                                     false)                    // fLimitFree
@@ -70,23 +72,54 @@ namespace {
     // Capture this interaction with the upgraded_nop argument: set it when
     // evaluating any script flag that is implemented as an upgraded NOP code.
     void ValidateCheckInputsForAllFlags(const CMutableTransaction &mutableTx,
-                                        uint32_t failing_flags, bool add_to_cache,
+                                        std::function<bool(uint32_t)> expectedResultBasedOnFlags,
+                                        bool add_to_cache,
                                         bool upgraded_nop) {
+        //DummyConfig config(CBaseChainParams::MAIN);
+        auto& config = GlobalConfig::GetConfig();
+        auto genesisActivationHeight = config.GetGenesisActivationHeight();
         const CTransaction tx(mutableTx);
         PrecomputedTransactionData txdata(tx);
+        auto source = task::CCancellationSource::Make();
         // If we add many more flags, this loop can get too expensive, but we can
         // rewrite in the future to randomly pick a set of flags to evaluate.
-        for (size_t test_flags = 0; test_flags < (1U << 17); test_flags += 1) {
+        for (size_t test_flags = 0; test_flags < SCRIPT_FLAG_LAST; test_flags += 1) {
+
+            // skipping impossible combination
+            if ((test_flags & SCRIPT_UTXO_AFTER_GENESIS) && !(test_flags & SCRIPT_GENESIS)){
+                continue; 
+            }
+
+            // If all mandatory flags are not set no point to test.
+            if((test_flags & MANDATORY_SCRIPT_VERIFY_FLAGS) != MANDATORY_SCRIPT_VERIFY_FLAGS) {
+                continue;
+            }
+
+            if (test_flags & SCRIPT_UTXO_AFTER_GENESIS) {
+                config.SetGenesisActivationHeight(1); // put genesis activation low to be sure that every utxo is before genesis
+            } else {
+                config.SetGenesisActivationHeight(chainActive.Height() + 2); // put genesis activation one block above mempool height
+            }
+
             CValidationState state;
-            // Make sure the mandatory flags are enabled.
-            test_flags |= MANDATORY_SCRIPT_VERIFY_FLAGS;
 
-            bool ret = CheckInputs(tx, state, pcoinsTip, true, test_flags, true,
-                                   add_to_cache, txdata, nullptr);
+            bool ret =
+                CheckInputs(
+                    source->GetToken(),
+                    config,
+                    true,
+                    tx,
+                    state,
+                    pcoinsTip,
+                    true,
+                    test_flags,
+                    true,
+                    add_to_cache,
+                    txdata,
+                    nullptr).value();
 
-            // CheckInputs should succeed iff test_flags doesn't intersect with
-            // failing_flags
-            bool expected_return_value = !(test_flags & failing_flags);
+            // find out if we should pass or fail based on flags.
+            bool expected_return_value = expectedResultBasedOnFlags(test_flags);
             if (expected_return_value && upgraded_nop) {
                 // If the script flag being tested corresponds to an upgraded NOP,
                 // then script execution should fail if DISCOURAGE_UPGRADABLE_NOPS
@@ -101,18 +134,43 @@ namespace {
             if (ret && add_to_cache) {
                 // Check that we get a cache hit if the tx was valid
                 std::vector<CScriptCheck> scriptchecks;
-                BOOST_CHECK(CheckInputs(tx, state, pcoinsTip, true, test_flags,
-                                        true, add_to_cache, txdata, &scriptchecks));
+                BOOST_CHECK(
+                    CheckInputs(
+                        source->GetToken(),
+                        config,
+                        true,
+                        tx,
+                        state,
+                        pcoinsTip,
+                        true,
+                        test_flags,
+                        true,
+                        add_to_cache,
+                        txdata,
+                        &scriptchecks).value());
                 BOOST_CHECK(scriptchecks.empty());
             } else {
                 // Check that we get script executions to check, if the transaction
                 // was invalid, or we didn't add to cache.
                 std::vector<CScriptCheck> scriptchecks;
-                BOOST_CHECK(CheckInputs(tx, state, pcoinsTip, true, test_flags,
-                                        true, add_to_cache, txdata, &scriptchecks));
+                BOOST_CHECK(
+                    CheckInputs(
+                        source->GetToken(),
+                        config,
+                        true,
+                        tx,
+                        state,
+                        pcoinsTip,
+                        true,
+                        test_flags,
+                        true,
+                        add_to_cache,
+                        txdata,
+                        &scriptchecks).value());
                 BOOST_CHECK_EQUAL(scriptchecks.size(), tx.vin.size());
             }
         }
+        config.SetGenesisActivationHeight(genesisActivationHeight);
     }
 }
 
@@ -175,6 +233,7 @@ BOOST_AUTO_TEST_CASE(tx_mempool_block_doublespend) {
     BOOST_CHECK_EQUAL(mempool.Size(), 0);
 }
 
+
 BOOST_AUTO_TEST_CASE(checkinputs_test) {
     // Test that passing CheckInputs with one set of script flags doesn't imply
     // that we would pass again with a different set of flags.
@@ -230,36 +289,62 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
     const CTransaction spend_tx(mutableSpend_tx);
 
     LOCK(cs_main);
+    auto& config = GlobalConfig::GetConfig();
+    config.SetGenesisActivationHeight(102);
 
     // Test that invalidity under a set of flags doesn't preclude validity under
     // other (eg consensus) flags.
     // spend_tx is invalid according to DERSIG
     CValidationState state;
+    auto source = task::CCancellationSource::Make();
     {
         PrecomputedTransactionData ptd_spend_tx(spend_tx);
 
-        BOOST_CHECK(!CheckInputs(spend_tx, state, pcoinsTip, true,
-                                 MANDATORY_SCRIPT_VERIFY_FLAGS |
-                                     SCRIPT_VERIFY_CLEANSTACK,
-                                 true, true, ptd_spend_tx, nullptr));
+        BOOST_CHECK(
+            !CheckInputs(
+                source->GetToken(),
+                config,
+                true,
+                spend_tx,
+                state,
+                pcoinsTip,
+                true,
+                MANDATORY_SCRIPT_VERIFY_FLAGS |
+                    SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
+                true,
+                true,
+                ptd_spend_tx,
+                nullptr).value());
 
         // If we call again asking for scriptchecks (as happens in
         // ConnectBlock), we should add a script check object for this -- we're
         // not caching invalidity (if that changes, delete this test case).
         std::vector<CScriptCheck> scriptchecks;
-        BOOST_CHECK(CheckInputs(spend_tx, state, pcoinsTip, true,
-                                MANDATORY_SCRIPT_VERIFY_FLAGS |
-                                    SCRIPT_VERIFY_CLEANSTACK,
-                                true, true, ptd_spend_tx, &scriptchecks));
+        BOOST_CHECK(
+            CheckInputs(
+                source->GetToken(),
+                config,
+                true,
+                spend_tx,
+                state,
+                pcoinsTip,
+                true,
+                MANDATORY_SCRIPT_VERIFY_FLAGS |
+                    SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
+                true,
+                true,
+                ptd_spend_tx,
+                &scriptchecks).value());
         BOOST_CHECK_EQUAL(scriptchecks.size(), 1);
 
         // Test that CheckInputs returns true iff cleanstack-enforcing flags are
         // not present. Don't add these checks to the cache, so that we can test
         // later that block validation works fine in the absence of cached
         // successes.
-        ValidateCheckInputsForAllFlags(spend_tx, SCRIPT_VERIFY_CLEANSTACK,
+        ValidateCheckInputsForAllFlags(spend_tx, 
+                                       [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CLEANSTACK); },
                                        false, false);
-
+        
         // And if we produce a block with this tx, it should be valid (LOW_S not
         // enabled yet), even though there's no cache entry.
         CBlock block;
@@ -269,8 +354,8 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         BOOST_CHECK(pcoinsTip->GetBestBlock() == block.GetHash());
     }
 
-    // Test P2SH: construct a transaction that is valid without P2SH, and then
-    // test validity with P2SH.
+    // Test P2SH: construct a transaction that is valid without P2SH, redeem script hash is correct but redeem script is invalid. 
+    // Redeem script is not executed after genesis so it passes.
     {
         CMutableTransaction invalid_under_p2sh_tx;
         invalid_under_p2sh_tx.nVersion = 1;
@@ -283,8 +368,10 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                                      p2pk_scriptPubKey.end());
         invalid_under_p2sh_tx.vin[0].scriptSig << vchSig2;
 
+
         ValidateCheckInputsForAllFlags(invalid_under_p2sh_tx,
-                                       SCRIPT_VERIFY_P2SH, true, false);
+                                       [](uint32_t flags) -> bool { return (flags & SCRIPT_UTXO_AFTER_GENESIS); },
+                                       true, false);
     }
 
     // Test CHECKLOCKTIMEVERIFY
@@ -308,10 +395,12 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         vchSig.push_back(uint8_t(SIGHASH_ALL | SIGHASH_FORKID));
         invalid_with_cltv_tx.vin[0].scriptSig = CScript() << vchSig << 101;
 
+        // Since Genesis CLV operator is treated as NOP.
         ValidateCheckInputsForAllFlags(invalid_with_cltv_tx,
-                                       SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY, true,
-                                       true);
-
+                                       [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)
+                                                                            || (flags & SCRIPT_UTXO_AFTER_GENESIS); },
+                                       true, true);
+        
         // Make it valid, and check again
         invalid_with_cltv_tx.vin[0].scriptSig = CScript() << vchSig << 100;
         CValidationState state;
@@ -319,10 +408,21 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         CTransaction transaction(invalid_with_cltv_tx);
         PrecomputedTransactionData txdata(transaction);
 
-        BOOST_CHECK(CheckInputs(transaction, state, pcoinsTip, true,
-                                MANDATORY_SCRIPT_VERIFY_FLAGS |
-                                    SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY,
-                                true, true, txdata, nullptr));
+        BOOST_CHECK(
+            CheckInputs(
+                source->GetToken(),
+                config,
+                true,
+                transaction,
+                state,
+                pcoinsTip,
+                true,
+                MANDATORY_SCRIPT_VERIFY_FLAGS |
+                    SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_GENESIS,
+                true,
+                true,
+                txdata,
+                nullptr).value());
     }
 
     // TEST CHECKSEQUENCEVERIFY
@@ -345,9 +445,11 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         vchSig.push_back(uint8_t(SIGHASH_ALL | SIGHASH_FORKID));
         invalid_with_csv_tx.vin[0].scriptSig = CScript() << vchSig << 101;
 
-        ValidateCheckInputsForAllFlags(
-            invalid_with_csv_tx, SCRIPT_VERIFY_CHECKSEQUENCEVERIFY, true, true);
-
+        // Since Genesis CSV operator is treated as NOP.
+        ValidateCheckInputsForAllFlags(invalid_with_csv_tx,
+                                       [](uint32_t flags) -> bool { return !(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)
+                                                                            || (flags & SCRIPT_UTXO_AFTER_GENESIS); },
+                                       true, true);
         // Make it valid, and check again
         invalid_with_csv_tx.vin[0].scriptSig = CScript() << vchSig << 100;
         CValidationState state;
@@ -355,10 +457,21 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         CTransaction transaction(invalid_with_csv_tx);
         PrecomputedTransactionData txdata(transaction);
 
-        BOOST_CHECK(CheckInputs(transaction, state, pcoinsTip, true,
-                                MANDATORY_SCRIPT_VERIFY_FLAGS |
-                                    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY,
-                                true, true, txdata, nullptr));
+        BOOST_CHECK(
+            CheckInputs(
+                source->GetToken(),
+                config,
+                true,
+                transaction,
+                state,
+                pcoinsTip,
+                true,
+                MANDATORY_SCRIPT_VERIFY_FLAGS |
+                    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_GENESIS,
+                true,
+                true,
+                txdata,
+                nullptr).value());
     }
 
     // TODO: add tests for remaining script flags
@@ -377,19 +490,26 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         // Sign
         SignatureData sigdata;
-        ProduceSignature(
+        ProduceSignature(config, true,
             MutableTransactionSignatureCreator(&keystore, &tx, 0, 11 * CENT,
                                                SigHashType().withForkId()),
-            spend_tx.vout[0].scriptPubKey, sigdata);
+            true, false, spend_tx.vout[0].scriptPubKey, sigdata);
+
         UpdateTransaction(tx, 0, sigdata);
-        ProduceSignature(
+        ProduceSignature(config, true,
             MutableTransactionSignatureCreator(&keystore, &tx, 1, 11 * CENT,
                                                SigHashType().withForkId()),
-            spend_tx.vout[3].scriptPubKey, sigdata);
+            true, false, spend_tx.vout[3].scriptPubKey, sigdata);
         UpdateTransaction(tx, 1, sigdata);
 
-        // This should be valid under all script flags
-        ValidateCheckInputsForAllFlags(tx, 0, true, false);
+        auto shouldPass = [](uint32_t flags) -> bool {
+            bool isUtxoAfterGenesis = flags & SCRIPT_UTXO_AFTER_GENESIS;
+            bool isCleanStackEnforced = flags & SCRIPT_VERIFY_CLEANSTACK;
+            return !(isUtxoAfterGenesis && isCleanStackEnforced); 
+        };
+
+        // This spends p2sh so after genesis it should fail if cleans stack rule is enforced
+        ValidateCheckInputsForAllFlags(tx, shouldPass,  true, false);
 
         // Check that if the second input is invalid, but the first input is
         // valid, the transaction is not cached.
@@ -402,16 +522,38 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
 
         // This transaction is now invalid because the second signature is
         // missing.
-        BOOST_CHECK(!CheckInputs(transaction, state, pcoinsTip, true,
-                                 MANDATORY_SCRIPT_VERIFY_FLAGS, true, true,
-                                 txdata, nullptr));
+        BOOST_CHECK(
+            !CheckInputs(
+                source->GetToken(),
+                config,
+                true,
+                transaction,
+                state,
+                pcoinsTip,
+                true,
+                MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
+                true,
+                true,
+                txdata,
+                nullptr).value());
 
         // Make sure this transaction was not cached (ie becausethe first input
         // was valid)
         std::vector<CScriptCheck> scriptchecks;
-        BOOST_CHECK(CheckInputs(transaction, state, pcoinsTip, true,
-                                MANDATORY_SCRIPT_VERIFY_FLAGS, true, true,
-                                txdata, &scriptchecks));
+        BOOST_CHECK(
+            CheckInputs(
+                source->GetToken(),
+                config,
+                true,
+                transaction,
+                state,
+                pcoinsTip,
+                true,
+                MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
+                true,
+                true,
+                txdata,
+                &scriptchecks).value());
         // Should get 2 script checks back -- caching is on a whole-transaction
         // basis.
         BOOST_CHECK_EQUAL(scriptchecks.size(), 2);

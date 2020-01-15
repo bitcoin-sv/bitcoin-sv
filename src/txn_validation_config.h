@@ -4,5 +4,15 @@
 
 #pragma once
 
-/** A default threshold which controls a number of txns per task */
-static constexpr uint64_t DEFAULT_TXNS_PER_TASK_THRESHOLD = 10;
+#include <chrono>
+
+/** A default ratio for max number of standard transactions per thread. */
+static constexpr uint64_t DEFAULT_MAX_STD_TXNS_PER_THREAD_RATIO = 1000;
+/** A default ratio for max number of non-standard transactions per thread. */
+static constexpr uint64_t DEFAULT_MAX_NON_STD_TXNS_PER_THREAD_RATIO = 1000;
+/** The maximum wall time for standard transaction validation before we terminate the task */
+static constexpr std::chrono::milliseconds DEFAULT_MAX_STD_TXN_VALIDATION_DURATION =
+	std::chrono::milliseconds{5};
+/** The maximum wall time for non-standard transaction validation before we terminate the task */
+static constexpr std::chrono::milliseconds DEFAULT_MAX_NON_STD_TXN_VALIDATION_DURATION =
+	std::chrono::seconds{1};
