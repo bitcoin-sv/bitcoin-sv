@@ -1,4 +1,4 @@
-# Bitcoin SV version 1.0.0-beta3 Release Notes
+# Bitcoin SV version 1.0.0 Release Notes
 
 ## List of Changes since 0.2.2
 * Increase or remove limits, final version of default values
@@ -110,7 +110,7 @@
 * Revert CORE-167 - Restore original SIGHASH algorithm
 * Funtional test fixes
 * fundrawtransaction RPC changePosition parameter causing out of bounds access
-* Make `-maxstackmemoryusagepolicy`  and -excessiveblocksize required parameter for node startup
+* Make -maxstackmemoryusageconsensus  and -excessiveblocksize required parameter for node startup
 * Ignore sigop limit when verifiying Genesis blocks
 * RPC;Treat transcations recevied from merchant API as trusted
 * Investigation into high memory usage over long period of time.
@@ -120,6 +120,10 @@
 * Fix: Random crashes when running modified version of bsv-txnvalidator_p2p_txns.py
 * Fix: OP_LSHIFT and OP_LSHIFT does not work with data larger than 2GB
 * Fix: OP_LSHIFT and OP_LSHIFT does not work with shifts larger than 2^31-1 (approx)
+
+## More Details
+For a more detailed description of the new Genesis changes and an explanation on them, please
+see the Bitcoin SV [website.](https://bitcoinsv.io/genesis-hard-fork/)
 
 ## Scaling Test Network (STN) Reset
 NA
