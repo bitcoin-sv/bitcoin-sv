@@ -86,15 +86,9 @@ size_t CTxnDoubleSpendDetector::getKnownSpendsSize() const {
     return mKnownSpends.size();
 }
 
-std::vector<TxInputDataSPtr> CTxnDoubleSpendDetector::getDoubleSpendTxns() {
-    std::lock_guard lock(mMainMtx);
-	return std::move(mDoubleSpendTxns);
-}
-
 void CTxnDoubleSpendDetector::clear() {
     std::lock_guard lock(mMainMtx);
     mKnownSpends.clear();
-    mDoubleSpendTxns.clear();
 }
 
 bool CTxnDoubleSpendDetector::isAnyOfInputsKnownNL(const CTransaction &tx) const {
