@@ -73,6 +73,8 @@ class GetBlockTemplateLPTest(BitcoinTestFramework):
         # generate a random transaction and submit it
         (txid, txhex, fee) = random_transaction(self.nodes,
                                                 Decimal("1.1"), Decimal("0.0"), Decimal("0.001"), 20)
+        # Check if the validation queues are empty
+        wait_until(lambda: self.nodes[0].rpc.getblockchainactivity()["transactions"] == 0, timeout=60)
         # after one minute, every 10 seconds the mempool is probed, so in 80
         # seconds it should have returned
         thr.join(60 + 20)
