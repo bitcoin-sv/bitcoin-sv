@@ -144,6 +144,10 @@ typedef UniValue (*rpcfn_type)(Config &config,
                                const JSONRPCRequest &jsonRequest);
 typedef UniValue (*const_rpcfn_type)(const Config &config,
                                      const JSONRPCRequest &jsonRequest);
+typedef void(*rpcfn_http_type)(const Config &config,
+                               const JSONRPCRequest &jsonRequest,
+                               HTTPRequest &httpReq,
+                               bool processedInBatch);
 
 class CRPCCommand {
 public:
@@ -155,38 +159,45 @@ private:
     union {
         rpcfn_type fn;
         const_rpcfn_type cfn;
+        rpcfn_http_type http_fn;
     } actor;
     bool useConstConfig;
+    bool useHTTPRequest;
 
 public:
     std::vector<std::string> argNames;
 
+    /**
+     * There are different constructors depending whether Http request is required or
+     * Config is const or not, so we can call the command through the proper pointer.
+     * Casting constness on parameters of function is undefined behavior.
+     */
+
     CRPCCommand(std::string _category, std::string _name, rpcfn_type _actor,
                 bool _okSafeMode, std::vector<std::string> _argNames)
         : category{std::move(_category)}, name{std::move(_name)},
-          okSafeMode{_okSafeMode}, useConstConfig{false}, argNames{std::move(
-                                                              _argNames)} {
+          okSafeMode{_okSafeMode}, useConstConfig{false}, 
+          useHTTPRequest{false}, argNames{std::move(_argNames)} {
         actor.fn = _actor;
     }
 
-    /**
-     * There are 2 constructors depending Config is const or not, so we
-     * can call the command through the proper pointer. Casting constness
-     * on parameters of function is undefined behavior.
-     */
-    CRPCCommand(std::string _category, std::string _name,
-                const_rpcfn_type _actor, bool _okSafeMode,
-                std::vector<std::string> _argNames)
+    CRPCCommand(std::string _category, std::string _name, const_rpcfn_type _actor,
+                bool _okSafeMode, std::vector<std::string> _argNames)
         : category{std::move(_category)}, name{std::move(_name)},
-          okSafeMode{_okSafeMode}, useConstConfig{true}, argNames{std::move(
-                                                             _argNames)} {
+          okSafeMode{_okSafeMode}, useConstConfig{true},
+          useHTTPRequest{false}, argNames{std::move(_argNames)} {
         actor.cfn = _actor;
     }
 
-    UniValue call(Config &config, const JSONRPCRequest &jsonRequest) const {
-        return useConstConfig ? (*actor.cfn)(config, jsonRequest)
-                              : (*actor.fn)(config, jsonRequest);
-    };
+    CRPCCommand(std::string _category, std::string _name, rpcfn_http_type _actor,
+                bool _okSafeMode, std::vector<std::string> _argNames)
+        : category{std::move(_category)}, name{std::move(_name)},
+          okSafeMode{_okSafeMode}, useConstConfig{true},
+          useHTTPRequest{true}, argNames{std::move(_argNames)} {
+        actor.http_fn = _actor;
+    }
+
+    UniValue call(Config &config, const JSONRPCRequest &jsonRequest, HTTPRequest *httpReq = nullptr, bool processedInBatch = true) const;
 };
 
 /**
@@ -205,10 +216,11 @@ public:
     /**
      * Execute a method.
      * @param request The JSONRPCRequest to execute
-     * @returns Result of the call.
-     * @throws an exception (UniValue) when an error happens.
+     * @param httpReq The httpRequest to handle
+     * @param processedInBatch If true, write response in multiple chunks 
+     * @throws an exception (JSONRPCError) when an error happens.
      */
-    UniValue execute(Config &config, const JSONRPCRequest &request) const;
+    void execute(Config &config, const JSONRPCRequest &request, HTTPRequest *httpReq = nullptr, bool processedInBatch = true) const;
 
     /**
      * Returns a list of registered commands
