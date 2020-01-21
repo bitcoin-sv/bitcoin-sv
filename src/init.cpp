@@ -991,6 +991,13 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
                     "included in block creation. (default: %s)"),
                   CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)));
+    strUsage += HelpMessageOpt(
+        "-invalidateblock=<hash>",
+        strprintf(_("Permanently marks an existing block as invalid as if it violated "
+                    "a consensus rule (same as InvalidateBlock RPC function). "
+                    "If specified block header was not received yet, the header will be "
+                    "ignored when it is received from a peer. "
+                    "This option can be specified multiple times.")));
 
     if (showDebug) {
         strUsage +=
@@ -2032,6 +2039,17 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
+    if (gArgs.IsArgSet("-invalidateblock"))
+    {
+        std::set<uint256> invalidBlocks;
+        for(auto invalidBlockHashStr : gArgs.GetArgs("-invalidateblock"))
+        {
+            uint256 hash = uint256S(invalidBlockHashStr);
+            invalidBlocks.insert(hash);
+        }
+        config.SetInvalidBlocks(invalidBlocks);
+    }
+
     return true;
 }
 
@@ -2591,6 +2609,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     strLoadError = _("Corrupted block database detected");
                     break;
                 }
+
+                InvalidateBlocksFromConfig(config);
+
             } catch (const std::exception &e) {
                 LogPrintf("%s\n", e.what());
                 strLoadError = _("Error opening block database");
