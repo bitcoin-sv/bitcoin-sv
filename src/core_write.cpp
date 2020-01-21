@@ -357,7 +357,7 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
     entry.writeBeginArray("addresses");
     for (const CTxDestination& addr : addresses)
     {
-        entry.pushV(EncodeDestination(addr), true, addr != addresses.back());
+        entry.pushV(EncodeDestination(addr), addr != addresses.back());
     }
     entry.writeEndArray(false);
 }
