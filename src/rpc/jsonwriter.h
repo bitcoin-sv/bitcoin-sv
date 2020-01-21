@@ -26,7 +26,7 @@ public:
 
     void pushK(const std::string& key);
     // Used for array elements
-    void pushV(const std::string& val_, bool ignorePrettyIndent, bool addEndingComma = true);
+    void pushV(const std::string& val_, bool addEndingComma = true);
     void pushKVMoney(const std::string& key, const std::string& val_, bool addEndingComma = true);
     void pushKV(const std::string& key, const std::string& val_, bool addEndingComma = true);
     void pushKV(const std::string& key, const char* val_, bool addEndingComma = true);
