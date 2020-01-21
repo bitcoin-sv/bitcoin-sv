@@ -33,7 +33,7 @@ class CTxnValidator final
     static constexpr unsigned DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS {100};
     // Default maximum validation duration for async tasks in a single run
     static constexpr std::chrono::milliseconds DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION {
-        std::chrono::seconds(60)
+        std::chrono::seconds(10)
     };
     // Default maximum memory usage (in MB) for the transaction queues
     static constexpr uint64_t DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES {2048};

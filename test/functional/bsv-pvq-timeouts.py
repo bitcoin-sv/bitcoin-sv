@@ -379,10 +379,12 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 "P2P-Scenario1_a [nodoublespends]: "
                 "-maxstdtxvalidationduration=5 "
                 "-maxnonstdtxvalidationduration=10000 "
+                "-maxtxnvalidatorasynctasksrunduration=11000 "
                 "-checkmempool=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=5',
                  '-maxnonstdtxvalidationduration=10000',
+                 '-maxtxnvalidatorasynctasksrunduration=11000',
                  '-checkmempool=0'],
                 TxType.standard,
                 # A number of spend money txns used in the test
@@ -411,10 +413,12 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 "P2P-Scenario1_b [nodoublespends]: "
                 "-maxstdtxvalidationduration=10000 "
                 "-maxnonstdtxvalidationduration=10001 "
+                "-maxtxnvalidatorasynctasksrunduration=11000 "
                 "-checkmempool=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=10000',
                  '-maxnonstdtxvalidationduration=10001',
+                 '-maxtxnvalidatorasynctasksrunduration=11000',
                  '-checkmempool=0'],
                 TxType.standard,
                 # A number of spend money txns used in the test
@@ -477,10 +481,12 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 "P2P-Scenario3_a [nodoublespends]: "
                 "-maxstdtxvalidationduration=5 "
                 "-maxnonstdtxvalidationduration=10000 "
+                "-maxtxnvalidatorasynctasksrunduration=11000 "
                 "-checkmempool=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=5',
                  '-maxnonstdtxvalidationduration=10000',
+                 '-maxtxnvalidatorasynctasksrunduration=11000',
                  '-checkmempool=0'],
                 TxType.nonstandard,
                 # A number of spend money txns used in the test
@@ -542,10 +548,12 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 "P2P-Scenario4 [nodoublespends]: "
                 "-maxstdtxvalidationduration=5 "
                 "-maxnonstdtxvalidationduration=10000 "
+                "-maxtxnvalidatorasynctasksrunduration=11000 "
                 "-checkmempool=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=5',
                  '-maxnonstdtxvalidationduration=10000',
+                 '-maxtxnvalidatorasynctasksrunduration=11000',
                  '-checkmempool=0'],
                 TxType.std_and_nonstd,
                 # A number of spend money txns used in the test
@@ -584,10 +592,12 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 "P2P-Scenario1 [doublespends]: "
                 "-maxstdtxvalidationduration=5 "
                 "-maxnonstdtxvalidationduration=10000 "
+                "-maxtxnvalidatorasynctasksrunduration=11000 "
                 "-checkmempool=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=5',
                  '-maxnonstdtxvalidationduration=10000',
+                 '-maxtxnvalidatorasynctasksrunduration=11000',
                  '-checkmempool=0'],
                 TxType.standard,
                 # A number of spend money txns used in the test
@@ -659,10 +669,12 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 "P2P-Scenario3 [doublespends]: "
                 "-maxstdtxvalidationduration=5 "
                 "-maxnonstdtxvalidationduration=10000 "
+                "-maxtxnvalidatorasynctasksrunduration=11000 "
                 "-checkmempool=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=5',
                  '-maxnonstdtxvalidationduration=10000',
+                 '-maxtxnvalidatorasynctasksrunduration=11000',
                  '-checkmempool=0'],
                 TxType.nonstandard,
                 # A number of spend money txns used in the test
