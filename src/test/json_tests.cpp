@@ -41,12 +41,12 @@ BOOST_AUTO_TEST_CASE(CJWriter_pushK_pushV)
     jsonWriter.pushK("key");
     jsonWriter.pushV("val", true);
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"val\",");
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"val\",\n");
 
     jsonWriter.pushK("key");
-    jsonWriter.pushV("val", true, false);
+    jsonWriter.pushV("val", false);
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"val\"");
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"val\"\n");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_pushKVMoney) 
@@ -145,11 +145,11 @@ BOOST_AUTO_TEST_CASE(CJWriter_write_JSONText)
     jsonWriter.writeBeginArray("array");
     jsonWriter.pushV("arr1", true);
     jsonWriter.pushV("arr2", true);
-    jsonWriter.pushV("arr3", true, false);
+    jsonWriter.pushV("arr3", false);
     jsonWriter.writeEndArray(false);
     jsonWriter.writeEndObject(false);
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\"int\": 1,\"bool\": true,\"string\": \"val\",\"money\": 1,\"int64\": 64,\"char\": \"v\",\"quotes\": \"test_quotes\",\"array\": [\"arr1\",\"arr2\",\"arr3\"]}");
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\"int\": 1,\"bool\": true,\"string\": \"val\",\"money\": 1,\"int64\": 64,\"char\": \"v\",\"quotes\": \"test_quotes\",\"array\": [\"arr1\",\n\"arr2\",\n\"arr3\"\n]}");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_write_JSONText_with_indents)
@@ -171,11 +171,11 @@ BOOST_AUTO_TEST_CASE(CJWriter_write_JSONText_with_indents)
     indentJsonWriter.writeBeginArray("array");
     indentJsonWriter.pushV("arr1", true);
     indentJsonWriter.pushV("arr2", true);
-    indentJsonWriter.pushV("arr3", true, false);
+    indentJsonWriter.pushV("arr3", false);
     indentJsonWriter.writeEndArray(false);
     indentJsonWriter.writeEndObject(false);
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\n  \"int\": 1,\n  \"bool\": true,\n  \"string\": \"val\",\n  \"money\": 1,\n  \"int64\": 64,\n  \"char\": \"v\",\n  \"quotes\": \"test_quotes\",\n  \"array\": [\n\"arr1\",\"arr2\",\"arr3\"  ]\n}\n");
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\n  \"int\": 1,\n  \"bool\": true,\n  \"string\": \"val\",\n  \"money\": 1,\n  \"int64\": 64,\n  \"char\": \"v\",\n  \"quotes\": \"test_quotes\",\n  \"array\": [\n    \"arr1\",\n    \"arr2\",\n    \"arr3\"\n  ]\n}");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

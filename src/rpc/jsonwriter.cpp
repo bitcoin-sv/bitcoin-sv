@@ -78,13 +78,9 @@ void CJSONWriter::pushK(const std::string& key)
     writeString("\": ", false, true);
 }
 
-void CJSONWriter::pushV(const std::string& val, bool ignorePrettyIndent, bool addEndingComma)
+void CJSONWriter::pushV(const std::string& val, bool addEndingComma)
 {
-    if (!ignorePrettyIndent)
-    {
-        jWriter.Write(indentStr());
-    }
-
+    jWriter.Write(indentStr());
     jWriter.Write('"');
     jWriter.Write(json_escape(val));
     jWriter.Write('"');
@@ -93,6 +89,7 @@ void CJSONWriter::pushV(const std::string& val, bool ignorePrettyIndent, bool ad
     {
         jWriter.Write(',');
     }
+    jWriter.WriteLine("");
 }
 
 void CJSONWriter::pushKVMoney(const std::string& key, const std::string& val, bool addEndingComma)
@@ -201,7 +198,11 @@ void CJSONWriter::createTag(const std::string& tag, bool incrementLevel, const s
 
     if (_prettyIndent)
     {
-        jWriter.Write('\n');
+        //this condition is here only to prevent adding additional new line after last curly bracket
+        if (incrementLevel || _indentLevel != 0)
+        {
+            jWriter.Write('\n');
+        }
     }
 
     if (incrementLevel)
