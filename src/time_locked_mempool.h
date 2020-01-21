@@ -9,6 +9,7 @@
 #include <tx_mempool_info.h>
 #include <utiltime.h>
 
+#include <atomic>
 #include <map>
 #include <set>
 #include <shared_mutex>
@@ -78,6 +79,8 @@ class CTimeLockedMempool final
     size_t getNumTxns() const;
     // Estimate total memory usage
     size_t estimateMemoryUsage() const;
+    // Get our max memory limit
+    size_t getMaxMemory() const { return mMaxMemory; }
 
     // Load or reload our config
     void loadConfig();
@@ -180,7 +183,7 @@ class CTimeLockedMempool final
     CRollingBloomFilter         mRecentlyRemoved { 10000, 0.000001 };
 
     // Cached configuration values
-    size_t                      mMaxMemory {0};     // Max memory target
+    std::atomic<size_t>         mMaxMemory {0};     // Max memory target
     int64_t                     mPeriodRunFreq {0}; // Run frequency for periodic checks
     int64_t                     mPurgeAge {0};      // Age at which we purge unfinalised txns
 

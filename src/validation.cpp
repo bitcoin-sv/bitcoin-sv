@@ -1222,6 +1222,13 @@ CTxnValResult TxnValidation(
             // Copy non-final status to return state
             state.SetNonFinal();
             isFinal = false;
+
+            // No point doing further validation on non-final txn if we not going to be able to store it
+            if(mempool.getNonFinalPool().getMaxMemory() == 0) {
+                state.DoS(0, false, REJECT_MEMPOOL_FULL, "non-final-pool-full");
+                return Result{state, pTxInputData};
+            }
+
             // Currently we don't allow chains of non-final txns
             if(DoesNonFinalSpendNonFinal(tx)) {
                 state.DoS(0, false, REJECT_NONSTANDARD, "too-long-non-final-chain",
