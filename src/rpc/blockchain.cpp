@@ -791,274 +791,291 @@ static void parseGetBlockVerbosity(const UniValue &verbosityParam,
     }
 }
 
-// This is a special case for displaying getblock help
-const std::runtime_error getblock_help_msg(
-    "getblock \"blockhash\" ( verbosity ) \n"
-    "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is "
-    "serialized, "
-    "hex-encoded data for block 'hash'.\n"
-    "If verbosity is 1 or DECODE_HEADER, returns an Object with "
-    "information about block <hash>.\n"
-    "If verbosity is 2 or DECODE_TRANSACTIONS, returns an Object with "
-    "information about "
-    "block <hash> and information about each transaction. \n"
-    "If verbosity is 3 or DECODE_HEADER_AND_COINBASE, returns a json "
-    "object with block information "
-    "and the coinbase transaction. \n"
-    "\nArguments:\n"
-    "1. \"blockhash\"          (string, required) The block hash\n"
-    "2. verbosity              (numeric or string, optional, "
-    "default=1) 0 (RAW_BLOCK) for hex encoded data, "
-    "1 (DECODE_HEADER) for a json object, 2 (DECODE_TRANSACTIONS) for "
-    "json object with transaction data and "
-    "3 (DECODE_HEADER_AND_COINBASE) for a json object with coinbase "
-    "only\n"
-    "\nResult (for verbosity = 0 or verbosity = RAW_BLOCK):\n"
-    "\"data\"             (string) A string that is serialized, "
-    "hex-encoded data for block 'hash'.\n"
-    "\nResult (for verbosity = 1 or verbosity = DECODE_HEADER):\n"
-    "{\n"
-    "  \"hash\" : \"hash\",     (string) the block hash (same as "
-    "provided)\n"
-    "  \"confirmations\" : n,   (numeric) The number of confirmations, "
-    "or -1 if the block is not on the main chain\n"
-    "  \"size\" : n,            (numeric) The block size\n"
-    "  \"height\" : n,          (numeric) The block height or index\n"
-    "  \"version\" : n,         (numeric) The block version\n"
-    "  \"versionHex\" : \"00000000\", (string) The block version "
-    "formatted in hexadecimal\n"
-    "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
-    "  \"tx\" : [               (array of string) The transaction ids\n"
-    "     \"transactionid\"     (string) The transaction id\n"
-    "     ,...\n"
-    "  ],\n"
-    "  \"time\" : ttt,          (numeric) The block time in seconds "
-    "since epoch (Jan 1 1970 GMT)\n"
-    "  \"mediantime\" : ttt,    (numeric) The median block time in "
-    "seconds since epoch (Jan 1 1970 GMT)\n"
-    "  \"nonce\" : n,           (numeric) The nonce\n"
-    "  \"bits\" : \"1d00ffff\", (string) The bits\n"
-    "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
-    "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
-    "required to produce the chain up to this block (in hex)\n"
-    "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
-    "previous block\n"
-    "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
-    "next block\n"
-    "}\n"
-    "\nResult (for verbosity = 2 or verbosity = DECODE_TRANSACTIONS):\n"
-    "\"data\"             (string) A string that is serialized, "
-    "hex-encoded data for block 'hash'.\n"
-    "{\n"
-    "  \"hash\" : \"hash\",     (string) the block hash (same as "
-    "provided)\n"
-    "  \"confirmations\" : n,   (numeric) The number of confirmations, "
-    "or -1 if the block is not on the main chain\n"
-    "  \"size\" : n,            (numeric) The block size\n"
-    "  \"height\" : n,          (numeric) The block height or index\n"
-    "  \"version\" : n,         (numeric) The block version\n"
-    "  \"versionHex\" : \"00000000\", (string) The block version "
-    "formatted in hexadecimal\n"
-    "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
-    "  \"tx\" : [               (array of Objects) The transactions in "
-    "the format of the getrawtransaction RPC. Different from verbosity "
-    "= 1 \"tx\" result.\n"
-    "         ,...\n"
-    "  ],\n"
-    "  \"time\" : ttt,          (numeric) The block time in seconds "
-    "since epoch (Jan 1 1970 GMT)\n"
-    "  \"mediantime\" : ttt,    (numeric) The median block time in "
-    "seconds since epoch (Jan 1 1970 GMT)\n"
-    "  \"nonce\" : n,           (numeric) The nonce\n"
-    "  \"bits\" : \"1d00ffff\", (string) The bits\n"
-    "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
-    "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
-    "required to produce the chain up to this block (in hex)\n"
-    "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
-    "previous block\n"
-    "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
-    "next block\n"
-    "}\n"
-    "\nResult (for verbosity = 3 or verbosity = "
-    "DECODE_HEADER_AND_COINBASE):\n"
-    "{\n"
-    "  \"hash\" : \"hash\",     (string) the block hash (same as "
-    "provided)\n"
-    "  \"confirmations\" : n,   (numeric) The number of confirmations, "
-    "or -1 if the block is not on the main chain\n"
-    "  \"size\" : n,            (numeric) The block size\n"
-    "  \"height\" : n,          (numeric) The block height or index\n"
-    "  \"version\" : n,         (numeric) The block version\n"
-    "  \"versionHex\" : \"00000000\", (string) The block version "
-    "formatted in hexadecimal\n"
-    "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
-    "  \"tx\" : [               The coinbase transaction in the format "
-    "of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" "
-    "result.\n"
-    "         ,...\n"
-    "  ],\n"
-    "  \"time\" : ttt,          (numeric) The block time in seconds "
-    "since epoch (Jan 1 1970 GMT)\n"
-    "  \"mediantime\" : ttt,    (numeric) The median block time in "
-    "seconds since epoch (Jan 1 1970 GMT)\n"
-    "  \"nonce\" : n,           (numeric) The nonce\n"
-    "  \"bits\" : \"1d00ffff\", (string) The bits\n"
-    "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
-    "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
-    "required to produce the chain up to this block (in hex)\n"
-    "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
-    "previous block\n"
-    "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
-    "next block\n"
-    "}\n"
-    "\nExamples:\n" +
-    HelpExampleCli("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda"
-                               "81d7e2a3dd146f6ed09\"") +
-    HelpExampleRpc("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda"
-                               "81d7e2a3dd146f6ed09\""));
+void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
+              HTTPRequest &httpReq, bool processedInBatch) {
 
-// A special case for displaying getblock help. See also getblock_help_msg
-UniValue getblock_help(const Config &config, const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() < 1 ||
-        request.params.size() > 2) {
-        throw getblock_help_msg;
+    if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
+        jsonRPCReq.params.size() > 2) {
+        throw std::runtime_error(
+            "getblock \"blockhash\" ( verbosity ) \n"
+            "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is "
+            "serialized, "
+            "hex-encoded data for block 'hash'.\n"
+            "If verbosity is 1 or DECODE_HEADER, returns an Object with "
+            "information about block <hash>.\n"
+            "If verbosity is 2 or DECODE_TRANSACTIONS, returns an Object with "
+            "information about "
+            "block <hash> and information about each transaction. \n"
+            "If verbosity is 3 or DECODE_HEADER_AND_COINBASE, returns a json "
+            "object with block information "
+            "and the coinbase transaction. \n"
+            "\nArguments:\n"
+            "1. \"blockhash\"          (string, required) The block hash\n"
+            "2. verbosity              (numeric or string, optional, "
+            "default=1) 0 (RAW_BLOCK) for hex encoded data, "
+            "1 (DECODE_HEADER) for a json object, 2 (DECODE_TRANSACTIONS) for "
+            "json object with transaction data and "
+            "3 (DECODE_HEADER_AND_COINBASE) for a json object with coinbase "
+            "only\n"
+            "\nResult (for verbosity = 0 or verbosity = RAW_BLOCK):\n"
+            "\"data\"             (string) A string that is serialized, "
+            "hex-encoded data for block 'hash'.\n"
+            "\nResult (for verbosity = 1 or verbosity = DECODE_HEADER):\n"
+            "{\n"
+            "  \"hash\" : \"hash\",     (string) the block hash (same as "
+            "provided)\n"
+            "  \"confirmations\" : n,   (numeric) The number of confirmations, "
+            "or -1 if the block is not on the main chain\n"
+            "  \"size\" : n,            (numeric) The block size\n"
+            "  \"height\" : n,          (numeric) The block height or index\n"
+            "  \"version\" : n,         (numeric) The block version\n"
+            "  \"versionHex\" : \"00000000\", (string) The block version "
+            "formatted in hexadecimal\n"
+            "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"tx\" : [               (array of string) The transaction ids\n"
+            "     \"transactionid\"     (string) The transaction id\n"
+            "     ,...\n"
+            "  ],\n"
+            "  \"time\" : ttt,          (numeric) The block time in seconds "
+            "since epoch (Jan 1 1970 GMT)\n"
+            "  \"mediantime\" : ttt,    (numeric) The median block time in "
+            "seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"nonce\" : n,           (numeric) The nonce\n"
+            "  \"bits\" : \"1d00ffff\", (string) The bits\n"
+            "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
+            "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
+            "required to produce the chain up to this block (in hex)\n"
+            "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
+            "previous block\n"
+            "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
+            "next block\n"
+            "}\n"
+            "\nResult (for verbosity = 2 or verbosity = DECODE_TRANSACTIONS):\n"
+            "\"data\"             (string) A string that is serialized, "
+            "hex-encoded data for block 'hash'.\n"
+            "{\n"
+            "  \"hash\" : \"hash\",     (string) the block hash (same as "
+            "provided)\n"
+            "  \"confirmations\" : n,   (numeric) The number of confirmations, "
+            "or -1 if the block is not on the main chain\n"
+            "  \"size\" : n,            (numeric) The block size\n"
+            "  \"height\" : n,          (numeric) The block height or index\n"
+            "  \"version\" : n,         (numeric) The block version\n"
+            "  \"versionHex\" : \"00000000\", (string) The block version "
+            "formatted in hexadecimal\n"
+            "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"tx\" : [               (array of Objects) The transactions in "
+            "the format of the getrawtransaction RPC. Different from verbosity "
+            "= 1 \"tx\" result.\n"
+            "         ,...\n"
+            "  ],\n"
+            "  \"time\" : ttt,          (numeric) The block time in seconds "
+            "since epoch (Jan 1 1970 GMT)\n"
+            "  \"mediantime\" : ttt,    (numeric) The median block time in "
+            "seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"nonce\" : n,           (numeric) The nonce\n"
+            "  \"bits\" : \"1d00ffff\", (string) The bits\n"
+            "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
+            "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
+            "required to produce the chain up to this block (in hex)\n"
+            "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
+            "previous block\n"
+            "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
+            "next block\n"
+            "}\n"
+            "\nResult (for verbosity = 3 or verbosity = "
+            "DECODE_HEADER_AND_COINBASE):\n"
+            "{\n"
+            "  \"hash\" : \"hash\",     (string) the block hash (same as "
+            "provided)\n"
+            "  \"confirmations\" : n,   (numeric) The number of confirmations, "
+            "or -1 if the block is not on the main chain\n"
+            "  \"size\" : n,            (numeric) The block size\n"
+            "  \"height\" : n,          (numeric) The block height or index\n"
+            "  \"version\" : n,         (numeric) The block version\n"
+            "  \"versionHex\" : \"00000000\", (string) The block version "
+            "formatted in hexadecimal\n"
+            "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"tx\" : [               The coinbase transaction in the format "
+            "of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" "
+            "result.\n"
+            "         ,...\n"
+            "  ],\n"
+            "  \"time\" : ttt,          (numeric) The block time in seconds "
+            "since epoch (Jan 1 1970 GMT)\n"
+            "  \"mediantime\" : ttt,    (numeric) The median block time in "
+            "seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"nonce\" : n,           (numeric) The nonce\n"
+            "  \"bits\" : \"1d00ffff\", (string) The bits\n"
+            "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
+            "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
+            "required to produce the chain up to this block (in hex)\n"
+            "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
+            "previous block\n"
+            "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
+            "next block\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda"
+                "81d7e2a3dd146f6ed09\"") +
+            HelpExampleRpc("getblock", "\"00000000c937983704a73af28acdec37b049d214adbda"
+                "81d7e2a3dd146f6ed09\""));
     }
-    return 0;
+
+    LOCK(cs_main);
+
+    std::string strHash = jsonRPCReq.params[0].get_str();
+    uint256 hash(uint256S(strHash));
+
+    if (mapBlockIndex.count(hash) == 0) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+    }
+
+    CBlockIndex *pblockindex = mapBlockIndex[hash];
+
+    getblockdata(pblockindex, config, jsonRPCReq, httpReq, processedInBatch);
 }
 
-// This is a special case for displaying getblockbyheight help
-const std::runtime_error getblockbyheight_help_msg(
-    "getblockbyheight height ( verbosity ) \n"
-    "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is "
-    "serialized, "
-    "hex-encoded data for block 'hash'.\n"
-    "If verbosity is 1 or DECODE_HEADER, returns an Object with "
-    "information about block <hash>.\n"
-    "If verbosity is 2 or DECODE_TRANSACTIONS, returns an Object with "
-    "information about "
-    "block <hash> and information about each transaction. \n"
-    "If verbosity is 3 or DECODE_HEADER_AND_COINBASE, returns a json "
-    "object with block information and the coinbase transaction. \n"
-    "\nArguments:\n"
-    "1. \"height\"             (numeric, required) The block height\n"
-    "2. verbosity              (numeric or string, optional, "
-    "default=1) 0 (RAW_BLOCK) for hex encoded data, "
-    "1 (DECODE_HEADER) for a json object, 2 (DECODE_TRANSACTIONS) for "
-    "json object with transaction data and "
-    "3 (DECODE_HEADER_AND_COINBASE) for a json object with coinbase "
-    "only\n"
-    "\nResult (for verbosity = 0 or verbosity = RAW_BLOCK):\n"
-    "\"data\"             (string) A string that is serialized, "
-    "hex-encoded data for block 'hash'.\n"
-    "\nResult (for verbosity = 1 or verbosity = DECODE_HEADER):\n"
-    "{\n"
-    "  \"hash\" : \"hash\",     (string) the block hash (same as "
-    "provided)\n"
-    "  \"confirmations\" : n,   (numeric) The number of confirmations, "
-    "or -1 if the block is not on the main chain\n"
-    "  \"size\" : n,            (numeric) The block size\n"
-    "  \"height\" : n,          (numeric) The block height or index\n"
-    "  \"version\" : n,         (numeric) The block version\n"
-    "  \"versionHex\" : \"00000000\", (string) The block version "
-    "formatted in hexadecimal\n"
-    "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
-    "  \"tx\" : [               (array of string) The transaction ids\n"
-    "     \"transactionid\"     (string) The transaction id\n"
-    "     ,...\n"
-    "  ],\n"
-    "  \"time\" : ttt,          (numeric) The block time in seconds "
-    "since epoch (Jan 1 1970 GMT)\n"
-    "  \"mediantime\" : ttt,    (numeric) The median block time in "
-    "seconds since epoch (Jan 1 1970 GMT)\n"
-    "  \"nonce\" : n,           (numeric) The nonce\n"
-    "  \"bits\" : \"1d00ffff\", (string) The bits\n"
-    "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
-    "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
-    "required to produce the chain up to this block (in hex)\n"
-    "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
-    "previous block\n"
-    "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
-    "next block\n"
-    "}\n"
-    "\nResult (for verbosity = 2 or verbosity = DECODE_TRANSACTIONS):\n"
-    "{\n"
-    "  \"hash\" : \"hash\",     (string) the block hash (same as "
-    "provided)\n"
-    "  \"confirmations\" : n,   (numeric) The number of confirmations, "
-    "or -1 if the block is not on the main chain\n"
-    "  \"size\" : n,            (numeric) The block size\n"
-    "  \"height\" : n,          (numeric) The block height or index\n"
-    "  \"version\" : n,         (numeric) The block version\n"
-    "  \"versionHex\" : \"00000000\", (string) The block version "
-    "formatted in hexadecimal\n"
-    "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
-    "  \"tx\" : [               (array of Objects) The transactions in "
-    "the format of the getrawtransaction RPC. Different from verbosity "
-    "= 1 \"tx\" result.\n"
-    "         ,...\n"
-    "  ],\n"
-    "  \"time\" : ttt,          (numeric) The block time in seconds "
-    "since epoch (Jan 1 1970 GMT)\n"
-    "  \"mediantime\" : ttt,    (numeric) The median block time in "
-    "seconds since epoch (Jan 1 1970 GMT)\n"
-    "  \"nonce\" : n,           (numeric) The nonce\n"
-    "  \"bits\" : \"1d00ffff\", (string) The bits\n"
-    "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
-    "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
-    "required to produce the chain up to this block (in hex)\n"
-    "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
-    "previous block\n"
-    "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
-    "next block\n"
-    "}\n"
-    "\nResult (for verbosity = 3 or verbosity = "
-    "DECODE_HEADER_AND_COINBASE):\n"
-    "{\n"
-    "  \"hash\" : \"hash\",     (string) the block hash (same as "
-    "provided)\n"
-    "  \"confirmations\" : n,   (numeric) The number of confirmations, "
-    "or -1 if the block is not on the main chain\n"
-    "  \"size\" : n,            (numeric) The block size\n"
-    "  \"height\" : n,          (numeric) The block height or index\n"
-    "  \"version\" : n,         (numeric) The block version\n"
-    "  \"versionHex\" : \"00000000\", (string) The block version "
-    "formatted in hexadecimal\n"
-    "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
-    "  \"tx\" : [               The coinbase transaction in the format "
-    "of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" "
-    "result.\n"
-    "         ,...\n"
-    "  ],\n"
-    "  \"time\" : ttt,          (numeric) The block time in seconds "
-    "since epoch (Jan 1 1970 GMT)\n"
-    "  \"mediantime\" : ttt,    (numeric) The median block time in "
-    "seconds since epoch (Jan 1 1970 GMT)\n"
-    "  \"nonce\" : n,           (numeric) The nonce\n"
-    "  \"bits\" : \"1d00ffff\", (string) The bits\n"
-    "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
-    "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
-    "required to produce the chain up to this block (in hex)\n"
-    "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
-    "previous block\n"
-    "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
-    "next block\n"
-    "}\n"
-    "\nExamples:\n" +
-    HelpExampleCli("getblockbyheight", "\"1214adbda81d7e2a3dd146f6ed09\"") +
-    HelpExampleRpc("getblockbyheight", "\"1214adbda81d7e2a3dd146f6ed09\""));
+void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
+                      HTTPRequest &httpReq, bool processedInBatch) {
 
-// A special case for displaying getblock help. See also getblock_help_msg
-UniValue getblockbyheight_help(const Config &config,
-                               const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() < 1 ||
-        request.params.size() > 2) {
-        throw getblockbyheight_help_msg;
+    if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
+        jsonRPCReq.params.size() > 2) {
+        throw std::runtime_error(
+            "getblockbyheight height ( verbosity ) \n"
+            "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is "
+            "serialized, "
+            "hex-encoded data for block 'hash'.\n"
+            "If verbosity is 1 or DECODE_HEADER, returns an Object with "
+            "information about block <hash>.\n"
+            "If verbosity is 2 or DECODE_TRANSACTIONS, returns an Object with "
+            "information about "
+            "block <hash> and information about each transaction. \n"
+            "If verbosity is 3 or DECODE_HEADER_AND_COINBASE, returns a json "
+            "object with block information and the coinbase transaction. \n"
+            "\nArguments:\n"
+            "1. \"height\"             (numeric, required) The block height\n"
+            "2. verbosity              (numeric or string, optional, "
+            "default=1) 0 (RAW_BLOCK) for hex encoded data, "
+            "1 (DECODE_HEADER) for a json object, 2 (DECODE_TRANSACTIONS) for "
+            "json object with transaction data and "
+            "3 (DECODE_HEADER_AND_COINBASE) for a json object with coinbase "
+            "only\n"
+            "\nResult (for verbosity = 0 or verbosity = RAW_BLOCK):\n"
+            "\"data\"             (string) A string that is serialized, "
+            "hex-encoded data for block 'hash'.\n"
+            "\nResult (for verbosity = 1 or verbosity = DECODE_HEADER):\n"
+            "{\n"
+            "  \"hash\" : \"hash\",     (string) the block hash (same as "
+            "provided)\n"
+            "  \"confirmations\" : n,   (numeric) The number of confirmations, "
+            "or -1 if the block is not on the main chain\n"
+            "  \"size\" : n,            (numeric) The block size\n"
+            "  \"height\" : n,          (numeric) The block height or index\n"
+            "  \"version\" : n,         (numeric) The block version\n"
+            "  \"versionHex\" : \"00000000\", (string) The block version "
+            "formatted in hexadecimal\n"
+            "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"tx\" : [               (array of string) The transaction ids\n"
+            "     \"transactionid\"     (string) The transaction id\n"
+            "     ,...\n"
+            "  ],\n"
+            "  \"time\" : ttt,          (numeric) The block time in seconds "
+            "since epoch (Jan 1 1970 GMT)\n"
+            "  \"mediantime\" : ttt,    (numeric) The median block time in "
+            "seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"nonce\" : n,           (numeric) The nonce\n"
+            "  \"bits\" : \"1d00ffff\", (string) The bits\n"
+            "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
+            "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
+            "required to produce the chain up to this block (in hex)\n"
+            "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
+            "previous block\n"
+            "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
+            "next block\n"
+            "}\n"
+            "\nResult (for verbosity = 2 or verbosity = DECODE_TRANSACTIONS):\n"
+            "{\n"
+            "  \"hash\" : \"hash\",     (string) the block hash (same as "
+            "provided)\n"
+            "  \"confirmations\" : n,   (numeric) The number of confirmations, "
+            "or -1 if the block is not on the main chain\n"
+            "  \"size\" : n,            (numeric) The block size\n"
+            "  \"height\" : n,          (numeric) The block height or index\n"
+            "  \"version\" : n,         (numeric) The block version\n"
+            "  \"versionHex\" : \"00000000\", (string) The block version "
+            "formatted in hexadecimal\n"
+            "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"tx\" : [               (array of Objects) The transactions in "
+            "the format of the getrawtransaction RPC. Different from verbosity "
+            "= 1 \"tx\" result.\n"
+            "         ,...\n"
+            "  ],\n"
+            "  \"time\" : ttt,          (numeric) The block time in seconds "
+            "since epoch (Jan 1 1970 GMT)\n"
+            "  \"mediantime\" : ttt,    (numeric) The median block time in "
+            "seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"nonce\" : n,           (numeric) The nonce\n"
+            "  \"bits\" : \"1d00ffff\", (string) The bits\n"
+            "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
+            "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
+            "required to produce the chain up to this block (in hex)\n"
+            "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
+            "previous block\n"
+            "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
+            "next block\n"
+            "}\n"
+            "\nResult (for verbosity = 3 or verbosity = "
+            "DECODE_HEADER_AND_COINBASE):\n"
+            "{\n"
+            "  \"hash\" : \"hash\",     (string) the block hash (same as "
+            "provided)\n"
+            "  \"confirmations\" : n,   (numeric) The number of confirmations, "
+            "or -1 if the block is not on the main chain\n"
+            "  \"size\" : n,            (numeric) The block size\n"
+            "  \"height\" : n,          (numeric) The block height or index\n"
+            "  \"version\" : n,         (numeric) The block version\n"
+            "  \"versionHex\" : \"00000000\", (string) The block version "
+            "formatted in hexadecimal\n"
+            "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"tx\" : [               The coinbase transaction in the format "
+            "of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" "
+            "result.\n"
+            "         ,...\n"
+            "  ],\n"
+            "  \"time\" : ttt,          (numeric) The block time in seconds "
+            "since epoch (Jan 1 1970 GMT)\n"
+            "  \"mediantime\" : ttt,    (numeric) The median block time in "
+            "seconds since epoch (Jan 1 1970 GMT)\n"
+            "  \"nonce\" : n,           (numeric) The nonce\n"
+            "  \"bits\" : \"1d00ffff\", (string) The bits\n"
+            "  \"difficulty\" : x.xxx,  (numeric) The difficulty\n"
+            "  \"chainwork\" : \"xxxx\",  (string) Expected number of hashes "
+            "required to produce the chain up to this block (in hex)\n"
+            "  \"previousblockhash\" : \"hash\",  (string) The hash of the "
+            "previous block\n"
+            "  \"nextblockhash\" : \"hash\"       (string) The hash of the "
+            "next block\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getblockbyheight", "\"1214adbda81d7e2a3dd146f6ed09\"") +
+            HelpExampleRpc("getblockbyheight", "\"1214adbda81d7e2a3dd146f6ed09\""));
     }
-    return 0;
+
+    LOCK(cs_main);
+
+    int nHeight = jsonRPCReq.params[0].get_int();
+    if (nHeight < 0 || nHeight > chainActive.Height()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+    }
+
+    CBlockIndex *pblockindex = chainActive.operator[](nHeight);
+
+    getblockdata(pblockindex, config, jsonRPCReq, httpReq, processedInBatch);
 }
 
 void getblockdata(CBlockIndex *pblockindex, const Config &config,
-                  const JSONRPCRequest &jsonRPCReq, HTTPRequest *httpReq,
+                  const JSONRPCRequest &jsonRPCReq, HTTPRequest &httpReq,
                   bool processedInBatch) {
 
     // previously, false and true were accepted for verbosity 0 and 1
@@ -1084,74 +1101,39 @@ void getblockdata(CBlockIndex *pblockindex, const Config &config,
     }
 
     if (!processedInBatch) {
-        httpReq->WriteHeader("Content-Type", "application/json");
-        httpReq->StartWritingChunks(HTTP_OK);
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
     }
 
     if (verbosity == GetBlockVerbosity::RAW_BLOCK) {
-        httpReq->WriteReplyChunk("{\"result\": \"");
-        writeBlockChunksAndUpdateMetadata(true, *httpReq, *stream,
-                                          *pblockindex);
-        httpReq->WriteReplyChunk("\", \"error\": " + NullUniValue.write() +
-                                 ", \"id\": " + jsonRPCReq.id.write() + "}");
+        httpReq.WriteReplyChunk("{\"result\": \"");
+        writeBlockChunksAndUpdateMetadata(true, httpReq, *stream,
+            *pblockindex);
+        httpReq.WriteReplyChunk("\", \"error\": " + NullUniValue.write() +
+            ", \"id\": " + jsonRPCReq.id.write() + "}");
     } else if (verbosity == GetBlockVerbosity::DECODE_HEADER) {
-        httpReq->WriteReplyChunk("{\"result\":");
-        writeBlockJsonChunksAndUpdateMetadata(config, *httpReq, false,
-                                              *pblockindex, false);
-        httpReq->WriteReplyChunk(", \"error\": " + NullUniValue.write() +
-                                 ", \"id\": " + jsonRPCReq.id.write() + "}");
+        httpReq.WriteReplyChunk("{\"result\":");
+        writeBlockJsonChunksAndUpdateMetadata(config, httpReq, false,
+            *pblockindex, false);
+        httpReq.WriteReplyChunk(", \"error\": " + NullUniValue.write() +
+            ", \"id\": " + jsonRPCReq.id.write() + "}");
     } else if (verbosity == GetBlockVerbosity::DECODE_TRANSACTIONS) {
-        httpReq->WriteReplyChunk("{\"result\":");
-        writeBlockJsonChunksAndUpdateMetadata(config, *httpReq, true,
-                                              *pblockindex, false);
-        httpReq->WriteReplyChunk(", \"error\": " + NullUniValue.write() +
-                                 ", \"id\": " + jsonRPCReq.id.write() + "}");
+        httpReq.WriteReplyChunk("{\"result\":");
+        writeBlockJsonChunksAndUpdateMetadata(config, httpReq, true,
+            *pblockindex, false);
+        httpReq.WriteReplyChunk(", \"error\": " + NullUniValue.write() +
+            ", \"id\": " + jsonRPCReq.id.write() + "}");
     } else if (verbosity == GetBlockVerbosity::DECODE_HEADER_AND_COINBASE) {
-        httpReq->WriteReplyChunk("{\"result\":");
-        writeBlockJsonChunksAndUpdateMetadata(config, *httpReq, true,
-                                              *pblockindex, true);
-        httpReq->WriteReplyChunk(", \"error\": " + NullUniValue.write() +
-                                 ", \"id\": " + jsonRPCReq.id.write() + "}");
+        httpReq.WriteReplyChunk("{\"result\":");
+        writeBlockJsonChunksAndUpdateMetadata(config, httpReq, true,
+            *pblockindex, true);
+        httpReq.WriteReplyChunk(", \"error\": " + NullUniValue.write() +
+            ", \"id\": " + jsonRPCReq.id.write() + "}");
     }
 
     if (!processedInBatch) {
-        httpReq->StopWritingChunks();
+        httpReq.StopWritingChunks();
     }
-}
-
-void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
-              HTTPRequest *httpReq, bool processedInBatch) {
-    getblock_help(config, jsonRPCReq);
-    LOCK(cs_main);
-
-    std::string strHash = jsonRPCReq.params[0].get_str();
-    uint256 hash(uint256S(strHash));
-
-    if (mapBlockIndex.count(hash) == 0) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-    }
-
-    CBlock block;
-    CBlockIndex *pblockindex = mapBlockIndex[hash];
-
-    getblockdata(pblockindex, config, jsonRPCReq, httpReq, processedInBatch);
-}
-
-void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
-                      HTTPRequest *httpReq, bool processedInBatch) {
-    getblockbyheight_help(config, jsonRPCReq);
-
-    LOCK(cs_main);
-
-    int nHeight = jsonRPCReq.params[0].get_int();
-    if (nHeight < 0 || nHeight > chainActive.Height()) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
-    }
-
-    CBlock block;
-    CBlockIndex *pblockindex = chainActive.operator[](nHeight);
-
-    getblockdata(pblockindex, config, jsonRPCReq, httpReq, processedInBatch);
 }
 
 void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
@@ -1191,7 +1173,8 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
 void writeBlockJsonChunksAndUpdateMetadata(const Config &config,
                                            HTTPRequest &req, bool showTxDetails,
                                            CBlockIndex &blockIndex,
-                                           bool showOnlyCoinbase) {
+                                           bool showOnlyCoinbase) 
+{
 
     bool hasDiskBlockMetaData;
     {
@@ -1199,35 +1182,45 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config,
         hasDiskBlockMetaData = blockIndex.nStatus.hasDiskBlockMetaData();
     }
 
-    auto reader = GetDiskBlockStreamReader(blockIndex.GetBlockPos(),
-                                           !hasDiskBlockMetaData);
-    if (!reader) {
+    auto reader = GetDiskBlockStreamReader(blockIndex.GetBlockPos(), !hasDiskBlockMetaData);
+    if (!reader) 
+    {
         assert(!"cannot load block from disk");
     }
 
     std::string delimiter;
 
     req.WriteReplyChunk("{\"tx\":[");
-    do {
-        const CTransaction &transaction = reader->ReadTransaction();
-        UniValue objBlockTx =
-            blockTxToJSON(config, transaction, showTxDetails,
-                          IsGenesisEnabled(config, blockIndex.nHeight));
-        std::string strJSON = delimiter + objBlockTx.write();
-        req.WriteReplyChunk(strJSON);
-        delimiter = ",";
-    } while (!reader->EndOfStream() && !showOnlyCoinbase);
+    do
+    {
+        const CTransaction& transaction = reader->ReadTransaction();
+        if (showTxDetails)
+        {
+            req.WriteReplyChunk(delimiter);
+
+            CHttpTextWriter httpWriter(req);
+            CJSONWriter jWritter(httpWriter, false);
+            TxToJSON(transaction, uint256(), IsGenesisEnabled(config, blockIndex.nHeight), RPCSerializationFlags(), jWritter);
+            delimiter = ",";
+        }
+        else
+        {
+            std::string strJSON = delimiter + UniValue(transaction.GetId().GetHex()).write();
+            req.WriteReplyChunk(strJSON);
+            delimiter = ",";
+        }
+    } while(!reader->EndOfStream() && !showOnlyCoinbase);
 
     CBlockHeader header = reader->GetBlockHeader();
 
     // set metadata so it is available when setting header in the next step
-    if (!hasDiskBlockMetaData) {
+    if (!hasDiskBlockMetaData) 
+    {
         CDiskBlockMetaData metadata = reader->getDiskBlockMetadata();
         SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);
     }
 
-    req.WriteReplyChunk("]," + headerBlockToJSON(config, header, &blockIndex) +
-                        "}");
+    req.WriteReplyChunk("]," + headerBlockToJSON(config, header, &blockIndex) + "}");
 }
 
 std::string headerBlockToJSON(const Config &config,
@@ -1277,17 +1270,6 @@ std::string headerBlockToJSON(const Config &config,
 
     std::string headerJSON = result.write();
     return headerJSON.substr(1, headerJSON.size() - 2);
-}
-
-UniValue blockTxToJSON(const Config &config, const CTransaction &tx,
-                       bool txDetails, bool isGenesisEnabled) {
-    if (txDetails) {
-        UniValue objTx(UniValue::VOBJ);
-        TxToUniv(tx, uint256(), isGenesisEnabled, objTx);
-        return objTx;
-    }
-
-    return tx.GetId().GetHex();
 }
 
 struct CCoinsStats {
@@ -2298,10 +2280,8 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "getchaintxstats",        &getchaintxstats,       true,  {"nblocks", "blockhash"} },
     { "blockchain",         "getbestblockhash",       getbestblockhash,       true,  {} },
     { "blockchain",         "getblockcount",          getblockcount,          true,  {} },
-    // getblock command is processed in a special way in httprpc.cpp and server.cpp, because it uses streaming
-    // It is only present in this table to handle display of help for getblock. This is done by a special method getblock_help
-    { "blockchain",         "getblock",               getblock_help,          true,  {} },
-    { "blockchain",         "getblockbyheight",       getblockbyheight_help,  true,  {} },
+    { "blockchain",         "getblock",               getblock,               true,  {"blockhash","verbosity|verbose"} },
+    { "blockchain",         "getblockbyheight",       getblockbyheight,       true,  {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           getblockhash,           true,  {"height"} },
     { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbose"} },
     { "blockchain",         "getchaintips",           getchaintips,           true,  {} },

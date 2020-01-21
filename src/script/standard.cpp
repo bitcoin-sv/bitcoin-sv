@@ -134,8 +134,8 @@ bool Solver(const CScript &scriptPubKey,
                     // Additional checks for TX_MULTISIG:
                     int m = CScriptNum(vSolutionsRet.front(), false).getint();
                     int n = CScriptNum(vSolutionsRet.back(), false).getint();
-                    if (m < 1 || n < 1 || m > n ||
-                        vSolutionsRet.size() - 2 != n) {
+                    if (m < 1 || n < 1 || m > n || vSolutionsRet.size() < 2 ||
+                        vSolutionsRet.size() - 2 != static_cast<uint64_t>(n)) {
                         return false;
                     }
                 }
