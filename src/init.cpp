@@ -1133,6 +1133,9 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf("Set the maximum validation duration for async tasks in a single run (default: %dms)",
             CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count())) ;
     strUsage += HelpMessageOpt(
+        "-maxcoinsviewcachesize=<n>",
+        _("Set the maximum cumulative size of accepted transaction inputs inside coins cache (default: unlimited -> 0)"));
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d)",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -1887,6 +1890,12 @@ bool AppInitParameterInteraction(Config &config) {
         config.GetMaxNonStdTxnValidationDuration().count())) {
         return InitError(
             strprintf("maxtxnvalidatorasynctasksrunduration must be greater than maxnonstdtxvalidationduration"));
+    }
+
+    if(std::string err; !config.SetMaxCoinsViewCacheSize(
+        gArgs.GetArg("-maxcoinsviewcachesize", 0), &err))
+    {
+        return InitError(err);
     }
 
     RegisterAllRPCCommands(tableRPC);

@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <mutex>
+#include <optional>
 
 /**
  * A UTXO entry.
@@ -290,6 +291,10 @@ public:
     //! Check whether all prevouts of the transaction are present in the UTXO
     //! set represented by this view
     bool HaveInputs(const CTransaction &tx) const;
+
+    //! Same as HaveInputs but with addition of limiting cache size
+    //! If result is std::nullopt
+    std::optional<bool> HaveInputsLimited(const CTransaction &tx, size_t maxCachedCoinsUsage) const;
 
     /**
      * Return priority of tx at height nHeight. Also calculate the sum of the

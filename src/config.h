@@ -131,6 +131,9 @@ public:
 
     virtual void SetAcceptNonStandardOutput(bool accept) = 0;
     virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
+
+    virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
+    virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
 };
 
 class GlobalConfig final : public Config {
@@ -243,6 +246,9 @@ public:
     void SetAcceptNonStandardOutput(bool accept) override;
     bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
 
+    bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
+    uint64_t GetMaxCoinsViewCacheSize() const override {return mMaxCoinsViewCacheSize;}
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -306,6 +312,8 @@ private:
     uint64_t maxScriptNumLengthPolicy;
 
     bool mAcceptNonStandardOutput;
+
+    uint64_t mMaxCoinsViewCacheSize;
 };
 
 // Dummy for subclassing in unittests
@@ -515,6 +523,17 @@ public:
     {
         return isGenesisEnabled ? true : !fRequireStandard;
     }
+
+    bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override
+    {
+        if(err)
+        {
+            *err = "This is dummy config";
+        }
+
+        return false;
+    }
+    uint64_t GetMaxCoinsViewCacheSize() const override {return 0; /* unlimited */}
 
 private:
     std::unique_ptr<CChainParams> chainParams;
