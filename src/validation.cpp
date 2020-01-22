@@ -1266,7 +1266,15 @@ CTxnValResult TxnValidation(
            return Result{state, pTxInputData, vCoinsToUncache};
         }
         // Are the actual inputs available?
-        if (!view.HaveInputs(tx)) {
+        if (auto have = view.HaveInputsLimited(tx, config.GetMaxCoinsViewCacheSize());
+            !have.has_value())
+        {
+            state.Invalid(false, REJECT_INVALID,
+                         "bad-txns-inputs-too-large");
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
+        else if (!have.value())
+        {
             state.Invalid(false, REJECT_DUPLICATE,
                          "bad-txns-inputs-spent");
             return Result{state, pTxInputData, vCoinsToUncache};

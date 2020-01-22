@@ -380,6 +380,29 @@ bool CCoinsViewCache::HaveInputs(const CTransaction &tx) const {
     return true;
 }
 
+std::optional<bool> CCoinsViewCache::HaveInputsLimited(
+    const CTransaction &tx,
+    size_t maxCachedCoinsUsage) const
+{
+    if (tx.IsCoinBase()) {
+        return true;
+    }
+    {
+        std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
+        for (const auto& input: tx.vin) {
+            if (!HaveCoinNL(input.prevout)) {
+                return false;
+            }
+
+            if(maxCachedCoinsUsage > 0 && cachedCoinsUsage >= maxCachedCoinsUsage)
+            {
+                return {};
+            }
+        }
+    }
+    return true;
+}
+
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight,
                                     Amount &inChainInputValue) const {
     inChainInputValue = Amount(0);
