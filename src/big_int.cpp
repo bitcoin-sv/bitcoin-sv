@@ -466,7 +466,7 @@ namespace
         void operator()(ASN1_INTEGER* p) const { ::ASN1_INTEGER_free(p); }
     };
     using unique_asn1_ptr = std::unique_ptr<ASN1_INTEGER, empty_asn1_deleter>;
-    static_assert(sizeof(unique_asn1_ptr) == 8);
+    static_assert(sizeof(unique_asn1_ptr) == sizeof(ASN1_INTEGER*));
 
     unique_asn1_ptr to_asn1(bignum_st* bn)
     {
