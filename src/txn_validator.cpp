@@ -498,7 +498,7 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
     std::vector<TxInputDataSPtr>& txns,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource,
+    bool fUseLimits,
     std::chrono::milliseconds maxasynctasksrunduration) {
 
     // Trigger parallel validation
@@ -510,7 +510,7 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
                     CTxMemPool *pool,
                     CTxnHandlers& handlers,
                     bool fReadyForFeeEstimation,
-                    bool fUseTimedCancellationSource,
+                    bool fUseLimits,
                     std::chrono::steady_clock::time_point end_time_point) {
                     return TxnValidationProcessingTask(
                                 pTxInputData,
@@ -518,7 +518,7 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
                                *pool,
                                 handlers,
                                 fReadyForFeeEstimation,
-                                fUseTimedCancellationSource,
+                                fUseLimits,
                                 end_time_point);
                 },
                 &mConfig,
@@ -526,7 +526,7 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
                 txns,
                 handlers,
                 fReadyForFeeEstimation,
-                fUseTimedCancellationSource,
+                fUseLimits,
                 maxasynctasksrunduration)
     };
     // All txns accepted by the mempool and not removed from there.
