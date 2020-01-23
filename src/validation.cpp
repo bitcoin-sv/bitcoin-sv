@@ -1113,7 +1113,7 @@ CTxnValResult TxnValidation(
     CTxMemPool& pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource) {
+    bool fUseLimits) {
 
     using Result = CTxnValResult;
 
@@ -1177,7 +1177,7 @@ CTxnValResult TxnValidation(
     }
     // Set txn validation timeout if required.
     auto source =
-        fUseTimedCancellationSource ?
+        fUseLimits ?
             task::CTimedCancellationSource::Make(
                 (TxValidationPriority::high == pTxInputData->mTxValidationPriority ||
                  TxValidationPriority::normal == pTxInputData->mTxValidationPriority)
@@ -1266,7 +1266,7 @@ CTxnValResult TxnValidation(
            return Result{state, pTxInputData, vCoinsToUncache};
         }
         // Are the actual inputs available?
-        if (auto have = view.HaveInputsLimited(tx, config.GetMaxCoinsViewCacheSize());
+        if (auto have = view.HaveInputsLimited(tx, fUseLimits ? config.GetMaxCoinsViewCacheSize() : 0);
             !have.has_value())
         {
             state.Invalid(false, REJECT_INVALID,
@@ -1562,7 +1562,7 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     CTxMemPool& pool,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource,
+    bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
 
     // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
@@ -1578,7 +1578,7 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
                 pool,
                 handlers.mpTxnDoubleSpendDetector,
                 fReadyForFeeEstimation,
-                fUseTimedCancellationSource)
+                fUseLimits)
     };
     // Process validated results
     ProcessValidatedTxn(pool, result, handlers, false);

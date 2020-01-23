@@ -659,7 +659,7 @@ void CommitTxToMempool(
  * @param pool A reference to the mempool
  * @param dsDetector A reference to a double spend detector
  * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
- * @param fUseTimedCancellationSource A flag to check if timed cancellation source should be used
+ * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
  * @return A result of validation.
  */
 CTxnValResult TxnValidation(
@@ -668,7 +668,7 @@ CTxnValResult TxnValidation(
     CTxMemPool &pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource);
+    bool fUseLimits);
 
 /**
  * Batch processing support for txns validation.
@@ -678,7 +678,7 @@ CTxnValResult TxnValidation(
  * @param pool A reference to the mempool
  * @param handlers Txn handlers
  * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
- * @param fUseTimedCancellationSource A flag to check if timed cancellation source should be used
+ * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
  * @return A vector of validation results
  */
 std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
@@ -687,7 +687,7 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     CTxMemPool &pool,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource,
+    bool fUseLimits,
     std::chrono::steady_clock::time_point end);
 
 /**
