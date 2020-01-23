@@ -3219,6 +3219,13 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
 void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
     size_t nPayloadLength = msg.Size();
     size_t nTotalSize = nPayloadLength + CMessageHeader::HEADER_SIZE;
+
+    if (nPayloadLength > std::numeric_limits<uint32_t>::max())
+    {
+        LogPrint(BCLog::NET, "message %s (%d bytes) cannot be sent because it exceeds max P2P message limit peer=%d\n",
+            SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
+        return;
+    }
     LogPrint(BCLog::NET, "sending %s (%d bytes) peer=%d\n",
              SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
 
