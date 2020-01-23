@@ -112,8 +112,6 @@ static const unsigned int MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR = 20;
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
-/** The size of the header for each block in a block file */
-static const unsigned int BLOCKFILE_BLOCK_HEADER_SIZE = 8;  // 8 bytes: - 4 bytes for disk magic + 4 bytes for size
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
 static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
@@ -415,6 +413,11 @@ bool ProcessNewBlockHeaders(const Config &config,
                             const std::vector<CBlockHeader> &block,
                             CValidationState &state,
                             const CBlockIndex **ppindex = nullptr);
+
+/** 
+ * The size of the header for each block in a block file 
+ */
+unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize);
 
 /**
  * Check whether enough disk space is available for an incoming block.

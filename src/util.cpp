@@ -478,10 +478,11 @@ void FileCommit(FILE *file) {
 #endif
 }
 
-bool TruncateFile(FILE *file, unsigned int length) {
+bool TruncateFile(FILE *file, uint64_t length) {
 #if defined(WIN32)
-    return _chsize(_fileno(file), length) == 0;
+    return _chsize_s(_fileno(file), length) == 0;
 #else
+    static_assert(std::is_same_v<off_t, int64_t>, "Type off_t must be 64-bit.");
     return ftruncate(fileno(file), length) == 0;
 #endif
 }
@@ -516,7 +517,7 @@ int RaiseFileDescriptorLimit(int nMinFD) {
  * (corresponding to disk space) it is advisory, and the range specified in the
  * arguments will never contain live data.
  */
-void AllocateFileRange(FILE *file, unsigned int offset, unsigned int length) {
+void AllocateFileRange(FILE *file, unsigned int offset, uint64_t length) {
 #if defined(WIN32)
     // Windows-specific version.
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
