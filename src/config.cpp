@@ -62,6 +62,8 @@ void GlobalConfig::Reset()
     genesisGracefulPeriod = DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD;
 
     mAcceptNonStandardOutput = true;
+
+    mMaxCoinsViewCacheSize = 0;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -748,6 +750,22 @@ void GlobalConfig::SetAcceptNonStandardOutput(bool accept)
 bool GlobalConfig::GetAcceptNonStandardOutput(bool isGenesisEnabled) const
 {
     return isGenesisEnabled ? mAcceptNonStandardOutput : !fRequireStandard;
+}
+
+bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
+{
+    if (max < 0)
+    {
+        if (err)
+        {
+            *err = _("Policy value for maximum coins view cache size must not be less than 0.");
+        }
+        return false;
+    }
+
+    mMaxCoinsViewCacheSize = static_cast<uint64_t>(max);
+
+    return true;
 }
 
 DummyConfig::DummyConfig()

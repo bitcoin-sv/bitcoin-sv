@@ -112,7 +112,7 @@ class CTxnValidator final
         std::vector<TxInputDataSPtr>& txns,
         CTxnHandlers& handlers,
         bool fReadyForFeeEstimation,
-        bool fUseTimedCancellationSource,
+        bool fUseLimits,
         std::chrono::milliseconds maxasynctasksrunduration);
 
     /** Post validation step for txns before limit mempool size is done*/
