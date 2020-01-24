@@ -4763,6 +4763,30 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     return true;
 }
 
+void InvalidateBlocksFromConfig(const Config &config)
+{
+    for ( const auto& invalidBlockHash: config.GetInvalidBlocks() )
+    {
+        CValidationState state;
+        {
+            LOCK(cs_main);
+            if (mapBlockIndex.count(invalidBlockHash) == 0) {
+                LogPrintf("Block %s that is proclaimed invalid is not found.\n", invalidBlockHash.GetHex());
+                continue;
+            }
+                
+            CBlockIndex *pblockindex = mapBlockIndex[invalidBlockHash];
+            LogPrintf("Invalidating Block %s.\n", invalidBlockHash.GetHex());
+            InvalidateBlock(config, state, pblockindex);
+        }
+                
+        if (!state.IsValid()) 
+        {
+            LogPrintf("Problem when invalidating block: %s.\n",state.GetRejectReason());
+        }
+    }
+}
+
 bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
@@ -5268,8 +5292,15 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
     AssertLockHeld(cs_main);
     const CChainParams &chainparams = config.GetChainParams();
 
-    // Check for duplicate
     uint256 hash = block.GetHash();
+    
+    if (config.IsBlockInvalidated(hash))
+    {
+        return error("%s: Block %s is proclaimed invalid.", 
+            __func__, block.GetHash().GetHex());
+    }
+
+    // Check for duplicate
     BlockMap::iterator miSelf = mapBlockIndex.find(hash);
     CBlockIndex *pindex = nullptr;
     if (hash != chainparams.GetConsensus().hashGenesisBlock) {

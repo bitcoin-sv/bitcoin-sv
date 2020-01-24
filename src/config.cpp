@@ -768,6 +768,21 @@ bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
     return true;
 }
 
+void GlobalConfig::SetInvalidBlocks(const std::set<uint256>& hashes)
+{
+    mInvalidBlocks = hashes;
+}
+
+const std::set<uint256>& GlobalConfig::GetInvalidBlocks() const
+{
+    return mInvalidBlocks;
+}
+
+bool GlobalConfig::IsBlockInvalidated(const uint256& hash) const
+{
+    return mInvalidBlocks.find(hash) != mInvalidBlocks.end(); 
+}
+
 DummyConfig::DummyConfig()
     : chainParams(CreateChainParams(CBaseChainParams::REGTEST)) {}
 
