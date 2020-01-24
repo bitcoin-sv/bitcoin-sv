@@ -79,6 +79,11 @@ if(MSVC)
 
 endif()
 
+# openssl library
+include(BrewHelper)
+find_brew_prefix(OPENSSL_ROOT_DIR openssl)
+find_package(OpenSSL REQUIRED)
+
 # libtool style configure
 add_subdirectory(config)
 
@@ -210,6 +215,10 @@ add_library(bitcoinconsensus
 )
 
 target_link_libraries(bitcoinconsensus common)
+target_include_directories(bitcoinconsensus
+	PRIVATE
+		${OPENSSL_INCLUDE_DIR}
+)
 
 # Bitcoin server facilities
 add_library(server
