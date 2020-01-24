@@ -104,10 +104,6 @@ static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT *
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 /** Default for -nonfinalmempoolexpiry, expiration time for non-final mempool transactions in hours */
 static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
-/** Used to calculate how many bytes of transactions to store for processing during reorg
- *  The value is multiplied with default block size to calculate actual bytes.
- */
-static const unsigned int MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR = 20;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
