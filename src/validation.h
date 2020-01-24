@@ -989,6 +989,9 @@ bool PreciousBlock(const Config &config, CValidationState &state,
 bool InvalidateBlock(const Config &config, CValidationState &state,
                      CBlockIndex *pindex);
 
+/** Blocks that are in the Config::GetInvalidBlocks() will be marked as invalid.*/
+void InvalidateBlocksFromConfig(const Config &config);
+
 /** Remove invalidity status from a block and its descendants. */
 bool ResetBlockFailureFlags(CBlockIndex *pindex);
 
