@@ -1,19 +1,19 @@
 # Bitcoin SV version 1.0.1 Release Notes
 
 ## List of Changes since 1.0.0
-* boost-multi-index added to build instructions
+* Update Windows build instructions for VS 2019
 * .vscode added to .gitignore
-* Fix: getBlock/getrawtranscations with ouput format=JSON can run out of memory
+* optimize getblock/getblockrawtransactions for large transactions
 * Fix unit tests that are failing because of the change in JSON formatting
 * Misc document changes for Genesis
 * Switch to disable replacement (non-final) transactions
-* Fix: Blocks larger than 4GB might not be stored correctly
+* Upgrade database format for larger blocks
 * Policy limit on size of transaction inputs
 * Change default for maxtxnvalidatorasynctasksrunduration from 60 seconds to 10 seconds
 * Fix: BSVRD-593 - accepting headers for Block 1
 * Orphan txn size of 10MB should also be accepted
 * Fix: lshift_big_int and rshift_big_int failing on windows
-* Provide -invalidateblock CLI switch Genesis
+* Provide -invalidateblock CLI switch
 * Fix disconnect pool limit overflow
 * Fix: autotools build system uses default compiler version gen
 
