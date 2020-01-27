@@ -4178,7 +4178,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
     // Detect whether we're stalling
     int64_t nNow = GetTimeMicros();
     if (state->nStallingSince &&
-        state->nStallingSince < nNow - 1000000 * BLOCK_STALLING_TIMEOUT) {
+        state->nStallingSince < nNow - 1000000 * gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT)) {
         // Stalling only triggers when the block download window cannot move.
         // During normal steady state, the download window should be much larger
         // than the to-be-downloaded set of blocks, so disconnection should only
