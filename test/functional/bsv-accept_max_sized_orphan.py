@@ -9,7 +9,7 @@ from test_framework.blocktools import create_transaction, create_coinbase, creat
 from test_framework.mininode import msg_tx, msg_block
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until
+from test_framework.util import wait_until, assert_equal
 from test_framework.cdefs import DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS
 
 import time
@@ -55,16 +55,15 @@ class TestMaxSizedOrphan(BitcoinTestFramework):
                                             number_of_connections=1) as (conn,):
 
             coinbase1 = make_new_block(conn)
-            coinbase2 = make_new_block(conn)
 
-            for i in range(110):
+            for _ in range(110):
                 make_new_block(conn)
 
             tx_parent = create_transaction(coinbase1, 0, CScript(), coinbase1.vout[0].nValue - 1000, CScript([OP_TRUE]))
             tx_parent.rehash()
             tx_orphan = make_big_orphan(tx_parent, DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
             assert_equal(len(tx_orphan.serialize()), DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS)
-            
+
             conn.send_message(msg_tx(tx_orphan))
             # Making sure parent is not sent right away for bitcond to detect an orphan
             time.sleep(1)
