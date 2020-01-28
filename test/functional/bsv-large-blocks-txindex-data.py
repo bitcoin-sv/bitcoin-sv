@@ -42,6 +42,7 @@ class BlockFileStore(ComparisonTestFramework):
             '-maxscriptsizepolicy=0',
             '-maxstdtxvalidationduration=55000',
             '-maxnonstdtxvalidationduration=55001',
+            '-maxtxnvalidatorasynctasksrunduration=55002',
             '-rpcservertimeout=1000',
             '-genesisactivationheight=%d' % self.genesisactivationheight,
             "-txindex"
