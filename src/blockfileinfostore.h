@@ -21,12 +21,12 @@ class CBlockFileInfoStore
     std::set<int> setDirtyFileInfo;
 
     void FindNextFileWithEnoughEmptySpace(const Config &config,
-        unsigned int nAddSize, unsigned int& nFile);
+        uint64_t nAddSize, unsigned int& nFile);
 public:
     uint64_t CalculateCurrentUsage();
 
     bool FindBlockPos(const Config &config, CValidationState &state,
-        CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight,
+        CDiskBlockPos &pos, uint64_t nAddSize, unsigned int nHeight,
         uint64_t nTime, bool& fCheckForPruning, bool fKnown = false);
 
     void FindFilesToPrune(std::set<int> &setFilesToPrune,
@@ -36,7 +36,7 @@ public:
         int nManualPruneHeight);
 
     bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
-        unsigned int nAddSize, bool& fCheckForPruning);
+        uint64_t nAddSize, bool& fCheckForPruning);
 
     void FlushBlockFile(bool fFinalize = false);
 

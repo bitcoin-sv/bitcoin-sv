@@ -152,13 +152,16 @@ BITCOIN_CORE_H = \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
+  rpc/jsonwriter.h \
   rpc/mining.h \
   rpc/misc.h \
   rpc/protocol.h \
   rpc/server.h \
   rpc/tojson.h \
   rpc/register.h \
+  rpc/text_writer.h \
   scheduler.h \
+  script_config.h \
   script/scriptcache.h \
   script/sigcache.h \
   script/sign.h \
@@ -396,6 +399,7 @@ libbitcoin_common_a_SOURCES = \
   netaddress.cpp \
   netbase.cpp \
   protocol.cpp \
+  rpc/jsonwriter.cpp \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \

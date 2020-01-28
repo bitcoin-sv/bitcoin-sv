@@ -783,14 +783,15 @@ static void MutateTx(const Config& config, CMutableTransaction& tx, const std::s
 }
 
 static void OutputTxJSON(const CTransaction &tx) {
-    UniValue entry(UniValue::VOBJ);
 
     //treat as after genesis if no output is P2SH
     bool genesisEnabled = std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) { return out.scriptPubKey.IsPayToScriptHash(); });
-    TxToUniv(tx, uint256(), genesisEnabled, entry);
 
-    std::string jsonOutput = entry.write(4);
-    fprintf(stdout, "%s\n", jsonOutput.c_str());
+    CStringWriter strWriter;
+    CJSONWriter jWriter(strWriter, true);
+    TxToJSON(tx, uint256(), genesisEnabled, 0, jWriter);
+
+    fprintf(stdout, "%s\n", strWriter.MoveOutString().c_str());
 }
 
 static void OutputTxHash(const CTransaction &tx) {

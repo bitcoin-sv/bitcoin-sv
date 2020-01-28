@@ -104,16 +104,10 @@ static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT *
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 /** Default for -nonfinalmempoolexpiry, expiration time for non-final mempool transactions in hours */
 static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
-/** Used to calculate how many bytes of transactions to store for processing during reorg
- *  The value is multiplied with default block size to calculate actual bytes.
- */
-static const unsigned int MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR = 20;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
-/** The size of the header for each block in a block file */
-static const unsigned int BLOCKFILE_BLOCK_HEADER_SIZE = 8;  // 8 bytes: - 4 bytes for disk magic + 4 bytes for size
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
 static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
@@ -416,6 +410,11 @@ bool ProcessNewBlockHeaders(const Config &config,
                             CValidationState &state,
                             const CBlockIndex **ppindex = nullptr);
 
+/** 
+ * The size of the header for each block in a block file 
+ */
+unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize);
+
 /**
  * Check whether enough disk space is available for an incoming block.
  */
@@ -659,7 +658,7 @@ void CommitTxToMempool(
  * @param pool A reference to the mempool
  * @param dsDetector A reference to a double spend detector
  * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
- * @param fUseTimedCancellationSource A flag to check if timed cancellation source should be used
+ * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
  * @return A result of validation.
  */
 CTxnValResult TxnValidation(
@@ -668,7 +667,7 @@ CTxnValResult TxnValidation(
     CTxMemPool &pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource);
+    bool fUseLimits);
 
 /**
  * Batch processing support for txns validation.
@@ -678,7 +677,7 @@ CTxnValResult TxnValidation(
  * @param pool A reference to the mempool
  * @param handlers Txn handlers
  * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
- * @param fUseTimedCancellationSource A flag to check if timed cancellation source should be used
+ * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
  * @return A vector of validation results
  */
 std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
@@ -687,7 +686,7 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     CTxMemPool &pool,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource,
+    bool fUseLimits,
     std::chrono::steady_clock::time_point end);
 
 /**
@@ -985,6 +984,9 @@ bool PreciousBlock(const Config &config, CValidationState &state,
 /** Mark a block as invalid. */
 bool InvalidateBlock(const Config &config, CValidationState &state,
                      CBlockIndex *pindex);
+
+/** Blocks that are in the Config::GetInvalidBlocks() will be marked as invalid.*/
+void InvalidateBlocksFromConfig(const Config &config);
 
 /** Remove invalidity status from a block and its descendants. */
 bool ResetBlockFailureFlags(CBlockIndex *pindex);

@@ -1113,7 +1113,7 @@ CTxnValResult TxnValidation(
     CTxMemPool& pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource) {
+    bool fUseLimits) {
 
     using Result = CTxnValResult;
 
@@ -1177,7 +1177,7 @@ CTxnValResult TxnValidation(
     }
     // Set txn validation timeout if required.
     auto source =
-        fUseTimedCancellationSource ?
+        fUseLimits ?
             task::CTimedCancellationSource::Make(
                 (TxValidationPriority::high == pTxInputData->mTxValidationPriority ||
                  TxValidationPriority::normal == pTxInputData->mTxValidationPriority)
@@ -1222,6 +1222,13 @@ CTxnValResult TxnValidation(
             // Copy non-final status to return state
             state.SetNonFinal();
             isFinal = false;
+
+            // No point doing further validation on non-final txn if we not going to be able to store it
+            if(mempool.getNonFinalPool().getMaxMemory() == 0) {
+                state.DoS(0, false, REJECT_MEMPOOL_FULL, "non-final-pool-full");
+                return Result{state, pTxInputData};
+            }
+
             // Currently we don't allow chains of non-final txns
             if(DoesNonFinalSpendNonFinal(tx)) {
                 state.DoS(0, false, REJECT_NONSTANDARD, "too-long-non-final-chain",
@@ -1266,7 +1273,15 @@ CTxnValResult TxnValidation(
            return Result{state, pTxInputData, vCoinsToUncache};
         }
         // Are the actual inputs available?
-        if (!view.HaveInputs(tx)) {
+        if (auto have = view.HaveInputsLimited(tx, fUseLimits ? config.GetMaxCoinsViewCacheSize() : 0);
+            !have.has_value())
+        {
+            state.Invalid(false, REJECT_INVALID,
+                         "bad-txns-inputs-too-large");
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
+        else if (!have.value())
+        {
             state.Invalid(false, REJECT_DUPLICATE,
                          "bad-txns-inputs-spent");
             return Result{state, pTxInputData, vCoinsToUncache};
@@ -1554,7 +1569,7 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     CTxMemPool& pool,
     CTxnHandlers& handlers,
     bool fReadyForFeeEstimation,
-    bool fUseTimedCancellationSource,
+    bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
 
     // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
@@ -1570,7 +1585,7 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
                 pool,
                 handlers.mpTxnDoubleSpendDetector,
                 fReadyForFeeEstimation,
-                fUseTimedCancellationSource)
+                fUseLimits)
     };
     // Process validated results
     ProcessValidatedTxn(pool, result, handlers, false);
@@ -2200,6 +2215,41 @@ bool GetTransaction(const Config &config, const TxId &txid,
 // CBlock and CBlockIndex
 //
 
+/**
+ * Returns size of the header for each block in a block file based on block size.
+ * This method replaces BLOCKFILE_BLOCK_HEADER_SIZE because we need 64 bit number 
+ * to store block size for blocks equal or larger than 32 bit max number.
+ */
+unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize)
+{
+    if (nBlockSize >= std::numeric_limits<unsigned int>::max())
+    {
+        return 16; // 4 bytes disk magic + 4 bytes uint32_t max + 8 bytes block size
+    }
+    else
+    {
+        return 8; // 4 bytes disk magic + 4 bytes block size 
+    }
+}
+
+/** 
+ * Write index header. If size larger thant 32 bit max than write 32 bit max and 64 bit size.
+ * 32 bit max (0xFFFFFFFF) indicates that there is 64 bit size value following.
+ */
+void WriteIndexHeader(CAutoFile& fileout,
+                      const CMessageHeader::MessageMagic& messageStart,
+                      uint64_t nSize)
+{
+    if (nSize >= std::numeric_limits<unsigned int>::max())
+    {
+        fileout << FLATDATA(messageStart) << std::numeric_limits<uint32_t>::max() << nSize;
+    }
+    else
+    {
+        fileout << FLATDATA(messageStart) << static_cast<uint32_t>(nSize);
+    }
+}
+
 static bool WriteBlockToDisk(
     const CBlock &block,
     CDiskBlockPos &pos,
@@ -2212,10 +2262,9 @@ static bool WriteBlockToDisk(
         return error("WriteBlockToDisk: OpenBlockFile failed");
     }
 
-    // Write index header
-    unsigned int nSize = GetSerializeSize(fileout, block);
-    fileout << FLATDATA(messageStart) << nSize;
-
+    // Write index header.
+    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, block));    
+    
     // Write block
     long fileOutPos = ftell(fileout.Get());
     if (fileOutPos < 0) {
@@ -2861,9 +2910,8 @@ bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos,
         return error("%s: OpenUndoFile failed", __func__);
     }
 
-    // Write index header
-    unsigned int nSize = GetSerializeSize(fileout, blockundo);
-    fileout << FLATDATA(messageStart) << nSize;
+    // Write index header. 
+    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, blockundo));
 
     // Write undo data
     long fileOutPos = ftell(fileout.Get());
@@ -3851,9 +3899,9 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
             disconnectpool->addTransaction(tx);
         }
 
-        //  The amount of tranasctions we are willing to store during reorg is calculated based
-        //  of default block size for the network (not our configuration that might be lower)
-        uint64_t maxDisconnectedTxPoolSize = MAX_DISCONNECTED_TX_POOL_SIZE_FACTOR * config.GetChainParams().GetDefaultBlockSizeParams().maxBlockSize;
+
+        //  The amount of transactions we are willing to store during reorg is the same as max mempool size
+        uint64_t maxDisconnectedTxPoolSize = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
         while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
             // Drop the earliest entry, and remove its children from the
             // mempool.
@@ -4715,6 +4763,30 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     return true;
 }
 
+void InvalidateBlocksFromConfig(const Config &config)
+{
+    for ( const auto& invalidBlockHash: config.GetInvalidBlocks() )
+    {
+        CValidationState state;
+        {
+            LOCK(cs_main);
+            if (mapBlockIndex.count(invalidBlockHash) == 0) {
+                LogPrintf("Block %s that is proclaimed invalid is not found.\n", invalidBlockHash.GetHex());
+                continue;
+            }
+                
+            CBlockIndex *pblockindex = mapBlockIndex[invalidBlockHash];
+            LogPrintf("Invalidating Block %s.\n", invalidBlockHash.GetHex());
+            InvalidateBlock(config, state, pblockindex);
+        }
+                
+        if (!state.IsValid()) 
+        {
+            LogPrintf("Problem when invalidating block: %s.\n",state.GetRejectReason());
+        }
+    }
+}
+
 bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
@@ -4996,11 +5068,6 @@ static bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
                                         CValidationState &state,
                                         const CChainParams &chainparams,
                                         const uint256 &hash) {
-    if (*pindexPrev->phashBlock ==
-        chainparams.GetConsensus().hashGenesisBlock) {
-        return true;
-    }
-
     int nHeight = pindexPrev->nHeight + 1;
     const CCheckpointData &checkpoints = chainparams.Checkpoints();
 
@@ -5225,8 +5292,15 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
     AssertLockHeld(cs_main);
     const CChainParams &chainparams = config.GetChainParams();
 
-    // Check for duplicate
     uint256 hash = block.GetHash();
+    
+    if (config.IsBlockInvalidated(hash))
+    {
+        return error("%s: Block %s is proclaimed invalid.", 
+            __func__, block.GetHash().GetHex());
+    }
+
+    // Check for duplicate
     BlockMap::iterator miSelf = mapBlockIndex.find(hash);
     CBlockIndex *pindex = nullptr;
     if (hash != chainparams.GetConsensus().hashGenesisBlock) {
@@ -5431,14 +5505,14 @@ static bool AcceptBlock(const Config &config,
 
     // Write block to history file
     try {
-        unsigned int nBlockSize =
+        uint64_t nBlockSize =
             ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
         CDiskBlockPos blockPos;
         if (dbp != nullptr) {
             blockPos = *dbp;
         }
         if (!pBlockFileInfoStore->FindBlockPos(config, state, blockPos,
-                          nBlockSize + BLOCKFILE_BLOCK_HEADER_SIZE, nHeight,
+                          (nBlockSize + GetBlockFileBlockHeaderSize(nBlockSize)), nHeight,
                           block.GetBlockTime(), fCheckForPruning, dbp != nullptr)) {
             return error("AcceptBlock(): FindBlockPos failed");
         }
@@ -6292,9 +6366,10 @@ bool InitBlockIndex(const Config &config) {
             const CChainParams &chainparams = config.GetChainParams();
             CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
             // Start new block file
-            unsigned int nBlockSizeWithHeader =
-                ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION)
-                + BLOCKFILE_BLOCK_HEADER_SIZE;
+            uint64_t nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
+            uint64_t nBlockSizeWithHeader =
+                nBlockSize
+                + GetBlockFileBlockHeaderSize(nBlockSize);
             CDiskBlockPos blockPos;
             CValidationState state;
             if (!pBlockFileInfoStore->FindBlockPos(config, state, blockPos,
@@ -6373,7 +6448,8 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
             nRewind++;
             // Remove former limit.
             blkdat.SetLimit();
-            unsigned int nSize = 0;
+            uint64_t nSize = 0;
+            uint32_t nSizeLegacy = 0;
             try {
                 // Locate a header.
                 uint8_t buf[CMessageHeader::MESSAGE_START_SIZE];
@@ -6384,8 +6460,17 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                            CMessageHeader::MESSAGE_START_SIZE)) {
                     continue;
                 }
-                // Read size.
-                blkdat >> nSize;
+                // Read 32 bit size. If it is equal to 32 max than read also 64 bit size.
+                blkdat >> nSizeLegacy;
+                if (nSizeLegacy == std::numeric_limits<uint32_t>::max())
+                {
+                    blkdat >> nSize;
+                }
+                else
+                {
+                    nSize = nSizeLegacy;
+                }
+
                 if (nSize < 80) {
                     continue;
                 }

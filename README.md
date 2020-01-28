@@ -1,9 +1,6 @@
 Bitcoin SV
 ===========
 
-*Note: version 1.0.0.beta1 is an optional beta release for testing the Genesis hard-fork. We do not recommend
-running this on the main network at this time. For more information on the Genesis hard fork, see https://bitcoinsv.io/genesis-hard-fork/*
-
 What is Bitcoin SV?
 -------------------
 

@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "rpc/text_writer.h"
 
 #define BEGIN(a) ((char *)&(a))
 #define END(a) ((char *)&((&(a))[1]))
@@ -105,24 +106,45 @@ bool ParseUInt64(const std::string &str, uint64_t *out);
 bool ParseDouble(const std::string &str, double *out);
 
 template <typename T>
-std::string HexStr(const T itbegin, const T itend, bool fSpaces = false) {
+void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = false)
+{
     std::string rv;
     static const char hexmap[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
                                     '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
-    rv.reserve((itend - itbegin) * 3);
-    for (T it = itbegin; it < itend; ++it) {
+    writer.ReserveAdditional((itend - itbegin) * 3);
+    for (T it = itbegin; it < itend; ++it)
+    {
         uint8_t val = uint8_t(*it);
-        if (fSpaces && it != itbegin) rv.push_back(' ');
-        rv.push_back(hexmap[val >> 4]);
-        rv.push_back(hexmap[val & 15]);
-    }
+        if (fSpaces && it != itbegin)
+        {
+            writer.Write(' ');
+        }
 
-    return rv;
+        writer.Write(hexmap[val >> 4]);
+        writer.Write(hexmap[val & 15]);
+    }
 }
 
 template <typename T>
-inline std::string HexStr(const T &vch, bool fSpaces = false) {
-    return HexStr(vch.begin(), vch.end(), fSpaces);
+std::string HexStr(const T itbegin, const T itend, bool fSpaces = false)
+{
+    CStringWriter stringWriter;
+    HexStr(itbegin, itend, stringWriter, fSpaces);
+    return stringWriter.MoveOutString();
+}
+
+template <typename T>
+inline std::string HexStr(const T &vch, bool fSpaces = false)
+{
+    CStringWriter stringWriter;
+    HexStr(vch.begin(), vch.end(), stringWriter, fSpaces);
+    return stringWriter.MoveOutString();
+}
+
+template <typename T>
+inline void HexStr(const T& vch, CTextWriter& writer, bool fSpaces = false)
+{
+    HexStr(vch.begin(), vch.end(), writer, fSpaces);
 }
 
 /**

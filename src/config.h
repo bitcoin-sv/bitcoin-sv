@@ -13,6 +13,7 @@
 #include "script/standard.h"
 #include "txn_validation_config.h"
 #include "validation.h"
+#include "script_config.h"
 
 #include <boost/noncopyable.hpp>
 
@@ -24,7 +25,7 @@
 class CChainParams;
 struct DefaultBlockSizeParams;
 
-class Config : public boost::noncopyable {
+class Config : public boost::noncopyable, public CScriptConfig {
 public:
     // used to specify default block size related parameters
     virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) = 0;
@@ -99,7 +100,6 @@ public:
     virtual int GetPerBlockScriptValidationMaxBatchSize() const = 0;
 
     virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
-    virtual uint64_t GetMaxOpsPerScript(bool isGenesisEnabled, bool consensus) const = 0;
 
     /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
     virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
@@ -109,7 +109,6 @@ public:
     virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
 
     virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool consensus) const = 0;
 
     virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
@@ -118,19 +117,26 @@ public:
     virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
 
     virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consensus) const = 0;
 
     virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus) const = 0;
 
     virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMaxScriptNumLength(bool isGenesisEnabled, bool isConsensus) const = 0;
 
     virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
 
     virtual void SetAcceptNonStandardOutput(bool accept) = 0;
     virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
+
+    virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
+    virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
+
+    virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
+    virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
+    virtual bool IsBlockInvalidated(const uint256& hash) const = 0;
+
+protected:
+    ~Config() = default;
 };
 
 class GlobalConfig final : public Config {
@@ -243,6 +249,13 @@ public:
     void SetAcceptNonStandardOutput(bool accept) override;
     bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const override;
 
+    bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override;
+    uint64_t GetMaxCoinsViewCacheSize() const override {return mMaxCoinsViewCacheSize;}
+
+    void SetInvalidBlocks(const std::set<uint256>& hashes) override; 
+    const std::set<uint256>& GetInvalidBlocks() const override;
+    bool IsBlockInvalidated(const uint256& hash) const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -306,6 +319,10 @@ private:
     uint64_t maxScriptNumLengthPolicy;
 
     bool mAcceptNonStandardOutput;
+
+    uint64_t mMaxCoinsViewCacheSize;
+
+    std::set<uint256> mInvalidBlocks;
 };
 
 // Dummy for subclassing in unittests
@@ -516,12 +533,39 @@ public:
         return isGenesisEnabled ? true : !fRequireStandard;
     }
 
+    bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override
+    {
+        if(err)
+        {
+            *err = "This is dummy config";
+        }
+
+        return false;
+    }
+    uint64_t GetMaxCoinsViewCacheSize() const override {return 0; /* unlimited */}
+
+    void SetInvalidBlocks(const std::set<uint256>& hashes) override 
+    { 
+        mInvalidBlocks = hashes; 
+    };
+
+    const std::set<uint256>& GetInvalidBlocks() const override 
+    { 
+        return mInvalidBlocks; 
+    };
+
+    bool IsBlockInvalidated(const uint256& hash) const override 
+    {
+        return mInvalidBlocks.find(hash) != mInvalidBlocks.end(); 
+    };
+
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
     uint64_t genesisActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
+    std::set<uint256> mInvalidBlocks;
 };
 
 #endif

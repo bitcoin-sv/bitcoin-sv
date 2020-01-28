@@ -17,7 +17,7 @@
 #include "taskcancellation.h"
 #include "uint256.h"
 #include "consensus/consensus.h"
-#include "config.h"
+#include "script_config.h"
 
 namespace {
 
@@ -355,14 +355,14 @@ static bool IsInvalidBranchingOpcode(opcodetype opcode) {
 }
 
 inline bool IsValidMaxOpsPerScript(uint64_t nOpCount,
-                                   const Config &config, 
-                                   bool isGenesisEnabled, bool consensus) 
+                                   const CScriptConfig &config,
+                                   bool isGenesisEnabled, bool consensus)
 {
     return (nOpCount <= config.GetMaxOpsPerScript(isGenesisEnabled, consensus));
 }
 
 std::optional<bool> EvalScript(
-    const Config& config,
+    const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     LimitedStack& stack,
@@ -2014,7 +2014,7 @@ bool TransactionSignatureChecker::CheckSequence(
 }
 
 std::optional<bool> VerifyScript(
-    const Config& config,
+    const CScriptConfig& config,
     bool consensus,
     const task::CCancellationToken& token,
     const CScript& scriptSig,
