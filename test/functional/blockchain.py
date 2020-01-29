@@ -47,6 +47,7 @@ class BlockchainTest(BitcoinTestFramework):
         self._test_getblockbyheight()
         self._test_getdifficulty()
         self._test_getnetworkhashps()
+        self._test_getblock_num_tx()
         self._test_stopatheight()
         assert self.nodes[0].verifychain(4, 0)
 
@@ -374,8 +375,8 @@ class BlockchainTest(BitcoinTestFramework):
 
     def _test_stopatheight(self):
         self.log.info("Test stopatheight")
-        assert_equal(self.nodes[0].getblockcount(), 200)
-        self.nodes[0].generate(6)
+        assert_equal(self.nodes[0].getblockcount(), 201)
+        self.nodes[0].generate(5)
         assert_equal(self.nodes[0].getblockcount(), 206)
         self.log.debug('Node should not stop at this height')
         assert_raises(subprocess.TimeoutExpired,
@@ -389,6 +390,34 @@ class BlockchainTest(BitcoinTestFramework):
         self.start_node(0)
         assert_equal(self.nodes[0].getblockcount(), 207)
 
+    def _test_getblock_num_tx(self):
+        self.log.info("Test num_tx is valid for getblock, getblockbyheight, getblockheader")
+        num_tx_to_create = 10
+        addr = self.nodes[0].getnewaddress()
+        for _ in range(num_tx_to_create):
+            self.nodes[0].sendtoaddress(addr, 0.1)
+        self.sync_all()
+        blockhash = self.nodes[0].generate(1)[0]
+        blockheight = self.nodes[0].getblockcount()
+        # getblock
+        blockjson = self.nodes[0].getblock(blockhash, 1)
+        assert_equal(len(blockjson['tx']), blockjson['num_tx'])
+        blockjson = self.nodes[0].getblock(blockhash, 2)
+        assert_equal(len(blockjson['tx']), blockjson['num_tx'])
+        blockjson = self.nodes[0].getblock(blockhash, 3)
+        assert_equal(len(blockjson['tx']), 1)
+        assert_equal(blockjson['num_tx'], num_tx_to_create + 1)
+        # getblockbyheight
+        blockjson = self.nodes[0].getblockbyheight(blockheight, 1)
+        assert_equal(len(blockjson['tx']), blockjson['num_tx'])
+        blockjson = self.nodes[0].getblockbyheight(blockheight, 2)
+        assert_equal(len(blockjson['tx']), blockjson['num_tx'])
+        blockjson = self.nodes[0].getblockbyheight(blockheight, 3)
+        assert_equal(len(blockjson['tx']), 1)
+        assert_equal(blockjson['num_tx'], num_tx_to_create + 1)
+        # getblockhash
+        blockjson = self.nodes[0].getblockheader(blockhash)
+        assert_equal(blockjson['num_tx'], num_tx_to_create + 1)
 
 if __name__ == '__main__':
     BlockchainTest().main()
