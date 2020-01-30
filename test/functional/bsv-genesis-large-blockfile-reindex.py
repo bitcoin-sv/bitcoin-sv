@@ -36,8 +36,9 @@ class LargeBlockFileReindex(ComparisonTestFramework):
             '-maxmempool=%d' % ONE_GIGABYTE * 10, 
             '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
             '-maxscriptsizepolicy=0',
-            '-maxstdtxvalidationduration=15000', 
-            '-maxnonstdtxvalidationduration=15001', 
+            '-maxstdtxvalidationduration=15000',
+            '-maxnonstdtxvalidationduration=15001',
+            '-maxtxnvalidatorasynctasksrunduration=15002',
             '-rpcservertimeout=1000',             
             '-genesisactivationheight=%d' % self.genesisactivationheight
             ]
