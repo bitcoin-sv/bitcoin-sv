@@ -2500,6 +2500,13 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
             }
             return error("invalid header received");
         }
+        // safety net: if the first block header is not accepted but the state is not marked
+        // as invalid pindexLast will stay null
+        // in that case we have nothing to do...
+        if (pindexLast == nullptr)
+        {
+            return error("first header is not accepted");
+        }
     }
 
     {
@@ -2758,6 +2765,15 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
             }
             return true;
         }
+        
+        // safety net: if the first block header is not accepted but the state is not marked
+        // as invalid pindexLast will stay null
+        // in that case we have nothing to do...
+        if (pindex == nullptr)
+        {
+            return error("header is not accepted");
+        }
+
     }
 
     // When we succeed in decoding a block's txids from a cmpctblock

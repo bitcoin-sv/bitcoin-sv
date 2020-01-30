@@ -4771,7 +4771,7 @@ void InvalidateBlocksFromConfig(const Config &config)
         {
             LOCK(cs_main);
             if (mapBlockIndex.count(invalidBlockHash) == 0) {
-                LogPrintf("Block %s that is proclaimed invalid is not found.\n", invalidBlockHash.GetHex());
+                LogPrintf("Block %s that is marked as invalid is not found.\n", invalidBlockHash.GetHex());
                 continue;
             }
                 
@@ -5296,8 +5296,9 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
     
     if (config.IsBlockInvalidated(hash))
     {
-        return error("%s: Block %s is proclaimed invalid.", 
-            __func__, block.GetHash().GetHex());
+        return state.Invalid(error("%s: block %s is marked as invalid from command line",
+                                   __func__, hash.ToString()),
+                             10, "block is marked as invalid");
     }
 
     // Check for duplicate
