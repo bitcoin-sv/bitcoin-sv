@@ -2212,7 +2212,11 @@ bool GetTransaction(const Config &config, const TxId &txid,
             CBlockHeader header;
             try {
                 file >> header;
+#if defined(WIN32)
+                _fseeki64(file.Get(), postx.nTxOffset, SEEK_CUR);
+#else
                 fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
+#endif
                 file >> txOut;
             } catch (const std::exception &e) {
                 return error("%s: Deserialize or I/O error - %s", __func__,
