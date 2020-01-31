@@ -246,8 +246,9 @@ void TxToJSON(const CTransaction& tx,
     entry.pushKV("locktime", (int64_t)tx.nLockTime);
 
     entry.writeBeginArray("vin");
-    for (const CTxIn& txin : tx.vin)
+    for (size_t i = 0; i < tx.vin.size(); i++)
     {
+        const CTxIn& txin = tx.vin[i];
         entry.writeBeginObject();
         if (tx.IsCoinBase())
         {
@@ -276,12 +277,12 @@ void TxToJSON(const CTransaction& tx,
         }
         entry.pushKV("sequence", (int64_t)txin.nSequence, false);
 
-        entry.writeEndObject(txin != tx.vin.back());
+        entry.writeEndObject(i < tx.vin.size() - 1);
     }
     entry.writeEndArray();
 
     entry.writeBeginArray("vout");
-    for (unsigned int i = 0; i < tx.vout.size(); i++)
+    for (size_t i = 0; i < tx.vout.size(); i++)
     {
         const CTxOut& txout = tx.vout[i];
         entry.writeBeginObject();
@@ -293,7 +294,7 @@ void TxToJSON(const CTransaction& tx,
         ScriptPublicKeyToJSON(txout.scriptPubKey, true, utxoAfterGenesis, entry);
         entry.writeEndObject(false);
 
-        entry.writeEndObject(txout != tx.vout.back());
+        entry.writeEndObject(i < tx.vout.size() - 1);
     }
 
     entry.writeEndArray();
@@ -355,9 +356,10 @@ void ScriptPublicKeyToJSON(const CScript& scriptPubKey,
     entry.pushKV("type", GetTxnOutputType(type));
 
     entry.writeBeginArray("addresses");
-    for (const CTxDestination& addr : addresses)
+    for (size_t i = 0; i < addresses.size(); i++)
     {
-        entry.pushV(EncodeDestination(addr), addr != addresses.back());
+        const CTxDestination& addr = addresses[i];
+        entry.pushV(EncodeDestination(addr), i < addresses.size() - 1);
     }
     entry.writeEndArray(false);
 }
