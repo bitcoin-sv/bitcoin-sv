@@ -37,6 +37,7 @@ class LargeBlockFileMax32Bit(ComparisonTestFramework):
             '-maxscriptsizepolicy=0',
             '-maxstdtxvalidationduration=15000', 
             '-maxnonstdtxvalidationduration=15001', 
+            '-maxtxnvalidatorasynctasksrunduration=15002',
             '-rpcservertimeout=6000',       
             '-rpcclienttimeout=0',      
             '-genesisactivationheight=%d' % self.genesisactivationheight
