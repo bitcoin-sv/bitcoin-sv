@@ -542,6 +542,11 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt("-bind=<addr>",
                                _("Bind to given address and always listen on "
                                  "it. Use [host]:port notation for IPv6"));
+    if (showDebug) {
+        strUsage += HelpMessageOpt("-blockstallingtimeout=<n>",
+            strprintf(_("Number of seconds to wait before considering a peer stalling "
+                        "during IBD (default: %u)"), DEFAULT_BLOCK_STALLING_TIMEOUT));
+    }
     strUsage +=
         HelpMessageOpt("-connect=<ip>",
                        _("Connect only to the specified node(s); -noconnect or "
