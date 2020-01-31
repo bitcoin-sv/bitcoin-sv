@@ -643,7 +643,19 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForRetry() {
         // Move p2p orphan txns into the main queue
         std::unique_lock lock { mStdTxnsMtx };
         enqueueTxnsNL(vOrphanTxns.begin(), vOrphanTxns.end(),
-            [this](const TxInputDataSPtr& txn){ enqueueStdTxnNL(txn); }
+            [this](const TxInputDataSPtr& txn){
+                const TxId& txid = txn->mpTx->GetId();
+                // Enqueue orphan txn if it is not already queued.
+                if (!isTxnKnownInSetNL(txid, mStdTxns)) {
+                    std::shared_lock lock1 { mNonStdTxnsMtx };
+                    if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
+                        std::shared_lock lock2 { mProcessingQueueMtx };
+                        if(!isTxnKnownInSetNL(txid, mProcessingQueue)) {
+                            enqueueStdTxnNL(txn);
+                        }
+                    }
+                }
+            }
         );
     }
     return nOrphanTxnsNum;

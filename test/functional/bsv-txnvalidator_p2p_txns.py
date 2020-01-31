@@ -289,6 +289,8 @@ class TxnValidatorP2PTxnsTest(BitcoinTestFramework):
             with run_connection(description, callback_connections):
                 # Broadcast txns to the node0
                 sync_node_scenarios(sync_node_type, spend_txns, callback_connections)
+                # Check if the validation queues are empty
+                wait_until(lambda: self.nodes[0].rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout)
                 # Wait until the condition is met
                 wait_until(lambda: len(self.nodes[0].getrawmempool()) == expected_txns_num, timeout=timeout)
                 # Assert to confirm that the above wait is successfull (additional check for clarity)
