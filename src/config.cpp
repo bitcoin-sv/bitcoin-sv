@@ -8,6 +8,7 @@
 #include "validation.h"
 #include "net.h"
 #include "util.h"
+#include <boost/algorithm/string.hpp>
 
 GlobalConfig::GlobalConfig() {
     Reset();
@@ -781,6 +782,23 @@ const std::set<uint256>& GlobalConfig::GetInvalidBlocks() const
 bool GlobalConfig::IsBlockInvalidated(const uint256& hash) const
 {
     return mInvalidBlocks.find(hash) != mInvalidBlocks.end(); 
+}
+
+void GlobalConfig::SetBanClientUA(const std::set<std::string> uaClients)
+{
+    mBannedUAClients = uaClients;
+}
+
+bool GlobalConfig::IsClientUABanned(const std::string uaClient) const
+{
+    for (std::string invUAClient : mBannedUAClients)
+    {
+        if (boost::icontains(uaClient, invUAClient))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 DummyConfig::DummyConfig()
