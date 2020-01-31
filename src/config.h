@@ -135,6 +135,9 @@ public:
     virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
     virtual bool IsBlockInvalidated(const uint256& hash) const = 0;
 
+    virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
+    virtual bool IsClientUABanned(const std::string uaClient) const = 0;
+
 protected:
     ~Config() = default;
 };
@@ -256,6 +259,9 @@ public:
     const std::set<uint256>& GetInvalidBlocks() const override;
     bool IsBlockInvalidated(const uint256& hash) const override;
 
+    void SetBanClientUA(const std::set<std::string> uaClients) override;
+    bool IsClientUABanned(const std::string uaClient) const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -323,6 +329,8 @@ private:
     uint64_t mMaxCoinsViewCacheSize;
 
     std::set<uint256> mInvalidBlocks;
+    std::set<std::string> mBannedUAClients;
+
 };
 
 // Dummy for subclassing in unittests
@@ -559,6 +567,17 @@ public:
         return mInvalidBlocks.find(hash) != mInvalidBlocks.end(); 
     };
 
+    void SetBanClientUA(const std::set<std::string> uaClients) override
+    {
+        mBannedUAClients = uaClients;
+    }
+    
+    bool IsClientUABanned(const std::string uaClient) const override
+    {
+        return mBannedUAClients.find(uaClient) != mBannedUAClients.end();
+    }
+
+
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
@@ -566,6 +585,7 @@ private:
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;
+    std::set<std::string> mBannedUAClients;
 };
 
 #endif

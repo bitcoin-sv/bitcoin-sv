@@ -1628,7 +1628,7 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
 * Process version messages.
 */
 static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strCommand,
-    CDataStream& vRecv, CConnman& connman)
+    CDataStream& vRecv, CConnman& connman, const Config& config)
 {
     // Each connection can only send one version message
     if(pfrom->nVersion != 0) {
@@ -1695,6 +1695,12 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     if(!vRecv.empty()) {
         vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
         cleanSubVer = SanitizeString(strSubVer);
+        
+        if (config.IsClientUABanned(cleanSubVer))
+        {
+            Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
+            return false;
+        }
     }
     if(!vRecv.empty()) {
         vRecv >> nStartingHeight;
@@ -3385,7 +3391,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::VERSION) {
-        return ProcessVersionMessage(pfrom, strCommand, vRecv, connman);
+        return ProcessVersionMessage(pfrom, strCommand, vRecv, connman, config);
     }
 
     else if (pfrom->nVersion == 0) {

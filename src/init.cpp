@@ -1004,6 +1004,11 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "ignored when it is received from a peer. "
                     "This option can be specified multiple times.")));
 
+    strUsage += HelpMessageOpt(
+        "-banclientua=<ua>",
+        strprintf(_("Ban clients whose User Agent contains specified string (case insensitive). "
+                    "This option can be specified multiple times.")));
+
     if (showDebug) {
         strUsage +=
             HelpMessageOpt("-blockversion=<n>",
@@ -2053,6 +2058,16 @@ bool AppInitParameterInteraction(Config &config) {
             invalidBlocks.insert(hash);
         }
         config.SetInvalidBlocks(invalidBlocks);
+    }
+
+    if (gArgs.IsArgSet("-banclientua"))
+    {
+        std::set<std::string> invalidUAClients;
+        for (auto invalidClient : gArgs.GetArgs("-banclientua"))
+        {
+            invalidUAClients.insert(invalidClient);
+        }
+        config.SetBanClientUA(invalidUAClients);
     }
 
     return true;
