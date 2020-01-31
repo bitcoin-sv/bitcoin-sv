@@ -670,6 +670,23 @@ CTxnValResult TxnValidation(
     bool fUseLimits);
 
 /**
+ * Handle an exception thrown during txn processing.
+ *
+ * @param sExceptionMsg A message related to the exception.
+ * @param pTxInputData A reference to transaction's details.
+ * @param txnValResult A result of txn validation.
+ * @param pool A reference to the mempool
+ * @param handlers Txn handlers.
+ * @return A state of txn processing.
+ */
+CValidationState HandleTxnProcessingException(
+    const std::string& sExceptionMsg,
+    const TxInputDataSPtr& pTxInputData,
+    const CTxnValResult& txnValResult,
+    const CTxMemPool& pool,
+    CTxnHandlers& handlers);
+
+/**
  * Batch processing support for txns validation.
  *
  * @param pTxInputData A reference to transaction's details

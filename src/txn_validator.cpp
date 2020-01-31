@@ -201,14 +201,6 @@ CValidationState CTxnValidator::processValidation(
     LOCK(cs_main);
     std::unique_lock lock { mMainMtx };
     CTxnValResult result {};
-    // Execute txn validation (timed cancellation is not set).
-    result = TxnValidation(
-                pTxInputData,
-                mConfig,
-                mMempool,
-                mpTxnDoubleSpendDetector,
-                IsCurrentForFeeEstimation(),
-                false);
     // Special handlers
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
@@ -216,8 +208,31 @@ CValidationState CTxnValidator::processValidation(
         TxSource::p2p == pTxInputData->mTxSource ? mpOrphanTxnsP2PQ : nullptr, // Orphan txns queue
         mpTxnRecentRejects // Recent rejects queue
     };
-    // Process validated results for the given txn
-    ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
+    try
+    {
+        // Execute txn validation (timed cancellation is not set).
+        result = TxnValidation(
+                    pTxInputData,
+                    mConfig,
+                    mMempool,
+                    mpTxnDoubleSpendDetector,
+                    IsCurrentForFeeEstimation(),
+                    false);
+        // Process validated results for the given txn
+        ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
+    } catch (const std::exception& e) {
+        return HandleTxnProcessingException("An exception thrown in txn processing: " + std::string(e.what()),
+                    pTxInputData,
+                    result,
+                    mMempool,
+                    handlers);
+    } catch (...) {
+        return HandleTxnProcessingException("Unexpected exception in txn processing",
+                    pTxInputData,
+                    result,
+                    mMempool,
+                    handlers);
+    }
     // Notify subscribers that a new txn was added to the mempool and not
     // removed from there due to LimitMempoolSize.
     if (result.mState.IsValid()) {
@@ -551,9 +566,15 @@ void CTxnValidator::postValidationStepsNL(
 
     const CTxnValResult& txStatus = result.first;
     const CValidationState& state = txStatus.mState;
-    if (CTask::Status::Canceled == result.second) {
-        vCancelledTxns.emplace_back(txStatus.mTxInputData);
+    // Check task's status
+    if (CTask::Status::Faulted == result.second) {
+        return;
     }
+    else if (CTask::Status::Canceled == result.second) {
+        vCancelledTxns.emplace_back(txStatus.mTxInputData);
+        return;
+    }
+    // Check validation state
     if (state.IsValid()) {
         // Txns accepted by the mempool
         vAcceptedTxns.emplace_back(txStatus.mTxInputData);
