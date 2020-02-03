@@ -290,7 +290,7 @@ class BitcoinTestFramework():
     # This method runs and stops bitcoind node with index 'node_index'.
     # It also creates (and handles closing of) 'number_of_connections' connections to bitcoind node with index 'node_index'.
     @contextlib.contextmanager
-    def run_node_with_connections(self, title, node_index, args, number_of_connections, ip='127.0.0.1'):
+    def run_node_with_connections(self, title, node_index, args, number_of_connections, ip='127.0.0.1', strSubVer=None, wait_for_verack=True):
         logger.debug("setup %s", title)
 
         self.start_node(node_index, args)
@@ -301,14 +301,15 @@ class BitcoinTestFramework():
 
         connections = []
         for connCb in connectionCbs:
-            connection = NodeConn(ip, p2p_port(0), self.nodes[node_index], connCb)
+            connection = NodeConn(ip, p2p_port(0), self.nodes[node_index], connCb, strSubVer=strSubVer)
             connections.append(connection)
             connCb.add_connection(connection)
 
         thr = NetworkThread()
         thr.start()
-        for connCb in connectionCbs:
-            connCb.wait_for_verack()
+        if wait_for_verack:
+            for connCb in connectionCbs:
+                connCb.wait_for_verack()
 
         logger.debug("before %s", title)
         yield tuple(connections)
