@@ -546,6 +546,9 @@ std::string HelpMessage(HelpMessageMode mode) {
         strUsage += HelpMessageOpt("-blockstallingtimeout=<n>",
             strprintf(_("Number of seconds to wait before considering a peer stalling "
                         "during IBD (default: %u)"), DEFAULT_BLOCK_STALLING_TIMEOUT));
+        strUsage += HelpMessageOpt("-blockdownloadwindow=<n>",
+            strprintf(_("Size of block download window before considering we may be stalling "
+                        "during IBD (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_WINDOW));
     }
     strUsage +=
         HelpMessageOpt("-connect=<ip>",

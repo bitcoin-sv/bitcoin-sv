@@ -145,7 +145,7 @@ static const int MAX_BLOCKTXN_DEPTH = 10;
  * (which make reindexing and in the future perhaps pruning harder). We'll
  * probably want to make this a per-peer adaptive value at some point.
  */
-static const unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
+static const unsigned int DEFAULT_BLOCK_DOWNLOAD_WINDOW = 1024;
 /** Time to wait (in seconds) between writing blocks/block index to disk. */
 static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
 /** Time to wait (in seconds) between flushing chainstate to disk. */
