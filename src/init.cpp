@@ -839,6 +839,10 @@ std::string HelpMessage(HelpMessageMode mode) {
             strprintf("Limit size of signature cache to <n> MiB (default: %u)",
                       DEFAULT_MAX_SIG_CACHE_SIZE));
         strUsage += HelpMessageOpt(
+            "-maxinvalidsigcachesize=<n>",
+            strprintf("Limit size of invalid signature cache to <n> MiB (default: %u)",
+                      DEFAULT_INVALID_MAX_SIG_CACHE_SIZE));
+        strUsage += HelpMessageOpt(
             "-maxscriptcachesize=<n>",
             strprintf("Limit size of script cache to <n> MiB (default: %u)",
                       DEFAULT_MAX_SCRIPT_CACHE_SIZE));
