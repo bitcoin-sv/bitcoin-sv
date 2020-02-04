@@ -1095,16 +1095,6 @@ std::string HelpMessage(HelpMessageMode mode) {
          strprintf("Set the limit on the number of invalid checksums received over a given time period from a single node  (default: %d)",
             DEFAULT_INVALID_CHECKSUM_FREQUENCY)) ;
 
-    strUsage += HelpMessageOpt(
-        "-invalidheaderinterval=<n>",
-         strprintf("Set the time limit on the transmission of message headers from the local node in milliseconds (default: %dms)",
-            DEFAULT_MIN_TIME_INTERVAL_HEADER_MS)) ;
-
-    strUsage += HelpMessageOpt(
-        "-invalidheaderfreq=<n>",
-         strprintf("Set the limit on the number of message headers transmitted from the local node over a given time period (default: %d)",
-           DEFAULT_INVALID_HEADER_FREQUENCY)) ;
-
     /** COrphanTxns */
     strUsage += HelpMessageGroup(_("Orphan txns config :"));
     strUsage += HelpMessageOpt(

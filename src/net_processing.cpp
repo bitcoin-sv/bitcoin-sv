@@ -185,12 +185,8 @@ struct CNodeState {
     /*
     * Capture the number and frequency of Invalid checksum
     */
-
     double dInvalidChecksumFrequency {0};
     std::chrono::system_clock::time_point nTimeOfLastInvalidChecksumHeader { std::chrono::system_clock::now() };
-
-    double dInvalidHeaderFrequency {0};
-    std::chrono::system_clock::time_point nTimeOfLastHeaderMessage { std::chrono::system_clock::now() };
 
     int64_t nextSendThresholdTime {0};
 
@@ -3695,7 +3691,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
             const CNodeStatePtr& state { stateRef.get() };
             if (state){
                 auto curTime = std::chrono::system_clock::now();
-                auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastInvalidChecksumHeader - curTime).count();
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(curTime - state->nTimeOfLastInvalidChecksumHeader).count();
                 unsigned int interval = gArgs.GetArg("-invalidcsinterval", DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS);
                 std::chrono::milliseconds checksumInterval(interval); 
                 if (duration < std::chrono::milliseconds(checksumInterval).count()){
@@ -4015,29 +4011,7 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
                          __func__, vHeaders.front().GetHash().ToString(),
                          pto->id);
             }
-            // check for high-frequency pushing of header messages
-            auto curTime = std::chrono::system_clock::now();
-            auto duration =  std::chrono::duration_cast<std::chrono::milliseconds>(state->nTimeOfLastHeaderMessage - curTime).count();
-            unsigned int interval = gArgs.GetArg("-invalidheaderinterval", DEFAULT_MIN_TIME_INTERVAL_HEADER_MS );
-            std::chrono::milliseconds headerInterval(interval); 
-            if (duration < std::chrono::milliseconds(headerInterval).count()){
-                ++ state->dInvalidHeaderFrequency;
-            }
-            else { 
-                state->dInvalidHeaderFrequency = 0;
-            }
-            unsigned int headerFreq = gArgs.GetArg ("-invalidheaderfreq", DEFAULT_INVALID_HEADER_FREQUENCY );
-            if (state->dInvalidHeaderFrequency > headerFreq){
-                // MisbehavingNode if the count goes above some chosen value 
-                // 1100 conseqitive invalid checksums received with less than 500ms between them
-                // (this is approximately 2200 messages per second at which point TCP/IP will start to throttle
-                Misbehaving(pto, 1, "Invalid Header activity");
-                LogPrintf("Peer %d showing increased activity in message header transmission\n",pto->id);
-            }
-            // record the time of sending the header. 
-            state->nTimeOfLastHeaderMessage = curTime;
-            connman.PushMessage(
-                pto, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
+            connman.PushMessage(pto, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
             state->pindexBestHeaderSent = pBestIndex;
         }
         else {
