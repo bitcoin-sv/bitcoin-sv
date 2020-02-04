@@ -87,9 +87,7 @@ BOOST_AUTO_TEST_CASE(max_block_size_related_defaults) {
 
     // Make up genesis activation parameters 
     // - Genesis will be activated at block height 100
-    uint64_t heightBeforeGenesis     = 99;
     uint64_t heightActivateGenesis   = 100;
-    uint64_t heightAfterGenesis      = 101;
     config.SetGenesisActivationHeight(heightActivateGenesis);
 
     // Providing defaults should not override anything
