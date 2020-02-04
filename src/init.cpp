@@ -766,7 +766,7 @@ std::string HelpMessage(HelpMessageMode mode) {
             HelpMessageOpt("-limitancestorsize=<n>",
                            strprintf("Do not accept transactions whose size "
                                      "with all in-mempool ancestors exceeds "
-                                     "<n> kilobytes (default: %u)",
+                                     "<n>*1000 bytes (default: %u)",
                                      DEFAULT_ANCESTOR_SIZE_LIMIT));
         strUsage += HelpMessageOpt(
             "-limitdescendantcount=<n>",
@@ -776,7 +776,7 @@ std::string HelpMessage(HelpMessageMode mode) {
         strUsage += HelpMessageOpt(
             "-limitdescendantsize=<n>",
             strprintf("Do not accept transactions if any ancestor would have "
-                      "more than <n> kilobytes of in-mempool descendants "
+                      "more than <n>*1000 bytes of in-mempool descendants "
                       "(default: %u).",
                       DEFAULT_DESCENDANT_SIZE_LIMIT));
     }
