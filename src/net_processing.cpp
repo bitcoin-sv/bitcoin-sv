@@ -1976,10 +1976,10 @@ static void ProcessSendHeadersMessage(const CNodePtr& pfrom)
     const CNodeStatePtr& state { stateRef.get() };
     if(state) {
         if(state->fPreferHeaders) {
-            // This message should only be received once. If its already set it might 
+            // This message should only be received once. If its already set it might
             // indicate a misbehaving node. Increase the banscore
-            Misbehaving(pfrom, 1, "Invalid Header activity");
-            LogPrintf("Peer %d showing increased activity in message header transmission\n",pfrom->id);
+            Misbehaving(pfrom, 1, "Invalid SendHeaders activity");
+            LogPrint(BCLog::NET, "Peer %d sent SendHeaders more than once\n", pfrom->id);
         }
         else {
             state->fPreferHeaders = true;
