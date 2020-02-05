@@ -246,8 +246,9 @@ void TxToJSON(const CTransaction& tx,
     entry.pushKV("locktime", (int64_t)tx.nLockTime);
 
     entry.writeBeginArray("vin");
-    for (const CTxIn& txin : tx.vin)
+    for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
+        const CTxIn& txin = tx.vin[i];
         entry.writeBeginObject();
         if (tx.IsCoinBase())
         {
@@ -276,7 +277,7 @@ void TxToJSON(const CTransaction& tx,
         }
         entry.pushKV("sequence", (int64_t)txin.nSequence, false);
 
-        entry.writeEndObject(txin != tx.vin.back());
+        entry.writeEndObject(i != tx.vin.size() - 1);
     }
     entry.writeEndArray();
 
@@ -293,7 +294,7 @@ void TxToJSON(const CTransaction& tx,
         ScriptPublicKeyToJSON(txout.scriptPubKey, true, utxoAfterGenesis, entry);
         entry.writeEndObject(false);
 
-        entry.writeEndObject(txout != tx.vout.back());
+        entry.writeEndObject(i != tx.vout.size() - 1);
     }
 
     entry.writeEndArray();
