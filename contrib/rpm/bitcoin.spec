@@ -127,16 +127,15 @@ make %{?_smp_mflags}
 make install DESTDIR=%{buildroot}
 
 mkdir -p -m755 %{buildroot}%{_sbindir}
+# rename bitcoin to bitcoin-sv as one can have both of them installed
 mv %{buildroot}%{_bindir}/bitcoind %{buildroot}%{_sbindir}/bitcoin-svd
 mv %{buildroot}%{_bindir}/bitcoin-cli %{buildroot}%{_bindir}/bitcoin-sv-cli
 mv %{buildroot}%{_bindir}/bitcoin-tx %{buildroot}%{_bindir}/bitcoin-sv-tx
 mv %{buildroot}%{_bindir}/bench_bitcoin %{buildroot}%{_bindir}/bench_bitcoin-sv
 mv %{buildroot}%{_bindir}/bitcoin-miner %{buildroot}%{_bindir}/bitcoin-sv-miner
 mv %{buildroot}%{_bindir}/bitcoin-seeder %{buildroot}%{_bindir}/bitcoin-sv-seeder
-# mv %{buildroot}%{_mandir}/man1/bitcoin-cli.1.gz %{buildroot}%{_mandir}/man1/bitcoin-sv-cli.1.gz
-# mv %{buildroot}%{_mandir}/man1/bitcoin-tx.1.gz %{buildroot}%{_mandir}/man1/bitcoin-sv-tx.1.gz
-# mv %{buildroot}%{_mandir}/man1/bitcoind.1.gz %{buildroot}%{_mandir}/man1/bitcoin-svd.1.gz
-
+# remove manual pages as they are for "bitcoin" name
+rm -rf %{buildroot}/usr/share/man/man1/bitcoin*
 
 # systemd stuff
 mkdir -p %{buildroot}%{_tmpfilesdir}
@@ -275,6 +274,8 @@ rm -rf %{buildroot}
 %license COPYING
 %doc COPYING bitcoin-sv.conf.example doc/README.md
 %attr(0755,root,root) %{_sbindir}/bitcoin-svd
+%attr(0755,root,root) %{_bindir}/bitcoin-sv-miner
+%attr(0755,root,root) %{_bindir}/bitcoin-sv-seeder
 %attr(0644,root,root) %{_tmpfilesdir}/bitcoin-sv.conf
 %attr(0644,root,root) %{_unitdir}/bitcoin-sv.service
 %dir %attr(0750,bitcoin-sv,bitcoin-sv) %{_sysconfdir}/bitcoin-sv
