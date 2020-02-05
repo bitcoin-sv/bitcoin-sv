@@ -77,7 +77,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
     {
         // If the message doesn't not contain a block content,
         // it is limited to MAX_PROTOCOL_RECV_PAYLOAD_LENGTH.
-        return MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+        return config.GetMaxProtocolRecvPayloadLength();
     }
     else
     {
@@ -181,7 +181,7 @@ bool CMessageHeader::IsValid(const Config &config) const {
  * This is a transition method in order to stay compatible with older code that
  * do not use the config. It assumes message will not get too large. This cannot
  * be used for any piece of code that will download blocks as blocks may be
- * bigger than the permitted size. Idealy, code that uses this function should
+ * bigger than the permitted size. Ideally, code that uses this function should
  * be migrated toward using the config.
  */
 bool CMessageHeader::IsValidWithoutConfig(const MessageMagic &magic) const {
@@ -191,7 +191,7 @@ bool CMessageHeader::IsValidWithoutConfig(const MessageMagic &magic) const {
     }
 
     // Payload size
-    if (nPayloadLength > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH) {
+    if (nPayloadLength > DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH) {
         LogPrintf(
             "CMessageHeader::IsValidForSeeder(): (%s, %u bytes) is oversized\n",
             GetCommand(), nPayloadLength);

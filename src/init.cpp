@@ -1245,7 +1245,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE / ONE_MEGABYTE));
 #endif
 
-
+      strUsage += HelpMessageOpt(
+        "-maxprotocolrecvpayloadlength=<n>",
+        strprintf("Set maximum protocol recv payload length you are willing to accept in bytes (default %d). Value should be bigger than legacy protocol payload length: %d B "
+                  "and smaller than: %d B.", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, ONE_GIGABYTE));
     return strUsage;
 }
 
@@ -2322,6 +2325,13 @@ bool AppInitParameterInteraction(Config &config) {
             return InitError(err);
         }
     }
+
+    const uint64_t value = gArgs.GetArg("-maxprotocolrecvpayloadlength", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
+    if (std::string err; !config.SetMaxProtocolRecvPayloadLength(value, &err))
+    {
+        return InitError(err);
+    }
+    mapAlreadyAskedFor = std::make_unique<limitedmap<uint256, int64_t>>(CInv::estimateMaxInvElements(config.GetMaxProtocolSendPayloadLength()));
 
     return true;
 }

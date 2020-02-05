@@ -1553,7 +1553,6 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
     CTxnHandlers& handlers,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
-
     size_t chainLength = vTxInputData.size();
     if (chainLength > 1) {
         LogPrint(BCLog::TXNVAL,
@@ -1579,7 +1578,7 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
                         handlers.mpTxnDoubleSpendDetector,
                         fUseLimits);
             // Process validated results
-            ProcessValidatedTxn(pool, result, handlers, false);
+            ProcessValidatedTxn(pool, result, handlers, false, config);
             // Forward results to the next processing stage
             results.emplace_back(std::move(result), CTask::Status::RanToCompletion);
         } catch (const std::exception& e) {
@@ -1609,7 +1608,8 @@ static void HandleInvalidP2POrphanTxn(
 
 static void HandleInvalidP2PNonOrphanTxn(
     const CTxnValResult& txStatus,
-    CTxnHandlers& handlers);
+    CTxnHandlers& handlers,
+    const Config &config);
 
 static void HandleInvalidStateForP2PNonOrphanTxn(
     const CNodePtr& pNode,
@@ -1719,7 +1719,8 @@ void ProcessValidatedTxn(
     CTxMemPool& pool,
     CTxnValResult& txStatus,
     CTxnHandlers& handlers,
-    bool fLimitMempoolSize) {
+    bool fLimitMempoolSize,
+    const Config &config) {
 
     TxSource source {
         txStatus.mTxInputData->GetTxSource()
@@ -1747,7 +1748,7 @@ void ProcessValidatedTxn(
             if (fOrphanTxn) {
                 HandleInvalidP2POrphanTxn(txStatus, handlers);
             } else {
-                HandleInvalidP2PNonOrphanTxn(txStatus, handlers);
+                HandleInvalidP2PNonOrphanTxn(txStatus, handlers, config);
             }
         } else if (handlers.mpOrphanTxns && state.IsMissingInputs()) {
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
@@ -1820,14 +1821,15 @@ void ProcessValidatedTxn(
 
 static void AskForMissingParents(
     const CNodePtr& pNode,
-    const CTransaction &tx) {
+    const CTransaction &tx,
+    const Config &config) {
     for (const CTxIn &txin : tx.vin) {
         // FIXME: MSG_TX should use a TxHash, not a TxId.
         CInv inv(MSG_TX, txin.prevout.GetTxId());
         pNode->AddInventoryKnown(inv);
         // Check if txn is already known.
         if (!IsTxnKnown(inv)) {
-            pNode->AskFor(inv);
+            pNode->AskFor(inv, config);
         }
     }
 }
@@ -1835,7 +1837,8 @@ static void AskForMissingParents(
 static void HandleOrphanAndRejectedP2PTxns(
     const CNodePtr& pNode,
     const CTxnValResult& txStatus,
-    CTxnHandlers& handlers) {
+    CTxnHandlers& handlers,
+    const Config &config) {
 
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
@@ -1850,7 +1853,7 @@ static void HandleOrphanAndRejectedP2PTxns(
     if (!fRejectedParents) {
         // Add txn to the orphan queue if it is not there.
         if (!handlers.mpOrphanTxns->checkTxnExists(tx.GetId())) {
-            AskForMissingParents(pNode, tx);
+            AskForMissingParents(pNode, tx, config);
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
         // DoS prevention: do not allow mpOrphanTxns to grow unbounded
@@ -1949,7 +1952,8 @@ static void HandleInvalidP2POrphanTxn(
 
 static void HandleInvalidP2PNonOrphanTxn(
     const CTxnValResult& txStatus,
-    CTxnHandlers& handlers) {
+    CTxnHandlers& handlers,
+    const Config &config) {
 
     const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
@@ -1959,7 +1963,7 @@ static void HandleInvalidP2PNonOrphanTxn(
     const CValidationState& state = txStatus.mState;
     // Handle txn with missing inputs
     if (state.IsMissingInputs()) {
-        HandleOrphanAndRejectedP2PTxns(pNode, txStatus, handlers);
+        HandleOrphanAndRejectedP2PTxns(pNode, txStatus, handlers, config);
     // Handle an invalid state
     } else {
         int nDoS = 0;

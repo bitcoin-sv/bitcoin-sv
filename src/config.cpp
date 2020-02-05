@@ -70,7 +70,10 @@ void GlobalConfig::Reset()
 
     mMaxCoinsViewCacheSize = 0;
     mMaxCoinsProviderCacheSize = 0;
-    
+
+    maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+    maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
+
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
@@ -92,6 +95,7 @@ void GlobalConfig::Reset()
     maxMerkleTreeDiskSpace = MIN_DISK_SPACE_FOR_MERKLETREE_FILES;
     preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
     maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
+
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -933,7 +937,6 @@ bool GlobalConfig::AddInvalidTxSink(const std::string& sink, std::string* err)
         }
         return false;
     }
-
     invalidTxSinks.insert(sink);
     return true;
 }
@@ -1039,6 +1042,46 @@ bool GlobalConfig::SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, s
 uint64_t GlobalConfig::GetMaxMerkleTreeMemoryCacheSize() const
 {
     return maxMerkleTreeMemoryCacheSize;
+}
+
+bool GlobalConfig::SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err)
+{
+    // sending maxRecvPayloadLength less than LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH is considered protocol violation
+    if (value < LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
+    {
+        if (err)
+        {
+            *err = "MaxProtocolRecvPayloadLength should be at least: " + std::to_string(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH) + ".";
+        }
+        return false;
+    }
+    
+    if (value > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH )
+    {
+        if (err)
+        {
+            *err = "MaxProtocolRecvPayloadLength should be less than: " + std::to_string(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH ) + ".";
+        }
+        return false;
+    }
+
+    maxProtocolRecvPayloadLength = value;
+
+    // Since value is between LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH and ONE_GIGABYTE and MAX_PROTOCOL_SEND_PAYLOAD_FACTOR is set to 4
+    // this cannot overflow unsigned int
+    maxProtocolSendPayloadLength = static_cast<unsigned int>(value * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR);
+    
+    return true;
+}
+
+unsigned int GlobalConfig::GetMaxProtocolRecvPayloadLength() const
+{
+  return maxProtocolRecvPayloadLength;
+}
+
+unsigned int GlobalConfig::GetMaxProtocolSendPayloadLength() const
+{
+  return maxProtocolSendPayloadLength;
 }
 
 DummyConfig::DummyConfig()
