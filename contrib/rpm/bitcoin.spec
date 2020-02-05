@@ -198,6 +198,7 @@ mkdir -p %{buildroot}%{_localstatedir}/lib/bitcoin-sv
 rm -f %{buildroot}%{_bindir}/test_*
 
 %check
+. /opt/rh/devtoolset-7/enable
 make check
 
 %post libs -p /sbin/ldconfig
