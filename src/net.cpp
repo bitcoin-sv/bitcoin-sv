@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #if defined(HAVE_CONFIG_H)
@@ -732,6 +732,22 @@ void CNode::SetAddrLocal(const CService &addrLocalIn) {
     }
 }
 
+// If we have sufficinet samples then get average bandwidth from node,
+// otherwise we must be in early startup measuring the bandwidth so just
+// report it as 0.
+uint64_t CNode::GetAverageBandwidth() {
+    LOCK(cs_vRecv);
+
+    if(!vAvgBandwidth.empty())
+    {
+        // If we don't yet have a full minutes worth of measurements then just
+        // average with what we have
+        return static_cast<uint64_t>(Average(vAvgBandwidth.begin(), vAvgBandwidth.end()));
+    }
+
+    return 0;
+}
+
 void CNode::copyStats(CNodeStats &stats) {
     stats.nodeid = this->GetId();
     stats.nServices = nServices;
@@ -762,6 +778,18 @@ void CNode::copyStats(CNodeStats &stats) {
         LOCK(cs_vRecv);
         stats.mapRecvBytesPerMsgCmd = mapRecvBytesPerMsgCmd;
         stats.nRecvBytes = nRecvBytes;
+
+        // Avg bandwidth measurements
+        if(!vAvgBandwidth.empty())
+        {
+            stats.nMinuteBytesPerSec = GetAverageBandwidth();
+            stats.nSpotBytesPerSec = static_cast<uint64_t>(vAvgBandwidth.back());
+        }
+        else
+        {
+            stats.nMinuteBytesPerSec = 0;
+            stats.nSpotBytesPerSec = 0;
+        }
     }
     stats.fWhitelisted = fWhitelisted;
 
@@ -896,8 +924,10 @@ CNode::RECV_STATUS CNode::ReceiveMsgBytes(const Config &config, const char *pch,
     complete = false;
     int64_t nTimeMicros = GetTimeMicros();
     LOCK(cs_vRecv);
-    nLastRecv = nTimeMicros / 1000000;
+    nLastRecv = nTimeMicros / MICROS_PER_SECOND;
     nRecvBytes += nBytes;
+    nBytesRecvThisSpot += nBytes;
+
     while (nBytes > 0) {
         // Get current incomplete message, or create a new one.
         if (vRecvMsg.empty() || vRecvMsg.back().complete()) {
@@ -2726,6 +2756,11 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
     scheduler.scheduleEvery(std::bind(&CConnman::DumpData, this),
                             DUMP_ADDRESSES_INTERVAL * 1000);
 
+    // Schedule average bandwidth measurements
+    scheduler.scheduleEvery(std::bind(&CConnman::PeerAvgBandwithCalc, this),
+                            PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS * 1000);
+
+
     return true;
 }
 
@@ -3045,6 +3080,29 @@ unsigned int CConnman::GetReceiveFloodSize() const {
 }
 unsigned int CConnman::GetSendBufferSize() const {
     return nSendBufferMaxSize;
+}
+
+// Calculate average bandwidth for our peers
+void CConnman::PeerAvgBandwithCalc()
+{
+    LOCK(cs_vNodes);
+    for(const CNodePtr& pnode : vNodes)
+    {
+        LOCK(pnode->cs_vRecv);
+        int64_t currTime { GetTimeMicros() };
+        if(pnode->nLastSpotMeasurementTime > 0)
+        {
+            double secsSinceLastSpot { static_cast<double>(currTime - pnode->nLastSpotMeasurementTime) / MICROS_PER_SECOND };
+            if(secsSinceLastSpot > 0)
+            {
+                double spotbw { pnode->nBytesRecvThisSpot / secsSinceLastSpot };
+                pnode->vAvgBandwidth.push_back(spotbw);
+            }
+        }
+
+        pnode->nLastSpotMeasurementTime = currTime;
+        pnode->nBytesRecvThisSpot = 0;
+    }
 }
 
 CNode::CNode(
