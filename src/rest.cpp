@@ -8,6 +8,7 @@
 #include "config.h"
 #include "httpserver.h"
 #include "core_io.h"
+#include "merkletreestore.h"
 #include "primitives/transaction.h"
 #include "rpc/blockchain.h"
 #include "rpc/http_protocol.h"
@@ -120,8 +121,19 @@ static bool CheckWarmup(HTTPRequest *req) {
     return true;
 }
 
+struct CHeadersData
+{
+    CHeadersData(const CBlockIndex* pblockIndex)
+    : pblockIndex(pblockIndex)
+    {}
+
+    const CBlockIndex* const pblockIndex;
+    std::optional<uint256> nextBlockHash;
+    std::optional<CDiskBlockMetaData> diskBlockMetaData;
+};
+
 static bool rest_headers(Config &config, HTTPRequest *req,
-                         const std::string &strURIPart) {
+                         const std::string &strURIPart, bool showExtended) {
     if (!CheckWarmup(req)) {
         return false;
     }
@@ -149,9 +161,9 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         return RESTERR(req, HTTP_BAD_REQUEST, "Invalid hash: " + hashStr);
     }
 
-    std::optional<uint256> lastBlockHash;
     int confirmations = -1;
-    std::vector<const CBlockIndex*> headers;
+    int32_t currentChainHeight = 0;
+    std::vector<CHeadersData> headers;
     headers.reserve(count);
     {
         LOCK(cs_main);
@@ -162,26 +174,34 @@ static bool rest_headers(Config &config, HTTPRequest *req,
         const CBlockIndex* tip = chainActive.Tip();
         confirmations = tip->GetHeight() - pindex->GetHeight() + 1;
 
+        currentChainHeight = chainActive.Height();
+
+        // Read all data we need from chain so that later after cs_main lock is no longer held,
+        // we create and return consistent result even if something changes in between.
         while (pindex != nullptr && chainActive.Contains(pindex)) {
-            headers.push_back(pindex);
-            if (headers.size() == size_t(count)) {
-                break;
-            }
+            auto& hd = headers.emplace_back(pindex);
+            CDiskBlockMetaData diskBlockMetaData = pindex->GetDiskBlockMetaData();
+            hd.diskBlockMetaData = diskBlockMetaData.diskDataHash.IsNull() ? std::nullopt : std::optional<CDiskBlockMetaData>{ diskBlockMetaData };
+
             pindex = chainActive.Next(pindex);
-        }
-        // store blockhash of additional header if we are not on chain tip
-        // because each header points to next blockhash
-        if (pindex) {
-            const CBlockIndex* pLast = chainActive.Next(pindex);
-            if (pLast) {
-                lastBlockHash = pLast->GetBlockHash();
+
+            if (pindex)
+            {
+                // pindex now points to next block.
+                // Store hash of the this block as the next block hash of previous block.
+                hd.nextBlockHash = pindex->GetBlockHash();
+            }
+
+            if (headers.size() == size_t(count))
+            {
+                break;
             }
         }
     }
 
     CDataStream ssHeader(SER_NETWORK, PROTOCOL_VERSION);
-    for (const CBlockIndex *pindex : headers) {
-        ssHeader << pindex->GetBlockHeader();
+    for (const CHeadersData& headersData : headers) {
+        ssHeader << headersData.pblockIndex->GetBlockHeader();
     }
 
     switch (rf) {
@@ -200,20 +220,64 @@ static bool rest_headers(Config &config, HTTPRequest *req,
             return true;
         }
         case RF_JSON: {
-            UniValue jsonHeaders(UniValue::VARR);
-            for (size_t i = 0; i < headers.size(); i++) {
-                std::optional<uint256> nextBlockHash;
-                const CBlockIndex* pindex= headers[i];
-                if (pindex != headers.back()) {
-                    nextBlockHash = headers[i + 1]->GetBlockHash();
-                } else {
-                    nextBlockHash = lastBlockHash;
-                }
-                jsonHeaders.push_back(blockheaderToJSON(pindex, confirmations--, nextBlockHash));
-            }
-            std::string strJSON = jsonHeaders.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
-            req->WriteReply(HTTP_OK, strJSON);
+            req->StartWritingChunks(HTTP_OK);
+            CHttpTextWriter httpWriter(*req);
+            CJSONWriter jWritter(httpWriter, false);
+            jWritter.writeBeginArray();
+            for (size_t i = 0; i < headers.size(); i++) {
+                const CHeadersData& headersData = headers[i];
+                jWritter.writeBeginObject();
+                if(showExtended)
+                {
+                    CDiskBlockMetaData diskBlockMetaData = headersData.pblockIndex->GetDiskBlockMetaData();
+                    auto reader = headersData.pblockIndex->GetDiskBlockStreamReader(diskBlockMetaData.diskDataHash.IsNull());
+                    const CTransaction* coinbaseTx = nullptr;
+                    try
+                    {
+                        if(reader)
+                        {
+                            coinbaseTx = &reader->ReadTransaction();
+                        }
+                    }
+                    catch(...)
+                    {
+                        LogPrint(BCLog::RPC, "/rest/headers/extended: Reading of coinbase txn failed.");
+                    }
+
+                    std::optional<std::vector<uint256>> coinbaseMerkleProof;
+                    if(coinbaseTx) // Merkle proof for CB is only needed if we were able to get CB txn
+                    {
+                        if(CMerkleTreeRef merkleTree=pMerkleTreeFactory->GetMerkleTree(config, *headersData.pblockIndex, currentChainHeight))
+                        {
+                            coinbaseMerkleProof = merkleTree->GetMerkleProof(0, false).merkleTreeHashes;
+                        }
+                        else
+                        {
+                            // Do not return just CB txn if we were unable to get its Merkle proof.
+                            coinbaseTx=nullptr;
+                        }
+                    }
+
+                    writeBlockHeaderEnhancedJSONFields(jWritter, headersData.pblockIndex, confirmations,
+                        headersData.nextBlockHash,
+                        headersData.diskBlockMetaData,
+                        coinbaseMerkleProof,
+                        coinbaseTx,
+                        config);
+                }
+                else
+                {
+                    writeBlockHeaderJSONFields(jWritter, headersData.pblockIndex, confirmations,
+                        headersData.nextBlockHash,
+                        headersData.diskBlockMetaData);
+                }
+                --confirmations;
+                jWritter.writeEndObject();
+            }
+            jWritter.writeEndArray();
+            jWritter.flush();
+            req->StopWritingChunks();
             return true;
         }
         default: {
@@ -226,6 +290,19 @@ static bool rest_headers(Config &config, HTTPRequest *req,
     // continue to process further HTTP reqs on this cxn
     return true;
 }
+
+static bool rest_headers_not_extended(Config& config, HTTPRequest* req,
+    const std::string& strURIPart)
+{
+    return rest_headers(config, req, strURIPart, false);
+}
+
+static bool rest_headers_extended(Config& config, HTTPRequest* req,
+    const std::string& strURIPart)
+{
+    return rest_headers(config, req, strURIPart, true);
+}
+
 
 static bool rest_block(const Config &config, HTTPRequest *req,
                        const std::string &strURIPart, bool showTxDetails) {
@@ -706,7 +783,8 @@ static const struct {
     {"/rest/chaininfo", rest_chaininfo},
     {"/rest/mempool/info", rest_mempool_info},
     {"/rest/mempool/contents", rest_mempool_contents},
-    {"/rest/headers/", rest_headers},
+    {"/rest/headers/extended/", rest_headers_extended},
+    {"/rest/headers/", rest_headers_not_extended},
     {"/rest/getutxos", rest_getutxos},
 };
 

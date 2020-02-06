@@ -6,19 +6,10 @@
 #define BITCOIN_RPCTOJSON_H
 
 #include "uint256.h"
-#include "text_writer.h"
 #include "httpserver.h" //for HTTPRequest
 #include <univalue.h>
 
 class CScript;
-
-// Following functions are implemented in blockchain.cpp
-void headerBlockToJSON(const Config& config, const CBlockHeader& blockHeader,
-                       const CBlockIndex* blockindex, const CDiskBlockMetaData& diskBlockMetaData,
-                       const int confirmations, const std::optional<uint256>& nextBlockHash, CJSONWriter& jWriter);
-UniValue blockheaderToJSON(const CBlockIndex *blockindex, 
-                           const int confirmations, 
-                           const std::optional<uint256>& nextBlockHash);
 
 UniValue blockStatusToJSON(const BlockStatus&);
 

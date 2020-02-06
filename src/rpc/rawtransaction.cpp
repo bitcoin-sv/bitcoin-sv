@@ -2245,8 +2245,10 @@ static UniValue getmerkleproof(const Config& config,
         LOCK(cs_main);
         confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), blockIndex, nextBlockHash);
     }
+
     // Target is block header as specified by (flags & (0x04 | 0x02)) == 2
-    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash));
+    CDiskBlockMetaData diskBlockMetaData = blockIndex->GetDiskBlockMetaData();
+    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex, confirmations, nextBlockHash, diskBlockMetaData.diskDataHash.IsNull() ? std::nullopt : std::optional<CDiskBlockMetaData>{ diskBlockMetaData }));
     callbackDataObject.pushKV("nodes", merkleProofArray);
     return callbackDataObject;
 }
