@@ -1739,6 +1739,27 @@ static void LogTxnCommitStatus(
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
 }
 
+void PublishInvalidTransaction(CTxnValResult& txStatus)
+{
+    const bool processingCompleted =
+            (TxValidationPriority::low == txStatus.mTxInputData->GetTxValidationPriority() ||
+            !txStatus.mState.IsValidationTimeoutExceeded());
+
+    if (!processingCompleted)
+    {
+        // we will end up in the low priority queue
+        return;
+    }
+
+    auto pNode = txStatus.mTxInputData->GetNodePtr().lock();
+    InvalidTxnInfo::TxDetails details{
+        txStatus.mTxInputData->GetTxSource(),
+        pNode ? pNode->GetId() : -1,
+        pNode ? pNode->GetAddrName() : ""};
+    CInvalidTxnPublisher::Get().Publish(
+        {txStatus.mTxInputData->GetTxnPtr(), details, std::time(nullptr), txStatus.mState} );
+}
+
 void ProcessValidatedTxn(
     CTxMemPool& pool,
     CTxnValResult& txStatus,
@@ -1776,6 +1797,9 @@ void ProcessValidatedTxn(
         } else if (handlers.mpOrphanTxns && state.IsMissingInputs()) {
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
+
+        PublishInvalidTransaction(txStatus);
+
         // Logging txn status
         LogTxnInvalidStatus(txStatus);
     }
