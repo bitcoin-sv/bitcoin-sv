@@ -91,18 +91,26 @@ public:
          * successful. In case of early validation termination an empty optional is
          * returned.
          *
+         * If the `failedChecks` is provided all failed checks are moved to this vector
+         *
          * NOTE: Add and Wait are not thread safe and should be called from the
          *       same thread or the caller should make sure to handle thread
          *       synchronization.
          */
-        std::optional<bool> Wait()
+        std::optional<bool> Wait(std::vector<T>* failedChecks = nullptr)
         {
             if (!mPool)
             {
                 return mResult;
             }
-            mResult = mQueue->Wait();
 
+            mResult = mQueue->Wait();
+            
+            if(failedChecks)
+            {
+                mQueue->TakeFailedChecks(*failedChecks);
+            }
+            
             mPool->ReturnQueueToPool(*mQueue);
             mPool.reset();
             mQueue.reset();
