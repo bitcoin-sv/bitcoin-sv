@@ -187,6 +187,7 @@ BITCOIN_CORE_H = \
   task.h \
   taskcancellation.h \
   task_helpers.h \
+  thread_safe_queue.h \
   threadpool.h \
   threadpoolT.h \
   threadpriority.h \

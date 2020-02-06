@@ -124,6 +124,7 @@ BITCOIN_TESTS =\
   test/test_txnvalidator.cpp \
   test/testutil.cpp \
   test/testutil.h \
+  test/thread_safe_queue_tests.cpp \
   test/threadpool_tests.cpp \
   test/timedata_tests.cpp \
   test/time_locked_mempool_tests.cpp \
