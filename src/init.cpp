@@ -918,7 +918,7 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusageconsensus",
         strprintf(_("Set maximum stack memory usage in bytes used for script verification "
-                    "we're willing to to accept from any source (0 = unlimited) "
+                    "we're willing to accept from any source (0 = unlimited) "
                     "after Genesis is activated (consensus level). This is a required parameter.")));
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusagepolicy",
