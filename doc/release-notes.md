@@ -1,6 +1,15 @@
-# Bitcoin SV version x.y.z Release Notes
+# Bitcoin SV version 1.0.2 Release Notes
 
 ## List of Changes since 1.0.1
+* Fix assert in ProcessHeaderMessages
+* Fix JSON bug
+* Updated exception processing during validation
+* Fix sanitiser warnings re prevector
+* Make block stalling timeout configurable
+* Updated orphan transaction processing
+* Use fseeki64 in Windows build.
+* Fix bsv-genesis-large-blockfile-io.py functional test
+* Banned peer based on user agent
 
 ## Scaling Test Network (STN) Reset
 NA
