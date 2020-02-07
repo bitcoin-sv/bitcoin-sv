@@ -107,6 +107,8 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"verifychain", 0, "checklevel"},
     {"verifychain", 1, "nblocks"},
     {"getblockstats", 1, "stats"},
+    {"getblockstatsbyheight", 0, "height"},
+    {"getblockstatsbyheight", 1, "stats"},
     {"pruneblockchain", 0, "height"},
     {"keypoolrefill", 0, "newsize"},
     {"getrawmempool", 0, "verbose"},

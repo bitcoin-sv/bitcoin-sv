@@ -2134,6 +2134,8 @@ static inline bool SetHasKeys(const std::set<T> &set, const Tk &key,
 static constexpr size_t PER_UTXO_OVERHEAD =
     sizeof(COutPoint) + sizeof(uint32_t) + sizeof(bool);
 
+UniValue getblockstats_impl(const Config &config, const JSONRPCRequest &request, CBlockIndex *pindex);
+
 static UniValue getblockstats(const Config &config,
                               const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() < 1 ||
@@ -2228,6 +2230,116 @@ static UniValue getblockstats(const Config &config,
     }
 
     assert(pindex != nullptr);
+    return getblockstats_impl(config, request, pindex);
+}
+
+
+static UniValue getblockstatsbyheight(const Config &config,
+                                      const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() < 1 ||
+        request.params.size() > 4) {
+        throw std::runtime_error(
+            "getblockstatsbyheight height ( stats )\n"
+            "\nCompute per block statistics for a given window. All amounts "
+            "are in " +
+            CURRENCY_UNIT +
+            ".\n"
+            "It won't work for some heights with pruning.\n"
+            "It won't work without -txindex for utxo_size_inc, *fee or "
+            "*feerate stats.\n"
+            "\nArguments:\n"
+            "1. \"height\"             (numeric, required) The height of "
+            "the target block\n"
+            "2. \"stats\"              (array,  optional) Values to plot, by "
+            "default all values (see result below)\n"
+            "    [\n"
+            "      \"height\",         (string, optional) Selected statistic\n"
+            "      \"time\",           (string, optional) Selected statistic\n"
+            "      ,...\n"
+            "    ]\n"
+            "\nResult:\n"
+            "{                           (json object)\n"
+            "  \"avgfee\": x.xxx,          (numeric) Average fee in the block\n"
+            "  \"avgfeerate\": x.xxx,      (numeric) Average feerate (in " +
+            CURRENCY_UNIT +
+            " per byte)\n"
+            "  \"avgtxsize\": xxxxx,       (numeric) Average transaction size\n"
+            "  \"blockhash\": xxxxx,       (string) The block hash (to check "
+            "for potential reorgs)\n"
+            "  \"height\": xxxxx,          (numeric) The height of the block\n"
+            "  \"ins\": xxxxx,             (numeric) The number of inputs "
+            "(excluding coinbase)\n"
+            "  \"maxfee\": xxxxx,          (numeric) Maximum fee in the block\n"
+            "  \"maxfeerate\": xxxxx,      (numeric) Maximum feerate (in " +
+            CURRENCY_UNIT +
+            " per byte)\n"
+            "  \"maxtxsize\": xxxxx,       (numeric) Maximum transaction size\n"
+            "  \"medianfee\": x.xxx,       (numeric) Truncated median fee in "
+            "the block\n"
+            "  \"medianfeerate\": x.xxx,   (numeric) Truncated median feerate "
+            "(in " +
+            CURRENCY_UNIT +
+            " per byte)\n"
+            "  \"mediantime\": xxxxx,      (numeric) The block median time "
+            "past\n"
+            "  \"mediantxsize\": xxxxx,    (numeric) Truncated median "
+            "transaction size\n"
+            "  \"minfee\": x.xxx,          (numeric) Minimum fee in the block\n"
+            "  \"minfeerate\": xx.xx,      (numeric) Minimum feerate (in " +
+            CURRENCY_UNIT +
+            " per byte)\n"
+            "  \"mintxsize\": xxxxx,       (numeric) Minimum transaction size\n"
+            "  \"outs\": xxxxx,            (numeric) The number of outputs\n"
+            "  \"subsidy\": x.xxx,         (numeric) The block subsidy\n"
+            "  \"time\": xxxxx,            (numeric) The block time\n"
+            "  \"total_out\": x.xxx,       (numeric) Total amount in all "
+            "outputs (excluding coinbase and thus reward [ie subsidy + "
+            "totalfee])\n"
+            "  \"total_size\": xxxxx,      (numeric) Total size of all "
+            "non-coinbase transactions\n"
+            "  \"totalfee\": x.xxx,        (numeric) The fee total\n"
+            "  \"txs\": xxxxx,             (numeric) The number of "
+            "transactions (excluding coinbase)\n"
+            "  \"utxo_increase\": xxxxx,   (numeric) The increase/decrease in "
+            "the number of unspent outputs\n"
+            "  \"utxo_size_inc\": xxxxx,   (numeric) The increase/decrease in "
+            "size for the utxo index (not discounting op_return and similar)\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getblockstatsbyheight",
+                           "620538 '[\"minfeerate\",\"avgfeerate\"]'") +
+            HelpExampleRpc("getblockstatsbyheight",
+                           "630538 '[\"minfeerate\",\"avgfeerate\"]'"));
+    }
+
+    LOCK(cs_main);
+
+    CBlockIndex *pindex;
+    const int height = request.params[0].get_int();
+    const int current_tip = chainActive.Height();
+    if (height < 0) {
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER,
+            strprintf("Target block height %d is negative", height));
+    }
+    if (height > current_tip) {
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER,
+            strprintf("Target block height %d after current tip %d", height,
+                        current_tip));
+    }
+    pindex = chainActive[height];
+
+    assert(pindex != nullptr);
+    return getblockstats_impl(config, request, pindex);
+}
+
+
+UniValue getblockstats_impl(const Config &config,
+                            const JSONRPCRequest &request,
+                            CBlockIndex *pindex)
+{
+    LOCK(cs_main);
 
     std::set<std::string> stats;
     if (!request.params[1].isNull()) {
@@ -2615,6 +2727,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "getblockhash",           getblockhash,           true,  {"height"} },
     { "blockchain",         "getblockheader",         getblockheader,         true,  {"blockhash","verbose"} },
     { "blockchain",         "getblockstats",          getblockstats,          true,  {"blockhash","stats"} },
+    { "blockchain",         "getblockstatsbyheight",  getblockstatsbyheight,  true,  {"height","stats"} },
     { "blockchain",         "getchaintips",           getchaintips,           true,  {} },
     { "blockchain",         "getdifficulty",          getdifficulty,          true,  {} },
     { "blockchain",         "getmempoolancestors",    getmempoolancestors,    true,  {"txid","verbose"} },
