@@ -46,10 +46,10 @@ class GetblockstatsTest(BitcoinTestFramework):
     ]
 
     def add_options(self, parser):
-        parser.add_argument('--gen-test-data', dest='gen_test_data',
+        parser.add_option('--gen-test-data', dest='gen_test_data',
                             default=False, action='store_true',
                             help='Generate test data')
-        parser.add_argument('--test-data', dest='test_data',
+        parser.add_option('--test-data', dest='test_data',
                             default='data/rpc_getblockstats.json',
                             action='store', metavar='FILE',
                             help='Test data file')
@@ -60,7 +60,7 @@ class GetblockstatsTest(BitcoinTestFramework):
         self.setup_clean_chain = True
 
     def get_stats(self):
-        return [self.nodes[0].getblockstats(hash_or_height=self.start_height + i) for i in range(self.max_stat_pos + 1)]
+        return [self.nodes[0].getblockstatsbyheight(height=self.start_height + i) for i in range(self.max_stat_pos + 1)]
 
     def generate_test_data(self, filename):
         mocktime = time.time()
@@ -144,19 +144,19 @@ class GetblockstatsTest(BitcoinTestFramework):
             # Check selecting block by hash too
             blockhash = self.expected_stats[i]['blockhash']
             stats_by_hash = self.nodes[0].getblockstats(
-                hash_or_height=blockhash)
+                blockhash=blockhash)
             assert_equal(stats_by_hash, self.expected_stats[i])
 
             # Check with the node that has no txindex
             stats_no_txindex = self.nodes[1].getblockstats(
-                hash_or_height=blockhash, stats=list(expected_stats_noindex[i].keys()))
+                blockhash=blockhash, stats=list(expected_stats_noindex[i].keys()))
             assert_equal(stats_no_txindex, expected_stats_noindex[i])
 
         # Make sure each stat can be queried on its own
         for stat in expected_keys:
             for i in range(self.max_stat_pos + 1):
-                result = self.nodes[0].getblockstats(
-                    hash_or_height=self.start_height + i, stats=[stat])
+                result = self.nodes[0].getblockstatsbyheight(
+                    height=self.start_height + i, stats=[stat])
                 assert_equal(list(result.keys()), [stat])
                 if result[stat] != self.expected_stats[i][stat]:
                     self.log.info('result[{}] ({}) failed, {!r} != {!r}'.format(
@@ -165,16 +165,16 @@ class GetblockstatsTest(BitcoinTestFramework):
 
         # Make sure only the selected statistics are included (more than one)
         some_stats = {'minfee', 'maxfee'}
-        stats = self.nodes[0].getblockstats(
-            hash_or_height=1, stats=list(some_stats))
+        stats = self.nodes[0].getblockstatsbyheight(
+            height=1, stats=list(some_stats))
         assert_equal(set(stats.keys()), some_stats)
 
         # Test invalid parameters raise the proper json exceptions
         tip = self.start_height + self.max_stat_pos
         assert_raises_rpc_error(-8, 'Target block height {} after current tip {}'.format(
-            tip + 1, tip), self.nodes[0].getblockstats, hash_or_height=tip + 1)
+            tip + 1, tip), self.nodes[0].getblockstatsbyheight, height=tip + 1)
         assert_raises_rpc_error(-8, 'Target block height {} is negative'.format(-1),
-                                self.nodes[0].getblockstats, hash_or_height=-1)
+                                self.nodes[0].getblockstatsbyheight, height=-1)
 
         # Make sure not valid stats aren't allowed
         inv_sel_stat = 'asdfghjkl'
@@ -186,18 +186,18 @@ class GetblockstatsTest(BitcoinTestFramework):
         ]
         for inv_stat in inv_stats:
             assert_raises_rpc_error(-8, 'Invalid selected statistic {}'.format(
-                inv_sel_stat), self.nodes[0].getblockstats, hash_or_height=1, stats=inv_stat)
+                inv_sel_stat), self.nodes[0].getblockstatsbyheight, height=1, stats=inv_stat)
 
         # Make sure we aren't always returning inv_sel_stat as the culprit stat
         assert_raises_rpc_error(-8, 'Invalid selected statistic aaa{}'.format(inv_sel_stat),
-                                self.nodes[0].getblockstats, hash_or_height=1, stats=['minfee', 'aaa{}'.format(inv_sel_stat)])
+                                self.nodes[0].getblockstatsbyheight, height=1, stats=['minfee', 'aaa{}'.format(inv_sel_stat)])
 
         assert_raises_rpc_error(-8, 'One or more of the selected stats requires -txindex enabled',
-                                self.nodes[1].getblockstats, hash_or_height=self.start_height + self.max_stat_pos)
+                                self.nodes[1].getblockstatsbyheight, height=self.start_height + self.max_stat_pos)
 
         # Mainchain's genesis block shouldn't be found on regtest
         assert_raises_rpc_error(-5, 'Block not found', self.nodes[0].getblockstats,
-                                hash_or_height='000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')
+                                blockhash='000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')
 
 
 if __name__ == '__main__':
