@@ -42,6 +42,9 @@ public:
         READWRITE(nNonce);
     }
 
+    // Returns header size in bytes
+    size_t GetHeaderSize();
+
     void SetNull() {
         nVersion = 0;
         hashPrevBlock.SetNull();
@@ -84,6 +87,12 @@ public:
     uint64_t
     GetHeightFromCoinbase() const; // Returns the block's height as specified in
                                    // its coinbase transaction
+
+    // Get number of transactions in block
+    size_t GetTransactionCount();
+
+    // Returns block size in bytes without coinbase transaction
+    size_t GetSizeWithoutCoinbase();
 
     void SetNull() {
         CBlockHeader::SetNull();
