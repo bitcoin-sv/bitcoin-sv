@@ -124,6 +124,11 @@ static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
  */
 static const unsigned int DEFAULT_BLOCK_STALLING_TIMEOUT = 2;
 /**
+ * Minimum rate (in KBytes/sec) we will allow a stalling peer to send to us at
+ * before disconnecting them.
+ */
+static const unsigned int DEFAULT_MIN_BLOCK_STALLING_RATE = 100;
+/**
  * Number of headers sent in one getheaders result. We rely on the assumption
  * that if a peer sends less than this number, we reached its tip. Changing this
  * value is a protocol upgrade.

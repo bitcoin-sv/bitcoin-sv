@@ -542,6 +542,10 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt("-bind=<addr>",
                                _("Bind to given address and always listen on "
                                  "it. Use [host]:port notation for IPv6"));
+    strUsage += HelpMessageOpt("-blockstallingmindownloadspeed=<n>",
+        strprintf(_("Minimum average download speed (Kbytes/s) we will allow a stalling "
+                    "peer to fall to during IBD. A value of 0 means stall detection is "
+                    "disabled (default: %uKb/s)"), DEFAULT_MIN_BLOCK_STALLING_RATE));
     if (showDebug) {
         strUsage += HelpMessageOpt("-blockstallingtimeout=<n>",
             strprintf(_("Number of seconds to wait before considering a peer stalling "
