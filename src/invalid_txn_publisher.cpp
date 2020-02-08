@@ -170,6 +170,7 @@ public:
 
     virtual ~CInvalidTxnSink() = default;
     virtual void Publish(const InvalidTxnInfo& invalidTxnInfo) = 0;
+    virtual int64_t ClearStored() { return 0;};
 };
 
 // Writes invalid transactions to disk. Each transaction to separate file (YYYY-MM-DD_HH-MM-SS_<transaction id>_<ord number>.json). 
@@ -374,6 +375,18 @@ public:
             }
         }
     }
+
+    int64_t ClearStored() override
+    {
+        std::lock_guard<std::mutex> lock(guard);
+        int64_t startingSize = cumulativeFilesSize;
+        if(!isInitialized)
+        {
+            Initialize();
+        }
+        ShrinkToSize(0);
+        return cumulativeFilesSize - startingSize;
+    }
 };
 
 CInvalidTxnPublisher::CInvalidTxnPublisher()
@@ -474,6 +487,17 @@ void CInvalidTxnPublisher::AddFileSink(int64_t maxSize, InvalidTxEvictionPolicy 
 {
     std::lock_guard lock(sinksGuard);
     sinks.emplace_back(new CInvalidTxnFileSink(maxSize, evictionPolicy));
+}
+
+int64_t CInvalidTxnPublisher::ClearStored()
+{
+    std::lock_guard lock(sinksGuard);
+    int64_t clearedSize = 0;
+    for(auto& sink: sinks)
+    {
+        clearedSize += sink->ClearStored();
+    }
+    return clearedSize;
 }
 
 #if ENABLE_ZMQ

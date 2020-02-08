@@ -184,6 +184,8 @@ public:
     // Puts invalid transaction on the queue
     void Publish(InvalidTxnInfo&& InvalidTxnInfo);
 
+    // Removes locally stored invalid transactions
+    int64_t ClearStored();
 };
 
 // Utility class that registers block origin in the constructor and unregisters in the destructor.
