@@ -360,7 +360,7 @@ void CTimeLockedMempool::loadConfig()
     std::unique_lock lock { mMtx };
 
     // Get max memory size in bytes
-    mMaxMemory = gArgs.GetArg("-maxmempoolnonfinal", DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE) * 1024 * 1024;
+    mMaxMemory = gArgs.GetArgAsBytes("-maxmempoolnonfinal", DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE, 1024 * 1024);
     // Get periodic checks run frequency
     mPeriodRunFreq = gArgs.GetArg("-checknonfinalfreq", DEFAULT_NONFINAL_CHECKS_FREQ);
     // Get configured purge age (convert hours to seconds)

@@ -41,9 +41,8 @@ CTxnValidator::CTxnValidator(
     // Max memory usage for transaction queues
     mMaxQueueMemSize =
         static_cast<uint64_t>(
-                gArgs.GetArg("-txnvalidationqueuesmaxmemory",
-                        DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES))
-        * 1024 * 1024;
+                gArgs.GetArgAsBytes("-txnvalidationqueuesmaxmemory",
+                        DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES, 1024 * 1024));
  
     // Create a shared object for rejected transaction
     mpTxnRecentRejects = std::make_shared<CTxnRecentRejects>();
@@ -313,7 +312,7 @@ void CTxnValidator::processValidation(
             LimitMempoolSize(
                 mMempool,
                 changeSet,
-                gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
+                gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, 1000000),
                 gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
     }
     // Execute post processing steps.
@@ -356,7 +355,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         // Ensure, that the last - long running task - won't exceed the limit.
         nMaxTxnValidatorAsyncTasksRunDuration -= mConfig.GetMaxNonStdTxnValidationDuration();
         // Get mempool limits.
-        size_t nMaxMempoolSize = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
+        size_t nMaxMempoolSize = gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, 1000000);
         unsigned long nMempoolExpiry = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
         // The main running loop
         while(mRunning) {

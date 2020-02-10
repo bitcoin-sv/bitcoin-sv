@@ -121,6 +121,25 @@ BOOST_AUTO_TEST_CASE(intarg) {
     ResetArgs("-foo=NaN -bar=NotANumber");
 	BOOST_CHECK_EQUAL(gArgs.GetArg("-foo",1),1);
 	BOOST_CHECK_EQUAL(gArgs.GetArg("-bar",11),11);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-bar", 11, 1000), 11000);
+
+    ResetArgs("-foo=7 -byte=7B -kilo=7kB -mega=7MB -giga=7GB");
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-foo", 11), 7);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-byte", 11), 7);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-kilo", 11), 7000);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-mega", 11), 7000000);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-giga", 11), 7000000000);
+    ResetArgs("-kibibyte=7kiB -mebibyte=7MiB -gibibyte=0.5GiB");
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-kibibyte", 11), 7*1024);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-mebibyte", 11), 7*1024*1024);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-gibibyte", 11), 0.5*1024*1024*1024);
+    ResetArgs("-foo -bar");
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-foo", 7, 10), 70);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-foo", 7, 1000), 7000);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-bar", 7, 0), 0);
+    ResetArgs("-foo=7kBMB");
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-foo", 7), 7);
+    BOOST_CHECK_EQUAL(gArgs.GetArgAsBytes("-foo", 7, 10), 70);
 }
 
 BOOST_AUTO_TEST_CASE(doubledash) {

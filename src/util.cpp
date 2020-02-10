@@ -17,6 +17,7 @@
 #include "utiltime.h"
 
 #include <cstdarg>
+#include <regex>
 
 #if (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 #include <pthread.h>
@@ -207,27 +208,101 @@ std::string ArgsManager::GetArg(const std::string &strArg,
     return strDefault;
 }
 
-int64_t ArgsManager::GetArg(const std::string &strArg, int64_t nDefault) {
+int64_t ArgsManager::GetArg(const std::string& strArg, int64_t nDefault) {
     LOCK(cs_args);
     int64_t returnValue(nDefault);
-	if (mapArgs.count(strArg)) 
+    if (mapArgs.count(strArg))
     {
-        const std::string& argValue (mapArgs[strArg]);
-        if ( argValue.find_first_not_of ( "\t\r\n\f ") != std::string::npos)
+        const std::string& argValue(mapArgs[strArg]);
+        if (argValue.find_first_not_of("\t\r\n\f ") != std::string::npos)
         {
             try
-            {   
+            {
                 returnValue = stoll(argValue);
             }
-            catch (std::exception& e)
-            {   
-                PrintExceptionContinue(&e, "ArgsManager::GetArg" );
+            catch (std::exception & e)
+            {
+                std::string argError = "\nArgsManager::GetArg '" + argValue + "' is invalid value for argument " + strArg + ", must be numeric value.";
+                PrintExceptionContinue(&e, argError.c_str());
             }
         }
     }
     return returnValue;
 }
 
+int64_t ArgsManager::GetArgAsBytes(const std::string& strArg, int64_t nDefault, int64_t nMultiples) {
+    LOCK(cs_args);
+    int64_t returnValue(nDefault * nMultiples);
+    if (mapArgs.count(strArg))
+    {
+        const std::string& argValue(mapArgs[strArg]);
+        if (argValue.find_first_not_of("\t\r\n\f ") != std::string::npos)
+        {
+            try
+            {
+                returnValue = parseUnit(argValue, nMultiples);
+            }
+            catch (std::exception & e)
+            {
+                std::string argError = "\nArgsManager::GetArgAsBytes '" + argValue + "' is invalid value for argument " + strArg + ", must be numeric value.";
+                PrintExceptionContinue(&e, argError.c_str());
+            }
+        }
+    }
+    return returnValue;
+}
+
+int64_t ArgsManager::parseUnit(std::string argValue, int64_t nMultiples)
+{
+    long double argNum;
+
+    static const std::regex txt_regex("^\\s*((?:-|\\+)?[0-9]+(?:\\.[0-9]+)?)\\s?((?:KI|K|MI|M|GI|G)?B)?\\s*$", std::regex::icase);
+    std::smatch match;
+    if (std::regex_search(argValue, match, txt_regex))
+    {
+        std::string matchNumber = match[1].str();
+        std::string matchUnit = match[2].str();
+        boost::to_upper(matchUnit);
+
+        if (matchUnit == "KB")
+        {
+            argNum = std::stold(matchNumber) * ONE_KILOBYTE;
+        }
+        else if (matchUnit == "KIB")
+        {
+            argNum = std::stold(matchNumber) * 1024;
+        }
+        else if (matchUnit == "MB")
+        {
+            argNum = std::stold(matchNumber) * ONE_MEGABYTE;
+        }
+        else if (matchUnit == "MIB")
+        {
+            argNum = std::stold(matchNumber) * 1024 * 1024;
+        }
+        else if (matchUnit == "GB")
+        {
+            argNum = std::stold(matchNumber) * ONE_GIGABYTE;
+        }
+        else if (matchUnit == "GIB")
+        {
+            argNum = std::stold(matchNumber) * 1024 * 1024 * 1024;
+        }
+        else if (matchUnit == "B")
+        {
+            return std::stoll(matchNumber);
+        }
+        else
+        {
+            return std::stoll(matchNumber) * nMultiples;
+        }
+    }
+    else
+    {
+        throw std::runtime_error(argValue + " is invalid value.");
+    }
+    return std::llround(argNum);
+}
 
 bool ArgsManager::GetBoolArg(const std::string &strArg, bool fDefault) {
     LOCK(cs_args);

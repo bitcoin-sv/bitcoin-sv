@@ -855,7 +855,7 @@ static Amount GetMempoolRejectFee(
     unsigned int nTxSize) {
     // Get mempool reject fee
     return pool.GetMinFee(
-                gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE)
+                gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE))
             .GetFee(nTxSize);
 }
 
@@ -911,8 +911,7 @@ static bool CheckLimitFreeTx(
     // -limitfreerelay unit is thousand-bytes-per-minute
     // At default rate it would take over a month to fill 1GB
     if (dFreeCount + nTxSize >=
-        gArgs.GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) * 10 *
-            1000) {
+        gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, 1000) * 10) {
         return false;
     }
 
@@ -1044,7 +1043,7 @@ void CommitTxToMempool(
         LimitMempoolSize(
             pool,
             changeSet,
-            gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE,
+            gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE),
             gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
         if (!pool.Exists(txid)) {
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
@@ -1848,9 +1847,10 @@ static void HandleOrphanAndRejectedP2PTxns(
         // Multiplying and dividing by ONE_MEGABYTE, because users provide value in MB, internally we use B
         uint64_t nMaxOrphanTxnsSize {
             static_cast<uint64_t>(
-                    std::max(gArgs.GetArg("-maxorphantxsize",
-                                        COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE),
-                             (int64_t)0) * ONE_MEGABYTE)
+                    std::max(gArgs.GetArgAsBytes("-maxorphantxsize",
+                                        COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE,
+                                        ONE_MEGABYTE),
+                             (int64_t)0))
         };
         unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsSize(nMaxOrphanTxnsSize);
         if (nEvicted > 0) {
@@ -3968,7 +3968,7 @@ bool FlushStateToDisk(
                 nLastSetChain = nNow;
             }
             int64_t nMempoolSizeMax =
-                gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
+                gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE);
             int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
             int64_t nTotalSpace =
                 nCoinCacheUsage +
@@ -4201,7 +4201,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
 
 
         //  The amount of transactions we are willing to store during reorg is the same as max mempool size
-        uint64_t maxDisconnectedTxPoolSize = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
+        uint64_t maxDisconnectedTxPoolSize = gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE);
         while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
             // Drop the earliest entry, and remove its children from the
             // mempool.

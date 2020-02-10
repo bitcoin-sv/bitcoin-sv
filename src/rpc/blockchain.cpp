@@ -1787,7 +1787,7 @@ UniValue mempoolInfoToJSON() {
         Pair("nonfinalusage",
              (int64_t)mempool.getNonFinalPool().estimateMemoryUsage()));
     size_t maxmempool =
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
+        gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE);
     ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
     ret.push_back(
         Pair("mempoolminfee",

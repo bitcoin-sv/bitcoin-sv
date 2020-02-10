@@ -25,10 +25,9 @@ static void InitScriptExecutionCacheUnlocked()
     // setup_bytes creates the minimum possible cache (2 elements).
     size_t nMaxCacheSize =
         std::min(std::max(int64_t(0),
-                          gArgs.GetArg("-maxscriptcachesize",
-                                       DEFAULT_MAX_SCRIPT_CACHE_SIZE)),
-                 MAX_MAX_SCRIPT_CACHE_SIZE) *
-        (size_t(1) << 20);
+                          gArgs.GetArgAsBytes("-maxscriptcachesize",
+                                       DEFAULT_MAX_SCRIPT_CACHE_SIZE, 1024*1024)),
+                 MAX_MAX_SCRIPT_CACHE_SIZE * 1024*1024);
     size_t nElems = scriptExecutionCache->setup_bytes(nMaxCacheSize);
     LogPrintf("Using %zu MiB out of %zu requested for script execution cache, "
               "able to store %zu elements\n",

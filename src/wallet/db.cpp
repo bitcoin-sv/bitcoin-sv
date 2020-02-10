@@ -457,7 +457,7 @@ void CDB::Flush() {
     }
 
     env->dbenv->txn_checkpoint(
-        nMinutes ? gArgs.GetArg("-dblogsize", DEFAULT_WALLET_DBLOGSIZE) * 1024
+        nMinutes ? gArgs.GetArgAsBytes("-dblogsize", DEFAULT_WALLET_DBLOGSIZE, 1024 * 1024) / 1024
                  : 0,
         nMinutes, 0);
 }
