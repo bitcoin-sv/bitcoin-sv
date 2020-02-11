@@ -1840,6 +1840,11 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
                   pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", pfrom->addr.ToString()) : ""));
     }
+    else {
+        LogPrintf("New inbound peer connected: version: %d, subver: %s, blocks=%d, peer=%d%s\n",
+                  pfrom->nVersion.load(), pfrom->cleanSubVer, pfrom->nStartingHeight, pfrom->GetId(),
+                  (fLogIPs ? strprintf(", peeraddr=%s", pfrom->addr.ToString()) : ""));
+    }
 
     if(pfrom->nVersion >= SENDHEADERS_VERSION) {
         // Tell our peer we prefer to receive headers rather than inv's
