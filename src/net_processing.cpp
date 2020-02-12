@@ -4182,14 +4182,27 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
     // Detect whether we're stalling
     int64_t nNow = GetTimeMicros();
     if (state->nStallingSince &&
-        state->nStallingSince < nNow - 1000000 * gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT)) {
+        state->nStallingSince < nNow - MICROS_PER_SECOND * gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT)) {
         // Stalling only triggers when the block download window cannot move.
         // During normal steady state, the download window should be much larger
         // than the to-be-downloaded set of blocks, so disconnection should only
         // happen during initial block download.
-        LogPrintf("Peer=%d is stalling block download, disconnecting\n", pto->id);
-        pto->fDisconnect = true;
-        return true;
+        // 
+        // Also, don't abandon this attempt to download all the while we are making
+        // sufficient progress, as measured by the current download speed to this
+        // peer.
+        uint64_t avgbw { pto->GetAverageBandwidth() };
+        int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
+        minDownloadSpeed = std::max(0l, minDownloadSpeed);
+        if(avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000) {
+            LogPrintf("Peer=%d is stalling block download (current speed %d), disconnecting\n", pto->id, avgbw);
+            pto->fDisconnect = true;
+            return true;
+        }
+        else {
+            LogPrint(BCLog::NET, "Resetting stall (current speed %d) for peer=%d\n", avgbw, pto->id);
+            state->nStallingSince = GetTimeMicros();
+        }
     }
     // In case there is a block that has been in flight from this peer for 2 +
     // 0.5 * N times the block interval (with N the number of peers from which
@@ -4208,8 +4221,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
                            (BLOCK_DOWNLOAD_TIMEOUT_BASE +
                             BLOCK_DOWNLOAD_TIMEOUT_PER_PEER *
                                 nOtherPeersWithValidatedDownloads)) {
-            LogPrintf("Timeout downloading block %s from peer=%d, "
-                      "disconnecting\n",
+            LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n",
                       queuedBlock.hash.ToString(), pto->id);
             pto->fDisconnect = true;
             return true;
@@ -4257,7 +4269,8 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
             assert(stallerState);
             if (stallerState->nStallingSince == 0) {
                 stallerState->nStallingSince = GetTimeMicros();
-                LogPrint(BCLog::NET, "Stall started peer=%d\n", staller);
+                uint64_t avgbw { pto->GetAverageBandwidth() };
+                LogPrint(BCLog::NET, "Stall started (current speed %d) peer=%d\n", avgbw, staller);
             }
         }
     }
