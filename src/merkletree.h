@@ -204,6 +204,11 @@ public:
      */
     MerkleProof GetMerkleProof(const TxId& transactionId, bool skipDuplicates) const;
 
+    /**
+     * Same as the GetMerkleProof(const TxId&, bool) function, except that the transaction is specified by its index in this tree/block.
+     */
+    MerkleProof GetMerkleProof(size_t transactionIndex, bool skipDuplicates) const;
+
     /*
      * Returns size of Merkle Tree in bytes by calculating number of all hashes stored
      * multiplied by 32 bytes (uint256).

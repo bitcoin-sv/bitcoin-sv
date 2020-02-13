@@ -282,6 +282,13 @@ CMerkleTree::MerkleProof CMerkleTree::GetMerkleProof(const TxId& transactionId, 
         // Transaction id not found in this Merkle Tree
         return MerkleProof(0);
     }
+
+    return GetMerkleProof(currentIndex, skipDuplicates);
+}
+
+CMerkleTree::MerkleProof CMerkleTree::GetMerkleProof(size_t transactionIndex, bool skipDuplicates) const
+{
+    size_t currentIndex = transactionIndex;
     MerkleProof merkleProof(currentIndex);
     uint256 missingParentNode;
     for (size_t currentLevel = 0; currentLevel < merkleTreeLevelsWithNodeHashes.size(); ++currentLevel)

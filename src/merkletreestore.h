@@ -206,7 +206,7 @@ public:
      * to prevent removal of last MIN_BLOCKS_TO_KEEP Merkle trees.
      * Returns null if block could not be read from disk to create a Merkle Tree.
      */
-    CMerkleTreeRef GetMerkleTree(const Config& config, CBlockIndex& blockIndex, const int32_t currentChainHeight);
+    CMerkleTreeRef GetMerkleTree(const Config& config, const CBlockIndex& blockIndex, const int32_t currentChainHeight);
 private:
     /**
      * Inserts merkleTree into a cached map with key blockHash.
