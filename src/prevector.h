@@ -12,7 +12,6 @@
 
 #include <iterator>
 
-#pragma pack(push, 1)
 /**
  * Implements a drop-in replacement for std::vector<T> which stores up to N
  * elements directly (without heap allocation). The types Size and Diff are used
@@ -573,6 +572,5 @@ public:
 
     const value_type *data() const { return item_ptr(0); }
 };
-#pragma pack(pop)
 
 #endif

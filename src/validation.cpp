@@ -1563,6 +1563,36 @@ CTxnValResult TxnValidation(
                   fTxValidForFeeEstimation};
 }
 
+CValidationState HandleTxnProcessingException(
+    const std::string& sExceptionMsg,
+    const TxInputDataSPtr& pTxInputData,
+    const CTxnValResult& txnValResult,
+    const CTxMemPool& pool,
+    CTxnHandlers& handlers) {
+
+    const CTransactionRef& ptx = pTxInputData->mpTx;
+    const CTransaction &tx = *ptx;
+    // Clean-up steps.
+    if (!txnValResult.mCoinsToUncache.empty() && !pool.Exists(tx.GetId())) {
+        pcoinsTip->Uncache(txnValResult.mCoinsToUncache);
+    }
+    handlers.mpTxnDoubleSpendDetector->removeTxnInputs(tx);
+    // Construct validation result and a logging message.
+    CValidationState state;
+    // Do not ban the node. The problem is inside txn processing.
+    state.DoS(0, false, REJECT_INVALID, sExceptionMsg);
+    std::string sTxnStateMsg = FormatStateMessage(state);
+    if (txnValResult.mState.GetRejectCode()) {
+        sTxnStateMsg += FormatStateMessage(txnValResult.mState);
+    }
+    LogPrint(BCLog::TXNVAL, "%s: %s txn= %s: %s\n",
+             __func__,
+             enum_cast<std::string>(pTxInputData->mTxSource),
+             tx.GetId().ToString(),
+             sTxnStateMsg);
+    return state;
+}
+
 std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     const TxInputDataSPtr& txInputData,
     const Config& config,
@@ -1577,18 +1607,35 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
         !(std::chrono::steady_clock::now() < end_time_point)) {
         return {{CValidationState(), txInputData}, CTask::Status::Canceled};
     }
-    // Execute validation for the given txn
-    CTxnValResult result {
-        TxnValidation(
+    CTxnValResult result {};
+    try
+    {
+        // Execute validation for the given txn
+        result =
+            TxnValidation(
                 txInputData,
                 config,
                 pool,
                 handlers.mpTxnDoubleSpendDetector,
                 fReadyForFeeEstimation,
-                fUseLimits)
-    };
-    // Process validated results
-    ProcessValidatedTxn(pool, result, handlers, false);
+                fUseLimits);
+        // Process validated results
+        ProcessValidatedTxn(pool, result, handlers, false);
+    } catch (const std::exception& e) {
+        return { { HandleTxnProcessingException("An exception thrown in txn processing: " + std::string(e.what()),
+                      txInputData,
+                      result,
+                      pool,
+                      handlers), txInputData },
+                   CTask::Status::Faulted };
+    } catch (...) {
+        return { { HandleTxnProcessingException("Unexpected exception in txn processing",
+                      txInputData,
+                      result,
+                      pool,
+                      handlers), txInputData },
+                   CTask::Status::Faulted };
+    }
     // Forward results to the next processing stage
     return {result, CTask::Status::RanToCompletion};
 }
@@ -2165,7 +2212,11 @@ bool GetTransaction(const Config &config, const TxId &txid,
             CBlockHeader header;
             try {
                 file >> header;
+#if defined(WIN32)
+                _fseeki64(file.Get(), postx.nTxOffset, SEEK_CUR);
+#else
                 fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
+#endif
                 file >> txOut;
             } catch (const std::exception &e) {
                 return error("%s: Deserialize or I/O error - %s", __func__,
@@ -4771,7 +4822,7 @@ void InvalidateBlocksFromConfig(const Config &config)
         {
             LOCK(cs_main);
             if (mapBlockIndex.count(invalidBlockHash) == 0) {
-                LogPrintf("Block %s that is proclaimed invalid is not found.\n", invalidBlockHash.GetHex());
+                LogPrintf("Block %s that is marked as invalid is not found.\n", invalidBlockHash.GetHex());
                 continue;
             }
                 
@@ -5296,8 +5347,9 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
     
     if (config.IsBlockInvalidated(hash))
     {
-        return error("%s: Block %s is proclaimed invalid.", 
-            __func__, block.GetHash().GetHex());
+        return state.Invalid(error("%s: block %s is marked as invalid from command line",
+                                   __func__, hash.ToString()),
+                             10, "block is marked as invalid");
     }
 
     // Check for duplicate

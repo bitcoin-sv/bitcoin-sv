@@ -542,6 +542,11 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt("-bind=<addr>",
                                _("Bind to given address and always listen on "
                                  "it. Use [host]:port notation for IPv6"));
+    if (showDebug) {
+        strUsage += HelpMessageOpt("-blockstallingtimeout=<n>",
+            strprintf(_("Number of seconds to wait before considering a peer stalling "
+                        "during IBD (default: %u)"), DEFAULT_BLOCK_STALLING_TIMEOUT));
+    }
     strUsage +=
         HelpMessageOpt("-connect=<ip>",
                        _("Connect only to the specified node(s); -noconnect or "
@@ -997,6 +1002,11 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "a consensus rule (same as InvalidateBlock RPC function). "
                     "If specified block header was not received yet, the header will be "
                     "ignored when it is received from a peer. "
+                    "This option can be specified multiple times.")));
+
+    strUsage += HelpMessageOpt(
+        "-banclientua=<ua>",
+        strprintf(_("Ban clients whose User Agent contains specified string (case insensitive). "
                     "This option can be specified multiple times.")));
 
     if (showDebug) {
@@ -2048,6 +2058,16 @@ bool AppInitParameterInteraction(Config &config) {
             invalidBlocks.insert(hash);
         }
         config.SetInvalidBlocks(invalidBlocks);
+    }
+
+    if (gArgs.IsArgSet("-banclientua"))
+    {
+        std::set<std::string> invalidUAClients;
+        for (auto invalidClient : gArgs.GetArgs("-banclientua"))
+        {
+            invalidUAClients.insert(invalidClient);
+        }
+        config.SetBanClientUA(invalidUAClients);
     }
 
     return true;

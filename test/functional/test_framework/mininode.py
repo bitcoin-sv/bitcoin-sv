@@ -1659,7 +1659,7 @@ class NodeConn(asyncore.dispatcher):
         "regtest": b"\xda\xb5\xbf\xfa",
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True, strSubVer=None):
         asyncore.dispatcher.__init__(self, map=mininode_socket_map)
         self.dstaddr = dstaddr
         self.dstport = dstport
@@ -1675,6 +1675,7 @@ class NodeConn(asyncore.dispatcher):
         self.disconnect = False
         self.nServices = 0
         self.maxInvElements = CInv.estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
+        self.strSubVer = strSubVer
 
         if send_version:
             # stuff version msg into sendbuf
@@ -1684,6 +1685,8 @@ class NodeConn(asyncore.dispatcher):
             vt.addrTo.port = self.dstport
             vt.addrFrom.ip = "0.0.0.0"
             vt.addrFrom.port = 0
+            if(strSubVer):
+                vt.strSubVer = strSubVer
             self.send_message(vt, True)
 
         logger.info('Connecting to Bitcoin Node: %s:%d' %

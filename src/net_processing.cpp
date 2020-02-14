@@ -1628,7 +1628,7 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
 * Process version messages.
 */
 static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strCommand,
-    CDataStream& vRecv, CConnman& connman)
+    CDataStream& vRecv, CConnman& connman, const Config& config)
 {
     // Each connection can only send one version message
     if(pfrom->nVersion != 0) {
@@ -1695,6 +1695,12 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     if(!vRecv.empty()) {
         vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
         cleanSubVer = SanitizeString(strSubVer);
+        
+        if (config.IsClientUABanned(cleanSubVer))
+        {
+            Misbehaving(pfrom, gArgs.GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD), "invalid-UA");
+            return false;
+        }
     }
     if(!vRecv.empty()) {
         vRecv >> nStartingHeight;
@@ -1832,6 +1838,11 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         state->fCurrentlyConnected = true;
         LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s\n",
                   pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
+                  (fLogIPs ? strprintf(", peeraddr=%s", pfrom->addr.ToString()) : ""));
+    }
+    else {
+        LogPrintf("New inbound peer connected: version: %d, subver: %s, blocks=%d, peer=%d%s\n",
+                  pfrom->nVersion.load(), pfrom->cleanSubVer, pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", pfrom->addr.ToString()) : ""));
     }
 
@@ -2500,6 +2511,13 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
             }
             return error("invalid header received");
         }
+        // safety net: if the first block header is not accepted but the state is not marked
+        // as invalid pindexLast will stay null
+        // in that case we have nothing to do...
+        if (pindexLast == nullptr)
+        {
+            return error("first header is not accepted");
+        }
     }
 
     {
@@ -2758,6 +2776,15 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
             }
             return true;
         }
+        
+        // safety net: if the first block header is not accepted but the state is not marked
+        // as invalid pindexLast will stay null
+        // in that case we have nothing to do...
+        if (pindex == nullptr)
+        {
+            return error("header is not accepted");
+        }
+
     }
 
     // When we succeed in decoding a block's txids from a cmpctblock
@@ -3369,7 +3396,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::VERSION) {
-        return ProcessVersionMessage(pfrom, strCommand, vRecv, connman);
+        return ProcessVersionMessage(pfrom, strCommand, vRecv, connman, config);
     }
 
     else if (pfrom->nVersion == 0) {
@@ -4178,7 +4205,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
     // Detect whether we're stalling
     int64_t nNow = GetTimeMicros();
     if (state->nStallingSince &&
-        state->nStallingSince < nNow - 1000000 * BLOCK_STALLING_TIMEOUT) {
+        state->nStallingSince < nNow - 1000000 * gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT)) {
         // Stalling only triggers when the block download window cannot move.
         // During normal steady state, the download window should be much larger
         // than the to-be-downloaded set of blocks, so disconnection should only
