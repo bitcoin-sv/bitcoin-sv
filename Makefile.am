@@ -163,14 +163,10 @@ EXTRA_DIST += \
 	test/util/data/txcreatedata_seq1.json \
 	test/util/data/txcreatemultisig1.hex \
 	test/util/data/txcreatemultisig1.json \
-	test/util/data/txcreatemultisig2.hex \
-	test/util/data/txcreatemultisig2.json \
 	test/util/data/txcreateoutpubkey1.hex \
 	test/util/data/txcreateoutpubkey1.json \
 	test/util/data/txcreatescript1.hex \
 	test/util/data/txcreatescript1.json \
-	test/util/data/txcreatescript2.hex \
-	test/util/data/txcreatescript2.json \
 	test/util/data/txcreatesignv1.hex \
 	test/util/data/txcreatesignv1.json \
 	test/util/data/txcreatesignv2.hex
