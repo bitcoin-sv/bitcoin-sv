@@ -32,24 +32,12 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
     def get_tests(self):
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
-
-        # Create a new block
-        self.next_block(0)
-        self.chain.save_spendable_output()
+        block = self.chain.next_block
+        block(0)
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(140):
-            self.next_block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out = prepare_init_chain(self.chain, 140, 100)
         yield test
-
-        # Collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
 
         # Create blocks with multiple txns in
         block1 = self.chain.next_block(1, spend=out[0:20])

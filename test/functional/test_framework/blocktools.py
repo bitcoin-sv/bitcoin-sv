@@ -4,6 +4,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Utilities for manipulating blocks and transactions."""
 from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
+from test_framework.comptool import TestInstance
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_EQUAL, OP_HASH160
 from .util import assert_equal, assert_raises_rpc_error, hash256
@@ -245,6 +246,30 @@ def create_and_sign_transaction(spend_tx, n, value, script=CScript([OP_TRUE]), p
     sign_tx(tx, spend_tx, n, private_key)
     tx.rehash()
     return tx
+
+def prepare_init_chain(chain, no_blocks, no_outputs, block_0=True, save=None, get=None):
+    # Create a new block
+    block = chain.next_block
+    save_spendable_output=save
+    get_spendable_output=get
+    if not save:
+        save_spendable_output=chain.save_spendable_output
+        get_spendable_output=chain.get_spendable_output
+    if block_0:
+        save_spendable_output()
+    # Now we need that block to mature so we can spend the coinbase.
+    test = TestInstance(sync_every_block=False)
+    for i in range(no_blocks):
+        block(5000 + i)
+        test.blocks_and_transactions.append([chain.tip, True])
+        save_spendable_output()
+
+    # collect spendable outputs now to avoid cluttering the code later on
+    out = []
+    for i in range(no_outputs):
+        out.append(get_spendable_output())
+
+    return test, out
 
 ### Helper to build chain
 

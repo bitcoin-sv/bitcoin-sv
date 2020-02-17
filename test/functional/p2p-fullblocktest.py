@@ -87,22 +87,11 @@ class FullBlockTest(ComparisonTestFramework):
 
         # Create a new block
         block(0)
-        save_spendable_output()
         yield accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(99):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.tip, True])
-            save_spendable_output()
+        test, out = prepare_init_chain(self, 99, 33, save=save_spendable_output, get=get_spendable_output)
 
         yield test
-
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(33):
-            out.append(get_spendable_output())
 
         # Start by building a couple of blocks on top (which output is spent is
         # in parentheses):

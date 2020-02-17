@@ -10,7 +10,7 @@ In this test (opposed to bsv-genesis-pushonly-transactions.py), blocks are sent 
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE, OP_ADD
-from test_framework.blocktools import create_transaction
+from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, hashToHex
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 
@@ -32,23 +32,11 @@ class BSVGenesisActivation(ComparisonTestFramework):
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(101):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out = prepare_init_chain(self.chain, 101, 100)
         yield test
-
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
 
         assert_equal(node.getblock(node.getbestblockhash())['height'], 102)
 

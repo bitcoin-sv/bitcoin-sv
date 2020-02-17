@@ -37,25 +37,11 @@ class BSVBlockSizeTest(ComparisonTestFramework):
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
 
-        # Create a new block
         block(0)
-
-        self.chain.save_spendable_output()
-
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(self.genesisactivationheight - 3):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out = prepare_init_chain(self.chain, self.genesisactivationheight - 3, self.genesisactivationheight - 3)
         yield test
-
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(self.genesisactivationheight - 3):
-            out.append(self.chain.get_spendable_output())        
 
         # Current block height is 103
         assert_equal(node.getblock(node.getbestblockhash())['height'], self.genesisactivationheight - 2)

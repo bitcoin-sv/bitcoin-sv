@@ -6,7 +6,7 @@ Test applying limit to the non-final pool size.
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE
-from test_framework.blocktools import create_transaction
+from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, wait_until
 from test_framework.comptool import TestInstance, RejectResult, DiscardResult
 import time
@@ -48,24 +48,11 @@ class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
         node = self.nodes[0]
         self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        # Also, move block height on beyond Genesis activation.
-        test = TestInstance(sync_every_block=False)
-        for i in range(600):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out = prepare_init_chain(self.chain, 600, 200)
         yield test
-
-        # Collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(200):
-            out.append(self.chain.get_spendable_output())
 
         # Create block with some transactions for us to spend
         block(1, spend=out[0])
