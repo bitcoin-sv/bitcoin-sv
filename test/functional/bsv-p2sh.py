@@ -18,18 +18,6 @@ def create_tx(spend_tx, n, value, script=CScript([OP_TRUE])):
     tx = create_transaction(spend_tx, n, b"", value, script)
     return tx
 
-# sign a transaction, using the key we know about
-# this signs input 0 in tx, which is assumed to be spending output n in
-# spend_tx
-def sign_tx(tx, spend_tx, n, coinbase_key):
-    scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-    if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
-        tx.vin[0].scriptSig = CScript()
-        return
-    sighash = SignatureHashForkId(
-        spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
-    tx.vin[0].scriptSig = CScript(
-        [coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
 def create_and_sign_transaction(spend_tx, n, value, coinbase_key, script=CScript([OP_TRUE])):
     tx = create_tx(spend_tx, n, value, script)

@@ -29,18 +29,6 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
     def run_test(self):
         self.test.run()
 
-    # Sign a transaction, using the key we know about.
-    # This signs input 0 in tx, which is assumed to be spending output n in spend_tx
-    def sign_tx(self, tx, spend_tx, n):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-        if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
-            tx.vin[0].scriptSig = CScript()
-            return
-        sighash = SignatureHashForkId(
-            spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
-        tx.vin[0].scriptSig = CScript(
-            [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
-
     # Create a new block with some number of valid spending txns
     def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE])):
         if self.chain.tip == None:
@@ -66,7 +54,7 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
             for s in spend:
                 # Spend 1 satoshi
                 tx = create_transaction(s.tx, s.n, b"", 1, script)
-                self.sign_tx(tx, s.tx, s.n)
+                sign_tx(tx, s.tx, s.n, self.coinbase_key)
                 self.chain.add_transactions_to_block(block, [tx])
                 block.hashMerkleRoot = block.calc_merkle_root()
         # Do PoW, which is very inexpensive on regnet

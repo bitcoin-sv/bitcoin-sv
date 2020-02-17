@@ -28,6 +28,7 @@ import time
 import glob
 
 from test_framework.blocktools import (create_block, create_coinbase)
+from test_framework.blocktools import sign_tx
 from test_framework.mininode import (
     NetworkThread,
     NodeConn,
@@ -38,8 +39,7 @@ from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
     p2p_port,
     assert_equal,
-    wait_until,
-)
+    wait_until)
 from test_framework.script import *
 from test_framework.blocktools import create_transaction
 from test_framework.key import CECKey
@@ -62,16 +62,6 @@ class PBVWithSigOps(BitcoinTestFramework):
         self.coinbase_key.set_secretbytes(b"horsebattery")
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.chain = ChainManager()
-
-    def sign_tx(self, tx, spend_tx, n):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-        if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
-            tx.vin[0].scriptSig = CScript()
-            return
-        sighash = SignatureHashForkId(
-            spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
-        tx.vin[0].scriptSig = CScript(
-            [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
     def sign_expensive_tx(self, tx, spend_tx, n, sigChecks):
         sighash = SignatureHashForkId(
@@ -107,7 +97,7 @@ class PBVWithSigOps(BitcoinTestFramework):
             for s in spend:
                 # Spend 1 satoshi
                 tx = create_transaction(s.tx, s.n, b"", 1, script)
-                self.sign_tx(tx, s.tx, s.n)
+                sign_tx(tx, s.tx, s.n, self.coinbase_key)
                 self.chain.add_transactions_to_block(block, [tx])
                 block.hashMerkleRoot = block.calc_merkle_root()
         # Do PoW, which is very inexpensive on regnet
@@ -123,7 +113,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         for _ in range(0, num_of_transactions):
             money_to_spend = money_to_spend - 1  # one satoshi to fee
             tx2 = create_transaction(spend.tx, spend.n, b"", money_to_spend, CScript(expensive_script))
-            self.sign_tx(tx2, spend.tx, spend.n)
+            sign_tx(tx2, spend.tx, spend.n, self.coinbase_key)
             tx2.rehash()
             txns.append(tx2)
 

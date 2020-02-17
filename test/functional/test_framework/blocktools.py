@@ -3,7 +3,7 @@
 # Copyright (c) 2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """Utilities for manipulating blocks and transactions."""
-
+from test_framework.script import SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_EQUAL, OP_HASH160
 from .util import assert_equal, assert_raises_rpc_error, hash256
@@ -222,6 +222,19 @@ def wait_for_tip(conn, hash):
 def wait_for_tip_status(conn, hash, status):
     wait_until(lambda: chain_tip_status_equals(conn, hash, status), timeout=10, check_interval=0.2,
                 label=f"waiting until {hash} is tip with status {status}")
+
+# sign a transaction, using the key we know about
+# this signs input 0 in tx, which is assumed to be spending output n in
+# spend_tx
+def sign_tx(tx, spend_tx, n, private_key):
+    scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
+    if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
+        tx.vin[0].scriptSig = CScript()
+        return
+    sighash = SignatureHashForkId(
+        spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
+    tx.vin[0].scriptSig = CScript(
+        [private_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
 ### Helper to build chain
 
