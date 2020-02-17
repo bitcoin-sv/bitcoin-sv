@@ -8,13 +8,6 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from test_framework.mininode import COIN
 
-def get_unspent(listunspent, amount):
-    for utx in listunspent:
-        if utx['amount'] == amount:
-            return utx
-    raise AssertionError(
-        'Could not find unspent with amount={}'.format(amount))
-
 
 class DecodeRawTransactionsTest(BitcoinTestFramework):
     def set_test_params(self):
