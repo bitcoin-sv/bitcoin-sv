@@ -11,7 +11,7 @@ In this test (opposed to bsv-genesis-pushonly-transactions.py), blocks are sent 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE, OP_ADD
 from test_framework.blocktools import create_transaction
-from test_framework.util import assert_equal
+from test_framework.util import assert_equal, hashToHex
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 
 class BSVGenesisActivation(ComparisonTestFramework):
@@ -69,7 +69,7 @@ class BSVGenesisActivation(ComparisonTestFramework):
         assert_equal(node.getbestblockhash(), blk_accepted.hash)
 
         # invalidate block with height 103
-        node.invalidateblock(format(blk_accepted.sha256, 'x'))
+        node.invalidateblock(hashToHex(blk_accepted.sha256))
 
         # tip is now on height 102
         assert_equal(node.getblock(node.getbestblockhash())['height'], 102)

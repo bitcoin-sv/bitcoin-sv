@@ -27,7 +27,7 @@ Genesis height is 109.
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_RETURN, OP_TRUE
 from test_framework.blocktools import create_transaction
-from test_framework.util import assert_equal, assert_raises_rpc_error
+from test_framework.util import assert_equal, assert_raises_rpc_error, hashToHex
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import msg_tx
 from time import sleep
@@ -123,14 +123,14 @@ class BSVGenesisActivation(ComparisonTestFramework):
         # At this point, we have tx0 and tx1 in cache script marked as valid.
         # Now, invalidate blocks 109 and 108 so that we are in state before genesis.
 
-        node.invalidateblock(format(b109_accepted.sha256, 'x'))
+        node.invalidateblock(hashToHex(b109_accepted.sha256))
         sleep(1)
 
         # tx0 and tx1 are in mempool (currently valid because it was sent after genesis)
         assert_equal(True, tx0.hash in node.getrawmempool())
         assert_equal(True, tx1.hash in node.getrawmempool())
 
-        node.invalidateblock(format(b108.sha256, 'x'))
+        node.invalidateblock(hashToHex(b108.sha256))
 
          # tx0 and tx1 are not in mempool (mempool is deleted when 108 is invalidated)
         assert_equal(False, tx0.hash in node.getrawmempool())

@@ -737,10 +737,11 @@ def loghash(inhash=None):
     else:
         return inhash
 
-
 def check_for_log_msg(log_msg, node_dir):
     for line in open(glob.glob(node_dir + "/regtest/bitcoind.log")[0]):
         if log_msg in line:
             return True
     return False
 
+def hashToHex(hash):
+    return format(hash, '064x')

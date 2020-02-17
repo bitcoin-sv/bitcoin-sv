@@ -9,10 +9,6 @@ import time
 from time import sleep
 
 
-def hashToHex(hash):
-    return format(hash, '064x')
-
-
 def invsOrderedbyTime(invListExpected, txinvs):
     for x in range(60):
         with mininode_lock:

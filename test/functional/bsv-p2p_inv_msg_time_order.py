@@ -9,10 +9,6 @@ from test_framework.mininode import *
 from test_framework.script import CScript, OP_DUP, OP_HASH160, OP_EQUALVERIFY, OP_CHECKSIG
 
 
-def hashToHex(hash):
-    return format(hash, '064x')
-
-
 class P2PInvMsgTimeOrder(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1

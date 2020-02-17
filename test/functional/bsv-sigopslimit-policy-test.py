@@ -13,8 +13,6 @@ from test_framework.script import OP_CHECKSIG, OP_FALSE, OP_RETURN, CScript, OP_
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import bytes_to_hex_str
 
-def hashToHex(hash):
-    return format(hash, '064x')
 
 class TestNode(NodeConnCB):
     def __init__(self):
@@ -24,7 +22,7 @@ class TestNode(NodeConnCB):
     def on_inv(self, conn, message):
         for i in message.inv:
             if (i.type == 1):
-                self.txinvs.append(format(i.hash, '064x'))
+                self.txinvs.append(hashToHex(i.hash))
 
     def clear_invs(self):
         with mininode_lock:
