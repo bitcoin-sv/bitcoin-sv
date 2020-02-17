@@ -758,6 +758,8 @@ void CNode::copyStats(CNodeStats &stats) {
     }
     stats.nLastSend = nLastSend;
     stats.nLastRecv = nLastRecv;
+    stats.fPauseRecv = fPauseRecv;
+    stats.fPauseSend = fPauseSend;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
     stats.addrName = GetAddrName();
@@ -773,6 +775,7 @@ void CNode::copyStats(CNodeStats &stats) {
         LOCK(cs_vSend);
         stats.mapSendBytesPerMsgCmd = mapSendBytesPerMsgCmd;
         stats.nSendBytes = nSendBytes;
+        stats.nSendSize = nSendSize.getSendQueueBytes();
     }
     {
         LOCK(cs_vRecv);

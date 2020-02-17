@@ -740,6 +740,9 @@ public:
     bool fRelayTxes;
     int64_t nLastSend;
     int64_t nLastRecv;
+    bool fPauseSend;
+    bool fPauseRecv;
+    int64_t nSendSize;
     int64_t nTimeConnected;
     int64_t nTimeOffset;
     std::string addrName;
