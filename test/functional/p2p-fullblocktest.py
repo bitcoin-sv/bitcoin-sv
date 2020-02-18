@@ -5,6 +5,7 @@
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 from test_framework.test_framework import ComparisonTestFramework
+from test_framework.blocktools import create_tx
 from test_framework.util import *
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
@@ -81,13 +82,8 @@ class FullBlockTest(ComparisonTestFramework):
         [tx.rehash() for tx in tx_list]
         block.vtx.extend(tx_list)
 
-    # this is a little handier to use than the version in blocktools.py
-    def create_tx(self, spend_tx, n, value, script=CScript([OP_TRUE])):
-        tx = create_transaction(spend_tx, n, b"", value, script)
-        return tx
-
     def create_and_sign_transaction(self, spend_tx, n, value, script=CScript([OP_TRUE])):
-        tx = self.create_tx(spend_tx, n, value, script)
+        tx = create_tx(spend_tx, n, value, script)
         sign_tx(tx, spend_tx, n, self.coinbase_key)
         tx.rehash()
         return tx
@@ -170,7 +166,6 @@ class FullBlockTest(ComparisonTestFramework):
 
         # shorthand for functions
         block = self.next_block
-        create_tx = self.create_tx
         create_and_sign_tx = self.create_and_sign_transaction
 
         # Create a new block

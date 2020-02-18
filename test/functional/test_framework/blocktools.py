@@ -135,6 +135,10 @@ def create_transaction(prevtx, n, sig, value, scriptPubKey=CScript()):
     tx.calc_sha256()
     return tx
 
+# a little handier version of create_transaction
+def create_tx(spend_tx, n, value, script=CScript([OP_TRUE])):
+    tx = create_transaction(spend_tx, n, b"", value, script)
+    return tx
 
 def get_legacy_sigopcount_block(block, fAccurate=True):
     count = 0

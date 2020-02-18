@@ -13,12 +13,6 @@ from test_framework.blocktools import *
 from test_framework.key import CECKey
 from test_framework.script import *
 
-# a little handier version of create_transaction
-def create_tx(spend_tx, n, value, script=CScript([OP_TRUE])):
-    tx = create_transaction(spend_tx, n, b"", value, script)
-    return tx
-
-
 def create_and_sign_transaction(spend_tx, n, value, coinbase_key, script=CScript([OP_TRUE])):
     tx = create_tx(spend_tx, n, value, script)
     sign_tx(tx, spend_tx, n, coinbase_key)
