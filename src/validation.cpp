@@ -4885,6 +4885,84 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
     return pindexNew;
 }
 
+void InvalidateChain(const CBlockIndex* pindexNew)
+{
+    std::set<CBlockIndex*> setTipCandidates;
+    std::set<CBlockIndex*> setPrevs;
+
+    // Check that we are invalidating chain from an invalid block
+    assert(pindexNew->nStatus.isInvalid());
+
+    // Check if invalid block is on current active chain
+    bool isInvalidBlockOnActiveChain = chainActive.Contains(pindexNew);
+
+    // Collect blocks that are not part of currently active chain
+    for (const std::pair<const uint256, CBlockIndex*>& item : mapBlockIndex)
+    {
+        // Tip candidates are only blocks above invalid block 
+        // If we are invalid block is not on active chain than we 
+        // need only fork tips not active tip
+        if (item.second->nHeight > pindexNew->nHeight &&
+            (isInvalidBlockOnActiveChain || !chainActive.Contains(item.second)))
+        {
+            setTipCandidates.insert(item.second);
+            setPrevs.insert(item.second->pprev);
+        }
+    }
+
+    std::set<CBlockIndex*> setTips;
+    std::set_difference(setTipCandidates.begin(), setTipCandidates.end(),
+        setPrevs.begin(), setPrevs.end(),
+        std::inserter(setTips, setTips.begin()));
+
+    for (std::set< CBlockIndex*>::iterator it = setTips.begin();
+        it != setTips.end(); ++it)
+    {
+        // Check if pindexNew is in this chain
+        CBlockIndex* pindexWalk = (*it);
+        while (pindexWalk->nHeight > pindexNew->nHeight)
+        {
+            pindexWalk = pindexWalk->pprev;
+        }
+        if (pindexWalk == pindexNew)
+        {
+            // Set status of all descendant blocks to withFailedParent
+            pindexWalk = (*it);
+            while (pindexWalk != pindexNew)
+            {
+                pindexWalk->nStatus = pindexWalk->nStatus.withFailedParent();
+                setDirtyBlockIndex.insert(pindexWalk);
+                setBlockIndexCandidates.erase(pindexWalk);
+                pindexWalk = pindexWalk->pprev;
+            }
+        }
+    }
+}
+
+bool CheckBlockTTOROrder(const CBlock& block)
+{
+    std::set<TxId> usedInputs;
+    for (const auto& tx : block.vtx)
+    {
+        // If current transactions is found after another transaction 
+        // that spends any output of current transaction, then the block 
+        // violates TTOR order.
+        if (usedInputs.find(tx->GetId()) != usedInputs.end())
+        {
+            return false;
+        }
+        for (const auto& vin : tx->vin)
+        {
+            // Skip coinbase
+            if (!vin.prevout.IsNull())
+            {
+                usedInputs.insert(vin.prevout.GetTxId());
+            }
+        }
+    }
+    return true;
+}
+
 /**
  * Mark a block as having its data received and checked (up to
  * BLOCK_VALID_TRANSACTIONS).
@@ -4896,6 +4974,22 @@ static bool ReceivedBlockTransactions(
     const CDiskBlockPos &pos,
     const CDiskBlockMetaData& metaData)
 {
+    // Validate TTOR order for blocks that are MIN_TTOR_VALIDATION_DISTANCE blocks or more from active tip
+    if (chainActive.Tip() && chainActive.Tip()->nHeight - pindexNew->nHeight >= MIN_TTOR_VALIDATION_DISTANCE)
+    {
+        if (!CheckBlockTTOROrder(block))
+        {
+            LogPrintf("Block %s at height %d violates TTOR order.\n", block.GetHash().ToString(), pindexNew->nHeight);
+            // Mark the block itself as invalid.
+            pindexNew->nStatus = pindexNew->nStatus.withFailed();
+            setDirtyBlockIndex.insert(pindexNew);
+            setBlockIndexCandidates.erase(pindexNew);
+            InvalidateChain(pindexNew);
+            InvalidChainFound(pindexNew);
+            return state.Invalid(false, 0, "bad-blk-ttor");
+        }
+    }
+
     pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData);
     setDirtyBlockIndex.insert(pindexNew);
 

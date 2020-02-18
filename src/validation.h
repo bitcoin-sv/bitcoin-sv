@@ -306,6 +306,25 @@ static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 /** get number of blocks that are currently being processed */
 int GetProcessingBlocksCount();
 
+/**
+ * Invalidate all chains containing given block that should be already invalid. 
+ * Set status of descendent blocks to "with failed parent".
+ */
+void InvalidateChain(const CBlockIndex* pindexNew);
+
+/**
+ * Minimum distance between recevied block and active tip required 
+ * to perform TTOR order validation of a block.
+ * This is a local policy and not a consensus rule.
+ */
+static const int MIN_TTOR_VALIDATION_DISTANCE = 100;
+
+/** 
+ * Search block for transaction that violates TTOR order. 
+ * Returns false if TTOR is violated. 
+ */
+bool CheckBlockTTOROrder(const CBlock& block);
+
 class BlockValidationOptions {
 private:
     bool checkPoW : 1;
