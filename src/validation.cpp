@@ -4201,24 +4201,24 @@ static CBlockIndex *FindMostWorkChain() {
                     (pindexBestInvalid == nullptr ||
                      pindexNew->nChainWork > pindexBestInvalid->nChainWork)) {
                     pindexBestInvalid = pindexNew;
-        }
-        CBlockIndex* pindexFailed = pindexNew;
-        // Remove the entire chain from the set.
+                }
+                CBlockIndex* pindexFailed = pindexNew;
+                // Remove the entire chain from the set.
                 while (pindexTest != pindexFailed) {
-            if (fInvalidChain) {
-                pindexFailed->nStatus =
-                    pindexFailed->nStatus.withFailedParent();
-            } else if (fMissingData) {
-                // If we're missing data, then add back to
-                // mapBlocksUnlinked, so that if the block arrives in
-                // the future we can try adding to
-                // setBlockIndexCandidates again.
-                mapBlocksUnlinked.insert(
-                    std::make_pair(pindexFailed->pprev, pindexFailed));
-            }
-            setBlockIndexCandidates.erase(pindexFailed);
-            pindexFailed = pindexFailed->pprev;
-        }
+                    if (fInvalidChain) {
+                        pindexFailed->nStatus =
+                            pindexFailed->nStatus.withFailedParent();
+                    } else if (fMissingData) {
+                        // If we're missing data, then add back to
+                        // mapBlocksUnlinked, so that if the block arrives in
+                        // the future we can try adding to
+                        // setBlockIndexCandidates again.
+                        mapBlocksUnlinked.insert(
+                            std::make_pair(pindexFailed->pprev, pindexFailed));
+                    }
+                    setBlockIndexCandidates.erase(pindexFailed);
+                    pindexFailed = pindexFailed->pprev;
+                }
                 setBlockIndexCandidates.erase(pindexTest);
                 fInvalidAncestor = true;
                 break;
