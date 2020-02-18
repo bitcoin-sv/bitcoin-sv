@@ -240,6 +240,12 @@ def sign_tx(tx, spend_tx, n, private_key):
     tx.vin[0].scriptSig = CScript(
         [private_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
 
+def create_and_sign_transaction(spend_tx, n, value, script=CScript([OP_TRUE]), private_key=None):
+    tx = create_tx(spend_tx, n, value, script)
+    sign_tx(tx, spend_tx, n, private_key)
+    tx.rehash()
+    return tx
+
 ### Helper to build chain
 
 class PreviousSpendableOutput():

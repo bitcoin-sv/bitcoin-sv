@@ -15,12 +15,6 @@ from test_framework.script import *
 
 from test_framework.util import assert_raises_message
 
-def create_and_sign_transaction(spend_tx, n, value, coinbase_key, script=CScript([OP_TRUE])):
-    tx = create_tx(spend_tx, n, value, script)
-    sign_tx(tx, spend_tx, n, coinbase_key)
-    tx.rehash()
-    return tx
-
 
 # In this test we are checking behavior of the Wallet when trying to spend pre and post genesis P2SH script
 # 1. Importing different P2SH(P2PKH) scripts in wallets on nodes 1 and 2
@@ -91,7 +85,7 @@ class P2SH(ComparisonTestFramework):
             p2sh_script = CScript([OP_HASH160, redeem_script_hash, OP_EQUAL])
             return create_and_sign_transaction(spend_tx=output.tx, n=output.n,
                                                value=output.tx.vout[0].nValue-100,
-                                               coinbase_key=self.coinbase_key,
+                                               private_key=self.coinbase_key,
                                                script=p2sh_script)
 
         # Add the transactions to the block

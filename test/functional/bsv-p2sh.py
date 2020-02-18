@@ -13,12 +13,6 @@ from test_framework.blocktools import *
 from test_framework.key import CECKey
 from test_framework.script import *
 
-def create_and_sign_transaction(spend_tx, n, value, coinbase_key, script=CScript([OP_TRUE])):
-    tx = create_tx(spend_tx, n, value, script)
-    sign_tx(tx, spend_tx, n, coinbase_key)
-    tx.rehash()
-    return tx
-
 SPEND_OUTPUT = CScript([OP_FALSE,OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 
 class P2SH(ComparisonTestFramework):
@@ -84,7 +78,7 @@ class P2SH(ComparisonTestFramework):
             output = coinbase_utxos.pop(0)
             return create_and_sign_transaction(spend_tx=output.tx, n=output.n,
                                                value=output.tx.vout[0].nValue-100,
-                                               coinbase_key=self.coinbase_key,
+                                               private_key=self.coinbase_key,
                                                script=self.p2sh_script)
 
         # Add the transactions to the block

@@ -82,12 +82,6 @@ class FullBlockTest(ComparisonTestFramework):
         [tx.rehash() for tx in tx_list]
         block.vtx.extend(tx_list)
 
-    def create_and_sign_transaction(self, spend_tx, n, value, script=CScript([OP_TRUE])):
-        tx = create_tx(spend_tx, n, value, script)
-        sign_tx(tx, spend_tx, n, self.coinbase_key)
-        tx.rehash()
-        return tx
-
     def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE]), do_solve_block=True):
         if self.tip == None:
             base_block_hash = self.genesis_hash
@@ -166,7 +160,7 @@ class FullBlockTest(ComparisonTestFramework):
 
         # shorthand for functions
         block = self.next_block
-        create_and_sign_tx = self.create_and_sign_transaction
+        create_and_sign_tx=lambda *a, **kw: create_and_sign_transaction(*a, private_key=self.coinbase_key, **({k:v for k,v in kw.items() if not k == 'private_key'}))
 
         # Create a new block
         block(0)

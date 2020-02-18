@@ -65,12 +65,6 @@ class FullBlockTest(ComparisonTestFramework):
         [tx.rehash() for tx in tx_list]
         block.vtx.extend(tx_list)
 
-    def create_and_sign_transaction(self, spend_tx, n, value, script=CScript([OP_TRUE])):
-        tx = create_tx(spend_tx, n, value, script)
-        sign_tx(tx, spend_tx, n, self.coinbase_key)
-        tx.rehash()
-        return tx
-
     def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE])):
         if self.tip == None:
             base_block_hash = self.genesis_hash
@@ -197,8 +191,8 @@ class FullBlockTest(ComparisonTestFramework):
 
         # P2SH tests
         # Create a p2sh transaction
-        p2sh_tx = self.create_and_sign_transaction(
-            out[0].tx, out[0].n, 1, p2sh_script)
+        p2sh_tx = create_and_sign_transaction(
+            out[0].tx, out[0].n, 1, p2sh_script, self.coinbase_key)
 
         # Add the transaction to the block
         block(1)
