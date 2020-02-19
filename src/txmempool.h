@@ -159,7 +159,8 @@ public:
                     unsigned int _entryHeight, Amount _inChainInputValue,
                     bool spendsCoinbase, int64_t nSigOpsCost, LockPoints lp);
 
-    CTxMemPoolEntry(const CTxMemPoolEntry &other);
+    CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
+    CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
     const CTransaction &GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }

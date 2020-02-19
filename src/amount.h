@@ -27,6 +27,7 @@ public:
     }
 
     constexpr Amount(const Amount &_camount) : amount(_camount.amount) {}
+    constexpr Amount& operator=(const Amount&) = default;
 
     // Allow access to underlying value for non-monetary operations
     int64_t GetSatoshis() const { return amount; }
@@ -178,7 +179,7 @@ public:
      * exceed (2^63 - 1)
      */
     CFeeRate(const Amount nFeePaid, size_t nBytes);
-    CFeeRate(const CFeeRate &other) { nSatoshisPerK = other.nSatoshisPerK; }
+    CFeeRate(const CFeeRate &other) = default;
     /**
      * Return the fee in satoshis for the given size in bytes.
      */
