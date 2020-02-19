@@ -73,41 +73,6 @@ class PBVWithSigOps(BitcoinTestFramework):
             + [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])),
                self.coinbase_pubkey])
 
-    def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE])):
-        if self.chain.tip == None:
-            base_block_hash = self.chain._genesis_hash
-            block_time = int(time.time()) + 1
-        else:
-            base_block_hash = self.chain.tip.sha256
-            block_time = self.chain.tip.nTime + 1
-        # First create the coinbase
-        height = self.chain.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height, self.coinbase_pubkey)
-        coinbase.vout[0].nValue += additional_coinbase_value
-        coinbase.rehash()
-        if spend == None:
-            block = create_block(base_block_hash, coinbase, block_time)
-        else:
-            # All but one satoshi for each txn to fees
-            for s in spend:
-                coinbase.vout[0].nValue += s.tx.vout[s.n].nValue - 1
-                coinbase.rehash()
-            block = create_block(base_block_hash, coinbase, block_time)
-            # Add as many txns as required
-            for s in spend:
-                # Spend 1 satoshi
-                tx = create_transaction(s.tx, s.n, b"", 1, script)
-                sign_tx(tx, s.tx, s.n, self.coinbase_key)
-                self.chain.add_transactions_to_block(block, [tx])
-                block.hashMerkleRoot = block.calc_merkle_root()
-        # Do PoW, which is very inexpensive on regnet
-        block.solve()
-        self.chain.tip = block
-        self.chain.block_heights[block.sha256] = height
-        assert number not in self.chain.blocks
-        self.chain.blocks[number] = block
-        return block
-
     def get_hard_transactions(self, spend, money_to_spend, num_of_transactions, num_of_sig_checks, expensive_script):
         txns = []
         for _ in range(0, num_of_transactions):
@@ -146,7 +111,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         node0.send_message(msg_block(block))
 
         for i in range(100):
-            block = self.next_block(block_count)
+            block = self.chain.next_block(block_count)
             block_count += 1
             self.chain.save_spendable_output()
             node0.send_message(msg_block(block))
@@ -173,7 +138,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         money_to_spend = 5000000000
         spend = out[0]
 
-        block2_hard = self.next_block(block_count)
+        block2_hard = self.chain.next_block(block_count)
 
         # creates 4000 hard transaction and 4000 transaction to spend them. It will be 8k transactions in total
         add_txns = self.get_hard_transactions(spend, money_to_spend=money_to_spend, num_of_transactions=4000,
@@ -184,7 +149,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         self.log.info(f"block2_hard hash: {block2_hard.hash}")
 
         self.chain.set_tip(block1_num)
-        block3_easier = self.next_block(block_count)
+        block3_easier = self.chain.next_block(block_count)
         add_txns = self.get_hard_transactions(spend, money_to_spend=money_to_spend, num_of_transactions=1000,
                                               num_of_sig_checks=num_of_sig_checks,
                                               expensive_script=expensive_scriptPubKey)

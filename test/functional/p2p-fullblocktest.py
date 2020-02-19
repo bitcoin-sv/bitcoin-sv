@@ -78,89 +78,18 @@ class FullBlockTest(ComparisonTestFramework):
     def run_test(self):
         self.test.run()
 
-    def add_transactions_to_block(self, block, tx_list):
-        [tx.rehash() for tx in tx_list]
-        block.vtx.extend(tx_list)
-
-    def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE]), do_solve_block=True):
-        if self.tip == None:
-            base_block_hash = self.genesis_hash
-            block_time = int(time.time()) + 1
-        else:
-            base_block_hash = self.tip.sha256
-            block_time = self.tip.nTime + 1
-        # First create the coinbase
-        height = self.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height, self.coinbase_pubkey)
-        coinbase.vout[0].nValue += additional_coinbase_value
-        coinbase.rehash()
-        if spend == None:
-            block = create_block(base_block_hash, coinbase, block_time)
-        else:
-            coinbase.vout[0].nValue += spend.tx.vout[
-                spend.n].nValue - 1  # all but one satoshi to fees
-            coinbase.rehash()
-            block = create_block(base_block_hash, coinbase, block_time)
-            tx = create_transaction(
-                spend.tx, spend.n, b"", 1, script)  # spend 1 satoshi
-            sign_tx(tx, spend.tx, spend.n, self.coinbase_key)
-            self.add_transactions_to_block(block, [tx])
-            block.hashMerkleRoot = block.calc_merkle_root()
-        if do_solve_block:
-            block.solve()
-        self.tip = block
-        self.block_heights[block.sha256] = height
-        assert number not in self.blocks
-        self.blocks[number] = block
-        return block
-
     def get_tests(self):
-        self.genesis_hash = int(self.nodes[0].getbestblockhash(), 16)
-        self.block_heights[self.genesis_hash] = 0
-        spendable_outputs = []
-
-        # save the current tip so it can be spent by a later block
-        def save_spendable_output():
-            spendable_outputs.append(self.tip)
-
-        # get an output that we previously marked as spendable
-        def get_spendable_output():
-            return PreviousSpendableOutput(spendable_outputs.pop(0).vtx[0], 0)
-
-        # returns a test case that asserts that the current tip was accepted
-        def accepted():
-            return TestInstance([[self.tip, True]])
-
-        # returns a test case that asserts that the current tip was rejected
-        def rejected(reject=None):
-            if reject is None:
-                return TestInstance([[self.tip, False]])
-            else:
-                return TestInstance([[self.tip, reject]])
-
-        # move the tip back to a previous block
-        def tip(number):
-            self.tip = self.blocks[number]
-
-        # adds transactions to the block and updates state
-        def update_block(block_number, new_transactions):
-            block = self.blocks[block_number]
-            self.add_transactions_to_block(block, new_transactions)
-            old_sha256 = block.sha256
-            block.hashMerkleRoot = block.calc_merkle_root()
-            block.solve()
-            # Update the internal state just like in next_block
-            self.tip = block
-            if block.sha256 != old_sha256:
-                self.block_heights[
-                    block.sha256] = self.block_heights[old_sha256]
-                del self.block_heights[old_sha256]
-            self.blocks[block_number] = block
-            return block
-
         # shorthand for functions
-        block = self.next_block
+        block=lambda *a, **kw: self.chain.next_block(*a,  coinbase_key=self.coinbase_key, simple_output=True, **kw)
         create_and_sign_tx=lambda *a, **kw: create_and_sign_transaction(*a, private_key=self.coinbase_key, **({k:v for k,v in kw.items() if not k == 'private_key'}))
+        update_block = self.chain.update_block
+        tip = self.chain.set_tip
+        accepted = self.accepted
+        rejected = self.rejected
+
+        self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
+        save_spendable_output = self.chain.save_spendable_output
+        get_spendable_output = self.chain.get_spendable_output
 
         # Create a new block
         block(0)
@@ -173,6 +102,7 @@ class FullBlockTest(ComparisonTestFramework):
             block(5000 + i)
             test.blocks_and_transactions.append([self.tip, True])
             save_spendable_output()
+
         yield test
 
         # collect spendable outputs now to avoid cluttering the code later on
@@ -597,34 +527,34 @@ class FullBlockTest(ComparisonTestFramework):
         # The next few blocks are going to be created "by hand" since they'll do funky things, such as having
         # the first transaction be non-coinbase, etc.  The purpose of b44 is to
         # make sure this works.
-        height = self.block_heights[self.tip.sha256] + 1
+        height = self.chain.block_heights[self.chain.tip.sha256] + 1
         coinbase = create_coinbase(height, self.coinbase_pubkey)
         b44 = CBlock()
-        b44.nTime = self.tip.nTime + 1
-        b44.hashPrevBlock = self.tip.sha256
+        b44.nTime = self.chain.tip.nTime + 1
+        b44.hashPrevBlock = self.chain.tip.sha256
         b44.nBits = 0x207fffff
         b44.vtx.append(coinbase)
         b44.hashMerkleRoot = b44.calc_merkle_root()
         b44.solve()
-        self.tip = b44
-        self.block_heights[b44.sha256] = height
-        self.blocks[44] = b44
+        self.chain.tip = b44
+        self.chain.block_heights[b44.sha256] = height
+        self.chain.blocks[44] = b44
         yield accepted()
 
         # A block with a non-coinbase as the first tx
         non_coinbase = create_tx(out[15].tx, out[15].n, 1)
         b45 = CBlock()
-        b45.nTime = self.tip.nTime + 1
-        b45.hashPrevBlock = self.tip.sha256
+        b45.nTime = self.chain.tip.nTime + 1
+        b45.hashPrevBlock = self.chain.tip.sha256
         b45.nBits = 0x207fffff
         b45.vtx.append(non_coinbase)
         b45.hashMerkleRoot = b45.calc_merkle_root()
         b45.calc_sha256()
         b45.solve()
-        self.block_heights[b45.sha256] = self.block_heights[
-            self.tip.sha256] + 1
-        self.tip = b45
-        self.blocks[45] = b45
+        self.chain.block_heights[b45.sha256] = self.chain.block_heights[
+            self.chain.tip.sha256] + 1
+        self.chain.tip = b45
+        self.chain.blocks[45] = b45
         yield rejected(RejectResult(16, b'bad-cb-missing'))
 
         # A block with no txns
@@ -636,10 +566,10 @@ class FullBlockTest(ComparisonTestFramework):
         b46.vtx = []
         b46.hashMerkleRoot = 0
         b46.solve()
-        self.block_heights[b46.sha256] = self.block_heights[b44.sha256] + 1
-        self.tip = b46
-        assert 46 not in self.blocks
-        self.blocks[46] = b46
+        self.chain.block_heights[b46.sha256] = self.chain.block_heights[b44.sha256] + 1
+        self.chain.tip = b46
+        assert 46 not in self.chain.blocks
+        self.chain.blocks[46] = b46
         s = ser_uint256(b46.hashMerkleRoot)
         yield rejected(RejectResult(16, b'bad-cb-missing'))
 
@@ -750,7 +680,7 @@ class FullBlockTest(ComparisonTestFramework):
         # b56 - copy b57, add a duplicate tx
         tip(55)
         b56 = copy.deepcopy(b57)
-        self.blocks[56] = b56
+        self.chain.blocks[56] = b56
         assert_equal(len(b56.vtx), 3)
         b56 = update_block(56, [tx1])
         assert_equal(b56.hash, b57.hash)
@@ -769,7 +699,7 @@ class FullBlockTest(ComparisonTestFramework):
         # b56p2 - copy b57p2, duplicate two non-consecutive tx's
         tip(55)
         b56p2 = copy.deepcopy(b57p2)
-        self.blocks["b56p2"] = b56p2
+        self.chain.blocks["b56p2"] = b56p2
         assert_equal(b56p2.hash, b57p2.hash)
         assert_equal(len(b56p2.vtx), 6)
         b56p2 = update_block("b56p2", [tx3, tx4])
@@ -882,8 +812,8 @@ class FullBlockTest(ComparisonTestFramework):
         # make it a "broken_block," with non-canonical serialization
         b64a = CBrokenBlock(regular_block)
         b64a.initialize(regular_block)
-        self.blocks["64a"] = b64a
-        self.tip = b64a
+        self.chain.blocks["64a"] = b64a
+        self.chain.tip = b64a
         tx = CTransaction()
 
         # use canonical serialization to calculate size
@@ -894,7 +824,7 @@ class FullBlockTest(ComparisonTestFramework):
         tx.vin.append(CTxIn(COutPoint(b64a.vtx[1].sha256, 0)))
         b64a = update_block("64a", [tx])
         assert_equal(len(b64a.serialize()), LEGACY_MAX_BLOCK_SIZE + 8)
-        yield TestInstance([[self.tip, None]])
+        yield TestInstance([[self.chain.tip, None]])
 
         # comptool workaround: to make sure b64 is delivered, manually erase
         # b64a from blockstore
@@ -905,7 +835,7 @@ class FullBlockTest(ComparisonTestFramework):
         b64.vtx = copy.deepcopy(b64a.vtx)
         assert_equal(b64.hash, b64a.hash)
         assert_equal(len(b64.serialize()), LEGACY_MAX_BLOCK_SIZE)
-        self.blocks[64] = b64
+        self.chain.blocks[64] = b64
         update_block(64, [])
         yield accepted()
         save_spendable_output()
@@ -1008,9 +938,9 @@ class FullBlockTest(ComparisonTestFramework):
         b72 = update_block(72, [tx1, tx2])  # now tip is 72
         b71 = copy.deepcopy(b72)
         b71.vtx.append(tx2)   # add duplicate tx2
-        self.block_heights[b71.sha256] = self.block_heights[
+        self.chain.block_heights[b71.sha256] = self.chain.block_heights[
             b69.sha256] + 1  # b71 builds off b69
-        self.blocks[71] = b71
+        self.chain.blocks[71] = b71
 
         assert_equal(len(b71.vtx), 4)
         assert_equal(len(b72.vtx), 3)
@@ -1253,9 +1183,9 @@ class FullBlockTest(ComparisonTestFramework):
                 tx.vin.append(CTxIn(COutPoint(b.vtx[1].sha256, 0)))
                 b = update_block(i, [tx])
                 assert_equal(len(b.serialize()), LEGACY_MAX_BLOCK_SIZE)
-                test1.blocks_and_transactions.append([self.tip, True])
+                test1.blocks_and_transactions.append([self.chain.tip, True])
                 save_spendable_output()
-                spend = get_spendable_output()
+                spend = self.chain.get_spendable_output()
 
             yield test1
             chain1_tip = i
@@ -1265,7 +1195,7 @@ class FullBlockTest(ComparisonTestFramework):
             test2 = TestInstance(sync_every_block=False)
             for i in range(89, LARGE_REORG_SIZE + 89):
                 block("alt" + str(i))
-                test2.blocks_and_transactions.append([self.tip, False])
+                test2.blocks_and_transactions.append([self.chain.tip, False])
             yield test2
 
             # extend alt chain to trigger re-org

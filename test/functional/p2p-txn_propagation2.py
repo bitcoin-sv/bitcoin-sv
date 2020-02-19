@@ -29,42 +29,6 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
     def run_test(self):
         self.test.run()
 
-    # Create a new block with some number of valid spending txns
-    def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE])):
-        if self.chain.tip == None:
-            base_block_hash = self.chain._genesis_hash
-            block_time = int(time.time()) + 1
-        else:
-            base_block_hash = self.chain.tip.sha256
-            block_time = self.chain.tip.nTime + 1
-        # First create the coinbase
-        height = self.chain.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height, self.coinbase_pubkey)
-        coinbase.vout[0].nValue += additional_coinbase_value
-        coinbase.rehash()
-        if spend == None:
-            block = create_block(base_block_hash, coinbase, block_time)
-        else:
-            # All but one satoshi for each txn to fees
-            for s in spend:
-                coinbase.vout[0].nValue += s.tx.vout[s.n].nValue - 1 
-                coinbase.rehash()
-            block = create_block(base_block_hash, coinbase, block_time)
-            # Add as many txns as required
-            for s in spend:
-                # Spend 1 satoshi
-                tx = create_transaction(s.tx, s.n, b"", 1, script)
-                sign_tx(tx, s.tx, s.n, self.coinbase_key)
-                self.chain.add_transactions_to_block(block, [tx])
-                block.hashMerkleRoot = block.calc_merkle_root()
-        # Do PoW, which is very inexpensive on regnet
-        block.solve()
-        self.chain.tip = block
-        self.chain.block_heights[block.sha256] = height
-        assert number not in self.chain.blocks
-        self.chain.blocks[number] = block
-        return block
-
     def get_tests(self):
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
@@ -88,8 +52,8 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
             out.append(self.chain.get_spendable_output())
 
         # Create blocks with multiple txns in
-        block1 = self.next_block(1, spend=out[0:20])
-        block2 = self.next_block(2, spend=out[20:40])
+        block1 = self.chain.next_block(1, spend=out[0:20])
+        block2 = self.chain.next_block(2, spend=out[20:40])
 
         # Check frequency propagator runs has been correctly set to very slow (we will poke as required)
         assert_equal(self.nodes[0].getnetworkinfo()['txnpropagationfreq'], 50000)

@@ -61,95 +61,20 @@ class FullBlockTest(ComparisonTestFramework):
     def run_test(self):
         self.test.run()
 
-    def add_transactions_to_block(self, block, tx_list):
-        [tx.rehash() for tx in tx_list]
-        block.vtx.extend(tx_list)
-
-    def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE])):
-        if self.tip == None:
-            base_block_hash = self.genesis_hash
-            block_time = int(time.time()) + 1
-        else:
-            base_block_hash = self.tip.sha256
-            block_time = self.tip.nTime + 1
-        # First create the coinbase
-        height = self.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height, self.coinbase_pubkey)
-        coinbase.vout[0].nValue += additional_coinbase_value
-        coinbase.rehash()
-        if spend == None:
-            block = create_block(base_block_hash, coinbase, block_time)
-        else:
-            # all but one satoshi to fees
-            coinbase.vout[0].nValue += spend.tx.vout[
-                spend.n].nValue - 1
-            coinbase.rehash()
-            block = create_block(base_block_hash, coinbase, block_time)
-            # spend 1 satoshi
-            tx = create_transaction(spend.tx, spend.n, b"", 1, script)
-            sign_tx(tx, spend.tx, spend.n, self.coinbase_key)
-            self.add_transactions_to_block(block, [tx])
-            block.hashMerkleRoot = block.calc_merkle_root()
-        # Do PoW, which is very inexpensive on regnet
-        block.solve()
-        self.tip = block
-        self.block_heights[block.sha256] = height
-        assert number not in self.blocks
-        self.blocks[number] = block
-        return block
-
     def get_tests(self):
-        self.genesis_hash = int(self.nodes[0].getbestblockhash(), 16)
-        self.block_heights[self.genesis_hash] = 0
-        spendable_outputs = []
-
-        # save the current tip so it can be spent by a later block
-        def save_spendable_output():
-            spendable_outputs.append(self.tip)
-
-        # get an output that we previously marked as spendable
-        def get_spendable_output():
-            return PreviousSpendableOutput(spendable_outputs.pop(0).vtx[0], 0)
-
-        # returns a test case that asserts that the current tip was accepted
-        def accepted():
-            return TestInstance([[self.tip, True]])
-
-        # returns a test case that asserts that the current tip was rejected
-        def rejected(reject=None):
-            if reject is None:
-                return TestInstance([[self.tip, False]])
-            else:
-                return TestInstance([[self.tip, reject]])
-
-        # move the tip back to a previous block
-        def tip(number):
-            self.tip = self.blocks[number]
-
-        # adds transactions to the block and updates state
-        def update_block(block_number, new_transactions):
-            block = self.blocks[block_number]
-            self.add_transactions_to_block(block, new_transactions)
-            old_sha256 = block.sha256
-            block.hashMerkleRoot = block.calc_merkle_root()
-            block.solve()
-            # Update the internal state just like in next_block
-            self.tip = block
-            if block.sha256 != old_sha256:
-                self.block_heights[
-                    block.sha256] = self.block_heights[old_sha256]
-                del self.block_heights[old_sha256]
-            self.blocks[block_number] = block
-            return block
-
         # shorthand for functions
-        block = self.next_block
+        block = self.chain.next_block
+        update_block = self.chain.update_block
+        save_spendable_output = self.chain.save_spendable_output
+        get_spendable_output = self.chain.get_spendable_output
+        accepted = self.accepted
 
         # shorthand for variables
         node = self.nodes[0]
-
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
         # Create a new block
         block(0)
+
         save_spendable_output()
         yield accepted()
 

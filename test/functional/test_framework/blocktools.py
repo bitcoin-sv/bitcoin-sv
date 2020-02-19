@@ -294,7 +294,7 @@ class ChainManager():
     def set_tip(self, number):
         self.tip = self.blocks[number]
 
-    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None):
+    def next_block(self, number, spend=None, script=CScript([OP_TRUE]), block_size=0, extra_sigops=0, extra_txns=0, additional_coinbase_value=0, do_solve_block=True, coinbase_pubkey=None, coinbase_key=None, simple_output=False):
         if self.tip == None:
             base_block_hash = self._genesis_hash
             block_time = int(time.time()) + 1
@@ -302,109 +302,127 @@ class ChainManager():
             base_block_hash = self.tip.sha256
             block_time = self.tip.nTime + 1
 
-        # Single spend or list of spends?
-        spendable_outputs = None
-        if not spend is None:
-            if isinstance(spend, list):
-                spendable_outputs = deque(spend)
-            else:
-                spendable_outputs = deque([spend])
+        if not coinbase_pubkey and coinbase_key:
+            coinbase_pubkey = coinbase_key.get_pubkey()
 
         # First create the coinbase
         height = self.block_heights[base_block_hash] + 1
         coinbase = create_coinbase(height=height, pubkey=coinbase_pubkey)
         coinbase.vout[0].nValue += additional_coinbase_value
         coinbase.rehash()
-        if spendable_outputs == None:
+        if spend == None:
             # We need to have something to spend to fill the block.
             assert_equal(block_size, 0)
             block = create_block(base_block_hash, coinbase, block_time)
         else:
-            # all but one satoshi to fees
-            first_spend = spendable_outputs[0]
-            coinbase.vout[0].nValue += first_spend.tx.vout[first_spend.n].nValue - 1
-            coinbase.rehash()
-            block = create_block(base_block_hash, coinbase, block_time)
+            if type(spend) == list:
+                for s in spend:
+                    coinbase.vout[0].nValue += s.tx.vout[s.n].nValue - 1
+                    coinbase.rehash()
+                block = create_block(base_block_hash, coinbase, block_time)
+                for s in spend:
+                    # Spend 1 satoshi
+                    tx = create_transaction(s.tx, s.n, b"", 1, script)
+                    sign_tx(tx, s.tx, s.n, coinbase_key)
+                    self.add_transactions_to_block(block, [tx])
+                    block.hashMerkleRoot = block.calc_merkle_root()
+            else:
+                # all but one satoshi to fees
+                coinbase.vout[0].nValue += spend.tx.vout[spend.n].nValue - 1
+                coinbase.rehash()
+                block = create_block(base_block_hash, coinbase, block_time)
+                if simple_output:
+                    tx = create_transaction(spend.tx, spend.n, b"", 1, script)  # spend 1 satoshi
 
-            def get_base_transaction():
-                # Create the new transaction
-                tx = CTransaction()
-                # Spend from one of the spendable outputs
-                spend = spendable_outputs.popleft()
-                tx.vin.append(CTxIn(COutPoint(spend.tx.sha256, spend.n)))
-                # Add spendable outputs
-                for i in range(4):
-                    tx.vout.append(CTxOut(0, CScript([OP_TRUE])))
-                    spendable_outputs.append(PreviousSpendableOutput(tx, i))
-                return tx
+                    if script == CScript([OP_TRUE]):
+                        tx.vout.append(CTxOut(0, CScript([random.randint(0, 256), OP_RETURN])))
+                    sign_tx(tx, spend.tx, spend.n, coinbase_key)
+                    self.add_transactions_to_block(block, [tx])
+                    block.hashMerkleRoot = block.calc_merkle_root()
+                else:
+                    # Make sure we have plenty engough to spend going forward.
+                    spendable_outputs = deque([spend])
 
-            tx = get_base_transaction()
+                    def get_base_transaction():
+                        # Create the new transaction
+                        tx = CTransaction()
+                        # Spend from one of the spendable outputs
+                        spend = spendable_outputs.popleft()
+                        tx.vin.append(CTxIn(COutPoint(spend.tx.sha256, spend.n)))
+                        # Add spendable outputs
+                        for i in range(4):
+                            tx.vout.append(CTxOut(0, CScript([OP_TRUE])))
+                            spendable_outputs.append(PreviousSpendableOutput(tx, i))
+                        return tx
 
-            # Make it the same format as transaction added for padding and save the size.            
-            tx.rehash()
-            base_tx_size = len(tx.serialize())
+                    tx = get_base_transaction()
 
-            # If a specific script is required, add it.
-            if script != None:
-                tx.vout.append(CTxOut(1, script))
+                    # Make it the same format as transaction added for padding and save the size.
+                    tx.rehash()
+                    base_tx_size = len(tx.serialize())
 
-            # Put some random data into the first transaction of the chain to randomize ids.
-            tx.vout.append(
-                CTxOut(0, CScript([random.randint(0, 256), OP_RETURN])))
+                    # If a specific script is required, add it.
+                    if script != None:
+                        tx.vout.append(CTxOut(1, script))
 
-            # Add the transaction to the block
-            self.add_transactions_to_block(block, [tx])
+                    # Put some random data into the first transaction of the chain to randomize ids.
+                    tx.vout.append(
+                        CTxOut(0, CScript([random.randint(0, 256), OP_RETURN])))
 
-            # Add transaction until we reach the expected transaction count
-            for _ in range(extra_txns):
-                self.add_transactions_to_block(block, [get_base_transaction()])
+                    # Add the transaction to the block
+                    self.add_transactions_to_block(block, [tx])
 
-            # If we have a block size requirement, just fill
-            # the block until we get there
-            current_block_size = len(block.serialize())
+                    # Add transaction until we reach the expected transaction count
+                    for _ in range(extra_txns):
+                        self.add_transactions_to_block(block, [get_base_transaction()])
 
-            extra_sigops_orig = extra_sigops
+                    # If we have a block size requirement, just fill
+                    # the block until we get there
+                    current_block_size = len(block.serialize())
 
-            while current_block_size < block_size:
-                # We will add a new transaction. That means the size of
-                # the field enumerating how many transaction go in the block
-                # may change.
-                current_block_size -= len(ser_compact_size(len(block.vtx)))
-                current_block_size += len(ser_compact_size(len(block.vtx) + 1))
+                    extra_sigops_orig = extra_sigops
 
-                # Create the new transaction
-                tx = get_base_transaction()
+                    while current_block_size < block_size:
+                        # We will add a new transaction. That means the size of
+                        # the field enumerating how many transaction go in the block
+                        # may change.
+                        current_block_size -= len(ser_compact_size(len(block.vtx)))
+                        current_block_size += len(ser_compact_size(len(block.vtx) + 1))
 
-                # Add padding to fill the block.
-                script_length = block_size - current_block_size
-                num_loops = 1
-                if script_length > 510000:
-                    if script_length < 1000000:
-                        # Make sure we don't find ourselves in a position where we
-                        # need to generate a transaction smaller than what we expected.
-                        script_length = script_length // 2
-                        num_loops = 2
-                    else:
-                        num_loops = script_length // 500000
-                        script_length = 500000
-                script_length -= base_tx_size + 8 + len(ser_compact_size(script_length)) # <existing tx size> + <amount> + <vector<size><elements>>
-                tx_sigops = min(extra_sigops, script_length, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
-                if tx_sigops * num_loops < extra_sigops:
-                    tx_sigops = min(extra_sigops // num_loops, script_length)
-                extra_sigops -= tx_sigops
-                script_pad_len = script_length - tx_sigops - len(ser_compact_size(script_length - tx_sigops))
-                script_output = CScript([b'\x00' * script_pad_len] + [OP_CHECKSIG] * tx_sigops)
+                        # Create the new transaction
+                        tx = get_base_transaction()
 
-                tx.vout.append(CTxOut(0, script_output))
+                        # Add padding to fill the block.
+                        script_length = block_size - current_block_size
+                        num_loops = 1
+                        if script_length > 510000:
+                            if script_length < 1000000:
+                                # Make sure we don't find ourselves in a position where we
+                                # need to generate a transaction smaller than what we expected.
+                                script_length = script_length // 2
+                                num_loops = 2
+                            else:
+                                num_loops = script_length // 500000
+                                script_length = 500000
+                        script_length -= base_tx_size + 8 + len(ser_compact_size(script_length)) # <existing tx size> + <amount> + <vector<size><elements>>
+                        tx_sigops = min(extra_sigops, script_length, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
+                        if tx_sigops * num_loops < extra_sigops:
+                            tx_sigops = min(extra_sigops // num_loops, script_length)
+                        extra_sigops -= tx_sigops
+                        script_pad_len = script_length - tx_sigops - len(ser_compact_size(script_length - tx_sigops))
+                        script_output = CScript([b'\x00' * script_pad_len] + [OP_CHECKSIG] * tx_sigops)
 
-                # Add the tx to the list of transactions to be included
-                # in the block.
-                self.add_transactions_to_block(block, [tx])
-                current_block_size += len(tx.serialize())
+                        tx.vout.append(CTxOut(0, script_output))
 
-            # Now that we added a bunch of transaction, we need to recompute
-            # the merkle root.
-            block.hashMerkleRoot = block.calc_merkle_root()
+                        # Add the tx to the list of transactions to be included
+                        # in the block.
+                        self.add_transactions_to_block(block, [tx])
+                        current_block_size += len(tx.serialize())
+
+                    # Now that we added a bunch of transaction, we need to recompute
+                    # the merkle root.
+                    block.hashMerkleRoot = block.calc_merkle_root()
+
 
         # Check that the block size is what's expected
         if block_size > 0:
