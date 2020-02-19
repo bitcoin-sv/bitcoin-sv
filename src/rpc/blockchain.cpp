@@ -93,6 +93,9 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex) {
     result.push_back(
         Pair("versionHex", strprintf("%08x", blockindex->nVersion)));
     result.push_back(Pair("merkleroot", blockindex->hashMerkleRoot.GetHex()));
+    if (blockindex->nTx > 0) {
+        result.push_back(Pair("num_tx", uint64_t(blockindex->nTx)));
+    }
     result.push_back(Pair("time", int64_t(blockindex->nTime)));
     result.push_back(
         Pair("mediantime", int64_t(blockindex->GetMedianTimePast())));
@@ -694,6 +697,7 @@ UniValue getblockheader(const Config &config, const JSONRPCRequest &request) {
             "  \"versionHex\" : \"00000000\", (string) The block version "
             "formatted in hexadecimal\n"
             "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"num_tx\" : n,          (numeric) The number of transactions\n"
             "  \"time\" : ttt,          (numeric) The block time in seconds "
             "since epoch (Jan 1 1970 GMT)\n"
             "  \"mediantime\" : ttt,    (numeric) The median block time in "
@@ -832,6 +836,7 @@ void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
             "  \"versionHex\" : \"00000000\", (string) The block version "
             "formatted in hexadecimal\n"
             "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"num_tx\" : n,          (numeric) The number of transactions\n"
             "  \"tx\" : [               (array of string) The transaction ids\n"
             "     \"transactionid\"     (string) The transaction id\n"
             "     ,...\n"
@@ -864,6 +869,7 @@ void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
             "  \"versionHex\" : \"00000000\", (string) The block version "
             "formatted in hexadecimal\n"
             "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"num_tx\" : n,          (numeric) The number of transactions\n"
             "  \"tx\" : [               (array of Objects) The transactions in "
             "the format of the getrawtransaction RPC. Different from verbosity "
             "= 1 \"tx\" result.\n"
@@ -896,6 +902,7 @@ void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
             "  \"versionHex\" : \"00000000\", (string) The block version "
             "formatted in hexadecimal\n"
             "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"num_tx\" : n,          (numeric) The number of transactions\n"
             "  \"tx\" : [               The coinbase transaction in the format "
             "of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" "
             "result.\n"
@@ -976,6 +983,7 @@ void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
             "  \"versionHex\" : \"00000000\", (string) The block version "
             "formatted in hexadecimal\n"
             "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"num_tx\" : n,          (numeric) The number of transactions\n"
             "  \"tx\" : [               (array of string) The transaction ids\n"
             "     \"transactionid\"     (string) The transaction id\n"
             "     ,...\n"
@@ -1006,6 +1014,7 @@ void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
             "  \"versionHex\" : \"00000000\", (string) The block version "
             "formatted in hexadecimal\n"
             "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"num_tx\" : n,          (numeric) The number of transactions\n"
             "  \"tx\" : [               (array of Objects) The transactions in "
             "the format of the getrawtransaction RPC. Different from verbosity "
             "= 1 \"tx\" result.\n"
@@ -1038,6 +1047,7 @@ void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
             "  \"versionHex\" : \"00000000\", (string) The block version "
             "formatted in hexadecimal\n"
             "  \"merkleroot\" : \"xxxx\", (string) The merkle root\n"
+            "  \"num_tx\" : n,          (numeric) The number of transactions\n"
             "  \"tx\" : [               The coinbase transaction in the format "
             "of the getrawtransaction RPC. Different from verbosity = 1 \"tx\" "
             "result.\n"
@@ -1251,6 +1261,7 @@ std::string headerBlockToJSON(const Config &config,
     result.push_back(
         Pair("versionHex", strprintf("%08x", blockHeader.nVersion)));
     result.push_back(Pair("merkleroot", blockHeader.hashMerkleRoot.GetHex()));
+    result.push_back(Pair("num_tx", uint64_t(blockindex->nTx)));
     result.push_back(Pair("time", blockHeader.GetBlockTime()));
     result.push_back(
         Pair("mediantime", int64_t(blockindex->GetMedianTimePast())));
