@@ -122,7 +122,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
 
             if valid == None:
                 valid = txs
-            check_mempool(node, valid)
+            check_mempool_equals(node, valid)
             mempool0 = node.getrawmempool()
             block_id = node.generate(1)
             mempool1 = node.getrawmempool()
@@ -142,9 +142,6 @@ class MaxScriptSizeTest(BitcoinTestFramework):
             rejected_txs.append(msg)
 
         conn.cb.on_reject = on_reject
-
-        def check_mempool(rpc, should_be_in_mempool):
-            wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool}, timeout=20)
 
         def check_rejected(rejected=True, reject_reason=None):
             if rejected:

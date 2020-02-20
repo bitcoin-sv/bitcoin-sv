@@ -9,7 +9,7 @@ from test_framework.blocktools import create_transaction, create_coinbase, creat
 from test_framework.mininode import msg_tx, msg_block
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until, assert_equal
+from test_framework.util import wait_until, assert_equal, check_mempool_equals
 from test_framework.cdefs import DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS
 
 import time
@@ -46,9 +46,6 @@ class TestMaxSizedOrphan(BitcoinTestFramework):
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes)
-
-    def check_mempool(self, rpc, should_be_in_mempool):
-        wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool}, timeout=20)
     
     def run_test(self):
         with self.run_node_with_connections("Scenario 1", 0, ['-banscore=100000', '-genesisactivationheight=110', '-maxstdtxvalidationduration=100'],
@@ -68,7 +65,7 @@ class TestMaxSizedOrphan(BitcoinTestFramework):
             # Making sure parent is not sent right away for bitcond to detect an orphan
             time.sleep(1)
             conn.send_message(msg_tx(tx_parent))
-            self.check_mempool(conn.rpc, [tx_parent, tx_orphan])
+            check_mempool_equals(conn.rpc, [tx_parent, tx_orphan])
 
 if __name__ == '__main__':
     TestMaxSizedOrphan().main()
