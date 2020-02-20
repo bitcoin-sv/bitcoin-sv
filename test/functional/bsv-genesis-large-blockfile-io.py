@@ -61,7 +61,8 @@ class LargeBlockFileIO(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 200, 200)
+        test, out, _ = prepare_init_chain(self.chain, 200, 200)
+
         yield test
 
         # Create transaction that will almost fill block file when next block will be generated (~130 MB)

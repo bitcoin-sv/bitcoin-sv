@@ -4,6 +4,7 @@
 """
 Test stalling isn't triggered just for large blocks.
 """
+from test_framework.blocktools import prepare_init_chain
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import assert_equal, p2p_port, connect_nodes
 from test_framework.comptool import TestInstance
@@ -47,18 +48,8 @@ class StallingTest(ComparisonTestFramework):
         self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(self.num_blocks):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out, _ = prepare_init_chain(self.chain, self.num_blocks, self.num_blocks+1)
         yield test
-
-        # Collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(self.num_blocks + 1):
-            out.append(self.chain.get_spendable_output())
 
         # Create 1GB block
         block(1, spend=out[0], block_size=1*ONE_GIGABYTE)

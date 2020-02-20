@@ -59,7 +59,8 @@ class CheckSigTest(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 119, 119)
+        test, out, _ = prepare_init_chain(self.chain, 119, 119)
+
         yield test
 
         logger.info("Before Genesis, blocks 2, 4, 6 should be rejected because of too many sigops")

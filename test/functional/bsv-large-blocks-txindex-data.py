@@ -66,7 +66,8 @@ class BlockFileStore(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 200, 200)
+        test, out, _ = prepare_init_chain(self.chain, 200, 200)
+
         yield test
 
         txHashes = []

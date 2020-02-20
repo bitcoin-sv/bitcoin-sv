@@ -30,7 +30,8 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 300, 300)
+        test, out, _ = prepare_init_chain(self.chain, 300, 300)
+
         yield test
 
         # send 100 transactions with high sigops density

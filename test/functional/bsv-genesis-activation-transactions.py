@@ -46,7 +46,9 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 100, 100)
+
+        test, out, _ = prepare_init_chain(self.chain, 100, 100)
+
         yield test
 
         # Create transaction with OP_RETURN in the locking script.

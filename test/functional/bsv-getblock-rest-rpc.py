@@ -73,7 +73,8 @@ class BSVGetBlock(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, _ = prepare_init_chain(self.chain, 99, 0)
+        test, _, _ = prepare_init_chain(self.chain, 99, 0)
+
         yield test
 
         block_size = 100000

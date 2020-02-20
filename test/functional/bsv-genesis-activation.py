@@ -53,7 +53,8 @@ class BSVGenesisActivation(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 105, 100)
+        test, out, _ = prepare_init_chain(self.chain, 105, 100)
+
         yield test
 
         # Block with height 107.

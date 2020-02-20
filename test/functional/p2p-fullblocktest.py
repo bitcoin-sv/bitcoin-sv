@@ -89,7 +89,8 @@ class FullBlockTest(ComparisonTestFramework):
         block(0)
         yield accepted()
 
-        test, out = prepare_init_chain(self, 99, 33, save=save_spendable_output, get=get_spendable_output)
+        test, out, _ = prepare_init_chain(self.chain, 99, 33)
+
 
         yield test
 

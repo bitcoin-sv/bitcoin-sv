@@ -247,29 +247,44 @@ def create_and_sign_transaction(spend_tx, n, value, script=CScript([OP_TRUE]), p
     tx.rehash()
     return tx
 
-def prepare_init_chain(chain, no_blocks, no_outputs, block_0=True, save=None, get=None):
+# The function prepares a number of spendable outputs
+# Params:
+# no_blocks - number of blocks we want to mine
+# no_outputs - number of outputs the fun. returns in out list
+# block_0 - was block 0 already mined outside the function and we need to save output
+# start_block - a number at which we want to start mining blocks
+# node - a node that sends block message (not needed if using TestInstance)
+# Return values:
+# test - TestInstance object
+# out - list of spendable outputs
+# start_block+no_blocks - last mined block
+def prepare_init_chain(chain, no_blocks, no_outputs, block_0=True, start_block=5000, node=None):
     # Create a new block
     block = chain.next_block
-    save_spendable_output=save
-    get_spendable_output=get
-    if not save:
-        save_spendable_output=chain.save_spendable_output
-        get_spendable_output=chain.get_spendable_output
+    save_spendable_output=chain.save_spendable_output
+    get_spendable_output=chain.get_spendable_output
     if block_0:
         save_spendable_output()
     # Now we need that block to mature so we can spend the coinbase.
-    test = TestInstance(sync_every_block=False)
-    for i in range(no_blocks):
-        block(5000 + i)
-        test.blocks_and_transactions.append([chain.tip, True])
-        save_spendable_output()
+    test = None
+    if not node:
+        test = TestInstance(sync_every_block=False)
+        for i in range(no_blocks):
+            block(start_block + i)
+            test.blocks_and_transactions.append([chain.tip, True])
+            save_spendable_output()
+    else:
+        for i in range(no_blocks):
+            b = block(start_block + i)
+            save_spendable_output()
+            node.send_message(msg_block(b))
 
     # collect spendable outputs now to avoid cluttering the code later on
     out = []
     for i in range(no_outputs):
         out.append(get_spendable_output())
 
-    return test, out
+    return test, out, start_block+no_blocks
 
 ### Helper to build chain
 

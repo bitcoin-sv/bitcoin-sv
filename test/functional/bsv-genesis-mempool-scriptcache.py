@@ -54,7 +54,8 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 101, 100)
+        test, out, _ = prepare_init_chain(self.chain, 101, 100)
+
         yield test
 
         ########## SCENARIO 1

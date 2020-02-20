@@ -51,7 +51,8 @@ class BSVGenesis_NonFinalPoolLimit(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 600, 200)
+        test, out, _ = prepare_init_chain(self.chain, 600, 200)
+
         yield test
 
         # Create block with some transactions for us to spend

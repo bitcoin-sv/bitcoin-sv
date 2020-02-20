@@ -83,7 +83,8 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 150, 150)
+        test, out, _ = prepare_init_chain(self.chain, 150, 150)
+
         yield test
 
         # Create transaction with OP_ADD in the locking script which should be banned 

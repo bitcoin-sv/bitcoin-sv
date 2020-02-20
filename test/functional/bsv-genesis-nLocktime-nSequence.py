@@ -186,7 +186,8 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 580, 200)
+        test, out, _ = prepare_init_chain(self.chain, 580, 200)
+
         yield test
 
         # Create block on height 581 with some transactions for us to spend

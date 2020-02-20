@@ -40,7 +40,8 @@ class BSVBlockSizeTest(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, self.genesisactivationheight - 3, self.genesisactivationheight - 3)
+        test, out, _ = prepare_init_chain(self.chain, self.genesisactivationheight - 3, self.genesisactivationheight - 3)
+
         yield test
 
         # Current block height is 103

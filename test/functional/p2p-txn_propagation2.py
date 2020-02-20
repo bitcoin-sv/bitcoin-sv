@@ -36,7 +36,8 @@ class TxnPropagationAfterBlock(ComparisonTestFramework):
         block(0)
         yield self.accepted()
 
-        test, out = prepare_init_chain(self.chain, 140, 100)
+        test, out, _ = prepare_init_chain(self.chain, 140, 100)
+
         yield test
 
         # Create blocks with multiple txns in

@@ -18,6 +18,7 @@ therefore won the validation race.
 """
 import threading
 
+from test_framework.blocktools import prepare_init_chain
 from test_framework.util import (
     assert_equal,
     p2p_port,
@@ -65,18 +66,9 @@ class PBVSubmitMiningSolution(BitcoinTestFramework):
         node1.wait_for_verack()
 
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
-        block = self.chain.next_block(block_count)
-        block_count += 1
-        self.chain.save_spendable_output()
-        node0.send_message(msg_block(block))
 
-        for i in range(100):
-            block = self.chain.next_block(block_count)
-            block_count += 1
-            self.chain.save_spendable_output()
-            node0.send_message(msg_block(block))
-
-        out = self.chain.get_spendable_output()
+        _, outs, block_count = prepare_init_chain(self.chain, 101, 1, block_0=False, start_block=0, node=node0)
+        out = outs[0]
 
         self.log.info("waiting for block height 101 via rpc")
         self.nodes[0].waitforblockheight(101)
