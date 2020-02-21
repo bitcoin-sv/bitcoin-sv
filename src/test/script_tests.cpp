@@ -11,6 +11,7 @@
 #include "rpc/server.h"
 #include "script/script.h"
 #include "script/script_num.h"
+#include "script/sigcache.h"
 #include "script/script_error.h"
 #include "script/sighashtype.h"
 #include "script/sign.h"
@@ -31,10 +32,12 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <chrono> 
 
 #include <boost/test/unit_test.hpp>
 
 #include <univalue.h>
+
 
 // Uncomment if you want to output updated JSON tests.
 // #define UPDATE_JSON_TESTS
@@ -2154,7 +2157,7 @@ void CheckSolver(const CScript scriptPubKey, bool isGenesisEnabled,
 
 BOOST_AUTO_TEST_CASE(script_Solver) {
 
-    // Dummy for differnt parts of the script
+    // Dummy for different parts of the script
     std::vector<uint8_t> pubKey(33, 1);
     std::vector<uint8_t> hash160(20, 2);
     std::vector<uint8_t> data(100, 3);
@@ -2289,6 +2292,73 @@ BOOST_AUTO_TEST_CASE(txout_IsDust) {
 
     BOOST_CHECK(!CTxOut(Amount(10), opFalseOpReturn).IsDust(feerate, true));
     BOOST_CHECK(CTxOut(Amount(10), opReturn).IsDust(feerate, true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
+}
+
+BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
+    ScriptError err;
+    auto source = task::CCancellationSource::Make();
+    std::vector<CKey> keys(200); // Vector of 200 public keys
+    for(auto& key : keys)
+    {
+       key.MakeNewKey(false);
+    }
+    // Create scriptPubKey with 200 public keys
+    CScript scriptPubKey;
+    scriptPubKey << OP_1;
+    for(auto& key : keys){
+      scriptPubKey << ToByteVector(key.GetPubKey());
+    }
+    scriptPubKey << CScriptNum(keys.size()) << OP_CHECKMULTISIG;
+    scriptPubKey << OP_1;
+    CMutableTransaction creditingTx =
+        BuildCreditingTransaction(scriptPubKey, Amount(0));
+    CMutableTransaction spendingTx = BuildSpendingTransaction(CScript(), creditingTx);
+
+    // Create scriptSig where the last key satisfies the conditions in scriptPubKey
+    CScript scriptSig = sign_multisig(scriptPubKey, keys[0], CTransaction(spendingTx));
+
+    const CTransaction nmCreditingTx(creditingTx);
+    const CTransaction nmSpendingTx(spendingTx);
+
+    PrecomputedTransactionData txdata(nmSpendingTx);
+
+    // Verify the same script twice. In the second iteration it should run
+    // much faster, since we cached invalid signatures.
+    auto start = std::chrono::high_resolution_clock::now();    
+    auto res =
+        VerifyScript(
+            testConfig,
+            true,
+            source->GetToken(),
+            scriptSig,
+            scriptPubKey,
+            flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
+            CachingTransactionSignatureChecker(&nmSpendingTx, true, nmCreditingTx.vout[0].nValue, true, txdata),
+            &err);
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
+    BOOST_CHECK(res.value());
+    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+    auto start2 = std::chrono::high_resolution_clock::now();
+    auto res2 =
+        VerifyScript(
+            testConfig,
+            true,
+            source->GetToken(),
+            scriptSig,
+            scriptPubKey,
+            flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
+            CachingTransactionSignatureChecker(&nmSpendingTx, true, nmCreditingTx.vout[0].nValue, true, txdata),
+            &err);
+    auto stop2 = std::chrono::high_resolution_clock::now();
+    auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2); 
+    
+    BOOST_CHECK(res2.value());
+    BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+
+    // Check if second time code runs much faster since invalid signatures are cached.
+    // It usually runs 50-60 times faster.
+    BOOST_CHECK(duration.count() >  (duration2.count() * 10));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
