@@ -1,4 +1,6 @@
 // Pipeline for building Bitcoin SV
+String cron_string = BRANCH_NAME == "develop" ? "@daily" : ""
+
 pipeline {
     agent { 
         dockerfile  {filename "contrib/nchain/devops/Dockerfile"}
@@ -12,6 +14,8 @@ pipeline {
                    , [$class: 'BitBucketPPRPullRequestTriggerFilter'
                    , actionFilter: [$class: 'BitBucketPPRPullRequestApprovedActionFilter'
                    , triggerOnlyIfAllReviewersApproved: false]]])
+        cron(cron_string) 
+              
     }
 
     stages {
