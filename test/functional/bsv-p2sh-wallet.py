@@ -33,11 +33,11 @@ class P2SH(ComparisonTestFramework):
         self.coinbase_key.set_secretbytes(b"horsebattery")
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.genesisactivationheight = 150
+        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-banscore=1000000',
+                            f'-genesisactivationheight={self.genesisactivationheight}']] * 3
 
     def setup_network(self):
-        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-banscore=1000000', f'-genesisactivationheight={self.genesisactivationheight}']]*3
-        self.add_nodes(self.num_nodes, self.extra_args)
-        self.start_nodes()
+        self.setup_nodes()
         self.init_network()
 
     def run_test(self):

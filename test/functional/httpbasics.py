@@ -17,9 +17,9 @@ import urllib.parse
 class HTTPBasicsTest (BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 3
+        self.extra_args = [["-rpccorsdomain=null"], [], []]
 
     def setup_network(self):
-        self.extra_args = [["-rpccorsdomain=null"], [], []]
         self.setup_nodes()
 
     def run_test(self):

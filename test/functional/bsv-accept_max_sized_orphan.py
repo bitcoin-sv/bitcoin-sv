@@ -42,11 +42,8 @@ class TestMaxSizedOrphan(BitcoinTestFramework):
         self.num_nodes = 1
 
     def setup_network(self):
-        self.setup_nodes()
-
-    def setup_nodes(self):
         self.add_nodes(self.num_nodes)
-    
+
     def run_test(self):
         with self.run_node_with_connections("Scenario 1", 0, ['-banscore=100000', '-genesisactivationheight=110', '-maxstdtxvalidationduration=100'],
                                             number_of_connections=1) as (conn,):

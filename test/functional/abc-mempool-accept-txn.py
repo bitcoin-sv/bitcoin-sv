@@ -38,11 +38,10 @@ class FullBlockTest(ComparisonTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.tip = None
         self.blocks = {}
+        self.extra_args = [['-norelaypriority']]
 
     def setup_network(self):
-        self.extra_args = [['-norelaypriority']]
-        self.add_nodes(self.num_nodes, self.extra_args)
-        self.start_nodes()
+        self.setup_nodes()
         self.init_network()
 
     def add_options(self, parser):

@@ -21,9 +21,6 @@ class P2PMempoolTests(BitcoinTestFramework):
         self.num_peers = 1
 
     def setup_network(self):
-        self.setup_nodes()
-
-    def setup_nodes(self):
         self.add_nodes(self.num_nodes)
 
     def run_test(self):

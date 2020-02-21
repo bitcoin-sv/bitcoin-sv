@@ -36,12 +36,10 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         self.genesisactivationheight = 209
         self.maxscriptsize = ONE_MEGABYTE - 200
         self.setup_clean_chain = True
+        self.extra_args = [['-genesisactivationheight=%d' % self.genesisactivationheight, "-maxscriptsizepolicy=%d" % self.maxscriptsize, "-maxopsperscriptpolicy=5000", '-banscore=10000000']]
 
     def setup_network(self):
-        # Add & start nodes
-        self.add_nodes(self.num_nodes)
-        # Create nodes
-        self.start_node(0, ['-genesisactivationheight=%d' % self.genesisactivationheight, "-maxscriptsizepolicy=%d" % self.maxscriptsize, "-maxopsperscriptpolicy=5000", '-banscore=10000000'])
+        self.setup_nodes()
 
     def run_test_node(self, node_index=0, dstaddr='127.0.0.1', dstportno=0, num_of_connections=1):
         test_node = TestNode()

@@ -35,14 +35,10 @@ class SigopPolicyTest(BitcoinTestFramework):
         self.genesisactivationheight = 205
         self.maxblocksigops = 30000
         self.setup_clean_chain = True
+        self.extra_args = [['-genesisactivationheight=%d' % self.genesisactivationheight], ['-genesisactivationheight=%d' % self.genesisactivationheight, '-maxtxsigopscountspolicy=10000']]
 
     def setup_network(self):
-        # Add & start nodes
-        self.add_nodes(self.num_nodes)
-        # Create nodes
-        self.start_node(0, ['-genesisactivationheight=%d' % self.genesisactivationheight])
-        self.start_node(1, ['-genesisactivationheight=%d' % self.genesisactivationheight, '-maxtxsigopscountspolicy=10000'])
-
+        self.setup_nodes()
         sync_blocks(self.nodes)
 
     def run_test_node(self, node_index=0, dstaddr='127.0.0.1', dstportno=0, num_of_connections=1):
