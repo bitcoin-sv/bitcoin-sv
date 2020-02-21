@@ -40,6 +40,38 @@
 
 using namespace mining;
 
+UniValue gettxsize(const Config &config, const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 1) {
+        throw std::runtime_error(
+            "gettxsize txid\n"
+            "\nReturn the serialized transaction.\n"
+            "\nArguments:\n"
+            "1. txid         (string, required) The transaction id\n"
+            "\nResult:\n"
+            "\"size\"         (numeric) The serialized transaction size\n"
+            "\nExamples:\n" +
+            HelpExampleRpc("gettxsize", "\"mytxid\""));
+    }
+
+    LOCK(cs_main);
+    TxId txid = TxId(ParseHashV(request.params[0], "parameter 1"));
+
+    CTransactionRef tx;
+    uint256 hashBlock;
+    bool isGenesisEnabled;
+    if (!GetTransaction(config, txid, tx, true, hashBlock, isGenesisEnabled))
+    {
+        throw JSONRPCError(
+            RPC_INVALID_ADDRESS_OR_KEY,
+            std::string(fTxIndex ? "No such mempool or blockchain transaction"
+                                 : "No such mempool transaction. Use -txindex "
+                                   "to enable blockchain transaction queries") +
+                ". Use gettransaction for wallet transactions.");
+    }
+
+    return (int)::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+}
+
 void getrawtransaction(const Config& config,
                        const JSONRPCRequest& request,
                        HTTPRequest& httpReq,
@@ -1267,6 +1299,7 @@ static UniValue sendrawtransaction(const Config &config,
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
     //  ------------------- ------------------------  ----------------------  ----------
+    { "rawtransactions",    "gettxsize",              gettxsize,              true,  {"txid"} },
     { "rawtransactions",    "getrawtransaction",      getrawtransaction,      true,  {"txid","verbose"} },
     { "rawtransactions",    "createrawtransaction",   createrawtransaction,   true,  {"inputs","outputs","locktime"} },
     { "rawtransactions",    "decoderawtransaction",   decoderawtransaction,   true,  {"hexstring"} },
