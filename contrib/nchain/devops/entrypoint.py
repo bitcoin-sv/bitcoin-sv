@@ -23,18 +23,14 @@ def do_linux_build():
     except:
         exit(-1)
 
-    args = ['./configure']
+    args = ['./configure', '--enable-zmq']
     try:
         subprocess.call(args)
     except:
         exit(-1)
 
-    args = ["nproc", "--all"]
-    out = subprocess.check_output(args)
-    out = out.strip()
-    nproc = "".join(chr(x) for x in out)
-    nproc = "-j" +  nproc
-    args = ['make', nproc]
+    
+    args = ['make']
     try:
         subprocess.call(args)
     except:
