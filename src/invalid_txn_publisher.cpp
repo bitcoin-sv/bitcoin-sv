@@ -389,6 +389,27 @@ public:
     }
 };
 
+#if ENABLE_ZMQ
+class CInvalidTxnZmqSink : public CInvalidTxnSink
+{
+    int64_t maxMessageSize;
+public:
+    CInvalidTxnZmqSink(int64_t maxMsgSize)
+        :maxMessageSize(maxMsgSize)
+    {}
+
+    void Publish(const InvalidTxnInfo& invalidTxInfo) override
+    {
+        auto messageSize = EstimateMessageSize(invalidTxInfo, true);
+        CStringWriter tw;
+        CJSONWriter jw(tw, false);
+        invalidTxInfo.ToJson(jw, messageSize <= maxMessageSize);
+        std::string jsonString = tw.MoveOutString();
+        GetMainSignals().InvalidTxMessage(jsonString);
+    }
+};
+#endif
+
 CInvalidTxnPublisher::CInvalidTxnPublisher()
     :txInfoQueue(ONE_GIGABYTE, [](const InvalidTxnInfo& txInfo) { return txInfo.DynamicMemoryUsage(); })
 {}
@@ -503,7 +524,8 @@ int64_t CInvalidTxnPublisher::ClearStored()
 #if ENABLE_ZMQ
 void CInvalidTxnPublisher::AddZMQSink(int64_t maxMessageSize)
 {
-    throw std::runtime_error("Not implemented!");
+    std::lock_guard lock(sinksGuard);
+    sinks.emplace_back(new CInvalidTxnZmqSink(maxMessageSize));
 }
 #endif
 

@@ -49,4 +49,9 @@ public:
     bool NotifyTransaction(const CTransaction &transaction) override;
 };
 
+class CZMQPublishTextNotifier : public CZMQAbstractPublishNotifier {
+public:
+    bool NotifyTextMessage(const std::string& topic, std::string_view message) override;
+};
+
 #endif // BITCOIN_ZMQ_ZMQPUBLISHNOTIFIER_H

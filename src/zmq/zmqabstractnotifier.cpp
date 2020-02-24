@@ -17,3 +17,8 @@ bool CZMQAbstractNotifier::NotifyTransaction(
     const CTransaction & /*transaction*/) {
     return true;
 }
+
+bool CZMQAbstractNotifier::NotifyTextMessage(const std::string& topic, std::string_view message)
+{
+    return true;
+}
