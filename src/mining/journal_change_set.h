@@ -79,6 +79,9 @@ class CJournalChangeSet final
     // Apply our changes to the journal
     void apply();
 
+    // Clear the changeset without applying it
+    void clear();
+
   private:
 
     // Common post operation addition steps

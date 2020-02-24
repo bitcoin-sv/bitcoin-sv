@@ -7,6 +7,7 @@
 from base64 import b64encode
 from binascii import hexlify, unhexlify
 from decimal import Decimal, ROUND_DOWN
+import glob
 import hashlib
 import json
 import logging
@@ -726,6 +727,7 @@ def get_srcdir(calling_script=None):
     # No luck, give up.
     return None
 
+
 def loghash(inhash=None):
     if inhash:
         if len(inhash) > 12:
@@ -734,4 +736,11 @@ def loghash(inhash=None):
             return inhash
     else:
         return inhash
+
+
+def check_for_log_msg(log_msg, node_dir):
+    for line in open(glob.glob(node_dir + "/regtest/bitcoind.log")[0]):
+        if log_msg in line:
+            return True
+    return False
 

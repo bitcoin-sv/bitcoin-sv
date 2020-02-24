@@ -86,6 +86,13 @@ void CJournalChangeSet::apply()
     applyNL();
 }
 
+// Clear the changeset without applying it
+void CJournalChangeSet::clear()
+{
+    std::unique_lock<std::mutex> lock { mMtx };
+    mChangeSet.clear();
+}
+
 // Apply our changes to the journal - Caller holds mutex
 void CJournalChangeSet::applyNL()
 {

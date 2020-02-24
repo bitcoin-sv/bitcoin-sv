@@ -3873,13 +3873,17 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
 
 }
 
-void FinalizeGenesisCrossing(const Config &config, int height)
+static void FinalizeGenesisCrossing(const Config &config, int height, const CJournalChangeSetPtr& changeSet)
 {
     if ((IsGenesisEnabled(config, height + 1)) &&
         (!IsGenesisEnabled(config, height)))
     {
         mempool.Clear();
         ClearCache();
+        if(changeSet)
+        {
+            changeSet->clear();
+        }
     }
 }
 
@@ -3901,7 +3905,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
 
-    FinalizeGenesisCrossing(config, pindexDelete->nHeight);
+    FinalizeGenesisCrossing(config, pindexDelete->nHeight, changeSet);
 
     // Read block from disk.
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
@@ -4178,7 +4182,7 @@ static bool ConnectTip(
 
     connectTrace.BlockConnected(pindexNew, std::move(pthisBlock));
 
-    FinalizeGenesisCrossing(config, pindexNew->nHeight);
+    FinalizeGenesisCrossing(config, pindexNew->nHeight, changeSet);
 
     return true;
 }
