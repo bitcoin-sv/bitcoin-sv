@@ -6,11 +6,13 @@ import json
 from time import sleep
 import os
 import shutil
+import configparser
 
 from test_framework.blocktools import create_block, serialize_script_num, create_coinbase, create_transaction
+from test_framework.cdefs import ONE_MEGABYTE
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, ToHex, ser_string, COIN
 from test_framework.script import CScript, OP_FALSE, OP_DROP, OP_HASH160, hash160, OP_EQUAL
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import BitcoinTestFramework, SkipTest
 from test_framework.util import wait_until, assert_raises_rpc_error, bytes_to_hex_str
 
 
@@ -76,6 +78,28 @@ class InvalidTx(BitcoinTestFramework):
         self.setup_nodes()
 
     def setup_nodes(self):
+        # Try to import python3-zmq. Skip this test if the import fails.
+        try:
+            import zmq
+        except ImportError:
+            raise Exception("python3-zmq module not available.")
+
+        # Check that bitcoin has been built with ZMQ enabled
+        config = configparser.ConfigParser()
+        if not self.options.configfile:
+            self.options.configfile = os.path.dirname(
+                __file__) + "/../config.ini"
+        config.read_file(open(self.options.configfile))
+
+        if not config["components"].getboolean("ENABLE_ZMQ"):
+            raise SkipTest("bitcoind has not been built with zmq enabled.")
+
+        self.zmqContext = zmq.Context()
+        self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
+        self.zmqSubSocket.set(zmq.RCVTIMEO, 60000)
+        self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"invalidtx")
+        self.ip_address = "tcp://127.0.0.1:28332"
+
         self.add_nodes(self.num_nodes)
 
     def assert_number_of_files(self, number):
@@ -170,8 +194,11 @@ class InvalidTx(BitcoinTestFramework):
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
-                                             "-invalidtxsink=FILE"],
+                                             "-invalidtxsink=ZMQ",
+                                             "-invalidtxsink=FILE",
+                                             f"-zmqpubinvalidtx={self.ip_address}"],
                                             1) as (conn, ):
+            self.zmqSubSocket.connect(self.ip_address)
             invalid_tx1 = make_invalid_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx1], wait_for_confirmation=False)
             conn.cb.sync_with_ping()
@@ -187,6 +214,12 @@ class InvalidTx(BitcoinTestFramework):
                 self.check_stored_tx_file(filename=fn, tx=invalid_tx1, block=block, rejectionFlags=["isInvalid"], source=source, has_hex=has_hex,
                                           rejectionReason="Script evaluated without error but finished with a false/empty top stack element")
 
+            for _ in range(3): # three ZMQ messages should arrive
+                msg = self.zmqSubSocket.recv_multipart()
+                assert msg[0] == b"invalidtx"
+                data = json.loads(msg[1])
+                self.check_message(data, tx=invalid_tx1, block=block, rejectionFlags=["isInvalid"], has_hex=True,
+                                   rejectionReason="Script evaluated without error but finished with a false/empty top stack element")
 
         with self.run_node_with_connections("Scenario 2: invalid txs passed through block, p2p, rpc (no script validation)",
                                             0,
@@ -242,15 +275,20 @@ class InvalidTx(BitcoinTestFramework):
 
 
         with self.run_node_with_connections("Scenario 4: Limiting file size and putting three large (1MB each) transactions, "
-                                            "only first two txs are saved through file sink, last is ignored, ",
+                                            "only first two txs are saved through file sink, last is ignored, "
+                                            "maximal zmq message size is limited, messages should be smaller",
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
                                              "-invalidtxsink=FILE",
                                              "-invalidtxfilemaxdiskusage=5",
                                              "-invalidtxfileevictionpolicy=IGNORE_NEW",
+                                             "-invalidtxsink=ZMQ",
+                                             f"-zmqpubinvalidtx={self.ip_address}",
+                                             "-invalidtxzmqmaxmessagesize=1",
                                              ],
                                             1) as (conn, ):
+            self.zmqSubSocket.connect(self.ip_address)
             conn.rpc.clearinvalidtransactions()
 
             invalid_tx1 = make_large_invalid_tx(invalid_coinbases[0], 0)
@@ -271,16 +309,26 @@ class InvalidTx(BitcoinTestFramework):
             self.assert_number_of_files_with_substring_in_name(1, invalid_tx2.hash)
             self.assert_number_of_files_with_substring_in_name(0, invalid_tx3.hash)
 
+            for _ in range(3): # three ZMQ messages should arrive
+                msg = self.zmqSubSocket.recv_multipart()
+                # maximal zmq tx size is set 1MB so messages will not contain tx hex (tx hex > 2MB)
+                assert len(msg[1]) < ONE_MEGABYTE, "messages should be smaller than one megabyte"
+
         with self.run_node_with_connections("Scenario 5: Limiting file size and putting three large (1MB each) transactions, "
-                                            "first is evicted and other two are saved through file sink, ",
+                                            "first is evicted and other two are saved through file sink, "
+                                            "maximal zmq message size is unlimited",
                                             0,
                                             ["-genesisactivationheight=1",
                                              "-banscore=100000",
                                              "-invalidtxsink=FILE",
                                              "-invalidtxfilemaxdiskusage=5",
                                              "-invalidtxfileevictionpolicy=DELETE_OLD",
+                                             "-invalidtxsink=ZMQ",
+                                             f"-zmqpubinvalidtx={self.ip_address}",
+                                             "-invalidtxzmqmaxmessagesize=0",
                                              ],
                                             1) as (conn, ):
+            self.zmqSubSocket.connect(self.ip_address)
             conn.rpc.clearinvalidtransactions()
 
             invalid_tx1 = make_large_invalid_tx(invalid_coinbases[0], 0)
@@ -304,6 +352,12 @@ class InvalidTx(BitcoinTestFramework):
             self.assert_number_of_files_with_substring_in_name(0, invalid_tx1.hash)
             self.assert_number_of_files_with_substring_in_name(1, invalid_tx2.hash)
             self.assert_number_of_files_with_substring_in_name(1, invalid_tx3.hash)
+
+            for _ in range(3): # three ZMQ messages should arrive
+                msg = self.zmqSubSocket.recv_multipart()
+                # maximal zmq tx size is set to msximal value so messages will contain tx hex (tx hex > 2MB)
+                assert len(msg[1]) > 2 * ONE_MEGABYTE
+
 
         with self.run_node_with_connections("Scenario 6: ",
                                             0,
@@ -335,8 +389,6 @@ class InvalidTx(BitcoinTestFramework):
 
             # transactions are sent from different connections so they must have different addresses
             assert data1["address"] != data2["address"]
-
-
 
 
         shutil.rmtree(invalidtxsfolder)
