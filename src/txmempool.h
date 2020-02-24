@@ -122,12 +122,8 @@ private:
     int64_t nTime;
     //!< Priority when entering the mempool
     double entryPriority;
-    //!< Chain height when entering the mempool
-    unsigned int entryHeight;
     //!< Sum of all txin values that are already in blockchain
     Amount inChainInputValue;
-    //!< keep track of transactions that spend a coinbase
-    bool spendsCoinbase;
     //!< Total sigop plus P2SH sigops count
     int64_t sigOpCount;
     //!< Used for determining the priority of the transaction for mining in a
@@ -152,6 +148,11 @@ private:
     uint64_t nSizeWithAncestors;
     Amount nModFeesWithAncestors;
     int64_t nSigOpCountWithAncestors;
+
+    //!< Chain height when entering the mempool
+    unsigned int entryHeight;
+    //!< keep track of transactions that spend a coinbase
+    bool spendsCoinbase;
 
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
