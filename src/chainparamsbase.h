@@ -7,14 +7,14 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 /**
  * CBaseChainParams defines the base parameters
  * (shared between bitcoin-cli and bitcoind)
  * of a given instance of the Bitcoin system.
  */
-class CBaseChainParams {
+class CBaseChainParams
+{
 public:
     /** BIP70 chain name strings (main, test or regtest) */
     static const std::string MAIN;
@@ -22,12 +22,12 @@ public:
     static const std::string REGTEST;
     static const std::string STN;
 
-    const std::string &DataDir() const { return strDataDir; }
+    CBaseChainParams(int port, const std::string& data_dir);
+
+    const std::string& DataDir() const { return strDataDir; }
     int RPCPort() const { return nRPCPort; }
 
-protected:
-    CBaseChainParams() {}
-
+private:
     int nRPCPort;
     std::string strDataDir;
 };
