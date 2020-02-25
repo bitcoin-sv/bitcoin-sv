@@ -1677,30 +1677,27 @@ void CConnman::ThreadSocketHandler() {
             //
             int64_t nTime = GetSystemTimeInSeconds();
             if (nTime - pnode->nTimeConnected > 60) {
+                auto timeout = gArgs.GetArg("-p2ptimeout", DEFAULT_P2P_TIMEOUT_INTERVAL);
                 if (pnode->nLastRecv == 0 || pnode->nLastSend == 0) {
-                    LogPrint(BCLog::NET, "socket no message in first 60 "
-                                         "seconds, %d %d from %d\n",
-                             pnode->nLastRecv != 0, pnode->nLastSend != 0,
-                             pnode->id);
+                    LogPrint(BCLog::NET, "socket no message in first 60 seconds, %d %d from %d\n",
+                             pnode->nLastRecv != 0, pnode->nLastSend != 0, pnode->id);
                     pnode->fDisconnect = true;
-                } else if (nTime - pnode->nLastSend > TIMEOUT_INTERVAL) {
-                    LogPrintf("socket sending timeout: %is\n",
-                              nTime - pnode->nLastSend);
+                }
+                else if (nTime - pnode->nLastSend > timeout) {
+                    LogPrintf("socket sending timeout: %is\n", nTime - pnode->nLastSend);
                     pnode->fDisconnect = true;
-                } else if (nTime - pnode->nLastRecv >
-                           (pnode->nVersion > BIP0031_VERSION ? TIMEOUT_INTERVAL
+                }
+                else if (nTime - pnode->nLastRecv >
+                           (pnode->nVersion > BIP0031_VERSION ? timeout
                                                               : 90 * 60)) {
-                    LogPrintf("socket receive timeout: %is\n",
-                              nTime - pnode->nLastRecv);
+                    LogPrintf("socket receive timeout: %is\n", nTime - pnode->nLastRecv);
                     pnode->fDisconnect = true;
-                } else if (pnode->nPingNonceSent &&
-                           pnode->nPingUsecStart + TIMEOUT_INTERVAL * 1000000 <
-                               GetTimeMicros()) {
-                    LogPrintf("ping timeout: %fs\n",
-                              0.000001 *
-                                  (GetTimeMicros() - pnode->nPingUsecStart));
+                }
+                else if (pnode->nPingNonceSent && pnode->nPingUsecStart + (timeout * MICROS_PER_SECOND) < GetTimeMicros()) {
+                    LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
                     pnode->fDisconnect = true;
-                } else if (!pnode->fSuccessfullyConnected) {
+                }
+                else if (!pnode->fSuccessfullyConnected) {
                     LogPrintf("version handshake timeout from %d\n", pnode->id);
                     pnode->fDisconnect = true;
                 }

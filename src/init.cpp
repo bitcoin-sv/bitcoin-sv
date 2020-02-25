@@ -625,6 +625,12 @@ std::string HelpMessage(HelpMessageMode mode) {
         HelpMessageOpt("-permitbaremultisig",
                        strprintf(_("Relay non-P2SH multisig (default: %d)"),
                                  DEFAULT_PERMIT_BAREMULTISIG));
+    if(showDebug) {
+        strUsage += HelpMessageOpt("-p2ptimeout=<n>",
+            strprintf(_("Number of seconds before timing out some operations "
+                "within the P2P layer. Affected operations include pings and "
+                "send/receive inactivity (default: %u seconds)"), DEFAULT_P2P_TIMEOUT_INTERVAL));
+    }
     strUsage += HelpMessageOpt(
         "-peerbloomfilters",
         strprintf(_("Support filtering of blocks and transaction with bloom "
