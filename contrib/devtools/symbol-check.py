@@ -70,6 +70,7 @@ ALLOWED_LIBRARIES = {
     'ld-linux-aarch64.so.1', # 64-bit ARM dynamic linker
     'ld-linux-armhf.so.3', # 32-bit ARM dynamic linker
     'ld-linux-riscv64-lp64d.so.1', # 64-bit RISC-V dynamic linker
+    'libdl.so.2' # programming interface to dynamic linker
 }
 
 ARCH_MIN_GLIBC_VER = {
