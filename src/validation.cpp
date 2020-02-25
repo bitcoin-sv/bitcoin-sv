@@ -3830,7 +3830,6 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
 
     cvBlockChange.notify_all();
 
-    static bool fWarned = false;
     std::vector<std::string> warningMessages;
     if (!IsInitialBlockDownload()) {
         int nUpgraded = 0;
