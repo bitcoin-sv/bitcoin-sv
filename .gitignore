@@ -101,3 +101,6 @@ contrib/devtools/split-debug.sh
 .vagrant
 
 .vscode
+
+# JetBrains, Clion, PyCharm etc...
+.idea
