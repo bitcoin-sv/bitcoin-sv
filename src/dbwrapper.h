@@ -16,6 +16,9 @@
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
 
+#include <string_view>
+#include <memory>
+
 static const size_t DBWRAPPER_PREALLOC_KEY_SIZE = 64;
 static const size_t DBWRAPPER_PREALLOC_VALUE_SIZE = 1024;
 
@@ -42,6 +45,142 @@ void HandleError(const leveldb::Status &status);
  * specific database.
  */
 const std::vector<uint8_t> &GetObfuscateKey(const CDBWrapper &w);
+
+/**
+ * Input stream that can be used to unserialize data from external buffer without
+ * creating unnecessary copies.
+ *
+ * This class holds a non-owning reference (string_view) to external buffer which must
+ * therefore outlive CDataStreamInput object.
+ */
+// NOTE: Class is based on CDataStream and provides only read functionality
+class CDataStreamInput
+{
+    std::string_view buf;
+    const std::vector<std::uint8_t>& obfuscate_key;
+    unsigned int nReadPos;
+
+public:
+    typedef std::string_view::size_type size_type;
+    typedef std::string_view::const_reference const_reference;
+    typedef std::string_view::value_type value_type;
+    typedef std::string_view::const_iterator const_iterator;
+
+    /**
+     * Constructor
+     *
+     * @param buf External buffer that contains previously serialized data
+     * @param obfuscate_key Key used to de-obfuscate serialized data in buffer
+     *
+     * @note Both buf and obfuscate_key must outlive constructed CDataStreamInput object.
+     */
+    CDataStreamInput(std::string_view buf, const std::vector<uint8_t>& obfuscate_key)
+        : buf(buf)
+        , obfuscate_key(obfuscate_key)
+        , nReadPos(0)
+    {}
+
+    // Access to serialized data
+    const value_type* data() const { return buf.data() + nReadPos; }
+    size_type size() const { return buf.size() - nReadPos; }
+
+    //
+    // Stream subset
+    //
+    bool eof() const { return size() == 0; }
+
+    // Since this class is only used to read from level DB,
+    // values for stream type and version are fixed.
+    int GetType() const { return SER_DISK; }
+    int GetVersion() const { return CLIENT_VERSION; }
+
+    void read(char* pch, std::size_t nSize)
+    {
+        if (nSize == 0) {
+            return;
+        }
+
+        // Read from buffer at current position
+        unsigned int nReadPosNext = nReadPos + nSize;
+        if (nReadPosNext >= buf.size())
+        {
+            if (nReadPosNext > buf.size())
+            {
+                throw std::ios_base::failure("CDataStreamInput::read(): end of data");
+            }
+
+            memcpy(pch, &buf[nReadPos], nSize);
+            XorBuf(pch, nSize, nReadPos);
+            nReadPos = 0;
+            buf = {};
+            return;
+        }
+        memcpy(pch, &buf[nReadPos], nSize);
+        XorBuf(pch, nSize, nReadPos);
+        nReadPos = nReadPosNext;
+    }
+
+    void ignore(int nSize)
+    {
+        // Ignore from buffer at current position
+        if (nSize < 0)
+        {
+            throw std::ios_base::failure("CDataStreamInput::ignore(): nSize negative");
+        }
+
+        unsigned int nReadPosNext = nReadPos + nSize;
+        if (nReadPosNext >= buf.size())
+        {
+            if (nReadPosNext > buf.size())
+            {
+                throw std::ios_base::failure("CDataStreamInput::ignore(): end of data");
+            }
+
+            nReadPos = 0;
+            buf = {};
+            return;
+        }
+        nReadPos = nReadPosNext;
+    }
+
+    template<typename T>
+    CDataStreamInput& operator>>(T& obj)
+    {
+        // Unserialize from this stream
+        ::Unserialize(*this, obj);
+        return (*this);
+    }
+
+private:
+    /**
+     * XOR the contents of given buffer with de-obfuscation key
+     *
+     * It is used by read() method to de-obfuscate each chunk of stream as it is being read.
+     *
+     * @param buf Buffer that will be xor-ed
+     * @param bufSize Size of buffer
+     * @param readPos Read position from start of stream. Used to calculate proper offset into key.
+     */
+    void XorBuf(char* buf, std::size_t bufSize, unsigned int readPos)
+    {
+        if (obfuscate_key.size() == 0)
+        {
+            return;
+        }
+
+        for (size_type i = 0, j = readPos % obfuscate_key.size(); i != bufSize; i++)
+        {
+            buf[i] ^= obfuscate_key[j++];
+
+            // This potentially acts on very many bytes of data, so it's
+            // important that we calculate `j`, i.e. the `key` index in this way
+            // instead of doing a %, which would effectively be a division for
+            // each byte Xor'd -- much slower than need be.
+            if (j == obfuscate_key.size()) j = 0;
+        }
+    }
+};
+
 }; // namespace dbwrapper_private
 
 /** Batch of changes queued to be written to a CDBWrapper */
@@ -158,12 +297,22 @@ public:
 
     unsigned int GetKeySize() { return piter->key().size(); }
 
-    template <typename V> bool GetValue(V &value) {
+    /**
+     * Default for TStream template parameter in GetValue() member function
+     */
+    template<class TBase>
+    using GetValue_TStreamDefault  = TBase;
+
+    // See comments in CDBWrapper::Read() method for description of template parameters and usage principles.
+    template <template<class TBase> class TStream = GetValue_TStreamDefault, typename V, typename... Args>
+    bool GetValue(V &value, Args&&... args) {
         leveldb::Slice slValue = piter->value();
         try {
-            CDataStream ssValue(slValue.data(), slValue.data() + slValue.size(),
-                                SER_DISK, CLIENT_VERSION);
-            ssValue.Xor(dbwrapper_private::GetObfuscateKey(parent));
+            // Create data stream optimized for reading and unserialize the value
+            static_assert(std::is_base_of<dbwrapper_private::CDataStreamInput, TStream<dbwrapper_private::CDataStreamInput>>::value, "TStream must be a class template derived from TBase!");
+            TStream<dbwrapper_private::CDataStreamInput> ssValue( std::string_view(slValue.data(), slValue.size()),
+                dbwrapper_private::GetObfuscateKey(parent),
+                std::forward<Args>(args)... );
             ssValue >> value;
         } catch (const std::exception &) {
             return false;
@@ -231,24 +380,61 @@ public:
                bool fWipe = false, bool obfuscate = false);
     ~CDBWrapper();
 
-    template <typename K, typename V> bool Read(const K &key, V &value) const {
+public:
+    /**
+     * Default for TStream template parameter in Read() member function
+     */
+    template<class TBase>
+    using Read_TStreamDefault  = TBase;
+
+    /**
+     * Retrieve value for given key from database and unserialize it into value object.
+     *
+     * @param TStream Stream class providing required unserialization functionality (i.e. as in CDataStreamInput).
+     *                This is a template template parameter so that custom unserialization functionality can be provided
+     *                by creating a class template derived from required TBase that is provided by implementation
+     *                of this method (CRTP).
+     * @param args Additional arguments passed to TStream constructor (besides buffer with serialized data and obfuscation key).
+     */
+    template <template<class TBase> class TStream = Read_TStreamDefault, typename K, typename V, typename... Args>
+    bool Read(const K& key, V& value, Args&&... args) const
+    {
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
         ssKey << key;
         leveldb::Slice slKey(ssKey.data(), ssKey.size());
 
-        std::string strValue;
-        leveldb::Status status = pdb->Get(readoptions, slKey, &strValue);
-        if (!status.ok()) {
-            if (status.IsNotFound()) return false;
-            LogPrintf("LevelDB read failure: %s\n", status.ToString());
-            dbwrapper_private::HandleError(status);
+        // Read value from leveldb using an iterator.
+        // NOTE: Iterator is used instead of DB::Get() because we do not want the value to be
+        //       immediately copied into a std::string resulting in two copies (one in DB cache
+        //       and another in std::string), which is inefficient for large values.
+        std::unique_ptr<leveldb::Iterator> it(pdb->NewIterator(readoptions));
+        it->Seek(slKey);
+
+        {
+            // Check for errors
+            leveldb::Status status = it->status();
+            if(!status.ok())
+            {
+                // An error occurred
+                LogPrintf("LevelDB read failure: %s\n", status.ToString());
+                dbwrapper_private::HandleError(status);
+            }
         }
+
+        if(!it->Valid() || !(it->key() == slKey))
+        {
+            // Key was not found
+            return false;
+        }
+
         try {
-            CDataStream ssValue(strValue.data(),
-                                strValue.data() + strValue.size(), SER_DISK,
-                                CLIENT_VERSION);
-            ssValue.Xor(obfuscate_key);
+            // Create data stream optimized for reading and unserialize the value
+            leveldb::Slice slValue = it->value();
+            static_assert(std::is_base_of<dbwrapper_private::CDataStreamInput, TStream<dbwrapper_private::CDataStreamInput>>::value, "TStream must be a class template derived from TBase!");
+            TStream<dbwrapper_private::CDataStreamInput> ssValue( std::string_view(slValue.data(), slValue.size()),
+                                                                  obfuscate_key,
+                                                                  std::forward<Args>(args)... );
             ssValue >> value;
         } catch (const std::exception &) {
             return false;
