@@ -149,6 +149,15 @@ static const uint64_t DEFAULT_COINS_PROVIDER_CACHE_SIZE = ONE_GIGABYTE;
 
 static const std::set<std::string> DEFAULT_CLIENTUA_BAN_PATTERNS {"abc","cash","bch"};
 
+/* Default min time difference in sec between the last block and last mempool
+* transaction for the block to be classified as selfishly mined */
+static constexpr int64_t DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH = 60;
+/** 
+* Percentage threshold of number of txs in mempool 
+* that are not included in received block for 
+* the block to be classified as selfishly mined */
+static constexpr uint64_t DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT = 10;
+
 /**
  * Standard script verification flags that standard transactions will comply
  * with. However scripts violating these flags may still be present in valid

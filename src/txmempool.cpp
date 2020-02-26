@@ -6,6 +6,7 @@
 #include "txmempool.h"
 #include "txmempoolevictioncandidates.h"
 #include "clientversion.h"
+#include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "frozentxo.h"
@@ -1001,13 +1002,17 @@ void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     const CJournalChangeSetPtr& changeSet,
     const uint256& blockhash,
-    std::vector<CTransactionRef>& txNew) {
+    std::vector<CTransactionRef>& txNew,
+    const Config& config) {
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
     std::unique_lock lock{smtx};
 
     evictionTracker.reset();
+
+    int64_t last_block_tx_time = 0;
+    CFeeRate minBlockFeeRate{Amount{std::numeric_limits<int64_t>::max()}};
 
     setEntries toRemove; // entries which should be removed
     setEntriesTopoSorted childrenOfToRemove; // we must collect all transaction which parents we have removed to update its ancestorCount
@@ -1023,6 +1028,18 @@ void CTxMemPool::RemoveForBlock(
         if(found != mapTx.end()) 
         {
             toRemove.insert(found);
+
+            // get block's latest transaction time
+            int64_t foundTxTime = (&*found)->GetTime();
+            if (foundTxTime > last_block_tx_time) {
+                last_block_tx_time = foundTxTime;
+            }
+            // get block's lowest transaction fee rate
+            CFeeRate foundTxFeeRate{(&*found)->GetFee(), (&*found)->GetTxSize()};
+            if (foundTxFeeRate < minBlockFeeRate) {
+                minBlockFeeRate = foundTxFeeRate;
+            }
+
             for(auto child: GetMemPoolChildrenNL(found))
             {
                 // we are iterating block transactions backwards (we will always first visit child than its parent) 
@@ -1079,6 +1096,14 @@ void CTxMemPool::RemoveForBlock(
         }
     }
 
+    if (config.GetDetectSelfishMining() && !mapTx.empty())
+    {
+        if (CheckSelfishNL(toRemove, last_block_tx_time, minBlockFeeRate, config))
+        {
+            LogPrint(BCLog::MEMPOOL, "Selfish mining detected.\n");
+        }
+    }
+
     // remove affected groups from primary mempool
     // we are ignoring members of "toRemove" (we will remove them in the removeUncheckedNL), so that "removedFromPrimary" can not contain transactions that will be removed
     auto removedFromPrimary = RemoveFromPrimaryMempoolNL(std::move(childrenOfToRemoveGroupMembers), nonNullChangeSet.Get(), true, &toRemove);
@@ -1120,6 +1145,79 @@ void CTxMemPool::RemoveForBlock(
 
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = true;
+}
+
+bool CTxMemPool::CheckSelfishNL(const setEntries& block_entries, int64_t last_block_tx_time, 
+                                const CFeeRate& minBlockFeeRate, const Config& config) 
+{
+    auto last = mapTx.get<entry_time>().end();
+    last--;
+
+    int64_t last_mempool_tx_time = (&*last)->GetTime();
+    // If time difference between the last transaction that was included in the
+    // block and the last transaction that was left in the mempool is smaller
+    // than threshold, block is not considered selfish.
+    if (last_mempool_tx_time - last_block_tx_time < config.GetMinBlockMempoolTimeDifferenceSelfish()) 
+    {
+        return false;
+    }
+
+    // Value from -blockmintxfee parameter
+    Amount blockMinTxFee{mempool.GetBlockMinTxFee().GetFeePerK()};
+    uint64_t aboveBlockTxFeeCount = 0;
+    // If received block is not empty check if there are txs in mempool that doesn't exists in received block
+    if (!block_entries.empty())
+    {
+        // Measure duration of for loop of mempool Txs
+        int64_t forLoopOfMempoolTxsDuration = GetTimeMicros();
+        std::vector<const CTxMemPoolEntry*> entries;
+        // Loop backwards through mempool only to tx's time > last_block_tx_time
+        for ( ; last != mapTx.get<entry_time>().begin() && last->GetTime()>last_block_tx_time; --last) 
+        {
+            if (block_entries.find(mapTx.project<transaction_id>(last)) != block_entries.end()) 
+            {
+                continue;
+            }
+            entries.push_back(&*last);
+        }
+        forLoopOfMempoolTxsDuration = GetTimeMicros() - forLoopOfMempoolTxsDuration;
+        LogPrint(BCLog::BENCH, "    - CheckSelfishNL() : for loop of mempool's %u Txs completed in %.2fms \n", (unsigned int)mapTx.size(), forLoopOfMempoolTxsDuration * 0.001);
+
+        // Measure duration of for loop of block Txs
+        int64_t count_ifDurationOfBlockTxs = GetTimeMicros();
+        // Take higher value between the init value and received block tx fee
+        Amount maxBlockFeeRate {std::max(blockMinTxFee, minBlockFeeRate.GetFeePerK())};
+        aboveBlockTxFeeCount = std::count_if(entries.begin(), entries.end(), [&maxBlockFeeRate](const auto& ent)
+            {
+                // If fee rate one of the entries is above the max(BlockMinFeePerKB, minBlockFeeRate), then it should be in block
+                // It was not included in block --> sth is wrong
+                return CFeeRate{ent->GetFee(), ent->GetTxSize()}.GetFeePerK() >= maxBlockFeeRate;
+            });
+
+        count_ifDurationOfBlockTxs = GetTimeMicros() - count_ifDurationOfBlockTxs;
+        LogPrint(BCLog::BENCH, "    - CheckSelfishNL() : count_if of block's %u Txs completed in %.2fms \n", (unsigned int)entries.size(), count_ifDurationOfBlockTxs * 0.001);
+        LogPrint(BCLog::MEMPOOL, "%u/%u transactions in mempool were not included in block. %u/%u have a fee above the block's fee rate.\n",
+            (unsigned int)entries.size(), (unsigned int)mapTx.size(), aboveBlockTxFeeCount, (unsigned int)entries.size());
+    } 
+    else
+    {
+        // If the transactions of the received block do not exist in the mempool or block is empty,
+        // check if txs in mempool have sufficient fee rate to be in block
+        aboveBlockTxFeeCount = std::count_if(mapTx.begin(), mapTx.end(), [&blockMinTxFee](const auto& tx)
+                {
+                    return CFeeRate{tx.GetFee(), tx.GetTxSize()}.GetFeePerK() >= blockMinTxFee;
+                });
+        LogPrint(BCLog::MEMPOOL, "%u/%u transactions have a fee above the config blockmintxfee value."
+            " Block was either empty or none of its transactions are in our mempool.\n ", 
+            aboveBlockTxFeeCount, (unsigned int)mapTx.size());
+    }
+
+    // Check if percentage of txs in mempool that are not included in block is above TH
+    if (aboveBlockTxFeeCount > 0 && (aboveBlockTxFeeCount*100 / mapTx.size()) >= config.GetSelfishTxThreshold())
+    {
+        return true;
+    }
+    return false;
 }
 
 void CTxMemPool::RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet)
@@ -2655,7 +2753,6 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
 
     return Snapshot(std::move(contents), std::move(relevantTxIds));
 }
-
 
 std::vector<CTransactionRef> CTxMemPool::GetTransactions() const
 {

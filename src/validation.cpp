@@ -3987,12 +3987,12 @@ static bool ConnectTip(
     }
     std::vector<CTransactionRef> txNew;
     auto asyncRemoveForBlock = std::async(std::launch::async,
-        [&blockConnecting, &changeSet, &txNew]()
+        [&blockConnecting, &changeSet, &txNew, &config]()
         {
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
             // Remove transactions from the mempool.;
-            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash(), txNew);
+            mempool.RemoveForBlock(blockConnecting.vtx, changeSet, blockConnecting.GetHash(), txNew, config);
             nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
             nTimeRemoveFromMempool += nTimeRemoveForBlock;
             LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",

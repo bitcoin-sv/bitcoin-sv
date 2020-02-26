@@ -164,6 +164,11 @@ public:
     virtual uint32_t GetMinerIdReputationM() const = 0;
     virtual uint32_t GetMinerIdReputationN() const = 0;
 
+    // Detect selfish mining
+    virtual bool GetDetectSelfishMining() const = 0;
+    virtual int64_t GetMinBlockMempoolTimeDifferenceSelfish() const = 0;
+    virtual uint64_t GetSelfishTxThreshold() const = 0;
+
 protected:
     virtual ~Config() = default;
 };
@@ -316,6 +321,11 @@ public:
     virtual bool SetMinerIdsNumToKeep(int64_t num, std::string* err) = 0;
     virtual bool SetMinerIdReputationM(int64_t num, std::string* err) = 0;
     virtual bool SetMinerIdReputationN(int64_t num, std::string* err) = 0;
+
+    // Detect selfish mining
+    virtual void SetDetectSelfishMining(bool detectSelfishMining) = 0;
+    virtual bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err = nullptr) = 0;
+    virtual bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err = nullptr) = 0;
 
 protected:
     ~ConfigInit() = default;
@@ -619,6 +629,14 @@ public:
     bool SetMinerIdReputationN(int64_t num, std::string* err) override;
     uint32_t GetMinerIdReputationN() const override;
 
+    // Detect selfish mining
+    bool GetDetectSelfishMining() const override;
+    void SetDetectSelfishMining(bool detectSelfishMining) override;
+    int64_t GetMinBlockMempoolTimeDifferenceSelfish() const override;
+    bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err = nullptr) override;
+    uint64_t GetSelfishTxThreshold() const override;
+    bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err = nullptr) override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset() override;
@@ -781,6 +799,10 @@ private:
         uint32_t minerIdReputationN;
 
         std::optional<bool> mDisableBIP30Checks;
+
+        bool mDetectSelfishMining;
+        int64_t minBlockMempoolTimeDifferenceSelfish;
+        uint64_t mSelfishTxThreshold;
 
     #if ENABLE_ZMQ
         int64_t invalidTxZMQMaxMessageSize;
@@ -1335,6 +1357,33 @@ public:
     bool SetSafeModeMinForkLength(int64_t length, std::string* err) override {return true;};
     int64_t GetSafeModeMinForkHeightDifference() const  override { return 5;};
     bool SetSafeModeMinForkHeightDifference(int64_t heightDifference, std::string* err) override {return true;};
+
+    bool GetDetectSelfishMining() const override
+    {
+        return true;    
+    };
+
+    void SetDetectSelfishMining(bool detectSelfishMining) override {}
+
+    int64_t GetMinBlockMempoolTimeDifferenceSelfish() const override
+    {
+        return DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH;
+    };
+
+    bool SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err) override
+    {
+        return true;
+    }
+
+    uint64_t GetSelfishTxThreshold() const override
+    {
+        return DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT;
+    }
+
+    bool SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err) override
+    {
+        return true;
+    }
 
     void Reset() override;
 

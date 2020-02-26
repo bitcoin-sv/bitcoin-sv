@@ -183,6 +183,11 @@ void GlobalConfig::Reset()
     data->safeModeMaxForkDistance = SAFE_MODE_DEFAULT_MAX_FORK_DISTANCE;
     data->safeModeMinForkLength = SAFE_MODE_DEFAULT_MIN_FORK_LENGTH;
     data->safeModeMinHeightDifference = SAFE_MODE_DEFAULT_MIN_POW_DIFFERENCE;
+
+    // Detect selfish mining
+    data->minBlockMempoolTimeDifferenceSelfish = DEFAULT_MIN_BLOCK_MEMPOOL_TIME_DIFFERENCE_SELFISH;
+    data->mDetectSelfishMining = DEFAULT_DETECT_SELFISH_MINING;
+    data->mSelfishTxThreshold = DEFAULT_SELFISH_TX_THRESHOLD_IN_PERCENT;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -2350,6 +2355,49 @@ bool GlobalConfig::SetSoftConsensusFreezeDuration( std::int64_t duration, std::s
 std::int32_t GlobalConfig::GetSoftConsensusFreezeDuration() const
 {
     return data->mSoftConsensusFreezeDuration;
+}
+
+bool GlobalConfig::GetDetectSelfishMining() const
+{
+    return data->mDetectSelfishMining;
+}
+
+void GlobalConfig::SetDetectSelfishMining(bool detectSelfishMining)
+{
+    data->mDetectSelfishMining = detectSelfishMining;
+}
+
+int64_t GlobalConfig::GetMinBlockMempoolTimeDifferenceSelfish() const
+{
+    return data->minBlockMempoolTimeDifferenceSelfish;
+}
+
+bool GlobalConfig::SetMinBlockMempoolTimeDifferenceSelfish(int64_t minBlockMempoolTimeDiffIn, std::string* err) {
+    if (LessThanZero(minBlockMempoolTimeDiffIn, err, "Value for min block - mempool tx time difference must not be less than 0"))
+    {
+        return false;
+    }
+    data->minBlockMempoolTimeDifferenceSelfish = minBlockMempoolTimeDiffIn;
+    return true;
+}
+
+uint64_t GlobalConfig::GetSelfishTxThreshold() const
+{
+    return data->mSelfishTxThreshold;
+}
+
+bool GlobalConfig::SetSelfishTxThreshold(uint64_t selfishTxPercentThreshold, std::string* err)
+{
+    if (selfishTxPercentThreshold > 100)
+    {
+        if (err)
+        {
+            *err = "Selfish tx percentage threshold must be between 0 and 100.";
+        }
+        return false;
+    }
+    data->mSelfishTxThreshold = selfishTxPercentThreshold;
+    return true;
 }
 
 std::shared_ptr<GlobalConfig::GlobalConfigData> GlobalConfig::getGlobalConfigData() const

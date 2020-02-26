@@ -77,6 +77,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	bswap_tests.cpp
 	checkpoints_tests.cpp
 	checkqueue_tests.cpp
+	check_selfish_mining_tests.cpp
 	coinbase_doc_tests.cpp
 	coins_tests.cpp
 	write_preferring_upgradable_mutex_tests.cpp
