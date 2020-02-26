@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
 // Copyright (c) 2017 The Bitcoin developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_NET_H
@@ -43,6 +43,7 @@
 #include <arpa/inet.h>
 #endif
 
+#include <boost/circular_buffer.hpp>
 #include <boost/signals2/signal.hpp>
 
 class CAddrMan;
@@ -100,6 +101,10 @@ static const bool DEFAULT_BLOCKSONLY = false;
 * size is exceeded, no response to block related P2P messages is sent.
 **/
 static const unsigned int DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES = 4;
+/** Microseconds in a second */
+static const unsigned int MICROS_PER_SECOND = 1000000;
+/** Peer average bandwidth measurement interval */
+static const unsigned PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS = 5;
 
 // Force DNS seed use ahead of UAHF fork, to ensure peers are found
 // as long as seeders are working.
@@ -553,6 +558,9 @@ private:
     // Whether the node should be passed out in ForEach* callbacks
     static bool NodeFullyConnected(const CNodePtr& pnode);
 
+    // Peer average bandwidth calculation
+    void PeerAvgBandwithCalc();
+
     const Config *config;
 
     // Network usage totals
@@ -732,6 +740,9 @@ public:
     bool fRelayTxes;
     int64_t nLastSend;
     int64_t nLastRecv;
+    bool fPauseSend;
+    bool fPauseRecv;
+    int64_t nSendSize;
     int64_t nTimeConnected;
     int64_t nTimeOffset;
     std::string addrName;
@@ -752,6 +763,8 @@ public:
     std::string addrLocal;
     CAddress addr;
     size_t nInvQueueSize;
+    uint64_t nSpotBytesPerSec;
+    uint64_t nMinuteBytesPerSec;
 };
 
 class CNetMessage {
@@ -878,6 +891,14 @@ public:
     std::deque<CInv> vRecvGetData {};
     uint64_t nRecvBytes {0};
     std::atomic<int> nRecvVersion {INIT_PROTO_VERSION};
+
+    /** Average bandwidth measurements */
+    // Keep enough spot measurements to cover 1 minute
+    boost::circular_buffer<double> vAvgBandwidth {60 / PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS};
+    // Time we last took a spot measurement
+    int64_t nLastSpotMeasurementTime { GetTimeMicros() };
+    // Bytes received since last spot measurement
+    uint64_t nBytesRecvThisSpot {0};
 
     std::atomic<int64_t> nLastSend {0};
     std::atomic<int64_t> nLastRecv {0};
@@ -1120,6 +1141,8 @@ public:
     void CloseSocketDisconnect();
 
     void copyStats(CNodeStats &stats);
+
+    uint64_t GetAverageBandwidth();
 
     ServiceFlags GetLocalServices() const { return nLocalServices; }
 

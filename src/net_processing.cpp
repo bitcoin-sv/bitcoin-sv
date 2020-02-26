@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <chrono>
@@ -615,10 +615,12 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
     // than BLOCK_DOWNLOAD_WINDOW + 1 beyond the last linked block we have in
     // common with this peer. The +1 is so we can detect stalling, namely if we
     // would be able to download that next block if the window were 1 larger.
-    int nWindowEnd =
-        state->pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
-    int nMaxHeight =
-        std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
+    int64_t nWindowSize { gArgs.GetArg("-blockdownloadwindow", DEFAULT_BLOCK_DOWNLOAD_WINDOW) };
+    if(nWindowSize <= 0) {
+        nWindowSize = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
+    }
+    int nWindowEnd = state->pindexLastCommonBlock->nHeight + nWindowSize;
+    int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed)
@@ -4180,14 +4182,27 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
     // Detect whether we're stalling
     int64_t nNow = GetTimeMicros();
     if (state->nStallingSince &&
-        state->nStallingSince < nNow - 1000000 * gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT)) {
+        state->nStallingSince < nNow - MICROS_PER_SECOND * gArgs.GetArg("-blockstallingtimeout", DEFAULT_BLOCK_STALLING_TIMEOUT)) {
         // Stalling only triggers when the block download window cannot move.
         // During normal steady state, the download window should be much larger
         // than the to-be-downloaded set of blocks, so disconnection should only
         // happen during initial block download.
-        LogPrintf("Peer=%d is stalling block download, disconnecting\n", pto->id);
-        pto->fDisconnect = true;
-        return true;
+        // 
+        // Also, don't abandon this attempt to download all the while we are making
+        // sufficient progress, as measured by the current download speed to this
+        // peer.
+        uint64_t avgbw { pto->GetAverageBandwidth() };
+        int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
+        minDownloadSpeed = std::max(0l, minDownloadSpeed);
+        if(avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000) {
+            LogPrintf("Peer=%d is stalling block download (current speed %d), disconnecting\n", pto->id, avgbw);
+            pto->fDisconnect = true;
+            return true;
+        }
+        else {
+            LogPrint(BCLog::NET, "Resetting stall (current speed %d) for peer=%d\n", avgbw, pto->id);
+            state->nStallingSince = GetTimeMicros();
+        }
     }
     // In case there is a block that has been in flight from this peer for 2 +
     // 0.5 * N times the block interval (with N the number of peers from which
@@ -4206,8 +4221,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
                            (BLOCK_DOWNLOAD_TIMEOUT_BASE +
                             BLOCK_DOWNLOAD_TIMEOUT_PER_PEER *
                                 nOtherPeersWithValidatedDownloads)) {
-            LogPrintf("Timeout downloading block %s from peer=%d, "
-                      "disconnecting\n",
+            LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n",
                       queuedBlock.hash.ToString(), pto->id);
             pto->fDisconnect = true;
             return true;
@@ -4255,7 +4269,8 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
             assert(stallerState);
             if (stallerState->nStallingSince == 0) {
                 stallerState->nStallingSince = GetTimeMicros();
-                LogPrint(BCLog::NET, "Stall started peer=%d\n", staller);
+                uint64_t avgbw { pto->GetAverageBandwidth() };
+                LogPrint(BCLog::NET, "Stall started (current speed %d) peer=%d\n", avgbw, staller);
             }
         }
     }

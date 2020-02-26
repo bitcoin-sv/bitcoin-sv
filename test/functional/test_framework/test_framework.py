@@ -248,8 +248,13 @@ class BitcoinTestFramework():
         assert_equal(len(extra_args), num_nodes)
         assert_equal(len(binaries), num_nodes)
         for i in range(num_nodes):
-            self.nodes.append(TestNode(i, self.options.tmpdir, extra_args[i], rpchost, timewait=timewait,
-                                       binary=binaries[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+            self.add_node(i, extra_args[i], rpchost, timewait, binaries[i])
+
+    def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
+        self.nodes.append(TestNode(i, self.options.tmpdir, extra_args, rpchost, timewait, binary, stderr=None,
+                                   mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+        if init_data_dir:
+            initialize_datadir(self.options.tmpdir, i)
 
     def start_node(self, i, extra_args=None, stderr=None):
         """Start a bitcoind"""
