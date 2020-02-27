@@ -8,6 +8,7 @@
 #include <primitives/transaction.h>
 #include <tx_mempool_info.h>
 #include <utiltime.h>
+#include <taskcancellation.h>
 
 #include <atomic>
 #include <map>
@@ -73,7 +74,7 @@ class CTimeLockedMempool final
 
     // Save/restore
     void dumpMempool() const;
-    bool loadMempool() const;
+    bool loadMempool(const task::CCancellationToken& shutdownToken) const;
 
     // Get number of txns we hold
     size_t getNumTxns() const;

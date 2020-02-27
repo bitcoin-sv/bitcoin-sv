@@ -4481,7 +4481,7 @@ bool ActivateBestChain(
         try
         {
             boost::this_thread::interruption_point();
-            if (ShutdownRequested() || token.IsCanceled()) {
+            if (GetShutdownToken().IsCanceled() || token.IsCanceled()) { // TODO: global shutdown token and input token should be merged/joined togeter. This will be done in the next commit. 
                 break;
             }
 
@@ -6008,7 +6008,7 @@ CVerifyDB::~CVerifyDB() {
 }
 
 bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
-                         int nCheckLevel, int nCheckDepth) {
+                         int nCheckLevel, int nCheckDepth, const task::CCancellationToken& shutdownToken) {
     LOCK(cs_main);
     if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr) {
         return true;
@@ -6037,7 +6037,6 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
     LogPrintf("[0%%]...");
     for (CBlockIndex *pindex = chainActive.Tip(); pindex && pindex->pprev;
          pindex = pindex->pprev) {
-        boost::this_thread::interruption_point();
         int percentageDone = std::max(
             1, std::min(
                    99,
@@ -6116,7 +6115,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
             }
         }
 
-        if (ShutdownRequested()) {
+        if (shutdownToken.IsCanceled()) {
             return true;
         }
     }
@@ -6132,7 +6131,6 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
     if (nCheckLevel >= 4) {
         CBlockIndex *pindex = pindexState;
         while (pindex != chainActive.Tip()) {
-            boost::this_thread::interruption_point();
             uiInterface.ShowProgress(
                 _("Verifying blocks..."),
                 std::max(1,
@@ -6908,7 +6906,7 @@ CBlockFileInfo *GetBlockFileInfo(size_t n) {
 
 static const uint64_t MEMPOOL_DUMP_VERSION = 1;
 
-bool LoadMempool(const Config &config)
+bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
 {
     try {
         int64_t nExpiryTimeout = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
@@ -6972,7 +6970,7 @@ bool LoadMempool(const Config &config)
             } else {
                 ++skipped;
             }
-            if (ShutdownRequested()) {
+            if (shutdownToken.IsCanceled()) {
                 return false;
             }
         }
@@ -6995,7 +6993,7 @@ bool LoadMempool(const Config &config)
     }
 
     // Restore non-final transactions
-    return mempool.getNonFinalPool().loadMempool();
+    return mempool.getNonFinalPool().loadMempool(shutdownToken);
 }
 
 void DumpMempool(void) {

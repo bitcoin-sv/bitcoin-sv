@@ -249,7 +249,7 @@ void CTimeLockedMempool::dumpMempool() const
 }
 
 // Load from disk
-bool CTimeLockedMempool::loadMempool() const
+bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownToken) const
 {
     try
     {
@@ -321,7 +321,7 @@ bool CTimeLockedMempool::loadMempool() const
                 ++skipped;
             }
 
-            if(ShutdownRequested())
+            if(shutdownToken.IsCanceled())
             {
                 // Abort early
                 return false;
