@@ -72,7 +72,7 @@ LARGE_BLOCK_TESTS = [
 
 # This tests can be only run by explicitly specifying them on command line. 
 # This is usefull for tests that take really long time to execute.
-EXCLUDED_TESTS = LARGE_BLOCK_TESTS
+EXCLUDED_TESTS = []
 
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
@@ -180,11 +180,6 @@ def main():
     # Build list of tests
     all_scripts = get_all_scripts_from_disk(tests_dir, NON_SCRIPTS)
 
-    # Check for large block tests parameter 
-    if args.large_block_tests:
-        tests = LARGE_BLOCK_TESTS
-        args.jobs = 1
-
     if tests:
         # Individual tests have been specified. Run specified tests that exist
         # in the all_scripts list. Accept the name with or without .py
@@ -201,10 +196,11 @@ def main():
         if args.extended:
             cutoff = sys.maxsize
         # Exclude tests specified in EXCLUDED_TESTS. 
-        # This tests should be specified in command line to execute 
-        for exclude_test in EXCLUDED_TESTS:
-            if exclude_test in test_list:
-                test_list.remove(exclude_test)
+        # These tests should be specified in command line to execute 
+        test_list = [test for test in test_list if test not in EXCLUDED_TESTS]
+        # Exclude large block tests unless explicitly told to run them
+        if not args.large_block_tests:
+            test_list = [test for test in test_list if test not in LARGE_BLOCK_TESTS]
 
     # Remove the test cases that the user has explicitly asked to exclude.
     if args.exclude:
