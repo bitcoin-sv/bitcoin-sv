@@ -4193,7 +4193,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
         // peer.
         uint64_t avgbw { pto->GetAverageBandwidth() };
         int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
-        minDownloadSpeed = std::max(0l, minDownloadSpeed);
+        minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
         if(avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000) {
             LogPrintf("Peer=%d is stalling block download (current speed %d), disconnecting\n", pto->id, avgbw);
             pto->fDisconnect = true;
