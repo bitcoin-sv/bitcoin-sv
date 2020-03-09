@@ -92,6 +92,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"signrawtransaction", 1, "prevtxs"},
     {"signrawtransaction", 2, "privkeys"},
     {"sendrawtransaction", 1, "allowhighfees"},
+    {"sendrawtransaction", 2, "dontcheckfee"},
     {"fundrawtransaction", 1, "options"},
     {"gettxout", 1, "n"},
     {"gettxout", 2, "include_mempool"},
