@@ -3203,6 +3203,7 @@ static int64_t nTimeConnect = 0;
 static int64_t nTimeIndex = 0;
 static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
+static int64_t nTimeObtainLock = 0;
 
 /**
  * Apply the effects of this block (with given index) on the UTXO set
@@ -3525,6 +3526,7 @@ static bool ConnectBlock(
 
     const CBlockIndex* tipBeforeMainLockReleased = chainActive.Tip();
 
+    int64_t nTime4; // This is set inside scope below
     {
         auto guard =
             blockValidationStatus.getScopedCurrentlyValidatingBlock(*pindex);
@@ -3562,15 +3564,27 @@ static bool ConnectBlock(
             return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
                              "parallel script check failed");
         }
+
+        // must be inside this scope as csGuard can take a while to re-obtain
+        // cs_main lock and we don't want that time to count to validation
+        // duration time
+        nTime4 = GetTimeMicros();
     }
 
-    int64_t nTime4 = GetTimeMicros();
+    // this is the time needed to re-obtain cs_main lock after validation is
+    // complete - bound to csGuard in the scope above
+    int64_t lockReObtainTime = GetTimeMicros() - nTime4;
+    nTimeObtainLock += lockReObtainTime;
+
     nTimeVerify += nTime4 - nTime2;
     LogPrint(BCLog::BENCH,
              "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n",
              nInputs - 1, 0.001 * (nTime4 - nTime2),
              nInputs <= 1 ? 0 : 0.001 * (nTime4 - nTime2) / (nInputs - 1),
              nTimeVerify * 0.000001);
+
+    LogPrint(BCLog::BENCH, "    - Time to reobtain the lock: %.2fms [%.2fs]\n",
+             0.001 * lockReObtainTime, nTimeObtainLock * 0.000001);
 
     if (fJustCheck) {
         return true;
