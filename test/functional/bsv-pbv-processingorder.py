@@ -65,13 +65,12 @@ from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
     assert_equal,
     p2p_port,
-    wait_until
-)
+    wait_until,
+    check_for_log_msg)
 from bsv_pbv_common import wait_for_waiting_blocks
 from test_framework.script import *
 from test_framework.blocktools import create_transaction
 from test_framework.key import CECKey
-import glob
 
 
 class PBVProcessingOrder(BitcoinTestFramework):
@@ -120,14 +119,7 @@ class PBVProcessingOrder(BitcoinTestFramework):
         node0.send_message(msg_block(block2))
         self.log.info(f"block2 hash: {block2.hash}")
 
-        def wait_for_log():
-            line_text = block2.hash + " will not be considered by the current"
-            for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-                if line_text in line:
-                    self.log.info("Found line: %s", line)
-                    return True
-            return False
-        wait_until(wait_for_log)
+        wait_until(lambda: check_for_log_msg(self, block2.hash + " will not be considered by the current", "/node0"))
 
         self.nodes[0].waitaftervalidatingblock(block1.hash, "remove")
 

@@ -87,7 +87,7 @@ class StallingTest(ComparisonTestFramework):
         self.sync_all(timeout=120)
 
         # Check we didn't hit a stall for node2
-        assert(not check_for_log_msg("stalling block download", self.options.tmpdir + "/node2"))
+        assert(not check_for_log_msg(self, "stalling block download", "/node2"))
 
 if __name__ == '__main__':
     StallingTest().main()

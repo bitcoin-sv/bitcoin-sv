@@ -19,6 +19,7 @@ import time
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
+import glob
 
 logger = logging.getLogger("TestFramework.utils")
 
@@ -760,9 +761,10 @@ def loghash(inhash=None):
     else:
         return inhash
 
-def check_for_log_msg(log_msg, node_dir):
-    for line in open(glob.glob(node_dir + "/regtest/bitcoind.log")[0]):
+def check_for_log_msg(rpc, log_msg, node_dir):
+    for line in open(glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]):
         if log_msg in line:
+            rpc.log.info("Found line: %s", line)
             return True
     return False
 
