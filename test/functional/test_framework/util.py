@@ -480,7 +480,7 @@ def wait_for_reject_message(conn, reject_reason=None, timeout=5):
 # The function checks that transaction/block was not rejected
 def ensure_no_rejection(conn):
     # wait 2 seconds for transaction/block before checking for reject message
-    sleep(2)
+    time.sleep(2)
     wait_until(lambda: not ('reject' in list(conn.cb.last_message.keys())) or conn.cb.last_message[
         'reject'].reason == None, timeout=5)
     conn.rpc.log.info('Not rejected -- OK')

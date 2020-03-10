@@ -141,13 +141,6 @@ class MaxScriptSizeTest(BitcoinTestFramework):
 
         conn.cb.on_reject = on_reject
 
-        def check_rejected(rejected=True, reject_reason=None):
-            if rejected:
-                wait_until(lambda: ('reject' in list(conn.cb.last_message.keys()) and (reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)), timeout=20)
-                conn.cb.last_message.pop('reject',None)
-            else:
-                wait_until(lambda: not ('reject' in list(conn.cb.last_message.keys())) or conn.cb.last_message['reject'].reason != None)
-
         thr = NetworkThread()
         thr.start()
         sleep(1)
@@ -162,7 +155,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid':base_tx, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS)
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
 
         # Create a tx with script size MAX_SCRIPT_SIZE_BEFORE_GENESIS+1,
         # Check that it doesn't get into the mempool, because parent is unspendable
@@ -171,7 +164,7 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid':base_tx, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS+1)
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
 
         # Create 2 more txes with script size MAX_SCRIPT_SIZE_BEFORE_GENESIS and MAX_SCRIPT_SIZE_BEFORE_GENESIS+1,
         # send them via p2p and mine into a block
@@ -189,13 +182,13 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid': tx3, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS, unlock_script=make_unlock_script(target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS))
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
 
         # Test tx with unlock script size MAX_SCRIPT_SIZE_BEFORE_GENESIS +1 is rejected
         utxo = {'txid': tx4, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS+1, unlock_script=make_unlock_script(target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS + 1))
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(reject_reason=b'genesis-script-verify-flag-failed (Script is too big)')
+        wait_for_reject_message(conn, reject_reason=b'genesis-script-verify-flag-failed (Script is too big)')
 
         # The last block at genesisactivationheight - 1 was rejected and therefore reverted
         # We generate additional block to get to genesis height
@@ -206,24 +199,24 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid': tx1, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS)
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
         #
         utxo = {'txid': tx2, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS+1)
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
         #
         # Test tx with unlock script size MAX_SCRIPT_SIZE_BEFORE_GENESIS is ok
         utxo = {'txid': tx5, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS, unlock_script=make_unlock_script(target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS))
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
         #
         # Test tx with unlock script size MAX_SCRIPT_SIZE_BEFORE_GENESIS +1 is still rejected
         utxo = {'txid': tx6, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS + 1, unlock_script=make_unlock_script(target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS+1))
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(reject_reason=b'genesis-script-verify-flag-failed (Script is too big)')
+        wait_for_reject_message(conn, reject_reason=b'genesis-script-verify-flag-failed (Script is too big)')
 
         # Create 3 new txes with script sizes :
         # MAX_SCRIPT_SIZE_BEFORE_GENESIS, MAX_SCRIPT_SIZE_BEFORE_GENESIS*5, policyLimit and policyLimit+30 (just under max tx size)
@@ -238,22 +231,22 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid': tx1, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS)
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
 
         utxo = {'txid': tx2, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS*5)
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
 
         utxo = {'txid': tx3, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=ONE_MEGABYTE-200)
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
 
         utxo = {'txid': tx4, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=ONE_MEGABYTE - 170)
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(reject_reason=b'non-mandatory-script-verify-flag (Script is too big)')
+        wait_for_reject_message(conn, reject_reason=b'non-mandatory-script-verify-flag (Script is too big)')
 
         # Create 3 more txs with large unlocking scripts
         # With CORE-195 we treat txs with OP_CODES in unlock script as invalid. Since we're testing utxos from before genesis, the script must
@@ -267,19 +260,19 @@ class MaxScriptSizeTest(BitcoinTestFramework):
         utxo = {'txid': tx1, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS, unlock_script=make_unlock_script(target_script_size=MAX_SCRIPT_SIZE_BEFORE_GENESIS))
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
 
         # Test that tx with unlock script size policyLimit is ok
         utxo = {'txid': tx2, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=ONE_MEGABYTE - 200, unlock_script=make_unlock_script(target_script_size=ONE_MEGABYTE - 200))
         add_to_block_and_send(txs=[test_tx])
-        check_rejected(rejected=False)
+        ensure_no_rejection(conn)
 
         # Test that tx with unlock script size over policyLimit is still rejected
         utxo = {'txid': tx3, 'vout': 0, 'amount': 200000000}
         test_tx = new_tx(utxo, simple=True, target_script_size=ONE_MEGABYTE - 170, unlock_script=make_unlock_script(target_script_size=ONE_MEGABYTE - 170))
         add_to_block_and_send(txs=[test_tx], len_mem0=0, valid=[])
-        check_rejected(reject_reason=b'non-mandatory-script-verify-flag (Script is too big)')
+        wait_for_reject_message(conn, reject_reason=b'non-mandatory-script-verify-flag (Script is too big)')
 
 
 if __name__ == '__main__':
