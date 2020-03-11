@@ -1051,4 +1051,7 @@ void DumpMempool();
 /** Load the mempool from disk. */
 bool LoadMempool(const Config &config);
 
+/** AlertNotify */
+void AlertNotify(const std::string &strMessage);
+
 #endif // BITCOIN_VALIDATION_H

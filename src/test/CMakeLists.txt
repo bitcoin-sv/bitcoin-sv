@@ -49,6 +49,7 @@ create_test_suite(bitcoin)
 add_dependencies(check check-bitcoin)
 
 add_test_to_suite(bitcoin test_bitcoin
+	alertnotify_tests.cpp
 	arith_uint256_tests.cpp
 	addrman_tests.cpp
 	amount_tests.cpp
