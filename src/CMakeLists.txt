@@ -275,7 +275,6 @@ add_library(server
 	script/ismine.cpp
 	timedata.cpp
     time_locked_mempool.cpp
-	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
 	txmempoolevictioncandidates.cpp

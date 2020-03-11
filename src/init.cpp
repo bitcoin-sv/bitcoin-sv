@@ -140,7 +140,6 @@ void Interrupt(boost::thread_group &threadGroup) {
     InterruptHTTPRPC();
     InterruptRPC();
     InterruptREST();
-    InterruptTorControl();
     if (g_connman) g_connman->Interrupt();
     threadGroup.interrupt_all();
 }
@@ -187,7 +186,6 @@ void Shutdown() {
     // using it before that
     ShutdownScriptCheckQueues();
 
-    StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
     if (fDumpMempoolLater &&
         gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
@@ -575,10 +573,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         HelpMessageOpt("-listen", _("Accept connections from outside (default: "
                                     "1 if no -proxy or -connect/-noconnect)"));
     strUsage += HelpMessageOpt(
-        "-listenonion",
-        strprintf(_("Automatically create Tor hidden service (default: %d)"),
-                  DEFAULT_LISTEN_ONION));
-    strUsage += HelpMessageOpt(
         "-maxconnections=<n>",
         strprintf(_("Maintain at most <n> connections to peers (default: %u)"),
                   DEFAULT_MAX_PEER_CONNECTIONS));
@@ -619,14 +613,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(_("(available policies: %s, default: %s)"),
         StreamPolicyFactory{}.GetAllPolicyNamesStr(), DEFAULT_STREAM_POLICY_LIST));
 
-    strUsage +=
-        HelpMessageOpt("-onion=<ip:port>",
-                       strprintf(_("Use separate SOCKS5 proxy to reach peers "
-                                   "via Tor hidden services (default: %s)"),
-                                 "-proxy"));
     strUsage += HelpMessageOpt(
         "-onlynet=<net>",
-        _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)"));
+        _("Only connect to nodes in network <net> (ipv4 or ipv6)"));
     strUsage +=
         HelpMessageOpt("-permitbaremultisig",
                        strprintf(_("Relay non-P2SH multisig (default: %d)"),
@@ -656,8 +645,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         HelpMessageOpt("-proxy=<ip:port>", _("Connect through SOCKS5 proxy"));
     strUsage += HelpMessageOpt(
         "-proxyrandomize",
-        strprintf(_("Randomize credentials for every proxy connection. This "
-                    "enables Tor stream isolation (default: %d)"),
+        strprintf(_("Randomize credentials for every proxy connection. (default: %d)"),
                   DEFAULT_PROXYRANDOMIZE));
     strUsage += HelpMessageOpt(
         "-seednode=<ip>",
@@ -666,12 +654,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-timeout=<n>", strprintf(_("Specify connection timeout in "
                                     "milliseconds (minimum: 1, default: %d)"),
                                   DEFAULT_CONNECT_TIMEOUT));
-    strUsage += HelpMessageOpt("-torcontrol=<ip>:<port>",
-                               strprintf(_("Tor control port to use if onion "
-                                           "listening enabled (default: %s)"),
-                                         DEFAULT_TOR_CONTROL));
-    strUsage += HelpMessageOpt("-torpassword=<pass>",
-                               _("Tor control port password (default: empty)"));
 #ifdef USE_UPNP
 #if USE_UPNP
     strUsage +=
@@ -1536,10 +1518,6 @@ void InitParameterInteraction() {
             LogPrintf(
                 "%s: parameter interaction: -listen=0 -> setting -discover=0\n",
                 __func__);
-        if (gArgs.SoftSetBoolArg("-listenonion", false))
-            LogPrintf("%s: parameter interaction: -listen=0 -> setting "
-                      "-listenonion=0\n",
-                      __func__);
     }
 
     if (gArgs.IsArgSet("-externalip")) {
@@ -1749,9 +1727,6 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(
             _("Unsupported argument -socks found. Setting SOCKS version isn't "
               "possible anymore, only SOCKS5 proxies are supported."));
-    // Check for -tor - as this is a privacy risk to continue, exit here
-    if (gArgs.GetBoolArg("-tor", false))
-        return InitError(_("Unsupported argument -tor found, use -onion."));
 
     if (gArgs.GetBoolArg("-benchmark", false))
         InitWarning(
@@ -2646,7 +2621,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // -noproxy (or -proxy=0) as well as the empty string can be used to not set
     // a proxy, this is the default
     std::string proxyArg = gArgs.GetArg("-proxy", "");
-    SetLimited(NET_TOR);
+
     if (proxyArg != "" && proxyArg != "0") {
         CService resolved(LookupNumeric(proxyArg.c_str(), 9050));
         proxyType addrProxy = proxyType(resolved, proxyRandomize);
@@ -2657,31 +2632,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
         SetProxy(NET_IPV4, addrProxy);
         SetProxy(NET_IPV6, addrProxy);
-        SetProxy(NET_TOR, addrProxy);
         SetNameProxy(addrProxy);
-        SetLimited(NET_TOR, false); // by default, -proxy sets onion as
-                                    // reachable, unless -noonion later
-    }
-
-    // -onion can be used to set only a proxy for .onion, or override normal
-    // proxy for .onion addresses.
-    // -noonion (or -onion=0) disables connecting to .onion entirely. An empty
-    // string is used to not override the onion proxy (in which case it defaults
-    // to -proxy set above, or none)
-    std::string onionArg = gArgs.GetArg("-onion", "");
-    if (onionArg != "") {
-        if (onionArg == "0") {   // Handle -noonion/-onion=0
-            SetLimited(NET_TOR); // set onions as unreachable
-        } else {
-            CService resolved(LookupNumeric(onionArg.c_str(), 9050));
-            proxyType addrOnion = proxyType(resolved, proxyRandomize);
-            if (!addrOnion.IsValid()) {
-                return InitError(
-                    strprintf(_("Invalid -onion address: '%s'"), onionArg));
-            }
-            SetProxy(NET_TOR, addrOnion);
-            SetLimited(NET_TOR, false);
-        }
     }
 
     // see Step 2: parameter interactions for more information about these
@@ -3074,9 +3025,6 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         LogPrintf("mapBlockIndex.size() = %u\n", mapBlockIndex.size());
     }
     LogPrintf("nBestHeight = %d\n", chainActive.Height());
-    if (gArgs.GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION)) {
-        StartTorControl(threadGroup, scheduler);
-    }
 
     Discover(threadGroup);
 
