@@ -5,7 +5,7 @@
 """Utilities for manipulating blocks and transactions."""
 
 from .mininode import *
-from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN
+from .script import CScript, OP_TRUE, OP_CHECKSIG, OP_RETURN, OP_EQUAL, OP_HASH160
 from .util import assert_equal, assert_raises_rpc_error, hash256
 from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE, MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT_BEFORE_GENESIS)
 
@@ -103,6 +103,22 @@ def create_coinbase(height, pubkey=None, outputValue=50):
         coinbaseoutput.scriptPubKey = CScript([pubkey, OP_CHECKSIG])
     else:
         coinbaseoutput.scriptPubKey = CScript([OP_TRUE])
+    coinbase.vout = [coinbaseoutput]
+    coinbase.calc_sha256()
+    return coinbase
+
+# Create a coinbase transaction containing P2SH, assuming no miner fees.
+
+
+def create_coinbase_P2SH(height, scriptHash, outputValue=50):
+    coinbase = CTransaction()
+    coinbase.vin.append(CTxIn(COutPoint(0, 0xffffffff),
+                              ser_string(serialize_script_num(height)), 0xffffffff))
+    coinbaseoutput = CTxOut()
+    coinbaseoutput.nValue = outputValue * COIN
+    coinbaseoutput.scriptPubKey = CScript([OP_HASH160, hex_str_to_bytes(scriptHash), OP_EQUAL])
+    halvings = int(height / 150)  # regtest
+    coinbaseoutput.nValue >>= halvings
     coinbase.vout = [coinbaseoutput]
     coinbase.calc_sha256()
     return coinbase
