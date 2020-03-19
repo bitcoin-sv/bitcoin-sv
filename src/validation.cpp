@@ -1695,7 +1695,7 @@ static void LogTxnCommitStatus(
     const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
-    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
+    const CNodePtr& pNode = txStatus.mTxInputData->mpNode.lock();
     const TxSource source = txStatus.mTxInputData->mTxSource;
     const std::string csPeerId {
         TxSource::p2p == source ? (pNode ? std::to_string(pNode->GetId()) : "-1")  : ""
@@ -1886,7 +1886,7 @@ void CreateTxRejectMsgForP2PTxn(
     unsigned int nRejectCode,
     const std::string& sRejectReason) {
 
-    const CNodePtr& pNode = pTxInputData->mpNode;
+    const CNodePtr& pNode = pTxInputData->mpNode.lock();
     // Never send validation's internal codes over P2P.
     if (pNode && nRejectCode > 0 && nRejectCode < REJECT_INTERNAL) {
         const CNetMsgMaker msgMaker(pNode->GetSendVersion());
@@ -1905,7 +1905,7 @@ static void HandleInvalidP2POrphanTxn(
     const CTxnValResult& txStatus,
     CTxnHandlers& handlers) {
 
-    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
+    const CNodePtr& pNode = txStatus.mTxInputData->mpNode.lock();
     if (!pNode) {
         LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
         return;
@@ -1956,7 +1956,7 @@ static void HandleInvalidP2PNonOrphanTxn(
     const CTxnValResult& txStatus,
     CTxnHandlers& handlers) {
 
-    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
+    const CNodePtr& pNode = txStatus.mTxInputData->mpNode.lock();
     if (!pNode) {
         LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
         return;
@@ -2048,7 +2048,7 @@ static void PostValidationStepsForP2PTxn(
     CTxMemPool& pool,
     CTxnHandlers& handlers) {
 
-    const CNodePtr& pNode = txStatus.mTxInputData->mpNode;
+    const CNodePtr& pNode = txStatus.mTxInputData->mpNode.lock();
     if (!pNode) {
         LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
         return;

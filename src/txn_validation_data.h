@@ -46,7 +46,7 @@ public:
         int64_t nAcceptTime=0,
         bool fLimitFree=false,
         Amount nAbsurdFee=Amount(0),
-        std::shared_ptr<CNode> pNode=nullptr,
+        std::weak_ptr<CNode> pNode={},
         bool fOrphan=false)
     : mTxSource(txSource),
       mTxValidationPriority(txValidationPriority),
@@ -68,7 +68,7 @@ public:
     int64_t mnAcceptTime {0};
     bool mfLimitFree {false};
     Amount mnAbsurdFee {0};
-    std::shared_ptr<CNode> mpNode {nullptr};
+    std::weak_ptr<CNode> mpNode {};
     bool mfOrphan {false};
 };
 
