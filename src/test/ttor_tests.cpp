@@ -152,4 +152,74 @@ BOOST_AUTO_TEST_CASE(check_ttor) {
 
 }
 
+/**
+ * Checking TTOR, but with more complex cases:
+ * - spending transactions from previous blocks
+ * - using transactions with multiple inputs
+ */
+BOOST_AUTO_TEST_CASE(check_ttor_advanced) {
+
+    CBlock block0;
+    block0.vtx.reserve(3);
+
+    CMutableTransaction mtx0 = CMutableTransaction();
+    mtx0.vout.resize(1);
+    mtx0.vin.resize(1);
+    mtx0.vout[0].scriptPubKey = CScript() << OP_TRUE;
+    mtx0.vin[0].prevout = COutPoint(InsecureRand256(), 0);
+
+    CMutableTransaction mtx1 = CMutableTransaction();
+    mtx1.vout.resize(2);
+    mtx1.vin.resize(1);
+    mtx1.vout[0].scriptPubKey = CScript() << OP_TRUE;
+    mtx1.vout[1].scriptPubKey = CScript() << OP_TRUE;
+    mtx1.vin[0].prevout = COutPoint(mtx0.GetHash(), 0);
+
+    CMutableTransaction mtx2 = CMutableTransaction();
+    mtx2.vout.resize(1);
+    mtx2.vin.resize(1);
+    mtx2.vout[0].scriptPubKey = CScript() << OP_TRUE;
+    mtx2.vin[0].prevout = COutPoint(mtx1.GetHash(), 0);
+
+    CTransaction tx0 = CTransaction(mtx0);
+    CTransaction tx1 = CTransaction(mtx1);
+    CTransaction tx2 = CTransaction(mtx2);
+
+    block0.vtx.push_back(MakeTransactionRef(tx0));
+    block0.vtx.push_back(MakeTransactionRef(tx1));
+    block0.vtx.push_back(MakeTransactionRef(tx2));
+
+    BOOST_CHECK_EQUAL(CheckBlockTTOROrder(block0), true);
+
+    CBlock block1;
+    block1.vtx.reserve(2);
+
+    CMutableTransaction mtx3 = CMutableTransaction();
+    mtx3.vout.resize(1);
+    mtx3.vin.resize(1);
+    mtx3.vout[0].scriptPubKey = CScript() << OP_TRUE;
+    mtx3.vin[0].prevout = COutPoint(mtx2.GetHash(), 0);
+
+    CMutableTransaction mtx4 = CMutableTransaction();
+    mtx4.vout.resize(1);
+    mtx4.vin.resize(2);
+    mtx4.vout[0].scriptPubKey = CScript() << OP_TRUE;
+    mtx4.vin[0].prevout = COutPoint(mtx3.GetHash(), 0);
+    mtx4.vin[1].prevout = COutPoint(mtx1.GetHash(), 1);
+
+    CTransaction tx3 = CTransaction(mtx3);
+    CTransaction tx4 = CTransaction(mtx4);
+
+    block1.vtx.push_back(MakeTransactionRef(tx3));
+    block1.vtx.push_back(MakeTransactionRef(tx4));
+
+    BOOST_CHECK_EQUAL(CheckBlockTTOROrder(block1), true);
+
+    // switching transactions will violate TTOR
+    block1.vtx[0] = MakeTransactionRef(tx4);
+    block1.vtx[1] = MakeTransactionRef(tx3);
+
+    BOOST_CHECK_EQUAL(CheckBlockTTOROrder(block1), false);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
