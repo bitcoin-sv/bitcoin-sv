@@ -50,9 +50,6 @@ public:
     virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
 
-    virtual void SetExcessUTXOCharge(Amount amt) = 0;
-    virtual Amount GetExcessUTXOCharge() const = 0;
-
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
 
@@ -169,9 +166,6 @@ public:
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const  override;
 
-    void SetExcessUTXOCharge(Amount) override;
-    Amount GetExcessUTXOCharge() const override;
-
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
 
@@ -271,7 +265,6 @@ public:
 
 private:
     // All fileds are initialized in Reset()    
-    Amount excessUTXOCharge;
     CFeeRate feePerKB;
     uint64_t blockPriorityPercentage;
     uint64_t preferredBlockFileSize;
@@ -382,9 +375,6 @@ public:
 
     void SetChainParams(std::string net);
     const CChainParams &GetChainParams() const override { return *chainParams; }
-
-    void SetExcessUTXOCharge(Amount amt) override {}
-    Amount GetExcessUTXOCharge() const override { return Amount(0); }
 
     void SetMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetMinFeePerKB() const override { return CFeeRate(Amount(0)); }
