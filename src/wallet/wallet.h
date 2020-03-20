@@ -38,7 +38,6 @@ extern std::vector<CWalletRef> vpwallets;
  * Settings
  */
 extern CFeeRate payTxFee;
-extern unsigned int nTxConfirmTarget;
 extern bool bSpendZeroConfChange;
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 1000;
@@ -58,8 +57,6 @@ static const Amount MIN_FINAL_CHANGE = MIN_CHANGE / 2;
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 //! Default for -walletrejectlongchains
 static const bool DEFAULT_WALLET_REJECT_LONG_CHAINS = false;
-//! -txconfirmtarget default
-static const unsigned int DEFAULT_TX_CONFIRM_TARGET = 6;
 //! Largest (in bytes) free transaction we're willing to create
 static const unsigned int MAX_FREE_TRANSACTION_CREATE_SIZE = 1000;
 static const bool DEFAULT_WALLETBROADCAST = true;
@@ -933,7 +930,7 @@ public:
                            CWalletTx &wtxNew, CReserveKey &reservekey,
                            Amount &nFeeRet, int &nChangePosInOut,
                            std::string &strFailReason,
-                           const CCoinControl *coinControl = nullptr,
+                           const CCoinControl& coinControl,
                            bool sign = true);
     bool CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey,
                            CConnman *connman, CValidationState &state);
@@ -947,25 +944,13 @@ public:
 
     static CFeeRate minTxFee;
     static CFeeRate fallbackFee;
-    /**
-     * Estimate the minimum fee considering user set parameters and the required
-     * fee
-     */
-    static Amount GetMinimumFee(unsigned int nTxBytes,
-                                unsigned int nConfirmTarget,
-                                const CTxMemPool &pool);
-    /**
-     * Estimate the minimum fee considering required fee and targetFee or if 0
-     * then fee estimation for nConfirmTarget
-     */
-    static Amount GetMinimumFee(unsigned int nTxBytes,
-                                unsigned int nConfirmTarget,
-                                const CTxMemPool &pool, Amount targetFee);
-    /**
-     * Return the minimum required fee taking into account the floating relay
-     * fee and user set minimum transaction fee
-     */
-    static Amount GetRequiredFee(unsigned int nTxBytes);
+    Amount GetMinimumFee(unsigned int nTxBytes,
+                         const CCoinControl &coin_control,
+                         const CTxMemPool &pool);
+
+    CFeeRate GetRequiredFeeRate();
+
+    CFeeRate GetMinimumFeeRate(const CCoinControl & coin_control, const CTxMemPool & pool);
 
     bool NewKeyPool();
     size_t KeypoolCountExternalKeys();

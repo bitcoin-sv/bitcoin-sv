@@ -832,41 +832,19 @@ static UniValue submitblock(const Config &config,
 
 static UniValue estimatefee(const Config &config,
                             const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() != 1) {
+    // allow 1 parameter because of the backwards compatibility even though it is ignored in the current implementation
+    if (request.fHelp || request.params.size() > 1) {
         throw std::runtime_error(
-            "estimatefee nblocks\n"
+            "estimatefee\n"
             "\nEstimates the approximate fee per kilobyte needed for a "
-            "transaction to begin\n"
-            "confirmation within nblocks blocks.\n"
-            "\nArguments:\n"
-            "1. nblocks     (numeric, required)\n"
+            "transaction\n"
             "\nResult:\n"
-            "n              (numeric) estimated fee-per-kilobyte\n"
-            "\n"
-            "A negative value is returned if not enough transactions and "
-            "blocks\n"
-            "have been observed to make an estimate.\n"
-            "-1 is always returned for nblocks == 1 as it is impossible to "
-            "calculate\n"
-            "a fee that is high enough to get reliably included in the next "
-            "block.\n"
+            "n(numeric) estimated fee-per-kilobyte\n"
             "\nExample:\n" +
-            HelpExampleCli("estimatefee", "6"));
+            HelpExampleCli("estimatefee", ""));
     }
 
-    RPCTypeCheck(request.params, {UniValue::VNUM});
-
-    int nBlocks = request.params[0].get_int();
-    if (nBlocks < 1) {
-        nBlocks = 1;
-    }
-
-    CFeeRate feeRate = mempool.EstimateFee(nBlocks);
-    if (feeRate == CFeeRate(Amount(0))) {
-        return -1.0;
-    }
-
-    return ValueFromAmount(feeRate.GetFeePerK());
+    return ValueFromAmount(mempool.estimateFee().GetFeePerK());
 }
 
 // clang-format off
@@ -882,7 +860,7 @@ static const CRPCCommand commands[] = {
 
     {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},
 
-    {"util",       "estimatefee",           estimatefee,           true, {"nblocks"}},
+    {"util",       "estimatefee",           estimatefee,           true, {}},
 };
 // clang-format on
 

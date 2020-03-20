@@ -292,7 +292,6 @@ public:
             CTxMemPool *pool,
             TxInputDataSPtrVec& vNewTxns,
             CTxnHandlers& handlers,
-            bool fReadyForFeeEstimation,
             bool fUseTimedCancellationSource,
             std::chrono::milliseconds maxasynctasksrunduration)
         -> std::vector<std::future<typename std::result_of<
@@ -301,14 +300,12 @@ public:
                 CTxMemPool*,
                 CTxnHandlers&,
                 bool,
-                bool,
                 std::chrono::steady_clock::time_point)>::type>> {
         using resultType = typename std::result_of<
             Callable(const TxInputDataSPtr&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
-                bool,
                 bool,
                 std::chrono::steady_clock::time_point)>::type;
         // A variable which stors results
@@ -331,7 +328,6 @@ public:
                     config,
                     pool,
                     handlers,
-                    fReadyForFeeEstimation,
                     fUseTimedCancellationSource,
                     end_time_point));
         }

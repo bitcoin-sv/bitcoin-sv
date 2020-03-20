@@ -63,13 +63,15 @@ class DataCarrierSizeTest(BitcoinTestFramework):
         while True:
             tx = CTransaction()
             # as we cannot call fundrawtransaction with transaction bigger than MAX_TX_SIZE_POLICY_BEFORE_GENESIS
-            # a bit smaller transacton is used to generate inputs
+            # a bit smaller transaction is used to generate inputs
             self.fill_outputs(tx, n_outputs, script_op_codes, fund, total_bytes - 3000)
-            tx_hex = self.nodes[0].fundrawtransaction(ToHex(tx), {'changePosition': 0})['hex']
+            # Fee rate is set to 2, because we add outputs after funding transaction. Leaving it on default value (1)
+            # could lead to insufficient priority of created transaction
+            tx_hex = self.nodes[0].fundrawtransaction(ToHex(tx), {'changePosition': 0, 'feeRate': 2})['hex']
             tx_hex = self.nodes[0].signrawtransaction(tx_hex)['hex']
             tx = FromHex(CTransaction(), tx_hex)
 
-            #bytes needed to add to archive desired size
+            # bytes needed to add to archive desired size
             missing_bytes = total_bytes - len(tx.serialize())
 
             desired_scripts_size = total_bytes - 3000 + missing_bytes
@@ -83,12 +85,10 @@ class DataCarrierSizeTest(BitcoinTestFramework):
             tx.rehash()
             final_size = len(tx.serialize())
 
-            #signing transaction can change its lenght by +- n inputs
-            #if tx size is not desired we will try again
+            # signing transaction can change its lenght by +- n inputs
+            # if tx size is not desired we will try again
             if final_size == total_bytes:
                 return tx
-
-
 
     def check_datacarriersize(self, script_op_codes, n_outputs, dataCarrierSize, description):
 

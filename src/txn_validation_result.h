@@ -21,5 +21,4 @@ class CTxnValResult {
     std::vector<COutPoint> mCoinsToUncache {};
     std::shared_ptr<CTxMemPoolEntry> mpEntry {nullptr};
     CTxMemPool::setEntries mSetAncestors {};
-    bool mfTxValidForFeeEstimation {false};
 };

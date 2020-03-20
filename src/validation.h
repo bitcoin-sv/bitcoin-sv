@@ -187,11 +187,6 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 static const unsigned int DEFAULT_LIMITFREERELAY = 0;
 static const bool DEFAULT_RELAYPRIORITY = true;
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
-/**
- * Maximum age of our tip in seconds for us to be considered current for fee
- * estimation.
- */
-static const int64_t MAX_FEE_ESTIMATION_TIP_AGE = 3 * 60 * 60;
 
 /** Default for -permitbaremultisig */
 static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
@@ -647,7 +642,6 @@ void CommitTxToMempool(
     CTxMemPool& pool,
     CValidationState& state,
     const mining::CJournalChangeSetPtr& changeSet,
-    bool fLimitMempoolSize=true,
     size_t* pnMempoolSize=nullptr,
     size_t* pnDynamicMemoryUsage=nullptr);
 
@@ -659,7 +653,6 @@ void CommitTxToMempool(
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
  * @param dsDetector A reference to a double spend detector
- * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
  * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
  * @return A result of validation.
  */
@@ -668,7 +661,6 @@ CTxnValResult TxnValidation(
     const Config &config,
     CTxMemPool &pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fReadyForFeeEstimation,
     bool fUseLimits);
 
 /**
@@ -695,7 +687,6 @@ CValidationState HandleTxnProcessingException(
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
  * @param handlers Txn handlers
- * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
  * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
  * @return A vector of validation results
  */
@@ -704,7 +695,6 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     const Config &config,
     CTxMemPool &pool,
     CTxnHandlers& handlers,
-    bool fReadyForFeeEstimation,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end);
 
@@ -736,9 +726,6 @@ void CreateTxRejectMsgForP2PTxn(
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
-
-/** Check if all conditions are met to apply fee estimation */
-bool IsCurrentForFeeEstimation();
 
 /**
  * Count ECDSA signature operations the old-fashioned (pre-0.6) way

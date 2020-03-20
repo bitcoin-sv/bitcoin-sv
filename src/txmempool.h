@@ -365,7 +365,6 @@ struct descendant_score {};
 struct entry_time {};
 struct ancestor_score {};
 
-class CBlockPolicyEstimator;
 
 /**
  * Reason why a transaction was removed from the mempool, this is passed to the
@@ -492,7 +491,6 @@ private:
     //!< Value n means that n times in 2^32 we check.
     std::atomic_uint32_t nCheckFrequency;
     std::atomic_uint nTransactionsUpdated;
-    CBlockPolicyEstimator *minerPolicyEstimator;
 
     //!< sum of all mempool tx's virtual sizes.
     uint64_t totalTxSize;
@@ -616,7 +614,6 @@ public:
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
             const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
@@ -625,7 +622,6 @@ public:
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
@@ -833,23 +829,9 @@ public:
     // DEPRECATED - this will become private and ultimately changed or removed
     std::vector<TxMempoolInfo> InfoAllNL() const;
 
-    /**
-     * Estimate fee rate needed to get into the next nBlocks. If no answer can
-     * be given at nBlocks, return an estimate at the lowest number of blocks
-     * where one can be given.
-     */
-    CFeeRate EstimateSmartFee(
-            int nBlocks,
-            int *answerFoundAtBlocks = nullptr) const;
-
-    /** Estimate fee rate needed to get into the next nBlocks */
-    CFeeRate EstimateFee(int nBlocks) const;
-
-    /** Write/Read estimates to disk */
-    bool WriteFeeEstimates(CAutoFile &fileout) const;
-    bool ReadFeeEstimates(CAutoFile &filein);
-
     size_t DynamicMemoryUsage() const;
+
+    CFeeRate estimateFee() const;
 
     boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
@@ -884,7 +866,6 @@ private:
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
@@ -908,6 +889,7 @@ private:
      * children. If updateDescendants is true, then also update in-mempool
      * descendants' ancestor state.
      */
+
     void updateForRemoveFromMempoolNL(
             const setEntries &entriesToRemove,
             bool updateDescendants);
