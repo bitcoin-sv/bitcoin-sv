@@ -8,6 +8,8 @@
 #include "consensus/validation.h"
 #include "streams.h"
 #include "validation.h"
+#include "chainparams.h"
+#include "init.h"
 
 namespace block_bench {
 #include "bench/data/block413567.raw.h"
@@ -40,7 +42,10 @@ static void DeserializeAndCheckBlockTest(benchmark::State &state) {
     char a;
     stream.write(&a, 1); // Prevent compaction
 
-    const Config &config = GlobalConfig::GetConfig();
+    SelectParams(CBaseChainParams::MAIN);
+    Config &config = GlobalConfig::GetConfig();
+    assert(AppInitParameterInteraction(config));
+
     while (state.KeepRunning()) {
         // Note that CBlock caches its checked state, so we need to recreate it
         // here.
