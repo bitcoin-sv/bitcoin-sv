@@ -24,16 +24,19 @@
 
 using namespace mining;
 
-CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
-                                 int64_t _nTime, double _entryPriority,
+CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
+                                 const Amount _nFee,
+                                 int64_t _nTime,
+                                 double _entryPriority,
                                  unsigned int _entryHeight,
                                  Amount _inChainInputValue,
-                                 bool _spendsCoinbase, int64_t _sigOpsCount,
+                                 bool _spendsCoinbase,
+                                 int64_t _sigOpsCount,
                                  LockPoints lp)
     : tx(_tx), nFee(_nFee), nTime(_nTime), entryPriority(_entryPriority),
-      entryHeight(_entryHeight), inChainInputValue(_inChainInputValue),
-      spendsCoinbase(_spendsCoinbase), sigOpCount(_sigOpsCount),
-      lockPoints(lp) {
+      inChainInputValue(_inChainInputValue), sigOpCount(_sigOpsCount),
+      lockPoints(lp), entryHeight(_entryHeight), spendsCoinbase(_spendsCoinbase)
+{
     nTxSize = tx->GetTotalSize();
     nModSize = tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(tx);
