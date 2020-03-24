@@ -184,7 +184,7 @@ struct timeval MillisToTimeval(int64_t nTimeout) {
  *
  * @note This function requires that hSocket is in non-blocking mode.
  */
-static bool InterruptibleRecv(char *data, size_t len, int timeout,
+static bool InterruptibleRecv(uint8_t* data, size_t len, int timeout,
                               SOCKET &hSocket) {
     int64_t curTime = GetTimeMillis();
     int64_t endTime = curTime + timeout;
@@ -193,7 +193,7 @@ static bool InterruptibleRecv(char *data, size_t len, int timeout,
     const int64_t maxWait = 1000;
     while (len > 0 && curTime < endTime) {
         // Optimistically try the recv first
-        ssize_t ret = recv(hSocket, data, len, 0);
+        ssize_t ret = recv(hSocket, reinterpret_cast<char*>(data), len, 0);
         if (ret > 0) {
             len -= ret;
             data += ret;
@@ -285,7 +285,7 @@ static bool Socks5(const std::string &strDest, int port,
         CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
-    char pchRet1[2];
+    uint8_t pchRet1[2];
     if (!InterruptibleRecv(pchRet1, 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
         CloseSocket(hSocket);
         LogPrintf("Socks5() connect to %s:%d failed: InterruptibleRecv() "
@@ -315,7 +315,7 @@ static bool Socks5(const std::string &strDest, int port,
         }
         LogPrint(BCLog::PROXY, "SOCKS5 sending proxy authentication %s:%s\n",
                  auth->username, auth->password);
-        char pchRetA[2];
+        uint8_t pchRetA[2];
         if (!InterruptibleRecv(pchRetA, 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
             CloseSocket(hSocket);
             return error("Error reading proxy authentication response");
@@ -351,7 +351,7 @@ static bool Socks5(const std::string &strDest, int port,
         CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
-    char pchRet2[4];
+    uint8_t pchRet2[4];
     if (!InterruptibleRecv(pchRet2, 4, SOCKS5_RECV_TIMEOUT, hSocket)) {
         CloseSocket(hSocket);
         return error("Error reading proxy response");
@@ -371,7 +371,7 @@ static bool Socks5(const std::string &strDest, int port,
         CloseSocket(hSocket);
         return error("Error: malformed proxy response");
     }
-    char pchRet3[256];
+    uint8_t pchRet3[256];
     switch (pchRet2[3]) {
         case 0x01:
             ret = InterruptibleRecv(pchRet3, 4, SOCKS5_RECV_TIMEOUT, hSocket);
@@ -385,9 +385,7 @@ static bool Socks5(const std::string &strDest, int port,
                 CloseSocket(hSocket);
                 return error("Error reading from proxy");
             }
-            int nRecv = pchRet3[0];
-            ret =
-                InterruptibleRecv(pchRet3, nRecv, SOCKS5_RECV_TIMEOUT, hSocket);
+            ret = InterruptibleRecv(pchRet3, pchRet3[0], SOCKS5_RECV_TIMEOUT, hSocket);
             break;
         }
         default:
