@@ -88,39 +88,15 @@ class StallingTest(ComparisonTestFramework):
                                       ],
                       init_data_dir=True)
         self.start_node(2)
-        # Launch another node with a very high requried bandwidth that will cause it to hit the stall
-        self.add_node(3, extra_args = [
-                                    '-whitelist=127.0.0.1',
-                                    '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
-                                    '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
-                                    '-maxtxsizepolicy=%d' % ONE_GIGABYTE * 2,
-                                    '-maxscriptsizepolicy=0',
-                                    '-rpcservertimeout=1000',
-                                    '-genesisactivationheight=%d' % self.genesisactivationheight,
-                                    "-txindex",
-                                    "-maxtipage=0",
-                                    "-blockdownloadwindow=64",
-                                    "-blockstallingmindownloadspeed=50000000",
-                                    "-blockstallingtimeout=6"
-                                      ],
-                      init_data_dir=True)
-        self.start_node(3)
 
         # Connect the new nodes up so they do IBD
         self.log.info("Starting IBD")
         connect_nodes(self.nodes[0], 2)
         connect_nodes(self.nodes[1], 2)
-        connect_nodes(self.nodes[0], 3)
-        connect_nodes(self.nodes[1], 3)
         self.sync_all(timeout=120)
 
         # Check we didn't hit a stall for node2
         assert(not check_for_log_msg("stalling block download", self.options.tmpdir + "/node2"))
-
-        # Check we hit a stall for node3 (if this test starts failing, try increasing
-        # -blockstallingmindownloadspeed above, if it still keeps failing then consider
-        # getting rid of this test on node3 because it doesn't add much)
-        assert(check_for_log_msg("stalling block download", self.options.tmpdir + "/node3"))
 
 if __name__ == '__main__':
     StallingTest().main()
