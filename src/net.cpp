@@ -89,7 +89,7 @@ limitedmap<uint256, int64_t> mapAlreadyAskedFor(CInv::estimateMaxInvElements(MAX
 /** The maximum number of entries in mapAskFor */
 static const size_t MAPASKFOR_MAX_SIZE = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
 /** The maximum number of entries in setAskFor (larger due to getdata latency)*/
-static const size_t SETASKFOR_MAX_SIZE = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * 2);
+static const size_t SETASKFOR_MAX_SIZE = MAPASKFOR_MAX_SIZE * 4;
 
 // Signals for message handling
 static CNodeSignals g_signals;
