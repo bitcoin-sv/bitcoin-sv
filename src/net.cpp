@@ -3251,17 +3251,17 @@ void CNode::AskFor(const CInv &inv) {
     }
     LogPrint(BCLog::NET, "askfor %s  %d (%s) peer=%d\n", inv.ToString(),
              nRequestTime,
-             DateTimeStrFormat("%H:%M:%S", nRequestTime / 1000000), id);
+             DateTimeStrFormat("%H:%M:%S", nRequestTime / MICROS_PER_SECOND), id);
 
     // Make sure not to reuse time indexes to keep things in the same order
-    int64_t nNow = GetTimeMicros() - 1000000;
+    int64_t nNow = GetTimeMicros() - MICROS_PER_SECOND;
     static int64_t nLastTime;
     ++nLastTime;
     nNow = std::max(nNow, nLastTime);
     nLastTime = nNow;
 
-    // Each retry is 2 minutes after the last
-    nRequestTime = std::max(nRequestTime + 2 * 60 * 1000000, nNow);
+    // Each retry is 1 minute after the last
+    nRequestTime = std::max(nRequestTime + 1 * 60 * MICROS_PER_SECOND, nNow);
     if (it != mapAlreadyAskedFor.end()) {
         mapAlreadyAskedFor.update(it, nRequestTime);
     } else {
