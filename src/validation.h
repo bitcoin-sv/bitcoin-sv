@@ -307,6 +307,48 @@ static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 int GetProcessingBlocksCount();
 
 /**
+ * Minimum length of valid fork that trigger safe mode.
+ */
+static const int SAFE_MODE_MIN_VALID_FORK_LENGTH = 7;
+
+/**
+ * Maximum distance of valid fork tip from active tip.
+ */
+static const int SAFE_MODE_MAX_VALID_FORK_DISTANCE = 72;
+
+/**
+ * Maximum distance of forks last common block from current active tip
+ * to still enter safe mode.
+ */
+static const int SAFE_MODE_MAX_FORK_DISTANCE = 288;
+
+/**
+ * Minimum number of blocks that fork should be ahead of active tip to
+ * enter safe mode.
+ */
+static const int SAFE_MODE_MIN_POW_DIFFERENCE = 6;
+
+/**
+ * Method checks if block that is being added to block index causes
+ * node to enter safe mode. 
+ * Node enters "Safe mode" in two cases:
+ *   1. When any fork tip which is demonstrating at least SAFE_MODE_MIN_POW_DIFFERENCE 
+ *      blocks more proof of work than the current best chain, is detected regardless 
+ *      of the header status (valid / invalid / unknown) but only if last common block
+ *      is at most SAFE_MODE_MAX_FORK_DISTANCE blocks away from current best tip. 
+ *   2. When a fork with successfully validated blocks is detected, which is at least 
+ *      SAFE_MODE_MIN_VALID_FORK_LENGTH block long and whose tip is within 
+ *      SAFE_MODE_MAX_VALID_FORK_DISTANCE blocks from the current best chain tip
+ */
+void CheckSafeModeParameters(const CBlockIndex* pindexNew);
+
+/**
+ * Method finds all chain tips (except active) and checks if any of them 
+ * should trigger node to enter safe mode.
+ */
+void CheckSafeModeParametersForAllForksOnStartup();
+
+/**
  * Invalidate all chains containing given block that should be already invalid. 
  * Set status of descendent blocks to "with failed parent".
  */
