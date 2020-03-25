@@ -2502,8 +2502,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     if (fPruneMode) {
                         CleanupBlockRevFiles();
                     }
-                } else if (!pcoinsdbview->Upgrade()) {
-                    strLoadError = _("Error upgrading chainstate database");
+                } else if (pcoinsdbview->IsOldDBFormat()) {
+                    strLoadError = _("Refusing to start, older database format detected");
                     break;
                 }
                 if (shutdownToken.IsCanceled()) break;

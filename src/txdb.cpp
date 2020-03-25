@@ -337,134 +337,13 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
     return true;
 }
 
-namespace {
-//! Legacy class to deserialize pre-pertxout database entries without reindex.
-class CCoins {
-public:
-    //! whether transaction is a coinbase
-    bool fCoinBase;
-
-    //! unspent transaction outputs; spent outputs are .IsNull(); spent outputs
-    //! at the end of the array are dropped
-    std::vector<CTxOut> vout;
-
-    //! at which height this transaction was included in the active block chain
-    int nHeight;
-
-    //! empty constructor
-    CCoins() : fCoinBase(false), vout(0), nHeight(0) {}
-
-    template <typename Stream> void Unserialize(Stream &s) {
-        uint32_t nCode = 0;
-        // version
-        int nVersionDummy;
-        ::Unserialize(s, VARINT(nVersionDummy));
-        // header code
-        ::Unserialize(s, VARINT(nCode));
-        fCoinBase = nCode & 1;
-        std::vector<bool> vAvail(2, false);
-        vAvail[0] = (nCode & 2) != 0;
-        vAvail[1] = (nCode & 4) != 0;
-        uint32_t nMaskCode = (nCode / 8) + ((nCode & 6) != 0 ? 0 : 1);
-        // spentness bitmask
-        while (nMaskCode > 0) {
-            uint8_t chAvail = 0;
-            ::Unserialize(s, chAvail);
-            for (unsigned int p = 0; p < 8; p++) {
-                bool f = (chAvail & (1 << p)) != 0;
-                vAvail.push_back(f);
-            }
-            if (chAvail != 0) {
-                nMaskCode--;
-            }
-        }
-        // txouts themself
-        vout.assign(vAvail.size(), CTxOut());
-        for (size_t i = 0; i < vAvail.size(); i++) {
-            if (vAvail[i]) {
-                ::Unserialize(s, REF(CTxOutCompressor(vout[i])));
-            }
-        }
-        // coinbase height
-        ::Unserialize(s, VARINT(nHeight));
-    }
-};
-} // namespace
-
-/**
- * Upgrade the database from older formats.
- *
- * Currently implemented: from the per-tx utxo model (0.8..0.14.x) to per-txout.
- */
-bool CCoinsViewDB::Upgrade() {
+bool CCoinsViewDB::IsOldDBFormat()
+{
     std::unique_ptr<CDBIterator> pcursor(db.NewIterator());
     pcursor->Seek(std::make_pair(DB_COINS, uint256()));
-    if (!pcursor->Valid()) {
-        return true;
+    if (!pcursor->Valid())
+    {
+        return false;
     }
-
-    int64_t count = 0;
-    LogPrintf("Upgrading utxo-set database...\n");
-    LogPrintf("[0%%]...");
-    size_t batch_size = 1 << 24;
-    CDBBatch batch(db);
-    uiInterface.SetProgressBreakAction(StartShutdown);
-    int reportDone = 0;
-    std::pair<uint8_t, uint256> key;
-    std::pair<uint8_t, uint256> prev_key = {DB_COINS, uint256()};
-    while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
-
-        if (!pcursor->GetKey(key) || key.first != DB_COINS) {
-            break;
-        }
-
-        if (count++ % 256 == 0) {
-            uint32_t high =
-                0x100 * *key.second.begin() + *(key.second.begin() + 1);
-            int percentageDone = (int)(high * 100.0 / 65536.0 + 0.5);
-            uiInterface.ShowProgress(
-                _("Upgrading UTXO database") + "\n" +
-                    _("(press q to shutdown and continue later)") + "\n",
-                percentageDone);
-            if (reportDone < percentageDone / 10) {
-                // report max. every 10% step
-                LogPrintf("[%d%%]...", percentageDone);
-                reportDone = percentageDone / 10;
-            }
-        }
-
-        CCoins old_coins;
-        if (!pcursor->GetValue(old_coins)) {
-            return error("%s: cannot parse CCoins record", __func__);
-        }
-
-        TxId id(key.second);
-        for (size_t i = 0; i < old_coins.vout.size(); ++i) {
-            if (!old_coins.vout[i].IsNull() &&
-                !old_coins.vout[i].scriptPubKey.IsUnspendable(IsGenesisEnabled(GlobalConfig::GetConfig(), old_coins.nHeight))) {
-                Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight,
-                             old_coins.fCoinBase);
-                COutPoint outpoint(id, i);
-                CoinEntry entry(&outpoint);
-                batch.Write(entry, newcoin);
-            }
-        }
-
-        batch.Erase(key);
-        if (batch.SizeEstimate() > batch_size) {
-            db.WriteBatch(batch);
-            batch.Clear();
-            db.CompactRange(prev_key, key);
-            prev_key = key;
-        }
-
-        pcursor->Next();
-    }
-
-    db.WriteBatch(batch);
-    db.CompactRange({DB_COINS, uint256()}, key);
-    uiInterface.SetProgressBreakAction(std::function<void(void)>());
-    LogPrintf("[%s].\n", "DONE");
     return true;
 }

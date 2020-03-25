@@ -97,9 +97,8 @@ public:
     CCoinsViewCursor *Cursor() const override;
     CCoinsViewCursor *Cursor(const TxId &txId) const override;
 
-    //! Attempt to update from an older database format.
-    //! Returns whether an error occurred.
-    bool Upgrade();
+    //! Returns true if database is in an older format.
+    bool IsOldDBFormat();
     size_t EstimateSize() const override;
 };
 
