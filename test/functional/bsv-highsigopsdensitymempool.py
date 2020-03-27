@@ -53,8 +53,8 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
             txMultisig = create_transaction(out[i].tx, out[i].n, b'', 100000, CScript([twoGB, OP_CHECKMULTISIG]))
             self.test.connections[0].send_message(msg_tx(txMultisig))
             txsMultisigs.append(txMultisig)
-        # check that last transaction is in mempool
-        self.check_mempool(self.test.connections[0].rpc, [txMultisig])
+        # check that transactions are in mempool
+        self.check_mempool(self.test.connections[0].rpc, txsMultisigs)
 
         # send 10 transactions with normal sigops density
         txsBasics = []
@@ -62,8 +62,8 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
             txBasic = create_transaction(out[i+j+1].tx, out[i+j+1].n, b'', 100000, CScript([2, OP_CHECKMULTISIG]))
             self.test.connections[0].send_message(msg_tx(txBasic))
             txsBasics.append(txBasic)
-        # check that last transaction is in mempool
-        self.check_mempool(self.test.connections[0].rpc, [txBasic])
+        # check that transactions are in mempool
+        self.check_mempool(self.test.connections[0].rpc, txsBasics)
 
         mempool = node.getrawmempool()
         for tx in txsMultisigs:
