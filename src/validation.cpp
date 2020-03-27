@@ -851,12 +851,12 @@ static bool CheckTxSpendsCoinbase(
 }
 
 static Amount GetMempoolRejectFee(
+    const Config& config,
     const CTxMemPool &pool,
     unsigned int nTxSize) {
     // Get mempool reject fee
-    return pool.GetMinFee(
-                gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE))
-            .GetFee(nTxSize);
+    return pool.GetMinFee(config.GetMaxMempool())
+        .GetFee(nTxSize);
 }
 
 static bool CheckMempoolMinFee(
@@ -887,6 +887,7 @@ static bool CheckTxRelayPriority(
 }
 
 static bool CheckLimitFreeTx(
+    const Config& config,
     bool fLimitFree,
     const Amount& nModifiedFees,
     const CFeeRate& minRelayTxFee,
@@ -911,7 +912,7 @@ static bool CheckLimitFreeTx(
     // -limitfreerelay unit is thousand-bytes-per-minute
     // At default rate it would take over a month to fill 1GB
     if (dFreeCount + nTxSize >=
-        gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, 1000) * 10) {
+        config.GetLimitFreeRelay() * 10) {
         return false;
     }
 
@@ -947,9 +948,11 @@ static uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) 
     // Check inputs based on the set of flags we activate.
     uint32_t scriptVerifyFlags = StandardScriptVerifyFlags(genesisEnabled, false);
     if (!config.GetChainParams().RequireStandard()) {
-        scriptVerifyFlags =
-            SCRIPT_ENABLE_SIGHASH_FORKID |
-            gArgs.GetArg("-promiscuousmempoolflags", scriptVerifyFlags);
+        if (config.IsSetPromiscuousMempoolFlags())
+        {
+            scriptVerifyFlags = config.GetPromiscuousMempoolFlags();
+        }
+        scriptVerifyFlags = SCRIPT_ENABLE_SIGHASH_FORKID | scriptVerifyFlags;
     }
     // Make sure whatever we need to activate is actually activated.
     return scriptVerifyFlags;
@@ -1043,8 +1046,8 @@ void CommitTxToMempool(
         LimitMempoolSize(
             pool,
             changeSet,
-            gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE),
-            gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+            GlobalConfig::GetConfig().GetMaxMempool(),
+            GlobalConfig::GetConfig().GetMemPoolExpiry());
         if (!pool.Exists(txid)) {
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                      "mempool full");
@@ -1344,7 +1347,7 @@ CTxnValResult TxnValidation(
     // Calculate tx's size.
     const unsigned int nTxSize = ptx->GetTotalSize();
     // Check mempool minimal fee requirement.
-    const Amount& nMempoolRejectFee = GetMempoolRejectFee(pool, nTxSize);
+    const Amount& nMempoolRejectFee = GetMempoolRejectFee(config, pool, nTxSize);
     if(!CheckMempoolMinFee(nModifiedFees, nMempoolRejectFee)) {
         state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                  "mempool min fee not met",
@@ -1383,7 +1386,7 @@ CTxnValResult TxnValidation(
     // This mitigates 'penny-flooding' -- sending thousands of free
     // transactions just to be annoying or make others' transactions take
     // longer to confirm.
-    if (!CheckLimitFreeTx(fLimitFree, nModifiedFees, minRelayTxFee, nTxSize)){
+    if (!CheckLimitFreeTx(config, fLimitFree, nModifiedFees, minRelayTxFee, nTxSize)){
         state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                  "rate limited free transaction");
         return Result{state, pTxInputData, vCoinsToUncache};
@@ -1844,13 +1847,8 @@ static void HandleOrphanAndRejectedP2PTxns(
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
         // DoS prevention: do not allow mpOrphanTxns to grow unbounded
-        // Multiplying and dividing by ONE_MEGABYTE, because users provide value in MB, internally we use B
-        uint64_t nMaxOrphanTxnsSize {
-            static_cast<uint64_t>(
-                    std::max(gArgs.GetArgAsBytes("-maxorphantxsize",
-                                        COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE,
-                                        ONE_MEGABYTE),
-                             (int64_t)0))
+        uint64_t nMaxOrphanTxnsSize{
+            GlobalConfig::GetConfig().GetMaxOrphanTxSize()
         };
         unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsSize(nMaxOrphanTxnsSize);
         if (nEvicted > 0) {
@@ -3967,8 +3965,7 @@ bool FlushStateToDisk(
             if (nLastSetChain == 0) {
                 nLastSetChain = nNow;
             }
-            int64_t nMempoolSizeMax =
-                gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE);
+            int64_t nMempoolSizeMax = GlobalConfig::GetConfig().GetMaxMempool();
             int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
             int64_t nTotalSpace =
                 nCoinCacheUsage +
@@ -4201,7 +4198,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
 
 
         //  The amount of transactions we are willing to store during reorg is the same as max mempool size
-        uint64_t maxDisconnectedTxPoolSize = gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE);
+        uint64_t maxDisconnectedTxPoolSize = config.GetMaxMempool();
         while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
             // Drop the earliest entry, and remove its children from the
             // mempool.
@@ -4955,7 +4952,7 @@ bool ActivateBestChain(
         return false;
     }
 
-    int nStopAtHeight = gArgs.GetArg("-stopatheight", DEFAULT_STOPATHEIGHT);
+    int nStopAtHeight = config.GetStopAtHeight();
     if (nStopAtHeight && pindexNewTip &&
         pindexNewTip->nHeight >= nStopAtHeight) {
         StartShutdown();
@@ -7341,7 +7338,7 @@ static const uint64_t MEMPOOL_DUMP_VERSION = 1;
 bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
 {
     try {
-        int64_t nExpiryTimeout = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
+        int64_t nExpiryTimeout = config.GetMemPoolExpiry();
         FILE *filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
         CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
         if (file.IsNull()) {

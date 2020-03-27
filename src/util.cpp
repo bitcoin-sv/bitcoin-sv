@@ -220,7 +220,7 @@ int64_t ArgsManager::GetArg(const std::string& strArg, int64_t nDefault) {
             {
                 returnValue = stoll(argValue);
             }
-            catch (std::exception & e)
+            catch (std::exception& e)
             {
                 std::string argError = "\nArgsManager::GetArg '" + argValue + "' is invalid value for argument " + strArg + ", must be numeric value.";
                 PrintExceptionContinue(&e, argError.c_str());

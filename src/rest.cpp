@@ -59,7 +59,7 @@ struct CCoin {
     }
 };
 
-extern UniValue mempoolInfoToJSON();
+extern UniValue mempoolInfoToJSON(const Config& config);
 extern UniValue mempoolToJSON(bool fVerbose = false);
 
 static bool RESTERR(HTTPRequest *req, enum HTTPStatusCode status,
@@ -354,7 +354,7 @@ static bool rest_mempool_info(Config &config, HTTPRequest *req,
 
     switch (rf) {
         case RF_JSON: {
-            UniValue mempoolInfoObject = mempoolInfoToJSON();
+            UniValue mempoolInfoObject = mempoolInfoToJSON(config);
 
             std::string strJSON = mempoolInfoObject.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");

@@ -312,8 +312,8 @@ void CTxnValidator::processValidation(
             LimitMempoolSize(
                 mMempool,
                 changeSet,
-                gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, 1000000),
-                gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+                mConfig.GetMaxMempool(),
+                mConfig.GetMemPoolExpiry());
     }
     // Execute post processing steps.
     postProcessingStepsNL(vAcceptedTxns, vRemovedTxIds, handlers);
@@ -355,8 +355,8 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         // Ensure, that the last - long running task - won't exceed the limit.
         nMaxTxnValidatorAsyncTasksRunDuration -= mConfig.GetMaxNonStdTxnValidationDuration();
         // Get mempool limits.
-        size_t nMaxMempoolSize = gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, 1000000);
-        unsigned long nMempoolExpiry = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
+        size_t nMaxMempoolSize = mConfig.GetMaxMempool();
+        unsigned long nMempoolExpiry = mConfig.GetMemPoolExpiry();
         // The main running loop
         while(mRunning) {
             // Run every few seconds or until stopping

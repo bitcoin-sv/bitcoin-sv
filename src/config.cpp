@@ -63,6 +63,15 @@ void GlobalConfig::Reset()
     mAcceptNonStandardOutput = true;
 
     mMaxCoinsViewCacheSize = 0;
+    
+    mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
+    mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * 60 * 60;
+    mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
+    mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
+    mStopAtHeight = DEFAULT_STOPATHEIGHT;
+    mPromiscuousMempoolFlags = 0;
+    mIsSetPromiscuousMempoolFlags = false;
+
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -919,4 +928,129 @@ uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus)
         return MAX_SCRIPT_SIZE_AFTER_GENESIS;
     }
     return maxScriptSizePolicy;
+}
+
+bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
+    if (maxMempool < 0)
+    {
+        if (err)
+        {
+            *err = _("Policy value for maximum memory pool must not be less than 0.");
+        }
+        return false;
+    }
+    if (maxMempool > 0 && maxMempool < DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE * 0.3)
+    {
+        if (err)
+        {
+            *err = strprintf(_("Policy value for maximum memory pool must be at least %d MB"), std::ceil(DEFAULT_MAX_MEMPOOL_SIZE * 0.3));
+        }
+        return false;
+    }
+
+    mMaxMempool = static_cast<uint64_t>(maxMempool);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxMempool() const {
+    return mMaxMempool;
+}
+
+bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
+    if (memPoolExpiry < 0)
+    {
+        if (err)
+        {
+            *err = _("Policy value for memory pool expiry must not be less than 0.");
+        }
+        return false;
+    }
+
+    mMemPoolExpiry = static_cast<uint64_t>(memPoolExpiry);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMemPoolExpiry() const {
+    return mMemPoolExpiry;
+}
+
+bool GlobalConfig::SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) {
+    if (limitFreeRelay < 0)
+    {
+        if (err)
+        {
+            *err = _("Policy value for rate-limit free transactions must not be less than 0.");
+        }
+        return false;
+    }
+
+    mLimitFreeRelay = static_cast<uint64_t>(limitFreeRelay);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetLimitFreeRelay() const {
+    return mLimitFreeRelay;
+}
+
+bool GlobalConfig::SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) {
+    if (maxOrphanTxSize < 0)
+    {
+        if (err)
+        {
+            *err = _("Policy value for maximum orphan transaction size must not be less than 0.");
+        }
+        return false;
+    }
+
+    mMaxOrphanTxSize = static_cast<uint64_t>(maxOrphanTxSize);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxOrphanTxSize() const {
+    return mMaxOrphanTxSize;
+}
+
+bool GlobalConfig::SetStopAtHeight(int64_t stopAtHeight, std::string* err) {
+    if (stopAtHeight < 0)
+    {
+        if (err)
+        {
+            *err = _("Policy value for stop at height in the main chain must not be less than 0.");
+        }
+        return false;
+    }
+
+    mStopAtHeight = static_cast<uint64_t>(stopAtHeight);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetStopAtHeight() const {
+    return mStopAtHeight;
+}
+
+bool GlobalConfig::SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) {
+    if (promiscuousMempoolFlags < 0)
+    {
+        if (err)
+        {
+            *err = _("Promiscuous mempool flags value must not be less than 0.");
+        }
+        return false;
+    }
+    mPromiscuousMempoolFlags = static_cast<uint64_t>(promiscuousMempoolFlags);
+    mIsSetPromiscuousMempoolFlags = true;
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetPromiscuousMempoolFlags() const {
+    return mPromiscuousMempoolFlags;
+}
+bool GlobalConfig::IsSetPromiscuousMempoolFlags() const {
+    return mIsSetPromiscuousMempoolFlags;
 }

@@ -396,10 +396,9 @@ std::string HelpMessage(HelpMessageMode mode) {
         _("Imports blocks from external blk000??.dat file on startup"));
 
     strUsage += HelpMessageOpt("-maxmempool=<n>",
-                   strprintf(_("Keep the transaction memory pool below <n> megabytes "
-                               "(default: %u%s). The value may be given in megabytes or with unit (B, kB, MB, GB). "),
-                             DEFAULT_MAX_MEMPOOL_SIZE,
-                             showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : ""));
+                               strprintf(_("Keep the transaction memory pool "
+                                           "below <n> megabytes (default: %u%s,  must be at least %d). The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+                                         DEFAULT_MAX_MEMPOOL_SIZE, showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "", std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
     strUsage +=
         HelpMessageOpt("-mempoolexpiry=<n>",
                        strprintf(_("Do not keep transactions in the mempool "
@@ -1737,15 +1736,13 @@ bool AppInitParameterInteraction(Config &config) {
         LogPrintf("Warning: nMinimumChainWork set below default value of %s\n",
                   chainparams.GetConsensus().nMinimumChainWork.GetHex());
     }
-
-    // mempool limits
-    int64_t nMempoolSizeMax =
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
-    constexpr int64_t nMempoolSizeMin = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE * 0.3;
-    if (nMempoolSizeMax < 0 || (nMempoolSizeMax && nMempoolSizeMax < nMempoolSizeMin))
-        return InitError(strprintf(_("-maxmempool must be at least %d MB"),
-                                   std::ceil(nMempoolSizeMin / static_cast<double>(ONE_MEGABYTE))));
-
+    
+    // mempool limits  
+    if (std::string err; !config.SetMaxMempool(
+        gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
 
     // script validation settings
     if(std::string error; !config.SetBlockScriptValidatorsParams(
@@ -1762,6 +1759,45 @@ bool AppInitParameterInteraction(Config &config) {
         &error))
     {
         return InitError("-maxparallelblocksperpeer: " + error);
+    }
+
+    // Configure memory pool expiry
+    if (std::string err; !config.SetMemPoolExpiry(
+        gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60, &err))
+    {
+        return InitError(err);
+    }
+    
+    // Configure free transactions limit 
+    if (std::string err; !config.SetLimitFreeRelay(
+        gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, ONE_KILOBYTE), &err))
+    {
+        return InitError(err);
+    }
+
+    // Configure max orphant Tx size
+    if (std::string err; !config.SetMaxOrphanTxSize(
+        gArgs.GetArgAsBytes("-maxorphantxsize", 
+            COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
+
+    // Configure height to stop running
+    if (std::string err; !config.SetStopAtHeight(
+        gArgs.GetArg("-stopatheight", DEFAULT_STOPATHEIGHT), &err))
+    {
+        return InitError(err);
+    }
+
+    // Configure promiscuous memory pool flags
+    if (gArgs.IsArgSet("-promiscuousmempoolflags"))
+    {
+        if (std::string err; !config.SetPromiscuousMempoolFlags(
+            gArgs.GetArg("-promiscuousmempoolflags", 0), &err))
+        {
+            return InitError(err);
+        }
     }
 
     // Configure preferred size of blockfile.
@@ -1840,12 +1876,12 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure descendant limit size.
     if(gArgs.IsArgSet("-limitdescendantsize")) {
-        config.SetLimitDescendantSize(gArgs.GetArgAsBytes("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT, 1000));
+        config.SetLimitDescendantSize(gArgs.GetArgAsBytes("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT, ONE_KILOBYTE));
     }
 
     // Configure ancestor limit size.
     if(gArgs.IsArgSet("-limitancestorsize")) {
-        config.SetLimitAncestorSize(gArgs.GetArgAsBytes("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT, 1000));
+        config.SetLimitAncestorSize(gArgs.GetArgAsBytes("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT, ONE_KILOBYTE));
     }
 
     // Configure genesis activation height.
@@ -2494,8 +2530,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     nTotalCache -= nCoinDBCache;
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
-    int64_t nMempoolSizeMax =
-        gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE);
+    int64_t nMempoolSizeMax = config.GetMaxMempool();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / 1024 / 1024));
@@ -2784,9 +2819,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     connOptions.nBestHeight = chainActive.Height();
     connOptions.uiInterface = &uiInterface;
     connOptions.nSendBufferMaxSize = 
-        gArgs.GetArgAsBytes("-maxsendbuffer", DEFAULT_MAXSENDBUFFER, 1000);
+        gArgs.GetArgAsBytes("-maxsendbuffer", DEFAULT_MAXSENDBUFFER, ONE_KILOBYTE);
     connOptions.nReceiveFloodSize =
-        gArgs.GetArgAsBytes("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER, 1000);
+        gArgs.GetArgAsBytes("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER, ONE_KILOBYTE);
 
     connOptions.nMaxOutboundTimeframe = nMaxOutboundTimeframe;
     connOptions.nMaxOutboundLimit = nMaxOutboundLimit;

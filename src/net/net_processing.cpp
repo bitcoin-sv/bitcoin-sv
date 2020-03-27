@@ -4301,11 +4301,7 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         !(pto->fWhitelisted &&
           gArgs.GetBoolArg("-whitelistforcerelay",
                            DEFAULT_WHITELISTFORCERELAY))) {
-        Amount currentFilter =
-            mempool
-                .GetMinFee(
-                    gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE))
-                .GetFeePerK();
+        Amount currentFilter = mempool.GetMinFee(config.GetMaxMempool()).GetFeePerK();
         int64_t timeNow = GetTimeMicros();
         if (timeNow > pto->nextSendTimeFeeFilter) {
             static CFeeRate default_feerate =
@@ -4314,7 +4310,7 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
             Amount filterToSend = filterRounder.round(currentFilter);
             // If we don't allow free transactions, then we always have a fee
             // filter of at least minRelayTxFee
-            if (gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, ONE_KILOBYTE) <= 0) {
+            if (config.GetLimitFreeRelay() <= 0) {
                 filterToSend = std::max(filterToSend,
                                         config.GetMinFeePerKB().GetFeePerK());
             }
