@@ -151,6 +151,61 @@ def calc_needed_data_size(script_op_codes, target_size):
 
     return target_size - (len(script_op_codes) + pushdata_size(target_size))
 
+def make_block(connection, parent_block=None, makeValid=True, last_block_time=0):
+    if parent_block is not None:
+        parent_hash = parent_block.sha256
+        parent_time = parent_block.nTime
+        parent_height = parent_block.height
+
+    else:
+        tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
+        parent_hash = int(tip["hash"], 16)
+        parent_time = tip["time"]
+        parent_height = tip["height"]
+
+    coinbase_tx = create_coinbase(parent_height + 1)
+    if not makeValid:
+        coinbase_tx.vout.append(CTxOut(50, CScript([OP_TRUE])))
+    coinbase_tx.rehash()
+
+    block = create_block(parent_hash, coinbase_tx, max(last_block_time, parent_time) + 1)
+
+    block.height = parent_height + 1
+    block.solve()
+    return block, block.nTime
+
+def send_by_headers(conn, blocks, do_send_blocks):
+    hash_block_map = {b.sha256: b for b in blocks}
+
+    def on_getdata(c, msg):
+        for i in msg.inv:
+            bl = hash_block_map.get(i.hash, None)
+            if not bl:
+                continue
+            del hash_block_map[i.hash]
+            conn.send_message(msg_block(bl))
+
+    with conn.cb.temporary_override_callback(on_getdata=on_getdata):
+        headers_message = msg_headers()
+        headers_message.headers = [CBlockHeader(b) for b in blocks]
+        conn.send_message(headers_message)
+        if do_send_blocks:
+            wait_until(lambda: len(hash_block_map)==0, label="wait until all blocks are sent")
+
+def chain_tip_status_equals(conn, hash, status):
+    chain_tips = conn.rpc.getchaintips()
+    for tip in chain_tips:
+        if tip["hash"] == hash and tip["status"] == status:
+            return True
+    return False
+    
+def wait_for_tip(conn, hash):
+    wait_until(lambda: conn.rpc.getbestblockhash() == hash, timeout=10, check_interval=0.2,
+                label=f"waiting until {hash} become tip")
+
+def wait_for_tip_status(conn, hash, status):
+    wait_until(lambda: chain_tip_status_equals(conn, hash, status), timeout=10, check_interval=0.2,
+                label=f"waiting until {hash} is tip with status {status}")
 
 ### Helper to build chain
 
