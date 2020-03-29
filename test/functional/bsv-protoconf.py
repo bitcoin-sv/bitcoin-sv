@@ -3,11 +3,11 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-from test_framework.mininode import *
+from test_framework.mininode import CInv, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, logger, NodeConn, NodeConnCB, \
+    NetworkThread, msg_protoconf, CProtoconf, msg_inv
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
-import time, math
-from test_framework.blocktools import create_block, create_coinbase
+from test_framework.util import assert_equal, p2p_port
+import math
 
 class BsvProtoconfTest(BitcoinTestFramework):
 
@@ -18,8 +18,11 @@ class BsvProtoconfTest(BitcoinTestFramework):
     def setup_network(self):
         self.setup_nodes()
 
-    def run_test(self):
+    def setup_nodes(self):
+        self.add_nodes(self.num_nodes)
 
+    def run_test_parametrized(self, args):
+        self.start_node(0, ["-{}={}".format(args[0], args[1])] if len(args) == 2 else args)
         # Testing scope: our maximal protocol message length is smaller than remote node's message length, remote node has to respect this.
 
         ELEMENTS_PER_1MiB = 29126
@@ -55,8 +58,16 @@ class BsvProtoconfTest(BitcoinTestFramework):
         test_node.wait_for_protoconf()
         max_recv_payload_length = test_node.last_message["protoconf"].protoconf.max_recv_payload_length
 
-        maxInvElements = CInv.estimateMaxInvElements(max_recv_payload_length) #58254
-        assert_equal(maxInvElements, ELEMENTS_PER_2MiB)
+        maxInvElements = CInv.estimateMaxInvElements(max_recv_payload_length)
+
+        # Calculate number of elements from the size of command line parameter maxprotocolrecvpayloadlength
+        # if no parameter is give use default number of elements for 2MiB.
+        # Formula for calculating number of elements is: (payload_length - 8) // 36
+        expected_elements = (args[1]-8)//36 if len(
+            args) > 1 else ELEMENTS_PER_2MiB
+
+        assert_equal(maxInvElements, expected_elements)
+
         logger.info("Received bitcoind max message size: {} B, which represents {} elements. ".format(max_recv_payload_length, maxInvElements))
 
         # 2. Send bitcoind Inv message.
@@ -67,11 +78,14 @@ class BsvProtoconfTest(BitcoinTestFramework):
         # 2.1. Receive GetData.
         test_node.wait_for_getdata()
 
-        # 2.2. We should receive 2 GetData messages with 1MB size (29126 elements) and 1 GetData message with 2 elements.
-        assert_equal(wanted_inv_lengths[0], expected_inv_len)
-        assert_equal(wanted_inv_lengths[1], expected_inv_len)
-        assert_equal(wanted_inv_lengths[2], 2)
-        assert_equal(len(wanted_inv_lengths), 3)
+        # 2.2. We should receive GetData messages with 1MB size (29126 elements)
+        # and 1 GetData message with remaining elements. Both values depend on maxprotocolrecvpayloadlength parameter.
+        number_of_getdata_messages = math.ceil(expected_elements/ELEMENTS_PER_1MiB)
+        for i in range(0, number_of_getdata_messages-1):
+            assert_equal(wanted_inv_lengths[0], expected_inv_len)
+        remained_for_last_getdata = expected_elements - (number_of_getdata_messages-1) * expected_inv_len
+        assert_equal(wanted_inv_lengths[number_of_getdata_messages-1], remained_for_last_getdata)
+        assert_equal(len(wanted_inv_lengths), number_of_getdata_messages)
 
         ### TEST WITH maxInvElements - 1, maxInvElements and maxInvElements + 1
         # 1. Send bitcoind Inv message that is smaller than max_recv_payload_length.
@@ -90,6 +104,13 @@ class BsvProtoconfTest(BitcoinTestFramework):
         assert(self.nodes[0].closed)# disconnected
         assert_equal(len(self.nodes[0].listbanned()), 1) #banned
         logger.info("Banned nodes : {}".format(self.nodes[0].listbanned()))
+        self.nodes[0].setban("127.0.0.1", "remove") #remove ban and stop node, to enable next test
+        self.stop_node(0)
+
+    def run_test(self):
+        self.run_test_parametrized([])
+        self.run_test_parametrized(["maxprotocolrecvpayloadlength", 3145728]) # 3 MiB
+
 
 if __name__ == '__main__':
     BsvProtoconfTest().main()
