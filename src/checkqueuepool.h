@@ -283,7 +283,10 @@ public:
 
         if(checkerPoolToken)
         {
-            *checkerPoolToken = prematureCheckerTerminationSource->GetToken();
+            *checkerPoolToken =
+                task::CCancellationToken::JoinToken(
+                    token,
+                    prematureCheckerTerminationSource->GetToken());
         }
 
         return
