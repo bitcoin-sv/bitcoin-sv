@@ -6,6 +6,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <thread>
 
 #include <boost/test/unit_test.hpp>
 
@@ -17,11 +18,11 @@ BOOST_AUTO_TEST_CASE(alertnotify_test) {
                              (unsigned long)GetTime(),
                              (int)(InsecureRandRange(100000)));
     gArgs.ForceSetArg("-alertnotify",
-                      strprintf("echo %%s >> %s", tmpfile_name.string()));
+                      strprintf("echo %%s>> %s", tmpfile_name.string())); // NOTE: Space between '%%s' and '>>' is deliberately omitted because on Windows echo command would also output that space.
 
     std::string msg = "This is just an alert!";
     AlertNotify(msg);
-    sleep(3); // Give some time for AlertNotify spawned thread to finish
+    std::this_thread::sleep_for( std::chrono::seconds(3) ); // Give some time for AlertNotify spawned thread to finish
 
     std::ifstream t(tmpfile_name.string());
     std::stringstream buffer;
