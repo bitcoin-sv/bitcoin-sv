@@ -211,8 +211,6 @@ void Shutdown() {
 
     mining::g_miningFactory.reset();
 
-    ShutdownScriptCheckQueues();
-
     if (g_connman) {
         // call Stop first as CConnman members are using g_connman global
         // variable and they must be shut down before the variable is reset to
@@ -221,6 +219,10 @@ void Shutdown() {
         g_connman->Stop();
         g_connman.reset();
     }
+
+    // must be called after g_connman shutdown as conman threads could still be
+    // using it before that
+    ShutdownScriptCheckQueues();
 
     StopTorControl();
     UnregisterNodeSignals(GetNodeSignals());
