@@ -72,7 +72,7 @@ LARGE_BLOCK_TESTS = [
 
 # This tests can be only run by explicitly specifying them on command line. 
 # This is usefull for tests that take really long time to execute.
-EXCLUDED_TESTS = []
+EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
 
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
