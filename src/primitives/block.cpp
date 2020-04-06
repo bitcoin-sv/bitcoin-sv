@@ -28,6 +28,29 @@ std::string CBlock::ToString() const {
     return s.str();
 }
 
+size_t CBlockHeader::GetHeaderSize()
+{
+    return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+}
+
+size_t CBlock::GetTransactionCount()
+{
+    return vtx.size();
+}
+
+size_t CBlock::GetSizeWithoutCoinbase()
+{
+    size_t size = GetHeaderSize();
+    for (const CTransactionRef& tx : vtx)
+    {
+        if (!tx->IsCoinBase())
+        {
+            size += tx->GetTotalSize();
+        }
+    }
+    return size;
+}
+
 uint64_t CBlock::GetHeightFromCoinbase()
     const // Returns the block's height as specified in its coinbase transaction
 {
