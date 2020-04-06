@@ -4241,23 +4241,41 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
     std::vector<CInv> vGetData {};
     {
         LOCK(cs_invQueries);
-        while (!pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow) {
-            const CInv &inv = (*pto->mapAskFor.begin()).second;
-            if (!AlreadyHave(inv)) {
-                LogPrint(BCLog::NET, "Requesting %s peer=%d\n", inv.ToString(),
-                         pto->id);
-                vGetData.push_back(inv);
-                // if next element will cause too large message, then we send it now, as message size is still under limit
-                if (vGetData.size() == pto->maxInvElements) {
-                    connman.PushMessage(
-                        pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
-                    vGetData.clear();
+        while (!pto->mapAskFor.empty()) {
+            const auto& firstIt { pto->mapAskFor.begin() };
+            const CInv& inv { firstIt->second };
+            bool alreadyHave { AlreadyHave(inv) };
+
+            if(firstIt->first <= nNow) {
+                // It's time to request (or re-request) this item
+                if (!alreadyHave) {
+                    LogPrint(BCLog::NET, "Requesting %s peer=%d\n", inv.ToString(), pto->id);
+                    vGetData.push_back(inv);
+                    // if next element will cause too large message, then we send it now, as message size is still under limit
+                    if (vGetData.size() == pto->maxInvElements) {
+                        connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                        vGetData.clear();
+                    }
                 }
-            } else {
-                // If we're not going to ask, don't expect a response.
-                pto->setAskFor.erase(inv.hash);
+                else {
+                    // If we're not going to ask, don't expect a response.
+                    pto->setAskFor.erase(inv.hash);
+                }
+                pto->mapAskFor.erase(firstIt);
             }
-            pto->mapAskFor.erase(pto->mapAskFor.begin());
+            else {
+                // Look ahead to see if we can clear out some items we have already recieved from elsewhere
+                if(alreadyHave) {
+                    pto->mapAskFor.erase(firstIt);
+                    pto->setAskFor.erase(inv.hash);
+                }
+                else {
+                    // Abort clearing out items as soon as we find one that is still required. Bailing out here
+                    // is a trade-off between optimally clearing out every item as soon as it's seen from
+                    // any of our peers, and wasting a lot of time here iterating over this map every time.
+                    break;
+                }
+            }
         }
     }
     if (!vGetData.empty()) {
