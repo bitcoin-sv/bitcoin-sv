@@ -300,7 +300,7 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
 {
     if (pushId)
     {
-        jWriter.writeBeginObject(e.GetTx().GetId().ToString());
+        jWriter.writeBeginObject(e.GetTxId().ToString());
     }
     else
     {
@@ -315,8 +315,8 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
     jWriter.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
     jWriter.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
     std::set<std::string> deps;
-    const CTransaction& tx = e.GetTx();
-    for (const CTxIn& txin : tx.vin)
+    const auto tx = e.GetSharedTx();
+    for (const CTxIn &txin : tx->vin)
     {
         const auto& hash = txin.prevout.GetTxId();
         if (snapshot.TxIdExists(hash)) {
@@ -533,7 +533,7 @@ void getmempoolancestors(const Config &config,
             jWriter.writeBeginArray();
             for (const auto& entry : snapshot)
             {
-                jWriter.pushV(entry.GetTx().GetId().ToString());
+                jWriter.pushV(entry.GetTxId().ToString());
             }
             jWriter.writeEndArray();
         } else {
@@ -618,7 +618,7 @@ void getmempooldescendants(const Config &config,
             jWriter.writeBeginArray();
             for (const auto& entry : snapshot)
             {
-                jWriter.pushV(entry.GetTx().GetId().ToString());
+                jWriter.pushV(entry.GetTxId().ToString());
             }
             jWriter.writeEndArray();
         } else {

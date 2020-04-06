@@ -182,7 +182,8 @@ bool CTxMemPool::CalculateMemPoolAncestorsNL(
     // GetMemPoolParentsNL() is only valid for entries in the mempool, so we
     // iterate mapTx to find parents.
     setEntries parentHashes;
-    for (const auto& in : entry.GetTx().vin) {
+    const auto tx = entry.GetSharedTx();
+    for (const auto& in : tx->vin) {
         const auto piter = mapTx.find(in.prevout.GetTxId());
         if (piter == mapTx.end()) {
             continue;
@@ -412,10 +413,10 @@ void CTxMemPool::AddUncheckedNL(
     // further updated.)
     cachedInnerUsage += entry.DynamicMemoryUsage();
 
-    const CTransaction &tx = newit->GetTx();
+    const auto tx = newit->GetSharedTx();
     std::set<uint256> setParentTransactions;
-    for (const CTxIn &in : tx.vin) {
-        mapNextTx.insert(std::make_pair(&in.prevout, &tx));
+    for (const CTxIn &in : tx->vin) {
+        mapNextTx.insert(std::make_pair(&in.prevout, tx.get()));
         setParentTransactions.insert(in.prevout.GetTxId());
     }
     // Don't bother worrying about child transactions of this one. Normal case
@@ -589,7 +590,7 @@ void CTxMemPool::RemoveForReorg(
     std::unique_lock lock(smtx);
     setEntries txToRemove;
     for (txiter it = mapTx.begin(); it != mapTx.end(); it++) {
-        const CTransaction &tx = it->GetTx();
+        const auto tx = it->GetSharedTx();
         LockPoints lp = it->GetLockPoints();
         bool validLP = TestLockPointValidity(&lp);
 
@@ -600,14 +601,14 @@ void CTxMemPool::RemoveForReorg(
         CValidationState state;
         if (!ContextualCheckTransactionForCurrentBlock(
                 config,
-                tx,
+                *tx,
                 tip.nHeight,
                 nMedianTimePast,
                 state,
                 flags) ||
                 !CheckSequenceLocks(
                     tip,
-                    tx,
+                    *tx,
                     config,
                     flags,
                     &lp,
@@ -617,7 +618,7 @@ void CTxMemPool::RemoveForReorg(
             // the LockPoints.
             txToRemove.insert(it);
         } else if (it->GetSpendsCoinbase()) {
-            for (const CTxIn &txin : tx.vin) {
+            for (const CTxIn &txin : tx->vin) {
                 txiter it2 = mapTx.find(txin.prevout.GetTxId());
                 if (it2 != mapTx.end()) {
                     continue;
@@ -784,7 +785,7 @@ void CTxMemPool::CheckMempoolImplNL(
         unsigned int i = 0;
         checkTotal += it->GetTxSize();
         innerUsage += it->DynamicMemoryUsage();
-        const CTransaction &tx = it->GetTx();
+        const auto tx = it->GetSharedTx();
         txlinksMap::const_iterator linksiter = mapLinks.find(it);
         assert(linksiter != mapLinks.end());
         const TxLinks &links = linksiter->second;
@@ -793,14 +794,14 @@ void CTxMemPool::CheckMempoolImplNL(
         bool fDependsWait = false;
         setEntries setParentCheck;
         int64_t parentSizes = 0;
-        for (const CTxIn &txin : tx.vin) {
+        for (const CTxIn &txin : tx->vin) {
             // Check that every mempool transaction's inputs refer to available
             // coins, or other mempool tx's.
             txiter it2 = mapTx.find(txin.prevout.GetTxId());
             if (it2 != mapTx.end()) {
-                const CTransaction &tx2 = it2->GetTx();
-                assert(tx2.vout.size() > txin.prevout.GetN() &&
-                       !tx2.vout[txin.prevout.GetN()].IsNull());
+                const auto tx2 = it2->GetSharedTx();
+                assert(tx2->vout.size() > txin.prevout.GetN() &&
+                       !tx2->vout[txin.prevout.GetN()].IsNull());
                 fDependsWait = true;
                 if (setParentCheck.insert(it2).second) {
                     parentSizes += it2->GetTxSize();
@@ -812,7 +813,7 @@ void CTxMemPool::CheckMempoolImplNL(
             auto it3 = mapNextTx.find(txin.prevout);
             assert(it3 != mapNextTx.end());
             assert(it3->first == &txin.prevout);
-            assert(it3->second == &tx);
+            assert(it3->second == tx.get());
             i++;
         }
         assert(setParentCheck == GetMemPoolParentsNL(it)); // MARK: also used by legacy
@@ -836,10 +837,11 @@ void CTxMemPool::CheckMempoolImplNL(
 
         // Check children against mapNextTx
         setEntries setChildrenCheck;
-        auto iter = mapNextTx.lower_bound(COutPoint(it->GetTx().GetId(), 0));
+        auto iter = mapNextTx.lower_bound(COutPoint(it->GetTxId(), 0));
+
         int64_t childSizes = 0;
         for (; iter != mapNextTx.end() &&
-               iter->first->GetTxId() == it->GetTx().GetId();
+               iter->first->GetTxId() == it->GetTxId();
              ++iter) {
             txiter childit = mapTx.find(iter->second->GetId());
             // mapNextTx points to in-mempool transactions
@@ -854,15 +856,15 @@ void CTxMemPool::CheckMempoolImplNL(
             waitingOnDependants.push_back(&(*it));
         } else {
             CValidationState state;
-            bool fCheckResult = tx.IsCoinBase() ||
+            bool fCheckResult = tx->IsCoinBase() ||
                                 Consensus::CheckTxInputs(
-                                    tx, state, mempoolDuplicate, nSpendHeight);
+                                    *tx, state, mempoolDuplicate, nSpendHeight);
             assert(fCheckResult);
-            UpdateCoins(tx, mempoolDuplicate, 1000000);
+            UpdateCoins(*tx, mempoolDuplicate, 1000000);
         }
 
         // Check we haven't let any non-final txns in
-        assert(IsFinalTx(tx, nSpendHeight, medianTimePast));
+        assert(IsFinalTx(*tx, nSpendHeight, medianTimePast));
     }
 
     unsigned int stepsSinceLastRemove = 0;
@@ -870,17 +872,18 @@ void CTxMemPool::CheckMempoolImplNL(
         const CTxMemPoolEntry *entry = waitingOnDependants.front();
         waitingOnDependants.pop_front();
         CValidationState state;
-        if (!mempoolDuplicate.HaveInputs(entry->GetTx())) {
+        const auto entryTx = entry->GetSharedTx();
+        if (!mempoolDuplicate.HaveInputs(*entryTx)) {
             waitingOnDependants.push_back(entry);
             stepsSinceLastRemove++;
             assert(stepsSinceLastRemove < waitingOnDependants.size());
         } else {
             bool fCheckResult =
-                entry->GetTx().IsCoinBase() ||
-                Consensus::CheckTxInputs(entry->GetTx(), state,
+                entryTx->IsCoinBase() ||
+                Consensus::CheckTxInputs(*entryTx, state,
                                          mempoolDuplicate, nSpendHeight);
             assert(fCheckResult);
-            UpdateCoins(entry->GetTx(), mempoolDuplicate, 1000000);
+            UpdateCoins(*entryTx, mempoolDuplicate, 1000000);
             stepsSinceLastRemove = 0;
         }
     }
@@ -888,9 +891,8 @@ void CTxMemPool::CheckMempoolImplNL(
     for (auto it = mapNextTx.cbegin(); it != mapNextTx.cend(); it++) {
         uint256 txid = it->second->GetId();
         txiter it2 = mapTx.find(txid);
-        const CTransaction &tx = it2->GetTx();
         assert(it2 != mapTx.end());
-        assert(&tx == it->second);
+        assert(it2->GetSharedTx().get() == it->second);
     }
 
     assert(totalTxSize == checkTotal);
@@ -1066,7 +1068,7 @@ void CTxMemPool::QueryHashes(std::vector<uint256> &vtxid) {
     vtxid.reserve(mapTx.size());
 
     for (auto it : iters) {
-        vtxid.push_back(it->GetTx().GetId());
+        vtxid.push_back(it->GetTxId());
     }
 }
 
@@ -1442,7 +1444,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         auto& tempMapTxSequenced = tempMapTx.get<insertion_order>();
         for (auto itTemp = tempMapTxSequenced.begin(); itTemp != tempMapTxSequenced.end();) 
         {
-            AddUncheckedNL(itTemp->GetTx().GetId(), *itTemp, changeSet);
+            AddUncheckedNL(itTemp->GetTxId(), *itTemp, changeSet);
             tempMapTxSequenced.erase(itTemp++);
         }
 
@@ -1686,7 +1688,7 @@ bool CTxMemPool::Exists(const COutPoint &outpoint) const {
 
 bool CTxMemPool::ExistsNL(const COutPoint &outpoint) const {
     auto it = mapTx.find(outpoint.GetTxId());
-    return it != mapTx.end() && outpoint.GetN() < it->GetTx().vout.size();
+    return it != mapTx.end() && outpoint.GetN() < it->GetSharedTx()->vout.size();
 }
 
 SaltedTxidHasher::SaltedTxidHasher()
@@ -1735,7 +1737,7 @@ void CTxMemPool::Snapshot::CreateIndex() const
             mIndex.reserve(mContents.size()
                            + (mRelevantTxIds ? mRelevantTxIds->size() : 0));
             for (auto it = cbegin(); it != cend(); ++it) {
-                mIndex.emplace(it->GetTx().GetId(), it);
+                mIndex.emplace(it->GetTxId(), it);
             }
             if (mRelevantTxIds) {
                 for (const auto& txid : *mRelevantTxIds) {
@@ -1774,7 +1776,8 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
         [this, &contents, &relevantTxIds](const CTxMemPoolEntry& entry)
         {
             contents.emplace_back(entry);
-            for (const auto& input : entry.GetTx().vin) {
+            const auto tx = entry.GetSharedTx();
+            for (const auto& input : tx->vin) {
                 const auto& id = input.prevout.GetTxId();
                 if (ExistsNL(id)) {
                     relevantTxIds->emplace_back(id);

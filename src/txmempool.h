@@ -188,10 +188,8 @@ public:
 
     // CPFP group, if any that this transaction belongs to.
     GroupID GetCPFPGroupId() const { return std::nullopt; }
-    const CTransaction &GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }
     TxId GetTxId() const { return this->tx->GetId(); }
-
     /**
      * Fast calculation of lower bound of current priority as update from entry
      * priority. Only inputs that were originally in-chain will age.
@@ -242,7 +240,7 @@ private:
 struct mempoolentry_txid {
     typedef uint256 result_type;
     result_type operator()(const CTxMemPoolEntry &entry) const {
-        return entry.GetTx().GetId();
+        return entry.GetTxId();
     }
 
     result_type operator()(const CTransactionRef &tx) const {
@@ -261,7 +259,7 @@ public:
         double f1 = double(b.GetTxSize() * a.GetModifiedFee().GetSatoshis());
         double f2 = double(a.GetTxSize() * b.GetModifiedFee().GetSatoshis());
         if (f1 == f2) {
-            return b.GetTx().GetId() < a.GetTx().GetId();
+            return b.GetTxId() < a.GetTxId();
         }
         return f1 > f2;
     }
@@ -450,7 +448,7 @@ private:
 
     struct CompareIteratorByHash {
         bool operator()(const txiter &a, const txiter &b) const {
-            return a->GetTx().GetId() < b->GetTx().GetId();
+            return a->GetTxId() < b->GetTxId();
         }
     };
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
