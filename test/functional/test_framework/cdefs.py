@@ -43,6 +43,12 @@ _limitedstack_h_fh = open(os.path.join(get_srcdir(), 'src', 'script',
 _limitedstack_h_contents = _limitedstack_h_fh.read()
 _limitedstack_h_fh.close()
 
+# Slurp in validation.h contents
+_validation_h_fh = open(os.path.join(get_srcdir(), 'src',
+                                    'validation.h'), 'rt')
+_validation_h_contents = _validation_h_fh.read()
+_validation_h_fh.close()
+
 def _extractConsensusValue(name):
     return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
 
@@ -64,6 +70,9 @@ def _extractScriptValue(name):
 
 def _extractLimitedStackValue(name):
     return int(eval(re.search(name + ' = (.+);', _limitedstack_h_contents).group(1)))
+
+def _extractValidationValue(name):
+    return int(eval(re.search(name + ' = (.+);', _validation_h_contents).group(1)))
 
 # Extract relevant default values parameters
 
@@ -136,6 +145,8 @@ MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = _extractConsensusValue('MAX_SCRIPT_NUM_LE
 MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = _extractConsensusValue('MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS')
 DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS  = _extractPolicyValue('DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS')
 
+MIN_TTOR_VALIDATION_DISTANCE  = _extractValidationValue('MIN_TTOR_VALIDATION_DISTANCE')
+
 if __name__ == "__main__":
     # Output values if run standalone to verify
     print("REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = %d" % REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME)
@@ -159,4 +170,5 @@ if __name__ == "__main__":
     print("MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = %d" % MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS)
     print("MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = %d" % MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS)
     print("DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS = %d" % DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS)
+    print("MIN_TTOR_VALIDATION_DISTANCE = %d" % MIN_TTOR_VALIDATION_DISTANCE)
     
