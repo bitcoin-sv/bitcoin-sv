@@ -41,7 +41,7 @@ void BCLog::Logger::OpenDebugLog() {
     fs::path pathDebug = GetDataDir() / LOGFILE;
     fileout = fsbridge::fopen(pathDebug, "a");
     if (fileout) {
-        logFileOpenFail = false;
+        logFileOpen = true;
         // Unbuffered.
         setbuf(fileout, nullptr);
         // Dump buffered messages from before we opened the log.
@@ -51,7 +51,7 @@ void BCLog::Logger::OpenDebugLog() {
         }
     }
     else {
-        logFileOpenFail = true;
+        logFileOpen = false;
     }
 }
 
@@ -165,8 +165,9 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
 
         // Buffer if we haven't opened the log yet.
         if (fileout == nullptr) {
-            if (!logFileOpenFail) {
+            if (logFileOpen) {
                 ret = strTimestamped.length();
+                strTimestamped.append(" (buffered)");
                 vMsgsBeforeOpenLog.push_back(strTimestamped);
             }
         } else {
