@@ -34,14 +34,13 @@ static int FileWriteStr(const std::string &str, FILE *fp) {
     return fwrite(str.data(), 1, str.size(), fp);
 }
 
-void BCLog::Logger::OpenDebugLog() {
+bool BCLog::Logger::OpenDebugLog() {
     std::lock_guard<std::mutex> scoped_lock(mutexDebugLog);
 
     assert(fileout == nullptr);
     fs::path pathDebug = GetDataDir() / LOGFILE;
     fileout = fsbridge::fopen(pathDebug, "a");
     if (fileout) {
-        logFileOpen = true;
         // Unbuffered.
         setbuf(fileout, nullptr);
         // Dump buffered messages from before we opened the log.
@@ -49,9 +48,10 @@ void BCLog::Logger::OpenDebugLog() {
             FileWriteStr(vMsgsBeforeOpenLog.front(), fileout);
             vMsgsBeforeOpenLog.pop_front();
         }
+        return false;
     }
     else {
-        logFileOpen = false;
+        return true;
     }
 }
 
@@ -165,10 +165,13 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
 
         // Buffer if we haven't opened the log yet.
         if (fileout == nullptr) {
-            if (logFileOpen) {
-                ret = strTimestamped.length();
-                strTimestamped.append(" (buffered)");
+            // Stop logging if buffer gets too big
+            if (vMsgsBeforeOpenLog.size() > 100000000) {
+                ret = 0;
+            }
+            else {
                 vMsgsBeforeOpenLog.push_back(strTimestamped);
+                ret = strTimestamped.length();
             }
         } else {
             // Reopen the log file, if requested.

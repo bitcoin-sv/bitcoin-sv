@@ -72,8 +72,6 @@ private:
 
     std::string LogTimestampStr(const std::string &str);
 
-    bool logFileOpen = true;
-
 public:
     bool fPrintToConsole = false;
     bool fPrintToDebugLog = true;
@@ -88,7 +86,7 @@ public:
     /** Send a string to the log output */
     int LogPrintStr(const std::string &str);
 
-    void OpenDebugLog();
+    bool OpenDebugLog();
     void ShrinkDebugFile();
 
     void EnableCategory(LogFlags category);
