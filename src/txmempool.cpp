@@ -106,6 +106,37 @@ CTxPrioritizer::~CTxPrioritizer()
 }
 
 /**
+ * class CTransactionRefWrapper
+ */
+CTransactionRefWrapper::CTransactionRefWrapper() {
+    tx = nullptr;
+}
+
+CTransactionRefWrapper::CTransactionRefWrapper(const CTransactionRef &_tx)
+ : tx(_tx)
+ , txid(_tx->GetId())
+{
+}
+
+CTransactionRef CTransactionRefWrapper::GetTxFromDB() const {
+    CTransactionRef txref;
+    //mempoolTxDB->GetTransaction(txid, txref);
+    return txref;
+}
+
+
+const TxId& CTransactionRefWrapper::GetId() const {
+    return txid;
+}
+
+CTransactionRef CTransactionRefWrapper::GetTx() const {
+    if (tx != nullptr) {
+        return tx;
+    }
+    return GetTxFromDB();
+}
+
+/**
  * class CTxMemPoolEntry
  */
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
@@ -116,19 +147,20 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  Amount _inChainInputValue,
                                  bool _spendsCoinbase,
                                  LockPoints lp)
-    : tx{_tx}, nFee{_nFee}, nTime{_nTime}, entryPriority{_entryPriority},
+    : nFee{_nFee}, nTime{_nTime}, entryPriority{_entryPriority},
       inChainInputValue{_inChainInputValue},
       lockPoints{lp}, entryHeight{_entryHeight}, spendsCoinbase{_spendsCoinbase},
       group{nullptr}, groupingData{std::nullopt}
 {
-    nTxSize = tx->GetTotalSize();
-    nModSize = tx->CalculateModifiedSize(GetTxSize());
-    nUsageSize = RecursiveDynamicUsage(tx);
+    tx = CTransactionRefWrapper {_tx};
+    nTxSize = _tx->GetTotalSize();
+    nModSize = _tx->CalculateModifiedSize(GetTxSize());
+    nUsageSize = RecursiveDynamicUsage(_tx);
 
-    Amount nValueIn = tx->GetValueOut() + nFee;
+    Amount nValueIn = _tx->GetValueOut() + nFee;
     assert(inChainInputValue <= nValueIn);
 
-    feeDelta = Amount(0);
+    feeDelta = Amount {0};
 }
 
 double CTxMemPoolEntry::GetPriority(int32_t currentHeight) const {

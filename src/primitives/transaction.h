@@ -10,6 +10,7 @@
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
+#include <optional>
 
 struct TxId;
 /**
@@ -27,6 +28,7 @@ namespace std
 struct TxId : public uint256 {
     TxId() {}
     explicit TxId(const uint256 &b) : uint256(b) {}
+    TxId(const TxId& b): uint256(b) {}
 };
 
 /**
@@ -382,6 +384,7 @@ public:
         return a.GetId() == b.GetId();
     }
 };
+
 
 typedef std::shared_ptr<const CTransaction> CTransactionRef;
 static inline CTransactionRef MakeTransactionRef() {

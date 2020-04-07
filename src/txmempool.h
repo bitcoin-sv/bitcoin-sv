@@ -134,6 +134,22 @@ struct CPFPGroup;
  */
 using GroupID = std::optional<uint64_t>;
 
+class CTransactionRefWrapper {
+private:
+    CTransactionRef tx;
+    TxId txid;
+
+    CTransactionRef GetTxFromDB() const;
+
+public:
+    CTransactionRefWrapper();
+    CTransactionRefWrapper(const CTransactionRef &tx);
+
+    CTransactionRef GetTx() const;
+    const TxId& GetId() const;
+
+};
+
 /** \class CTxMemPoolEntry
  *
  * CTxMemPoolEntry stores data about the corresponding transaction.
@@ -151,7 +167,7 @@ using GroupID = std::optional<uint64_t>;
 
 class CTxMemPoolEntry {
 private:
-    CTransactionRef tx;
+    CTransactionRefWrapper tx;
     //!< Cached to avoid expensive parent-transaction lookups
     Amount nFee;
     //!< ... and avoid recomputing tx size
@@ -188,8 +204,9 @@ public:
 
     // CPFP group, if any that this transaction belongs to.
     GroupID GetCPFPGroupId() const { return std::nullopt; }
-    CTransactionRef GetSharedTx() const { return this->tx; }
-    TxId GetTxId() const { return this->tx->GetId(); }
+    CTransactionRef GetSharedTx() const { return tx.GetTx(); }
+    const TxId& GetTxId() const { return tx.GetId(); }
+
     /**
      * Fast calculation of lower bound of current priority as update from entry
      * priority. Only inputs that were originally in-chain will age.
