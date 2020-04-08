@@ -185,3 +185,4 @@ std::optional<bool> AreInputsStandard(
 }
 
 CFeeRate dustRelayFee = CFeeRate(DUST_RELAY_TX_FEE);
+static_assert(DUST_RELAY_TX_FEE == DEFAULT_MIN_RELAY_TX_FEE, "lowering only fees increases dust");
