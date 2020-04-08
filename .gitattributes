@@ -1,1 +1,2 @@
 src/clientversion.cpp export-subst
+test/functional/data/dataTemplate_InvalidateChain/node0/regtest/** binary
