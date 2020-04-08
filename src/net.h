@@ -16,10 +16,13 @@
 #include "fs.h"
 #include "hash.h"
 #include "limitedmap.h"
+#include "net/association.h"
+#include "net/net_message.h"
+#include "net/net_types.h"
+#include "net/node_stats.h"
 #include "netaddress.h"
 #include "protocol.h"
 #include "random.h"
-#include "streams.h"
 #include "sync.h"
 #include "task_helpers.h"
 #include "threadinterrupt.h"
@@ -43,7 +46,6 @@
 #include <arpa/inet.h>
 #endif
 
-#include <boost/circular_buffer.hpp>
 #include <boost/signals2/signal.hpp>
 
 class CAddrMan;
@@ -103,8 +105,6 @@ static const bool DEFAULT_BLOCKSONLY = false;
 static const unsigned int DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES = 4;
 /** Microseconds in a second */
 static const unsigned int MICROS_PER_SECOND = 1000000;
-/** Peer average bandwidth measurement interval */
-static const unsigned PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS = 5;
 
 // Force DNS seed use ahead of UAHF fork, to ensure peers are found
 // as long as seeders are working.
@@ -124,8 +124,6 @@ static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
  * processing is skipped until the amount is freed up again.
  */
 constexpr size_t DEFAULT_NODE_ASYNC_TASKS_LIMIT = 3;
-
-typedef int64_t NodeId;
 
 struct AddedNodeInfo {
     std::string strAddedNode;
@@ -588,7 +586,6 @@ private:
 
     NodeId GetNewNodeId();
 
-    size_t SocketSendData(const CNodePtr& pnode) const;
     //! check is the banlist has unwritten changes
     bool BannedSetIsDirty();
     //! set the "dirty" flag for the banlist
@@ -778,156 +775,16 @@ struct LocalServiceInfo {
 extern CCriticalSection cs_mapLocalHost;
 extern std::map<CNetAddr, LocalServiceInfo> mapLocalHost;
 
-// Command, total bytes
-typedef std::map<std::string, uint64_t> mapMsgCmdSize;
-
-class CNodeStats {
-public:
-    NodeId nodeid;
-    ServiceFlags nServices;
-    bool fRelayTxes;
-    int64_t nLastSend;
-    int64_t nLastRecv;
-    bool fPauseSend;
-    bool fPauseRecv;
-    int64_t nSendSize;
-    int64_t nTimeConnected;
-    int64_t nTimeOffset;
-    std::string addrName;
-    int nVersion;
-    std::string cleanSubVer;
-    bool fInbound;
-    bool fAddnode;
-    int nStartingHeight;
-    uint64_t nSendBytes;
-    mapMsgCmdSize mapSendBytesPerMsgCmd;
-    uint64_t nRecvBytes;
-    mapMsgCmdSize mapRecvBytesPerMsgCmd;
-    bool fWhitelisted;
-    double dPingTime;
-    double dPingWait;
-    double dMinPing;
-    // What this peer sees as my address
-    std::string addrLocal;
-    CAddress addr;
-    size_t nInvQueueSize;
-    uint64_t nSpotBytesPerSec;
-    uint64_t nMinuteBytesPerSec;
-};
-
-class CNetMessage {
-private:
-    mutable CHash256 hasher;
-    mutable uint256 data_hash;
-
-public:
-    // Parsing header (false) or data (true)
-    bool in_data;
-
-    // Partially received header.
-    CDataStream hdrbuf;
-    // Complete header.
-    CMessageHeader hdr;
-    uint32_t nHdrPos;
-
-    // Received message data.
-    CDataStream vRecv;
-    uint32_t nDataPos;
-
-    // Time (in microseconds) of message receipt.
-    int64_t nTime;
-
-    CNetMessage(const CMessageHeader::MessageMagic &pchMessageStartIn,
-                int nTypeIn, int nVersionIn)
-        : hdrbuf(nTypeIn, nVersionIn), hdr(pchMessageStartIn),
-          vRecv(nTypeIn, nVersionIn) {
-        hdrbuf.resize(24);
-        in_data = false;
-        nHdrPos = 0;
-        nDataPos = 0;
-        nTime = 0;
-    }
-
-    bool complete() const {
-        if (!in_data) {
-            return false;
-        }
-
-        return (hdr.nPayloadLength == nDataPos);
-    }
-
-    const uint256 &GetMessageHash() const;
-
-    void SetVersion(int nVersionIn) {
-        hdrbuf.SetVersion(nVersionIn);
-        vRecv.SetVersion(nVersionIn);
-    }
-
-    int readHeader(const Config &config, const char *pch, uint32_t nBytes);
-    int readData(const char *pch, uint32_t nBytes);
-};
-
-class CSendQueueBytes {
-    // nSendQueueBytes holds data of how many bytes are currently in queue for specific node
-    size_t nSendQueueBytes = 0;
-    // nTotalSendQueuesBytes holds data of how many bytes are currently in all queues across the network (all nodes)
-    static std::atomic_size_t nTotalSendQueuesBytes;
-
-public:
-    ~CSendQueueBytes() {
-        nTotalSendQueuesBytes -= nSendQueueBytes;
-    }
-
-    size_t operator-= (size_t nBytes) {
-        nSendQueueBytes -= nBytes;
-        nTotalSendQueuesBytes -= nBytes;
-        return nSendQueueBytes;
-    }
-
-     size_t operator+= (size_t nBytes) {
-        nSendQueueBytes += nBytes;
-        nTotalSendQueuesBytes += nBytes;
-        return nSendQueueBytes;
-    }
-
-    size_t getSendQueueBytes() const {
-        return nSendQueueBytes;
-    }
-
-    static size_t getTotalSendQueuesBytes() {
-        return nTotalSendQueuesBytes;
-    }
-};
-
 /** Information about a peer */
 class CNode : public std::enable_shared_from_this<CNode>
 {
     friend class CConnman;
 
 public:
-    /**
-     * Notification structure for SendMessage function that returns:
-     * sendComplete: whether the send was fully complete/partially complete and
-     *               data is needed for sending the rest later.
-     * sentSize: amount of data that was sent.
-     */
-    struct CSendResult
-    {
-        bool sendComplete;
-        size_t sentSize;
-    };
 
-    // socket
     std::atomic<ServiceFlags> nServices {NODE_NONE};
     // Services expected from a peer, otherwise it will be disconnected
     ServiceFlags nServicesExpected {NODE_NONE};
-    SOCKET hSocket {0};
-    // Total size of all vSendMsg entries.
-    CSendQueueBytes nSendSize;
-    std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> vSendMsg {};
-    CCriticalSection cs_vSend {};
-    CCriticalSection cs_hSocket {};
-    CCriticalSection cs_vRecv {};
 
     CCriticalSection cs_vProcessMsg {};
     std::list<CNetMessage> vProcessMsg {};
@@ -937,23 +794,10 @@ public:
 
     std::optional<CGetBlockMessageRequest> mGetBlockMessageRequest;
     std::deque<CInv> vRecvGetData {};
-    uint64_t nRecvBytes {0};
     std::atomic<int> nRecvVersion {INIT_PROTO_VERSION};
 
-    /** Average bandwidth measurements */
-    // Keep enough spot measurements to cover 1 minute
-    boost::circular_buffer<double> vAvgBandwidth {60 / PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS};
-    // Time we last took a spot measurement
-    int64_t nLastSpotMeasurementTime { GetTimeMicros() };
-    // Bytes received since last spot measurement
-    uint64_t nBytesRecvThisSpot {0};
-
-    std::atomic<int64_t> nLastSend {0};
-    std::atomic<int64_t> nLastRecv {0};
     const int64_t nTimeConnected {0};
     std::atomic<int64_t> nTimeOffset {0};
-    // The address of the remote peer
-    const CAddress addr {};
     std::atomic<int> nVersion {0};
     // strSubVer is whatever byte array we read from the wire. However, this
     // field is intended to be printed out, displayed to humans in various forms
@@ -990,10 +834,6 @@ public:
     const uint64_t nKeyedNetGroup {0};
     std::atomic_bool fPauseRecv {false};
     std::atomic_bool fPauseSend {false};
-
-protected:
-    mapMsgCmdSize mapSendBytesPerMsgCmd {};
-    mapMsgCmdSize mapRecvBytesPerMsgCmd {};
 
 public:
     uint256 hashContinue { uint256() };
@@ -1082,30 +922,14 @@ private:
         const std::string &addrNameIn = "",
         bool fInboundIn = false);
 
-    /**
-     * Storage for the last chunk being sent to the peer. This variable contains
-     * data for the duration of sending the chunk. Once the chunk is sent it is
-     * cleared.
-     * In case there is an interruption during sending (sent size exceeded or
-     * network layer can not process any more data at the moment) this variable
-     * remains set and is used to continue streaming on the next try.
-     */
-    std::optional<CSpan> mSendChunk;
-    uint64_t nSendBytes {0};
-
     const uint64_t nLocalHostNonce {};
     // Services offered to this peer
     const ServiceFlags nLocalServices {};
     const int nMyStartingHeight {};
     int nSendVersion {0};
-    // Used only by SocketHandler thread.
-    std::list<CNetMessage> vRecvMsg {};
 
     mutable CCriticalSection cs_addrName {};
     std::string addrName {};
-
-    CService addrLocal {};
-    mutable CCriticalSection cs_addrLocal {};
 
     /** Deque of inventory msgs for transactions to send */
     std::deque<CTxnSendingDetails> mInvList;
@@ -1113,12 +937,10 @@ private:
 
     CConnman::CAsyncTaskPool& mAsyncTaskPool;
 
-public:
-    enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
+    // Peer association details
+    CAssociation mAssociation;
 
-    CSendResult SendMessage(
-        CForwardAsyncReadonlyStream& data,
-        size_t maxChunkSize);
+public:
 
     /** Add some new transactions to our pending inventory list */
     void AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns);
@@ -1129,21 +951,26 @@ public:
 
     NodeId GetId() const { return id; }
 
+    // Fetch peer association details
+    const CAssociation& GetAssociation() const { return mAssociation; }
+    CAssociation& GetAssociation() { return mAssociation; }
+
     uint64_t GetLocalNonce() const { return nLocalHostNonce; }
 
     int GetMyStartingHeight() const { return nMyStartingHeight; }
 
-    RECV_STATUS ReceiveMsgBytes(const Config &config, const char *pch, uint32_t nBytes,
-                         bool &complete);
+    bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
+    void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
+                        const Config& config, size_t& bytesRecv, size_t& bytesSent);
+
+    bool GetDisconnect() const { return fDisconnect; }
 
     void SetRecvVersion(int nVersionIn) { nRecvVersion = nVersionIn; }
     int GetRecvVersion() { return nRecvVersion; }
     void SetSendVersion(int nVersionIn);
     int GetSendVersion() const;
 
-    CService GetAddrLocal() const;
-    //! May not be called more than once
-    void SetAddrLocal(const CService &addrLocalIn);
+    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg);
 
     void AddAddressKnown(const CAddress &_addr) {
         addrKnown.insert(_addr.GetKey());
@@ -1189,8 +1016,6 @@ public:
     void CloseSocketDisconnect();
 
     void copyStats(CNodeStats &stats);
-
-    uint64_t GetAverageBandwidth();
 
     ServiceFlags GetLocalServices() const { return nLocalServices; }
 

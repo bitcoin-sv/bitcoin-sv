@@ -1,5 +1,5 @@
 # Copyright (c) 2017 The Bitcoin developers
-# Copyright (c) 2019 Bitcoin Association
+# Copyright (c) 2019-2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 cmake_minimum_required(VERSION 3.5)
@@ -244,6 +244,8 @@ add_library(server
 	mining/journaling_block_assembler.cpp
     mining/legacy.cpp
 	net.cpp
+    net/association.cpp
+    net/net_message.cpp
 	net_processing.cpp
 	noui.cpp
 	orphan_txns.cpp

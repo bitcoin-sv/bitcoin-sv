@@ -1,5 +1,5 @@
 # Copyright (c) 2013-2016 The Bitcoin Core developers
-# Copyright (c) 2018-2019 Bitcoin Association
+# Copyright (c) 2018-2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 DIST_SUBDIRS = secp256k1 univalue
@@ -139,6 +139,11 @@ BITCOIN_CORE_H = \
   mining/legacy.h \
   net.h \
   net_processing.h \
+  net/association.h \
+  net/net_message.h \
+  net/net_types.h \
+  net/node_stats.h \
+  net/send_queue_bytes.h \
   netaddress.h \
   netbase.h \
   netmessagemaker.h \
@@ -253,6 +258,8 @@ libbitcoin_server_a_SOURCES = \
   mining/journaling_block_assembler.cpp \
   mining/legacy.cpp \
   net.cpp \
+  net/association.cpp \
+  net/net_message.cpp \
   net_processing.cpp \
   noui.cpp \
   orphan_txns.cpp \
