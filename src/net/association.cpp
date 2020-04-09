@@ -152,14 +152,6 @@ size_t CAssociation::SocketSendData()
     return nSentSize;
 }
 
-bool CAssociation::ThreadSending() const
-{
-    // FIXME: This looks like an unnecessary horrible hack to me; is
-    // this method really necessary?
-    TRY_LOCK(cs_mSendMsgQueue, lockSend);
-    return !lockSend;
-}
-
 bool CAssociation::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                                        SOCKET& socketMax, bool pauseRecv) const
 {

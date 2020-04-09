@@ -48,9 +48,6 @@ class CAssociation
     // Write the next batch of data to the wire
     size_t SocketSendData();
 
-    // Is there a thread currently trying to send?
-    bool ThreadSending() const;
-
     // Add our sockets to the sets for reading and writing
     bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                              SOCKET& socketMax, bool pauseRecv) const;

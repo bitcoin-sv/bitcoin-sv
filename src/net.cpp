@@ -1272,34 +1272,22 @@ void CConnman::ThreadSocketHandler() {
                 vNodesDisconnected.push_back(node);
             }
         }
+
+        // Delete disconnected nodes
+        auto nodeIt { vNodesDisconnected.begin() };
+        while(nodeIt != vNodesDisconnected.end())
         {
-            // Delete disconnected nodes
-            auto nodeIt { vNodesDisconnected.begin() };
-            while(nodeIt != vNodesDisconnected.end())
-            {
-                // Wait until threads are done using it
-                const CNodePtr& node { *nodeIt };
-                bool fDelete {false};
-                if(node.use_count() <= 1)
-                {
-                    {
-                        TRY_LOCK(node->cs_inventory, lockInv);
-                        if (lockInv) {
-                            if (!node->GetAssociation().ThreadSending()) {
-                                fDelete = true;
-                            }
-                        }
-                    }
-                }
-                if (fDelete) {
-                    DeleteNode(node);
-                    nodeIt = vNodesDisconnected.erase(nodeIt);
-                }
-                else {
-                    ++nodeIt;
-                }
+            // Wait until threads are done using it
+            const CNodePtr& node { *nodeIt };
+            if (node.use_count() <= 1) {
+                DeleteNode(node);
+                nodeIt = vNodesDisconnected.erase(nodeIt);
+            }
+            else {
+                ++nodeIt;
             }
         }
+
         size_t vNodesSize;
         {
             LOCK(cs_vNodes);
