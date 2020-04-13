@@ -128,7 +128,7 @@ class CTxnValidator final
         CTxnHandlers& handlers);
 
     /** Schedule orphan p2p txns for retry into the main queue */
-    size_t scheduleOrphanP2PTxnsForRetry();
+    size_t scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtrVec& vCancelledTxns);
 
     /** Check if the given txn is known in the given set of txns */
 	template<typename T>
@@ -177,6 +177,17 @@ class CTxnValidator final
     template<typename Iterator, typename Callable>
     void enqueueTxnsNL(Iterator begin, const Iterator& end, Callable&& func) {
         std::for_each(begin, end, func);
+    }
+
+    /** Eliminate elements, from src, that fulfill a certain criterion defined by func predicate. */
+    template<typename T, typename Callable>
+    void eraseTxnIfNL(T& src, Callable&& func) {
+        src.erase(
+            std::remove_if(
+                src.begin(),
+                src.end(),
+                func),
+            src.end());
     }
 
     template<typename T1, typename T2>

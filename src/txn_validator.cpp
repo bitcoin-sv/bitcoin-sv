@@ -460,7 +460,15 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                             [this](const TxInputDataSPtr& txn){ enqueueNonStdTxnNL(txn); }
                         );
                     }
-                    // Move back into the processing queue any tasks which were cancelled or clean the queue otherwise.
+                    // Copy orphan p2p txns for reprocessing (if any exists)
+                    size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForReprocessing(std::get<2>(result));
+                    if (nOrphanP2PTxnsNum) {
+                        LogPrint(BCLog::TXNVAL,
+                                "Txnval-asynch: The number of orphan %s txns that need to be reprocessed is %d\n",
+                                 enum_cast<std::string>(TxSource::p2p),
+                                 nOrphanP2PTxnsNum);
+                    }
+                    // Move back into the processing queue any txns which were cancelled.
                     size_t nCancelledTxnsNum = std::get<2>(result).size();
                     if (nCancelledTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
@@ -468,19 +476,20 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                  enum_cast<std::string>(TxSource::p2p),
                                  nCancelledTxnsNum);
                         std::unique_lock lockPQ { mProcessingQueueMtx };
-                        mProcessingQueue = std::move_if_noexcept(std::get<2>(result));
-                    } else {
-                        std::unique_lock lockPQ { mProcessingQueueMtx };
-                        mProcessingQueue.clear();
+                        if (nOrphanP2PTxnsNum) {
+                            mProcessingQueue.insert(mProcessingQueue.end(),
+                                std::make_move_iterator(std::get<2>(result).begin()),
+                                std::make_move_iterator(std::get<2>(result).end()));
+                        } else {
+                            mProcessingQueue = std::move_if_noexcept(std::get<2>(result));
+                        }
                     }
-                    // Copy orphan p2p txns for re-try (if any exists)
-                    size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForRetry();
-                    if (nOrphanP2PTxnsNum) {
-                        LogPrint(BCLog::TXNVAL,
-                                "Txnval-asynch: The number of orphan %s txns that need to be reprocessed is %d\n",
-                                 enum_cast<std::string>(TxSource::p2p),
-                                 nOrphanP2PTxnsNum);
-                    } else {
+                    // Clear the processing queue when orphan and cancelled transactions were not detected.
+                    if (!nOrphanP2PTxnsNum && !nCancelledTxnsNum) {
+                        {
+                            std::unique_lock lockPQ { mProcessingQueueMtx };
+                            mProcessingQueue.clear();
+                        }
                         mTxnsProcessedCV.notify_one();
                     }
                 } catch (const std::exception& e) {
@@ -624,31 +633,32 @@ void CTxnValidator::postProcessingStepsNL(
     }
 }
 
-// The method needs to take mStdTxnsMtx lock to move collected orphan txns
-// to the mStdTxns queue.
+// A p2p orphan txn can be scheduled if:
+// - it is not present in the set of cancelled txns.
+// - it was not detected before and scheduled as a non-stdandard txn.
 // Collected orphnas are created as copies and not removed from the orphan's queue.
-size_t CTxnValidator::scheduleOrphanP2PTxnsForRetry() {
+size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtrVec& vCancelledTxns) {
     /** Get p2p orphan txns */
     auto vOrphanTxns { mpOrphanTxnsP2PQ->collectDependentTxnsForRetry() };
     size_t nOrphanTxnsNum { vOrphanTxns.size() };
     if (nOrphanTxnsNum) {
-        // Move p2p orphan txns into the main queue
-        std::unique_lock lock { mStdTxnsMtx };
-        enqueueTxnsNL(vOrphanTxns.begin(), vOrphanTxns.end(),
+        // Remove those orphans which are present in the set of cancelled txns.
+        eraseTxnIfNL(vOrphanTxns,
+            [this, &vCancelledTxns](const TxInputDataSPtr& txn){
+                const TxId& txid = txn->mpTx->GetId();
+                return isTxnKnownInSetNL(txid, vCancelledTxns); });
+        // Remove those orphans already detected as non-standard txns.
+        eraseTxnIfNL(vOrphanTxns,
             [this](const TxInputDataSPtr& txn){
                 const TxId& txid = txn->mpTx->GetId();
-                // Enqueue orphan txn if it is not already queued.
-                if (!isTxnKnownInSetNL(txid, mStdTxns)) {
-                    std::shared_lock lock1 { mNonStdTxnsMtx };
-                    if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
-                        std::shared_lock lock2 { mProcessingQueueMtx };
-                        if(!isTxnKnownInSetNL(txid, mProcessingQueue)) {
-                            enqueueStdTxnNL(txn);
-                        }
-                    }
-                }
-            }
-        );
+                std::shared_lock lock {mNonStdTxnsMtx};
+                return isTxnKnownInSetNL(txid, mNonStdTxns); });
+        // Move txns into the processing queue.
+        nOrphanTxnsNum = vOrphanTxns.size();
+        if (nOrphanTxnsNum) {
+            std::unique_lock lockPQ { mProcessingQueueMtx };
+            mProcessingQueue = std::move_if_noexcept(vOrphanTxns);
+        }
     }
     return nOrphanTxnsNum;
 }
