@@ -740,22 +740,23 @@ CValidationState HandleTxnProcessingException(
     CTxnHandlers& handlers);
 
 /**
- * Batch processing support for txns validation.
+ * This function defines txn validation steps executed by a task from the validation thread pool.
  *
- * @param pTxInputData A reference to transaction's details
+ * @param vTxInputData A vector holding references to transactions.
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
  * @param handlers Txn handlers
  * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
+ * @param end_time_point A time marker to cancell validation.
  * @return A vector of validation results
  */
-std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
-    const TxInputDataSPtr& pTxInputData,
-    const Config &config,
-    CTxMemPool &pool,
+std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask(
+    const TxInputDataSPtrRefVec& vTxInputData,
+    const Config& config,
+    CTxMemPool& pool,
     CTxnHandlers& handlers,
     bool fUseLimits,
-    std::chrono::steady_clock::time_point end);
+    std::chrono::steady_clock::time_point end_time_point);
 
 /**
  * Process validated txn. Submit txn to the mempool if it is valid.

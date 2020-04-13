@@ -512,14 +512,14 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
     auto results {
         g_connman->
             ParallelTxnValidation(
-                [](const TxInputDataSPtr& pTxInputData,
+                [](const TxInputDataSPtrRefVec& vTxInputData,
                     const Config* config,
                     CTxMemPool *pool,
                     CTxnHandlers& handlers,
                     bool fUseLimits,
                     std::chrono::steady_clock::time_point end_time_point) {
                     return TxnValidationProcessingTask(
-                                pTxInputData,
+                                vTxInputData,
                                *config,
                                *pool,
                                 handlers,
@@ -541,8 +541,11 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
     // A vector of cancelled txns.
     std::vector<TxInputDataSPtr> vCancelledTxns {};
     // Process validation results
-    for(auto& result : results) {
-        postValidationStepsNL(result.get(), vAcceptedTxns, vDetectedLowPriorityTxns, vCancelledTxns);
+    for(auto& task_result : results) {
+        auto vBatchResults = task_result.get();
+        for (auto& result : vBatchResults) {
+            postValidationStepsNL(result, vAcceptedTxns, vDetectedLowPriorityTxns, vCancelledTxns);
+        }
     }
     return {vAcceptedTxns, vDetectedLowPriorityTxns, vCancelledTxns};
 }

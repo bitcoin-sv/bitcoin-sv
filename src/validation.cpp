@@ -1573,48 +1573,61 @@ CValidationState HandleTxnProcessingException(
     return state;
 }
 
-std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
-    const TxInputDataSPtr& txInputData,
+std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask(
+    const TxInputDataSPtrRefVec& vTxInputData,
     const Config& config,
     CTxMemPool& pool,
     CTxnHandlers& handlers,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
-    // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
-    if (!(std::chrono::steady_clock::time_point(std::chrono::milliseconds(0)) == end_time_point) &&
-        !(std::chrono::steady_clock::now() < end_time_point)) {
-        return {{CValidationState(), txInputData}, CTask::Status::Canceled};
+
+    size_t chainLength = vTxInputData.size();
+    if (chainLength > 1) {
+        LogPrint(BCLog::TXNVAL,
+                "A non-trivial chain detected, length=%zu\n", chainLength);
     }
-    CTxnValResult result {};
-    try
-    {
-        // Execute validation for the given txn
-        result =
-            TxnValidation(
-                txInputData,
-                config,
-                pool,
-                handlers.mpTxnDoubleSpendDetector,
-                fUseLimits);
-        // Process validated results
-        ProcessValidatedTxn(pool, result, handlers, false);
-    } catch (const std::exception& e) {
-        return { { HandleTxnProcessingException("An exception thrown in txn processing: " + std::string(e.what()),
-                      txInputData,
+    std::vector<std::pair<CTxnValResult, CTask::Status>> results {};
+    results.reserve(chainLength);
+    for (const auto& elem : vTxInputData) {
+        // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
+        if (!(std::chrono::steady_clock::time_point(std::chrono::milliseconds(0)) == end_time_point) &&
+            !(std::chrono::steady_clock::now() < end_time_point)) {
+            results.emplace_back(CTxnValResult{CValidationState(), elem.get()}, CTask::Status::Canceled);
+            continue;
+        }
+        CTxnValResult result {};
+        try {
+            // Execute validation for the given txn
+            result =
+                TxnValidation(
+                        elem,
+                        config,
+                        pool,
+                        handlers.mpTxnDoubleSpendDetector,
+                        fUseLimits);
+            // Process validated results
+            ProcessValidatedTxn(pool, result, handlers, false);
+            // Forward results to the next processing stage
+            results.emplace_back(std::move(result), CTask::Status::RanToCompletion);
+        } catch (const std::exception& e) {
+            results.emplace_back(
+                    CTxnValResult{HandleTxnProcessingException("An exception thrown in txn processing: " + std::string(e.what()),
+                      elem.get(),
                       result,
                       pool,
-                      handlers), txInputData },
-                   CTask::Status::Faulted };
-    } catch (...) {
-        return { { HandleTxnProcessingException("Unexpected exception in txn processing",
-                      txInputData,
+                      handlers), elem.get()},
+                    CTask::Status::Faulted);
+        } catch (...) {
+            results.emplace_back(
+                    CTxnValResult{HandleTxnProcessingException("Unexpected exception in txn processing",
+                      elem.get(),
                       result,
                       pool,
-                      handlers), txInputData },
-                   CTask::Status::Faulted };
+                      handlers), elem.get()},
+                    CTask::Status::Faulted);
+        }
     }
-    // Forward results to the next processing stage
-    return {result, CTask::Status::RanToCompletion};
+    return results;
 }
 
 static void HandleInvalidP2POrphanTxn(
