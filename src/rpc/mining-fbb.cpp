@@ -18,6 +18,7 @@
 #include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
+#include "primitives/transaction.h"
 #include "rpc/server.h"
 #include "tinyformat.h"
 #include "util.h"
@@ -336,6 +337,10 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         // Use original coinbase from mining candidate
         block->vtx[0] = result->GetBlockCoinbase();
     }
+
+     if (block->vtx[0]->HasP2SHOutput()) {
+          throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
+     }
 
     // Merkle root
     {

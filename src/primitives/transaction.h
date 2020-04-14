@@ -331,6 +331,8 @@ public:
         return a.hash != b.hash;
     }
 
+    bool HasP2SHOutput() const;
+
     std::string ToString() const;
 };
 
