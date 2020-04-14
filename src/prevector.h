@@ -302,7 +302,7 @@ public:
         }
         while (size() < n) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(val);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(val);
         }
     }
 
@@ -315,7 +315,7 @@ public:
         }
         while (first != last) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(*first);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*first);
             ++first;
         }
     }
@@ -328,17 +328,17 @@ public:
         change_capacity(n);
         while (size() < n) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(val);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(val);
         }
     }
 
     template <typename InputIterator>
     prevector(InputIterator first, InputIterator last) : _size(0) {
-        size_type n = last - first;
+        size_type n = static_cast<size_type>(last - first);
         change_capacity(n);
         while (first != last) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(*first);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*first);
             ++first;
         }
     }
@@ -348,7 +348,7 @@ public:
         const_iterator it = other.begin();
         while (it != other.end()) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(*it);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*it);
             ++it;
         }
     }
@@ -364,7 +364,7 @@ public:
         const_iterator it = other.begin();
         while (it != other.end()) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T(*it);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T(*it);
             ++it;
         }
         return *this;
@@ -381,16 +381,16 @@ public:
 
     iterator begin() { return iterator(item_ptr(0)); }
     const_iterator begin() const { return const_iterator(item_ptr(0)); }
-    iterator end() { return iterator(item_ptr(size())); }
-    const_iterator end() const { return const_iterator(item_ptr(size())); }
+    iterator end() { return iterator(item_ptr(static_cast<difference_type>(size()))); }
+    const_iterator end() const { return const_iterator(item_ptr(static_cast<difference_type>(size()))); }
 
-    reverse_iterator rbegin() { return reverse_iterator(item_ptr(size() - 1)); }
+    reverse_iterator rbegin() { return reverse_iterator(item_ptr(static_cast<difference_type>(size() - 1))); }
     const_reverse_iterator rbegin() const {
-        return const_reverse_iterator(item_ptr(size() - 1));
+        return const_reverse_iterator(item_ptr(static_cast<difference_type>(size() - 1)));
     }
-    reverse_iterator rend() { return reverse_iterator(item_ptr(-1)); }
+    reverse_iterator rend() { return reverse_iterator(item_ptr(static_cast<difference_type>(-1))); }
     const_reverse_iterator rend() const {
-        return const_reverse_iterator(item_ptr(-1));
+        return const_reverse_iterator(item_ptr(static_cast<difference_type>(-1)));
     }
 
     size_t capacity() const {
@@ -401,20 +401,20 @@ public:
         }
     }
 
-    T &operator[](size_type pos) { return *item_ptr(pos); }
+    T &operator[](size_type pos) { return *item_ptr(static_cast<difference_type>(pos)); }
 
-    const T &operator[](size_type pos) const { return *item_ptr(pos); }
+    const T &operator[](size_type pos) const { return *item_ptr(static_cast<difference_type>(pos)); }
 
     void resize(size_type new_size) {
         if (size() > new_size) {
-            erase(item_ptr(new_size), end());
+            erase(item_ptr(static_cast<difference_type>(new_size)), end());
         }
         if (new_size > capacity()) {
             change_capacity(new_size);
         }
         while (size() < new_size) {
             _size++;
-            new (static_cast<void *>(item_ptr(size() - 1))) T();
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(size() - 1)))) T();
         }
     }
 
@@ -429,42 +429,42 @@ public:
     void clear() { resize(0); }
 
     iterator insert(iterator pos, const T &value) {
-        size_type p = pos - begin();
+        size_type p = static_cast<size_type>(pos - begin());
         size_type new_size = size() + 1;
         if (capacity() < new_size) {
             change_capacity(new_size + (new_size >> 1));
         }
-        memmove(item_ptr(p + 1), item_ptr(p), (size() - p) * sizeof(T));
+        memmove(item_ptr(static_cast<difference_type>(p + 1)), item_ptr(static_cast<difference_type>(p)), (size() - p) * sizeof(T));
         _size++;
-        new (static_cast<void *>(item_ptr(p))) T(value);
-        return iterator(item_ptr(p));
+        new (static_cast<void *>(item_ptr(static_cast<difference_type>(p)))) T(value);
+        return iterator(item_ptr(static_cast<difference_type>(p)));
     }
 
     void insert(iterator pos, size_type count, const T &value) {
-        size_type p = pos - begin();
+        size_type p = static_cast<size_type>(pos - begin());
         size_type new_size = size() + count;
         if (capacity() < new_size) {
             change_capacity(new_size + (new_size >> 1));
         }
-        memmove(item_ptr(p + count), item_ptr(p), (size() - p) * sizeof(T));
+        memmove(item_ptr(static_cast<difference_type>(p + count)), item_ptr(static_cast<difference_type>(p)), (size() - p) * sizeof(T));
         _size += count;
         for (size_type i = 0; i < count; i++) {
-            new (static_cast<void *>(item_ptr(p + i))) T(value);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(p + i)))) T(value);
         }
     }
 
     template <typename InputIterator>
     void insert(iterator pos, InputIterator first, InputIterator last) {
-        size_type p = pos - begin();
-        difference_type count = last - first;
+        size_type p = static_cast<size_type>(pos - begin());
+        size_type count = static_cast<size_type>(last - first);
         size_type new_size = size() + count;
         if (capacity() < new_size) {
             change_capacity(new_size + (new_size >> 1));
         }
-        memmove(item_ptr(p + count), item_ptr(p), (size() - p) * sizeof(T));
+        memmove(item_ptr(static_cast<difference_type>(p + count)), item_ptr(static_cast<difference_type>(p)), (size() - p) * sizeof(T));
         _size += count;
         while (first != last) {
-            new (static_cast<void *>(item_ptr(p))) T(*first);
+            new (static_cast<void *>(item_ptr(static_cast<difference_type>(p)))) T(*first);
             ++p;
             ++first;
         }
@@ -480,7 +480,7 @@ public:
             _size--;
             ++p;
         }
-        memmove(&(*first), &(*last), endp - ((char *)(&(*last))));
+        memmove(&(*first), &(*last), static_cast<size_t>(endp - ((char *)(&(*last)))));
         return first;
     }
 
@@ -489,7 +489,7 @@ public:
         if (capacity() < new_size) {
             change_capacity(new_size + (new_size >> 1));
         }
-        new (item_ptr(size())) T(value);
+        new (item_ptr(static_cast<difference_type>(size()))) T(value);
         _size++;
     }
 
