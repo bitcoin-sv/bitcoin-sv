@@ -18,6 +18,7 @@ std::unique_ptr<CConnman> g_connman;
     std::exit(EXIT_SUCCESS);
 }
 
-bool ShutdownRequested() {
-    return false;
+task::CCancellationToken GetShutdownToken()
+{
+    return task::CCancellationSource::Make()->GetToken();
 }

@@ -7,6 +7,7 @@
 #define BITCOIN_INIT_H
 
 #include <string>
+#include "taskcancellation.h"
 
 class Config;
 class CScheduler;
@@ -17,7 +18,7 @@ class thread_group;
 } // namespace boost
 
 void StartShutdown();
-bool ShutdownRequested();
+task::CCancellationToken GetShutdownToken();
 /** Interrupt threads */
 void Interrupt(boost::thread_group &threadGroup);
 void Shutdown();
@@ -52,7 +53,7 @@ bool AppInitSanityChecks();
  * AppInitSanityChecks should have been called.
  */
 bool AppInitMain(Config &config, boost::thread_group &threadGroup,
-                 CScheduler &scheduler);
+                 CScheduler &scheduler, const task::CCancellationToken& shutdownToken);
 
 /** The help message mode determines what help message to show */
 enum HelpMessageMode { HMM_BITCOIND };

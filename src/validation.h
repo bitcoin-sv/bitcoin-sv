@@ -1025,7 +1025,7 @@ public:
     CVerifyDB();
     ~CVerifyDB();
     bool VerifyDB(const Config &config, CCoinsView *coinsview, int nCheckLevel,
-                  int nCheckDepth);
+                  int nCheckDepth, const task::CCancellationToken& shutdownToken);
 };
 
 /** Replay blocks that aren't fully applied to the database. */
@@ -1095,7 +1095,7 @@ static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
 void DumpMempool();
 
 /** Load the mempool from disk. */
-bool LoadMempool(const Config &config);
+bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
 
 /** AlertNotify */
 void AlertNotify(const std::string &strMessage);

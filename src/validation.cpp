@@ -3252,7 +3252,8 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
  */
 static DisconnectResult DisconnectBlock(const CBlock &block,
                                         const CBlockIndex *pindex,
-                                        CCoinsViewCache &view) {
+                                        CCoinsViewCache &view,
+                                        const task::CCancellationToken& shutdownToken) {
     CBlockUndo blockUndo;
     CDiskBlockPos pos = pindex->GetUndoPos();
     if (pos.IsNull()) {
@@ -3265,12 +3266,13 @@ static DisconnectResult DisconnectBlock(const CBlock &block,
         return DISCONNECT_FAILED;
     }
 
-    return ApplyBlockUndo(blockUndo, block, pindex, view);
+    return ApplyBlockUndo(blockUndo, block, pindex, view, shutdownToken);
 }
 
 DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
                                 const CBlock &block, const CBlockIndex *pindex,
-                                CCoinsViewCache &view) {
+                                CCoinsViewCache &view,
+                                const task::CCancellationToken& shutdownToken) {
     bool fClean = true;
 
     if (blockUndo.vtxundo.size() + 1 != block.vtx.size()) {
@@ -3281,6 +3283,12 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
     // Undo transactions in reverse order.
     size_t i = block.vtx.size();
     while (i-- > 0) {
+
+        if (shutdownToken.IsCanceled())
+        {
+            return DISCONNECT_FAILED;
+        }
+
         const CTransaction &tx = *(block.vtx[i]);
         uint256 txid = tx.GetId();
 
@@ -4109,7 +4117,8 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     {
         CCoinsViewCache view(pcoinsTip);
         assert(view.GetBestBlock() == pindexDelete->GetBlockHash());
-        if (DisconnectBlock(block, pindexDelete, view) != DISCONNECT_OK) {
+        // Use new private CancellationSource that can not be cancelled
+        if (DisconnectBlock(block, pindexDelete, view, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
             return error("DisconnectTip(): DisconnectBlock %s failed",
                          pindexDelete->GetBlockHash().ToString());
         }
@@ -4693,7 +4702,7 @@ bool ActivateBestChain(
         try
         {
             boost::this_thread::interruption_point();
-            if (ShutdownRequested() || token.IsCanceled()) {
+            if (token.IsCanceled()) {
                 break;
             }
 
@@ -4946,7 +4955,7 @@ bool PreciousBlock(const Config &config, CValidationState &state,
     auto source = task::CCancellationSource::Make();
     // state is used to report errors, not block related invalidity
     // (see description of ActivateBestChain)
-    return ActivateBestChain(source->GetToken(), config, state, changeSet);
+    return ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
 }
 
 bool InvalidateBlock(const Config &config, CValidationState &state,
@@ -5007,7 +5016,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
         auto source = task::CCancellationSource::Make();
         // state is used to report errors, not block related invalidity
         // (see description of ActivateBestChain)
-        ActivateBestChain(source->GetToken(), config, state, changeSet);
+        ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
     }
 
     // Check mempool & journal
@@ -6009,7 +6018,7 @@ bool ProcessNewBlock(const Config &config,
     auto source = task::CCancellationSource::Make();
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            source->GetToken(), config, pblock, fForceProcessing, fNewBlock);
+            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, fForceProcessing, fNewBlock);
 
     if(!bestChainActivation)
     {
@@ -6348,7 +6357,7 @@ CVerifyDB::~CVerifyDB() {
 }
 
 bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
-                         int nCheckLevel, int nCheckDepth) {
+                         int nCheckLevel, int nCheckDepth, const task::CCancellationToken& shutdownToken) {
     LOCK(cs_main);
     if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr) {
         return true;
@@ -6377,7 +6386,6 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
     LogPrintf("[0%%]...");
     for (CBlockIndex *pindex = chainActive.Tip(); pindex && pindex->pprev;
          pindex = pindex->pprev) {
-        boost::this_thread::interruption_point();
         int percentageDone = std::max(
             1, std::min(
                    99,
@@ -6412,12 +6420,22 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
                 pindex->nHeight, pindex->GetBlockHash().ToString());
         }
 
+        if (shutdownToken.IsCanceled())
+        {
+            return true;
+        }
+
         // check level 1: verify block validity
         if (nCheckLevel >= 1 && !CheckBlock(config, block, state, pindex->nHeight)) {
             return error("%s: *** found bad block at %d, hash=%s (%s)\n",
                          __func__, pindex->nHeight,
                          pindex->GetBlockHash().ToString(),
                          FormatStateMessage(state));
+        }
+
+        if (shutdownToken.IsCanceled())
+        {
+            return true;
         }
 
         // check level 2: verify undo validity
@@ -6434,14 +6452,19 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
             }
         }
 
+        if (shutdownToken.IsCanceled())
+        {
+            return true;
+        }
+
         // check level 3: check for inconsistencies during memory-only
         // disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState &&
             (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <=
                 nCoinCacheUsage) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
-            DisconnectResult res = DisconnectBlock(block, pindex, coins);
-            if (res == DISCONNECT_FAILED) {
+            DisconnectResult res = DisconnectBlock(block, pindex, coins, shutdownToken);
+            if (res == DISCONNECT_FAILED && !shutdownToken.IsCanceled()) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in "
                              "block data at %d, hash=%s",
                              pindex->nHeight,
@@ -6456,7 +6479,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
             }
         }
 
-        if (ShutdownRequested()) {
+        if (shutdownToken.IsCanceled()) {
             return true;
         }
     }
@@ -6472,7 +6495,6 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
     if (nCheckLevel >= 4) {
         CBlockIndex *pindex = pindexState;
         while (pindex != chainActive.Tip()) {
-            boost::this_thread::interruption_point();
             uiInterface.ShowProgress(
                 _("Verifying blocks..."),
                 std::max(1,
@@ -6585,7 +6607,8 @@ bool ReplayBlocks(const Config &config, CCoinsView *view) {
             }
             LogPrintf("Rolling back %s (%i)\n",
                       pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
-            DisconnectResult res = DisconnectBlock(block, pindexOld, cache);
+            // Use new private CancellationSource that can not be cancelled
+            DisconnectResult res = DisconnectBlock(block, pindexOld, cache, task::CCancellationSource::Make()->GetToken());
             if (res == DISCONNECT_FAILED) {
                 return error(
                     "RollbackBlock(): DisconnectBlock failed at %d, hash=%s",
@@ -6896,7 +6919,7 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                     CValidationState dummyState;
                     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
                     auto source = task::CCancellationSource::Make();
-                    if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
+                    if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, dummyState, changeSet)) {
                         break;
                     }
                 }
@@ -7248,7 +7271,7 @@ CBlockFileInfo *GetBlockFileInfo(size_t n) {
 
 static const uint64_t MEMPOOL_DUMP_VERSION = 1;
 
-bool LoadMempool(const Config &config)
+bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
 {
     try {
         int64_t nExpiryTimeout = gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60;
@@ -7312,7 +7335,7 @@ bool LoadMempool(const Config &config)
             } else {
                 ++skipped;
             }
-            if (ShutdownRequested()) {
+            if (shutdownToken.IsCanceled()) {
                 return false;
             }
         }
@@ -7335,7 +7358,7 @@ bool LoadMempool(const Config &config)
     }
 
     // Restore non-final transactions
-    return mempool.getNonFinalPool().loadMempool();
+    return mempool.getNonFinalPool().loadMempool(shutdownToken);
 }
 
 void DumpMempool(void) {
