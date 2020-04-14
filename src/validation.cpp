@@ -549,6 +549,19 @@ uint64_t GetTransactionSigOpCount(const Config &config,
     return nSigOps;
 }
 
+// The following conditions check if all UTXOs of the transaction are confirmed
+static bool CheckConsolidationTxAllInputsConfirmed(const CTransaction &tx, const CCoinsViewCache &inputs)
+{
+    for (const auto& input: tx.vin) {
+        const Coin &coin = inputs.AccessCoin(input.prevout);
+        auto coinHeight = coin.GetHeight();
+        if (coinHeight == MEMPOOL_HEIGHT) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool CheckTransactionCommon(const CTransaction& tx,
                                    CValidationState& state,
                                    uint64_t maxTxSigOpsCountConsensusBeforeGenesis,
@@ -1348,6 +1361,18 @@ CTxnValResult TxnValidation(
     // Calculate tx's size.
     const unsigned int nTxSize = ptx->GetTotalSize();
     // Check mempool minimal fee requirement.
+
+    // Make sure that underfunded consolidation transactions still pass.
+    // Note that consolidation transactions paying a voluntary fee will
+    // be treated with higher priority. The higher the fee the higher
+    // the priority
+    bool skipFeeTest = IsConsolidationTxn(config, tx)
+                       && CheckConsolidationTxAllInputsConfirmed(tx, view);
+
+    const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
+    if (skipFeeTest) {
+        nModifiedFees += blockMinTxFee.GetFee(nTxSize);
+    }
     const Amount& nMempoolRejectFee = GetMempoolRejectFee(config, pool, nTxSize);
     if(!CheckMempoolMinFee(nModifiedFees, nMempoolRejectFee)) {
         state.DoS(0, false, REJECT_INSUFFICIENTFEE,
@@ -1374,24 +1399,27 @@ CTxnValResult TxnValidation(
             fSpendsCoinbase,
             nSigOpsCount,
             lp) };
-    // Check tx's priority based on relaypriority flag and relay fee.
-    CFeeRate minRelayTxFee = config.GetMinFeePerKB();
-    if (!CheckTxRelayPriority(nModifiedFees, minRelayTxFee, *pMempoolEntry, nTxSize)) {
-        // Require that free transactions have sufficient priority to be
-        // mined in the next block.
-        state.DoS(0, false, REJECT_INSUFFICIENTFEE,
-                 "insufficient priority");
-        return Result{state, pTxInputData, vCoinsToUncache};
+    if (!skipFeeTest) {
+        // Check tx's priority based on relaypriority flag and relay fee.
+        const CFeeRate minRelayTxFee = config.GetMinFeePerKB();
+        if (!CheckTxRelayPriority(nModifiedFees, minRelayTxFee, *pMempoolEntry, nTxSize)) {
+            // Require that free transactions have sufficient priority to be
+            // mined in the next block.
+            state.DoS(0, false, REJECT_INSUFFICIENTFEE,
+                      "insufficient priority");
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
+        // Continuously rate-limit free (really, very-low-fee) transactions.
+        // This mitigates 'penny-flooding' -- sending thousands of free
+        // transactions just to be annoying or make others' transactions take
+        // longer to confirm.
+    	if (!CheckLimitFreeTx(config, fLimitFree, nModifiedFees, minRelayTxFee, nTxSize)){
+            state.DoS(0, false, REJECT_INSUFFICIENTFEE,
+                      "rate limited free transaction");
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
     }
-    // Continuously rate-limit free (really, very-low-fee) transactions.
-    // This mitigates 'penny-flooding' -- sending thousands of free
-    // transactions just to be annoying or make others' transactions take
-    // longer to confirm.
-    if (!CheckLimitFreeTx(config, fLimitFree, nModifiedFees, minRelayTxFee, nTxSize)){
-        state.DoS(0, false, REJECT_INSUFFICIENTFEE,
-                 "rate limited free transaction");
-        return Result{state, pTxInputData, vCoinsToUncache};
-    }
+
     // Calculate in-mempool ancestors, up to a limit.
     CTxMemPool::setEntries setAncestors;
     std::string errString;

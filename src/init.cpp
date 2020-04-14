@@ -964,6 +964,11 @@ std::string HelpMessage(HelpMessageMode mode) {
                         "The value may be given in bytes or with unit (B, kB, MB, GB)."),
                 DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS/ONE_MEGABYTE, MAX_TX_SIZE_POLICY_BEFORE_GENESIS));
 
+    strUsage +=
+            HelpMessageOpt("-mintxconsolidationfactor=<n>",
+                           strprintf(_("Set minimum ratio between sum of input input script sizes to fum of output script sizes (default: %u)"),
+                                     DEFAULT_MIN_TX_CONSOLIDATION_FACTOR));
+
     strUsage += HelpMessageOpt(
         "-maxscriptsizepolicy",
         strprintf("Set maximum script size in bytes we're willing to relay/mine per script after Genesis is activated. "
@@ -1871,6 +1876,15 @@ bool AppInitParameterInteraction(Config &config) {
     {
         int64_t maxTxSizePolicy = gArgs.GetArgAsBytes("-maxtxsizepolicy", DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
         if (std::string err; !config.SetMaxTxSizePolicy(maxTxSizePolicy, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // configure min ratio between tx input to tx output size to be considered free consolidation tx.
+    if (gArgs.IsArgSet("-mintxconsolidationfactor"))
+    {
+        uint64_t minTxConsolidationFactor = gArgs.GetArg("-mintxconsolidationfactor", DEFAULT_MIN_TX_CONSOLIDATION_FACTOR);
+        if (std::string err; !config.SetMinTxConsolidationFactor(minTxConsolidationFactor, &err)) {
             return InitError(err);
         }
     }

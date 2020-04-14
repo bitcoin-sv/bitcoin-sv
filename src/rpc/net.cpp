@@ -602,6 +602,7 @@ static UniValue getnetworkinfo(const Config &config,
         obj.push_back(Pair("connections", (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
         obj.push_back(Pair("addresscount", static_cast<uint64_t>(g_connman->GetAddressCount())));
     }
+    obj.push_back(Pair("mintxconsolidationfactor",  config.GetMinTxConsolidationFactor()));
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee",
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));

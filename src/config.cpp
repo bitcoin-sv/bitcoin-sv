@@ -16,6 +16,7 @@ GlobalConfig::GlobalConfig() {
 void GlobalConfig::Reset()
 {
     feePerKB = CFeeRate {};
+    blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
     blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
@@ -29,6 +30,7 @@ void GlobalConfig::Reset()
     maxGeneratedBlockSizeAfter = 0;
     maxGeneratedBlockSizeOverridden =  false;
     maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
+    minTxConsolidationFactor = DEFAULT_MIN_TX_CONSOLIDATION_FACTOR;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
@@ -257,6 +259,21 @@ uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) con
         return MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
     }
     return maxTxSizePolicy;
+}
+
+bool GlobalConfig::SetMinTxConsolidationFactor(uint64_t minTxConsolidationFactorIn, std::string* err)
+{
+    if (minTxConsolidationFactorIn == 0) {
+        minTxConsolidationFactor = DEFAULT_MIN_TX_CONSOLIDATION_FACTOR;
+    } else {
+        minTxConsolidationFactor = static_cast<uint64_t>(minTxConsolidationFactorIn);
+    }
+    return true;
+}
+
+uint64_t GlobalConfig::GetMinTxConsolidationFactor() const
+{
+    return minTxConsolidationFactor;
 }
 
 void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {
@@ -834,6 +851,15 @@ void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {
 CFeeRate GlobalConfig::GetMinFeePerKB() const {
     return feePerKB;
 }
+
+void GlobalConfig::SetBlockMinFeePerKB(CFeeRate fee) {
+    blockMinFeePerKB = fee;
+}
+
+CFeeRate GlobalConfig::GetBlockMinFeePerKB() const {
+    return blockMinFeePerKB;
+}
+
 bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err)
 {
     if (LessThanZero(maxTxSigOpsCountIn, err, "Policy value for maximum allowed number of signature operations per transaction cannot be less than 0"))

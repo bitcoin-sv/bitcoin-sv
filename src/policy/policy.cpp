@@ -52,6 +52,28 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
     return whichType != TX_NONSTANDARD;
 }
 
+bool IsConsolidationTxn(const Config &config, const CTransaction &tx) noexcept
+{
+    // A consolidation transaction is a transaction which reduces the size of the
+    // UTXO database and meets following criteria:
+    // The number of inputs and the number of input sizes measured in script memory allocation
+    // must exceed the number and size of output transactions by specified margins.
+
+    if (tx.IsCoinBase())
+        return false;
+
+    if (tx.vin.size() <=  (tx.vout.size()))
+        return false;
+
+    auto addSigSize = [](auto x, CTxIn const & y){return x + y.scriptSig.size();};
+    auto addPubKeySize = [](auto x, CTxOut const & y){return x + y.scriptPubKey.size();};
+
+    auto sin = std::accumulate(tx.vin.begin(), tx.vin.end(), CScript::size_type{}, addSigSize);
+    auto sout = std::accumulate(tx.vout.begin(), tx.vout.end(), CScript::size_type{}, addPubKeySize);
+
+    return sin > config.GetMinTxConsolidationFactor() * sout;
+}
+
 bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std::string &reason) {
     if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1) {
         reason = "version";

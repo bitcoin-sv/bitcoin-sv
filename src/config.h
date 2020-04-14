@@ -51,8 +51,14 @@ public:
     virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
 
+    virtual bool SetMinTxConsolidationFactor(uint64_t value, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMinTxConsolidationFactor() const = 0;
+
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
+
+    virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
+    virtual CFeeRate GetBlockMinFeePerKB() const = 0;
 
     virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual uint64_t GetPreferredBlockFileSize() const = 0;
@@ -186,8 +192,14 @@ public:
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const  override;
 
+    bool SetMinTxConsolidationFactor(uint64_t value, std::string* err = nullptr) override;
+    uint64_t GetMinTxConsolidationFactor() const  override;
+
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
+
+    void SetBlockMinFeePerKB(CFeeRate amt) override;
+    CFeeRate GetBlockMinFeePerKB() const override;
 
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override;
     uint64_t GetPreferredBlockFileSize() const override;
@@ -305,6 +317,7 @@ public:
 private:
     // All fileds are initialized in Reset()    
     CFeeRate feePerKB;
+    CFeeRate blockMinFeePerKB;
     uint64_t blockPriorityPercentage;
     uint64_t preferredBlockFileSize;
     uint64_t factorMaxSendQueuesBytes;
@@ -324,6 +337,7 @@ private:
     bool maxGeneratedBlockSizeOverridden;
 
     uint64_t maxTxSizePolicy;
+    uint64_t minTxConsolidationFactor;
 
     uint64_t dataCarrierSize;
     uint64_t limitDescendantCount;
@@ -419,11 +433,22 @@ public:
     }
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
 
+    bool SetMinTxConsolidationFactor(uint64_t value, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+        minTxConsolidationFactor = value;
+        return false;
+    }
+    uint64_t GetMinTxConsolidationFactor() const override { return minTxConsolidationFactor; }
+
     void SetChainParams(std::string net);
     const CChainParams &GetChainParams() const override { return *chainParams; }
 
     void SetMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetMinFeePerKB() const override { return CFeeRate(Amount(0)); }
+
+    void SetBlockMinFeePerKB(CFeeRate amt) override{};
+    CFeeRate GetBlockMinFeePerKB() const override { return CFeeRate(Amount(0)); }
 
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override {}
     uint64_t GetPreferredBlockFileSize() const override { return 0; }
@@ -655,6 +680,7 @@ private:
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
     uint64_t genesisActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
+    uint64_t minTxConsolidationFactor{ DEFAULT_MIN_TX_CONSOLIDATION_FACTOR };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;
