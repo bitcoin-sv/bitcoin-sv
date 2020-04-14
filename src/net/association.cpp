@@ -12,22 +12,15 @@
 namespace
 {
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
-
-    bool IsOversizedMessage(const Config& config, const CNetMessage& msg)
-    {
-        if(!msg.in_data)
-        {
-            // Header only, cannot be oversized.
-            return false;
-        }
-
-        return msg.hdr.IsOversized(config);
-    }
 }
 
 CAssociation::CAssociation(CNode& node, SOCKET socket, const CAddress& peerAddr)
-: mNode{node}, mSocket{socket}, mPeerAddr{peerAddr}
+: mNode{node}, mPeerAddr{peerAddr}
 {
+    // Create initial stream
+    mStreams[StreamType::GENERAL] = std::make_shared<CStream>(mNode, StreamType::GENERAL, socket);
+
+    // Setup bytes count per message type
     for(const std::string& msg : getAllNetMessageTypes())
     {
         mRecvBytesPerMsgCmd[msg] = 0;
@@ -62,153 +55,206 @@ void CAssociation::SetPeerAddrLocal(const CService& addrLocal)
 
 void CAssociation::Shutdown()
 {
-    // Close the socket connection
-    LOCK(cs_mSocket);
-    if(mSocket != INVALID_SOCKET)
+    // Shutdown all our streams
+    LOCK(cs_mStreams);
+    if(!mShutdown)
     {
+        mShutdown = true;
+
         LogPrint(BCLog::NET, "disconnecting peer=%d\n", mNode.GetId());
-        CloseSocket(mSocket);
+        for(auto& stream : mStreams)
+        {
+            stream.second->Shutdown();
+        }
     }
 }
 
-// If we have sufficinet samples then get average bandwidth from node,
-// otherwise we must be in early startup measuring the bandwidth so just
-// report it as 0.
 uint64_t CAssociation::GetAverageBandwidth() const
 {
-    LOCK(cs_mRecvMsgQueue);
+    LOCK(cs_mStreams);
 
-    if(!mAvgBandwidth.empty())
-    {   
-        // If we don't yet have a full minutes worth of measurements then just
-        // average with what we have
-        return static_cast<uint64_t>(Average(mAvgBandwidth.begin(), mAvgBandwidth.end()));
+    // Sum of averages from all streams
+    uint64_t sumOfMeans {0};
+    size_t sumOfNumberOfItems {0};
+
+    for(const auto& stream : mStreams)
+    {
+        AverageBandwidth bw { stream.second->GetAverageBandwidth() };
+        sumOfMeans += (bw.first * bw.second);
+        sumOfNumberOfItems += bw.second;
     }
 
-    return 0;
+    if(sumOfNumberOfItems == 0)
+    {
+        return 0;
+    }
+
+    // Just return rounded sum of averages
+    return static_cast<uint64_t>(sumOfMeans / sumOfNumberOfItems);
 }
 
-void CAssociation::CopyStats(CNodeStats& stats) const
+AverageBandwidth CAssociation::GetAverageBandwidth(const StreamType streamType) const
 {
+    LOCK(cs_mStreams);
+
+    if(mStreams.empty())
+    {
+        return {0,0};
+    }
+
+    // Do we have a stream that exactly matches the requested type?
+    StreamMap::const_iterator streamIt { mStreams.find(streamType) };
+    if(streamIt == mStreams.end())
+    {
+        // No we don't, so fall back to using the GENERAL stream
+        streamIt = mStreams.begin();
+    }
+
+    return streamIt->second->GetAverageBandwidth();
+}
+
+void CAssociation::CopyStats(CAssociationStats& stats) const
+{
+    {
+        // Build stream stats
+        LOCK(cs_mStreams);
+        for(const auto& stream : mStreams)
+        {
+            CStreamStats streamStats {};
+            stream.second->CopyStats(streamStats);
+            stats.streamStats.push_back(std::move(streamStats));
+        }
+    }
+    const std::vector<CStreamStats>& streamStats { stats.streamStats };
+
+    // Last send/recv times are the latest for any of our underlying streams
+    if(streamStats.empty())
+    {
+        stats.nLastSend = 0;
+        stats.nLastRecv = 0;
+    }
+    else
+    {
+        auto maxStreamSendTime = std::max_element(streamStats.begin(), streamStats.end(),
+            [](const CStreamStats& s1, const CStreamStats& s2) {
+                return s1.nLastSend < s2.nLastSend;
+            }
+        );
+        stats.nLastSend = maxStreamSendTime->nLastSend;
+        auto maxStreamRecvTime = std::max_element(streamStats.begin(), streamStats.end(),
+            [](const CStreamStats& s1, const CStreamStats& s2) {
+                return s1.nLastRecv < s2.nLastRecv;
+            }
+        );
+        stats.nLastRecv = maxStreamRecvTime->nLastRecv;
+    }
+
     stats.addr = mPeerAddr;
-    stats.nLastSend = mLastSendTime;
-    stats.nLastRecv = mLastRecvTime;
+    stats.nAvgBandwidth = GetAverageBandwidth();
+
+    // Total send/recv bytes for all our underlying streams
+    stats.nSendBytes = std::accumulate(streamStats.begin(), streamStats.end(), 0,
+        [](const uint64_t& tot, const CStreamStats& s) {
+            return tot + s.nSendBytes;
+        }
+    );
+    stats.nRecvBytes = std::accumulate(streamStats.begin(), streamStats.end(), 0,
+        [](const uint64_t& tot, const CStreamStats& s) {
+            return tot + s.nRecvBytes;
+        }
+    );
+
+    // Total send queue bytes for all our underlying streams
+    stats.nSendSize = std::accumulate(streamStats.begin(), streamStats.end(), 0,
+        [](const uint64_t& tot, const CStreamStats& s) {
+            return tot + s.nSendSize;
+        }
+    );
 
     {
-        LOCK(cs_mSendMsgQueue);
+        LOCK(cs_mSendRecvBytes);
         stats.mapSendBytesPerMsgCmd = mSendBytesPerMsgCmd;
-        stats.nSendBytes = mTotalBytesSent;
-        stats.nSendSize = mSendMsgQueueSize.getSendQueueBytes();
-    }
-    {
-        LOCK(cs_mRecvMsgQueue);
         stats.mapRecvBytesPerMsgCmd = mRecvBytesPerMsgCmd;
-        stats.nRecvBytes = mTotalBytesRecv;
-
-        // Avg bandwidth measurements
-        if(!mAvgBandwidth.empty())
-        {
-            stats.nMinuteBytesPerSec = GetAverageBandwidth();
-            stats.nSpotBytesPerSec = static_cast<uint64_t>(mAvgBandwidth.back());
-        }
-        else
-        {
-            stats.nMinuteBytesPerSec = 0;
-            stats.nSpotBytesPerSec = 0;
-        }
     }
 }
 
-size_t CAssociation::SocketSendData()
+int64_t CAssociation::GetLastSendTime() const
 {
-    size_t nSentSize = 0;
-    size_t nMsgCount = 0;
-    size_t nSendBufferMaxSize = g_connman->GetSendBufferSize();
-
-    LOCK(cs_mSendMsgQueue);
-
-    for(const auto& data : mSendMsgQueue)
+    // Get most recent send time for any of our underlying streams
+    auto getLastSentTime = [](const CStreamPtr& stream) { return stream->GetLastSendTime(); };
+    std::vector<int64_t> streamTimes { ForEachStream(getLastSentTime) };
+    if(streamTimes.empty())
     {
-        auto sent = SendMessage(*data, nSendBufferMaxSize);
-        nSentSize += sent.sentSize;
-        mSendMsgQueueSize -= sent.sentSize;
-
-        if(sent.sendComplete == false)
-        {   
-            break;
-        }
-
-        ++nMsgCount;
+        return 0;
     }
-
-    mSendMsgQueue.erase(mSendMsgQueue.begin(), mSendMsgQueue.begin() + nMsgCount);
-
-    if (mSendMsgQueue.empty())
+    else
     {
-        assert(!mSendChunk);
-        assert(mSendMsgQueueSize.getSendQueueBytes() == 0);
+        return *(std::max_element(streamTimes.begin(), streamTimes.end()));
     }
+}
 
-    return nSentSize;
+int64_t CAssociation::GetLastRecvTime() const
+{
+    // Get most recent recv time for any of our underlying streams
+    auto getLastRecvTime = [](const CStreamPtr& stream) { return stream->GetLastRecvTime(); };
+    std::vector<int64_t> streamTimes { ForEachStream(getLastRecvTime) };
+    if(streamTimes.empty())
+    {
+        return 0;
+    }
+    else
+    {
+        return *(std::max_element(streamTimes.begin(), streamTimes.end()));
+    }
 }
 
 bool CAssociation::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                                        SOCKET& socketMax, bool pauseRecv) const
 {
-    // Implement the following logic:
-    // * If there is data to send, select() for sending data. As
-    // this only happens when optimistic write failed, we choose to
-    // first drain the write buffer in this case before receiving
-    // more. This avoids needlessly queueing received data if the
-    // remote peer is not themselves receiving data. This means
-    // properly utilizing TCP flow control signalling.
-    // * Otherwise, if there is space left in the receive buffer,
-    // select() for receiving data.
+    bool havefds {false};
 
-    bool select_recv = !pauseRecv;
-    bool select_send;
-    {   
-        LOCK(cs_mSendMsgQueue);
-        select_send = !mSendMsgQueue.empty();
+    // Get all sockets from each stream
+    LOCK(cs_mStreams);
+    for(const auto& stream : mStreams)
+    {
+        havefds |= stream.second->SetSocketForSelect(setRecv, setSend, setError, socketMax, pauseRecv);
     }
 
-    LOCK(cs_mSocket);
-    if(mSocket == INVALID_SOCKET)
-    {   
-        return false;
-    }
-
-    FD_SET(mSocket, &setError);
-    socketMax = std::max(socketMax, mSocket);
-
-    if(select_send)
-    {   
-        FD_SET(mSocket, &setSend);
-    }
-    else if(select_recv)
-    {   
-        FD_SET(mSocket, &setRecv);
-    }
-
-    return true;
+    return havefds;
 }
 
 size_t CAssociation::GetNewMsgs(std::list<CNetMessage>& msgList)
 {
     size_t nSizeAdded {0};
 
-    LOCK(cs_mRecvMsgQueue);
-    auto it { mRecvMsgQueue.begin() };
-    for(; it != mRecvMsgQueue.end(); ++it)
+    // Fetch from all our streams
+    std::list<CNetMessage> newMsgs {};
     {
-        if(!it->complete())
+        LOCK(cs_mStreams);
+        for(auto& stream : mStreams)
         {
-            break;
+            nSizeAdded += stream.second->GetNewMsgs(newMsgs);
         }
-        nSizeAdded += it->vRecv.size() + CMessageHeader::HEADER_SIZE;
     }
 
-    msgList.splice(msgList.end(), mRecvMsgQueue, mRecvMsgQueue.begin(), it);
+    // Update recieved msg counts
+    {
+        LOCK(cs_mSendRecvBytes);
+        for(const CNetMessage& msg : newMsgs)
+        {
+            mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find(msg.hdr.pchCommand) };
+            if (i == mRecvBytesPerMsgCmd.end())
+            {   
+                i = mRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
+            }
+
+            assert(i != mRecvBytesPerMsgCmd.end());
+            i->second += msg.hdr.nPayloadLength + CMessageHeader::HEADER_SIZE;
+        }
+    }
+
+    // Move all new msgs to callers list
+    msgList.splice(msgList.end(), std::move(newMsgs));
 
     return nSizeAdded;
 }
@@ -219,104 +265,34 @@ void CAssociation::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setE
 {
     bytesRecv = bytesSent = 0;
 
-    //
-    // Receive
-    //
-    bool recvSet = false;
-    bool sendSet = false;
-    bool errorSet = false;
-    {   
-        LOCK(cs_mSocket);
-        if (mSocket == INVALID_SOCKET)
-        {
-            return;
-        }
-        recvSet = FD_ISSET(mSocket, &setRecv);
-        sendSet = FD_ISSET(mSocket, &setSend);
-        errorSet = FD_ISSET(mSocket, &setError);
-    }
-    if (recvSet || errorSet)
+    // Service each stream socket
+    LOCK(cs_mStreams);
+    for(auto& stream : mStreams)
     {
-        // typical socket buffer is 8K-64K
-        char pchBuf[0x10000];
-        ssize_t nBytes = 0;
-        {   
-            LOCK(cs_mSocket);
-            if (mSocket == INVALID_SOCKET)
-            {
-                return;
-            }
-            nBytes = recv(mSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
-        }
-        if (nBytes > 0)
-        {
-            bytesRecv = static_cast<size_t>(nBytes);
-            const RECV_STATUS status = ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
-            if (status != RECV_OK)
-            {
-                mNode.CloseSocketDisconnect();
-                if (status == RECV_BAD_LENGTH)
-                {
-                    // Ban the peer if try to send messages with bad length
-                    connman.Ban(GetPeerAddr(), BanReasonNodeMisbehaving);
-                }
-            }
-        }
-        else if (nBytes == 0)
-        {
-            // socket closed gracefully
-            if (!mNode.GetDisconnect())
-            {
-                LogPrint(BCLog::NET, "socket closed\n");
-            }
-            mNode.CloseSocketDisconnect();
-        }
-        else if (nBytes < 0)
-        {
-            // error
-            int nErr = WSAGetLastError();
-            if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
-            {
-                if (!mNode.GetDisconnect())
-                {
-                    LogPrintf("socket recv error %s\n", NetworkErrorString(nErr));
-                }
-                mNode.CloseSocketDisconnect();
-            }
-        }
-    }
-
-    //
-    // Send
-    //
-    if (sendSet)
-    {  
-        bytesSent = SocketSendData();
+        size_t streamBytesRecv {0};
+        size_t streamBytesSent {0};
+        stream.second->ServiceSocket(setRecv, setSend, setError, connman, config, GetPeerAddr(),
+            gotNewMsgs, streamBytesRecv, streamBytesSent);
+        bytesRecv += streamBytesRecv;
+        bytesSent += streamBytesSent;
     }
 }
 
 void CAssociation::AvgBandwithCalc()
-{   
-    LOCK(cs_mRecvMsgQueue);
-    int64_t currTime { GetTimeMicros() };
-    if(mLastSpotMeasurementTime > 0)
-    {   
-        double secsSinceLastSpot { static_cast<double>(currTime - mLastSpotMeasurementTime) / MICROS_PER_SECOND };
-        if(secsSinceLastSpot > 0)
-        {   
-            double spotbw { mBytesRecvThisSpot / secsSinceLastSpot };
-            mAvgBandwidth.push_back(spotbw);
-        }
-    }
-
-    mLastSpotMeasurementTime = currTime;
-    mBytesRecvThisSpot = 0;
+{
+    // Let each stream do its own calculations
+    ForEachStream([](CStreamPtr& stream){ stream->AvgBandwithCalc(); });
 }
 
-size_t CAssociation::GetSendQueueSize() const
+size_t CAssociation::GetTotalSendQueueSize() const
 {
-    LOCK(cs_mSendMsgQueue);
-    return mSendMsgQueueSize.getSendQueueBytes();
+    // Get total of all stream send queue sizes
+    LOCK(cs_mStreams);
+    return std::accumulate(mStreams.begin(), mStreams.end(), 0,
+        [](const size_t& tot, const auto& stream) {
+            return tot + stream.second->GetSendQueueSize();
+        }
+    );
 }
 
 size_t CAssociation::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg)
@@ -325,173 +301,26 @@ size_t CAssociation::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSeria
     size_t nTotalSize { nPayloadLength + CMessageHeader::HEADER_SIZE };
     size_t nBytesSent {0};
 
-    LOCK(cs_mSendMsgQueue);
-    bool optimisticSend { mSendMsgQueue.empty() };
-
-    // log total amount of bytes per command
-    mSendBytesPerMsgCmd[msg.Command()] += nTotalSize;
-    mSendMsgQueueSize += nTotalSize;
-
-    mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
-    if(nPayloadLength)
+    // Decide which stream to send this message on
+    LOCK(cs_mStreams);
+    if(!mStreams.empty())
     {
-        mSendMsgQueue.push_back(msg.MoveData());
+        CStreamPtr& stream { mStreams[StreamType::GENERAL] };
+
+        {
+            // Log total amount of bytes per command
+            LOCK(cs_mSendRecvBytes);
+            mSendBytesPerMsgCmd[msg.Command()] += nTotalSize;
+        }
+
+        // Send it
+        nBytesSent = stream->PushMessage(std::move(serialisedHeader), std::move(msg), nPayloadLength, nTotalSize);
     }
-
-    // If write queue empty, attempt "optimistic write"
-    if(optimisticSend)
+    else
     {
-        nBytesSent = SocketSendData();
+        LogPrint(BCLog::NET, "No stream available to send message on for peer=%d\n", mNode.GetId());
     }
 
     return nBytesSent;
-}
-
-CAssociation::CSendResult CAssociation::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)
-{
-    if (maxChunkSize == 0)
-    {   
-        // if maxChunkSize is 0 assign some default chunk size value
-        maxChunkSize = 1024;
-    }
-    size_t sentSize = 0;
-
-    do
-    {   
-        int nBytes = 0;
-        if (!mSendChunk)
-        {   
-            mSendChunk = data.ReadAsync(maxChunkSize);
-
-            if (!mSendChunk->Size())
-            {   
-                // we need to wait for data to load so we should let others
-                // send data in the meantime
-                mSendChunk = std::nullopt;
-                return {false, sentSize};
-            }
-        }
-
-        {   
-            LOCK(cs_mSocket);
-            if (mSocket == INVALID_SOCKET)
-            {   
-                return {false, sentSize};
-            }
-
-            nBytes = send(mSocket,
-                          reinterpret_cast<const char *>(mSendChunk->Begin()),
-                          mSendChunk->Size(),
-                          MSG_NOSIGNAL | MSG_DONTWAIT);
-        }
-
-        if (nBytes == 0)
-        {
-            // couldn't send anything at all
-            return {false, sentSize};
-        }
-        if (nBytes < 0)
-        {
-            // error
-            int nErr = WSAGetLastError();
-            if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
-            {
-                LogPrintf("socket send error %s\n", NetworkErrorString(nErr));
-                mNode.CloseSocketDisconnect();
-            }
-
-            return {false, sentSize};
-        }
-
-        assert(nBytes > 0);
-        mLastSendTime = GetSystemTimeInSeconds();
-        mTotalBytesSent += nBytes;
-        sentSize += nBytes;
-        if (static_cast<size_t>(nBytes) != mSendChunk->Size())
-        {
-            // could not send full message; stop sending more
-            mSendChunk =
-                CSpan {
-                    mSendChunk->Begin() + nBytes,
-                    mSendChunk->Size() - nBytes
-                };
-            return {false, sentSize};
-        }
-
-        mSendChunk = std::nullopt;
-    } while(!data.EndOfStream());
-
-    return {true, sentSize};
-}
-
-CAssociation::RECV_STATUS CAssociation::ReceiveMsgBytes(const Config& config,
-    const char* pch, size_t nBytes, bool& complete)
-{
-    complete = false;
-    int64_t nTimeMicros = GetTimeMicros();
-
-    LOCK(cs_mRecvMsgQueue);
-    mLastRecvTime = nTimeMicros / MICROS_PER_SECOND;
-    mTotalBytesRecv += nBytes;
-    mBytesRecvThisSpot += nBytes;
-
-    while (nBytes > 0)
-    {
-        // Get current incomplete message, or create a new one.
-        if (mRecvMsgQueue.empty() || mRecvMsgQueue.back().complete())
-        {
-            mRecvMsgQueue.push_back(CNetMessage(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION));
-        }
-
-        CNetMessage& msg = mRecvMsgQueue.back();
-
-        // Absorb network data.
-        int handled;
-        if (!msg.in_data)
-        {
-            handled = msg.readHeader(config, pch, nBytes);
-            if (handled < 0)
-            {
-                return RECV_BAD_LENGTH;//Notify bad message as soon as seen in the header
-            }
-        }
-        else
-        {
-            handled = msg.readData(pch, nBytes);
-        }
-
-        if (handled < 0)
-        {
-            return RECV_FAIL;
-        }
-
-        if (IsOversizedMessage(config, msg))
-        {
-            LogPrint(BCLog::NET, "Oversized message from peer=%i, disconnecting\n", mNode.GetId());
-            return RECV_BAD_LENGTH;
-        }
-
-        pch += handled;
-        nBytes -= handled;
-
-        if (msg.complete())
-        {
-            // Store received bytes per message command to prevent a memory DOS,
-            // only allow valid commands.
-            mapMsgCmdSize::iterator i = mRecvBytesPerMsgCmd.find(msg.hdr.pchCommand);
-            if (i == mRecvBytesPerMsgCmd.end())
-            {
-                i = mRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
-            }   
-            
-            assert(i != mRecvBytesPerMsgCmd.end());
-            i->second += msg.hdr.nPayloadLength + CMessageHeader::HEADER_SIZE;
-            
-            msg.nTime = nTimeMicros;
-            complete = true;
-        }   
-    }   
-    
-    return RECV_OK;
 }
 

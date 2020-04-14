@@ -93,8 +93,7 @@ static UniValue getpeerinfo(const Config &config,
             "    \"sendsize\": n,             (numeric) Current size of queued messages for sending\n"
             "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
             "    \"pauserecv\": true|false,   (boolean) Are we paused for receiving\n"
-            "    \"spotrecvbw\": n,           (numeric) The spot average download bandwidth from this node (bytes/sec)\n"
-            "    \"minuterecvbw\": n,         (numeric) The 1 minute average download bandwidth from this node (bytes/sec)\n"
+            "    \"avgbw\": n,                (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
             "    \"conntime\": ttt,           (numeric) The connection time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
             "    \"timeoffset\": ttt,         (numeric) The time offset in "
@@ -168,15 +167,14 @@ static UniValue getpeerinfo(const Config &config,
         }
         obj.push_back(Pair("services", strprintf("%016x", stats.nServices)));
         obj.push_back(Pair("relaytxes", stats.fRelayTxes));
-        obj.push_back(Pair("lastsend", stats.nLastSend));
-        obj.push_back(Pair("lastrecv", stats.nLastRecv));
-        obj.push_back(Pair("sendsize", stats.nSendSize));
+        obj.push_back(Pair("lastsend", stats.associationStats.nLastSend));
+        obj.push_back(Pair("lastrecv", stats.associationStats.nLastRecv));
+        obj.push_back(Pair("sendsize", stats.associationStats.nSendSize));
         obj.push_back(Pair("pausesend", stats.fPauseSend));
         obj.push_back(Pair("pauserecv", stats.fPauseRecv));
-        obj.push_back(Pair("bytessent", stats.nSendBytes));
-        obj.push_back(Pair("bytesrecv", stats.nRecvBytes));
-        obj.push_back(Pair("spotrecvbw", stats.nSpotBytesPerSec));
-        obj.push_back(Pair("minuterecvbw", stats.nMinuteBytesPerSec));
+        obj.push_back(Pair("bytessent", stats.associationStats.nSendBytes));
+        obj.push_back(Pair("bytesrecv", stats.associationStats.nRecvBytes));
+        obj.push_back(Pair("avgbw", stats.associationStats.nAvgBandwidth));
         obj.push_back(Pair("conntime", stats.nTimeConnected));
         obj.push_back(Pair("timeoffset", stats.nTimeOffset));
         if (stats.dPingTime > 0.0) {
@@ -210,7 +208,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("whitelisted", stats.fWhitelisted));
 
         UniValue sendPerMsgCmd(UniValue::VOBJ);
-        for (const mapMsgCmdSize::value_type &i : stats.mapSendBytesPerMsgCmd) {
+        for (const mapMsgCmdSize::value_type &i : stats.associationStats.mapSendBytesPerMsgCmd) {
             if (i.second > 0) {
                 sendPerMsgCmd.push_back(Pair(i.first, i.second));
             }
@@ -218,7 +216,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("bytessent_per_msg", sendPerMsgCmd));
 
         UniValue recvPerMsgCmd(UniValue::VOBJ);
-        for (const mapMsgCmdSize::value_type &i : stats.mapRecvBytesPerMsgCmd) {
+        for (const mapMsgCmdSize::value_type &i : stats.associationStats.mapRecvBytesPerMsgCmd) {
             if (i.second > 0) {
                 recvPerMsgCmd.push_back(Pair(i.first, i.second));
             }

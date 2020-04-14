@@ -144,6 +144,7 @@ BITCOIN_CORE_H = \
   net/net_types.h \
   net/node_stats.h \
   net/send_queue_bytes.h \
+  net/stream.h \
   netaddress.h \
   netbase.h \
   netmessagemaker.h \
@@ -260,6 +261,7 @@ libbitcoin_server_a_SOURCES = \
   net.cpp \
   net/association.cpp \
   net/net_message.cpp \
+  net/stream.cpp \
   net_processing.cpp \
   noui.cpp \
   orphan_txns.cpp \

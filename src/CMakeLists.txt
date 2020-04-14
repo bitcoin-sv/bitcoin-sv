@@ -246,6 +246,7 @@ add_library(server
 	net.cpp
     net/association.cpp
     net/net_message.cpp
+    net/stream.cpp
 	net_processing.cpp
 	noui.cpp
 	orphan_txns.cpp

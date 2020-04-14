@@ -5,14 +5,16 @@
 
 #include <net/net_message.h>
 #include <net/net_types.h>
-#include <net/send_queue_bytes.h>
+#include <net/stream.h>
 #include <streams.h>
+
+#include <type_traits>
 
 #include <boost/circular_buffer.hpp>
 
+class CAssociationStats;
 class CConnman;
 class CNode;
-class CNodeStats;
 class Config;
 class CSerializedNetMsg;
 
@@ -43,10 +45,7 @@ class CAssociation
     void Shutdown();
 
     // Copy out current statistics
-    void CopyStats(CNodeStats& stats) const;
-
-    // Write the next batch of data to the wire
-    size_t SocketSendData();
+    void CopyStats(CAssociationStats& stats) const;
 
     // Add our sockets to the sets for reading and writing
     bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
@@ -59,88 +58,81 @@ class CAssociation
     void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
                         const Config& config, bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent);
 
-    // Get last send/receive time
-    int64_t GetLastSendTime() const { return mLastSendTime; }
-    int64_t GetLastRecvTime() const { return mLastRecvTime; }
-
-    // Get current send queue size
-    size_t GetSendQueueSize() const;
+    // Get current total send queue size
+    size_t GetTotalSendQueueSize() const;
 
     // Update average bandwidth measurements
     void AvgBandwithCalc();
 
     // Get estimated average bandwidth from peer
     uint64_t GetAverageBandwidth() const;
+    AverageBandwidth GetAverageBandwidth(const StreamType streamType) const;
 
     // Add new message to our list for sending
     size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg);
+
+    // Get last send/receive time for any stream
+    int64_t GetLastSendTime() const;
+    int64_t GetLastRecvTime() const;
 
   private:
 
     // Node we are for
     CNode& mNode;
 
-    // Socket
-    SOCKET mSocket {0};
-    mutable CCriticalSection cs_mSocket {};
+    // Streams within the association
+    using StreamMap = std::map<StreamType, CStreamPtr>;
+    StreamMap mStreams {};
+    bool mShutdown {false};
+    mutable CCriticalSection cs_mStreams {};
 
-    // Send message queue
-    std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> mSendMsgQueue {};
-    uint64_t mTotalBytesSent {0};
-    CSendQueueBytes mSendMsgQueueSize {};
+    // Track bytes sent/received per command
     mapMsgCmdSize mSendBytesPerMsgCmd {};
-    mutable CCriticalSection cs_mSendMsgQueue {};
+    mapMsgCmdSize mRecvBytesPerMsgCmd {};
+    mutable CCriticalSection cs_mSendRecvBytes {};
 
     // The address of the remote peer
     const CAddress mPeerAddr {};
     CService mPeerAddrLocal {};
     mutable CCriticalSection cs_mPeerAddr {};
 
-    // Receive message queue
-    std::list<CNetMessage> mRecvMsgQueue {};
-    uint64_t mTotalBytesRecv {0};
-    mapMsgCmdSize mRecvBytesPerMsgCmd {};
-    mutable CCriticalSection cs_mRecvMsgQueue {};
+    // Helper functions for running something over all streams that returns a result
+    template <typename Callable,
+              std::enable_if_t<!std::is_void<typename std::result_of<Callable(const CStreamPtr&)>::type>::value, int> = 0>
+    std::vector<typename std::result_of<Callable(const CStreamPtr&)>::type> ForEachStream(Callable&& func) const
+    {
+        std::vector<typename std::result_of<Callable(const CStreamPtr&)>::type> res {};
 
-    // Last time we sent or received anything
-    std::atomic<int64_t> mLastSendTime {0};
-    std::atomic<int64_t> mLastRecvTime {0};
+        LOCK(cs_mStreams);
+        for(const auto& stream : mStreams)
+        {
+            res.push_back(func(stream.second));
+        }
 
-    /** Average bandwidth measurements */
-    // Keep enough spot measurements to cover 1 minute
-    boost::circular_buffer<double> mAvgBandwidth {60 / PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS};
-    // Time we last took a spot measurement
-    int64_t mLastSpotMeasurementTime { GetTimeMicros() };
-    // Bytes received since last spot measurement
-    uint64_t mBytesRecvThisSpot {0};
+        return res;
+    }
 
-    /**
-     * Storage for the last chunk being sent to the peer. This variable contains
-     * data for the duration of sending the chunk. Once the chunk is sent it is
-     * cleared.
-     * In case there is an interruption during sending (sent size exceeded or
-     * network layer can not process any more data at the moment) this variable
-     * remains set and is used to continue streaming on the next try.
-     */
-    std::optional<CSpan> mSendChunk {};
-
-    /**
-     * Notification structure for SendMessage function that returns:
-     * sendComplete: whether the send was fully complete/partially complete and
-     *               data is needed for sending the rest later.
-     * sentSize: amount of data that was sent.
-     */
-    struct CSendResult
-    {   
-        bool sendComplete {false};
-        size_t sentSize {0};
-    };
-
-    // Message sending
-    CSendResult SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize);
-
-    // Process some newly read bytes from our underlying socket
-    enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
-    RECV_STATUS ReceiveMsgBytes(const Config& config, const char* pch, size_t nBytes, bool& complete);
+    // Helper functions for running something over all streams that returns void
+    template <typename Callable,
+              std::enable_if_t<std::is_void<typename std::result_of<Callable(const CStreamPtr&)>::type>::value, int> = 0>
+    void ForEachStream(Callable&& func) const
+    {
+        LOCK(cs_mStreams);
+        for(const auto& stream : mStreams)
+        {
+            func(stream.second);
+        }
+    }
+    // Non-const version
+    template <typename Callable,
+              std::enable_if_t<std::is_void<typename std::result_of<Callable(CStreamPtr&)>::type>::value, int> = 0>
+    void ForEachStream(Callable&& func)
+    {
+        LOCK(cs_mStreams);
+        for(auto& stream : mStreams)
+        {
+            func(stream.second);
+        }
+    }
 
 };

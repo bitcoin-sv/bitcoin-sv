@@ -714,7 +714,7 @@ void CNode::RunAsyncProcessing(
 
 void CNode::copyStats(CNodeStats &stats)
 {
-    mAssociation.CopyStats(stats);
+    mAssociation.CopyStats(stats.associationStats);
 
     stats.nodeid = this->GetId();
     stats.nServices = nServices;
@@ -906,7 +906,7 @@ void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, C
     }
 
     // Pause/unpause sending
-    fPauseSend = mAssociation.GetSendQueueSize() > connman.GetSendBufferSize();
+    fPauseSend = mAssociation.GetTotalSendQueueSize() > connman.GetSendBufferSize();
 
     //
     // Inactivity checking
@@ -2890,7 +2890,7 @@ size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNe
 {
     size_t bytesSent { mAssociation.PushMessage(std::move(serialisedHeader), std::move(msg)) };
 
-    fPauseSend = (mAssociation.GetSendQueueSize() > g_connman->GetSendBufferSize());
+    fPauseSend = (mAssociation.GetTotalSendQueueSize() > g_connman->GetSendBufferSize());
 
     return bytesSent;
 }
