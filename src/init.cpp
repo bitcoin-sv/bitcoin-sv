@@ -2644,6 +2644,11 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         LogPrintf("Shutdown requested. Exiting.\n");
         return false;
     }
+
+    // After block chain is loaded check fork tip statuses and
+    // restore global safe mode state.
+    CheckSafeModeParametersForAllForksOnStartup();
+
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
   
 
