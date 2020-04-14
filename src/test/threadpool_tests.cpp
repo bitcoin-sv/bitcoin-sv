@@ -81,6 +81,7 @@ BOOST_AUTO_TEST_CASE(NonPrioritised)
 // Test prioritised thread pool handling
 BOOST_AUTO_TEST_CASE(Prioritised)
 {
+    // Scenario 1: test basic, specified priorities
     // Single threaded pool for reproducable task execution ordering
     CThreadPool<CPriorityQueueAdaptor> pool { "TestPool", 1 };
     // Make sure nothing starts executing until we have queued everything
@@ -90,14 +91,13 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     // Each task will add a result to this vector
     std::vector<std::string> taskResults {};
     // Expected final contents
-    std::vector<std::string> expectedResults { "VeryHigh", "High", "Medium", "Unspec", "Low" };
+    std::vector<std::string> expectedResults { "VeryHigh", "High", "Medium", "Low" };
 
     // Some tasks to run
     std::vector<std::future<void>> results {};
     results.push_back(make_task(pool, CTask::Priority::Low, [&taskResults](){ taskResults.push_back("Low"); }));
     results.push_back(make_task(pool, CTask::Priority::Medium, [&taskResults](){ taskResults.push_back("Medium"); }));
     results.push_back(make_task(pool, CTask::Priority::High, [&taskResults](){ taskResults.push_back("High"); }));
-    results.push_back(make_task(pool, [&taskResults](){ taskResults.push_back("Unspec"); }));
     results.push_back(make_task(pool, 10, [&taskResults](){ taskResults.push_back("VeryHigh"); }));
 
     // Wait for all tasks to complete
@@ -109,6 +109,27 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     }
 
     BOOST_CHECK(taskResults == expectedResults);
+
+    taskResults.clear();
+    expectedResults.clear();
+    results.clear();
+
+    // Scenario 2: test that unspecified priority is the same as medium priority
+    expectedResults  = { "High", "Unspec", "Low" };
+    results.push_back(make_task(pool, CTask::Priority::Low, [&taskResults](){ taskResults.push_back("Low"); }));
+    results.push_back(make_task(pool, [&taskResults](){ taskResults.push_back("Unspec"); }));
+    results.push_back(make_task(pool, CTask::Priority::High, [&taskResults](){ taskResults.push_back("High"); }));
+
+    // Wait for all tasks to complete
+    pool.run();
+    BOOST_CHECK(!pool.paused());
+    for(auto& res : results)
+    {
+        res.get();
+    }
+
+    BOOST_CHECK(taskResults == expectedResults);
+
 }
 
 // Test dual queue processed by prioritised thread pool
