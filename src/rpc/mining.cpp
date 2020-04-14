@@ -723,6 +723,10 @@ UniValue processBlock(
                            "Block does not start with a coinbase");
     }
 
+    if (block.vtx[0]->HasP2SHOutput()) {
+        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
+    }
+
     uint256 hash = block.GetHash();
     bool fBlockPresent = false;
     {
@@ -828,10 +832,6 @@ static UniValue submitblock(const Config &config,
     if (!DecodeHexBlk(block, request.params[0].get_str())) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
-
-     if (blockptr->vtx[0]->HasP2SHOutput()) {
-        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
-     }
 
     auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
     {

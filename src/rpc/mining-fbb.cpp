@@ -338,10 +338,6 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
         block->vtx[0] = result->GetBlockCoinbase();
     }
 
-     if (block->vtx[0]->HasP2SHOutput()) {
-          throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
-     }
-
     // Merkle root
     {
         std::vector<uint256> merkleProof = GetMerkleProofBranches(block);

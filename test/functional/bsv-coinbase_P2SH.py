@@ -58,6 +58,10 @@ class MiningCoinbaseWithP2SHTest(BitcoinTestFramework):
         assert_raises_rpc_error(-26, "bad-txns-vout-p2sh",
                                 self.nodes[0].submitblock, ToHex(block))
 
+        # verifyblockcandidate with P2SH in coinbase tx (not included in blockchain)
+        assert_raises_rpc_error(-26, "bad-txns-vout-p2sh",
+                                self.nodes[0].verifyblockcandidate, ToHex(block))
+
         # submitblock without P2SH in coinbase tx (included in blockchain)
         hashPrev = int(self.nodes[0].getbestblockhash(), 16)
         ctx = create_coinbase(self.nodes[0].getblockcount() + 1)
