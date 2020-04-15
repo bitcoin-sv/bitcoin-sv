@@ -5,8 +5,6 @@
 #ifndef BITCOIN_RPC_MINING_H
 #define BITCOIN_RPC_MINING_H
 
-#include "script/script.h"
-
 #include <univalue.h>
 #include <functional>
 #include <memory>
@@ -15,6 +13,7 @@
 
 class Config;
 class CBlock;
+class CReserveScript;
 
 /** Generate blocks (mine) */
 UniValue generateBlocks(const Config& config,

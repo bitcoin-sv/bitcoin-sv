@@ -9,7 +9,6 @@
 #include "data/base58_keys_valid.json.h"
 
 #include "key.h"
-#include "script/script.h"
 #include "test/jsonutil.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"

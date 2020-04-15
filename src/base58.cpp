@@ -5,7 +5,6 @@
 #include "base58.h"
 
 #include "hash.h"
-#include "script/script.h"
 #include "uint256.h"
 
 #include <boost/variant/apply_visitor.hpp>

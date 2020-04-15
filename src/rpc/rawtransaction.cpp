@@ -19,7 +19,6 @@
 #include "primitives/transaction.h"
 #include "rpc/server.h"
 #include "rpc/tojson.h"
-#include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
 #include "script/standard.h"

@@ -16,7 +16,6 @@
 #include "keystore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
-#include "script/script.h"
 #include "script/sign.h"
 #include "taskcancellation.h"
 #include "univalue.h"
