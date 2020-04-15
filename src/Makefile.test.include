@@ -54,6 +54,7 @@ BITCOIN_TESTS =\
   test/config_tests.cpp \
   test/core_io_tests.cpp \
   test/crypto_tests.cpp \
+  test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
   test/dbwrapper_tests.cpp \
   test/DoS_tests.cpp \
@@ -62,6 +63,7 @@ BITCOIN_TESTS =\
   test/excessiveblock_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
+  test/instruction_iterator_tests.cpp \
   test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
   test/journal_tests.cpp \

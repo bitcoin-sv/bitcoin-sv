@@ -13,7 +13,7 @@
 using bsv::bint;
 using namespace std;
 
-CScriptNum::CScriptNum(const vector<uint8_t>& vch,
+CScriptNum::CScriptNum(bsv::span<const uint8_t> span,
                        bool fRequireMinimal,
                        const size_t nMaxNumSize,
                        const bool big_int)
@@ -21,15 +21,15 @@ CScriptNum::CScriptNum(const vector<uint8_t>& vch,
     assert(m_value.index() == 0);
     assert(get<0>(m_value) == 0);
 
-    if(vch.size() > nMaxNumSize)
+    if(span.size() > nMaxNumSize)
     {
         throw scriptnum_overflow_error("script number overflow");
     }
-    if(fRequireMinimal && !bsv::IsMinimallyEncoded(vch, nMaxNumSize))
+    if(fRequireMinimal && !bsv::IsMinimallyEncoded(span, nMaxNumSize))
     {
         throw scriptnum_minencode_error("non-minimally encoded script number");
     }
-    if(vch.empty())
+    if(span.empty())
     {
         if(big_int)
         {
@@ -37,12 +37,12 @@ CScriptNum::CScriptNum(const vector<uint8_t>& vch,
             assert(m_value.index() == 1);
         }
     }
-    else if(vch.size() <= nMaxNumSize)
+    else if(span.size() <= nMaxNumSize)
     {
         if(big_int)
-            m_value = bsv::bint::deserialize(vch);
+            m_value = bsv::bint::deserialize(span);
         else
-            m_value = bsv::deserialize<int64_t>(begin(vch), end(vch));
+            m_value = bsv::deserialize<int64_t>(span.begin(), span.end());
     }
 
     assert(big_int ? m_value.index() == 1 : m_value.index() == 0);

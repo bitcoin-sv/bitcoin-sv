@@ -4,9 +4,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script.h"
+#include "consensus/consensus.h"
+#include "instruction_iterator.h"
 #include "int_serialization.h"
 #include "script_num.h"
-#include "consensus/consensus.h"
 
 #include "tinyformat.h"
 #include "utilstrencodings.h"
@@ -16,7 +17,68 @@
 
 std::ostream& operator<<(std::ostream& os, const opcodetype& opcode)
 {
-    os << GetOpName(opcode);
+    if(opcode >= 1 && opcode <= 75)
+    {
+        os << static_cast<int>(opcode);
+        return os;
+    }
+
+    switch(opcode)
+    {
+    case OP_0:
+        os << "OP_0";
+        break;
+    case OP_1:
+        os << "OP_1";
+        break;
+    case OP_2:
+        os << "OP_2";
+        break;
+    case OP_3:
+        os << "OP_3";
+        break;
+    case OP_4:
+        os << "OP_4";
+        break;
+    case OP_5:
+        os << "OP_5";
+        break;
+    case OP_6:
+        os << "OP_6";
+        break;
+    case OP_7:
+        os << "OP_7";
+        break;
+    case OP_8:
+        os << "OP_8";
+        break;
+    case OP_9:
+        os << "OP_9";
+        break;
+    case OP_10:
+        os << "OP_10";
+        break;
+    case OP_11:
+        os << "OP_11";
+        break;
+    case OP_12:
+        os << "OP_12";
+        break;
+    case OP_13:
+        os << "OP_13";
+        break;
+    case OP_14:
+        os << "OP_14";
+        break;
+    case OP_15:
+        os << "OP_15";
+        break;
+    case OP_16:
+        os << "OP_16";
+        break;
+    default:
+        os << GetOpName(opcode);
+    }
     return os;
 }
 
@@ -278,20 +340,21 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
 {
     sigOpCountError = false;
     uint64_t n = 0;
-    const_iterator pc = begin();
-    opcodetype lastOpcode = OP_INVALIDOPCODE;
-    std::vector<uint8_t> lastVch;
-    std::vector<uint8_t> vch;
-    while (pc < end())
+    bsv::instruction last_instruction{OP_INVALIDOPCODE};
+    const auto it_end{end_instructions()};
+    for(auto it{begin_instructions()}; it != it_end; ++it)
     {
-        opcodetype opcode;
-        vch.clear();
-        if (!GetOp(pc, opcode, vch)) break;
-        if (opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY)
+        opcodetype lastOpcode{last_instruction.opcode()};
+
+        opcodetype opcode{it->opcode()};
+        if(it->opcode() == OP_INVALIDOPCODE)
+            break;
+
+        if(opcode == OP_CHECKSIG || opcode == OP_CHECKSIGVERIFY)
         {
             n++;
         }
-        else if (opcode == OP_CHECKMULTISIG ||
+        else if(opcode == OP_CHECKMULTISIG || 
             opcode == OP_CHECKMULTISIGVERIFY)
         {
             if ((fAccurate || isGenesisEnabled) && lastOpcode >= OP_1 && lastOpcode <= OP_16)
@@ -304,8 +367,8 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
                 if (lastOpcode == OP_0) 
                 {
                     // Checking multisig with 0 keys, so nothing to add to n
-                }                
-                else if (lastVch.size() > CScriptNum::MAXIMUM_ELEMENT_SIZE)
+                }
+                else if(last_instruction.operand().size() > CScriptNum::MAXIMUM_ELEMENT_SIZE)
                 {
                     // When trying to spend such output EvalScript does not allow numbers bigger than 4 bytes
                     // and the execution of such script would fail and make the coin unspendable
@@ -318,14 +381,17 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
                     //  and would fail the script if number is not minimally encoded
                     //  We check minimal encoding before calling CScriptNum to avoid
                     //  exception in CScriptNum constructor.
-                    if (!bsv::IsMinimallyEncoded(lastVch, CScriptNum::MAXIMUM_ELEMENT_SIZE))
+                    if(!bsv::IsMinimallyEncoded(
+                           last_instruction.operand(),
+                           CScriptNum::MAXIMUM_ELEMENT_SIZE))
                     {
                         sigOpCountError = true;
                         return 0;
                     }
 
-                    int numSigs = CScriptNum(lastVch, true).getint();
-                    if (numSigs <0)
+                    int numSigs =
+                        CScriptNum(last_instruction.operand(), true).getint();
+                    if(numSigs < 0)
                     {
                         sigOpCountError = true;
                         return 0;
@@ -338,9 +404,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
                 n += MAX_PUBKEYS_PER_MULTISIG_BEFORE_GENESIS;
             }
         }
-        lastOpcode = opcode;
-        // Swap is used here to avoid memory copying
-        lastVch.swap(vch);
+        last_instruction = *it;
     }
 
     return n;
@@ -439,6 +503,17 @@ CScript &CScript::operator<<(const CScriptNum &b) {
     return *this;
 }
 
+bsv::instruction_iterator CScript::begin_instructions() const
+{
+    return bsv::instruction_iterator{bsv::span<const uint8_t>{data(), size()}};
+}
+
+bsv::instruction_iterator CScript::end_instructions() const
+{
+    return bsv::instruction_iterator{
+        bsv::span<const uint8_t>{data() + size(), 0}};
+}
+
 std::string CScriptWitness::ToString() const {
     std::string ret = "CScriptWitness(";
     for (unsigned int i = 0; i < stack.size(); i++) {
@@ -452,13 +527,12 @@ std::string CScriptWitness::ToString() const {
 
 std::ostream& operator<<(std::ostream& os, const CScript& script)
 {
-    for(const auto opcode : script)
+    for(auto it = script.begin_instructions(); it != script.end_instructions();
+        ++it)
     {
-        if (opcode > OP_0 && opcode < OP_PUSHDATA1)
-            os << static_cast<int>(opcode) << ' ';
-        else
-            os << static_cast<opcodetype>(opcode) << ' ';
+        os << *it << '\n';
     }
+
     return os;
 }
 

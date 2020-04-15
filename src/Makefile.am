@@ -352,6 +352,8 @@ libbitcoin_consensus_a_SOURCES = \
   consensus/validation.h \
   hash.cpp \
   hash.h \
+  instruction.h \
+  instruction_iterator.h \
   prevector.h \
   primitives/block.cpp \
   primitives/block.h \
@@ -374,6 +376,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_error.cpp \
   script/script_error.h \
   serialize.h \
+  span.h \
   tinyformat.h \
   uint256.cpp \
   uint256.h \
