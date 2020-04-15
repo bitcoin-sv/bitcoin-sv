@@ -88,7 +88,6 @@ public:
 
     std::string GetCommand() const;
     bool IsValid(const Config &config) const;
-    bool IsValidWithoutConfig(const MessageMagic &magic) const;
     bool IsOversized(const Config &config) const;
 
     ADD_SERIALIZE_METHODS;

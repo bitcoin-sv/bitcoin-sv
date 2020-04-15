@@ -177,30 +177,6 @@ bool CMessageHeader::IsValid(const Config &config) const {
     return true;
 }
 
-/**
- * This is a transition method in order to stay compatible with older code that
- * do not use the config. It assumes message will not get too large. This cannot
- * be used for any piece of code that will download blocks as blocks may be
- * bigger than the permitted size. Ideally, code that uses this function should
- * be migrated toward using the config.
- */
-bool CMessageHeader::IsValidWithoutConfig(const MessageMagic &magic) const {
-    // Check start string
-    if (!CheckHeaderMagicAndCommand(*this, magic)) {
-        return false;
-    }
-
-    // Payload size
-    if (nPayloadLength > DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH) {
-        LogPrintf(
-            "CMessageHeader::IsValidForSeeder(): (%s, %u bytes) is oversized\n",
-            GetCommand(), nPayloadLength);
-        return false;
-    }
-
-    return true;
-}
-
 bool CMessageHeader::IsOversized(const Config &config) const 
 {
     return nPayloadLength > NetMsgType::GetMaxMessageLength(GetCommand(), config);
