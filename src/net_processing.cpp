@@ -4266,8 +4266,8 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
             else {
                 // Look ahead to see if we can clear out some items we have already recieved from elsewhere
                 if(alreadyHave) {
-                    pto->mapAskFor.erase(firstIt);
                     pto->setAskFor.erase(inv.hash);
+                    pto->mapAskFor.erase(firstIt);
                 }
                 else {
                     // Abort clearing out items as soon as we find one that is still required. Bailing out here
