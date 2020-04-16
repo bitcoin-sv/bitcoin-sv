@@ -2730,13 +2730,13 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
                 }
                 else
                 {
+                    // check if this fork rises safe mode level
+                    if (safeModeLevelForks > safeModeLevel)
+                    {
+                        safeModeLevel = safeModeLevelForks;
+                        pindexForkTip = it->first;
+                    }
                     ++it;
-                }
-                // check if this fork rises safe mode level
-                if (safeModeLevelForks > safeModeLevel)
-                {
-                    safeModeLevel = safeModeLevelForks;
-                    pindexForkTip = it->first;
                 }
             }
         }
