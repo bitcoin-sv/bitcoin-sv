@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "net.h"
+#include "net/net.h"
 #include "txn_validation_data.h"
 
 #include <shared_mutex>

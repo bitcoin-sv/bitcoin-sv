@@ -2,7 +2,7 @@
 
 #include "db.h"
 #include "hash.h"
-#include "netbase.h"
+#include "net/netbase.h"
 #include "serialize.h"
 #include "streams.h"
 #include "uint256.h"

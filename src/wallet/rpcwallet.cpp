@@ -11,7 +11,7 @@
 #include "core_io.h"
 #include "dstencode.h"
 #include "init.h"
-#include "net.h"
+#include "net/net.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "rpc/mining.h"

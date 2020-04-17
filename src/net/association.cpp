@@ -4,10 +4,10 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <net.h>
 #include <net/association.h>
+#include <net/net.h>
+#include <net/netbase.h>
 #include <net/node_stats.h>
-#include <netbase.h>
 
 namespace
 {

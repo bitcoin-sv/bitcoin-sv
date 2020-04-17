@@ -7,8 +7,11 @@
 #include <enum_cast.h>
 #include <net/send_queue_bytes.h>
 #include <sync.h>
+#include <utiltime.h>
 
+#include <list>
 #include <memory>
+#include <vector>
 
 #include <boost/circular_buffer.hpp>
 

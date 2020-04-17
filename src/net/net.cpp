@@ -7,7 +7,7 @@
 #include "config/bitcoin-config.h"
 #endif
 
-#include "net.h"
+#include "net/net.h"
 
 #include "addrman.h"
 #include "chainparams.h"
@@ -17,7 +17,7 @@
 #include "crypto/common.h"
 #include "crypto/sha256.h"
 #include "hash.h"
-#include "netbase.h"
+#include "net/netbase.h"
 #include "primitives/transaction.h"
 #include "scheduler.h"
 #include "taskcancellation.h"

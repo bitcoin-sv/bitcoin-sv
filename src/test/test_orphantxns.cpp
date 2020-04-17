@@ -3,7 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "config.h"
-#include "net_processing.h"
+#include "net/net_processing.h"
 #include "orphan_txns.h"
 #include "test/test_bitcoin.h"
 

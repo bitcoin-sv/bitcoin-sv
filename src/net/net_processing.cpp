@@ -6,7 +6,7 @@
 #include <chrono>
 #include <optional>
 #include <shared_mutex>
-#include "net_processing.h"
+#include "net/net_processing.h"
 
 #include "addrman.h"
 #include "arith_uint256.h"
@@ -21,8 +21,8 @@
 #include "locked_ref.h"
 #include "merkleblock.h"
 #include "mining/journal_builder.h"
-#include "net.h"
-#include "netbase.h"
+#include "net/net.h"
+#include "net/netbase.h"
 #include "netmessagemaker.h"
 #include "policy/fees.h"
 #include "policy/policy.h"

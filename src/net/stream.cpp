@@ -1,9 +1,9 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <net.h>
+#include <net/net.h>
+#include <net/netbase.h>
 #include <net/stream.h>
-#include <netbase.h>
 
 // Enable enum_cast for StreamType, so we can log informatively
 const enumTableT<StreamType>& enumTable(StreamType)

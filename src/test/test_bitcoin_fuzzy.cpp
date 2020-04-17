@@ -11,7 +11,7 @@
 #include "coins.h"
 #include "compressor.h"
 #include "consensus/merkle.h"
-#include "net.h"
+#include "net/net.h"
 #include "primitives/block.h"
 #include "protocol.h"
 #include "pubkey.h"

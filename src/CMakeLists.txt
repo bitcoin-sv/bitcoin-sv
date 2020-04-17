@@ -184,8 +184,8 @@ add_library(common
 	core_write.cpp
 	key.cpp
 	keystore.cpp
-	netaddress.cpp
-	netbase.cpp
+	net/netaddress.cpp
+	net/netbase.cpp
 	primitives/block.cpp
 	protocol.cpp
 	rpc/jsonwriter.cpp
@@ -243,11 +243,11 @@ add_library(server
 	mining/journal_change_set.cpp
 	mining/journaling_block_assembler.cpp
     mining/legacy.cpp
-	net.cpp
     net/association.cpp
+	net/net.cpp
     net/net_message.cpp
+	net/net_processing.cpp
     net/stream.cpp
-	net_processing.cpp
 	noui.cpp
 	orphan_txns.cpp
 	policy/fees.cpp

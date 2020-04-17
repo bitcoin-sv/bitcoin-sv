@@ -7,7 +7,7 @@
 
 #include "base58.h"
 #include "config.h"
-#include "netbase.h"
+#include "net/netbase.h"
 #include "policy/policy.h"
 #include "util.h"
 
