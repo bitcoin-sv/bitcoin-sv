@@ -93,7 +93,20 @@ static UniValue getpeerinfo(const Config &config,
             "    \"sendsize\": n,             (numeric) Current size of queued messages for sending\n"
             "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
             "    \"pauserecv\": true|false,   (boolean) Are we paused for receiving\n"
-            "    \"avgbw\": n,                (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
+            "    \"avgrecvbw\": n,            (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
+            "    \"streams\": [\n"
+            "       {\n"
+            "          \"streamtype\": \"TYPE\" (string) The type of this stream\n"
+            "          \"lastsend\": ttt,     (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last send\n"
+            "          \"lastrecv\": ttt,     (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last receive\n"
+            "          \"bytessent\": n,      (numeric) The total bytes sent\n"
+            "          \"bytesrecv\": n,      (numeric) The total bytes received\n"
+            "          \"sendsize\": n,       (numeric) Current size of queued messages for sending\n"
+            "          \"spotrecvbw\": n,     (numeric) The spot average download bandwidth over this stream (bytes/sec)\n"
+            "          \"minuterecvbw\": n    (numeric) The 1 minute average download bandwidth over this stream (bytes/sec)\n"
+            "       }\n"
+            "       ...\n"
+            "    ],\n"
             "    \"conntime\": ttt,           (numeric) The connection time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
             "    \"timeoffset\": ttt,         (numeric) The time offset in "
@@ -174,7 +187,23 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("pauserecv", stats.fPauseRecv));
         obj.push_back(Pair("bytessent", stats.associationStats.nSendBytes));
         obj.push_back(Pair("bytesrecv", stats.associationStats.nRecvBytes));
-        obj.push_back(Pair("avgbw", stats.associationStats.nAvgBandwidth));
+        obj.push_back(Pair("avgrecvbw", stats.associationStats.nAvgBandwidth));
+
+        UniValue streams(UniValue::VARR);
+        for (const CStreamStats& streamStats : stats.associationStats.streamStats) {
+            UniValue streamDetails(UniValue::VOBJ);
+            streamDetails.push_back(Pair("streamtype", streamStats.streamType));
+            streamDetails.push_back(Pair("lastsend", streamStats.nLastSend));
+            streamDetails.push_back(Pair("lastrecv", streamStats.nLastRecv));
+            streamDetails.push_back(Pair("bytessent", streamStats.nSendBytes));
+            streamDetails.push_back(Pair("bytesrecv", streamStats.nRecvBytes));
+            streamDetails.push_back(Pair("sendsize", streamStats.nSendSize));
+            streamDetails.push_back(Pair("spotrecvbw", streamStats.nSpotBytesPerSec));
+            streamDetails.push_back(Pair("minuterecvbw", streamStats.nMinuteBytesPerSec));
+            streams.push_back(streamDetails);
+        }
+        obj.push_back(Pair("streams", streams));
+
         obj.push_back(Pair("conntime", stats.nTimeConnected));
         obj.push_back(Pair("timeoffset", stats.nTimeOffset));
         if (stats.dPingTime > 0.0) {
