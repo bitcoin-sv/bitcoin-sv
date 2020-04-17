@@ -5,7 +5,10 @@
 
 #include <compat.h>
 #include <enum_cast.h>
+#include <net/net_message.h>
+#include <net/net_types.h>
 #include <net/send_queue_bytes.h>
+#include <streams.h>
 #include <sync.h>
 #include <utiltime.h>
 
@@ -16,6 +19,7 @@
 #include <boost/circular_buffer.hpp>
 
 class CConnman;
+class CNetAddr;
 class CNode;
 class Config;
 class CSerializedNetMsg;
