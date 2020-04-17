@@ -66,6 +66,25 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
             # we should not be in safe mode
             conn1.rpc.getbalance()
 
+            # From time to time this test can run faster than expected and
+            # the older blocks for batch 2 headers are not yet requested.
+            # In that case they will be rejected due to being too far away
+            # form the tip. In that case we need to send them again once they
+            # are requested.
+            def on_getdata(conn, msg):
+                for i in msg.inv:
+                    if i.type != 2: # MSG_BLOCK
+                        error_msg = f"Unexpected data requested {i}"
+                        self.log.error(error_msg)
+                        raise NotImplementedError(error_msg)
+                    requested_hash = format(i.hash, 'x')
+                    for block in branch_2_blocks:
+                        if block.hash == requested_hash:
+                            conn.send_message(msg_block(block))
+                            break
+
+            conn2.cb.on_getdata = on_getdata
+
             # send sencond branch full blocks
             for block in branch_2_blocks:
                 conn2.send_message(msg_block(block))
