@@ -1,0 +1,2 @@
+This directory contains data created with node version 1.0.0. 
+Contains blocks that were created before the introduction of CDiskBlockMetaData class and don't have information about block size written to disk.
