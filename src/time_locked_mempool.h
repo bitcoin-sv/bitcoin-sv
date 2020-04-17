@@ -5,7 +5,6 @@
 
 #include <bloom.h>
 #include <consensus/validation.h>
-#include <primitives/transaction.h>
 #include <tx_mempool_info.h>
 #include <utiltime.h>
 #include <taskcancellation.h>

@@ -9,7 +9,6 @@
 
 #include "amount.h"
 #include "key.h"
-#include "primitives/transaction.h"
 #include "script/standard.h" // for CTxDestination
 #include "wallet/db.h"
 

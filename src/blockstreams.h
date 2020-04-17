@@ -6,7 +6,6 @@
 
 #include "primitives/block.h"
 #include "consensus/consensus.h"
-#include "primitives/transaction.h"
 #include "streams.h"
 #include "chain.h"
 #include "hash.h"

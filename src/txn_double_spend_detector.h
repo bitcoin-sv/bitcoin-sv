@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "primitives/transaction.h"
 #include "txn_validation_data.h"
 #include "uint256.h"
 #include <mutex>
