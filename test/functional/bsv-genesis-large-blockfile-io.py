@@ -44,9 +44,6 @@ class LargeBlockFileIO(ComparisonTestFramework):
             ]
         ]
 
-    def check_mempool(self, rpc, should_be_in_mempool):
-        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=6000)
-
     def run_test(self):
         self.test.run()
 
@@ -69,7 +66,7 @@ class LargeBlockFileIO(ComparisonTestFramework):
         tx1 = create_transaction(out[0].tx, out[0].n, b"", ONE_MEGABYTE * 120,  CScript([OP_TRUE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 120))]))
         self.test.connections[0].send_message(msg_tx(tx1))        
         # Wait for transaction processing        
-        self.check_mempool(node, [tx1])
+        self.check_mempool(node, [tx1], timeout=6000)
 
         # Mine block with new transaction.
         minedBlock1 = node.generate(1)
@@ -78,19 +75,19 @@ class LargeBlockFileIO(ComparisonTestFramework):
         for i in range(4):
             txLarge = create_transaction(out[1 + i].tx, out[1 + i].n, b"", ONE_GIGABYTE, CScript([OP_TRUE, OP_RETURN, bytearray([42] * (ONE_GIGABYTE - ONE_MEGABYTE))]))
             self.test.connections[0].send_message(msg_tx(txLarge))  
-            self.check_mempool(node, [txLarge]) 
+            self.check_mempool(node, [txLarge], timeout=6000)
 
         # Send overflow     
         txOverflow = create_transaction(out[5].tx, out[5].n, b"", ONE_MEGABYTE * 305, CScript([OP_TRUE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 305))]))
         self.test.connections[0].send_message(msg_tx(txOverflow))  
-        self.check_mempool(node, [txOverflow]) 
+        self.check_mempool(node, [txOverflow], timeout=6000)
         
         # Mine block with new transactions.        
         minedBlock2 = node.generate(1) 
 
         txLast = create_transaction(out[6].tx, out[6].n, b"", ONE_MEGABYTE, CScript([OP_TRUE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE))]))
         self.test.connections[0].send_message(msg_tx(txLast))  
-        self.check_mempool(node, [txLast]) 
+        self.check_mempool(node, [txLast], timeout=6000)
 
         # Mine block with new transaction.
         minedBlock3 = node.generate(1)                

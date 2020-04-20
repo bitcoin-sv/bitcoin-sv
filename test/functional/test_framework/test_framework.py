@@ -593,8 +593,8 @@ class ComparisonTestFramework(BitcoinTestFramework):
         else:
             return TestInstance([[self.chain.tip, reject]])
 
-    def check_mempool(self, rpc, should_be_in_mempool):
-        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=20)
+    def check_mempool(self, rpc, should_be_in_mempool, timeout=20):
+        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=timeout)
 
 
 

@@ -49,9 +49,6 @@ class BlockFileStore(ComparisonTestFramework):
             ]
         ]
 
-    def check_mempool(self, rpc, should_be_in_mempool):
-        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=6000)
-
     def run_test(self):
         self.test.run()
 
@@ -74,17 +71,17 @@ class BlockFileStore(ComparisonTestFramework):
         for i in range(18):
             txLarge = create_transaction(out[i].tx, out[i].n, b"", ONE_MEGABYTE * 256, CScript([OP_FALSE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 256))]))
             self.test.connections[0].send_message(msg_tx(txLarge))
-            self.check_mempool(node, [txLarge])
+            self.check_mempool(node, [txLarge], timeout=6000)
             txHashes.append([txLarge.hash, txLarge.sha256])
 
         txOverflow = create_transaction(out[18].tx, out[18].n, b"", ONE_MEGABYTE * 305, CScript([OP_FALSE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 305))]))
         self.test.connections[0].send_message(msg_tx(txOverflow))
-        self.check_mempool(node, [txOverflow])
+        self.check_mempool(node, [txOverflow], timeout=6000)
         txHashes.append([txOverflow.hash, txOverflow.sha256])
 
         txOverflow = create_transaction(out[19].tx, out[19].n, b"", ONE_MEGABYTE, CScript([OP_FALSE, OP_RETURN, bytearray([42] * ONE_MEGABYTE)]))
         self.test.connections[0].send_message(msg_tx(txOverflow))
-        self.check_mempool(node, [txOverflow])
+        self.check_mempool(node, [txOverflow], timeout=6000)
         txHashes.append([txOverflow.hash, txOverflow.sha256])
 
         # Mine block with new transactions.
