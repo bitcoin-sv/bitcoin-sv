@@ -94,6 +94,7 @@ static UniValue getpeerinfo(const Config &config,
             "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
             "    \"pauserecv\": true|false,   (boolean) Are we paused for receiving\n"
             "    \"avgrecvbw\": n,            (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
+            "    \"associd\": \"xxxxxxx\"       (string) The association ID if set by the peer, otherwise Null\n"
             "    \"streams\": [\n"
             "       {\n"
             "          \"streamtype\": \"TYPE\" (string) The type of this stream\n"
@@ -188,6 +189,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("bytessent", stats.associationStats.nSendBytes));
         obj.push_back(Pair("bytesrecv", stats.associationStats.nRecvBytes));
         obj.push_back(Pair("avgrecvbw", stats.associationStats.nAvgBandwidth));
+        obj.push_back(Pair("associd", stats.associationStats.assocID));
 
         UniValue streams(UniValue::VARR);
         for (const StreamStats& streamStats : stats.associationStats.streamStats) {

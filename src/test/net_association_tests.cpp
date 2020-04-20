@@ -109,6 +109,7 @@ BOOST_AUTO_TEST_CASE(TestBasicAssociation)
     BOOST_CHECK_EQUAL(stats.nSendBytes, 0);
     BOOST_CHECK_EQUAL(stats.nRecvBytes, 0);
     BOOST_CHECK_EQUAL(stats.nSendSize, 0);
+    BOOST_CHECK_EQUAL(stats.assocID, "Null");
     for(const auto& cmdTot : stats.mapSendBytesPerMsgCmd)
     {
         BOOST_CHECK_EQUAL(cmdTot.second, 0);
@@ -133,6 +134,47 @@ BOOST_AUTO_TEST_CASE(TestBasicAssociation)
     BOOST_CHECK_EQUAL(abw.second, 1);
 }
 
+// Test AssociationID
+BOOST_AUTO_TEST_CASE(TestAssociationID)
+{
+    // Generate new random UUIDs
+    UUIDAssociationID uuidAID {};
+    UUIDAssociationID uuidAID2 {};
+    BOOST_CHECK(uuidAID.ToString() != uuidAID2.ToString());
+    BOOST_CHECK(!(uuidAID == uuidAID2));
+    std::vector<uint8_t> uuidAIDBytes { uuidAID.GetBytes() };
+    BOOST_CHECK_EQUAL(uuidAIDBytes.size(), 17);
+    BOOST_CHECK_EQUAL(uuidAIDBytes[0], static_cast<uint8_t>(AssociationID::IDType::UUID));
+
+    // Regenerate an ID from the raw bytes
+    BOOST_CHECK_NO_THROW(
+        std::unique_ptr<AssociationID> reconstructed { AssociationID::Make(uuidAIDBytes) };
+        BOOST_CHECK(reconstructed != nullptr);
+        BOOST_CHECK_EQUAL(reconstructed->ToString(), uuidAID.ToString());
+        BOOST_CHECK(*reconstructed == uuidAID);
+        AssociationID& uuidAIDRef { uuidAID };
+        BOOST_CHECK(*reconstructed == uuidAIDRef);
+        BOOST_CHECK(uuidAIDRef == *reconstructed);
+    );
+
+    // Test factory method errors
+    std::vector<uint8_t> uuidAIDBytesBadType { uuidAIDBytes };
+    uuidAIDBytesBadType[0] = 0xff;
+    BOOST_CHECK_THROW(
+        std::unique_ptr<AssociationID> reconstructed { AssociationID::Make(uuidAIDBytesBadType) };
+    , std::runtime_error);
+
+    std::vector<uint8_t> uuidAIDBytesBadLength { static_cast<uint8_t>(AssociationID::IDType::UUID), 0x00 };
+    BOOST_CHECK_THROW(
+        std::unique_ptr<AssociationID> reconstructed { AssociationID::Make(uuidAIDBytesBadLength) };
+    , std::runtime_error);
+
+    BOOST_CHECK_NO_THROW(
+        std::vector<uint8_t> uuidAIDBytesNull {};
+        std::unique_ptr<AssociationID> reconstructed { AssociationID::Make(uuidAIDBytesNull)};
+        BOOST_CHECK(reconstructed == nullptr);
+    );
+}
 
 BOOST_AUTO_TEST_SUITE_END();
 

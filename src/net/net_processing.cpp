@@ -256,23 +256,32 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
                             : CAddress(CService(), addr.nServices));
     CAddress addrMe = CAddress(CService(), nLocalNodeServices);
 
+    // Include association ID if we have one
+    std::vector<uint8_t> assocIDBytes {};
+    std::string assocIDStr { "Null" };
+    AssociationIDPtr assocID { pnode->GetAssociation().GetAssociationID() };
+    if(assocID) {
+        assocIDBytes = assocID->GetBytes();
+        assocIDStr = assocID->ToString();
+    }
+
     connman.PushMessage(pnode,
                         CNetMsgMaker(INIT_PROTO_VERSION)
                             .Make(NetMsgType::VERSION, PROTOCOL_VERSION,
                                   (uint64_t)nLocalNodeServices, nTime, addrYou,
                                   addrMe, nonce, userAgent(),
-                                  nNodeStartingHeight, ::fRelayTxes));
+                                  nNodeStartingHeight, ::fRelayTxes, assocIDBytes));
 
     if (fLogIPs) {
         LogPrint(BCLog::NET, "send version message: version %d, blocks=%d, "
-                             "us=%s, them=%s, peer=%d\n",
+                             "us=%s, them=%s, assocID=%s, peer=%d\n",
                  PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(),
-                 addrYou.ToString(), nodeid);
+                 addrYou.ToString(), assocIDStr, nodeid);
     } else {
         LogPrint(
             BCLog::NET,
-            "send version message: version %d, blocks=%d, us=%s, peer=%d\n",
-            PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), nodeid);
+            "send version message: version %d, blocks=%d, us=%s, assocID=%s, peer=%d\n",
+            PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), assocIDStr, nodeid);
     }
 }
 
@@ -297,6 +306,7 @@ void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
     }
 
     if (!pnode->fInbound) {
+        pnode->GetAssociation().CreateAssociationID<UUIDAssociationID>();
         PushNodeVersion(pnode, connman, GetTime());
     }
 }
@@ -1659,6 +1669,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     std::string cleanSubVer;
     int nStartingHeight = -1;
     bool fRelay = true;
+    std::vector<uint8_t> associationID {};
 
     vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
     nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
@@ -1714,6 +1725,34 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     if(!vRecv.empty()) {
         vRecv >> fRelay;
     }
+
+    std::string assocIDStr { "Null" };
+    if(!vRecv.empty()) {
+        vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+        if(associationID.size() > 1) {
+            // Get ID type
+            uint8_t rawIdType { associationID[0] };
+            associationID.erase(associationID.begin());
+            AssociationID::IDType idType { static_cast<AssociationID::IDType>(rawIdType) };
+            if(idType == AssociationID::IDType::UUID) {
+                pfrom->GetAssociation().SetAssociationID(std::make_shared<UUIDAssociationID>(associationID));
+                assocIDStr = pfrom->GetAssociation().GetAssociationID()->ToString();
+            }
+            else {
+                LogPrint(BCLog::NET, "peer=%d unknown assocID type %d; disconnecting\n", pfrom->id, rawIdType);
+                connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+                    .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
+                      strprintf("Unsupported assocID type %d", rawIdType)));
+                pfrom->fDisconnect = true;
+                return false;
+            }
+        }
+    }
+    else if(!pfrom->fInbound) {
+        // Remote didn't echo back the association ID, so they don't support streams
+        pfrom->GetAssociation().ClearAssociationID();
+    }
+
     // Disconnect if we connected to ourself
     if(pfrom->fInbound && !connman.CheckIncomingNonce(nNonce)) {
         LogPrintf("connected to self at %s, disconnecting\n",
@@ -1795,9 +1834,9 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     }
 
     LogPrint(BCLog::NET, "receive version message: [%s] %s: version %d, blocks=%d, "
-              "us=%s, peer=%d%s\n",
+              "us=%s, assocID=%s, peer=%d%s\n",
               peerAddr.ToString().c_str(), cleanSubVer, pfrom->nVersion,
-              pfrom->nStartingHeight, addrMe.ToString(), pfrom->id,
+              pfrom->nStartingHeight, addrMe.ToString(), assocIDStr, pfrom->id,
               remoteAddr);
 
     int64_t nTimeOffset = nTime - GetTime();

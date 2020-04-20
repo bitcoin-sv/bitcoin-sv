@@ -250,6 +250,7 @@ add_library(server
 	mining/journaling_block_assembler.cpp
     mining/legacy.cpp
     net/association.cpp
+    net/association_id.cpp
 	net/net.cpp
     net/net_message.cpp
 	net/net_processing.cpp

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <net/association_id.h>
 #include <net/net_message.h>
 #include <net/net_types.h>
 #include <net/stream.h>
@@ -33,13 +34,25 @@ class Association
     Association(CNode& node, SOCKET socket, const CAddress& peerAddr);
     ~Association();
 
-
     // Get peer address
     const CAddress& GetPeerAddr() const { return mPeerAddr; }
 
     // Get/Set peers local address
     CService GetPeerAddrLocal() const;
     void SetPeerAddrLocal(const CService& addrLocal);
+
+    // Generate and set a new association ID
+    template<typename IDType, typename... Args>
+    void CreateAssociationID(Args&&... args)
+    {
+        LOCK(cs_mAssocID);
+        mAssocID = std::make_shared<IDType>(std::forward<Args>(args)...);
+    }
+
+    // Get/Set association ID from peer
+    AssociationIDPtr GetAssociationID() const;
+    void SetAssociationID(AssociationIDPtr&& id);
+    void ClearAssociationID();
 
     // Shutdown the connection
     void Shutdown();
@@ -79,6 +92,10 @@ class Association
 
     // Node we are for
     CNode& mNode;
+
+    // ID possibly passed in from peer
+    AssociationIDPtr mAssocID {nullptr};
+    mutable CCriticalSection cs_mAssocID {};
 
     // Streams within the association
     using StreamMap = std::map<StreamType, StreamPtr>;

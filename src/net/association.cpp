@@ -28,6 +28,26 @@ Association::Association(CNode& node, SOCKET socket, const CAddress& peerAddr)
     mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
 }
 
+AssociationIDPtr Association::GetAssociationID() const
+{
+    LOCK(cs_mAssocID);
+    return mAssocID;
+}
+
+void Association::SetAssociationID(AssociationIDPtr&& id)
+{
+    LOCK(cs_mAssocID);
+    mAssocID = std::move(id);
+    LogPrint(BCLog::NET, "association ID set to %s for peer=%d\n", mAssocID->ToString(), mNode.GetId());
+}
+
+void Association::ClearAssociationID()
+{
+    LOCK(cs_mAssocID);
+    mAssocID = nullptr;
+    LogPrint(BCLog::NET, "association ID cleared for peer=%d\n", mNode->GetId());
+}
+
 Association::~Association()
 {
     Shutdown();
@@ -115,6 +135,19 @@ AverageBandwidth Association::GetAverageBandwidth(const StreamType streamType) c
 
 void Association::CopyStats(AssociationStats& stats) const
 {
+    {
+        // ID
+        LOCK(cs_mAssocID);
+        if(mAssocID)
+        {
+            stats.assocID = mAssocID->ToString();
+        }
+        else
+        {
+            stats.assocID = "Null";
+        }
+    }
+
     {
         // Build stream stats
         LOCK(cs_mStreams);

@@ -35,6 +35,7 @@ public:
     uint64_t nAvgBandwidth;
 
     std::vector<StreamStats> streamStats;
+    std::string assocID;
 };
 
 class NodeStats
