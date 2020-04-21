@@ -292,8 +292,21 @@ void PushProtoconf(const CNodePtr& pnode, CConnman &connman) {
     LogPrint(BCLog::NET, "send protoconf message: max size %d, number of fields =%d, ", MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, 1);
 }
 
+static void PushCreateStream(const CNodePtr& pnode, CConnman& connman, StreamType streamType,
+    const AssociationIDPtr& assocID)
+{
 
-void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
+    connman.PushMessage(pnode,
+        CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::CREATESTREAM, assocID->GetBytes(),
+            static_cast<uint8_t>(streamType)
+    ));
+
+    LogPrint(BCLog::NET, "send createstream message: type %s, assoc %s, peer=%d\n", enum_cast<std::string>(streamType),
+        assocID->ToString(), pnode->id);
+}
+
+void InitializeNode(const CNodePtr& pnode, CConnman& connman, const NodeConnectInfo* connectInfo)
+{
     CAddress addr = pnode->GetAssociation().GetPeerAddr();
     std::string addrName = pnode->GetAddrName();
     NodeId nodeid = pnode->GetId();
@@ -306,8 +319,15 @@ void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
     }
 
     if (!pnode->fInbound) {
-        pnode->GetAssociation().CreateAssociationID<UUIDAssociationID>();
-        PushNodeVersion(pnode, connman, GetTime());
+        if(connectInfo && connectInfo->fNewStream) {
+            PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->assocID);
+        }
+        else {
+            if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+                pnode->GetAssociation().CreateAssociationID<UUIDAssociationID>();
+            }
+            PushNodeVersion(pnode, connman, GetTime());
+        }
     }
 }
 
@@ -1641,6 +1661,120 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
 }
 
 /**
+* Process createstream messages.
+*/
+static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string& strCommand,
+    CDataStream& vRecv, CConnman& connman)
+{
+    // Check we haven't already received either a createstream or a version message
+    if(pfrom->nVersion != 0)
+    {
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
+                std::string("Invalid createstream scenario")));
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    std::vector<uint8_t> associationID {};
+    uint8_t streamTypeRaw {0};
+    vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+    vRecv >> streamTypeRaw;
+
+    // Which association is this for?
+    try
+    {
+        // Parse stream type
+        if(streamTypeRaw >= static_cast<uint8_t>(StreamType::MAX_STREAM_TYPE))
+        {
+            throw std::runtime_error("StreamType out of range");
+        }
+        StreamType streamType { static_cast<StreamType>(streamTypeRaw) };
+
+        // Parse association ID
+        AssociationIDPtr idptr { AssociationID::Make(associationID) };
+        LogPrint(BCLog::NET, "Got request for new %s stream within association %s, peer=%d\n",
+            enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
+
+        // Move stream to owning association
+        CNodePtr newOwner { connman.MoveStream(pfrom->id, idptr, streamType) };
+
+        // Send stream ack
+        connman.PushMessage(newOwner, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::STREAMACK, associationID, streamTypeRaw),
+            streamType);
+
+        // Once a node has had its stream moved out it's just an empty husk
+        // and should be flagged for shutdown/removal. The actual stream and
+        // socket connection will live on however under the new owner.
+        pfrom->fDisconnect = true;
+    }
+    catch(std::exception& e)
+    {
+        LogPrint(BCLog::NET, "peer=%d Failed to setup new stream (%s); disconnecting\n", pfrom->id, e.what());
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_STREAM_SETUP, std::string(e.what())));
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    return true;
+}
+
+/**
+* Process streamack messages.
+*/
+static bool ProcessStreamAckMessage(const CNodePtr& pfrom, const std::string& strCommand,
+    CDataStream& vRecv, CConnman& connman)
+{
+    // Can't receive streamacks over an established connection
+    if(pfrom->nVersion != 0)
+    {
+        connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
+            .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
+                std::string("Invalid streamack")));
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    std::vector<uint8_t> associationID {};
+    uint8_t streamTypeRaw {0};
+    vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+    vRecv >> streamTypeRaw;
+
+    try
+    {
+        // Parse stream type
+        if(streamTypeRaw >= static_cast<uint8_t>(StreamType::MAX_STREAM_TYPE))
+        {
+            throw std::runtime_error("StreamType out of range");
+        }
+        StreamType streamType { static_cast<StreamType>(streamTypeRaw) };
+
+        // Parse association ID
+        AssociationIDPtr idptr { AssociationID::Make(associationID) };
+        LogPrint(BCLog::NET, "Got stream ack for new %s stream within association %s, peer=%d\n",
+            enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
+
+        // Move newly established stream to owning association
+        connman.MoveStream(pfrom->id, idptr, streamType);
+
+        // Once a node has had its stream moved out it's just an empty husk
+        // and should be flagged for shutdown/removal. The actual stream and
+        // socket connection will live on however under the new owner.
+        pfrom->fDisconnect = true;
+    }
+    catch(std::exception& e)
+    {
+        LogPrint(BCLog::NET, "peer=%d Failed to process stream ack (%s); disconnecting\n", pfrom->id, e.what());
+        pfrom->fDisconnect = true;
+        return false;
+    }
+
+    return true;
+}
+
+/**
 * Process version messages.
 */
 static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strCommand,
@@ -1729,20 +1863,34 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     std::string assocIDStr { "Null" };
     if(!vRecv.empty()) {
         vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-        if(associationID.size() > 1) {
-            // Get ID type
-            uint8_t rawIdType { associationID[0] };
-            associationID.erase(associationID.begin());
-            AssociationID::IDType idType { static_cast<AssociationID::IDType>(rawIdType) };
-            if(idType == AssociationID::IDType::UUID) {
-                pfrom->GetAssociation().SetAssociationID(std::make_shared<UUIDAssociationID>(associationID));
-                assocIDStr = pfrom->GetAssociation().GetAssociationID()->ToString();
+        if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+            try {
+                // Decode received association ID
+                AssociationIDPtr recvdAssocID { AssociationID::Make(associationID) };
+                if(recvdAssocID) {
+                    assocIDStr = recvdAssocID->ToString();
+
+                    // If we sent them an assoc ID, make sure they echoed back the same one
+                    const AssociationIDPtr& currAssocID { pfrom->GetAssociation().GetAssociationID() };
+                    if(currAssocID != nullptr) {
+                        if(!(*recvdAssocID == *currAssocID)) {
+                            throw std::runtime_error("Mismatched association IDs");
+                        }
+                    }
+                    else {
+                        // Set association ID for node
+                        pfrom->GetAssociation().SetAssociationID(std::move(recvdAssocID));
+                    }
+                }
+                else {
+                    // Peer sent us a null ID, so they support streams but have disabled them
+                    pfrom->GetAssociation().ClearAssociationID();
+                }
             }
-            else {
-                LogPrint(BCLog::NET, "peer=%d unknown assocID type %d; disconnecting\n", pfrom->id, rawIdType);
+            catch(std::exception& e) {
+                LogPrint(BCLog::NET, "peer=%d bad association ID (%s); disconnecting\n", pfrom->id, e.what());
                 connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
-                    .Make(NetMsgType::REJECT, strCommand, REJECT_NONSTANDARD,
-                      strprintf("Unsupported assocID type %d", rawIdType)));
+                    .Make(NetMsgType::REJECT, strCommand, REJECT_STREAM_SETUP, std::string(e.what())));
                 pfrom->fDisconnect = true;
                 return false;
             }
@@ -1887,6 +2035,13 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s\n",
                   pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
+
+        // If required, queue attempts to create additional streams to this peer
+        AssociationIDPtr assocID { pfrom->GetAssociation().GetAssociationID() };
+        if(assocID) {
+            LogPrint(BCLog::NET, "Queuing new stream requests to peer=%d\n", pfrom->id);
+            connman.QueueNewStream(peerAddr, StreamType::BLOCK, assocID);
+        }
     }
     else {
         LogPrintf("New inbound peer connected: version: %d, subver: %s, blocks=%d, peer=%d%s\n",
@@ -3448,9 +3603,15 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     else if (strCommand == NetMsgType::VERSION) {
         return ProcessVersionMessage(pfrom, strCommand, vRecv, connman, config);
     }
+    else if(strCommand == NetMsgType::CREATESTREAM) {
+        return ProcessCreateStreamMessage(pfrom, strCommand, vRecv, connman);
+    }
+    else if(strCommand == NetMsgType::STREAMACK) {
+        return ProcessStreamAckMessage(pfrom, strCommand, vRecv, connman);
+    }
 
     else if (pfrom->nVersion == 0) {
-        // Must have a version message before anything else
+        // Must have a version or createstream message before anything else
         Misbehaving(pfrom, 1, "missing-version");
         return false;
     }

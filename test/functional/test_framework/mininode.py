@@ -1649,6 +1649,7 @@ class NodeConn(asyncore.dispatcher):
         b"version": msg_version,
         b"protoconf": msg_protoconf,
         b"verack": msg_verack,
+        b"createstream": msg_createstream,
         b"addr": msg_addr,
         b"alert": msg_alert,
         b"inv": msg_inv,

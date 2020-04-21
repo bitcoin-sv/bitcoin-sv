@@ -288,8 +288,8 @@ static UniValue addnode(const Config &config, const JSONRPCRequest &request) {
     std::string strNode = request.params[0].get_str();
 
     if (strCommand == "onetry") {
-        CAddress addr;
-        g_connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str());
+        NodeConnectInfo connectInfo { CAddress{}, strNode.c_str() };
+        g_connman->OpenNetworkConnection(connectInfo, nullptr);
         return NullUniValue;
     }
 

@@ -137,6 +137,30 @@ struct AddedNodeInfo {
     bool fInbound;
 };
 
+/**
+ * Details for a connection we should attempt to a peer.
+ */
+struct NodeConnectInfo
+{
+    NodeConnectInfo() = default;
+
+    NodeConnectInfo(const CAddress& addr, const char* dest = nullptr, bool count = false)
+    : addrConnect{addr}, pszDest{dest}, fCountFailure{count}
+    {}
+
+    NodeConnectInfo(const CAddress& addr, StreamType st, const AssociationIDPtr& id)
+    : addrConnect{addr}, streamType{st}, assocID{id}, fNewStream{true}
+    {}
+
+    CAddress addrConnect {};
+    const char* pszDest {nullptr};
+    bool fCountFailure {false};
+
+    StreamType streamType { StreamType::GENERAL };
+    AssociationIDPtr assocID {nullptr};
+    bool fNewStream {false};
+};
+
 class CGetBlockMessageRequest
 {
 public:
@@ -241,9 +265,8 @@ public:
                         bool fWhitelisted = false);
     bool GetNetworkActive() const { return fNetworkActive; };
     void SetNetworkActive(bool active);
-    bool OpenNetworkConnection(const CAddress &addrConnect, bool fCountFailure,
+    bool OpenNetworkConnection(NodeConnectInfo& connectInfo,
                                CSemaphoreGrant *grantOutbound = nullptr,
-                               const char *strDest = nullptr,
                                bool fOneShot = false, bool fFeeler = false,
                                bool fAddnode = false);
     bool CheckIncomingNonce(uint64_t nonce);
@@ -254,6 +277,8 @@ public:
 
     /** Transfer ownership of a stream from one peer's association to another */
     void MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType);
+    /** Queue an attempt to open a new stream to a peer */
+    void QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID);
 
     /** Enqueue a new transaction for later sending to our peers */
     void EnqueueTransaction(const CTxnSendingDetails& txn);
@@ -568,6 +593,7 @@ private:
     };
 
     void ThreadOpenAddedConnections();
+    void ThreadOpenNewStreamConnections();
     void ProcessOneShot();
     void ThreadOpenConnections();
     void ThreadMessageHandler();
@@ -583,8 +609,7 @@ private:
     CNodePtr FindNode(const CService &addr);
 
     bool AttemptToEvictConnection();
-    CNodePtr ConnectNode(CAddress addrConnect, const char *pszDest,
-                         bool fCountFailure);
+    CNodePtr ConnectNode(NodeConnectInfo& connect);
     bool IsWhitelistedRange(const CNetAddr &addr);
 
     void DeleteNode(const CNodePtr& pnode);
@@ -649,6 +674,10 @@ private:
     mutable CCriticalSection cs_vNodes;
     std::atomic<NodeId> nLastNodeId;
 
+    /** Additional streams we want to open to peers */
+    std::list<NodeConnectInfo> mPendingStreams {};
+    mutable CCriticalSection cs_mPendingStreams {};
+
     /** Services this instance offers */
     ServiceFlags nLocalServices;
 
@@ -692,6 +721,7 @@ private:
     std::thread threadSocketHandler;
     std::thread threadOpenAddedConnections;
     std::thread threadOpenConnections;
+    std::thread threadOpenNewStreamConnections;
     std::thread threadMessageHandler;
 
     std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
@@ -733,8 +763,7 @@ struct CNodeSignals {
                                  std::atomic<bool> &),
                             CombinerAll>
         SendMessages;
-    boost::signals2::signal<void(const CNodePtr& , CConnman &)>
-        InitializeNode;
+    boost::signals2::signal<void(const CNodePtr&, CConnman&, const NodeConnectInfo* connectInfo)> InitializeNode;
     boost::signals2::signal<void(NodeId, bool &)> FinalizeNode;
 };
 

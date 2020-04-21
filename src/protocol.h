@@ -271,6 +271,16 @@ extern const char *BLOCKTXN;
  * Sent right after VERACK message, regardless of remote peer's protocol version
  */
 extern const char *PROTOCONF;
+/**
+ * The createstream message is for setting up a new stream within an existing
+ * association.
+ */
+extern const char *CREATESTREAM;
+/**
+ * The streamack message is an acknowledgement that a previously requested
+ * attempt to setup a new stream has been successful.
+ */
+extern const char *STREAMACK;
 
 /**
  * Indicate if the message is used to transmit the content of a block.

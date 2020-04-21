@@ -28,12 +28,14 @@ class CSerializedNetMsg;
 class StreamStats;
 
 // Enumerate possible stream types
-enum class StreamType
+enum class StreamType : uint8_t
 {
-    UNKNOWN,
+    UNKNOWN = 0,
     GENERAL,
     BLOCK,
-    TRANSACTION
+    TRANSACTION,
+
+    MAX_STREAM_TYPE
 };
 // Enable enum_cast for StreamType, so we can log informatively
 const enumTableT<StreamType>& enumTable(StreamType);
