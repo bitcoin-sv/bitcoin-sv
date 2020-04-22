@@ -240,7 +240,7 @@ void CTimeLockedMempool::dumpMempool() const
         file.fclose();
         RenameOver(GetDataDir() / "non-final-mempool.dat.new", GetDataDir() / "non-final-mempool.dat");
         int64_t last { GetTimeMicros() };
-        LogPrintf("Dumped %d txns to non-final mempool: %gs to dump\n", numTxns, (last - start) * 0.000001);
+        LogPrintf("Dumped %d txns to non-final mempool: %.6fs to dump\n", numTxns, (last - start) * 0.000001);
     }
     catch(const std::exception& e)
     {

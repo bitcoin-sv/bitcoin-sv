@@ -7402,7 +7402,7 @@ void DumpMempool(void) {
         RenameOver(GetDataDir() / "mempool.dat.new",
                    GetDataDir() / "mempool.dat");
         int64_t last = GetTimeMicros();
-        LogPrintf("Dumped mempool: %gs to copy, %gs to dump\n",
+        LogPrintf("Dumped mempool: %.6fs to copy, %.6fs to dump\n",
                   (mid - start) * 0.000001, (last - mid) * 0.000001);
     } catch (const std::exception &e) {
         LogPrintf("Failed to dump mempool: %s. Continuing anyway.\n", e.what());
