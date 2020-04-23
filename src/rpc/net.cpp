@@ -164,12 +164,12 @@ static UniValue getpeerinfo(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    std::vector<CNodeStats> vstats;
+    std::vector<NodeStats> vstats;
     g_connman->GetNodeStats(vstats);
 
     UniValue ret(UniValue::VARR);
 
-    for (const CNodeStats &stats : vstats) {
+    for (const NodeStats &stats : vstats) {
         UniValue obj(UniValue::VOBJ);
         CNodeStateStats statestats;
         bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
@@ -190,7 +190,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("avgrecvbw", stats.associationStats.nAvgBandwidth));
 
         UniValue streams(UniValue::VARR);
-        for (const CStreamStats& streamStats : stats.associationStats.streamStats) {
+        for (const StreamStats& streamStats : stats.associationStats.streamStats) {
             UniValue streamDetails(UniValue::VOBJ);
             streamDetails.push_back(Pair("streamtype", streamStats.streamType));
             streamDetails.push_back(Pair("lastsend", streamStats.nLastSend));

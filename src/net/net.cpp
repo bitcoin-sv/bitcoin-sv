@@ -173,7 +173,7 @@ int GetnScore(const CService &addr) {
 // Is our peer's addrLocal potentially useful as an external IP source?
 bool IsPeerAddrLocalGood(const CNodePtr& pnode)
 {
-    const CAssociation& assoc { pnode->GetAssociation() };
+    const Association& assoc { pnode->GetAssociation() };
     CService addrLocal { assoc.GetPeerAddrLocal() };
     return fDiscover && assoc.GetPeerAddr().IsRoutable() && addrLocal.IsRoutable() &&
            !IsLimited(addrLocal.GetNetwork());
@@ -712,7 +712,7 @@ void CNode::RunAsyncProcessing(
         source);
 }
 
-void CNode::copyStats(CNodeStats &stats)
+void CNode::copyStats(NodeStats &stats)
 {
     mAssociation.CopyStats(stats.associationStats);
 
@@ -2618,7 +2618,7 @@ size_t CConnman::GetNodeCount(NumConnections flags) {
     return nNum;
 }
 
-void CConnman::GetNodeStats(std::vector<CNodeStats> &vstats) {
+void CConnman::GetNodeStats(std::vector<NodeStats> &vstats) {
     vstats.clear();
     LOCK(cs_vNodes);
     vstats.reserve(vNodes.size());

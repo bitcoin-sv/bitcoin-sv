@@ -453,7 +453,7 @@ public:
     std::vector<AddedNodeInfo> GetAddedNodeInfo();
 
     size_t GetNodeCount(NumConnections num);
-    void GetNodeStats(std::vector<CNodeStats> &vstats);
+    void GetNodeStats(std::vector<NodeStats> &vstats);
     bool DisconnectNode(const std::string &node);
     bool DisconnectNode(NodeId id);
 
@@ -938,7 +938,7 @@ private:
     CConnman::CAsyncTaskPool& mAsyncTaskPool;
 
     // Peer association details
-    CAssociation mAssociation;
+    Association mAssociation;
 
 public:
 
@@ -952,8 +952,8 @@ public:
     NodeId GetId() const { return id; }
 
     // Fetch peer association details
-    const CAssociation& GetAssociation() const { return mAssociation; }
-    CAssociation& GetAssociation() { return mAssociation; }
+    const Association& GetAssociation() const { return mAssociation; }
+    Association& GetAssociation() { return mAssociation; }
 
     uint64_t GetLocalNonce() const { return nLocalHostNonce; }
 
@@ -1015,7 +1015,7 @@ public:
 
     void CloseSocketDisconnect();
 
-    void copyStats(CNodeStats &stats);
+    void copyStats(NodeStats &stats);
 
     ServiceFlags GetLocalServices() const { return nLocalServices; }
 

@@ -23,7 +23,7 @@ class CNetAddr;
 class CNode;
 class Config;
 class CSerializedNetMsg;
-class CStreamStats;
+class StreamStats;
 
 // Enumerate possible stream types
 enum class StreamType
@@ -40,16 +40,16 @@ const enumTableT<StreamType>& enumTable(StreamType);
  * A stream is a single channel of communiction carried over an association
  * between 2 peers.
  */
-class CStream
+class Stream
 {
   public:
-    CStream(CNode& node, StreamType streamType, SOCKET socket);
-    ~CStream();
+    Stream(CNode& node, StreamType streamType, SOCKET socket);
+    ~Stream();
 
-    CStream(const CStream&) = delete;
-    CStream& operator=(const CStream&) = delete;
-    CStream(CStream&& that) = delete;
-    CStream& operator=(CStream&&) = delete;
+    Stream(const Stream&) = delete;
+    Stream& operator=(const Stream&) = delete;
+    Stream(Stream&& that) = delete;
+    Stream& operator=(Stream&&) = delete;
 
     // Shutdown the stream
     void Shutdown();
@@ -76,7 +76,7 @@ class CStream
     int64_t GetLastRecvTime() const { return mLastRecvTime; }
 
     // Copy out our stats
-    void CopyStats(CStreamStats& stats) const;
+    void CopyStats(StreamStats& stats) const;
 
     // Update average bandwidth measurements
     void AvgBandwithCalc();
@@ -156,4 +156,4 @@ class CStream
 
 };
 
-using CStreamPtr = std::shared_ptr<CStream>;
+using StreamPtr = std::shared_ptr<Stream>;

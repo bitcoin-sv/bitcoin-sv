@@ -17,7 +17,7 @@ namespace
         return CService(CNetAddr(s), Params().GetDefaultPort());
     }
 
-    void CheckInitialStreamStats(const CStreamStats& stats)
+    void CheckInitialStreamStats(const StreamStats& stats)
     {
         BOOST_CHECK_EQUAL(stats.streamType, "GENERAL");
         BOOST_CHECK_EQUAL(stats.nLastSend, 0);
@@ -52,10 +52,10 @@ BOOST_AUTO_TEST_CASE(TestBasicStream)
             true);
 
     // Create a stream
-    CStream stream { *pDummyNode, StreamType::GENERAL, INVALID_SOCKET };
+    Stream stream { *pDummyNode, StreamType::GENERAL, INVALID_SOCKET };
 
     // Check initial state
-    CStreamStats stats {};
+    StreamStats stats {};
     stream.CopyStats(stats);
     CheckInitialStreamStats(stats);
 
@@ -91,13 +91,13 @@ BOOST_AUTO_TEST_CASE(TestBasicAssociation)
             true);
 
     // Create an association
-    CAssociation association { *pDummyNode, INVALID_SOCKET, dummy_addr };
+    Association association { *pDummyNode, INVALID_SOCKET, dummy_addr };
 
     // Check initial state
     CAddress peerAddr { association.GetPeerAddr() };
     BOOST_CHECK_EQUAL(peerAddr.ToString(), "1.192.176.160:8333");
 
-    CAssociationStats stats {};
+    AssociationStats stats {};
     association.CopyStats(stats);
     BOOST_CHECK_EQUAL(stats.streamStats.size(), 1);
     CheckInitialStreamStats(stats.streamStats[0]);

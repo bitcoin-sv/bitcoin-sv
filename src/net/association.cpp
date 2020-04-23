@@ -14,11 +14,11 @@ namespace
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
 }
 
-CAssociation::CAssociation(CNode& node, SOCKET socket, const CAddress& peerAddr)
+Association::Association(CNode& node, SOCKET socket, const CAddress& peerAddr)
 : mNode{node}, mPeerAddr{peerAddr}
 {
     // Create initial stream
-    mStreams[StreamType::GENERAL] = std::make_shared<CStream>(mNode, StreamType::GENERAL, socket);
+    mStreams[StreamType::GENERAL] = std::make_shared<Stream>(mNode, StreamType::GENERAL, socket);
 
     // Setup bytes count per message type
     for(const std::string& msg : getAllNetMessageTypes())
@@ -28,18 +28,18 @@ CAssociation::CAssociation(CNode& node, SOCKET socket, const CAddress& peerAddr)
     mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
 }
 
-CAssociation::~CAssociation()
+Association::~Association()
 {
     Shutdown();
 }
 
-CService CAssociation::GetPeerAddrLocal() const
+CService Association::GetPeerAddrLocal() const
 {
     LOCK(cs_mPeerAddr);
     return mPeerAddrLocal;
 }
 
-void CAssociation::SetPeerAddrLocal(const CService& addrLocal)
+void Association::SetPeerAddrLocal(const CService& addrLocal)
 {
     LOCK(cs_mPeerAddr);
     if(mPeerAddrLocal.IsValid())
@@ -53,7 +53,7 @@ void CAssociation::SetPeerAddrLocal(const CService& addrLocal)
     }
 }
 
-void CAssociation::Shutdown()
+void Association::Shutdown()
 {
     // Shutdown all our streams
     LOCK(cs_mStreams);
@@ -69,7 +69,7 @@ void CAssociation::Shutdown()
     }
 }
 
-uint64_t CAssociation::GetAverageBandwidth() const
+uint64_t Association::GetAverageBandwidth() const
 {
     LOCK(cs_mStreams);
 
@@ -93,7 +93,7 @@ uint64_t CAssociation::GetAverageBandwidth() const
     return static_cast<uint64_t>(sumOfMeans / sumOfNumberOfItems);
 }
 
-AverageBandwidth CAssociation::GetAverageBandwidth(const StreamType streamType) const
+AverageBandwidth Association::GetAverageBandwidth(const StreamType streamType) const
 {
     LOCK(cs_mStreams);
 
@@ -113,19 +113,19 @@ AverageBandwidth CAssociation::GetAverageBandwidth(const StreamType streamType) 
     return streamIt->second->GetAverageBandwidth();
 }
 
-void CAssociation::CopyStats(CAssociationStats& stats) const
+void Association::CopyStats(AssociationStats& stats) const
 {
     {
         // Build stream stats
         LOCK(cs_mStreams);
         for(const auto& stream : mStreams)
         {
-            CStreamStats streamStats {};
+            StreamStats streamStats {};
             stream.second->CopyStats(streamStats);
             stats.streamStats.push_back(std::move(streamStats));
         }
     }
-    const std::vector<CStreamStats>& streamStats { stats.streamStats };
+    const std::vector<StreamStats>& streamStats { stats.streamStats };
 
     // Last send/recv times are the latest for any of our underlying streams
     if(streamStats.empty())
@@ -136,13 +136,13 @@ void CAssociation::CopyStats(CAssociationStats& stats) const
     else
     {
         auto maxStreamSendTime = std::max_element(streamStats.begin(), streamStats.end(),
-            [](const CStreamStats& s1, const CStreamStats& s2) {
+            [](const StreamStats& s1, const StreamStats& s2) {
                 return s1.nLastSend < s2.nLastSend;
             }
         );
         stats.nLastSend = maxStreamSendTime->nLastSend;
         auto maxStreamRecvTime = std::max_element(streamStats.begin(), streamStats.end(),
-            [](const CStreamStats& s1, const CStreamStats& s2) {
+            [](const StreamStats& s1, const StreamStats& s2) {
                 return s1.nLastRecv < s2.nLastRecv;
             }
         );
@@ -153,20 +153,20 @@ void CAssociation::CopyStats(CAssociationStats& stats) const
     stats.nAvgBandwidth = GetAverageBandwidth();
 
     // Total send/recv bytes for all our underlying streams
-    stats.nSendBytes = std::accumulate(streamStats.begin(), streamStats.end(), 0,
-        [](const uint64_t& tot, const CStreamStats& s) {
+    stats.nSendBytes = std::accumulate(streamStats.begin(), streamStats.end(), 0ULL,
+        [](const uint64_t& tot, const StreamStats& s) {
             return tot + s.nSendBytes;
         }
     );
-    stats.nRecvBytes = std::accumulate(streamStats.begin(), streamStats.end(), 0,
-        [](const uint64_t& tot, const CStreamStats& s) {
+    stats.nRecvBytes = std::accumulate(streamStats.begin(), streamStats.end(), 0ULL,
+        [](const uint64_t& tot, const StreamStats& s) {
             return tot + s.nRecvBytes;
         }
     );
 
     // Total send queue bytes for all our underlying streams
-    stats.nSendSize = std::accumulate(streamStats.begin(), streamStats.end(), 0,
-        [](const uint64_t& tot, const CStreamStats& s) {
+    stats.nSendSize = std::accumulate(streamStats.begin(), streamStats.end(), 0ULL,
+        [](const uint64_t& tot, const StreamStats& s) {
             return tot + s.nSendSize;
         }
     );
@@ -178,10 +178,10 @@ void CAssociation::CopyStats(CAssociationStats& stats) const
     }
 }
 
-int64_t CAssociation::GetLastSendTime() const
+int64_t Association::GetLastSendTime() const
 {
     // Get most recent send time for any of our underlying streams
-    auto getLastSentTime = [](const CStreamPtr& stream) { return stream->GetLastSendTime(); };
+    auto getLastSentTime = [](const StreamPtr& stream) { return stream->GetLastSendTime(); };
     std::vector<int64_t> streamTimes { ForEachStream(getLastSentTime) };
     if(streamTimes.empty())
     {
@@ -193,10 +193,10 @@ int64_t CAssociation::GetLastSendTime() const
     }
 }
 
-int64_t CAssociation::GetLastRecvTime() const
+int64_t Association::GetLastRecvTime() const
 {
     // Get most recent recv time for any of our underlying streams
-    auto getLastRecvTime = [](const CStreamPtr& stream) { return stream->GetLastRecvTime(); };
+    auto getLastRecvTime = [](const StreamPtr& stream) { return stream->GetLastRecvTime(); };
     std::vector<int64_t> streamTimes { ForEachStream(getLastRecvTime) };
     if(streamTimes.empty())
     {
@@ -208,7 +208,7 @@ int64_t CAssociation::GetLastRecvTime() const
     }
 }
 
-bool CAssociation::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
+bool Association::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                                        SOCKET& socketMax, bool pauseRecv) const
 {
     bool havefds {false};
@@ -223,7 +223,7 @@ bool CAssociation::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set&
     return havefds;
 }
 
-size_t CAssociation::GetNewMsgs(std::list<CNetMessage>& msgList)
+size_t Association::GetNewMsgs(std::list<CNetMessage>& msgList)
 {
     size_t nSizeAdded {0};
 
@@ -259,7 +259,7 @@ size_t CAssociation::GetNewMsgs(std::list<CNetMessage>& msgList)
     return nSizeAdded;
 }
 
-void CAssociation::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError,
+void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                                   CConnman& connman, const Config& config, bool& gotNewMsgs,
                                   size_t& bytesRecv, size_t& bytesSent)
 {
@@ -278,13 +278,13 @@ void CAssociation::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setE
     }
 }
 
-void CAssociation::AvgBandwithCalc()
+void Association::AvgBandwithCalc()
 {
     // Let each stream do its own calculations
-    ForEachStream([](CStreamPtr& stream){ stream->AvgBandwithCalc(); });
+    ForEachStream([](StreamPtr& stream){ stream->AvgBandwithCalc(); });
 }
 
-size_t CAssociation::GetTotalSendQueueSize() const
+size_t Association::GetTotalSendQueueSize() const
 {
     // Get total of all stream send queue sizes
     LOCK(cs_mStreams);
@@ -295,7 +295,7 @@ size_t CAssociation::GetTotalSendQueueSize() const
     );
 }
 
-size_t CAssociation::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg)
+size_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg)
 {
     size_t nPayloadLength { msg.Size() };
     size_t nTotalSize { nPayloadLength + CMessageHeader::HEADER_SIZE };
@@ -305,7 +305,7 @@ size_t CAssociation::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSeria
     LOCK(cs_mStreams);
     if(!mStreams.empty())
     {
-        CStreamPtr& stream { mStreams[StreamType::GENERAL] };
+        StreamPtr& stream { mStreams[StreamType::GENERAL] };
 
         {
             // Log total amount of bytes per command

@@ -8,7 +8,7 @@
 
 #include <net/net_types.h>
 
-class CStreamStats
+class StreamStats
 {
 public:
     std::string streamType;
@@ -21,7 +21,7 @@ public:
     uint64_t nMinuteBytesPerSec;
 };
 
-class CAssociationStats
+class AssociationStats
 {
 public:
     int64_t nLastSend;
@@ -34,10 +34,10 @@ public:
     uint64_t nSendSize;
     uint64_t nAvgBandwidth;
 
-    std::vector<CStreamStats> streamStats;
+    std::vector<StreamStats> streamStats;
 };
 
-class CNodeStats
+class NodeStats
 {
 public:
     NodeId nodeid;
@@ -45,15 +45,15 @@ public:
     bool fRelayTxes;
     bool fPauseSend;
     bool fPauseRecv;
+    bool fInbound;
+    bool fAddnode;
+    bool fWhitelisted;
     int64_t nTimeConnected;
     int64_t nTimeOffset;
     std::string addrName;
     int nVersion;
     std::string cleanSubVer;
-    bool fInbound;
-    bool fAddnode;
     int nStartingHeight;
-    bool fWhitelisted;
     double dPingTime;
     double dPingWait;
     double dMinPing;
@@ -61,5 +61,5 @@ public:
     std::string addrLocal;
     size_t nInvQueueSize;
 
-    CAssociationStats associationStats;
+    AssociationStats associationStats;
 };

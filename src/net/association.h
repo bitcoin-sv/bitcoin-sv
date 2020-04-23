@@ -12,7 +12,7 @@
 
 #include <boost/circular_buffer.hpp>
 
-class CAssociationStats;
+class AssociationStats;
 class CConnman;
 class CNode;
 class Config;
@@ -22,16 +22,16 @@ class CSerializedNetMsg;
  * An association is a connection between 2 peers which may carry
  * multiple independent streams of data.
  */
-class CAssociation
+class Association
 { 
   public:
-    CAssociation(const CAssociation&) = delete;
-    CAssociation(CAssociation&&) = delete;
-    CAssociation& operator=(const CAssociation&) = delete;
-    CAssociation& operator=(CAssociation&&) = delete;
+    Association(const Association&) = delete;
+    Association(Association&&) = delete;
+    Association& operator=(const Association&) = delete;
+    Association& operator=(Association&&) = delete;
 
-    CAssociation(CNode& node, SOCKET socket, const CAddress& peerAddr);
-    ~CAssociation();
+    Association(CNode& node, SOCKET socket, const CAddress& peerAddr);
+    ~Association();
 
 
     // Get peer address
@@ -45,7 +45,7 @@ class CAssociation
     void Shutdown();
 
     // Copy out current statistics
-    void CopyStats(CAssociationStats& stats) const;
+    void CopyStats(AssociationStats& stats) const;
 
     // Add our sockets to the sets for reading and writing
     bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
@@ -81,7 +81,7 @@ class CAssociation
     CNode& mNode;
 
     // Streams within the association
-    using StreamMap = std::map<StreamType, CStreamPtr>;
+    using StreamMap = std::map<StreamType, StreamPtr>;
     StreamMap mStreams {};
     bool mShutdown {false};
     mutable CCriticalSection cs_mStreams {};
@@ -98,10 +98,10 @@ class CAssociation
 
     // Helper functions for running something over all streams that returns a result
     template <typename Callable,
-              std::enable_if_t<!std::is_void<typename std::result_of<Callable(const CStreamPtr&)>::type>::value, int> = 0>
-    std::vector<typename std::result_of<Callable(const CStreamPtr&)>::type> ForEachStream(Callable&& func) const
+              std::enable_if_t<!std::is_void<typename std::result_of<Callable(const StreamPtr&)>::type>::value, int> = 0>
+    std::vector<typename std::result_of<Callable(const StreamPtr&)>::type> ForEachStream(Callable&& func) const
     {
-        std::vector<typename std::result_of<Callable(const CStreamPtr&)>::type> res {};
+        std::vector<typename std::result_of<Callable(const StreamPtr&)>::type> res {};
 
         LOCK(cs_mStreams);
         for(const auto& stream : mStreams)
@@ -114,7 +114,7 @@ class CAssociation
 
     // Helper functions for running something over all streams that returns void
     template <typename Callable,
-              std::enable_if_t<std::is_void<typename std::result_of<Callable(const CStreamPtr&)>::type>::value, int> = 0>
+              std::enable_if_t<std::is_void<typename std::result_of<Callable(const StreamPtr&)>::type>::value, int> = 0>
     void ForEachStream(Callable&& func) const
     {
         LOCK(cs_mStreams);
@@ -125,7 +125,7 @@ class CAssociation
     }
     // Non-const version
     template <typename Callable,
-              std::enable_if_t<std::is_void<typename std::result_of<Callable(CStreamPtr&)>::type>::value, int> = 0>
+              std::enable_if_t<std::is_void<typename std::result_of<Callable(StreamPtr&)>::type>::value, int> = 0>
     void ForEachStream(Callable&& func)
     {
         LOCK(cs_mStreams);

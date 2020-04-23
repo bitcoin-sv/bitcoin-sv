@@ -32,17 +32,17 @@ namespace
     }
 }
 
-CStream::CStream(CNode& node, StreamType streamType, SOCKET socket)
+Stream::Stream(CNode& node, StreamType streamType, SOCKET socket)
 : mNode{node}, mStreamType{streamType}, mSocket{socket}
 {
 }
 
-CStream::~CStream()
+Stream::~Stream()
 {
     Shutdown();
 }
 
-void CStream::Shutdown()
+void Stream::Shutdown()
 {
     // Close the socket connection
     LOCK(cs_mSocket);
@@ -54,7 +54,7 @@ void CStream::Shutdown()
     }
 }
 
-bool CStream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
+bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                                  SOCKET& socketMax, bool pauseRecv) const
 {
     // Implement the following logic:
@@ -89,7 +89,7 @@ bool CStream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setEr
     return true;
 }
 
-void CStream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
+void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                             CConnman& connman, const Config& config, const CNetAddr& peerAddr,
                             bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent)
 {
@@ -169,7 +169,7 @@ void CStream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
     }
 }
 
-size_t CStream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+size_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
     size_t nPayloadLength, size_t nTotalSize)
 {   
     size_t nBytesSent {0};
@@ -195,7 +195,7 @@ size_t CStream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialized
     return nBytesSent;
 }
 
-size_t CStream::GetNewMsgs(std::list<CNetMessage>& msgList)
+size_t Stream::GetNewMsgs(std::list<CNetMessage>& msgList)
 {
     size_t nSizeAdded {0};
 
@@ -215,7 +215,7 @@ size_t CStream::GetNewMsgs(std::list<CNetMessage>& msgList)
     return nSizeAdded;
 }
 
-void CStream::CopyStats(CStreamStats& stats) const
+void Stream::CopyStats(StreamStats& stats) const
 {
     stats.streamType = enum_cast<std::string>(mStreamType);
     stats.nLastSend = mLastSendTime;
@@ -245,7 +245,7 @@ void CStream::CopyStats(CStreamStats& stats) const
     }
 }
 
-void CStream::AvgBandwithCalc()
+void Stream::AvgBandwithCalc()
 {   
     LOCK(cs_mRecvMsgQueue);
     int64_t currTime { GetTimeMicros() };
@@ -266,7 +266,7 @@ void CStream::AvgBandwithCalc()
 // If we have sufficient samples then get average bandwidth from node,
 // otherwise we must be in early startup measuring the bandwidth so just
 // report it as 0.
-AverageBandwidth CStream::GetAverageBandwidth() const
+AverageBandwidth Stream::GetAverageBandwidth() const
 {
     LOCK(cs_mRecvMsgQueue);
 
@@ -281,13 +281,13 @@ AverageBandwidth CStream::GetAverageBandwidth() const
     return {0,0};
 }
 
-size_t CStream::GetSendQueueSize() const
+size_t Stream::GetSendQueueSize() const
 {
     LOCK(cs_mSendMsgQueue);
     return mSendMsgQueueSize.getSendQueueBytes();
 }
 
-CStream::RECV_STATUS CStream::ReceiveMsgBytes(const Config& config, const char* pch, size_t nBytes,
+Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pch, size_t nBytes,
     bool& complete)
 {
     complete = false;
@@ -347,7 +347,7 @@ CStream::RECV_STATUS CStream::ReceiveMsgBytes(const Config& config, const char* 
     return RECV_OK;
 }   
 
-size_t CStream::SocketSendData()
+size_t Stream::SocketSendData()
 {   
     size_t nSentSize = 0;
     size_t nMsgCount = 0;
@@ -380,7 +380,7 @@ size_t CStream::SocketSendData()
     return nSentSize;
 }
 
-CStream::CSendResult CStream::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)
+Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)
 {   
     if (maxChunkSize == 0)
     {   
