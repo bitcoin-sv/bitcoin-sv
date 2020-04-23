@@ -6,7 +6,6 @@
 
 #include "base58.h"
 #include "dstencode.h"
-#include "script/script.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
 #include "util.h"

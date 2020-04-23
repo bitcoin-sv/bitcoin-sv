@@ -5,7 +5,6 @@
 
 #include <enum_cast.h>
 #include <mining/journal.h>
-#include <primitives/transaction.h>
 
 #include <atomic>
 #include <memory>

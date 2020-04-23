@@ -7,7 +7,6 @@
 
 #include "memusage.h"
 #include "primitives/block.h"
-#include "primitives/transaction.h"
 
 static inline size_t RecursiveDynamicUsage(const CScript &script) {
     return memusage::DynamicUsage(*static_cast<const CScriptBase *>(&script));
