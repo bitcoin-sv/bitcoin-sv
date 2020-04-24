@@ -12,6 +12,7 @@
 #include <sync.h>
 #include <utiltime.h>
 
+#include <atomic>
 #include <list>
 #include <memory>
 #include <optional>
@@ -44,7 +45,7 @@ const enumTableT<StreamType>& enumTable(StreamType);
 class Stream
 {
   public:
-    Stream(CNode& node, StreamType streamType, SOCKET socket);
+    Stream(CNode* node, StreamType streamType, SOCKET socket);
     ~Stream();
 
     Stream(const Stream&) = delete;
@@ -88,13 +89,21 @@ class Stream
     // Get current send queue size
     size_t GetSendQueueSize() const;
 
+    // Get/Set stream type
+    StreamType GetStreamType() const { return mStreamType; }
+    void SetStreamType(StreamType streamType) { mStreamType = streamType; }
+
+    // Set our owning CNode
+    void SetOwningNode(CNode* newNode);
+
   private:
 
     // Node we are for
-    CNode& mNode;
+    CNode* mNode {nullptr};
+    mutable CCriticalSection cs_mNode {};
 
     // What does this stream carry?
-    StreamType mStreamType { StreamType::UNKNOWN };
+    std::atomic<StreamType> mStreamType { StreamType::UNKNOWN };
 
     // Our socket
     SOCKET mSocket {0};

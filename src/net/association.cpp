@@ -14,7 +14,7 @@ namespace
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
 }
 
-Association::Association(CNode& node, SOCKET socket, const CAddress& peerAddr)
+Association::Association(CNode* node, SOCKET socket, const CAddress& peerAddr)
 : mNode{node}, mPeerAddr{peerAddr}
 {
     // Create initial stream
@@ -38,7 +38,7 @@ void Association::SetAssociationID(AssociationIDPtr&& id)
 {
     LOCK(cs_mAssocID);
     mAssocID = std::move(id);
-    LogPrint(BCLog::NET, "association ID set to %s for peer=%d\n", mAssocID->ToString(), mNode.GetId());
+    LogPrint(BCLog::NET, "association ID set to %s for peer=%d\n", mAssocID->ToString(), mNode->GetId());
 }
 
 void Association::ClearAssociationID()
@@ -65,7 +65,7 @@ void Association::SetPeerAddrLocal(const CService& addrLocal)
     if(mPeerAddrLocal.IsValid())
     {
         error("Addr local already set for node: %i. Refusing to change from %s to %s",
-              mNode.GetId(), mPeerAddrLocal.ToString(), addrLocal.ToString());
+              mNode->GetId(), mPeerAddrLocal.ToString(), addrLocal.ToString());
     }
     else
     {
@@ -80,13 +80,40 @@ void Association::Shutdown()
     if(!mShutdown)
     {
         mShutdown = true;
-
-        LogPrint(BCLog::NET, "disconnecting peer=%d\n", mNode.GetId());
-        for(auto& stream : mStreams)
+        if(!mStreams.empty())
         {
-            stream.second->Shutdown();
+            LogPrint(BCLog::NET, "disconnecting peer=%d\n", mNode->GetId());
+            for(auto& stream : mStreams)
+            {
+                stream.second->Shutdown();
+            }
         }
     }
+}
+
+void Association::MoveStream(StreamType newType, Association& to)
+{
+    // Lock both associations so we can move stream from one to the other atomically
+    LOCK(cs_mStreams);
+    LOCK(to.cs_mStreams);
+
+    // Sanity check; we should only ever be moving a single stream at a time
+    if(mStreams.size() != 1)
+    {
+        throw std::runtime_error("Unexpected number of streams being moved");
+    }
+    // Check we aren't overwriting an existing stream in the target association
+    if(to.mStreams.find(newType) != to.mStreams.end())
+    {
+        throw std::runtime_error("Attempt to overwrite existing stream in move");
+    }
+
+    // Give stream to target association
+    auto handle { mStreams.extract(mStreams.begin()) };
+    StreamPtr streamToMove { handle.mapped() };
+    streamToMove->SetStreamType(newType);
+    streamToMove->SetOwningNode(to.mNode);
+    to.mStreams[newType] = streamToMove;
 }
 
 uint64_t Association::GetAverageBandwidth() const
@@ -351,7 +378,7 @@ size_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerial
     }
     else
     {
-        LogPrint(BCLog::NET, "No stream available to send message on for peer=%d\n", mNode.GetId());
+        LogPrint(BCLog::NET, "No stream available to send message on for peer=%d\n", mNode->GetId());
     }
 
     return nBytesSent;

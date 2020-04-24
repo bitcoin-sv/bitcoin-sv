@@ -252,6 +252,9 @@ public:
 
     void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg);
 
+    /** Transfer ownership of a stream from one peer's association to another */
+    void MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType);
+
     /** Enqueue a new transaction for later sending to our peers */
     void EnqueueTransaction(const CTxnSendingDetails& txn);
     /** Remove some transactions from our peers list of new transactions */

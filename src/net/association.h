@@ -31,7 +31,7 @@ class Association
     Association& operator=(const Association&) = delete;
     Association& operator=(Association&&) = delete;
 
-    Association(CNode& node, SOCKET socket, const CAddress& peerAddr);
+    Association(CNode* node, SOCKET socket, const CAddress& peerAddr);
     ~Association();
 
     // Get peer address
@@ -56,6 +56,9 @@ class Association
 
     // Shutdown the connection
     void Shutdown();
+
+    // Move ownership of our stream to a different association
+    void MoveStream(StreamType newType, Association& to);
 
     // Copy out current statistics
     void CopyStats(AssociationStats& stats) const;
@@ -91,7 +94,7 @@ class Association
   private:
 
     // Node we are for
-    CNode& mNode;
+    CNode* mNode {nullptr};
 
     // ID possibly passed in from peer
     AssociationIDPtr mAssocID {nullptr};

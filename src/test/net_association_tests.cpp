@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE(TestBasicStream)
             true);
 
     // Create a stream
-    Stream stream { *pDummyNode, StreamType::GENERAL, INVALID_SOCKET };
+    Stream stream { pDummyNode.get(), StreamType::GENERAL, INVALID_SOCKET };
 
     // Check initial state
     StreamStats stats {};
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(TestBasicAssociation)
             true);
 
     // Create an association
-    Association association { *pDummyNode, INVALID_SOCKET, dummy_addr };
+    Association association { pDummyNode.get(), INVALID_SOCKET, dummy_addr };
 
     // Check initial state
     CAddress peerAddr { association.GetPeerAddr() };

@@ -2846,7 +2846,7 @@ CNode::CNode(
     , nLocalServices(nLocalServicesIn)
     , nMyStartingHeight(nMyStartingHeightIn)
     , mAsyncTaskPool{asyncTaskPool}
-    , mAssociation{*this, hSocketIn, addrIn}
+    , mAssociation{this, hSocketIn, addrIn}
 {
     addrName = addrNameIn == "" ? mAssociation.GetPeerAddr().ToStringIPPort() : addrNameIn;
 
@@ -2859,6 +2859,7 @@ CNode::CNode(
 
 CNode::~CNode()
 {
+    LogPrint(BCLog::NET, "Removing peer=%d\n", id);
 }
 
 void CNode::AskFor(const CInv &inv) {
@@ -2943,6 +2944,44 @@ size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNe
     fPauseSend = (mAssociation.GetTotalSendQueueSize() > g_connman->GetSendBufferSize());
 
     return bytesSent;
+}
+
+/** Transfer ownership of a stream from one peer's association to another */
+void CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType)
+{
+    LOCK(cs_vNodes);
+
+    // Lookup node we're moving this stream to
+    CNodePtr toNode {nullptr};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        const AssociationIDPtr& assocID { pnode->GetAssociation().GetAssociationID() };
+        if(assocID && *assocID == *newAssocID)
+        {
+            toNode = pnode;
+            break;
+        }
+    }
+    if(toNode == nullptr)
+    {
+        std::stringstream err {};
+        err << "No node found with association ID " << newAssocID->ToString();
+        throw std::runtime_error(err.str());
+    }
+
+    // Lookup node we're moving this stream from
+    CNodePtr fromNode { FindNodeById(from) };
+    if(fromNode == nullptr)
+    {
+        std::stringstream err {};
+        err << "Failed to lookup node for peer " << from;
+        throw std::runtime_error(err.str());
+    }
+
+    // Transfer the stream
+    LogPrint(BCLog::NET, "Stream for association ID %s moving from peer=%d to peer=%d\n",
+        newAssocID->ToString(), from, toNode->id);
+    fromNode->GetAssociation().MoveStream(newStreamType, toNode->GetAssociation());
 }
 
 const TxIdTrackerSPtr& CConnman::GetTxIdTracker() {

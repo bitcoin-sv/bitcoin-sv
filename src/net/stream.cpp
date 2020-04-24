@@ -32,7 +32,7 @@ namespace
     }
 }
 
-Stream::Stream(CNode& node, StreamType streamType, SOCKET socket)
+Stream::Stream(CNode* node, StreamType streamType, SOCKET socket)
 : mNode{node}, mStreamType{streamType}, mSocket{socket}
 {
 }
@@ -44,12 +44,14 @@ Stream::~Stream()
 
 void Stream::Shutdown()
 {
+    LOCK(cs_mNode);
+
     // Close the socket connection
     LOCK(cs_mSocket);
     if(mSocket != INVALID_SOCKET)
     {
         LogPrint(BCLog::NET, "closing %s stream to peer=%d\n", enum_cast<std::string>(mStreamType),
-            mNode.GetId());
+            mNode->GetId());
         CloseSocket(mSocket);
     }
 }
@@ -93,6 +95,8 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                             CConnman& connman, const Config& config, const CNetAddr& peerAddr,
                             bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent)
 {
+    LOCK(cs_mNode);
+
     //
     // Receive
     //
@@ -128,7 +132,7 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
             const RECV_STATUS status = ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
             if (status != RECV_OK)
             {   
-                mNode.CloseSocketDisconnect();
+                mNode->CloseSocketDisconnect();
                 if (status == RECV_BAD_LENGTH)
                 {   
                     // Ban the peer if try to send messages with bad length
@@ -139,11 +143,11 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
         else if (nBytes == 0)
         {   
             // socket closed gracefully
-            if (!mNode.GetDisconnect())
+            if (!mNode->GetDisconnect())
             {   
                 LogPrint(BCLog::NET, "stream socket closed\n");
             }
-            mNode.CloseSocketDisconnect();
+            mNode->CloseSocketDisconnect();
         }
         else if (nBytes < 0)
         {
@@ -151,11 +155,11 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
             int nErr = WSAGetLastError();
             if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
             {
-                if (!mNode.GetDisconnect())
+                if (!mNode->GetDisconnect())
                 {
                     LogPrintf("stream socket recv error %s\n", NetworkErrorString(nErr));
                 }
-                mNode.CloseSocketDisconnect();
+                mNode->CloseSocketDisconnect();
             }
         }
     }
@@ -174,6 +178,7 @@ size_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedN
 {   
     size_t nBytesSent {0};
 
+    LOCK(cs_mNode);
     LOCK(cs_mSendMsgQueue);
     bool optimisticSend { mSendMsgQueue.empty() };
 
@@ -287,9 +292,17 @@ size_t Stream::GetSendQueueSize() const
     return mSendMsgQueueSize.getSendQueueBytes();
 }
 
+void Stream::SetOwningNode(CNode* newNode)
+{
+    LOCK(cs_mNode);
+    mNode = newNode;
+}
+
 Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pch, size_t nBytes,
     bool& complete)
 {
+    AssertLockHeld(cs_mNode);
+
     complete = false;
     int64_t nTimeMicros = GetTimeMicros();
 
@@ -330,7 +343,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
 
         if (IsOversizedMessage(config, msg))
         {   
-            LogPrint(BCLog::NET, "Oversized message from peer=%i, disconnecting\n", mNode.GetId());
+            LogPrint(BCLog::NET, "Oversized message from peer=%i, disconnecting\n", mNode->GetId());
             return RECV_BAD_LENGTH;
         }
 
@@ -353,6 +366,7 @@ size_t Stream::SocketSendData()
     size_t nMsgCount = 0;
     size_t nSendBufferMaxSize = g_connman->GetSendBufferSize();
 
+    AssertLockHeld(cs_mNode);
     LOCK(cs_mSendMsgQueue);
 
     for(const auto& data : mSendMsgQueue)
@@ -381,7 +395,9 @@ size_t Stream::SocketSendData()
 }
 
 Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)
-{   
+{
+    AssertLockHeld(cs_mNode);
+
     if (maxChunkSize == 0)
     {   
         // if maxChunkSize is 0 assign some default chunk size value
@@ -430,7 +446,7 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_
             if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
             {
                 LogPrintf("socket send error %s\n", NetworkErrorString(nErr));
-                mNode.CloseSocketDisconnect();
+                mNode->CloseSocketDisconnect();
             }
 
             return {false, sentSize};
