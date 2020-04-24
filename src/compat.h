@@ -51,7 +51,7 @@
 #ifdef WIN32
 #define MSG_DONTWAIT 0
 #else
-typedef u_int SOCKET;
+typedef int SOCKET;
 #include "errno.h"
 #define WSAGetLastError() errno
 #define WSAEINVAL EINVAL
@@ -62,7 +62,7 @@ typedef u_int SOCKET;
 #define WSAEINPROGRESS EINPROGRESS
 #define WSAEADDRINUSE EADDRINUSE
 #define WSAENOTSOCK EBADF
-#define INVALID_SOCKET (SOCKET)(~0)
+#define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #endif
 
