@@ -26,11 +26,10 @@ RUN apt-get update &&   \
        bsdmainutils
 
 
-RUN pip3 install requests   
+RUN pip3 install requests pyzmq rpyc   
 RUN cpanm PerlIO::gzip
 RUN cpanm JSON
 RUN cpanm Term::ReadLine
-RUN git clone https://github.com/linux-test-project/lcov.git && cd lcov && make install
 
 COPY contrib/nchain/devops/* ./
 RUN  chmod +x /entrypoint.py
