@@ -17,6 +17,7 @@
 #include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
+#include "primitives/transaction.h"
 #include "pow.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
@@ -164,6 +165,11 @@ UniValue generateBlocks(const Config &config,
 
         std::shared_ptr<const CBlock> shared_pblock =
             std::make_shared<const CBlock>(*pblock);
+
+        if (shared_pblock->vtx[0]->HasP2SHOutput()) {
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
+        }
+
         if (!ProcessNewBlock(config, shared_pblock, true, nullptr)) {
             throw JSONRPCError(RPC_INTERNAL_ERROR,
                                "ProcessNewBlock, block not accepted");
@@ -715,6 +721,10 @@ UniValue processBlock(
     if (block.vtx.empty() || !block.vtx[0]->IsCoinBase()) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                            "Block does not start with a coinbase");
+    }
+
+    if (block.vtx[0]->HasP2SHOutput()) {
+        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
     }
 
     uint256 hash = block.GetHash();

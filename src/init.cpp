@@ -129,14 +129,15 @@ enum BindFlags {
 // the parent exits from main().
 //
 
-std::atomic<bool> fRequestShutdown(false);
+std::shared_ptr<task::CCancellationSource> shutdownSource(task::CCancellationSource::Make());
 std::atomic<bool> fDumpMempoolLater(false);
 
 void StartShutdown() {
-    fRequestShutdown = true;
+    shutdownSource->Cancel();
 }
-bool ShutdownRequested() {
-    return fRequestShutdown;
+task::CCancellationToken GetShutdownToken()
+{
+    return shutdownSource->GetToken();
 }
 
 /**
@@ -278,7 +279,7 @@ void Shutdown() {
  * Signal handlers are very limited in what they are allowed to do, so:
  */
 void HandleSIGTERM(int) {
-    fRequestShutdown = true;
+    StartShutdown();
 }
 
 void HandleSIGHUP(int) {
@@ -1262,7 +1263,10 @@ void CleanupBlockRevFiles() {
     }
 }
 
-void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
+/* shutdownToken must be passed by value to prevent access violation because
+ * "import_files" thread can have longer life span than shutdownToken presented with a reference.
+ */
+void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, const task::CCancellationToken shutdownToken) {
     RenameThread("bitcoin-loadblk");
 
     {
@@ -1308,7 +1312,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
         CValidationState dummyState;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
-        if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
+        if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), shutdownToken), config, dummyState, changeSet)) {
             LogPrintf("Failed to connect best block");
             StartShutdown();
         }
@@ -1320,8 +1324,8 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
         }
     } // End scope of CImportingNow
     if (gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
-        LoadMempool(config);
-        fDumpMempoolLater = !fRequestShutdown;
+        LoadMempool(config, shutdownToken);
+        fDumpMempoolLater = !shutdownToken.IsCanceled();
     }
 }
 
@@ -2161,7 +2165,7 @@ void preloadChainState(boost::thread_group &threadGroup)
 }
 
 bool AppInitMain(Config &config, boost::thread_group &threadGroup,
-                 CScheduler &scheduler) {
+                 CScheduler &scheduler, const task::CCancellationToken& shutdownToken) {
     const CChainParams &chainparams = config.GetChainParams();
     // Step 4a: application initialization
 
@@ -2470,7 +2474,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
               nMempoolSizeMax * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
-    while (!fLoaded && !fRequestShutdown) {
+    while (!fLoaded && !shutdownToken.IsCanceled()) {
         bool fReset = fReindex;
         std::string strLoadError;
 
@@ -2502,7 +2506,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     strLoadError = _("Error upgrading chainstate database");
                     break;
                 }
-                if (fRequestShutdown) break;
+                if (shutdownToken.IsCanceled()) break;
 
                 if (!LoadBlockIndex(chainparams)) {
                     strLoadError = _("Error loading block database");
@@ -2597,7 +2601,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 if (!CVerifyDB().VerifyDB(
                         config, pcoinsdbview,
                         gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
-                        gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS))) {
+                        gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS),
+                        shutdownToken)) {
                     strLoadError = _("Corrupted block database detected");
                     break;
                 }
@@ -2613,7 +2618,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
             fLoaded = true;
         } while (false);
 
-        if (!fLoaded && !fRequestShutdown) {
+        if (!fLoaded && !shutdownToken.IsCanceled()) {
             // first suggest a reindex
             if (!fReset) {
                 bool fRet = uiInterface.ThreadSafeQuestion(
@@ -2624,9 +2629,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     "",
                     CClientUIInterface::MSG_ERROR |
                         CClientUIInterface::BTN_ABORT);
-                if (fRet) {
+                if (fRet && !shutdownToken.IsCanceled()) {
                     fReindex = true;
-                    fRequestShutdown = false;
                 } else {
                     LogPrintf("Aborted block database rebuild. Exiting.\n");
                     return false;
@@ -2640,10 +2644,15 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // As LoadBlockIndex can take several minutes.
     // As the program has not fully started yet, Shutdown() is possibly
     // overkill.
-    if (fRequestShutdown) {
+    if (shutdownToken.IsCanceled()) {
         LogPrintf("Shutdown requested. Exiting.\n");
         return false;
     }
+
+    // After block chain is loaded check fork tip statuses and
+    // restore global safe mode state.
+    CheckSafeModeParametersForAllForksOnStartup();
+
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
   
 
@@ -2695,11 +2704,11 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 
     threadGroup.create_thread(
-        [&config, vImportFiles]
+        [&config, vImportFiles, shutdownToken]
         {
             TraceThread(
                 "import_files",
-                [&config, &vImportFiles]{ThreadImport(config, vImportFiles);});
+                [&config, &vImportFiles, shutdownToken]{ThreadImport(config, vImportFiles, shutdownToken);});
         });
 
     // Wait for genesis block to be processed
@@ -2772,5 +2781,5 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 #endif
 
-    return !fRequestShutdown;
+    return !shutdownToken.IsCanceled();
 }

@@ -19,11 +19,6 @@ class ZMQTest (BitcoinTestFramework):
         self.num_nodes = 2
 
     def setup_nodes(self):
-        # Try to import python3-zmq. Skip this test if the import fails.
-        try:
-            import zmq
-        except ImportError:
-            raise SkipTest("python3-zmq module not available.")
 
         # Check that bitcoin has been built with ZMQ enabled
         config = configparser.ConfigParser()
@@ -34,6 +29,12 @@ class ZMQTest (BitcoinTestFramework):
 
         if not config["components"].getboolean("ENABLE_ZMQ"):
             raise SkipTest("bitcoind has not been built with zmq enabled.")
+
+        # if we built bitcoind with ZMQ enabled, then we need zmq package to test its functionality
+        try:
+            import zmq
+        except ImportError:
+            raise Exception("python3-zmq module not available.")
 
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)

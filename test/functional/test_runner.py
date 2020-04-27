@@ -72,7 +72,7 @@ LARGE_BLOCK_TESTS = [
 
 # This tests can be only run by explicitly specifying them on command line. 
 # This is usefull for tests that take really long time to execute.
-EXCLUDED_TESTS = []
+EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
 
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
@@ -335,10 +335,10 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
     if not os.listdir(tmpdir):
         os.rmdir(tmpdir)
 
-    all_passed = all(
-        map(lambda test_result: test_result.status == "Passed", test_results))
+    all_passed_or_skipped = all(
+        map(lambda test_result: test_result.status == "Passed" or test_result.status == "Skipped", test_results))
 
-    sys.exit(not all_passed)
+    sys.exit(not all_passed_or_skipped)
 
 
 def print_results(test_results, max_len_name, runtime):

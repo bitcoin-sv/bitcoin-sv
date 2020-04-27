@@ -48,12 +48,11 @@
  * <code>Files</code> at the top of the page to start navigating the code.
  */
 
-void WaitForShutdown(boost::thread_group *threadGroup) {
-    bool fShutdown = ShutdownRequested();
+void WaitForShutdown(boost::thread_group *threadGroup, const task::CCancellationToken& shutdownToken) {
+
     // Tell the main threads to shutdown.
-    while (!fShutdown) {
+    while (!shutdownToken.IsCanceled()) {
         MilliSleep(200);
-        fShutdown = ShutdownRequested();
     }
     if (threadGroup) {
         Interrupt(*threadGroup);
@@ -194,7 +193,7 @@ bool AppInit(int argc, char *argv[]) {
 #endif // HAVE_DECL_DAEMON
         }
 
-        fRet = AppInitMain(config, threadGroup, scheduler);
+        fRet = AppInitMain(config, threadGroup, scheduler, GetShutdownToken());
     } catch (const std::exception &e) {
         PrintExceptionContinue(&e, "AppInit()");
     } catch (...) {
@@ -209,7 +208,7 @@ bool AppInit(int argc, char *argv[]) {
         // thread-blocking-waiting-for-another-thread-during-startup case.
     } else {
         LogPrintf("Preload wait for shutdown\n");
-        WaitForShutdown(&threadGroup);
+        WaitForShutdown(&threadGroup, GetShutdownToken());
         LogPrintf("Preload wait for shutdown done\n");
     }
     LogPrintf("Checking Thread shutdown\n");

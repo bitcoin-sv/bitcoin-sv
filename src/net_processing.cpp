@@ -2696,7 +2696,7 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
         // new tip (missing previous block, chain not long enough, etc)
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                source->GetToken(), config, pblock, true, &fNewBlock);
+                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock);
         if(!bestChainActivation)
         {
             // something went wrong before we need to activate best chain
@@ -2967,7 +2967,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         auto source = task::CCancellationSource::Make();
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
-                source->GetToken(), config, pblock, true, &fNewBlock);
+                task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock);
         if(bestChainActivation)
         {
             pfrom->RunAsyncProcessing(
@@ -3036,7 +3036,7 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
     auto source = task::CCancellationSource::Make();
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            source->GetToken(), config, pblock, forceProcessing, &fNewBlock);
+            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, forceProcessing, &fNewBlock);
     if(!bestChainActivation)
     {
         // something went wrong before we need to activate best chain
@@ -4266,8 +4266,8 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
             else {
                 // Look ahead to see if we can clear out some items we have already recieved from elsewhere
                 if(alreadyHave) {
-                    pto->mapAskFor.erase(firstIt);
                     pto->setAskFor.erase(inv.hash);
+                    pto->mapAskFor.erase(firstIt);
                 }
                 else {
                     // Abort clearing out items as soon as we find one that is still required. Bailing out here

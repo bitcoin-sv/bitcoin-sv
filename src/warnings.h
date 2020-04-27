@@ -9,11 +9,34 @@
 #include <cstdlib>
 #include <string>
 
+enum class SafeModeLevel : uint32_t
+{
+    /**
+     * No safe mode
+     */
+    NONE = 0,
+
+    /**
+     * Indicates there is a large fork that causes node to enter safe mode but
+     * we have only block headers so we don't know if this is valid or invalid fork.
+     */
+     UNKNOWN = 1,
+
+     /**
+      * Indicates there is an invalid large fork that causes node to enter safe mode.
+      */
+      INVALID = 2,
+
+      /**
+       * Indicates there is a valid large fork that causes node to enter safe mode.
+       */
+       VALID = 3,
+};
+
+void SetSafeModeLevel(const SafeModeLevel& safeModeLevel);
+SafeModeLevel GetSafeModeLevel();
+
 void SetMiscWarning(const std::string &strWarning);
-void SetfLargeWorkForkFound(bool flag);
-bool GetfLargeWorkForkFound();
-void SetfLargeWorkInvalidChainFound(bool flag);
-bool GetfLargeWorkInvalidChainFound();
 std::string GetWarnings(const std::string &strFor);
 
 static const bool DEFAULT_TESTSAFEMODE = false;

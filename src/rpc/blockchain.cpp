@@ -29,6 +29,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
+#include "init.h"
 
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
 #include <boost/thread/thread.hpp>              // boost::thread::interrupt
@@ -1224,7 +1225,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config,
     CBlockHeader header = reader->GetBlockHeader();
 
     // set metadata so it is available when setting header in the next step
-    if (!hasDiskBlockMetaData) 
+    if (!hasDiskBlockMetaData && reader->EndOfStream())
     {
         CDiskBlockMetaData metadata = reader->getDiskBlockMetadata();
         SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);
@@ -1588,7 +1589,7 @@ UniValue verifychain(const Config &config, const JSONRPCRequest &request) {
         nCheckDepth = request.params[1].get_int();
     }
 
-    return CVerifyDB().VerifyDB(config, pcoinsTip, nCheckLevel, nCheckDepth);
+    return CVerifyDB().VerifyDB(config, pcoinsTip, nCheckLevel, nCheckDepth, task::CCancellationSource::Make()->GetToken());
 }
 
 /** Implementation of IsSuperMajority with better feedback */
@@ -2008,7 +2009,7 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
         mempool.getJournalBuilder()->getNewChangeSet(
             mining::JournalUpdateReason::REORG)};
     auto source = task::CCancellationSource::Make();
-    ActivateBestChain(source->GetToken(), config, state, changeSet);
+    ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
 
     if (!state.IsValid()) {
         throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
