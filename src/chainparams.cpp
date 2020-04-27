@@ -18,7 +18,7 @@
 #include "chainparamsseeds.h"
 
 #define GENESIS_ACTIVATION_MAIN                 620538
-#define GENESIS_ACTIVATION_STN                  14896
+#define GENESIS_ACTIVATION_STN                  100
 #define GENESIS_ACTIVATION_TESTNET              1344302
 #define GENESIS_ACTIVATION_REGTEST              10000
 
