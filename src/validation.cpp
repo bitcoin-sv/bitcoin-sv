@@ -2790,7 +2790,7 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
  */
 void CheckSafeModeParametersForAllForksOnStartup()
 {
-    AssertLockHeld(cs_main);
+    LOCK(cs_main);
 
     std::set<CBlockIndex*> setTipCandidates;
     std::set<CBlockIndex*> setPrevs;
