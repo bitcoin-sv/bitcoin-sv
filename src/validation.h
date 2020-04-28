@@ -80,8 +80,6 @@ static const bool DEFAULT_WHITELISTFORCERELAY = true;
 static const bool DEFAULT_REJECTMEMPOOLREQUEST = false;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
 static const Amount DEFAULT_MIN_RELAY_TX_FEE(250);
-/** Default for -excessutxocharge for transactions transactions */
-static const Amount DEFAULT_UTXO_FEE(0);
 //! -maxtxfee default
 static const Amount DEFAULT_TRANSACTION_MAXFEE(COIN / 10);
 //! Discourage users to set fees higher than this amount (in satoshis) per kB
@@ -122,7 +120,12 @@ static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 16;
  * Timeout in seconds during which a peer must stall block download progress
  * before being disconnected.
  */
-static const unsigned int DEFAULT_BLOCK_STALLING_TIMEOUT = 2;
+static const unsigned int DEFAULT_BLOCK_STALLING_TIMEOUT = 10;
+/**
+ * Minimum rate (in KBytes/sec) we will allow a stalling peer to send to us at
+ * before disconnecting them.
+ */
+static const unsigned int DEFAULT_MIN_BLOCK_STALLING_RATE = 100;
 /**
  * Number of headers sent in one getheaders result. We rely on the assumption
  * that if a peer sends less than this number, we reached its tip. Changing this
@@ -145,7 +148,7 @@ static const int MAX_BLOCKTXN_DEPTH = 10;
  * (which make reindexing and in the future perhaps pruning harder). We'll
  * probably want to make this a per-peer adaptive value at some point.
  */
-static const unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
+static const unsigned int DEFAULT_BLOCK_DOWNLOAD_WINDOW = 1024;
 /** Time to wait (in seconds) between writing blocks/block index to disk. */
 static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
 /** Time to wait (in seconds) between flushing chainstate to disk. */
@@ -182,11 +185,6 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 static const unsigned int DEFAULT_LIMITFREERELAY = 0;
 static const bool DEFAULT_RELAYPRIORITY = true;
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
-/**
- * Maximum age of our tip in seconds for us to be considered current for fee
- * estimation.
- */
-static const int64_t MAX_FEE_ESTIMATION_TIP_AGE = 3 * 60 * 60;
 
 /** Default for -permitbaremultisig */
 static const bool DEFAULT_PERMIT_BAREMULTISIG = true;
@@ -197,9 +195,6 @@ static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
 /* Default settings for controlling P2P reading */
 static const unsigned int DEFAULT_MIN_TIME_INTERVAL_CHECKSUM_MS = 500;
 static const unsigned int DEFAULT_INVALID_CHECKSUM_FREQUENCY = 100;
-
-static const unsigned int DEFAULT_MIN_TIME_INTERVAL_HEADER_MS = 500;
-static const unsigned int DEFAULT_INVALID_HEADER_FREQUENCY = 2000;
 
 /** Default for -persistmempool */
 static const bool DEFAULT_PERSIST_MEMPOOL = true;
@@ -310,6 +305,67 @@ static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 
 /** get number of blocks that are currently being processed */
 int GetProcessingBlocksCount();
+
+/**
+ * Minimum length of valid fork that trigger safe mode.
+ */
+static const int SAFE_MODE_MIN_VALID_FORK_LENGTH = 7;
+
+/**
+ * Maximum distance of valid fork tip from active tip.
+ */
+static const int SAFE_MODE_MAX_VALID_FORK_DISTANCE = 72;
+
+/**
+ * Maximum distance of forks last common block from current active tip
+ * to still enter safe mode.
+ */
+static const int SAFE_MODE_MAX_FORK_DISTANCE = 288;
+
+/**
+ * Minimum number of blocks that fork should be ahead of active tip to
+ * enter safe mode.
+ */
+static const int SAFE_MODE_MIN_POW_DIFFERENCE = 6;
+
+/**
+ * Method checks if block that is being added to block index causes
+ * node to enter safe mode. 
+ * Node enters "Safe mode" in two cases:
+ *   1. When any fork tip which is demonstrating at least SAFE_MODE_MIN_POW_DIFFERENCE 
+ *      blocks more proof of work than the current best chain, is detected regardless 
+ *      of the header status (valid / invalid / unknown) but only if last common block
+ *      is at most SAFE_MODE_MAX_FORK_DISTANCE blocks away from current best tip. 
+ *   2. When a fork with successfully validated blocks is detected, which is at least 
+ *      SAFE_MODE_MIN_VALID_FORK_LENGTH block long and whose tip is within 
+ *      SAFE_MODE_MAX_VALID_FORK_DISTANCE blocks from the current best chain tip
+ */
+void CheckSafeModeParameters(const CBlockIndex* pindexNew);
+
+/**
+ * Method finds all chain tips (except active) and checks if any of them 
+ * should trigger node to enter safe mode.
+ */
+void CheckSafeModeParametersForAllForksOnStartup();
+
+/**
+ * Invalidate all chains containing given block that should be already invalid. 
+ * Set status of descendent blocks to "with failed parent".
+ */
+void InvalidateChain(const CBlockIndex* pindexNew);
+
+/**
+ * Minimum distance between recevied block and active tip required 
+ * to perform TTOR order validation of a block.
+ * This is a local policy and not a consensus rule.
+ */
+static const int MIN_TTOR_VALIDATION_DISTANCE = 100;
+
+/** 
+ * Search block for transaction that violates TTOR order. 
+ * Returns false if TTOR is violated. 
+ */
+bool CheckBlockTTOROrder(const CBlock& block);
 
 class BlockValidationOptions {
 private:
@@ -645,7 +701,6 @@ void CommitTxToMempool(
     CTxMemPool& pool,
     CValidationState& state,
     const mining::CJournalChangeSetPtr& changeSet,
-    bool fLimitMempoolSize=true,
     size_t* pnMempoolSize=nullptr,
     size_t* pnDynamicMemoryUsage=nullptr);
 
@@ -657,7 +712,6 @@ void CommitTxToMempool(
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
  * @param dsDetector A reference to a double spend detector
- * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
  * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
  * @return A result of validation.
  */
@@ -666,7 +720,6 @@ CTxnValResult TxnValidation(
     const Config &config,
     CTxMemPool &pool,
     TxnDoubleSpendDetectorSPtr dsDetector,
-    bool fReadyForFeeEstimation,
     bool fUseLimits);
 
 /**
@@ -693,7 +746,6 @@ CValidationState HandleTxnProcessingException(
  * @param config A reference to a configuration
  * @param pool A reference to the mempool
  * @param handlers Txn handlers
- * @param fReadyForFeeEstimation A flag to check if fee estimation can be applied
  * @param fUseLimits A flag to check if timed cancellation source and coins cache limits should be used
  * @return A vector of validation results
  */
@@ -702,7 +754,6 @@ std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
     const Config &config,
     CTxMemPool &pool,
     CTxnHandlers& handlers,
-    bool fReadyForFeeEstimation,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end);
 
@@ -734,9 +785,6 @@ void CreateTxRejectMsgForP2PTxn(
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
-
-/** Check if all conditions are met to apply fee estimation */
-bool IsCurrentForFeeEstimation();
 
 /**
  * Count ECDSA signature operations the old-fashioned (pre-0.6) way
@@ -977,7 +1025,7 @@ public:
     CVerifyDB();
     ~CVerifyDB();
     bool VerifyDB(const Config &config, CCoinsView *coinsview, int nCheckLevel,
-                  int nCheckDepth);
+                  int nCheckDepth, const task::CCancellationToken& shutdownToken);
 };
 
 /** Replay blocks that aren't fully applied to the database. */
@@ -1047,6 +1095,9 @@ static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
 void DumpMempool();
 
 /** Load the mempool from disk. */
-bool LoadMempool(const Config &config);
+bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
+
+/** AlertNotify */
+void AlertNotify(const std::string &strMessage);
 
 #endif // BITCOIN_VALIDATION_H

@@ -35,6 +35,7 @@ import shutil
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+from test_framework.blocktools import wait_for_tip
 
 
 class WalletBackupTest(BitcoinTestFramework):
@@ -144,6 +145,12 @@ class WalletBackupTest(BitcoinTestFramework):
         # 114 are mature, so the sum of all wallets should be 114 * 50 = 5700.
         assert_equal(total, 5700)
 
+        # Store bect block hash
+        best_block_hash = self.nodes[0].getbestblockhash()
+        assert_equal(best_block_hash, self.nodes[1].getbestblockhash())
+        assert_equal(best_block_hash, self.nodes[2].getbestblockhash())
+        assert_equal(best_block_hash, self.nodes[3].getbestblockhash())
+
         ##
         # Test restoring spender wallets from backups
         ##
@@ -180,6 +187,12 @@ class WalletBackupTest(BitcoinTestFramework):
         shutil.rmtree(self.options.tmpdir + "/node2/regtest/chainstate")
 
         self.start_three()
+
+        # Make sure the nodes are synced
+        wait_for_tip(self.nodes[0], best_block_hash)
+        wait_for_tip(self.nodes[1], best_block_hash)
+        wait_for_tip(self.nodes[2], best_block_hash)
+        wait_for_tip(self.nodes[3], best_block_hash)
 
         assert_equal(self.nodes[0].getbalance(), 0)
         assert_equal(self.nodes[1].getbalance(), 0)

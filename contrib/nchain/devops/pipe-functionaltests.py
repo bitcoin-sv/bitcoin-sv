@@ -11,7 +11,7 @@ def main():
 
     try:
         args = ["python3", "test/functional/test_runner.py" \
-                , "--extended" \
+                , "--extended", "--large-block-tests" \
                 , "--junitouput=build/reports/func-tests.xml", "--jobs=2"]
         r1 = subprocess.call(args)
     except Exception as e:
@@ -21,7 +21,7 @@ def main():
         exit(-1)
 
     print("functional tests completed with result code {}".format(r1))
-    r1 ^= 1 # 1 rather than 0 is returned on success
+
     exit(abs(r1))
 
 if __name__ == '__main__':

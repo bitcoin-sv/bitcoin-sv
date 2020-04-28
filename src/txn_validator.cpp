@@ -216,7 +216,6 @@ CValidationState CTxnValidator::processValidation(
                     mConfig,
                     mMempool,
                     mpTxnDoubleSpendDetector,
-                    IsCurrentForFeeEstimation(),
                     false);
         // Process validated results for the given txn
         ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
@@ -271,8 +270,6 @@ void CTxnValidator::processValidation(
     std::unique_lock lock { mMainMtx };
     // A vector of accepted txns
     std::vector<TxInputDataSPtr> vAcceptedTxns {};
-    // Check fee estimation requirements
-    bool fReadyForFeeEstimation = IsCurrentForFeeEstimation();
     // Special handlers
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
@@ -294,7 +291,6 @@ void CTxnValidator::processValidation(
             processNewTransactionsNL(
                 vTxInputData,
                 handlers,
-                fReadyForFeeEstimation,
                 false,
                 std::chrono::milliseconds(0))
         };
@@ -428,14 +424,11 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     mpOrphanTxnsP2PQ,
                                     mpTxnRecentRejects
                                 };
-                                // Check fee estimation requirements
-                                bool fReadyForFeeEstimation = IsCurrentForFeeEstimation();
                                 // Validate txns and try to submit them to the mempool
                                 result =
                                     processNewTransactionsNL(
                                         mProcessingQueue,
                                         handlers,
-                                        fReadyForFeeEstimation,
                                         true,
                                         nMaxTxnValidatorAsyncTasksRunDuration);
                                 // Trim mempool if it's size exceeds the limit.
@@ -512,7 +505,6 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
 std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
     CTxnHandlers& handlers,
-    bool fReadyForFeeEstimation,
     bool fUseLimits,
     std::chrono::milliseconds maxasynctasksrunduration) {
 
@@ -524,7 +516,6 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
                     const Config* config,
                     CTxMemPool *pool,
                     CTxnHandlers& handlers,
-                    bool fReadyForFeeEstimation,
                     bool fUseLimits,
                     std::chrono::steady_clock::time_point end_time_point) {
                     return TxnValidationProcessingTask(
@@ -532,7 +523,6 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
                                *config,
                                *pool,
                                 handlers,
-                                fReadyForFeeEstimation,
                                 fUseLimits,
                                 end_time_point);
                 },
@@ -540,7 +530,6 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
                 &mMempool,
                 txns,
                 handlers,
-                fReadyForFeeEstimation,
                 fUseLimits,
                 maxasynctasksrunduration)
     };

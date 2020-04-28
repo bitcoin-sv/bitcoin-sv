@@ -197,6 +197,23 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
 
     CConnman::CAsyncTaskPool asyncTaskPool{GlobalConfig::GetConfig()};
 
+    std::vector<CNodePtr> nodes {};
+    for(auto i = 0; i < 50; ++i) {
+        CNodePtr pNode =
+            CNode::Make(
+                i,
+                NODE_NETWORK,
+                0,
+                INVALID_SOCKET,
+                dummy_addr,
+                0u,
+                0u,
+                asyncTaskPool,
+                "",
+                true);
+        nodes.push_back(pNode);
+    }
+
     // 50 orphan transactions:
     for (NodeId i = 0; i < 50; i++) {
         CKey key;
@@ -212,18 +229,6 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         tx.vout[0].scriptPubKey =
             GetScriptForDestination(key.GetPubKey().GetID());
 
-        CNodePtr pNode =
-            CNode::Make(
-                i,
-                NODE_NETWORK,
-                0,
-                INVALID_SOCKET,
-                dummy_addr,
-                0u,
-                0u,
-                asyncTaskPool,
-                "",
-                true);
         // Add txn input data to the queue
         orphanTxns->addTxn(
             std::make_shared<CTxInputData>(
@@ -233,7 +238,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                                 GetTime(),     // nAcceptTime
                                 false,         // mfLimitFree
                                 Amount(0),     // nAbsurdFee
-                                pNode));       // pNode
+                                nodes[i]));    // pNode
     }
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 50);
 

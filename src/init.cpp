@@ -77,7 +77,6 @@
 #include "zmq/zmqnotificationinterface.h"
 #endif
 
-bool fFeeEstimatesInitialized = false;
 static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
@@ -106,7 +105,6 @@ enum BindFlags {
     BF_WHITELIST = (1U << 2),
 };
 
-static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -131,14 +129,15 @@ static const char *FEE_ESTIMATES_FILENAME = "fee_estimates.dat";
 // the parent exits from main().
 //
 
-std::atomic<bool> fRequestShutdown(false);
+std::shared_ptr<task::CCancellationSource> shutdownSource(task::CCancellationSource::Make());
 std::atomic<bool> fDumpMempoolLater(false);
 
 void StartShutdown() {
-    fRequestShutdown = true;
+    shutdownSource->Cancel();
 }
-bool ShutdownRequested() {
-    return fRequestShutdown;
+task::CCancellationToken GetShutdownToken()
+{
+    return shutdownSource->GetToken();
 }
 
 /**
@@ -229,18 +228,6 @@ void Shutdown() {
         DumpMempool();
     }
 
-    if (fFeeEstimatesInitialized) {
-        fs::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
-        CAutoFile est_fileout(fsbridge::fopen(est_path, "wb"), SER_DISK,
-                              CLIENT_VERSION);
-        if (!est_fileout.IsNull())
-            mempool.WriteFeeEstimates(est_fileout);
-        else
-            LogPrintf("%s: Failed to write fee estimates to %s\n", __func__,
-                      est_path.string());
-        fFeeEstimatesInitialized = false;
-    }
-
     {
         LOCK(cs_main);
         if (pcoinsTip != nullptr) {
@@ -292,7 +279,7 @@ void Shutdown() {
  * Signal handlers are very limited in what they are allowed to do, so:
  */
 void HandleSIGTERM(int) {
-    fRequestShutdown = true;
+    StartShutdown();
 }
 
 void HandleSIGHUP(int) {
@@ -542,10 +529,17 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt("-bind=<addr>",
                                _("Bind to given address and always listen on "
                                  "it. Use [host]:port notation for IPv6"));
+    strUsage += HelpMessageOpt("-blockstallingmindownloadspeed=<n>",
+        strprintf(_("Minimum average download speed (Kbytes/s) we will allow a stalling "
+                    "peer to fall to during IBD. A value of 0 means stall detection is "
+                    "disabled (default: %uKb/s)"), DEFAULT_MIN_BLOCK_STALLING_RATE));
     if (showDebug) {
         strUsage += HelpMessageOpt("-blockstallingtimeout=<n>",
             strprintf(_("Number of seconds to wait before considering a peer stalling "
                         "during IBD (default: %u)"), DEFAULT_BLOCK_STALLING_TIMEOUT));
+        strUsage += HelpMessageOpt("-blockdownloadwindow=<n>",
+            strprintf(_("Size of block download window before considering we may be stalling "
+                        "during IBD (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_WINDOW));
     }
     strUsage +=
         HelpMessageOpt("-connect=<ip>",
@@ -618,6 +612,12 @@ std::string HelpMessage(HelpMessageMode mode) {
         HelpMessageOpt("-permitbaremultisig",
                        strprintf(_("Relay non-P2SH multisig (default: %d)"),
                                  DEFAULT_PERMIT_BAREMULTISIG));
+    if(showDebug) {
+        strUsage += HelpMessageOpt("-p2ptimeout=<n>",
+            strprintf(_("Number of seconds before timing out some operations "
+                "within the P2P layer. Affected operations include pings and "
+                "send/receive inactivity (default: %u seconds)"), DEFAULT_P2P_TIMEOUT_INTERVAL));
+    }
     strUsage += HelpMessageOpt(
         "-peerbloomfilters",
         strprintf(_("Support filtering of blocks and transaction with bloom "
@@ -766,7 +766,7 @@ std::string HelpMessage(HelpMessageMode mode) {
             HelpMessageOpt("-limitancestorsize=<n>",
                            strprintf("Do not accept transactions whose size "
                                      "with all in-mempool ancestors exceeds "
-                                     "<n> kilobytes (default: %u)",
+                                     "<n>*1000 bytes (default: %u)",
                                      DEFAULT_ANCESTOR_SIZE_LIMIT));
         strUsage += HelpMessageOpt(
             "-limitdescendantcount=<n>",
@@ -776,7 +776,7 @@ std::string HelpMessage(HelpMessageMode mode) {
         strUsage += HelpMessageOpt(
             "-limitdescendantsize=<n>",
             strprintf("Do not accept transactions if any ancestor would have "
-                      "more than <n> kilobytes of in-mempool descendants "
+                      "more than <n>*1000 bytes of in-mempool descendants "
                       "(default: %u).",
                       DEFAULT_DESCENDANT_SIZE_LIMIT));
     }
@@ -849,11 +849,6 @@ std::string HelpMessage(HelpMessageMode mode) {
                       DEFAULT_MAX_TIP_AGE));
     }
     strUsage += HelpMessageOpt(
-        "-excessutxocharge=<amt>",
-        strprintf(_("Fees (in %s/kB) to charge per utxo created for"
-                    "relaying, and mining (default: %s)"),
-                  CURRENCY_UNIT, FormatMoney(DEFAULT_UTXO_FEE)));
-    strUsage += HelpMessageOpt(
         "-minrelaytxfee=<amt>",
         strprintf(
             _("Fees (in %s/kB) smaller than this are considered zero fee for "
@@ -918,7 +913,7 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusageconsensus",
         strprintf(_("Set maximum stack memory usage in bytes used for script verification "
-                    "we're willing to to accept from any source (0 = unlimited) "
+                    "we're willing to accept from any source (0 = unlimited) "
                     "after Genesis is activated (consensus level). This is a required parameter.")));
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusagepolicy",
@@ -1095,16 +1090,6 @@ std::string HelpMessage(HelpMessageMode mode) {
          strprintf("Set the limit on the number of invalid checksums received over a given time period from a single node  (default: %d)",
             DEFAULT_INVALID_CHECKSUM_FREQUENCY)) ;
 
-    strUsage += HelpMessageOpt(
-        "-invalidheaderinterval=<n>",
-         strprintf("Set the time limit on the transmission of message headers from the local node in milliseconds (default: %dms)",
-            DEFAULT_MIN_TIME_INTERVAL_HEADER_MS)) ;
-
-    strUsage += HelpMessageOpt(
-        "-invalidheaderfreq=<n>",
-         strprintf("Set the limit on the number of message headers transmitted from the local node over a given time period (default: %d)",
-           DEFAULT_INVALID_HEADER_FREQUENCY)) ;
-
     /** COrphanTxns */
     strUsage += HelpMessageGroup(_("Orphan txns config :"));
     strUsage += HelpMessageOpt(
@@ -1278,7 +1263,10 @@ void CleanupBlockRevFiles() {
     }
 }
 
-void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
+/* shutdownToken must be passed by value to prevent access violation because
+ * "import_files" thread can have longer life span than shutdownToken presented with a reference.
+ */
+void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, const task::CCancellationToken shutdownToken) {
     RenameThread("bitcoin-loadblk");
 
     {
@@ -1324,7 +1312,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
         CValidationState dummyState;
         mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
-        if (!ActivateBestChain(source->GetToken(), config, dummyState, changeSet)) {
+        if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), shutdownToken), config, dummyState, changeSet)) {
             LogPrintf("Failed to connect best block");
             StartShutdown();
         }
@@ -1336,8 +1324,8 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles) {
         }
     } // End scope of CImportingNow
     if (gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
-        LoadMempool(config);
-        fDumpMempoolLater = !fRequestShutdown;
+        LoadMempool(config, shutdownToken);
+        fDumpMempoolLater = !shutdownToken.IsCanceled();
     }
 }
 
@@ -1924,18 +1912,6 @@ bool AppInitParameterInteraction(Config &config) {
     nConnectTimeout = gArgs.GetArg("-timeout", DEFAULT_CONNECT_TIMEOUT);
     if (nConnectTimeout <= 0) nConnectTimeout = DEFAULT_CONNECT_TIMEOUT;
 
-    // Obtain the amount to charge excess UTXO
-    if (gArgs.IsArgSet("-excessutxocharge")) {
-        Amount n(0);
-        auto parsed = ParseMoney(gArgs.GetArg("-excessutxocharge", ""), n);
-        if (!parsed || Amount(0) > n)
-            return InitError(AmountErrMsg(
-                "excessutxocharge", gArgs.GetArg("-excessutxocharge", "")));
-        config.SetExcessUTXOCharge(n);
-    } else {
-        config.SetExcessUTXOCharge(DEFAULT_UTXO_FEE);
-    }
-
     // Fee-per-kilobyte amount considered the same as "free". If you are mining,
     // be careful setting this: if you set it to zero then a transaction spammer
     // can cheaply fill blocks using 1-satoshi-fee transactions. It should be
@@ -2189,7 +2165,7 @@ void preloadChainState(boost::thread_group &threadGroup)
 }
 
 bool AppInitMain(Config &config, boost::thread_group &threadGroup,
-                 CScheduler &scheduler) {
+                 CScheduler &scheduler, const task::CCancellationToken& shutdownToken) {
     const CChainParams &chainparams = config.GetChainParams();
     // Step 4a: application initialization
 
@@ -2498,7 +2474,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
               nMempoolSizeMax * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
-    while (!fLoaded && !fRequestShutdown) {
+    while (!fLoaded && !shutdownToken.IsCanceled()) {
         bool fReset = fReindex;
         std::string strLoadError;
 
@@ -2530,7 +2506,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     strLoadError = _("Error upgrading chainstate database");
                     break;
                 }
-                if (fRequestShutdown) break;
+                if (shutdownToken.IsCanceled()) break;
 
                 if (!LoadBlockIndex(chainparams)) {
                     strLoadError = _("Error loading block database");
@@ -2625,7 +2601,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 if (!CVerifyDB().VerifyDB(
                         config, pcoinsdbview,
                         gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
-                        gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS))) {
+                        gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS),
+                        shutdownToken)) {
                     strLoadError = _("Corrupted block database detected");
                     break;
                 }
@@ -2641,7 +2618,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
             fLoaded = true;
         } while (false);
 
-        if (!fLoaded && !fRequestShutdown) {
+        if (!fLoaded && !shutdownToken.IsCanceled()) {
             // first suggest a reindex
             if (!fReset) {
                 bool fRet = uiInterface.ThreadSafeQuestion(
@@ -2652,9 +2629,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     "",
                     CClientUIInterface::MSG_ERROR |
                         CClientUIInterface::BTN_ABORT);
-                if (fRet) {
+                if (fRet && !shutdownToken.IsCanceled()) {
                     fReindex = true;
-                    fRequestShutdown = false;
                 } else {
                     LogPrintf("Aborted block database rebuild. Exiting.\n");
                     return false;
@@ -2668,18 +2644,18 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // As LoadBlockIndex can take several minutes.
     // As the program has not fully started yet, Shutdown() is possibly
     // overkill.
-    if (fRequestShutdown) {
+    if (shutdownToken.IsCanceled()) {
         LogPrintf("Shutdown requested. Exiting.\n");
         return false;
     }
-    LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
 
-    fs::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
-    CAutoFile est_filein(fsbridge::fopen(est_path, "rb"), SER_DISK,
-                         CLIENT_VERSION);
-    // Allowed to fail as this file IS missing on first startup.
-    if (!est_filein.IsNull()) mempool.ReadFeeEstimates(est_filein);
-    fFeeEstimatesInitialized = true;
+    // After block chain is loaded check fork tip statuses and
+    // restore global safe mode state.
+    CheckSafeModeParametersForAllForksOnStartup();
+
+    LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
+  
+
 
 // Step 8: load wallet
 #ifdef ENABLE_WALLET
@@ -2728,11 +2704,11 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 
     threadGroup.create_thread(
-        [&config, vImportFiles]
+        [&config, vImportFiles, shutdownToken]
         {
             TraceThread(
                 "import_files",
-                [&config, &vImportFiles]{ThreadImport(config, vImportFiles);});
+                [&config, &vImportFiles, shutdownToken]{ThreadImport(config, vImportFiles, shutdownToken);});
         });
 
     // Wait for genesis block to be processed
@@ -2805,5 +2781,5 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 #endif
 
-    return !fRequestShutdown;
+    return !shutdownToken.IsCanceled();
 }

@@ -122,12 +122,8 @@ private:
     int64_t nTime;
     //!< Priority when entering the mempool
     double entryPriority;
-    //!< Chain height when entering the mempool
-    unsigned int entryHeight;
     //!< Sum of all txin values that are already in blockchain
     Amount inChainInputValue;
-    //!< keep track of transactions that spend a coinbase
-    bool spendsCoinbase;
     //!< Total sigop plus P2SH sigops count
     int64_t sigOpCount;
     //!< Used for determining the priority of the transaction for mining in a
@@ -153,13 +149,19 @@ private:
     Amount nModFeesWithAncestors;
     int64_t nSigOpCountWithAncestors;
 
+    //!< Chain height when entering the mempool
+    unsigned int entryHeight;
+    //!< keep track of transactions that spend a coinbase
+    bool spendsCoinbase;
+
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime, double _entryPriority,
                     unsigned int _entryHeight, Amount _inChainInputValue,
                     bool spendsCoinbase, int64_t nSigOpsCost, LockPoints lp);
 
-    CTxMemPoolEntry(const CTxMemPoolEntry &other);
+    CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
+    CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
     const CTransaction &GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }
@@ -364,7 +366,6 @@ struct descendant_score {};
 struct entry_time {};
 struct ancestor_score {};
 
-class CBlockPolicyEstimator;
 
 /**
  * Reason why a transaction was removed from the mempool, this is passed to the
@@ -491,7 +492,6 @@ private:
     //!< Value n means that n times in 2^32 we check.
     std::atomic_uint32_t nCheckFrequency;
     std::atomic_uint nTransactionsUpdated;
-    CBlockPolicyEstimator *minerPolicyEstimator;
 
     //!< sum of all mempool tx's virtual sizes.
     uint64_t totalTxSize;
@@ -615,7 +615,6 @@ public:
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
             const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
@@ -624,7 +623,6 @@ public:
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
@@ -832,23 +830,9 @@ public:
     // DEPRECATED - this will become private and ultimately changed or removed
     std::vector<TxMempoolInfo> InfoAllNL() const;
 
-    /**
-     * Estimate fee rate needed to get into the next nBlocks. If no answer can
-     * be given at nBlocks, return an estimate at the lowest number of blocks
-     * where one can be given.
-     */
-    CFeeRate EstimateSmartFee(
-            int nBlocks,
-            int *answerFoundAtBlocks = nullptr) const;
-
-    /** Estimate fee rate needed to get into the next nBlocks */
-    CFeeRate EstimateFee(int nBlocks) const;
-
-    /** Write/Read estimates to disk */
-    bool WriteFeeEstimates(CAutoFile &fileout) const;
-    bool ReadFeeEstimates(CAutoFile &filein);
-
     size_t DynamicMemoryUsage() const;
+
+    CFeeRate estimateFee() const;
 
     boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
@@ -883,7 +867,6 @@ private:
             const CTxMemPoolEntry &entry,
             setEntries &setAncestors,
             const mining::CJournalChangeSetPtr& changeSet,
-            bool validFeeEstimate = true,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
@@ -907,6 +890,7 @@ private:
      * children. If updateDescendants is true, then also update in-mempool
      * descendants' ancestor state.
      */
+
     void updateForRemoveFromMempoolNL(
             const setEntries &entriesToRemove,
             bool updateDescendants);

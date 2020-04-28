@@ -10,32 +10,23 @@
 
 CCriticalSection cs_warnings;
 std::string strMiscWarning;
-bool fLargeWorkForkFound = false;
-bool fLargeWorkInvalidChainFound = false;
+SafeModeLevel currentSafeModeLevel = SafeModeLevel::NONE;
+
+void SetSafeModeLevel(const SafeModeLevel& safeModeLevel)
+{
+    LOCK(cs_warnings);
+    currentSafeModeLevel = safeModeLevel;
+}
+
+SafeModeLevel GetSafeModeLevel()
+{
+    LOCK(cs_warnings);
+    return currentSafeModeLevel;
+}
 
 void SetMiscWarning(const std::string &strWarning) {
     LOCK(cs_warnings);
     strMiscWarning = strWarning;
-}
-
-void SetfLargeWorkForkFound(bool flag) {
-    LOCK(cs_warnings);
-    fLargeWorkForkFound = flag;
-}
-
-bool GetfLargeWorkForkFound() {
-    LOCK(cs_warnings);
-    return fLargeWorkForkFound;
-}
-
-void SetfLargeWorkInvalidChainFound(bool flag) {
-    LOCK(cs_warnings);
-    fLargeWorkInvalidChainFound = flag;
-}
-
-bool GetfLargeWorkInvalidChainFound() {
-    LOCK(cs_warnings);
-    return fLargeWorkInvalidChainFound;
 }
 
 std::string GetWarnings(const std::string &strFor) {
@@ -46,7 +37,7 @@ std::string GetWarnings(const std::string &strFor) {
     LOCK(cs_warnings);
 
     if (!CLIENT_VERSION_IS_RELEASE) {
-        strStatusBar = "This is a pre-release test build - use at your own "
+        strStatusBar = "This is a pre-release or beta test build - use at your own "
                        "risk - do not use for mining or merchant applications";
     }
 
@@ -58,14 +49,26 @@ std::string GetWarnings(const std::string &strFor) {
         strStatusBar = strMiscWarning;
     }
 
-    if (fLargeWorkForkFound) {
+    switch (currentSafeModeLevel)
+    {
+    case SafeModeLevel::VALID:
         strStatusBar = strRPC = "Warning: The network does not appear to fully "
                                 "agree! Some miners appear to be experiencing "
-                                "issues.";
-    } else if (fLargeWorkInvalidChainFound) {
+                                "issues. A large valid fork has been detected.";
+        break;
+    case SafeModeLevel::INVALID:
         strStatusBar = strRPC = "Warning: We do not appear to fully agree with "
                                 "our peers! You may need to upgrade, or other "
-                                "nodes may need to upgrade.";
+                                "nodes may need to upgrade. A large invalid fork "
+                                "has been detected.";
+        break;
+    case SafeModeLevel::UNKNOWN:
+        strStatusBar = strRPC = "Warning: The network does not appear to fully "
+                                "agree! We received headers of a large fork. " 
+                                "Still waiting for block data for more details.";
+        break;
+    case SafeModeLevel::NONE:
+        break;
     }
 
     if (strFor == "statusbar")

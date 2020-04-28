@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2019 Bitcoin Association
+# Copyright (c) 2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 """
@@ -7,16 +7,28 @@ Test mining RPCs
 
 Spin up some nodes, feed in some transactions, use the mining API to
 mine some blocks, verify all nodes accept the mined blocks.
+
+Also tests rpc call getminingcandidate to correctly return number of transactions and
+the candidate size
 """
 
 from test_framework.blocktools import create_coinbase, merkle_root_from_merkle_proof, solve_bad, create_block_from_candidate
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.comptool import TestManager, TestInstance
-from test_framework.mininode import CBlock, CTransaction, FromHex, ToHex, uint256_from_compact
-from test_framework.util import connect_nodes_bi, create_confirmed_utxos, satoshi_round, assert_raises_rpc_error
+from test_framework.mininode import CBlock, ToHex
+from test_framework.util import connect_nodes_bi, create_confirmed_utxos, satoshi_round, assert_raises_rpc_error, assert_equal, wait_until
 from decimal import Decimal
 import math
 import time
+
+def get_any_unspent(listunspent, threshold_amount=0.0):
+    if len(listunspent) == 0:
+        raise AssertionError(
+            'Could not find any utxo')
+    for utx in listunspent:
+        if utx['amount'] >= threshold_amount:
+            return utx
+    raise AssertionError(
+        'Could not find any unspent with threshold={}'.format(threshold_amount))
 
 # Split some UTXOs into some number of spendable outputs
 def split_utxos(fee, node, count, utxos):
@@ -178,6 +190,8 @@ class MiningTest(BitcoinTestFramework):
         assert 'nBits' in candidate
         assert 'time' in candidate
         assert 'height' in candidate
+        assert 'sizeWithoutCoinbase' in candidate
+        assert 'num_tx' in candidate
         assert 'merkleProof' in candidate
 
         submitResult = self._create_and_submit_block(blockNode, candidate, get_coinbase)
@@ -238,6 +252,39 @@ class MiningTest(BitcoinTestFramework):
         # Without validation will be significantly quicker
         assert novalidation_time < validation_time
 
+    def test_additional_fields(self, node):
+        """
+            test rpc call getminingcandidate that correctly returns the number of transactions
+            and size of the current candidate
+        """
+        node.generate(40)
+        num_transactions = 40
+        relay_fee = node.getnetworkinfo()['relayfee']
+        size_txs = 0
+        for i in range(0, num_transactions):
+            utx = get_any_unspent(node.listunspent(), threshold_amount=1.0)
+            inputs = [{'txid': utx['txid'], 'vout': utx['vout']}]
+            outputs = {node.getnewaddress(): utx['amount']-relay_fee}
+            rawtx = node.createrawtransaction(inputs, outputs)
+            signed = node.signrawtransaction(rawtx)
+            node.sendrawtransaction(signed["hex"])
+            size_txs += len(signed["hex"]) / 2
+
+        def wait_for_transactions():
+            candidate = node.getminingcandidate()
+            # check that candidate contains num_transactions + coinbase transaction
+            return int(candidate['num_tx']) == num_transactions + 1
+
+        wait_until(wait_for_transactions, check_interval=0.01)
+
+        candidate = node.getminingcandidate()
+        self.log.info(f"number of transactions that candidate has including coinbase: {candidate['num_tx']}")
+        self.log.info(f"size without coinbase: {candidate['sizeWithoutCoinbase']} bytes")
+
+        # num_transactions + coinbase transaction
+        assert_equal(num_transactions + 1, int(candidate['num_tx']))
+        # size of transactions + 80 bytes for header
+        assert_equal(size_txs + 80, candidate['sizeWithoutCoinbase'])
 
     def run_test(self):
         txnNode = self.nodes[0]
@@ -252,7 +299,12 @@ class MiningTest(BitcoinTestFramework):
         self.test_optional_validation()
 
         self.test_mine_from_old_mining_candidate(blockNode, True)
+
+        self.sync_all()
+        
         self.test_mine_from_old_mining_candidate(blockNode, False)
+
+        self.test_additional_fields(txnNode)
 
 
 if __name__ == '__main__':

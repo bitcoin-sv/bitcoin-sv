@@ -163,7 +163,7 @@ endfunction(prepend)
 
 prepend(BOOST_LIBRARIES "Boost::" ${BOOST_PACKAGES_REQUIRED})
 
-find_package(Boost 1.58 REQUIRED ${BOOST_PACKAGES_REQUIRED})
+find_package(Boost 1.59 REQUIRED ${BOOST_PACKAGES_REQUIRED})
 target_link_libraries(util univalue crypto ${BOOST_LIBRARIES})
 
 # Make sure boost uses std::atomic (it doesn't before 1.63)

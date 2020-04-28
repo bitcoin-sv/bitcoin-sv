@@ -111,7 +111,6 @@ class CTxnValidator final
     std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
         CTxnHandlers& handlers,
-        bool fReadyForFeeEstimation,
         bool fUseLimits,
         std::chrono::milliseconds maxasynctasksrunduration);
 

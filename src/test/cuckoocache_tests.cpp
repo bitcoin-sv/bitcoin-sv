@@ -8,6 +8,7 @@
 #include "test/test_bitcoin.h"
 
 #include <thread>
+#include <deque>
 
 #include <boost/test/unit_test.hpp>
 #include <boost/thread.hpp>

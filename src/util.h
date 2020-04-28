@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <exception>
 #include <map>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -221,5 +222,23 @@ template <typename Callable> void TraceThread(const char *name, Callable func) {
 }
 
 std::string CopyrightHolders(const std::string &strPrefix);
+
+/**
+ * A reusable average function.
+ * Pre-condition: [first, last) is non-empty.
+ */
+template<typename InputIterator>
+auto Average(InputIterator first, InputIterator last)
+{
+    auto rangeSize { std::distance(first, last) };
+    if(rangeSize == 0)
+    {
+        throw std::runtime_error("0 elements for Average");
+    }
+
+    using T = typename InputIterator::value_type;
+    T sum = std::accumulate(first, last, T{});
+    return sum / rangeSize;
+}
 
 #endif // BITCOIN_UTIL_H

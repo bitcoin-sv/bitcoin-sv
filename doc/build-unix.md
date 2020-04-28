@@ -117,13 +117,7 @@ Optional:
 GCC version:
 
 A sufficiently recent version of GCC that supports C++17 is required for
-building, which in practise means at least version 7.X or above. On
-Centos 7 this means you will have to install a newer version of GCC from
-the auxilliary devtoolset suite. For exmaple:
-
-    sudo yum install centos-release-scl
-    sudo yum install devtoolset-7-gcc*
-    scl enable devtoolset-7 bash
+building, which in practise means at least version 7.X or above.
 
 Notes
 -----
@@ -254,6 +248,114 @@ To build executables for ARM:
 
 
 For further documentation on the depends system see [README.md](../depends/README.md) in the depends directory.
+
+
+Building on Ubuntu 16.04
+--------------------
+
+Install build tools
+
+    sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils -y
+    sudo apt-get install libdb++-dev -y
+    sudo apt-get install git -y
+
+
+Upgrade GCC to 7.4
+Note: this will upgrade your system version of gcc. See instructions at the bottom how to revert back to original version.
+
+    sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+    sudo apt-get update
+    sudo apt-get install g++-7 -y
+    sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 60 \
+                             --slave /usr/bin/g++ g++ /usr/bin/g++-7
+    sudo update-alternatives --config gcc
+
+
+Compile and install libboost
+
+    sudo apt-get update
+    sudo apt-get install build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev -y
+    mkdir boost
+    cd boost
+    wget https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.gz
+    tar -xzvf boost_1_70_0.tar.gz
+    cd boost_1_70_0
+    ./bootstrap.sh
+    ./b2
+    sudo ./b2 install
+    cd ../../
+
+
+Clone bitcoin-sv repo
+
+    git clone https://github.com/bitcoin-sv/bitcoin-sv
+
+
+Build bitcoin-sv
+
+    cd bitcoin-sv
+    ./autogen.sh
+    mkdir build
+    cd build
+    ../configure
+    make
+
+Revert gcc to original version (optional)
+
+    sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-5* 60 \
+                             --slave /usr/bin/g++ g++ /usr/bin/g++-5*
+    sudo update-alternatives --config gcc
+
+Building on Centos 7
+--------------------
+
+Note: to enable gcc-7 run the command `scl enable devtoolset-7 bash`. 
+RUN IT MANUALY because it doesn't work in a script!!!
+
+Note 2: When running bitcoind, it expects boost libreries in /usr/lib64 folder. Make sure that they are located there. See libbost instalation step for details.
+
+
+Install prerequisites
+
+    sudo yum install gcc-c++ libtool make autoconf automake openssl-devel libevent-devel  libdb-devel libdb-cxx-devel -y
+    sudo yum install python3 -y
+    sudo yum install git -y
+    sudo yum install centos-release-scl -y
+    sudo yum install devtoolset-7-gcc* -y
+    sudo scl enable devtoolset-7 bash &
+
+
+Compile and install libboost
+
+    mkdir boost
+    cd boost
+    wget https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.gz
+    tar -xzvf boost_1_70_0.tar.gz
+    cd boost_1_70_0
+    ./bootstrap.sh
+    ./b2
+    sudo ./b2 install --prefix=/opt/boost_1_70
+    sudo echo "/opt/boost_1_70/lib" > /etc/ld.so.conf.d/boost_1_70.conf
+    sudo ldconfig
+
+    cd ../../
+
+
+Clone bitcoin-sv repo
+
+    git clone https://github.com/bitcoin-sv/bitcoin-sv
+
+
+Build bitcoin-sv
+
+    cd bitcoin-sv
+    ./autogen.sh
+    mkdir build
+    cd build
+    scl enable devtoolset-7 bash 
+    ../configure --with-boost=/opt/boost_1_70
+    make
+
 
 Building on FreeBSD
 --------------------

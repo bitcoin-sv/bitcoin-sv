@@ -101,7 +101,7 @@ void COrphanTxns::eraseTxnsFromPeer(NodeId peer) {
         while (iter != mOrphanTxns.end()) {
             // Increment to avoid iterator becoming invalid.
             OrphanTxnsIter maybeErase = iter++;
-            auto pNode = maybeErase->second.pTxInputData->mpNode;
+            auto pNode = maybeErase->second.pTxInputData->mpNode.lock();
             if (pNode && pNode->GetId() == peer) {
                 nErased += eraseTxnNL(maybeErase->second.pTxInputData->mpTx->GetId());
             }

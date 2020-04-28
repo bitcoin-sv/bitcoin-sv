@@ -25,6 +25,7 @@ To run Bitcoin SV:
 * Log an issue on [GitHub] (https://github.com/bitcoin-sv/bitcoin-sv/issues)
 * Ask for help on the [Bitcoin SV Subreddit](https://www.reddit.com/r/bitcoinSV/) or
 [Bictoin Cash SV Subreddit](https://www.reddit.com/r/bitcoincashSV/).
+* Consult [Bitcoin SV Wiki](https://wiki.bitcoinsv.io/) for information about Bitcoin protocol.
 
 Building
 ---------------------

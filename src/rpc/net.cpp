@@ -89,8 +89,12 @@ static UniValue getpeerinfo(const Config &config,
             "    \"lastrecv\": ttt,           (numeric) The time in seconds "
             "since epoch (Jan 1 1970 GMT) of the last receive\n"
             "    \"bytessent\": n,            (numeric) The total bytes sent\n"
-            "    \"bytesrecv\": n,            (numeric) The total bytes "
-            "received\n"
+            "    \"bytesrecv\": n,            (numeric) The total bytes received\n"
+            "    \"sendsize\": n,             (numeric) Current size of queued messages for sending\n"
+            "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
+            "    \"pauserecv\": true|false,   (boolean) Are we paused for receiving\n"
+            "    \"spotrecvbw\": n,           (numeric) The spot average download bandwidth from this node (bytes/sec)\n"
+            "    \"minuterecvbw\": n,         (numeric) The 1 minute average download bandwidth from this node (bytes/sec)\n"
             "    \"conntime\": ttt,           (numeric) The connection time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
             "    \"timeoffset\": ttt,         (numeric) The time offset in "
@@ -166,8 +170,13 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("relaytxes", stats.fRelayTxes));
         obj.push_back(Pair("lastsend", stats.nLastSend));
         obj.push_back(Pair("lastrecv", stats.nLastRecv));
+        obj.push_back(Pair("sendsize", stats.nSendSize));
+        obj.push_back(Pair("pausesend", stats.fPauseSend));
+        obj.push_back(Pair("pauserecv", stats.fPauseRecv));
         obj.push_back(Pair("bytessent", stats.nSendBytes));
         obj.push_back(Pair("bytesrecv", stats.nRecvBytes));
+        obj.push_back(Pair("spotrecvbw", stats.nSpotBytesPerSec));
+        obj.push_back(Pair("minuterecvbw", stats.nMinuteBytesPerSec));
         obj.push_back(Pair("conntime", stats.nTimeConnected));
         obj.push_back(Pair("timeoffset", stats.nTimeOffset));
         if (stats.dPingTime > 0.0) {
@@ -530,9 +539,6 @@ static UniValue getnetworkinfo(const Config &config,
             "relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
-            "  \"excessutxocharge\": x.xxxxxxxx,        (numeric) minimum "
-            "charge for excess utxos in " +
-            CURRENCY_UNIT + "\n"
                             "  \"localaddresses\": [                    "
                             "(array) list of local addresses\n"
                             "  {\n"
@@ -572,8 +578,6 @@ static UniValue getnetworkinfo(const Config &config,
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee",
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
-    obj.push_back(Pair("excessutxocharge",
-                       ValueFromAmount(config.GetExcessUTXOCharge())));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);

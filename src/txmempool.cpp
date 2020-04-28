@@ -19,21 +19,24 @@
 #include "utiltime.h"
 #include "validation.h"
 #include "version.h"
-
 #include <boost/range/adaptor/reversed.hpp>
+#include <config.h>
 
 using namespace mining;
 
-CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
-                                 int64_t _nTime, double _entryPriority,
+CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
+                                 const Amount _nFee,
+                                 int64_t _nTime,
+                                 double _entryPriority,
                                  unsigned int _entryHeight,
                                  Amount _inChainInputValue,
-                                 bool _spendsCoinbase, int64_t _sigOpsCount,
+                                 bool _spendsCoinbase,
+                                 int64_t _sigOpsCount,
                                  LockPoints lp)
     : tx(_tx), nFee(_nFee), nTime(_nTime), entryPriority(_entryPriority),
-      entryHeight(_entryHeight), inChainInputValue(_inChainInputValue),
-      spendsCoinbase(_spendsCoinbase), sigOpCount(_sigOpsCount),
-      lockPoints(lp) {
+      inChainInputValue(_inChainInputValue), sigOpCount(_sigOpsCount),
+      lockPoints(lp), entryHeight(_entryHeight), spendsCoinbase(_spendsCoinbase)
+{
     nTxSize = tx->GetTotalSize();
     nModSize = tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(tx);
@@ -49,10 +52,6 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
     nSizeWithAncestors = GetTxSize();
     nModFeesWithAncestors = nFee;
     nSigOpCountWithAncestors = sigOpCount;
-}
-
-CTxMemPoolEntry::CTxMemPoolEntry(const CTxMemPoolEntry &other) {
-    *this = other;
 }
 
 double CTxMemPoolEntry::GetPriority(unsigned int currentHeight) const {
@@ -424,14 +423,12 @@ CTxMemPool::CTxMemPool() : nTransactionsUpdated(0) {
     // pool
     nCheckFrequency = 0;
 
-    minerPolicyEstimator = new CBlockPolicyEstimator();
 
     // Create the journal builder
     mJournalBuilder = std::make_unique<CJournalBuilder>();
 }
 
 CTxMemPool::~CTxMemPool() {
-    delete minerPolicyEstimator;
 }
 
 bool CTxMemPool::IsSpent(const COutPoint &outpoint) {
@@ -456,7 +453,6 @@ void CTxMemPool::AddUnchecked(
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
     const CJournalChangeSetPtr& changeSet,
-    bool validFeeEstimate,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
@@ -468,7 +464,6 @@ void CTxMemPool::AddUnchecked(
              entry,
              setAncestors,
              changeSet,
-             validFeeEstimate,
              pnMempoolSize,
              pnDynamicMemoryUsage);
     }
@@ -481,7 +476,6 @@ void CTxMemPool::AddUncheckedNL(
     const CTxMemPoolEntry &entry,
     setEntries &setAncestors,
     const CJournalChangeSetPtr& changeSet,
-    bool validFeeEstimate,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
@@ -541,7 +535,6 @@ void CTxMemPool::AddUncheckedNL(
 
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();
-    minerPolicyEstimator->processTransaction(entry, validFeeEstimate);
 
     vTxHashes.emplace_back(tx.GetHash(), newit);
     newit->vTxHashesIdx = vTxHashes.size() - 1;
@@ -562,7 +555,6 @@ void CTxMemPool::removeUncheckedNL(
 
     CTransactionRef txn { it->GetSharedTx() };
     NotifyEntryRemoved(txn, reason);
-    const TxId& txid = txn->GetId();
     for (const CTxIn &txin : txn->vin) {
         mapNextTx.erase(txin.prevout);
     }
@@ -596,7 +588,6 @@ void CTxMemPool::removeUncheckedNL(
     mapLinks.erase(it);
     mapTx.erase(it);
     nTransactionsUpdated++;
-    minerPolicyEstimator->removeTx(txid);
 }
 
 // Calculates descendants of entry that are not already in setDescendants, and
@@ -772,8 +763,7 @@ void CTxMemPool::removeConflictsNL(
 }
 
 /**
- * Called when a block is connected. Removes from mempool and updates the miner
- * fee estimator.
+ * Called when a block is connected. Removes from mempool.
  */
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
@@ -792,8 +782,6 @@ void CTxMemPool::RemoveForBlock(
     }
 
     // Before the txs in the new block have been removed from the mempool,
-    // update policy estimates
-    minerPolicyEstimator->processBlock(nBlockHeight, entries);
     for (const auto &tx : vtx) {
         txiter it = mapTx.find(tx->GetId());
         if (it != mapTx.end()) {
@@ -1207,52 +1195,15 @@ TxMempoolInfo CTxMemPool::Info(const uint256 &txid) const {
     return { *i };
 }
 
-CFeeRate CTxMemPool::EstimateFee(int nBlocks) const {
-    std::shared_lock lock(smtx);
-    return minerPolicyEstimator->estimateFee(nBlocks);
-}
-CFeeRate CTxMemPool::EstimateSmartFee(int nBlocks,
-                                      int *answerFoundAtBlocks) const {
-    std::shared_lock lock(smtx);
-    return minerPolicyEstimator->estimateSmartFee(nBlocks, answerFoundAtBlocks,
-                                                  *this);
-}
+CFeeRate CTxMemPool::estimateFee() const {
+    uint64_t maxMempoolSize =
+        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
 
-bool CTxMemPool::WriteFeeEstimates(CAutoFile &fileout) const {
-    try {
-        std::unique_lock lock(smtx);
-        // version required to read: 0.13.99 or later
-        fileout << 139900;
-        // version that wrote the file
-        fileout << CLIENT_VERSION;
-        minerPolicyEstimator->Write(fileout);
-    } catch (const std::exception &) {
-        LogPrintf("CTxMemPool::WriteFeeEstimates(): unable to write policy "
-                  "estimator data (non-fatal)\n");
-        return false;
-    }
-    return true;
-}
+    // return maximum of min fee per KB from config, min fee calculated from mempool 
+    return std::max(GlobalConfig::GetConfig().GetMinFeePerKB(), GetMinFee(maxMempoolSize));
 
-bool CTxMemPool::ReadFeeEstimates(CAutoFile &filein) {
-    try {
-        int nVersionRequired, nVersionThatWrote;
-        filein >> nVersionRequired >> nVersionThatWrote;
-        if (nVersionRequired > CLIENT_VERSION) {
-            return error("CTxMemPool::ReadFeeEstimates(): up-version (%d) fee "
-                         "estimate file",
-                         nVersionRequired);
-        }
+  }
 
-        std::unique_lock lock(smtx);
-        minerPolicyEstimator->Read(filein, nVersionThatWrote);
-    } catch (const std::exception &) {
-        LogPrintf("CTxMemPool::ReadFeeEstimates(): unable to read policy "
-                  "estimator data (non-fatal)\n");
-        return false;
-    }
-    return true;
-}
 
 void CTxMemPool::PrioritiseTransaction(const uint256& hash,
                                        const std::string& strHash,
@@ -1431,7 +1382,6 @@ void CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
     const CJournalChangeSetPtr& changeSet,
-    bool validFeeEstimate,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
@@ -1454,7 +1404,6 @@ void CTxMemPool::AddUnchecked(
              entry,
              setAncestors,
              changeSet,
-             validFeeEstimate,
              pnMempoolSize,
              pnDynamicMemoryUsage);
     }
