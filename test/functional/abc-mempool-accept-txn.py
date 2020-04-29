@@ -40,10 +40,6 @@ class FullBlockTest(ComparisonTestFramework):
         self.blocks = {}
         self.extra_args = [['-norelaypriority']]
 
-    def setup_network(self):
-        self.setup_nodes()
-        self.init_network()
-
     def add_options(self, parser):
         super().add_options(parser)
         parser.add_option(

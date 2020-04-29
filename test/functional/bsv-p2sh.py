@@ -30,10 +30,6 @@ class P2SH(ComparisonTestFramework):
         self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0', '-banscore=1000000',
                             f'-genesisactivationheight={self.genesisactivationheight}', '-maxgenesisgracefulperiod=1']]
 
-    def setup_network(self):
-        self.setup_nodes()
-        self.init_network()
-
     def run_test(self):
         self.test.run()
 
