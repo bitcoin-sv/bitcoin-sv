@@ -12,6 +12,7 @@ import logging
 import os
 import subprocess
 import time
+import atexit
 
 from .mininode import COIN, ToHex
 from .util import (
@@ -23,6 +24,10 @@ from .util import (
 from .authproxy import JSONRPCException
 
 BITCOIND_PROC_WAIT_TIMEOUT = 60
+
+# Keep a global list of started external processes so that they can be killed
+# before Python exits if they are still running.
+TestNode_process_list = []
 
 
 class TestNode():
@@ -115,6 +120,7 @@ class TestNode():
         if stderr is None:
             stderr = self.stderr
         self.process = subprocess.Popen(self.setRequiredArgs(self.args + extra_args, runNodesWithRequiredParams), stderr=stderr)
+        TestNode_process_list.append(self.process) # Add node process to list of running external processes
         self.running = True
         self.log.debug("bitcoind started, waiting for RPC to come up")
 
@@ -162,7 +168,7 @@ class TestNode():
         except http.client.CannotSendRequest:
             self.log.exception("Unable to stop node.")
 
-    def is_node_stopped(self):
+    def is_node_stopped(self, assert_zero_exit_code=True):
         """Checks whether the node has stopped.
 
         Returns True if the node has stopped. False otherwise.
@@ -173,8 +179,11 @@ class TestNode():
         if return_code is None:
             return False
 
-        # process has stopped. Assert that it didn't return an error code.
-        assert_equal(return_code, 0)
+        TestNode_process_list.remove(self.process) # Remove node process from list of running external processes
+
+        if assert_zero_exit_code:
+            # process has stopped. Assert that it didn't return an error code.
+            assert_equal(return_code, 0)
         self.running = False
         self.process = None
         self.rpc_connected = False
@@ -184,6 +193,10 @@ class TestNode():
 
     def wait_until_stopped(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
         wait_until(self.is_node_stopped, timeout=timeout)
+
+    def wait_for_exit(self, timeout):
+        self.process.wait(timeout)
+        assert self.is_node_stopped(assert_zero_exit_code=False) # Check that process has quit and cleanup resources
 
     def node_encrypt_wallet(self, passphrase):
         """"Encrypts the wallet.
@@ -245,3 +258,17 @@ class TestNodeCLI():
             raise subprocess.CalledProcessError(
                 returncode, self.binary, output=cli_stderr)
         return json.loads(cli_stdout, parse_float=decimal.Decimal)
+
+
+
+
+def TestNode_kill_running_processes():
+    """ Kill all started external processes that are still running in reverse order they were added to array """
+    for p in reversed(TestNode_process_list):
+        if(p.poll() is None):
+            print("Killing sub-process " + str(p.pid))
+            p.kill()
+            p.wait(timeout=1)
+    TestNode_process_list.clear()
+
+atexit.register(TestNode_kill_running_processes)
