@@ -121,6 +121,9 @@ static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);
 // NOTE: When adjusting this, update rpcnet:setban's help ("24h")
 static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
 
+// Multiple streams enabled by default
+static const bool DEFAULT_STREAMS_ENABLED = true;
+
 /**
  * Default maximum amount of concurrent async tasks per node before node message
  * processing is skipped until the amount is freed up again.

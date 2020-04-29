@@ -564,6 +564,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(_("Size of block download window before considering we may be stalling "
                         "during IBD (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_WINDOW));
     }
+    strUsage += HelpMessageOpt(
+        "-broadcastdelay=<n>",
+        strprintf(
+            _("Set inventory broadcast delay duration in millisecond(min: %d, max: %d)"),
+            0,MAX_INV_BROADCAST_DELAY));
     strUsage +=
         HelpMessageOpt("-connect=<ip>",
                        _("Connect only to the specified node(s); -noconnect or "
@@ -618,11 +623,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "perspective of time may be influenced by peers forward or "
                     "backward by this amount. (default: %u seconds)"),
                   DEFAULT_MAX_TIME_ADJUSTMENT));
-    strUsage += HelpMessageOpt(
-        "-broadcastdelay=<n>",
-        strprintf(
-            _("Set inventory broadcast delay duration in millisecond(min: %d, max: %d)"),
-            0,MAX_INV_BROADCAST_DELAY));
+    strUsage += HelpMessageOpt("-multistreams",
+        _("Enable the use of multiple streams to our peers") + " " +
+            strprintf(_("(default: %d)"), DEFAULT_STREAMS_ENABLED));
     strUsage +=
         HelpMessageOpt("-onion=<ip:port>",
                        strprintf(_("Use separate SOCKS5 proxy to reach peers "
