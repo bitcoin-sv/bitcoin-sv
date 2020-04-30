@@ -1501,14 +1501,8 @@ void CConnman::ThreadSocketHandler() {
             LOCK(cs_vNodes);
             for (const CNodePtr& pnode : vNodes) {
                 // Implement the following logic:
-                // * If there is data to send, select() for sending data. As
-                // this only happens when optimistic write failed, we choose to
-                // first drain the write buffer in this case before receiving
-                // more. This avoids needlessly queueing received data, if the
-                // remote peer is not themselves receiving data. This means
-                // properly utilizing TCP flow control signalling.
-                // * Otherwise, if there is space left in the receive buffer,
-                // select() for receiving data.
+                // * If there is data to send select() for sending data.
+                // * If there is space left in the receive buffer select() for receiving data.
                 // * Hand off all complete messages to the processor, to be
                 // handled without blocking here.
 
@@ -1530,7 +1524,6 @@ void CConnman::ThreadSocketHandler() {
 
                 if (select_send) {
                     FD_SET(pnode->hSocket, &fdsetSend);
-                    continue;
                 }
                 if (select_recv) {
                     FD_SET(pnode->hSocket, &fdsetRecv);
