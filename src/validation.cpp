@@ -2729,13 +2729,13 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
                 }
                 else
                 {
+                    // check if this fork rises safe mode level
+                    if (safeModeLevelForks > safeModeLevel)
+                    {
+                        safeModeLevel = safeModeLevelForks;
+                        pindexForkTip = it->first;
+                    }
                     ++it;
-                }
-                // check if this fork rises safe mode level
-                if (safeModeLevelForks > safeModeLevel)
-                {
-                    safeModeLevel = safeModeLevelForks;
-                    pindexForkTip = it->first;
                 }
             }
         }
@@ -2789,7 +2789,7 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
  */
 void CheckSafeModeParametersForAllForksOnStartup()
 {
-    AssertLockHeld(cs_main);
+    LOCK(cs_main);
 
     std::set<CBlockIndex*> setTipCandidates;
     std::set<CBlockIndex*> setPrevs;

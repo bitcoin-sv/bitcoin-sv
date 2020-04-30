@@ -1225,7 +1225,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config,
     CBlockHeader header = reader->GetBlockHeader();
 
     // set metadata so it is available when setting header in the next step
-    if (!hasDiskBlockMetaData) 
+    if (!hasDiskBlockMetaData && reader->EndOfStream())
     {
         CDiskBlockMetaData metadata = reader->getDiskBlockMetadata();
         SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);

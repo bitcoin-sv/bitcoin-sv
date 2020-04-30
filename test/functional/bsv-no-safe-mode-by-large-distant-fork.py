@@ -77,9 +77,8 @@ class NoSafeModeByLargeDistantFork(BitcoinTestFramework):
                         error_msg = f"Unexpected data requested {i}"
                         self.log.error(error_msg)
                         raise NotImplementedError(error_msg)
-                    requested_hash = format(i.hash, 'x')
                     for block in branch_2_blocks:
-                        if block.hash == requested_hash:
+                        if int(block.hash, 16) == i.hash:
                             conn.send_message(msg_block(block))
                             break
 
