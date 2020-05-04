@@ -115,6 +115,9 @@ class TestNode():
 
     def start(self, runNodesWithRequiredParams, extra_args=None, stderr=None):
         """Start the node."""
+        if os.path.isfile(os.path.join(self.datadir, "regtest", ".cookie")):
+            # remove old .cookie file so that it is not accidentally used in wait_for_rpc_connection before new one is created by node during startup
+            os.remove(os.path.join(self.datadir, "regtest", ".cookie"))
         if extra_args is None:
             extra_args = self.extra_args
         if stderr is None:
