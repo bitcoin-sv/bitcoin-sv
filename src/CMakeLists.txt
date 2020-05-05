@@ -369,3 +369,12 @@ target_link_libraries(
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)
 endif()
+
+if (MSVC)
+	# prevents default build from running unit tests automaticaly
+	set_target_properties(check-bitcoin PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
+	set_target_properties(check-leveldb PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
+	set_target_properties(check-secp256k1 PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
+	set_target_properties(check-univalue PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
+	set_target_properties(check-all PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD TRUE)
+endif()
