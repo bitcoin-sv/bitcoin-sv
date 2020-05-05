@@ -164,7 +164,7 @@ public:
 #define ADDRMAN_NEW_BUCKETS_PER_ADDRESS 8
 
 //! how old addresses can maximally be
-#define ADDRMAN_HORIZON_DAYS 30
+#define ADDRMAN_HORIZON_DAYS 7
 
 //! after how many failed attempts we give up on a new node
 #define ADDRMAN_RETRIES 3
@@ -173,7 +173,7 @@ public:
 #define ADDRMAN_MAX_FAILURES 10
 
 //! ... in at least this many days
-#define ADDRMAN_MIN_FAIL_DAYS 7
+#define ADDRMAN_MIN_FAIL_DAYS 2
 
 //! the maximum percentage of nodes to return in a getaddr call
 #define ADDRMAN_GETADDR_MAX_PCT 23
