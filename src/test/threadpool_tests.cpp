@@ -113,6 +113,7 @@ BOOST_AUTO_TEST_CASE(Prioritised)
     taskResults.clear();
     expectedResults.clear();
     results.clear();
+    pool.pause();
 
     // Scenario 2: test that unspecified priority is the same as medium priority
     expectedResults  = { "High", "Unspec", "Low" };
