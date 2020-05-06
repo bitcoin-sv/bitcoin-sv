@@ -18,7 +18,8 @@ class OurConfig : public DummyConfig {
 
 BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
 {
-    OurConfig config;
+    GlobalConfig config;
+    config.SetDefaultBlockSizeParams(DefaultBlockSizeParams{0, 10000, 10000, 10000});
 
     // confirm that an incomplete message is not valid
     CMessageHeader hdr(config.GetChainParams().NetMagic());
@@ -55,6 +56,19 @@ BOOST_AUTO_TEST_CASE(protocol_msghdr_length)
     BOOST_CHECK_EQUAL(sizemaxplus.IsValidWithoutConfig(config.GetChainParams().NetMagic()), false);
     BOOST_CHECK_EQUAL(sizemaxplus.IsValid(config), false);
     BOOST_CHECK_EQUAL(sizemaxplus.IsOversized(config), true);
+
+    // test with max size GETBLOCKTXN message
+    uint64_t maxSizeGetBlockTxn { NetMsgType::GetMaxMessageLength(NetMsgType::GETBLOCKTXN, config) };
+    CMessageHeader maxSizeGetBlockTxnHdr(config.GetChainParams().NetMagic(), NetMsgType::GETBLOCKTXN, maxSizeGetBlockTxn);
+    BOOST_CHECK_EQUAL(maxSizeGetBlockTxnHdr.IsValidWithoutConfig(config.GetChainParams().NetMagic()), true);
+    BOOST_CHECK_EQUAL(maxSizeGetBlockTxnHdr.IsValid(config), true);
+    BOOST_CHECK_EQUAL(maxSizeGetBlockTxnHdr.IsOversized(config), false);
+
+    // test with (max size + 1) GETBLOCKTXN message
+    CMessageHeader maxplusSizeGetBlockTxnHdr(config.GetChainParams().NetMagic(), NetMsgType::GETBLOCKTXN, maxSizeGetBlockTxn + 1);
+    BOOST_CHECK_EQUAL(maxplusSizeGetBlockTxnHdr.IsValidWithoutConfig(config.GetChainParams().NetMagic()), true);
+    BOOST_CHECK_EQUAL(maxplusSizeGetBlockTxnHdr.IsValid(config), false);
+    BOOST_CHECK_EQUAL(maxplusSizeGetBlockTxnHdr.IsOversized(config), true);
 }
 
 BOOST_AUTO_TEST_CASE(protocol_estimate_inv_elements)
