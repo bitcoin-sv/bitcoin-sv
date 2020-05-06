@@ -2966,7 +2966,7 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
     return pnode && pnode->fSuccessfullyConnected && !pnode->fDisconnect;
 }
 
-void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
+void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream) {
     size_t nPayloadLength = msg.Size();
     if (nPayloadLength > std::numeric_limits<uint32_t>::max())
     {
@@ -2985,16 +2985,16 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
 
     CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
 
-    size_t nBytesSent { pnode->PushMessage(std::move(serializedHeader), std::move(msg)) };
+    size_t nBytesSent { pnode->PushMessage(std::move(serializedHeader), std::move(msg), stream) };
     if (nBytesSent > 0)
     {
         RecordBytesSent(nBytesSent);
     }
 }
 
-size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg)
+size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream)
 {
-    size_t bytesSent { mAssociation.PushMessage(std::move(serialisedHeader), std::move(msg)) };
+    size_t bytesSent { mAssociation.PushMessage(std::move(serialisedHeader), std::move(msg), stream) };
 
     fPauseSend = (mAssociation.GetTotalSendQueueSize() > g_connman->GetSendBufferSize());
 
@@ -3002,7 +3002,7 @@ size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNe
 }
 
 /** Transfer ownership of a stream from one peer's association to another */
-void CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType)
+CNodePtr CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType)
 {
     LOCK(cs_vNodes);
 
@@ -3050,6 +3050,8 @@ void CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, Strea
     LogPrint(BCLog::NET, "Stream for association ID %s moving from peer=%d to peer=%d\n",
         newAssocID->ToString(), from, toNode->id);
     fromNode->GetAssociation().MoveStream(newStreamType, toNode->GetAssociation());
+
+    return toNode;
 }
 
 const TxIdTrackerSPtr& CConnman::GetTxIdTracker() {

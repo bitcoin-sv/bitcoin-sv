@@ -85,7 +85,7 @@ class Association
     AverageBandwidth GetAverageBandwidth(const StreamType streamType) const;
 
     // Add new message to our list for sending
-    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg);
+    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType);
 
     // Get last send/receive time for any stream
     int64_t GetLastSendTime() const;

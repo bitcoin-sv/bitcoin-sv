@@ -273,10 +273,10 @@ public:
 
     bool ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func);
 
-    void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg);
+    void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream = StreamType::GENERAL);
 
     /** Transfer ownership of a stream from one peer's association to another */
-    void MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType);
+    CNodePtr MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType);
     /** Queue an attempt to open a new stream to a peer */
     void QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID);
 
@@ -1010,7 +1010,7 @@ public:
     void SetSendVersion(int nVersionIn);
     int GetSendVersion() const;
 
-    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg);
+    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream);
 
     void AddAddressKnown(const CAddress &_addr) {
         addrKnown.insert(_addr.GetKey());

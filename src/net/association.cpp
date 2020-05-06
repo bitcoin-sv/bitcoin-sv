@@ -355,18 +355,33 @@ size_t Association::GetTotalSendQueueSize() const
     );
 }
 
-size_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg)
+size_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType)
 {
     size_t nPayloadLength { msg.Size() };
     size_t nTotalSize { nPayloadLength + CMessageHeader::HEADER_SIZE };
     size_t nBytesSent {0};
 
     // Decide which stream to send this message on
-    LOCK(cs_mStreams);
-    if(!mStreams.empty())
-    {
-        StreamPtr& stream { mStreams[StreamType::GENERAL] };
+    StreamPtr destStream {nullptr};
 
+    LOCK(cs_mStreams);
+    for(const auto& [type, stream] : mStreams)
+    {
+        if(type == streamType)
+        {
+            // Got the requested stream type
+            destStream = stream;
+            break;
+        }
+        else if(type == StreamType::GENERAL)
+        {
+            // Can always send anything over a GENERAL stream
+            destStream = stream;
+        }
+    }
+
+    if(destStream)
+    {
         {
             // Log total amount of bytes per command
             LOCK(cs_mSendRecvBytes);
@@ -374,11 +389,12 @@ size_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerial
         }
 
         // Send it
-        nBytesSent = stream->PushMessage(std::move(serialisedHeader), std::move(msg), nPayloadLength, nTotalSize);
+        nBytesSent = destStream->PushMessage(std::move(serialisedHeader), std::move(msg), nPayloadLength, nTotalSize);
     }
     else
     {
-        LogPrint(BCLog::NET, "No stream available to send message on for peer=%d\n", mNode->GetId());
+        LogPrint(BCLog::NET, "No stream of type %s available to send message on for peer=%d\n",
+            enum_cast<std::string>(streamType), mNode->GetId());
     }
 
     return nBytesSent;
