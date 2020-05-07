@@ -1856,7 +1856,13 @@ class NetworkThread(Thread):
                 if obj.disconnect:
                     disconnected.append(obj)
             [obj.handle_close() for obj in disconnected]
-            asyncore.loop(0.1, use_poll=True, map=mininode_socket_map, count=1)
+            try:
+                asyncore.loop(0.1, use_poll=True, map=mininode_socket_map, count=1)
+            except Exception as e:
+                # All exceptions are caught to prevent them from taking down the network thread.
+                # Since the error cannot be easily reported, it is just logged assuming that if
+                # the error is relevant, the test will detect it in some other way.
+                logger.warning("mininode NetworkThread: asyncore.loop() failed! " + str(e))
         logger.debug("Network thread closing")
 
 
