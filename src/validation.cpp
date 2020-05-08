@@ -6733,6 +6733,10 @@ bool RewindBlockIndex(const Config &config) {
 // logic assumes a consistent block index state
 void UnloadBlockIndex() {
     LOCK(cs_main);
+
+    LOCK(cs_safeModeLevelForks);
+    safeModeForks.clear();
+
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
     chainActiveSharedData.SetChainActiveHeight(0);
