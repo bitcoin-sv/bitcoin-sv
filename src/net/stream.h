@@ -13,6 +13,7 @@
 #include <utiltime.h>
 
 #include <atomic>
+#include <exception>
 #include <list>
 #include <memory>
 #include <optional>
@@ -51,13 +52,24 @@ enum class StreamType : uint8_t
 const enumTableT<StreamType>& enumTable(StreamType);
 
 /**
- * A stream is a single channel of communiction carried over an association
+ * Exception type that gets thrown if we should ban a peer due to something
+ * they did over a stream.
+ */
+class BanStream : public std::exception
+{
+  public:
+    const char* what() const noexcept override { return "StreamBan"; }
+};
+
+
+/**
+ * A stream is a single channel of communication carried over an association
  * between 2 peers.
  */
 class Stream
 {
   public:
-    Stream(CNode* node, StreamType streamType, SOCKET socket);
+    Stream(CNode* node, StreamType streamType, SOCKET socket, size_t maxRecvBuffSize);
     ~Stream();
 
     Stream(const Stream&) = delete;
@@ -69,12 +81,10 @@ class Stream
     void Shutdown();
 
     // Add our socket to the sets for reading and writing
-    bool SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                            SOCKET& socketMax, bool pauseRecv) const;
+    bool SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
 
     // Service our socket for reading and writing
-    void ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                       CConnman& connman, const Config& config, const CNetAddr& peerAddr,
+    void ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
                        bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent);
 
 
@@ -82,8 +92,9 @@ class Stream
     size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
                        size_t nPayloadLength, size_t nTotalSize);
 
-    // Move newly read completed messages to the callers queue
-    size_t GetNewMsgs(std::list<CNetMessage>& msgList);
+    // Fetch the next message for processing.
+    // Returns true if there are more queued messages available, and false if not.
+    bool GetNextMessage(std::list<CNetMessage>& msg);
 
     // Get last send/receive time
     int64_t GetLastSendTime() const { return mLastSendTime; }
@@ -125,16 +136,24 @@ class Stream
     std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> mSendMsgQueue {};
     uint64_t mTotalBytesSent {0};
     CSendQueueBytes mSendMsgQueueSize {};
+    mapMsgCmdSize mSendBytesPerMsgCmd {};
     mutable CCriticalSection cs_mSendMsgQueue {};
 
     // Receive message queue
     std::list<CNetMessage> mRecvMsgQueue {};
     uint64_t mTotalBytesRecv {0};
+    size_t mRecvMsgQueueSize {0};
+    std::atomic_bool mPauseRecv {false};
+    mapMsgCmdSize mRecvBytesPerMsgCmd {};
+    std::list<CNetMessage> mRecvCompleteMsgQueue {};
     mutable CCriticalSection cs_mRecvMsgQueue {};
 
     // Last time we sent or received anything
     std::atomic<int64_t> mLastSendTime {0};
     std::atomic<int64_t> mLastRecvTime {0};
+
+    // Maximum receieve queue size
+    const size_t mMaxRecvBuffSize {0};
 
     // Process some newly read bytes from our underlying socket
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
@@ -173,9 +192,13 @@ class Stream
         size_t sentSize {0};
     };
 
+    // Move newly read completed messages to another queue
+    void GetNewMsgs();
+
     // Message sending
     CSendResult SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize);
 
 };
 
 using StreamPtr = std::shared_ptr<Stream>;
+using StreamMap = std::map<StreamType, StreamPtr>;

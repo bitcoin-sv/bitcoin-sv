@@ -293,12 +293,12 @@ void PushProtoconf(const CNodePtr& pnode, CConnman &connman) {
 }
 
 static void PushCreateStream(const CNodePtr& pnode, CConnman& connman, StreamType streamType,
-    const AssociationIDPtr& assocID)
+    const std::string& streamPolicyName, const AssociationIDPtr& assocID)
 {
 
     connman.PushMessage(pnode,
         CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::CREATESTREAM, assocID->GetBytes(),
-            static_cast<uint8_t>(streamType)
+            static_cast<uint8_t>(streamType), streamPolicyName
     ));
 
     LogPrint(BCLog::NET, "send createstream message: type %s, assoc %s, peer=%d\n", enum_cast<std::string>(streamType),
@@ -320,7 +320,7 @@ void InitializeNode(const CNodePtr& pnode, CConnman& connman, const NodeConnectI
 
     if (!pnode->fInbound) {
         if(connectInfo && connectInfo->fNewStream) {
-            PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->assocID);
+            PushCreateStream(pnode, connman, connectInfo->streamType, connectInfo->streamPolicy, connectInfo->assocID);
         }
         else {
             if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
@@ -714,6 +714,49 @@ inline unsigned int GetInventoryBroadcastMax(const Config& config)
 {
     return INVENTORY_BROADCAST_MAX_PER_MB * (config.GetMaxBlockSize() / ONE_MEGABYTE);
 }
+
+/**
+ * Helper class for logging the duration of ProcessMessages request
+ * processing. It writes to log all the requests that take more time to
+ * process than the provided threshold.
+ */
+class CLogP2PStallDuration
+{
+public:
+    CLogP2PStallDuration(
+        std::string command,
+        std::chrono::milliseconds debugP2PTheadStallsThreshold)
+        : mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
+        , mProcessingStart{std::chrono::steady_clock::now()}
+        , mCommand{std::move(command)}
+    {/**/}
+
+
+    ~CLogP2PStallDuration()
+    {   
+        if(!mCommand.empty())
+        {   
+            auto processingDuration =
+                    std::chrono::steady_clock::now() - mProcessingStart;
+
+            if(processingDuration > mDebugP2PTheadStallsThreshold)
+            {   
+                LogPrint(
+                    BCLog::NET,
+                    "ProcessMessages request processing took %s ms to complete "
+                    "processing '%s' request!\n",
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        processingDuration).count(),
+                    mCommand);
+            }
+        }
+    }
+
+private:
+    std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
+    std::chrono::time_point<std::chrono::steady_clock> mProcessingStart;
+    std::string mCommand;
+};
 
 } // namespace
 
@@ -1678,8 +1721,10 @@ static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string&
 
     std::vector<uint8_t> associationID {};
     uint8_t streamTypeRaw {0};
+    std::string streamPolicyName {};
     vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
     vRecv >> streamTypeRaw;
+    vRecv >> LIMITED_STRING(streamPolicyName, StreamPolicy::MAX_STREAM_POLICY_NAME_LENGTH);
 
     // Which association is this for?
     try
@@ -1697,7 +1742,7 @@ static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string&
             enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
 
         // Move stream to owning association
-        CNodePtr newOwner { connman.MoveStream(pfrom->id, idptr, streamType) };
+        CNodePtr newOwner { connman.MoveStream(pfrom->id, idptr, streamType, streamPolicyName) };
 
         // Send stream ack
         connman.PushMessage(newOwner, CNetMsgMaker(INIT_PROTO_VERSION)
@@ -2036,12 +2081,8 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
                   pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
 
-        // If required, queue attempts to create additional streams to this peer
-        AssociationIDPtr assocID { pfrom->GetAssociation().GetAssociationID() };
-        if(assocID) {
-            LogPrint(BCLog::NET, "Queuing new stream requests to peer=%d\n", pfrom->id);
-            connman.QueueNewStream(peerAddr, StreamType::BLOCK, assocID);
-        }
+        // Create any required further streams to this peer
+        pfrom->GetAssociation().OpenRequiredStreams(connman);
     }
     else {
         LogPrintf("New inbound peer connected: version: %d, subver: %s, blocks=%d, peer=%d%s\n",
@@ -3778,7 +3819,9 @@ static bool SendRejectsAndCheckIfBanned(const CNodePtr& pnode, CConnman &connman
 }
 
 bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &connman,
-                     const std::atomic<bool> &interruptMsgProc) {
+                     const std::atomic<bool> &interruptMsgProc,
+                     std::chrono::milliseconds debugP2PTheadStallsThreshold)
+{
     const CChainParams &chainparams = config.GetChainParams();
     //
     // Message format
@@ -3820,24 +3863,21 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
         return false;
     }
 
-    std::list<CNetMessage> msgs;
-    {
-        LOCK(pfrom->cs_vProcessMsg);
-        if (pfrom->vProcessMsg.empty()) {
-            return false;
-        }
-        // Just take one message
-        msgs.splice(msgs.begin(), pfrom->vProcessMsg,
-                    pfrom->vProcessMsg.begin());
-        pfrom->nProcessQueueSize -=
-            msgs.front().vRecv.size() + CMessageHeader::HEADER_SIZE;
-        pfrom->fPauseRecv =
-            pfrom->nProcessQueueSize > connman.GetReceiveFloodSize();
-        fMoreWork = !pfrom->vProcessMsg.empty();
+    // Get next message for processing
+    std::list<CNetMessage> nextMsg {};
+    fMoreWork = pfrom->GetAssociation().GetNextMessage(nextMsg);
+    if(nextMsg.empty()) {
+        return false;
     }
-    CNetMessage &msg(msgs.front());
-
+    CNetMessage& msg { nextMsg.front() };
     msg.SetVersion(pfrom->GetRecvVersion());
+
+    std::optional<CLogP2PStallDuration> durationLog;
+    using namespace std::literals::chrono_literals;
+    if(debugP2PTheadStallsThreshold > 0ms)
+    {
+        durationLog = { msg.hdr.GetCommand(), debugP2PTheadStallsThreshold };
+    }
 
     // Scan for message start
     if (memcmp(msg.hdr.pchMessageStart.data(),

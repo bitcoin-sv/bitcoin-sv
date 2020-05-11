@@ -32,11 +32,19 @@ namespace
 
         return msg.hdr.IsOversized(config);
     }
+
+    const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
 }
 
-Stream::Stream(CNode* node, StreamType streamType, SOCKET socket)
-: mNode{node}, mStreamType{streamType}, mSocket{socket}
+Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, size_t maxRecvBuffSize)
+: mNode{node}, mStreamType{streamType}, mSocket{socket}, mMaxRecvBuffSize{maxRecvBuffSize}
 {
+    // Setup bytes count per message type
+    for(const std::string& msg : getAllNetMessageTypes())
+    {   
+        mRecvBytesPerMsgCmd[msg] = 0;
+    }
+    mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
 }
 
 Stream::~Stream()
@@ -59,13 +67,13 @@ void Stream::Shutdown()
 }
 
 bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                                 SOCKET& socketMax, bool pauseRecv) const
+                                SOCKET& socketMax) const
 {
     // Implement the following logic:
     // * If there is data to send select() for sending data.
     // * If there is space left in the receive buffer select() for receiving data.
 
-    bool select_recv = !pauseRecv;
+    bool select_recv = !mPauseRecv;
     bool select_send;
     {   
         LOCK(cs_mSendMsgQueue);
@@ -93,85 +101,93 @@ bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setErr
     return true;
 }
 
-void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                            CConnman& connman, const Config& config, const CNetAddr& peerAddr,
-                            bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent)
+void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
+                           bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent)
 {
-    LOCK(cs_mNode);
-
     //
     // Receive
     //
     bool recvSet = false;
     bool sendSet = false;
     bool errorSet = false;
-    {   
-        LOCK(cs_mSocket);
-        if (mSocket == INVALID_SOCKET)
-        {   
-            return;
-        }
-        recvSet = FD_ISSET(mSocket, &setRecv);
-        sendSet = FD_ISSET(mSocket, &setSend);
-        errorSet = FD_ISSET(mSocket, &setError);
-    }
-    if (recvSet || errorSet)
-    {   
-        // typical socket buffer is 8K-64K
-        char pchBuf[0x10000];
-        ssize_t nBytes = 0;
+
+    {
+        LOCK(cs_mNode);
         {   
             LOCK(cs_mSocket);
             if (mSocket == INVALID_SOCKET)
             {   
                 return;
             }
-            nBytes = recv(mSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
+            recvSet = FD_ISSET(mSocket, &setRecv);
+            sendSet = FD_ISSET(mSocket, &setSend);
+            errorSet = FD_ISSET(mSocket, &setError);
         }
-        if (nBytes > 0)
+        if (recvSet || errorSet)
         {   
-            bytesRecv = static_cast<size_t>(nBytes);
-            const RECV_STATUS status = ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
-            if (status != RECV_OK)
+            // typical socket buffer is 8K-64K
+            char pchBuf[0x10000];
+            ssize_t nBytes = 0;
+
             {   
-                mNode->CloseSocketDisconnect();
-                if (status == RECV_BAD_LENGTH)
+                LOCK(cs_mSocket);
+                if (mSocket == INVALID_SOCKET)
                 {   
-                    // Ban the peer if try to send messages with bad length
-                    connman.Ban(peerAddr, BanReasonNodeMisbehaving);
+                    return;
+                }
+                nBytes = recv(mSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
+            }
+            if (nBytes > 0)
+            {
+                bytesRecv = static_cast<size_t>(nBytes);
+                const RECV_STATUS status = ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
+                if (status != RECV_OK)
+                {   
+                    mNode->CloseSocketDisconnect();
+                    if (status == RECV_BAD_LENGTH)
+                    {   
+                        // Ban the peer if try to send messages with bad length
+                        throw BanStream{};
+                    }
                 }
             }
-        }
-        else if (nBytes == 0)
-        {   
-            // socket closed gracefully
-            if (!mNode->GetDisconnect())
+            else if (nBytes == 0)
             {   
-                LogPrint(BCLog::NET, "stream socket closed\n");
-            }
-            mNode->CloseSocketDisconnect();
-        }
-        else if (nBytes < 0)
-        {
-            // error
-            int nErr = WSAGetLastError();
-            if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
-            {
+                // socket closed gracefully
                 if (!mNode->GetDisconnect())
-                {
-                    LogPrintf("stream socket recv error %s\n", NetworkErrorString(nErr));
+                {   
+                    LogPrint(BCLog::NET, "stream socket closed\n");
                 }
                 mNode->CloseSocketDisconnect();
             }
+            else if (nBytes < 0)
+            {
+                // error
+                int nErr = WSAGetLastError();
+                if (nErr != WSAEWOULDBLOCK && nErr != WSAEMSGSIZE && nErr != WSAEINTR && nErr != WSAEINPROGRESS)
+                {
+                    if (!mNode->GetDisconnect())
+                    {
+                        LogPrintf("stream socket recv error %s\n", NetworkErrorString(nErr));
+                    }
+                    mNode->CloseSocketDisconnect();
+                }
+            }
+        }
+
+        //
+        // Send
+        //
+        if (sendSet)
+        {
+            bytesSent = SocketSendData();
         }
     }
 
-    //
-    // Send
-    //
-    if (sendSet)
+    // Pull out any completely received msgs
+    if(gotNewMsgs)
     {
-        bytesSent = SocketSendData();
+        GetNewMsgs();
     }
 }
 
@@ -183,6 +199,9 @@ size_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedN
     LOCK(cs_mNode);
     LOCK(cs_mSendMsgQueue);
     bool optimisticSend { mSendMsgQueue.empty() };
+
+    // Log total amount of bytes per command
+    mSendBytesPerMsgCmd[msg.Command()] += nTotalSize;
 
     // Track send queue length
     mSendMsgQueueSize += nTotalSize;
@@ -202,24 +221,22 @@ size_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedN
     return nBytesSent;
 }
 
-size_t Stream::GetNewMsgs(std::list<CNetMessage>& msgList)
+bool Stream::GetNextMessage(std::list<CNetMessage>& msg)
 {
-    size_t nSizeAdded {0};
-
     LOCK(cs_mRecvMsgQueue);
-    auto it { mRecvMsgQueue.begin() };
-    for(; it != mRecvMsgQueue.end(); ++it)
-    {   
-        if(!it->complete())
-        {   
-            break;
-        }
-        nSizeAdded += it->vRecv.size() + CMessageHeader::HEADER_SIZE;
+
+    // If we have completed msgs queued, return the first one
+    if(!mRecvCompleteMsgQueue.empty())
+    {
+        msg.splice(msg.end(), mRecvCompleteMsgQueue, mRecvCompleteMsgQueue.begin());
+
+        // Update total queued msgs size
+        mRecvMsgQueueSize -= msg.front().vRecv.size() + CMessageHeader::HEADER_SIZE;
+        mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
     }
 
-    msgList.splice(msgList.end(), mRecvMsgQueue, mRecvMsgQueue.begin(), it);
-
-    return nSizeAdded;
+    // Return whether we still have more msgs queued
+    return !mRecvCompleteMsgQueue.empty();
 }
 
 void Stream::CopyStats(StreamStats& stats) const
@@ -232,11 +249,14 @@ void Stream::CopyStats(StreamStats& stats) const
         LOCK(cs_mSendMsgQueue);
         stats.nSendBytes = mTotalBytesSent;
         stats.nSendSize = mSendMsgQueueSize.getSendQueueBytes();
+        stats.mapSendBytesPerMsgCmd = mSendBytesPerMsgCmd;
     }
 
     {
         LOCK(cs_mRecvMsgQueue);
         stats.nRecvBytes = mTotalBytesRecv;
+        stats.fPauseRecv = mPauseRecv;
+        stats.mapRecvBytesPerMsgCmd = mRecvBytesPerMsgCmd;
 
         // Avg bandwidth measurements
         if(!mAvgBandwidth.empty())
@@ -394,6 +414,39 @@ size_t Stream::SocketSendData()
     }
 
     return nSentSize;
+}
+
+void Stream::GetNewMsgs()
+{
+    size_t nSizeAdded {0};
+
+    LOCK(cs_mRecvMsgQueue);
+    auto it { mRecvMsgQueue.begin() };
+    for(; it != mRecvMsgQueue.end(); ++it)
+    {   
+        if(!it->complete())
+        {   
+            break;
+        }
+        size_t msgSize { it->vRecv.size() + CMessageHeader::HEADER_SIZE };
+        nSizeAdded += msgSize;
+
+        // Update recieved msg counts
+        mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find(it->hdr.pchCommand) };
+        if(i == mRecvBytesPerMsgCmd.end())
+        {   
+            i = mRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
+        }
+
+        assert(i != mRecvBytesPerMsgCmd.end());
+        i->second += msgSize;
+    }
+
+    mRecvCompleteMsgQueue.splice(mRecvCompleteMsgQueue.end(), mRecvMsgQueue, mRecvMsgQueue.begin(), it);
+
+    // Track total queued complete msgs size
+    mRecvMsgQueueSize += nSizeAdded;
+    mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
 }
 
 Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)

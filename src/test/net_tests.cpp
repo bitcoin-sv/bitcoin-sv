@@ -66,7 +66,7 @@ CDataStream AddrmanToStream(CAddrManSerializationMock &_addrman) {
     return CDataStream(vchData, SER_DISK, CLIENT_VERSION);
 }
 
-BOOST_FIXTURE_TEST_SUITE(net_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(net_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(caddrdb_read) {
     CAddrManUncorrupted addrmanUncorrupted;

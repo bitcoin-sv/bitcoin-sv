@@ -21,6 +21,7 @@
 #include "net/net_message.h"
 #include "net/net_types.h"
 #include "net/node_stats.h"
+#include "net/stream_policy_factory.h"
 #include "netaddress.h"
 #include "protocol.h"
 #include "random.h"
@@ -150,8 +151,9 @@ struct NodeConnectInfo
     : addrConnect{addr}, pszDest{dest}, fCountFailure{count}
     {}
 
-    NodeConnectInfo(const CAddress& addr, StreamType st, const AssociationIDPtr& id)
-    : addrConnect{addr}, streamType{st}, assocID{id}, fNewStream{true}
+    NodeConnectInfo(const CAddress& addr, StreamType st, const std::string& streamPolicy,
+        const AssociationIDPtr& id)
+    : addrConnect{addr}, streamType{st}, streamPolicy{streamPolicy}, assocID{id}, fNewStream{true}
     {}
 
     CAddress addrConnect {};
@@ -159,6 +161,7 @@ struct NodeConnectInfo
     bool fCountFailure {false};
 
     StreamType streamType { StreamType::GENERAL };
+    std::string streamPolicy {};
     AssociationIDPtr assocID {nullptr};
     bool fNewStream {false};
 };
@@ -275,12 +278,14 @@ public:
 
     bool ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func);
 
-    void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream = StreamType::GENERAL);
+    void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream = StreamType::UNKNOWN);
 
     /** Transfer ownership of a stream from one peer's association to another */
-    CNodePtr MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType);
+    CNodePtr MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType,
+        const std::string& streamPolicyName = "");
     /** Queue an attempt to open a new stream to a peer */
-    void QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID);
+    void QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID,
+        const std::string& streamPolicyName = "");
 
     /** Enqueue a new transaction for later sending to our peers */
     void EnqueueTransaction(const CTxnSendingDetails& txn);
@@ -680,6 +685,9 @@ private:
     std::list<NodeConnectInfo> mPendingStreams {};
     mutable CCriticalSection cs_mPendingStreams {};
 
+    /** Factory for creating stream policies */
+    StreamPolicyFactory mStreamPolicyFactory {};
+
     /** Services this instance offers */
     ServiceFlags nLocalServices;
 
@@ -758,7 +766,7 @@ struct CombinerAll {
 // Signals for message handling
 struct CNodeSignals {
     boost::signals2::signal<bool(const Config &, const CNodePtr& , CConnman &,
-                                 std::atomic<bool> &),
+                                 std::atomic<bool> &, std::chrono::milliseconds),
                             CombinerAll>
         ProcessMessages;
     boost::signals2::signal<bool(const Config &, const CNodePtr& , CConnman &,
@@ -828,10 +836,6 @@ public:
     // Services expected from a peer, otherwise it will be disconnected
     ServiceFlags nServicesExpected {NODE_NONE};
 
-    CCriticalSection cs_vProcessMsg {};
-    std::list<CNetMessage> vProcessMsg {};
-    size_t nProcessQueueSize {0};
-
     CCriticalSection cs_sendProcessing {};
 
     std::optional<CGetBlockMessageRequest> mGetBlockMessageRequest;
@@ -874,7 +878,6 @@ public:
     const NodeId id {};
 
     const uint64_t nKeyedNetGroup {0};
-    std::atomic_bool fPauseRecv {false};
     std::atomic_bool fPauseSend {false};
 
 public:

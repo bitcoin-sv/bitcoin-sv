@@ -7,6 +7,7 @@
 #include <net/net_message.h>
 #include <net/net_types.h>
 #include <net/stream.h>
+#include <net/stream_policy.h>
 #include <streams.h>
 
 #include <type_traits>
@@ -57,18 +58,23 @@ class Association
     // Shutdown the connection
     void Shutdown();
 
+    // Open any further required streams beyond the initial GENERAL stream
+    void OpenRequiredStreams(CConnman& connman);
+
     // Move ownership of our stream to a different association
     void MoveStream(StreamType newType, Association& to);
+
+    // Replace our active stream policy with a new one
+    void ReplaceStreamPolicy(const StreamPolicyPtr& newPolicy);
 
     // Copy out current statistics
     void CopyStats(AssociationStats& stats) const;
 
     // Add our sockets to the sets for reading and writing
-    bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                             SOCKET& socketMax, bool pauseRecv) const;
+    bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
 
-    // Move newly read completed messages to the caller's queue
-    size_t GetNewMsgs(std::list<CNetMessage>& msgList);
+    // Fetch the next message for processing
+    bool GetNextMessage(std::list<CNetMessage>& msg);
 
     // Service all sockets that are ready
     void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
@@ -101,20 +107,16 @@ class Association
     mutable CCriticalSection cs_mAssocID {};
 
     // Streams within the association
-    using StreamMap = std::map<StreamType, StreamPtr>;
     StreamMap mStreams {};
+    StreamPolicyPtr mStreamPolicy { std::make_shared<DefaultStreamPolicy>() };
     bool mShutdown {false};
     mutable CCriticalSection cs_mStreams {};
-
-    // Track bytes sent/received per command
-    mapMsgCmdSize mSendBytesPerMsgCmd {};
-    mapMsgCmdSize mRecvBytesPerMsgCmd {};
-    mutable CCriticalSection cs_mSendRecvBytes {};
 
     // The address of the remote peer
     const CAddress mPeerAddr {};
     CService mPeerAddrLocal {};
     mutable CCriticalSection cs_mPeerAddr {};
+
 
     // Helper functions for running something over all streams that returns a result
     template <typename Callable,

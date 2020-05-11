@@ -68,7 +68,8 @@ void Misbehaving(NodeId nodeid, int howmuch, const std::string &reason);
 
 /** Process protocol messages received from a given node */
 bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &connman,
-                     const std::atomic<bool> &interrupt);
+                     const std::atomic<bool> &interrupt,
+                     std::chrono::milliseconds debugP2PTheadStallsThreshold);
 /**
  * Send queued protocol messages to be sent to a give node.
  *

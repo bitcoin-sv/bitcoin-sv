@@ -4,6 +4,7 @@
 #include <config.h>
 #include <net/association.h>
 #include <net/stream.h>
+#include <net/stream_policy_factory.h>
 #include <test/test_bitcoin.h>
 
 #include <boost/test/unit_test.hpp>
@@ -27,10 +28,11 @@ namespace
         BOOST_CHECK_EQUAL(stats.nRecvBytes, 0);
         BOOST_CHECK_EQUAL(stats.nMinuteBytesPerSec, 0);
         BOOST_CHECK_EQUAL(stats.nSpotBytesPerSec, 0);
+        BOOST_CHECK_EQUAL(stats.fPauseRecv, false);
     }
 }
 
-BOOST_FIXTURE_TEST_SUITE(TestNetAssociation, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(TestNetAssociation, TestingSetup)
 
 // Basic stream testing only without a real network connection
 BOOST_AUTO_TEST_CASE(TestBasicStream)
@@ -52,7 +54,7 @@ BOOST_AUTO_TEST_CASE(TestBasicStream)
             true);
 
     // Create a stream
-    Stream stream { pDummyNode.get(), StreamType::GENERAL, INVALID_SOCKET };
+    Stream stream { pDummyNode.get(), StreamType::GENERAL, INVALID_SOCKET, 1000 };
 
     // Check initial state
     StreamStats stats {};
@@ -174,6 +176,23 @@ BOOST_AUTO_TEST_CASE(TestAssociationID)
         std::unique_ptr<AssociationID> reconstructed { AssociationID::Make(uuidAIDBytesNull)};
         BOOST_CHECK(reconstructed == nullptr);
     );
+}
+
+// Test stream policy factory
+BOOST_AUTO_TEST_CASE(TestStreamPolicyFactory)
+{
+    StreamPolicyFactory factory {};
+
+    // Fetch a known policy
+    BOOST_CHECK_NO_THROW(
+        StreamPolicyPtr policy { factory.Make(DefaultStreamPolicy::POLICY_NAME) };
+        BOOST_CHECK(policy != nullptr);
+    );
+
+    // Fetch a non-existant policy
+    BOOST_CHECK_THROW(
+        StreamPolicyPtr policy { factory.Make("Unknown policy name") };
+    , std::runtime_error);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

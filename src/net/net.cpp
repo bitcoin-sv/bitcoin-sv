@@ -728,7 +728,6 @@ void CNode::copyStats(NodeStats &stats)
         LOCK(cs_filter);
         stats.fRelayTxes = fRelayTxes;
     }
-    stats.fPauseRecv = fPauseRecv;
     stats.fPauseSend = fPauseSend;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
@@ -894,7 +893,7 @@ int CNode::GetSendVersion() const {
 bool CNode::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const
 {
     // Get all sockets from our association
-    return mAssociation.SetSocketsForSelect(setRecv, setSend, setError, socketMax, fPauseRecv);
+    return mAssociation.SetSocketsForSelect(setRecv, setSend, setError, socketMax);
 }
 
 void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
@@ -905,14 +904,6 @@ void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, C
     mAssociation.ServiceSockets(setRecv, setSend, setError, connman, config, newMsgs, bytesRecv, bytesSent);
     if(newMsgs)
     {
-        {
-            LOCK(cs_vProcessMsg);
-            size_t nSizeAdded { mAssociation.GetNewMsgs(vProcessMsg) };
-            // Pause/unpause receiving
-            nProcessQueueSize += nSizeAdded;
-            fPauseRecv = nProcessQueueSize > connman.GetReceiveFloodSize();
-        }
-
         connman.WakeMessageHandler();
     }
 
@@ -1934,10 +1925,11 @@ void CConnman::ThreadOpenAddedConnections() {
     }
 }
 
-void CConnman::QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID)
+void CConnman::QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID,
+    const std::string& streamPolicyName)
 {
     LOCK(cs_mPendingStreams);
-    mPendingStreams.emplace_back(addr, streamType, assocID);
+    mPendingStreams.emplace_back(addr, streamType, streamPolicyName, assocID);
 }
 
 void CConnman::ThreadOpenNewStreamConnections()
@@ -2026,52 +2018,6 @@ bool CConnman::OpenNetworkConnection(NodeConnectInfo& connectInfo,
     return true;
 }
 
-namespace
-{
-    /**
-     * Helper class for logging the duration of ThreadMessageHandler reqest
-     * processing. It writes to log all the requests that take more time to
-     * process than the provided threshold.
-     */
-    class CLogP2PStallDuration
-    {
-    public:
-        CLogP2PStallDuration(
-            std::string command,
-            std::chrono::milliseconds debugP2PTheadStallsThreshold)
-            : mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
-            , mProcessingStart{std::chrono::steady_clock::now()}
-            , mCommand{std::move(command)}
-        {/**/}
-
-
-        ~CLogP2PStallDuration()
-        {
-            if(!mCommand.empty())
-            {
-                auto processingDuration =
-                        std::chrono::steady_clock::now() - mProcessingStart;
-
-                if(processingDuration > mDebugP2PTheadStallsThreshold)
-                {
-                    LogPrint(
-                        BCLog::NET,
-                        "CConnman request processing took %s ms to complete "
-                        "processing '%s' request!\n",
-                        std::chrono::duration_cast<std::chrono::milliseconds>(
-                            processingDuration).count(),
-                        mCommand);
-                }
-            }
-        }
-
-    private:
-        std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
-        std::chrono::time_point<std::chrono::steady_clock> mProcessingStart;
-        std::string mCommand;
-    };
-}
-
 void CConnman::ThreadMessageHandler()
 {
     std::vector<CNodePtr> vNodesCopy;
@@ -2097,26 +2043,10 @@ void CConnman::ThreadMessageHandler()
                 continue;
             }
 
-            std::optional<CLogP2PStallDuration> durationLog;
-
-            using namespace std::literals::chrono_literals;
-
-            if(mDebugP2PTheadStallsThreshold > 0ms)
-            {
-                LOCK(pnode->cs_vProcessMsg);
-                if(!pnode->vProcessMsg.empty())
-                {
-                    durationLog =
-                        {
-                            pnode->vProcessMsg.begin()->hdr.GetCommand(),
-                            mDebugP2PTheadStallsThreshold
-                        };
-                }
-            }
-
             // Receive messages
             bool fMoreNodeWork = GetNodeSignals().ProcessMessages(
-                *config, pnode, *this, flagInterruptMsgProc);
+                *config, pnode, *this, flagInterruptMsgProc,
+                mDebugP2PTheadStallsThreshold);
             fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
 
             if (flagInterruptMsgProc) {
@@ -3002,7 +2932,8 @@ size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNe
 }
 
 /** Transfer ownership of a stream from one peer's association to another */
-CNodePtr CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType)
+CNodePtr CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType,
+    const std::string& streamPolicyName)
 {
     LOCK(cs_vNodes);
 
@@ -3044,6 +2975,12 @@ CNodePtr CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, S
         err << "Attempt to move stream between peers with different IPs: " <<
             fromAddr.ToString() << " != " << toAddr.ToString();
         throw std::runtime_error(err.str());
+    }
+
+    // Do we also have a new stream policy to use?
+    if(!streamPolicyName.empty())
+    {
+        toNode->GetAssociation().ReplaceStreamPolicy(mStreamPolicyFactory.Make(streamPolicyName));
     }
 
     // Transfer the stream

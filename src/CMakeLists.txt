@@ -255,6 +255,8 @@ add_library(server
     net/net_message.cpp
 	net/net_processing.cpp
     net/stream.cpp
+    net/stream_policy.cpp
+    net/stream_policy_factory.cpp
 	noui.cpp
 	orphan_txns.cpp
 	policy/fees.cpp

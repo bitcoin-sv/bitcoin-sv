@@ -11,21 +11,35 @@
 
 namespace
 {
-    const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
+    // Take msg sizes per command per stream and combine into a single per command total
+    std::pair<mapMsgCmdSize,mapMsgCmdSize> CombineStreamMsgCmdSizes(const std::vector<StreamStats>& allStreamStats)
+    {
+        mapMsgCmdSize sendResult {};
+        mapMsgCmdSize recvResult {};
+
+        for(const StreamStats& streamStats : allStreamStats)
+        {
+            for(const auto& [cmd, total] : streamStats.mapSendBytesPerMsgCmd)
+            {
+                sendResult[cmd] += total;
+            }
+            for(const auto& [cmd, total] : streamStats.mapRecvBytesPerMsgCmd)
+            {
+                recvResult[cmd] += total;
+            }
+        }
+
+        return { sendResult, recvResult };
+    }
 }
+
 
 Association::Association(CNode* node, SOCKET socket, const CAddress& peerAddr)
 : mNode{node}, mPeerAddr{peerAddr}
 {
     // Create initial stream
-    mStreams[StreamType::GENERAL] = std::make_shared<Stream>(mNode, StreamType::GENERAL, socket);
-
-    // Setup bytes count per message type
-    for(const std::string& msg : getAllNetMessageTypes())
-    {
-        mRecvBytesPerMsgCmd[msg] = 0;
-    }
-    mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
+    mStreams[StreamType::GENERAL] = std::make_shared<Stream>(mNode, StreamType::GENERAL, socket,
+        g_connman->GetReceiveFloodSize());
 }
 
 AssociationIDPtr Association::GetAssociationID() const
@@ -91,6 +105,33 @@ void Association::Shutdown()
     }
 }
 
+void Association::OpenRequiredStreams(CConnman& connman)
+{
+    // If required, queue attempts to create additional streams to our peer
+    AssociationIDPtr assocID { GetAssociationID() };
+    if(assocID)
+    {
+        LOCK(cs_mStreams);
+
+        // Set stream policy to use on outbound connections (inbound connections
+        // we wait to see what the other side asks for).
+        if(!mNode->fInbound)
+        {
+            // In future if we implement more stream policies we will want to make this
+            // configurable. For now, this is the only option.
+            mStreamPolicy = std::make_shared<BlockPriorityStreamPolicy>();
+        }
+
+        LogPrint(BCLog::NET, "Queuing new stream requests to peer=%d\n", mNode->id);
+        mStreamPolicy->SetupStreams(connman, mPeerAddr, assocID);
+    }
+    else
+    {
+        LogPrint(BCLog::NET, "AssociationID not set so not queuing new stream requests to peer=%d\n",
+            mNode->id);
+    }
+}
+
 void Association::MoveStream(StreamType newType, Association& to)
 {
     // Lock both associations so we can move stream from one to the other atomically
@@ -114,6 +155,15 @@ void Association::MoveStream(StreamType newType, Association& to)
     streamToMove->SetStreamType(newType);
     streamToMove->SetOwningNode(to.mNode);
     to.mStreams[newType] = streamToMove;
+}
+
+void Association::ReplaceStreamPolicy(const StreamPolicyPtr& newPolicy)
+{
+    {
+        LOCK(cs_mStreams);
+        mStreamPolicy = newPolicy;
+    }
+    LogPrint(BCLog::NET, "Stream policy changed to %s for peer=%d\n", newPolicy->GetPolicyName(), mNode->id);
 }
 
 uint64_t Association::GetAverageBandwidth() const
@@ -184,6 +234,7 @@ void Association::CopyStats(AssociationStats& stats) const
             stream.second->CopyStats(streamStats);
             stats.streamStats.push_back(std::move(streamStats));
         }
+        stats.streamPolicyName = mStreamPolicy->GetPolicyName();
     }
     const std::vector<StreamStats>& streamStats { stats.streamStats };
 
@@ -231,11 +282,10 @@ void Association::CopyStats(AssociationStats& stats) const
         }
     );
 
-    {
-        LOCK(cs_mSendRecvBytes);
-        stats.mapSendBytesPerMsgCmd = mSendBytesPerMsgCmd;
-        stats.mapRecvBytesPerMsgCmd = mRecvBytesPerMsgCmd;
-    }
+    // Per command msg sizes
+    const auto& [sendSizes, recvSizes] { CombineStreamMsgCmdSizes(streamStats) };
+    stats.mapSendBytesPerMsgCmd = sendSizes;
+    stats.mapRecvBytesPerMsgCmd = recvSizes;
 }
 
 int64_t Association::GetLastSendTime() const
@@ -269,7 +319,7 @@ int64_t Association::GetLastRecvTime() const
 }
 
 bool Association::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError,
-                                       SOCKET& socketMax, bool pauseRecv) const
+                                      SOCKET& socketMax) const
 {
     bool havefds {false};
 
@@ -277,46 +327,16 @@ bool Association::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& 
     LOCK(cs_mStreams);
     for(const auto& stream : mStreams)
     {
-        havefds |= stream.second->SetSocketForSelect(setRecv, setSend, setError, socketMax, pauseRecv);
+        havefds |= stream.second->SetSocketForSelect(setRecv, setSend, setError, socketMax);
     }
 
     return havefds;
 }
 
-size_t Association::GetNewMsgs(std::list<CNetMessage>& msgList)
+bool Association::GetNextMessage(std::list<CNetMessage>& msg)
 {
-    size_t nSizeAdded {0};
-
-    // Fetch from all our streams
-    std::list<CNetMessage> newMsgs {};
-    {
-        LOCK(cs_mStreams);
-        for(auto& stream : mStreams)
-        {
-            nSizeAdded += stream.second->GetNewMsgs(newMsgs);
-        }
-    }
-
-    // Update recieved msg counts
-    {
-        LOCK(cs_mSendRecvBytes);
-        for(const CNetMessage& msg : newMsgs)
-        {
-            mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find(msg.hdr.pchCommand) };
-            if (i == mRecvBytesPerMsgCmd.end())
-            {   
-                i = mRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);
-            }
-
-            assert(i != mRecvBytesPerMsgCmd.end());
-            i->second += msg.hdr.nPayloadLength + CMessageHeader::HEADER_SIZE;
-        }
-    }
-
-    // Move all new msgs to callers list
-    msgList.splice(msgList.end(), std::move(newMsgs));
-
-    return nSizeAdded;
+    LOCK(cs_mStreams);
+    return mStreamPolicy->GetNextMessage(mStreams, msg);
 }
 
 void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError,
@@ -326,15 +346,15 @@ void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setEr
     bytesRecv = bytesSent = 0;
 
     // Service each stream socket
-    LOCK(cs_mStreams);
-    for(auto& stream : mStreams)
+    try
     {
-        size_t streamBytesRecv {0};
-        size_t streamBytesSent {0};
-        stream.second->ServiceSocket(setRecv, setSend, setError, connman, config, GetPeerAddr(),
-            gotNewMsgs, streamBytesRecv, streamBytesSent);
-        bytesRecv += streamBytesRecv;
-        bytesSent += streamBytesSent;
+        LOCK(cs_mStreams);
+        mStreamPolicy->ServiceSockets(mStreams, setRecv, setSend, setError, config,
+            gotNewMsgs, bytesRecv, bytesSent);
+    }
+    catch(BanStream& ban)
+    {
+        connman.Ban(GetPeerAddr(), BanReasonNodeMisbehaving);
     }
 }
 
@@ -361,40 +381,16 @@ size_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerial
     size_t nTotalSize { nPayloadLength + CMessageHeader::HEADER_SIZE };
     size_t nBytesSent {0};
 
-    // Decide which stream to send this message on
-    StreamPtr destStream {nullptr};
-
-    LOCK(cs_mStreams);
-    for(const auto& [type, stream] : mStreams)
+    try
     {
-        if(type == streamType)
-        {
-            // Got the requested stream type
-            destStream = stream;
-            break;
-        }
-        else if(type == StreamType::GENERAL)
-        {
-            // Can always send anything over a GENERAL stream
-            destStream = stream;
-        }
+        // Send the message
+        LOCK(cs_mStreams);
+        nBytesSent = mStreamPolicy->PushMessage(mStreams, streamType, std::move(serialisedHeader),
+            std::move(msg), nPayloadLength, nTotalSize);
     }
-
-    if(destStream)
+    catch(std::exception& e)
     {
-        {
-            // Log total amount of bytes per command
-            LOCK(cs_mSendRecvBytes);
-            mSendBytesPerMsgCmd[msg.Command()] += nTotalSize;
-        }
-
-        // Send it
-        nBytesSent = destStream->PushMessage(std::move(serialisedHeader), std::move(msg), nPayloadLength, nTotalSize);
-    }
-    else
-    {
-        LogPrint(BCLog::NET, "No stream of type %s available to send message on for peer=%d\n",
-            enum_cast<std::string>(streamType), mNode->GetId());
+        LogPrint(BCLog::NET, "Failed to send message (%s) for peer=%d\n", e.what(), mNode->id);
     }
 
     return nBytesSent;
