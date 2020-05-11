@@ -27,13 +27,23 @@ class Config;
 class CSerializedNetMsg;
 class StreamStats;
 
-// Enumerate possible stream types
+/**
+ * Enumerate possible stream types.
+ *
+ * All associations have at least a GENERAL stream established, and anything
+ * can always be sent over a GENERAL stream.
+ *
+ * Streams DATA1 - DATA4 are optional additional general purpose streams that
+ * can be used for whatever the currently active stream policy deems useful.
+ */
 enum class StreamType : uint8_t
 {
     UNKNOWN = 0,
     GENERAL,
-    BLOCK,
-    TRANSACTION,
+    DATA1,
+    DATA2,
+    DATA3,
+    DATA4,
 
     MAX_STREAM_TYPE
 };

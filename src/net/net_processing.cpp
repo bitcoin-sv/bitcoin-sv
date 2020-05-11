@@ -4372,7 +4372,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
         // Also, don't abandon this attempt to download all the while we are making
         // sufficient progress, as measured by the current download speed to this
         // peer.
-        uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth(StreamType::BLOCK).first };
+        uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth() };
         int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
         minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
         if(avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000) {
@@ -4450,7 +4450,7 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
             assert(stallerState);
             if (stallerState->nStallingSince == 0) {
                 stallerState->nStallingSince = GetTimeMicros();
-                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth(StreamType::BLOCK).first };
+                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth() };
                 LogPrint(BCLog::NET, "Stall started (current speed %d) peer=%d\n", avgbw, staller);
             }
         }

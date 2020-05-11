@@ -10,10 +10,12 @@ const enumTableT<StreamType>& enumTable(StreamType)
 {
     static enumTableT<StreamType> table
     {
-        { StreamType::UNKNOWN,     "UNKNOWN" },
-        { StreamType::GENERAL,     "GENERAL" },
-        { StreamType::BLOCK,       "BLOCK" },
-        { StreamType::TRANSACTION, "TRANSACTION" }
+        { StreamType::UNKNOWN,  "UNKNOWN" },
+        { StreamType::GENERAL,  "GENERAL" },
+        { StreamType::DATA1,    "DATA1" },
+        { StreamType::DATA2,    "DATA2" },
+        { StreamType::DATA3,    "DATA3" },
+        { StreamType::DATA4,    "DATA4" },
     };
     return table;
 }
