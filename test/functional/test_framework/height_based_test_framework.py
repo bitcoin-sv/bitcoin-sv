@@ -268,7 +268,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
         block, coinbase_tx = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=txs)
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash,
-                   timeout=10, check_interval=0.2, label="Waiting for block to become current tip " + label)
+                   timeout=60, check_interval=0.2, label="Waiting for block to become current tip " + label)
 
         blk_ht = connection.rpc.getblock(connection.rpc.getbestblockhash())["height"]
         if txs:
