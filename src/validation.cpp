@@ -2579,6 +2579,26 @@ const CBlockIndex* FindInvalidBlockOnFork(const CBlockIndex* pindexForkTip)
 }
 
 /**
+ * Checks if block is part of one of the forks that are causing safe mode
+ */
+bool IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew)
+{
+    AssertLockHeld(cs_safeModeLevelForks);
+
+    for (auto const& fork : safeModeForks)
+    {
+        auto pindexWalk = fork.first;
+        while (pindexWalk && pindexWalk != fork.second)
+        {
+            if (pindexWalk == pindexNew)
+                return true;
+            pindexWalk = pindexWalk->pprev;
+        }
+    }
+    return false;
+}
+
+/**
  * Method tries to find invalid block from fork tip to active chain. If invalid
  * block is found, it sets status withFailedParent to all of its descendants.
  */
@@ -2713,47 +2733,29 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
     SafeModeLevel safeModeLevel = SafeModeLevel::NONE;
     // fork triggering safe mode level change
     const CBlockIndex* pindexForkTip = nullptr;
+    bool checkExistingForks = false;
 
-    if (chainActive.Tip() == pindexNew->pprev || chainActive.Contains(pindexNew))
+    if (chainActive.Tip() == pindexNew->pprev || chainActive.Contains(pindexNew) || IsBlockPartOfExistingSafeModeFork(pindexNew))
     {
-        // When we are extending or updating active chain only check if we have to exit safe mode
-        if (GetSafeModeLevel() != SafeModeLevel::UNKNOWN)
+        // When we are extending active chain or updating any of the forks or main chain 
+        // then only check all existing forks if we should stay in safe mode. If block is part
+        // of existing safe mode fork than check whole fork (and all other forks) not just
+        // from fork base to pindexNew
+        if (GetSafeModeLevel() != SafeModeLevel::NONE)
         {
             // Check all forks if they still meet conditions for safe mode
-            for (auto it = safeModeForks.cbegin(); it != safeModeForks.cend();)
-            {
-                SafeModeLevel safeModeLevelForks = ShouldForkTriggerSafeMode(it->first, it->second);
-                if (safeModeLevelForks == SafeModeLevel::NONE)
-                {
-                    it = safeModeForks.erase(it);
-                }
-                else
-                {
-                    // check if this fork rises safe mode level
-                    if (safeModeLevelForks > safeModeLevel)
-                    {
-                        safeModeLevel = safeModeLevelForks;
-                        pindexForkTip = it->first;
-                    }
-                    ++it;
-                }
-            }
+            checkExistingForks = true;
         }
     }
     else
     {
         const CBlockIndex* pindexForkBase = pindexNew;
-        if (safeModeForks.find(pindexNew->pprev) != safeModeForks.end())
+        auto itPPrev = safeModeForks.find(pindexNew->pprev);
+        if (itPPrev != safeModeForks.end())
         {
             // Check if we are extending existing fork that caused safe mode
-            pindexForkBase = safeModeForks[pindexNew->pprev];
-            safeModeForks.erase(pindexNew->pprev);
-        }
-        else if (safeModeForks.find(pindexNew) != safeModeForks.end())
-        {
-            // Check if we are updating block status of existing fork tip (e.g. unknown -> valid)
-            pindexForkBase = safeModeForks[pindexNew];
-            safeModeForks.erase(pindexNew);
+            pindexForkBase = itPPrev->second;
+            safeModeForks.erase(itPPrev);
         }
         else
         {
@@ -2765,12 +2767,42 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
         if (safeModeLevelFork != SafeModeLevel::NONE)
         {
             // Add fork to collection of forks that cause safe mode
-            safeModeForks[pindexNew] = pindexForkBase;
+            safeModeForks.insert(std::pair<const CBlockIndex*, const CBlockIndex*>(pindexNew, pindexForkBase));
+            // Check if we increased safe mode level
+            if (safeModeLevelFork > safeModeLevel)
+            {
+                safeModeLevel = safeModeLevelFork;
+                pindexForkTip = pindexNew;
+            }
         }
-        if (safeModeLevelFork > safeModeLevel)
+        else
         {
-            safeModeLevel = safeModeLevelFork;
-            pindexForkTip = pindexNew;
+            // This fork does not cause safe mode so check if any of 
+            // existing forks still cause safe mode
+            checkExistingForks = true;
+        }
+    }
+
+    // If needed, check existing forks and remove those that no longer cause safe mode
+    if (checkExistingForks)
+    {
+        for (auto it = safeModeForks.cbegin(); it != safeModeForks.cend();)
+        {
+            SafeModeLevel safeModeLevelForks = ShouldForkTriggerSafeMode(it->first, it->second);
+            if (safeModeLevelForks == SafeModeLevel::NONE)
+            {
+                it = safeModeForks.erase(it);
+            }
+            else
+            {
+                // check if this fork rises safe mode level
+                if (safeModeLevelForks > safeModeLevel)
+                {
+                    safeModeLevel = safeModeLevelForks;
+                    pindexForkTip = it->first;
+                }
+                ++it;
+            }
         }
     }
 
