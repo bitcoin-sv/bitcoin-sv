@@ -108,6 +108,19 @@ std::optional<bool> EvalScript(
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,
+    LimitedStack& altstack,
+    long& ipc,
+    std::vector<bool>& vfExec,
+    std::vector<bool>& vfElse,
+    ScriptError* error = nullptr);
+std::optional<bool> EvalScript(
+    const CScriptConfig& config,
+    bool consensus,
+    const task::CCancellationToken& token,
+    LimitedStack& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker,
     ScriptError* error = nullptr);
 std::optional<bool> VerifyScript(
     const CScriptConfig& config,
