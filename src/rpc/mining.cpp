@@ -654,7 +654,7 @@ void getblocktemplate(const Config& config,
     CBlock *pblock = blockRef.get();
 
     // Update nTime
-    UpdateTime(pblock, config, pindexPrev);
+    mining::UpdateTime(pblock, config, pindexPrev);
     pblock->nNonce = 0;
 
     // after start of writing chunks no exception must be thrown, otherwise JSON response will be invalid

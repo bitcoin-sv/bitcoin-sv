@@ -103,7 +103,7 @@ CMiningCandidateRef mkblocktemplate(const Config& config, bool coinbaseRequired)
     CBlock *pblock = blockref.get();
 
     // Update nTime
-    UpdateTime(pblock, config, pindexPrev);
+    mining::UpdateTime(pblock, config, pindexPrev);
     pblock->nNonce = 0;
 
     // Create candidate and return it
