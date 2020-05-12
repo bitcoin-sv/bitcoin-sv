@@ -167,13 +167,13 @@ void CTxMemPool::updateForDescendantsNL(txiter updateIt,
                                         cacheMap &cachedDescendants,
                                         const std::set<uint256> &setExclude) {
     setEntries stageEntries, setAllDescendants;
-    stageEntries = GetMemPoolChildrenNL(updateIt);
+    stageEntries = GetMemPoolChildrenNL(updateIt);  // MARK: also used by legacy
 
     while (!stageEntries.empty()) {
         const txiter cit = *stageEntries.begin();
         setAllDescendants.insert(cit);
         stageEntries.erase(cit);
-        const setEntries &setChildren = GetMemPoolChildrenNL(cit);
+        const setEntries &setChildren = GetMemPoolChildrenNL(cit); // MARK: also used by legacy
         for (const txiter childEntry : setChildren) {
             cacheMap::iterator cacheIt = cachedDescendants.find(childEntry);
             if (cacheIt != cachedDescendants.end()) {
@@ -317,7 +317,7 @@ bool CTxMemPool::CalculateMemPoolAncestorsNL(
         // If we're not searching for parents, we require this to be an entry in
         // the mempool already.
         txiter it = mapTx.iterator_to(entry);
-        parentHashes = GetMemPoolParentsNL(it);
+        parentHashes = GetMemPoolParentsNL(it); // MARK: also used by legacy
     }
 
     size_t totalSizeWithAncestors = entry.GetTxSize();
@@ -372,7 +372,7 @@ bool CTxMemPool::CalculateMemPoolAncestorsNL(
 void CTxMemPool::updateAncestorsOfNL(bool add,
                                      txiter it,
                                      setEntries &setAncestors) {
-    setEntries parentIters = GetMemPoolParentsNL(it);
+    setEntries parentIters = GetMemPoolParentsNL(it); // MARK: also used by legacy
     // add or remove this tx as a child of each parent
     for (txiter piter : parentIters) {
         updateChildNL(piter, it, add);
@@ -402,7 +402,7 @@ void CTxMemPool::updateEntryForAncestorsNL(txiter it,
 }
 
 void CTxMemPool::updateChildrenForRemovalNL(txiter it) {
-    const setEntries &setMemPoolChildren = GetMemPoolChildrenNL(it);
+    const setEntries &setMemPoolChildren = GetMemPoolChildrenNL(it); // MARK: also used by legacy
     for (txiter updateIt : setMemPoolChildren) {
          updateParentNL(updateIt, it, false);
     }
@@ -719,7 +719,7 @@ void CTxMemPool::CalculateDescendantsNL(txiter entryit,
         setDescendants.insert(it);
         stage.erase(it);
 
-        const setEntries &setChildren = GetMemPoolChildrenNL(it);
+        const setEntries &setChildren = GetMemPoolChildrenNL(it); // MARK: also used by legacy
         for (const txiter &childiter : setChildren) {
             if (!setDescendants.count(childiter)) {
                 stage.insert(childiter);
@@ -1024,7 +1024,7 @@ void CTxMemPool::CheckMempoolImplNL(
             assert(it3->second == &tx);
             i++;
         }
-        assert(setParentCheck == GetMemPoolParentsNL(it));
+        assert(setParentCheck == GetMemPoolParentsNL(it)); // MARK: also used by legacy
         // Verify ancestor state is correct.
         setEntries setAncestors;
         uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
@@ -1066,7 +1066,7 @@ void CTxMemPool::CheckMempoolImplNL(
                 childSizes += childit->GetTxSize();
             }
         }
-        assert(setChildrenCheck == GetMemPoolChildrenNL(it));
+        assert(setChildrenCheck == GetMemPoolChildrenNL(it)); // MARK: also used by legacy
         // Also check to make sure size is greater than sum with immediate
         // children. Just a sanity check, not definitive that this calc is
         // correct...
@@ -1395,10 +1395,10 @@ void CTxMemPool::PrioritiseTransaction(
 void CTxMemPool::ApplyDeltas(const uint256& hash, double &dPriorityDelta,
                              Amount &nFeeDelta) const {
     std::shared_lock lock(smtx);
-    ApplyDeltasNL(hash, dPriorityDelta, nFeeDelta);
+    ApplyDeltasNL(hash, dPriorityDelta, nFeeDelta); // MARK: also used by legacy
 }
 
-void CTxMemPool::ApplyDeltasNL(
+void CTxMemPool::ApplyDeltasNL(  // MARK: used by legacy
         const uint256& hash,
         double &dPriorityDelta,
         Amount &nFeeDelta) const {

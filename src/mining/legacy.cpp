@@ -41,7 +41,7 @@ static const int MAX_COINBASE_SCRIPTSIG_SIZE = 100;
 // pool, we select by highest priority or fee rate, so we might consider
 // transactions that depend on transactions that aren't yet in the block.
 
-int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
+int64_t UpdateTime(CBlockHeader *pblock, const Config &config, // TODO: move to mining/assembler.cpp
                    const CBlockIndex *pindexPrev) {
     int64_t nOldTime = pblock->nTime;
     int64_t nNewTime =
@@ -619,7 +619,7 @@ void LegacyBlockAssembler::addPriorityTxs() {
     }
 }
 
-void IncrementExtraNonce(CBlock *pblock,
+void IncrementExtraNonce(CBlock *pblock, // TODO: move to rpc/mining.cpp
                          const CBlockIndex *pindexPrev,
                          unsigned int &nExtraNonce) {
     // Update nExtraNonce
