@@ -210,9 +210,4 @@ private:
     int UpdatePackagesForAdded(const CTxMemPool::setEntries &alreadyAdded,
                                indexed_modified_transaction_set &mapModifiedTx);
 };
-
-/** Modify the extranonce in a block */
-void IncrementExtraNonce(CBlock *pblock,
-                         const CBlockIndex *pindexPrev,
-                         unsigned int &nExtraNonce); // TODO: move to rpc/mining.h
 #endif // BITCOIN_MINER_H

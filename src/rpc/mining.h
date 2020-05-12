@@ -14,6 +14,7 @@
 class Config;
 class CBlock;
 class CReserveScript;
+class CBlockIndex;
 
 /** Generate blocks (mine) */
 UniValue generateBlocks(const Config& config,
@@ -24,4 +25,8 @@ UniValue processBlock(const Config& config,
 	const std::shared_ptr<CBlock>& block,
 	std::function<bool(const Config&, const std::shared_ptr<CBlock>&)> performBlockOperation);
 
+/** Modify the extranonce in a block */
+void IncrementExtraNonce(CBlock *pblock,
+                         const CBlockIndex *pindexPrev,
+                         unsigned int &nExtraNonce);
 #endif

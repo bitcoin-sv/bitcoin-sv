@@ -8,6 +8,8 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "config.h"
+#include "consensus/consensus.h"
+#include "consensus/merkle.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "mining/factory.h"
@@ -20,6 +22,8 @@
 #include "pow.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
+#include "script/script_num.h"
+#include "txmempool.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
@@ -31,6 +35,29 @@
 #include <memory>
 
 using mining::CBlockTemplate;
+
+void IncrementExtraNonce(CBlock *pblock,
+                         const CBlockIndex *pindexPrev,
+                         unsigned int &nExtraNonce) {
+    // Update nExtraNonce
+    static uint256 hashPrevBlock;
+    if (hashPrevBlock != pblock->hashPrevBlock) {
+        nExtraNonce = 0;
+        hashPrevBlock = pblock->hashPrevBlock;
+    }
+    ++nExtraNonce;
+    // Height first in coinbase required for block.version=2
+    unsigned int nHeight = pindexPrev->nHeight + 1;
+    CMutableTransaction txCoinbase(*pblock->vtx[0]);
+    txCoinbase.vin[0].scriptSig =
+        (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
+    assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
+
+    pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+    pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+}
+
+
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,

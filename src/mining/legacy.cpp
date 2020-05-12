@@ -596,24 +596,3 @@ void LegacyBlockAssembler::addPriorityTxs() {
         }
     }
 }
-
-void IncrementExtraNonce(CBlock *pblock, // TODO: move to rpc/mining.cpp
-                         const CBlockIndex *pindexPrev,
-                         unsigned int &nExtraNonce) {
-    // Update nExtraNonce
-    static uint256 hashPrevBlock;
-    if (hashPrevBlock != pblock->hashPrevBlock) {
-        nExtraNonce = 0;
-        hashPrevBlock = pblock->hashPrevBlock;
-    }
-    ++nExtraNonce;
-    // Height first in coinbase required for block.version=2
-    int32_t nHeight = pindexPrev->nHeight + 1;
-    CMutableTransaction txCoinbase(*pblock->vtx[0]);
-    txCoinbase.vin[0].scriptSig =
-        (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
-    assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
-
-    pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
-    pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
-}
