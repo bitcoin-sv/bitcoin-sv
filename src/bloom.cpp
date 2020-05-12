@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "bloom.h"
@@ -33,8 +33,6 @@
  */
 CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweakIn, uint8_t nFlagsIn)
     : vData(MAX_BLOOM_FILTER_SIZE)
-    , isFull(false)
-    , isEmpty(true)
     , nHashFuncs(MAX_HASH_FUNCS)
     , nTweak(nTweakIn)
     , nFlags(nFlagsIn)
@@ -63,13 +61,15 @@ void CBloomFilter::insert(const std::vector<uint8_t> &vKey) {
     {
         return;
     }
-    if (isFull) return;
+    if (vData.empty()) // Avoid divide-by-zero (CVE-2013-5700)
+    {
+        return;
+    }
     for (unsigned int i = 0; i < nHashFuncs; i++) {
         unsigned int nIndex = Hash(i, vKey);
         // Sets bit nIndex of vData
         vData[nIndex >> 3] |= (1 << (7 & nIndex));
     }
-    isEmpty = false;
 }
 
 void CBloomFilter::insert(const COutPoint &outpoint) {
@@ -91,11 +91,9 @@ bool CBloomFilter::contains(const std::vector<uint8_t> &vKey) const {
         return false;
     }
 
-    if (isFull) {
+    if (vData.empty()) // Avoid divide-by-zero (CVE-2013-5700)
+    {
         return true;
-    }
-    if (isEmpty) {
-        return false;
     }
     for (unsigned int i = 0; i < nHashFuncs; i++) {
         unsigned int nIndex = Hash(i, vKey);
@@ -121,8 +119,6 @@ bool CBloomFilter::contains(const uint256 &hash) const {
 
 void CBloomFilter::clear() {
     vData.assign(vData.size(), 0);
-    isFull = false;
-    isEmpty = true;
 }
 
 void CBloomFilter::reset(unsigned int nNewTweak) {
@@ -139,11 +135,9 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
     bool fFound = false;
     // Match if the filter contains the hash of tx for finding tx when they
     // appear in a block
-    if (isFull) {
+    if (vData.empty()) // zero-size = "match-all" filter
+    {
         return true;
-    }
-    if (isEmpty) {
-        return false;
     }
     const uint256 &txid = tx.GetId();
     if (contains(txid)) {
@@ -212,17 +206,6 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction &tx) {
     }
 
     return false;
-}
-
-void CBloomFilter::UpdateEmptyFull() {
-    bool full = true;
-    bool empty = true;
-    for (const auto d : vData) {
-        full &= (d == 0xff);
-        empty &= (d == 0);
-    }
-    isFull = full;
-    isEmpty = empty;
 }
 
 CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements, double fpRate)
