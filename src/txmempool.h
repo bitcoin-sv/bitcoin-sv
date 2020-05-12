@@ -363,8 +363,8 @@ public:
 class CompareTxMemPoolEntryByAncestorFee {
 public:
     bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const {
-        double aFees = double(a.GetModFeesWithAncestors().GetSatoshis());
-        double aSize = a.GetSizeWithAncestors();
+        double aFees = double(a.GetModFeesWithAncestors().GetSatoshis()); // MARK: also used by legacy
+        double aSize = a.GetSizeWithAncestors(); // MARK: also used by legacy
 
         double bFees = double(b.GetModFeesWithAncestors().GetSatoshis());
         double bSize = b.GetSizeWithAncestors();

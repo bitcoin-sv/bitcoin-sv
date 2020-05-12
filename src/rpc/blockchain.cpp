@@ -330,8 +330,8 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
     jWriter.pushKV("descendantsize", e.GetSizeWithDescendants());
     jWriter.pushKV("descendantfees", e.GetModFeesWithDescendants().GetSatoshis());
     jWriter.pushKV("ancestorcount", e.GetCountWithAncestors());
-    jWriter.pushKV("ancestorsize", e.GetSizeWithAncestors());
-    jWriter.pushKV("ancestorfees", e.GetModFeesWithAncestors().GetSatoshis());
+    jWriter.pushKV("ancestorsize", e.GetSizeWithAncestors());  // MARK: also used by legacy
+    jWriter.pushKV("ancestorfees", e.GetModFeesWithAncestors().GetSatoshis()); // MARK: also used by legacy
     std::set<std::string> deps;
     const CTransaction& tx = e.GetTx();
     for (const CTxIn& txin : tx.vin)

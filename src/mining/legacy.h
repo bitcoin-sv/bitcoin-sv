@@ -214,7 +214,7 @@ private:
 /** Modify the extranonce in a block */
 void IncrementExtraNonce(CBlock *pblock,
                          const CBlockIndex *pindexPrev,
-                         unsigned int &nExtraNonce);
+                         unsigned int &nExtraNonce); // TODO: move to rpc/mining.h
 int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
-                   const CBlockIndex *pindexPrev);
+                   const CBlockIndex *pindexPrev); // TODO: move to assembler.h
 #endif // BITCOIN_MINER_H

@@ -1047,10 +1047,10 @@ void CTxMemPool::CheckMempoolImplNL(
             nSigOpCheck += ancestorIt->GetSigOpCount();
         }
 
-        assert(it->GetCountWithAncestors() == nCountCheck);
-        assert(it->GetSizeWithAncestors() == nSizeCheck);
-        assert(it->GetSigOpCountWithAncestors() == nSigOpCheck);
-        assert(it->GetModFeesWithAncestors() == nFeesCheck);
+        assert(it->GetCountWithAncestors() == nCountCheck); // MARK: also used by legacy
+        assert(it->GetSizeWithAncestors() == nSizeCheck); // MARK: also used by legacy
+        assert(it->GetSigOpCountWithAncestors() == nSigOpCheck); // MARK: also used by legacy
+        assert(it->GetModFeesWithAncestors() == nFeesCheck); // MARK: also used by legacy
 
         // Check children against mapNextTx
         CTxMemPool::setEntries setChildrenCheck;
@@ -1254,8 +1254,8 @@ private:
     static bool compare(const CTxMemPoolEntry& a,
                         const CTxMemPoolEntry& b)
     {
-        const auto counta = a.GetCountWithAncestors();
-        const auto countb = b.GetCountWithAncestors();
+        const auto counta = a.GetCountWithAncestors(); // MARK: also used by legacy
+        const auto countb = b.GetCountWithAncestors(); // MARK: also used by legacy
         if (counta == countb) {
             return CompareTxMemPoolEntryByScore()(a, b);
         }
