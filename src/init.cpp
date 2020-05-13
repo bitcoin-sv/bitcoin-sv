@@ -22,7 +22,6 @@
 #include "invalid_txn_publisher.h"
 #include "key.h"
 #include "mining/journaling_block_assembler.h"
-#include "mining/legacy.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
@@ -75,6 +74,7 @@ static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
+static const bool DEFAULT_PRINTPRIORITY = false;
 
 std::unique_ptr<CConnman> g_connman;
 std::unique_ptr<PeerLogicValidation> peerLogic;
@@ -1057,7 +1057,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-blockassembler=<type>",
         strprintf(_("Set the type of block assembler to use for mining. Supported options are "
-                    "LEGACY or JOURNALING. (default: %s)"),
+                    "JOURNALING. (default: %s)"),
                   enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
     strUsage += HelpMessageOpt( 
         "-jbamaxtxnbatch=<max batch size>",

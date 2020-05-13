@@ -7,7 +7,7 @@
 #include "consensus/validation.h"
 #include "key.h"
 #include "keystore.h"
-#include "mining/legacy.h"
+#include "mining/assembler.h"
 #include "pubkey.h"
 #include "random.h"
 #include "script/scriptcache.h"
