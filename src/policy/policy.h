@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_POLICY_POLICY_H
@@ -82,8 +82,7 @@ static const unsigned int DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = MAX_TX_
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 1000;
 /** Default for -maxnonfinalmempool, maximum megabytes of non-final mempool memory usage */
 static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
-/** Default for -incrementalrelayfee, which sets the minimum feerate increase
- * for mempool limiting or BIP 125 replacement **/
+/** Minimum feerate increase for mempool limiting **/
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
 /** Default for -maxscriptsizepolicy **/
 static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
@@ -186,7 +185,6 @@ std::optional<bool> AreInputsStandard(
     const CCoinsViewCache &mapInputs,
     const int mempoolHeight);
 
-extern CFeeRate incrementalRelayFee;
 extern CFeeRate dustRelayFee;
 
 #endif // BITCOIN_POLICY_POLICY_H
