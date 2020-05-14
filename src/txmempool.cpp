@@ -55,7 +55,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  const Amount _nFee,
                                  int64_t _nTime,
                                  double _entryPriority,
-                                 unsigned int _entryHeight,
+                                 int32_t _entryHeight,
                                  Amount _inChainInputValue,
                                  bool _spendsCoinbase,
                                  int64_t _sigOpsCount,
@@ -81,7 +81,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
     nSigOpCountWithAncestors = sigOpCount;
 }
 
-double CTxMemPoolEntry::GetPriority(unsigned int currentHeight) const {
+double CTxMemPoolEntry::GetPriority(int32_t currentHeight) const {
     double deltaPriority = double((currentHeight - entryHeight) *
                                   inChainInputValue.GetSatoshis()) /
                            nModSize;
@@ -771,7 +771,7 @@ void CTxMemPool::RemoveForReorg(
     int nMedianTimePast,
     int flags) {
 
-    const int64_t nMemPoolHeight = nChainActiveHeight + 1;
+    const int32_t nMemPoolHeight = nChainActiveHeight + 1;
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
     std::unique_lock lock(smtx);
@@ -856,7 +856,7 @@ void CTxMemPool::removeConflictsNL(
  */
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
-    unsigned int nBlockHeight,
+    int32_t nBlockHeight,
     const CJournalChangeSetPtr& changeSet) {
 
     std::unique_lock lock(smtx);

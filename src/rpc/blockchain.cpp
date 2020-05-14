@@ -1467,8 +1467,8 @@ UniValue pruneblockchain(const Config &config, const JSONRPCRequest &request) {
         heightParam = pindex->nHeight;
     }
 
-    unsigned int height = (unsigned int)heightParam;
-    unsigned int chainHeight = (unsigned int)chainActive.Height();
+    int32_t height = heightParam;
+    int32_t chainHeight = chainActive.Height();
     if (chainHeight < config.GetChainParams().PruneAfterHeight()) {
         throw JSONRPCError(RPC_MISC_ERROR,
                            "Blockchain is too short for pruning.");

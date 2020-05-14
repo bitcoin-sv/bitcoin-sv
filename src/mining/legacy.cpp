@@ -640,7 +640,7 @@ void IncrementExtraNonce(CBlock *pblock,
     }
     ++nExtraNonce;
     // Height first in coinbase required for block.version=2
-    unsigned int nHeight = pindexPrev->nHeight + 1;
+    int32_t nHeight = pindexPrev->nHeight + 1;
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
     txCoinbase.vin[0].scriptSig =
         (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;

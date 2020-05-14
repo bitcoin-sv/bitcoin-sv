@@ -51,7 +51,7 @@ size_t CBlock::GetSizeWithoutCoinbase()
     return size;
 }
 
-uint64_t CBlock::GetHeightFromCoinbase()
+int32_t CBlock::GetHeightFromCoinbase()
     const // Returns the block's height as specified in its coinbase transaction
 {
     const CScript &sig = vtx[0]->vin[0].scriptSig;

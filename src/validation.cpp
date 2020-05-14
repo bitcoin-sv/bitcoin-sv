@@ -701,13 +701,13 @@ bool IsGenesisEnabled(const Config &config, int32_t nHeight) {
             "Use the overload that takes Coin as parameter");
     }
 
-    return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
+    return nHeight >= config.GetGenesisActivationHeight();
 }
 
 bool IsGenesisEnabled(const Config& config, const Coin& coin, int32_t mempoolHeight) {
     auto height = coin.GetHeight();
     if (height == MEMPOOL_HEIGHT) {
-        return (uint32_t)mempoolHeight >= config.GetGenesisActivationHeight();
+        return mempoolHeight >= config.GetGenesisActivationHeight();
     }
     return height >= config.GetGenesisActivationHeight();
 }
@@ -1074,9 +1074,8 @@ static bool DoesNonFinalSpendNonFinal(const CTransaction& txn)
 
 static bool IsGenesisGracefulPeriod(const Config& config, int32_t spendHeight)
 {
-    uint64_t uSpendHeight = static_cast<uint64_t>(spendHeight);
-    if (((config.GetGenesisActivationHeight() - config.GetGenesisGracefulPeriod()) < uSpendHeight) &&
-        ((config.GetGenesisActivationHeight() + config.GetGenesisGracefulPeriod()) > uSpendHeight))
+    if (((config.GetGenesisActivationHeight() - static_cast<int32_t>(config.GetGenesisGracefulPeriod())) < spendHeight) &&
+        ((config.GetGenesisActivationHeight() + static_cast<int32_t>(config.GetGenesisGracefulPeriod())) > spendHeight))
     {
         return true;
     }
@@ -1378,8 +1377,7 @@ CTxnValResult TxnValidation(
     //
     // chainActive.Height() can never be negative when adding transactions to the mempool,
     // since active chain contains at least genesis block.
-    // We can therefore use std::max to convert height to unsigned integer.
-    unsigned int uiChainActiveHeight = std::max(chainActive.Height(), 0);
+    int32_t uiChainActiveHeight = std::max(chainActive.Height(), 0);
     std::shared_ptr<CTxMemPoolEntry> pMempoolEntry {
         std::make_shared<CTxMemPoolEntry>(
             ptx,
@@ -5999,7 +5997,7 @@ static bool AcceptBlock(const Config& config,
     // regardless of whether pruning is enabled; it should generally be safe to
     // not process unrequested blocks.
     bool fTooFarAhead =
-        (pindex->nHeight > int(chainActive.Height() + MIN_BLOCKS_TO_KEEP));
+        (pindex->nHeight > (chainActive.Height() + MIN_BLOCKS_TO_KEEP));
 
     // TODO: Decouple this function from the block download logic by removing
     // fRequested

@@ -111,7 +111,7 @@ bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const {
 
 void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin coin,
                               bool possible_overwrite,
-                              uint64_t genesisActivationHeight) {
+                              int32_t genesisActivationHeight) {
     std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     assert(!coin.IsSpent());
     if (coin.GetTxOut().scriptPubKey.IsUnspendable( coin.GetHeight() >= genesisActivationHeight)) {
@@ -139,7 +139,7 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin coin,
     cachedCoinsUsage += it->second.coin.DynamicMemoryUsage();
 }
 
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, uint64_t genesisActivationHeight,
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, int32_t genesisActivationHeight,
               bool check) {
     bool fCoinbase = tx.IsCoinBase();
     const TxId txid = tx.GetId();

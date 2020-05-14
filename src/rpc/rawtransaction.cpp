@@ -1047,7 +1047,7 @@ static UniValue signrawtransaction(const Config &config,
                 // We do not have coin height here. We assume that the coin is about to
                 // be mined using latest active rules.
                 const auto genesisActivationHeight = config.GetGenesisActivationHeight();
-                uint32_t coinHeight = static_cast<uint32_t>(chainActive.Height() + 1);
+                int32_t coinHeight = chainActive.Height() + 1;
 
                 // except if we are trying to sign transactions that spends p2sh transaction, which
                 // are non-standard (and therefore cannot be signed) after genesis upgrade

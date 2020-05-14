@@ -43,7 +43,7 @@ static const struct {
 };
 
 struct CCoin {
-    uint32_t nHeight;
+    int32_t nHeight;
     CTxOut out;
 
     CCoin() : nHeight(0) {}
@@ -666,7 +666,7 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
             UniValue utxos(UniValue::VARR);
             for (const CCoin &coin : outs) {
                 UniValue utxo(UniValue::VOBJ);
-                utxo.push_back(Pair("height", int32_t(coin.nHeight)));
+                utxo.push_back(Pair("height", coin.nHeight));
                 utxo.push_back(Pair("value", ValueFromAmount(coin.out.nValue)));
 
                 // include the script in a json output

@@ -79,8 +79,7 @@ private:
     using CandidateMap = std::map<MiningCandidateId, CMiningCandidateRef>;
     CandidateMap mCandidates {};
 
-    std::atomic_uint mPrevHeight {0};
-
+    std::atomic_int32_t mPrevHeight {0};
     boost::uuids::random_generator mIdGenerator {};
 };
 

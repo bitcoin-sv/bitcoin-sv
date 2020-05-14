@@ -373,7 +373,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
         Amount fee{ 3 };
         int64_t time = 0;
         double priority = 10.0;
-        unsigned int height = 1;
+        int32_t height = 1;
         bool spendsCoinbase = false;
         unsigned int sigOpCost = 4;
         LockPoints lp;

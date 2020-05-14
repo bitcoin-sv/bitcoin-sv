@@ -39,9 +39,9 @@ public:
     //!< number of blocks stored in file
     unsigned int nBlocks;
     //!< lowest height of block in file
-    unsigned int nHeightFirst;
+    int32_t nHeightFirst;
     //!< highest height of block in file
-    unsigned int nHeightLast;
+    int32_t nHeightLast;
     //!< earliest time of block in file
     uint64_t nTimeFirst;
     //!< latest time of block in file
@@ -120,7 +120,7 @@ public:
     std::string ToString() const;
 
     /** update statistics (does not update nSize) */
-    void AddBlock(unsigned int nHeightIn, uint64_t nTimeIn) {
+    void AddBlock(int32_t nHeightIn, uint64_t nTimeIn) {
         if (nBlocks == 0 || nHeightFirst > nHeightIn) {
             nHeightFirst = nHeightIn;
         }

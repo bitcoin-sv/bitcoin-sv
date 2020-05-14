@@ -465,7 +465,7 @@ mining::CMiningFactory::BlockAssemblerType GlobalConfig::GetMiningCandidateBuild
     return blockAssemblerType;
 }
 
-bool GlobalConfig::SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err) {
+bool GlobalConfig::SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err) {
     if (genesisActivationHeightIn <= 0)
     {
         if (err)
@@ -474,11 +474,11 @@ bool GlobalConfig::SetGenesisActivationHeight(int64_t genesisActivationHeightIn,
         }
         return false;
     }
-    genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn);
+    genesisActivationHeight = genesisActivationHeightIn;
     return true;
 }
 
-uint64_t GlobalConfig::GetGenesisActivationHeight() const {
+int32_t GlobalConfig::GetGenesisActivationHeight() const {
     return genesisActivationHeight;
 }
 
@@ -1202,18 +1202,18 @@ uint64_t GlobalConfig::GetMaxOrphanTxSize() const {
     return mMaxOrphanTxSize;
 }
 
-bool GlobalConfig::SetStopAtHeight(int64_t stopAtHeight, std::string* err) {
+bool GlobalConfig::SetStopAtHeight(int32_t stopAtHeight, std::string* err) {
     if (LessThanZero(stopAtHeight, err, "Policy value for stop at height in the main chain must not be less than 0."))
     {
         return false;
     }
 
-    mStopAtHeight = static_cast<uint64_t>(stopAtHeight);
+    mStopAtHeight = stopAtHeight;
 
     return true;
 }
 
-uint64_t GlobalConfig::GetStopAtHeight() const {
+int32_t GlobalConfig::GetStopAtHeight() const {
     return mStopAtHeight;
 }
 
