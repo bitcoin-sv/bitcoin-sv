@@ -120,6 +120,16 @@ bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) 
     return CheckSequenceLocks(*chainActive.Tip(), tx, config, flags, nullptr, &cache);
 }
 
+static bool transactionInBlock(const CBlockTemplate& pBlockTemplate, const TxId& txId)
+{
+    for (const auto& txn : pBlockTemplate.GetBlockRef()->vtx) {
+        if (txn->GetId() == txId) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Test suite for ancestor feerate transaction selection.
 // Implemented as an additional function, rather than a separate test case, to
 // allow reusing the blockchain created in CreateNewBlock_validity.
@@ -134,8 +144,7 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
 
     mining::CMiningFactory miningFactory { config };
 
-    // Test that a medium fee transaction will be selected after a higher fee
-    // rate package with a low fee rate parent.
+    // Test that paying transactions get selected in arrival order
     CMutableTransaction tx;
     tx.vin.resize(1);
     tx.vin[0].scriptSig = CScript() << OP_1;
@@ -200,10 +209,8 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     mempool.AddUnchecked(lowFeeTxId, entry.Fee(feeToUse).FromTx(tx), nullChangeSet);
     pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
     // Verify that the free tx and the low fee tx didn't get selected.
-    for (const auto &txn : pblocktemplate->GetBlockRef()->vtx) {
-        BOOST_CHECK(txn->GetId() != freeTxId);
-        BOOST_CHECK(txn->GetId() != lowFeeTxId);
-    }
+    BOOST_CHECK(!transactionInBlock(*pblocktemplate, freeTxId));
+    BOOST_CHECK(!transactionInBlock(*pblocktemplate, lowFeeTxId));
 
     // Test that packages above the min relay fee do get included, even if one
     // of the transactions is below the min relay fee. Remove the low fee
@@ -241,10 +248,8 @@ void TestPackageSelection(Config &config, CScript scriptPubKey,
     pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
 
     // Verify that this tx isn't selected.
-    for (const auto &txn : pblocktemplate->GetBlockRef()->vtx) {
-        BOOST_CHECK(txn->GetId() != freeTxId2);
-        BOOST_CHECK(txn->GetId() != lowFeeTxId2);
-    }
+    BOOST_CHECK(!transactionInBlock(*pblocktemplate, freeTxId2));
+    BOOST_CHECK(!transactionInBlock(*pblocktemplate, lowFeeTxId2));
 
     // This tx will be mineable, and should cause lowFeeTxId2 to be selected as
     // well.
