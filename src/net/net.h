@@ -112,8 +112,10 @@ static const unsigned int MICROS_PER_SECOND = 1000000;
 // as long as seeders are working.
 // TODO: Change this back to false after the forked network is stable.
 static const bool DEFAULT_FORCEDNSSEED = true;
-static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
-static const size_t DEFAULT_MAXSENDBUFFER = 1 * 1000;
+
+// Maximum sizes of queued messages for receiving and sending
+static const size_t DEFAULT_MAXRECEIVEBUFFER = 500 * 1000;
+static const size_t DEFAULT_MAXSENDBUFFER = 500 * 1000;
 
 static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);
 
