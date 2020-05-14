@@ -33,7 +33,7 @@ public:
         uint64_t nPruneAfterHeight);
 
     void FindFilesToPruneManual(std::set<int> &setFilesToPrune,
-        int nManualPruneHeight);
+        int32_t nManualPruneHeight);
 
     bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
         uint64_t nAddSize, bool& fCheckForPruning);

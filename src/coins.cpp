@@ -139,7 +139,7 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin coin,
     cachedCoinsUsage += it->second.coin.DynamicMemoryUsage();
 }
 
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight, uint64_t genesisActivationHeight,
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, uint64_t genesisActivationHeight,
               bool check) {
     bool fCoinbase = tx.IsCoinBase();
     const TxId txid = tx.GetId();
@@ -403,7 +403,7 @@ std::optional<bool> CCoinsViewCache::HaveInputsLimited(
     return true;
 }
 
-double CCoinsViewCache::GetPriority(const CTransaction &tx, int nHeight,
+double CCoinsViewCache::GetPriority(const CTransaction &tx, int32_t nHeight,
                                     Amount &inChainInputValue) const {
     inChainInputValue = Amount(0);
     if (tx.IsCoinBase()) {

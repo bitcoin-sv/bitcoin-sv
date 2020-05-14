@@ -30,7 +30,7 @@
  * expensive-to-check-upon-redemption script like:
  *   DUP CHECKSIG DROP ... repeated 100 times... OP_1
  */
-bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType) {
+bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType) {
     std::vector<std::vector<uint8_t>> vSolutions;
     if (!Solver(scriptPubKey, IsGenesisEnabled(config, nScriptPubKeyHeight), whichType, vSolutions)) {
         return false;
@@ -55,7 +55,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
 // Check if a transaction is a consolidation transaction.
 // A consolidation transaction is a transaction which reduces the size of the UTXO database to
 // an extent that is rewarding enough for the miner to mine the transaction for free.
-bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int tipHeight)
+bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
     const uint64_t factor = config.GetMinConsolidationFactor();
     const uint64_t minMaturity = config.GetMinConsolidationInputMaturity();
@@ -117,7 +117,7 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
     return true;
 }
 
-bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std::string &reason) {
+bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason) {
     if (tx.nVersion > CTransaction::MAX_STANDARD_VERSION || tx.nVersion < 1) {
         reason = "version";
         return false;
@@ -189,7 +189,7 @@ std::optional<bool> AreInputsStandard(
     const Config& config,
     const CTransaction& tx,
     const CCoinsViewCache &mapInputs,
-    const int mempoolHeight)
+    const int32_t mempoolHeight)
 {
     if (tx.IsCoinBase()) {
         // Coinbases don't use vin normally.

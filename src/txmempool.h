@@ -55,7 +55,7 @@ struct LockPoints {
     // Will be set to the blockchain height and median time past values that
     // would be necessary to satisfy all relative locktime constraints (BIP68)
     // of this tx given our view of block chain history
-    int height;
+    int32_t height;
     int64_t time;
     // As long as the current chain descends from the highest height block
     // containing one of the inputs used in the calculation, then the cached
@@ -656,7 +656,7 @@ public:
             const Config &config,
             const CCoinsViewCache *pcoins,
             const mining::CJournalChangeSetPtr& changeSet,
-            int nChainActiveHeight,
+            int32_t nChainActiveHeight,
             int nMedianTimePast,
             int flags);
 

@@ -254,7 +254,7 @@ static uint32_t GetBlockScriptFlags(const Config &config,
 /**
  * Test whether the given transaction is final for the given height and time.
  */
-bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
+bool IsFinalTx(const CTransaction &tx, int32_t nBlockHeight, int64_t nBlockTime)
 {
     if (tx.nLockTime == 0) {
         return true;
@@ -282,9 +282,9 @@ bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
  * Also removes from the vector of input heights any entries which did not
  * correspond to sequence locked inputs as they do not affect the calculation.
  */
-static std::pair<int, int64_t>
+static std::pair<int32_t, int64_t>
 CalculateSequenceLocks(const CTransaction &tx, int flags,
-                       std::vector<int> *prevHeights,
+                       std::vector<int32_t> *prevHeights,
                        const CBlockIndex &block) {
     assert(prevHeights->size() == tx.vin.size());
 
@@ -293,7 +293,7 @@ CalculateSequenceLocks(const CTransaction &tx, int flags,
     // time constraints given our view of block chain history.
     // The semantics of nLockTime are the last invalid height/time, so
     // use -1 to have the effect of any height or time being valid.
-    int nMinHeight = -1;
+    int32_t nMinHeight = -1;
     int64_t nMinTime = -1;
 
     // tx.nVersion is signed integer so requires cast to unsigned otherwise
@@ -320,7 +320,7 @@ CalculateSequenceLocks(const CTransaction &tx, int flags,
             continue;
         }
 
-        int nCoinHeight = (*prevHeights)[txinIndex];
+        int32_t nCoinHeight = (*prevHeights)[txinIndex];
 
         if (txin.nSequence & CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG) {
             int64_t nCoinTime = block.GetAncestor(std::max(nCoinHeight - 1, 0))
@@ -354,7 +354,7 @@ CalculateSequenceLocks(const CTransaction &tx, int flags,
 }
 
 static bool EvaluateSequenceLocks(const CBlockIndex &block,
-                                  std::pair<int, int64_t> lockPair) {
+                                  std::pair<int32_t, int64_t> lockPair) {
     assert(block.pprev);
     int64_t nBlockTime = block.pprev->GetMedianTimePast();
     if (lockPair.first >= block.nHeight || lockPair.second >= nBlockTime) {
@@ -365,7 +365,7 @@ static bool EvaluateSequenceLocks(const CBlockIndex &block,
 }
 
 bool SequenceLocks(const CTransaction &tx, int flags,
-                   std::vector<int> *prevHeights, const CBlockIndex &block) {
+                   std::vector<int32_t> *prevHeights, const CBlockIndex &block) {
     return EvaluateSequenceLocks(
         block, CalculateSequenceLocks(tx, flags, prevHeights, block));
 }
@@ -416,7 +416,7 @@ bool CheckSequenceLocks(
     // more than chainActive.Height()
     index.nHeight = tip->nHeight + 1;
 
-    std::pair<int, int64_t> lockPair;
+    std::pair<int32_t, int64_t> lockPair;
     if (useExistingLockPoints) {
         assert(lp);
         lockPair.first = lp->height;
@@ -424,7 +424,7 @@ bool CheckSequenceLocks(
     } else {
         // pcoinsTip contains the UTXO set for chainActive.Tip()
         CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
-        std::vector<int> prevheights;
+        std::vector<int32_t> prevheights;
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
             const CTxIn &txin = tx.vin[txinIndex];
@@ -456,8 +456,8 @@ bool CheckSequenceLocks(
             // EvaluateSequenceLocks will fail if there was a non-zero sequence
             // lock on a mempool input, so we can use the return value of
             // CheckSequenceLocks to indicate the LockPoints validity
-            int maxInputHeight = 0;
-            for (int height : prevheights) {
+            int32_t maxInputHeight = 0;
+            for (int32_t height : prevheights) {
                 // Can ignore mempool inputs since we'll fail if they had
                 // non-zero locks
                 if (height != tip->nHeight + 1) {
@@ -670,7 +670,7 @@ std::string FormatStateMessage(const CValidationState &state) {
         state.GetRejectCode());
 }
 
-static bool IsUAHFenabled(const Config &config, int nHeight) {
+static bool IsUAHFenabled(const Config &config, int32_t nHeight) {
     return nHeight >= config.GetChainParams().GetConsensus().uahfHeight;
 }
 
@@ -682,7 +682,7 @@ bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsUAHFenabled(config, pindexPrev->nHeight);
 }
 
-static bool IsDAAEnabled(const Config &config, int nHeight) {
+static bool IsDAAEnabled(const Config &config, int32_t nHeight) {
     return nHeight >= config.GetChainParams().GetConsensus().daaHeight;
 }
 
@@ -694,7 +694,7 @@ bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
     return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
-bool IsGenesisEnabled(const Config &config, int nHeight) {
+bool IsGenesisEnabled(const Config &config, int32_t nHeight) {
     if (nHeight == MEMPOOL_HEIGHT) {
         throw std::runtime_error("A coin with height == MEMPOOL_HEIGHT was passed "
             "to IsGenesisEnabled() overload that does not handle this case. "
@@ -704,7 +704,7 @@ bool IsGenesisEnabled(const Config &config, int nHeight) {
     return (uint64_t)nHeight >= config.GetGenesisActivationHeight();
 }
 
-bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight) {
+bool IsGenesisEnabled(const Config& config, const Coin& coin, int32_t mempoolHeight) {
     auto height = coin.GetHeight();
     if (height == MEMPOOL_HEIGHT) {
         return (uint32_t)mempoolHeight >= config.GetGenesisActivationHeight();
@@ -1072,7 +1072,7 @@ static bool DoesNonFinalSpendNonFinal(const CTransaction& txn)
     return false;
 }
 
-static bool IsGenesisGracefulPeriod(const Config& config, int spendHeight)
+static bool IsGenesisGracefulPeriod(const Config& config, int32_t spendHeight)
 {
     uint64_t uSpendHeight = static_cast<uint64_t>(spendHeight);
     if (((config.GetGenesisActivationHeight() - config.GetGenesisGracefulPeriod()) < uSpendHeight) &&
@@ -1179,7 +1179,7 @@ CTxnValResult TxnValidation(
     unsigned int lockTimeFlags;
     {
         const CBlockIndex* tip = chainActive.Tip();
-        int height { tip->nHeight };
+        int32_t height { tip->nHeight };
         lockTimeFlags = StandardNonFinalVerifyFlags(IsGenesisEnabled(config, height));
         ContextualCheckTransactionForCurrentBlock(config, tx, height, tip->GetMedianTimePast(),
             ctxState, lockTimeFlags);
@@ -2208,7 +2208,7 @@ static void UpdateMempoolForReorg(const Config &config,
     mempool.UpdateTransactionsFromBlock(vHashUpdate, changeSet);
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
-    int height { chainActive.Height() };
+    int32_t height { chainActive.Height() };
     mempool.
         RemoveForReorg(
             config,
@@ -2542,7 +2542,7 @@ std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& ind
             CStreamVersionAndType{SER_NETWORK, PROTOCOL_VERSION});
 }
 
-Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams) {
+Amount GetBlockSubsidy(int32_t nHeight, const Consensus::Params &consensusParams) {
     int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
     // Force block reward to zero when right shift is undefined.
     if (halvings >= 64) {
@@ -2960,7 +2960,7 @@ static void InvalidBlockFound(CBlockIndex *pindex,
 }
 
 void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
-                 CTxUndo &txundo, int nHeight) {
+                 CTxUndo &txundo, int32_t nHeight) {
     // Mark inputs spent.
     if (!tx.IsCoinBase()) {
         txundo.vprevout.reserve(tx.vin.size());
@@ -2976,7 +2976,7 @@ void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
     AddCoins(inputs, tx, nHeight, GlobalConfig::GetConfig().GetGenesisActivationHeight());
 }
 
-void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight) {
+void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int32_t nHeight) {
     CTxUndo txundo;
     UpdateCoins(tx, inputs, txundo, nHeight);
 }
@@ -2997,14 +2997,14 @@ std::optional<bool> CScriptCheck::operator()(const task::CCancellationToken& tok
             &error);
 }
 
-std::pair<int,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs) {
+std::pair<int32_t,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs) {
     CBlockIndex *pindexPrev = mapBlockIndex.find(inputs.GetBestBlock())->second;
     return { pindexPrev->nHeight + 1, pindexPrev->GetMedianTimePast() };
 }
 
 namespace Consensus {
 bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int nSpendHeight) {
+                   const CCoinsViewCache &inputs, int32_t nSpendHeight) {
     // This doesn't trigger the DoS code on purpose; if it did, it would make it
     // easier for an attacker to attempt to split the network.
     if (!inputs.HaveInputs(tx)) {
@@ -3058,7 +3058,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 }
 } // namespace Consensus
 
-static int GetInputScriptBlockHeight(int coinHeight) {
+static int32_t GetInputScriptBlockHeight(int32_t coinHeight) {
     if (coinHeight == MEMPOOL_HEIGHT) {
         // When spending an output that was created in mempool, we assume that it will be mined in the next block.
         return chainActive.Height() + 1;
@@ -3134,7 +3134,7 @@ std::optional<bool> CheckInputs(
         const Amount amount = coin.GetTxOut().nValue;
 
         uint32_t perInputScriptFlags = 0;
-        int inputScriptBlockHeight = GetInputScriptBlockHeight(coin.GetHeight());
+        int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coin.GetHeight());
         bool isGenesisEnabled = IsGenesisEnabled(config, inputScriptBlockHeight);
         if (isGenesisEnabled)
         {
@@ -3710,7 +3710,7 @@ static bool ConnectBlock(
         ? scriptCheckQueuePool->GetChecker(mostWorkOnChain, token, &checkPoolToken)
         : NullScriptChecker{};
 
-    std::vector<int> prevheights;
+    std::vector<int32_t> prevheights;
     Amount nFees(0);
     size_t nInputs = 0;
 
@@ -4016,7 +4016,7 @@ bool FlushStateToDisk(
     const CChainParams &chainparams,
     CValidationState &state,
     FlushStateMode mode,
-    int nManualPruneHeight) {
+    int32_t nManualPruneHeight) {
 
     int64_t nMempoolUsage = mempool.DynamicMemoryUsage();
     LOCK(cs_main);
@@ -4217,7 +4217,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
     LogPrintf("\n");
 }
 
-static void FinalizeGenesisCrossing(const Config &config, int height, const CJournalChangeSetPtr& changeSet)
+static void FinalizeGenesisCrossing(const Config &config, int32_t height, const CJournalChangeSetPtr& changeSet)
 {
     if ((IsGenesisEnabled(config, height + 1)) &&
         (!IsGenesisEnabled(config, height)))
@@ -4657,11 +4657,11 @@ static bool ActivateBestChainStep(
         // Build list of new blocks to connect.
         std::vector<CBlockIndex *> vpindexToConnect;
         bool fContinue = true;
-        int nHeight = pindexFork ? pindexFork->nHeight : -1;
+        int32_t nHeight = pindexFork ? pindexFork->nHeight : -1;
         while (fContinue && nHeight != pindexMostWork->nHeight) {
             // Don't iterate the entire list of potential improvements toward the
             // best tip, as we likely only need a few blocks along the way.
-            int nTargetHeight = std::min(nHeight + 32, pindexMostWork->nHeight);
+            int32_t nTargetHeight = std::min(nHeight + 32, pindexMostWork->nHeight);
             vpindexToConnect.clear();
             vpindexToConnect.reserve(nTargetHeight - nHeight);
             CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
@@ -5044,7 +5044,7 @@ bool ActivateBestChain(
         return false;
     }
 
-    int nStopAtHeight = config.GetStopAtHeight();
+    int32_t nStopAtHeight = config.GetStopAtHeight();
     if (nStopAtHeight && pindexNewTip &&
         pindexNewTip->nHeight >= nStopAtHeight) {
         StartShutdown();
@@ -5210,7 +5210,7 @@ void InvalidateBlocksFromConfig(const Config &config)
 bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
-    int nHeight = pindex->nHeight;
+    int32_t nHeight = pindex->nHeight;
 
     // Remove the invalidity flag from this block and all its descendants.
     BlockMap::iterator it = mapBlockIndex.begin();
@@ -5463,7 +5463,7 @@ static bool CheckBlockHeader(
 
 bool CheckBlock(const Config &config, const CBlock &block,
                 CValidationState &state,
-                int blockHeight,
+                int32_t blockHeight,
                 BlockValidationOptions validationOptions) {
     // These are checks that are independent of context.
     if (block.fChecked) {
@@ -5607,7 +5607,7 @@ static bool CheckIndexAgainstCheckpoint(const CBlockIndex *pindexPrev,
                                         CValidationState &state,
                                         const CChainParams &chainparams,
                                         const uint256 &hash) {
-    int nHeight = pindexPrev->nHeight + 1;
+    int32_t nHeight = pindexPrev->nHeight + 1;
     const CCheckpointData &checkpoints = chainparams.Checkpoints();
 
     // Check that the block chain matches the known block chain up to a
@@ -5641,7 +5641,7 @@ static bool ContextualCheckBlockHeader(const Config &config,
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
-    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+    const int32_t nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
 
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, config)) {
@@ -5678,7 +5678,7 @@ static bool ContextualCheckBlockHeader(const Config &config,
 }
 
 bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
-                                CValidationState &state, int nHeight,
+                                CValidationState &state, int32_t nHeight,
                                 int64_t nLockTimeCutoff, bool fromBlock)
 {
     if(!IsFinalTx(tx, nHeight, nLockTimeCutoff))
@@ -5701,7 +5701,7 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
 bool ContextualCheckTransactionForCurrentBlock(
     const Config &config,
     const CTransaction &tx,
-    int nChainActiveHeight,
+    int32_t nChainActiveHeight,
     int nMedianTimePast,
     CValidationState &state,
     int flags) {
@@ -5719,7 +5719,7 @@ bool ContextualCheckTransactionForCurrentBlock(
     // is used. Thus if we want to know if a transaction can be part of the
     // *next* block, we need to call ContextualCheckTransaction() with one more
     // than chainActive.Height().
-    const int nBlockHeight = nChainActiveHeight + 1;
+    const int32_t nBlockHeight = nChainActiveHeight + 1;
 
     // BIP113 will require that time-locked transactions have nLockTime set to
     // less than the median time of the previous block they're contained in.
@@ -5742,7 +5742,7 @@ bool ContextualCheckTransactionForCurrentBlock(
 static bool ContextualCheckBlock(const Config &config, const CBlock &block,
                                  CValidationState &state,
                                  const CBlockIndex *pindexPrev) {
-    const int nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
+    const int32_t nHeight = pindexPrev == nullptr ? 0 : pindexPrev->nHeight + 1;
     const Consensus::Params &consensusParams =
         config.GetChainParams().GetConsensus();
 
@@ -6052,7 +6052,7 @@ static bool AcceptBlock(const Config& config,
         GetMainSignals().NewPoWValidBlock(pindex, pblock);
     }
 
-    int nHeight = pindex->nHeight;
+    int32_t nHeight = pindex->nHeight;
     const CChainParams& chainparams = config.GetChainParams();
 
     // Write block to history file
@@ -6333,7 +6333,7 @@ void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune)
 }
 
 /* This function is called from the RPC code for pruneblockchain */
-void PruneBlockFilesManual(int nManualPruneHeight) {
+void PruneBlockFilesManual(int32_t nManualPruneHeight) {
     CValidationState state;
     const CChainParams &chainparams = Params();
     FlushStateToDisk(chainparams, state, FLUSH_STATE_NONE, nManualPruneHeight);
@@ -6423,14 +6423,14 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     boost::this_thread::interruption_point();
 
     // Calculate nChainWork
-    std::vector<std::pair<int, CBlockIndex *>> vSortedByHeight;
+    std::vector<std::pair<int32_t, CBlockIndex *>> vSortedByHeight;
     vSortedByHeight.reserve(mapBlockIndex.size());
     for (const std::pair<uint256, CBlockIndex *> &item : mapBlockIndex) {
         CBlockIndex *pindex = item.second;
         vSortedByHeight.push_back(std::make_pair(pindex->nHeight, pindex));
     }
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
-    for (const std::pair<int, CBlockIndex *> &item : vSortedByHeight) {
+    for (const std::pair<int32_t, CBlockIndex *> &item : vSortedByHeight) {
         CBlockIndex *pindex = item.second;
         pindex->SetChainWork();
         pindex->nTimeMax =
@@ -6813,8 +6813,8 @@ bool ReplayBlocks(const Config &config, CCoinsView *view) {
     }
 
     // Roll forward from the forking point to the new tip.
-    int nForkHeight = pindexFork ? pindexFork->nHeight : 0;
-    for (int nHeight = nForkHeight + 1; nHeight <= pindexNew->nHeight;
+    int32_t nForkHeight = pindexFork ? pindexFork->nHeight : 0;
+    for (int32_t nHeight = nForkHeight + 1; nHeight <= pindexNew->nHeight;
          ++nHeight) {
         const CBlockIndex *pindex = pindexNew->GetAncestor(nHeight);
         LogPrintf("Rolling forward %s (%i)\n",
@@ -6834,7 +6834,7 @@ bool RewindBlockIndex(const Config &config) {
     LOCK(cs_main);
 
     const CChainParams &params = config.GetChainParams();
-    int nHeight = chainActive.Height() + 1;
+    int32_t nHeight = chainActive.Height() + 1;
 
     // nHeight is now the height of the first insufficiently-validated block, or
     // tipheight + 1
@@ -7203,7 +7203,7 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
     // Along the way, remember whether there are blocks on the path from genesis
     // block being explored which are the first to have certain properties.
     size_t nNodes = 0;
-    int nHeight = 0;
+    int32_t nHeight = 0;
     // Oldest ancestor of pindex which is invalid.
     CBlockIndex *pindexFirstInvalid = nullptr;
     // Oldest ancestor of pindex which does not have data available.

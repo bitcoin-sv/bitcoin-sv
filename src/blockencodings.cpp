@@ -242,7 +242,7 @@ bool PartiallyDownloadedBlock::IsTxAvailable(size_t index) const {
 }
 
 ReadStatus PartiallyDownloadedBlock::FillBlock(
-    CBlock &block, const std::vector<CTransactionRef> &vtx_missing, int blockHeight) {
+    CBlock &block, const std::vector<CTransactionRef> &vtx_missing, int32_t blockHeight) {
     assert(!header.IsNull());
     uint256 hash = header.GetHash();
     block = header;

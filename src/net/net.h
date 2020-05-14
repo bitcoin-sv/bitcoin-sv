@@ -260,7 +260,7 @@ public:
         int nMaxOutbound = 0;
         int nMaxAddnode = 0;
         int nMaxFeeler = 0;
-        int nBestHeight = 0;
+        int32_t nBestHeight = 0;
         CClientUIInterface *uiInterface = nullptr;
         unsigned int nSendBufferMaxSize = 0;
         unsigned int nReceiveFloodSize = 0;
@@ -539,8 +539,8 @@ public:
     uint64_t GetTotalBytesRecv();
     uint64_t GetTotalBytesSent();
 
-    void SetBestHeight(int height);
-    int GetBestHeight() const;
+    void SetBestHeight(int32_t height);
+    int32_t GetBestHeight() const;
 
     /** Get a unique deterministic randomizer. */
     CSipHasher GetDeterministicRandomizer(uint64_t id) const;
@@ -714,7 +714,7 @@ private:
     int nMaxOutbound;
     int nMaxAddnode;
     int nMaxFeeler;
-    std::atomic<int> nBestHeight;
+    std::atomic<int32_t> nBestHeight;
     CClientUIInterface *clientInterface;
 
     /** SipHasher seeds for deterministic randomness */
@@ -896,7 +896,7 @@ public:
 
 public:
     uint256 hashContinue { uint256() };
-    std::atomic<int> nStartingHeight {-1};
+    std::atomic<int32_t> nStartingHeight {-1};
 
     // flood relay
     std::vector<CAddress> vAddrToSend {};
@@ -999,7 +999,7 @@ private:
     CNode(
         NodeId id,
         ServiceFlags nLocalServicesIn,
-        int nMyStartingHeightIn,
+        int32_t nMyStartingHeightIn,
         SOCKET hSocketIn,
         const CAddress& addrIn,
         uint64_t nKeyedNetGroupIn,
@@ -1011,7 +1011,7 @@ private:
     const uint64_t nLocalHostNonce {};
     // Services offered to this peer
     const ServiceFlags nLocalServices {};
-    const int nMyStartingHeight {};
+    const int32_t nMyStartingHeight {};
     int nSendVersion {0};
 
     mutable CCriticalSection cs_addrName {};
@@ -1055,7 +1055,7 @@ public:
 
     uint64_t GetLocalNonce() const { return nLocalHostNonce; }
 
-    int GetMyStartingHeight() const { return nMyStartingHeight; }
+    int32_t GetMyStartingHeight() const { return nMyStartingHeight; }
 
     bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
     void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,

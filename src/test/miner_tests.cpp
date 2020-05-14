@@ -91,7 +91,7 @@ static struct {
     {2, 0xbbbeb305}, {2, 0xfe1c810a},
 };
 
-CBlockIndex CreateBlockIndex(int nHeight) {
+CBlockIndex CreateBlockIndex(int32_t nHeight) {
     CBlockIndex index;
     index.nHeight = nHeight;
     index.pprev = chainActive.Tip();
@@ -266,7 +266,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
     // We can't make transactions until we have inputs. Therefore, load 100
     // blocks :)
-    int baseheight = 0;
+    int32_t baseheight = 0;
     std::vector<CTransactionRef> txFirst;
     for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) {
         // pointer for convenience.
@@ -498,7 +498,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.Clear();
 
     // Subsidy changing.
-    int nHeight = chainActive.Height();
+    int32_t nHeight = chainActive.Height();
     // Create an actual 209999-long block chain (without valid blocks).
     while (chainActive.Tip()->nHeight < 209999) {
         CBlockIndex *prev = chainActive.Tip();
@@ -547,7 +547,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
     int flags = LOCKTIME_VERIFY_SEQUENCE | LOCKTIME_MEDIAN_TIME_PAST;
     // height map
-    std::vector<int> prevheights;
+    std::vector<int32_t> prevheights;
 
     // Relative height locked.
     tx.nVersion = 2;
@@ -824,7 +824,7 @@ void CheckBlockMaxSizeForTime(TestingSetup& testingSetup, uint64_t medianPastTim
     // Construct chain  with desired median time. Set time of each block to 
     // the same value to get desired median past time.
     CBlockIndex* pprev{ nullptr };
-    int height = 0;
+    int32_t height = 0;
     for (auto& block : blocks)
     {
         block.nTime = medianPastTime;

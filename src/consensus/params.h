@@ -17,23 +17,23 @@ struct Params {
     uint256 hashGenesisBlock;
     int nSubsidyHalvingInterval;
     /** Block height and hash at which BIP34 becomes active */
-    int BIP34Height;
+    int32_t BIP34Height;
     uint256 BIP34Hash;
     /** Block height at which BIP65 becomes active */
-    int BIP65Height;
+    int32_t BIP65Height;
     /** Block height at which BIP66 becomes active */
-    int BIP66Height;
+    int32_t BIP66Height;
     /** Block height at which CSV (BIP68, BIP112 and BIP113) becomes active */
-    int CSVHeight;
+    int32_t CSVHeight;
     /** Block height at which UAHF kicks in */
-    int uahfHeight;
+    int32_t uahfHeight;
     /** Block height at which the new DAA becomes active */
-    int daaHeight;
+    int32_t daaHeight;
     /** Block height at which the Genesis becomes active.
       * The specified block height is the height of the block where the new rules are active.
       * It is not the height of the last block with the old rules.
       */
-    int genesisHeight;
+    int32_t genesisHeight;
     /**
      * Minimum blocks including miner confirmation of the total of 2016 blocks
      * in a retargeting period, (nPowTargetTimespan / nPowTargetSpacing) which

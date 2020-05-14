@@ -173,9 +173,9 @@ inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
 }
 
 /** Consolidation transactions are free */
-bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int tipHeight);
+bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight);
 
-bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType);
+bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScriptPubKeyHeight, txnouttype &whichType);
 
 /**
  * Check for standard transaction types
@@ -184,7 +184,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
  * @return True if all outputs (scriptPubKeys) use only standard transaction
  * forms
  */
-bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std::string &reason);
+bool IsStandardTx(const Config &config, const CTransaction &tx, int32_t nHeight, std::string &reason);
 
 /**
  * Check for standard transaction types
@@ -197,7 +197,7 @@ std::optional<bool> AreInputsStandard(
     const Config& config,
     const CTransaction& tx,
     const CCoinsViewCache &mapInputs,
-    const int mempoolHeight);
+    const int32_t mempoolHeight);
 
 extern CFeeRate dustRelayFee;
 

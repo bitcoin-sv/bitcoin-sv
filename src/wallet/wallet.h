@@ -246,7 +246,7 @@ public:
     /**
      * Return height of transaction in blockchain. If in mempool returs MEMPOOL_HEIGHT
      */
-    int GetHeightInMainChain() const;
+    int32_t GetHeightInMainChain() const;
     /**
     * Return is the transaction height larger or equal to the genesis activation height. 
     * If in mempool, we assume that it will be mined in next block.

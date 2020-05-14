@@ -767,7 +767,7 @@ void CTxMemPool::RemoveForReorg(
     const Config &config,
     const CCoinsViewCache *pcoins,
     const CJournalChangeSetPtr& changeSet,
-    int nChainActiveHeight,
+    int32_t nChainActiveHeight,
     int nMedianTimePast,
     int flags) {
 

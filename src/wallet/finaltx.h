@@ -14,7 +14,7 @@ class CTransaction;
  */
 bool CheckFinalTx(
     const CTransaction &tx,
-    int nChainActiveHeight,
+    int32_t nChainActiveHeight,
     int nMedianTimePast,
     int flags = -1);
 

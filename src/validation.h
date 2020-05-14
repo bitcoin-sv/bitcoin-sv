@@ -213,7 +213,7 @@ static const int MAX_UNCONNECTING_HEADERS = 10;
 static const bool DEFAULT_PEERBLOOMFILTERS = true;
 
 /** Default for -stopatheight */
-static const int DEFAULT_STOPATHEIGHT = 0;
+static const int32_t DEFAULT_STOPATHEIGHT = 0;
 
 /** Default count of transaction script checker instances */
 constexpr size_t DEFAULT_SCRIPT_CHECK_POOL_SIZE = 4;
@@ -568,7 +568,7 @@ bool ActivateBestChain(
     CValidationState &state,
     const mining::CJournalChangeSetPtr& changeSet,
     std::shared_ptr<const CBlock> pblock = std::shared_ptr<const CBlock>());
-Amount GetBlockSubsidy(int nHeight, const Consensus::Params &consensusParams);
+Amount GetBlockSubsidy(int32_t nHeight, const Consensus::Params &consensusParams);
 
 /**
  * Determines whether block is a best chain candidate or not.
@@ -609,13 +609,13 @@ bool FlushStateToDisk(
     const CChainParams &chainParams,
     CValidationState &state,
     FlushStateMode mode,
-    int nManualPruneHeight = 0);
+    int32_t nManualPruneHeight = 0);
 /** Flush all state, indexes and buffers to disk. */
 void FlushStateToDisk();
 /** Prune block files and flush state to disk. */
 void PruneAndFlush();
 /** Prune block files up to a given height */
-void PruneBlockFilesManual(int nPruneUpToHeight);
+void PruneBlockFilesManual(int32_t nPruneUpToHeight);
 
 /** Check if UAHF has activated. */
 bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev);
@@ -629,13 +629,13 @@ bool IsGenesisEnabled(const Config &config, const CBlockIndex *pindexPrev);
  * Do not call this overload with height of coin. If the coin was created in mempool, 
  * this function will throw exception.
  */
-bool IsGenesisEnabled(const Config& config, int nHeight);
+bool IsGenesisEnabled(const Config& config, int32_t nHeight);
 /**  Check if Genesis has activated.
  * When a coins is present in mempool, it will have height MEMPOOL_HEIGHT. 
  * In this case, you should call this overload and specify the mempool height (chainActive.Height()+1) 
  *as parameter to correctly determine if genesis is enabled for this coin.
  */
-bool IsGenesisEnabled(const Config& config, const Coin& coin, int mempoolHeight  );
+bool IsGenesisEnabled(const Config& config, const Coin& coin, int32_t mempoolHeight  );
 int GetGenesisActivationHeight(const Config& config);
 
 /**
@@ -853,9 +853,9 @@ std::optional<bool> CheckInputs(
     std::vector<CScriptCheck>* pvChecks = nullptr);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
-void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int nHeight);
+void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs, int32_t nHeight);
 void UpdateCoins(const CTransaction &tx, CCoinsViewCache &inputs,
-                 CTxUndo &txundo, int nHeight);
+                 CTxUndo &txundo, int32_t nHeight);
 
 /** Transaction validation functions */
 
@@ -871,14 +871,14 @@ namespace Consensus {
  * sigs. Preconditions: tx.IsCoinBase() is false.
  */
 bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int nSpendHeight);
+                   const CCoinsViewCache &inputs, int32_t nSpendHeight);
 
 } // namespace Consensus
 
 /**
  * Test whether the given transaction is final for the given height and time.
  */
-bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
+bool IsFinalTx(const CTransaction &tx, int32_t nBlockHeight, int64_t nBlockTime);
 
 /**
  * Test whether the LockPoints height and time are still valid on the current
@@ -892,7 +892,7 @@ bool TestLockPointValidity(const LockPoints *lp);
  * tx's inputs (in order) confirmed.
  */
 bool SequenceLocks(const CTransaction &tx, int flags,
-                   std::vector<int> *prevHeights, const CBlockIndex &block);
+                   std::vector<int32_t> *prevHeights, const CBlockIndex &block);
 
 /**
  * Check if transaction will be BIP 68 final in the next block to be created.
@@ -969,7 +969,7 @@ void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData me
  * transactions are valid, block is a valid size, etc.)
  */
 bool CheckBlock(
-    const Config &Config, const CBlock &block, CValidationState &state, int blockHeight,
+    const Config &Config, const CBlock &block, CValidationState &state, int32_t blockHeight,
     BlockValidationOptions validationOptions = BlockValidationOptions());
 
 /**
@@ -979,7 +979,7 @@ bool CheckBlock(
  * activation/deactivation and CLTV.
  */
 bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
-                                CValidationState &state, int nHeight,
+                                CValidationState &state, int32_t nHeight,
                                 int64_t nLockTimeCutoff, bool fromBlock);
 
 /**
@@ -999,7 +999,7 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
 bool ContextualCheckTransactionForCurrentBlock(
     const Config &config,
     const CTransaction &tx,
-    int nChainActiveHeight,
+    int32_t nChainActiveHeight,
     int nMedianTimePast,
     CValidationState &state,
     int flags = -1);
@@ -1076,7 +1076,7 @@ extern CBlockTreeDB *pblocktree;
  * cs_main)
  * This is also true for mempool checks.
  */
-std::pair<int,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs);
+std::pair<int32_t,int> GetSpendHeightAndMTP(const CCoinsViewCache &inputs);
 
 /**
  * Reject codes greater or equal to this can be returned by AcceptToMemPool for

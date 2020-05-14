@@ -2851,11 +2851,11 @@ ServiceFlags CConnman::GetLocalServices() const {
     return nLocalServices;
 }
 
-void CConnman::SetBestHeight(int height) {
+void CConnman::SetBestHeight(int32_t height) {
     nBestHeight.store(height, std::memory_order_release);
 }
 
-int CConnman::GetBestHeight() const {
+int32_t CConnman::GetBestHeight() const {
     return nBestHeight.load(std::memory_order_acquire);
 }
 
@@ -2879,7 +2879,7 @@ void CConnman::PeerAvgBandwithCalc()
 CNode::CNode(
     NodeId idIn,
     ServiceFlags nLocalServicesIn,
-    int nMyStartingHeightIn,
+    int32_t nMyStartingHeightIn,
     SOCKET hSocketIn,
     const CAddress& addrIn,
     uint64_t nKeyedNetGroupIn,

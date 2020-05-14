@@ -1393,7 +1393,7 @@ static UniValue ListReceived(
     CWallet *const pwallet,
     const UniValue &params,
     bool fByAccounts,
-    int nChainActiveHeight,
+    int32_t nChainActiveHeight,
     int nMedianTimePast) {
 
     // Minimum confirmations

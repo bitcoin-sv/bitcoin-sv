@@ -3859,7 +3859,7 @@ void CWallet::GetKeyBirthTimes(
         BlockMap::const_iterator blit = mapBlockIndex.find(wtx.hashBlock);
         if (blit != mapBlockIndex.end() && chainActive.Contains(blit->second)) {
             // ... which are already in a block.
-            int nHeight = blit->second->nHeight;
+            int32_t nHeight = blit->second->nHeight;
             for (const CTxOut &txout : wtx.tx->vout) {
                 // Iterate over all their outputs...
                 CAffectedKeysVisitor(*this, vAffected)
@@ -4512,7 +4512,7 @@ void CMerkleTx::SetMerkleBranch(const CBlockIndex *pindex, int posInBlock) {
 }
 
 int CMerkleTx::GetDepthInMainChain() const {
-    int height = GetHeightInMainChain();
+    int32_t height = GetHeightInMainChain();
     if (height == MEMPOOL_HEIGHT) {
         return 0;
     }
@@ -4543,7 +4543,7 @@ int CMerkleTx::GetHeightInMainChain() const {
 }
 
 bool CMerkleTx::IsGenesisEnabled() const {
-    int height = GetHeightInMainChain();
+    int32_t height = GetHeightInMainChain();
     if (height == MEMPOOL_HEIGHT) {
         AssertLockHeld(cs_main);
         return ::IsGenesisEnabled(GlobalConfig::GetConfig(), chainActive.Height() + 1);

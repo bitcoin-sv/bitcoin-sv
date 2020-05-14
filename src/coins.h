@@ -301,7 +301,7 @@ public:
      * values of the inputs that are already in the chain. These are the inputs
      * that will age and increase priority as new blocks are added to the chain.
      */
-    double GetPriority(const CTransaction &tx, int nHeight,
+    double GetPriority(const CTransaction &tx, int32_t nHeight,
                        Amount &inChainInputValue) const;
 
     const CTxOut &GetOutputFor(const CTxIn &input) const;
@@ -336,7 +336,7 @@ private:
 // an addition is an overwrite.
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight, uint64_t genesisActivationHeight,
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, uint64_t genesisActivationHeight,
               bool check = false);
 
 //! Utility function to find any unspent output with a given txid.

@@ -197,7 +197,7 @@ void CBlockFileInfoStore::ClearFileInfo(int fileNumber)
  * with RPC command pruneblockchain
  */
 void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
-    int nManualPruneHeight) {
+    int32_t nManualPruneHeight) {
     assert(fPruneMode && nManualPruneHeight > 0);
 
     LOCK2(cs_main, cs_LastBlockFile);
