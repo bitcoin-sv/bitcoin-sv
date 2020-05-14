@@ -240,6 +240,7 @@ class TestManager():
         # Wait for all the blocks to finish processing
         [c.cb.send_ping(self.ping_counter) for c in self.connections]
         self.wait_for_pings(self.ping_counter, timeout=timeout)
+        self.ping_counter += 1
 
         # Send getheaders message
         [c.cb.send_getheaders() for c in self.connections]
@@ -261,6 +262,11 @@ class TestManager():
         # --> error if not requested
         wait_until(transaction_requested, attempts=20 *
                    num_events, lock=mininode_lock)
+
+        # We must wait for node to finish processing transactions before 'mempool' p2p message is sent
+        [c.cb.send_ping(self.ping_counter) for c in self.connections]
+        self.wait_for_pings(self.ping_counter)
+        self.ping_counter += 1
 
         # Get the mempool
         [c.cb.send_mempool() for c in self.connections]
