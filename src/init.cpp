@@ -2506,6 +2506,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
     // Late configuration for globaly constructed objects
     mempool.getNonFinalPool().loadConfig();
+    mempool.InitMempoolTxDB();
 
     // Start the lightweight task scheduler thread
     scheduler.startServiceThread(threadGroup);

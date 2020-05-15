@@ -7,6 +7,7 @@
 #include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
+#include "mempooltxdb.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "timedata.h"
@@ -364,6 +365,8 @@ CTxMemPool::CTxMemPool() : nTransactionsUpdated(0) {
     // transactions becomes O(N^2) where N is the number of transactions in the
     // pool
     nCheckFrequency = 0;
+
+    mempoolTxDB = nullptr;
 }
 
 CTxMemPool::~CTxMemPool() {
@@ -1091,6 +1094,28 @@ CTxMemPool::getSortedDepthAndScoreNL() const {
     std::sort(iters.begin(), iters.end(), DepthAndScoreComparator());
     return iters;
 }
+
+
+void CTxMemPool::InitMempoolTxDB() {
+    mempoolTxDB =
+        std::make_shared<CMempoolTxDB>(1 << 20); /*TODO: remove constant*/
+}
+
+std::shared_ptr<CMempoolTxDB> CTxMemPool::GetMempoolTxDB() {
+    if (!this) {
+        return nullptr;
+    }
+    if (mempoolTxDB == nullptr) {
+        InitMempoolTxDB();
+    }
+    return mempoolTxDB;
+};
+
+uint64_t CTxMemPool::GetDiskUsage() {
+    uint64_t usage;
+    mempoolTxDB->GetDiskUsage(usage);
+    return usage;
+};
 
 void CTxMemPool::QueryHashes(std::vector<uint256> &vtxid) {
     std::shared_lock lock(smtx);

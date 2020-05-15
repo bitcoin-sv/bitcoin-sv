@@ -270,6 +270,7 @@ libbitcoin_server_a_SOURCES = \
   invalid_txn_sinks/file_sink.cpp \
   invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
+  mempooltxdb.cpp \
   merkleblock.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \

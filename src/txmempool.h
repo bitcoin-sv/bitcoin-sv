@@ -40,6 +40,7 @@ class CBlockIndex;
 class Config;
 class CoinsDB;
 class CoinsDBView;
+class CMempoolTxDB;
 
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
@@ -436,6 +437,9 @@ private:
     friend class CEvictionCandidateTracker;
     friend struct CPFPGroup;
 
+    // Mempool transaction database
+    std::shared_ptr<CMempoolTxDB> mempoolTxDB;
+
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     typedef boost::multi_index_container<
@@ -580,6 +584,12 @@ public:
         const CoinsDBView& tip,
         const std::vector<COutPoint>& outpoints,
         const std::function<void(const CoinWithScript&, size_t)>& callback) const;
+
+    void InitMempoolTxDB();
+    // Get MempoolTxDB
+    std::shared_ptr<CMempoolTxDB> GetMempoolTxDB();
+
+    uint64_t GetDiskUsage();
 
 public:
     /**
