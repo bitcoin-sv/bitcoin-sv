@@ -37,6 +37,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         # gdb requires file/line print flag to be set explicitly
         set(sanitizer_common_flags "-ggdb ${sanitizer_common_flags}")
+        # gcc does not link std::atomic library by default
+        link_libraries(atomic)
     endif()
 
     ###
