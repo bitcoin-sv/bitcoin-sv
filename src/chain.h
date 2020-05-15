@@ -780,7 +780,7 @@ public:
         if (nHeight < 0 || nHeight >= static_cast<int32_t>(vChain.size())) {
             return nullptr;
         }
-        return vChain[nHeight];
+        return vChain[static_cast<size_t>(nHeight)];
     }
 
     /** Compare two chains efficiently. */

@@ -17,9 +17,9 @@ void CChain::SetTip(CBlockIndex *pindex)
         return;
     }
 
-    vChain.resize(pindex->nHeight + 1);
-    while (pindex && vChain[pindex->nHeight] != pindex) {
-        vChain[pindex->nHeight] = pindex;
+    vChain.resize(static_cast<size_t>(pindex->nHeight + 1));
+    while (pindex && vChain[static_cast<size_t>(pindex->nHeight)] != pindex) {
+        vChain[static_cast<size_t>(pindex->nHeight)] = pindex;
         pindex = pindex->pprev;
     }
 }

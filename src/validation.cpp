@@ -4661,7 +4661,7 @@ static bool ActivateBestChainStep(
             // best tip, as we likely only need a few blocks along the way.
             int32_t nTargetHeight = std::min(nHeight + 32, pindexMostWork->nHeight);
             vpindexToConnect.clear();
-            vpindexToConnect.reserve(nTargetHeight - nHeight);
+            vpindexToConnect.reserve(static_cast<size_t>(nTargetHeight - nHeight));
             CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
             while (pindexIter && pindexIter->nHeight != nHeight) {
                 vpindexToConnect.push_back(pindexIter);
