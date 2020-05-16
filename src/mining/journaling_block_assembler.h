@@ -39,6 +39,8 @@ class JournalingBlockAssembler : public BlockAssembler
     // (Re)read our configuration parameters (for unit testing)
     void ReadConfigParameters();
 
+    BlockStats getLastBlockStats() const override { return mLastBlockStats; }
+
   private:
 
     // Thread entry point for block update processing
@@ -88,5 +90,8 @@ class JournalingBlockAssembler : public BlockAssembler
 
     // Flag to indicate whether we have been updated
     std::atomic_bool mRecentlyUpdated {false};
+
+    // Variables used for mining statistics
+    std::atomic<BlockStats> mLastBlockStats;
 };
 }

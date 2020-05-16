@@ -46,6 +46,15 @@ public:
     /** Get (and reset) whether we might produce an updated template */
     virtual bool GetTemplateUpdated() { return false; }
 
+    struct BlockStats
+    {
+        uint64_t txCount;    // TxCount excluding the coinbase transaction
+        uint64_t blockSize;  // Block size, including the coinbase transaction
+    };
+
+    /** Get the stats of the last block produced with CreateNewBlock() */
+    virtual BlockStats getLastBlockStats() const = 0;
+
 protected:
     uint64_t ComputeMaxGeneratedBlockSize(const CBlockIndex* pindexPrev) const;
 

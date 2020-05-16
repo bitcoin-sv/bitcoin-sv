@@ -223,8 +223,6 @@ constexpr size_t DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE = 128;
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern CTxMemPool mempool;
-extern uint64_t nLastBlockTx;
-extern uint64_t nLastBlockSize;
 extern const std::string strMessageMagic;
 extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;

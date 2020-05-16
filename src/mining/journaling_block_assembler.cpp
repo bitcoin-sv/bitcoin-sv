@@ -94,9 +94,15 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
         }
     }
 
-    uint64_t serializeSize { GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION) };
+
+    BlockStats blockStats {
+        block->vtx.size() - 1,
+        GetSerializeSize(*block, SER_NETWORK, PROTOCOL_VERSION) };
+
     LogPrintf("JournalingBlockAssembler::CreateNewBlock(): total size: %u txs: %u fees: %ld sigops %d\n",
-        serializeSize, block->vtx.size() - 1, mBlockFees, mBlockSigOps);
+        blockStats.blockSize, blockStats.txCount, mBlockFees, mBlockSigOps);
+
+    mLastBlockStats = blockStats;
 
     bool isGenesisEnabled = IsGenesisEnabled(mConfig, chainActive.Height() + 1);
     bool sigOpCountError;

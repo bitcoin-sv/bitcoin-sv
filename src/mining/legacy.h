@@ -148,6 +148,10 @@ private:
     int lastFewTxs;
     bool blockFinished;
 
+    // Variables used for mining statistics
+    static uint64_t nLastBlockTx;
+    static uint64_t nLastBlockSize;
+
 public:
     LegacyBlockAssembler(const Config &_config);
     /** Construct a new block template with coinbase to scriptPubKeyIn */
@@ -155,6 +159,10 @@ public:
 
     /** Get the maximum generated block size for the current config and chain tip */
     uint64_t GetMaxGeneratedBlockSize() const override { return nMaxGeneratedBlockSize; }
+
+    BlockStats getLastBlockStats() const override {
+        return BlockStats { nLastBlockTx, nLastBlockSize };
+    }
 
 private:
     // utility functions

@@ -41,9 +41,6 @@ static const int MAX_COINBASE_SCRIPTSIG_SIZE = 100;
 // pool, we select by highest priority or fee rate, so we might consider
 // transactions that depend on transactions that aren't yet in the block.
 
-uint64_t nLastBlockTx = 0;
-uint64_t nLastBlockSize = 0;
-
 int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
                    const CBlockIndex *pindexPrev) {
     int64_t nOldTime = pblock->nTime;
@@ -64,6 +61,9 @@ int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
 
     return nNewTime - nOldTime;
 }
+
+uint64_t LegacyBlockAssembler::nLastBlockTx = 0;
+uint64_t LegacyBlockAssembler::nLastBlockSize = 0;
 
 LegacyBlockAssembler::LegacyBlockAssembler(const Config &_config)
 : BlockAssembler{_config}
