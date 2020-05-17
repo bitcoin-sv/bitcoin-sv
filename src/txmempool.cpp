@@ -1309,6 +1309,30 @@ bool CTxMemPool::CompareDepthAndScore(const uint256 &hasha,
     return CompareDepthAndScoreNL(hasha, hashb);
 }
 
+namespace {
+class DepthAndScoreComparator {
+public:
+    template<typename MempoolEntryIterator>
+    bool operator()(const MempoolEntryIterator& a,
+                    const MempoolEntryIterator& b) const
+    {
+        return compare(*a, *b);
+    }
+
+private:
+    static bool compare(const CTxMemPoolEntry& a,
+                        const CTxMemPoolEntry& b)
+    {
+        const auto counta = a.GetCountWithAncestors();
+        const auto countb = b.GetCountWithAncestors();
+        if (counta == countb) {
+            return CompareTxMemPoolEntryByScore()(a, b);
+        }
+        return counta < countb;
+    }
+};
+} // namespace
+
 /**
 * Compare 2 transactions to determine their relative priority.
 * Does it wothout taking the mutex; it is up to the caller to
@@ -1317,37 +1341,16 @@ bool CTxMemPool::CompareDepthAndScore(const uint256 &hasha,
 bool CTxMemPool::CompareDepthAndScoreNL(const uint256 &hasha,
                                         const uint256 &hashb)
 {
-    indexed_transaction_set::const_iterator i = mapTx.find(hasha);
+    const auto i = mapTx.find(hasha);
     if (i == mapTx.end()) {
         return false;
     }
-    indexed_transaction_set::const_iterator j = mapTx.find(hashb);
+    const auto j = mapTx.find(hashb);
     if (j == mapTx.end()) {
         return true;
     }
-    uint64_t counta = i->GetCountWithAncestors();
-    uint64_t countb = j->GetCountWithAncestors();
-    if (counta == countb) {
-        return CompareTxMemPoolEntryByScore()(*i, *j);
-    }
-    return counta < countb;
+    return DepthAndScoreComparator()(i, j);
 }
-
-namespace {
-class DepthAndScoreComparator {
-public:
-    bool
-    operator()(const CTxMemPool::indexed_transaction_set::const_iterator &a,
-               const CTxMemPool::indexed_transaction_set::const_iterator &b) {
-        uint64_t counta = a->GetCountWithAncestors();
-        uint64_t countb = b->GetCountWithAncestors();
-        if (counta == countb) {
-            return CompareTxMemPoolEntryByScore()(*a, *b);
-        }
-        return counta < countb;
-    }
-};
-} // namespace
 
 std::vector<CTxMemPool::indexed_transaction_set::const_iterator>
 CTxMemPool::getSortedDepthAndScoreNL() const {
