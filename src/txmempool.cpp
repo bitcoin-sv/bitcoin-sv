@@ -742,13 +742,13 @@ void CTxMemPool::removeUncheckedNL(
 // it are already in setDescendants as well, so that we can save time by not
 // iterating over those entries.
 void CTxMemPool::CalculateDescendants(txiter entryit,
-                                      setEntries &setDescendants) {
+                                      setEntries &setDescendants) const {
     std::shared_lock lock(smtx);
     CalculateDescendantsNL(entryit, setDescendants);
 }
 
 void CTxMemPool::CalculateDescendantsNL(txiter entryit,
-                                        setEntries &setDescendants) {
+                                        setEntries &setDescendants) const {
     setEntries stage;
     if (setDescendants.count(entryit) == 0) {
         stage.insert(entryit);

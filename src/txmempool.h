@@ -803,12 +803,12 @@ public:
      * anything already in it.  */
     void CalculateDescendants(
             txiter it,
-            setEntries &setDescendants);
+            setEntries &setDescendants) const;
     // A non-locking version of CalculateDescendants
     // DEPRECATED - this will become private and ultimately changed or removed
     void CalculateDescendantsNL(
             txiter it,
-            setEntries &setDescendants);
+            setEntries &setDescendants) const;
 
     /**
      * The minimum fee to get into the mempool, which may itself not be enough
