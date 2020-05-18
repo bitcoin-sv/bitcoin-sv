@@ -31,6 +31,7 @@
 #include <vector>
 #include <mutex>
 #include <shared_mutex>
+#include <unordered_map>
 
 class CAutoFile;
 class CBlockIndex;
@@ -880,6 +881,127 @@ public:
 
     void ClearPrioritisation(const uint256 &hash);
     void ClearPrioritisation(const std::vector<TxId>& vTxIds);
+
+public:
+    /** \class CTxMemPool::Slice
+     *
+     * CTxMemPool::Slice contains a read-only snapshot-in-time of the (partial)
+     * contents of the mempool.
+     *
+     * The snapshot contains two things: a copy of a number of mempool entries,
+     * and a set of additional relevant transaction IDs. Which transaction IDs
+     * are relevant depends on how the snapshot was created (for example, see
+     * CTxMemPool::GetTxSnapshot()).
+     *
+     * @note This class is non-moveable and non-copyable.
+     */
+    class Slice final
+    {
+        // Only CTxMemPool is allowed to call the constructor.
+        friend class CTxMemPool;
+
+        using Contents = std::vector<CTxMemPoolEntry>;
+        using ContentsRef = std::unique_ptr<Contents>;
+        using CachedTxIds = std::vector<TxId>;
+        using CachedTxIdsRef = std::unique_ptr<CachedTxIds>;
+
+        /**
+         * The default constructor returns an invalid snapshot:
+         * IsValid() will return @c false.
+         */
+        explicit Slice() = default;
+
+        /**
+         * Creates a copy of the mempool with the given @a contents and an
+         * optional set of transaction IDs that will be used for TxIdExists()
+         * checks.
+         */
+        explicit Slice(ContentsRef&& contents,
+                       CachedTxIdsRef&& relevantTxIds);
+
+    public:
+        using size_type = Contents::size_type;
+        using value_type = Contents::value_type;
+        using const_iterator = Contents::const_iterator;
+
+        /// Checks whether the contents are empty.
+        bool empty() const noexcept;
+        /// Returns the number of mempool entries in the snapshot contents.
+        size_type size() const noexcept;
+
+        /// Returns an immutable iterator to the start of the snapshot contents.
+        const_iterator begin() const noexcept;
+        /// Returns an immutable iterator to the start of the snapshot contents.
+        const_iterator cbegin() const noexcept { return begin(); }
+
+        /// Returns an immutable iterator to the end of the snapshot contents.
+        const_iterator end() const noexcept;
+        /// Returns an immutable iterator to the end of the snapshot contents.
+        const_iterator cend() const noexcept { return end(); }
+
+        /// Returns an immutable iterator to a mempool entry in the snapshot
+        /// contents, or cend() if no such entry exists.
+        const_iterator find(const uint256& hash) const;
+
+        /// Checks if @a hash exists in the snapshot, even if the mempool entry
+        /// for that hash is not actually in the snapshot contents. May return
+        /// @c true when find() for the same hash returns cend().
+        bool TxIdExists(const uint256& hash) const;
+
+        /// Checks whether the contents are valid.
+        bool IsValid() const noexcept;
+        /// Conversion operator for boolean contexts,
+        /// checks whether the contents are valid.
+        operator bool() const noexcept { return IsValid(); }
+
+    private:
+        static const Contents mFakeContents;
+        static const const_iterator mFakeIterator;
+        const ContentsRef mContents;
+        const CachedTxIdsRef mRelevantTxIds;
+
+        // The transaction lookup index.
+        using TxIdIndex = std::unordered_map<uint256, Slice::const_iterator, SaltedTxidHasher>;
+        mutable TxIdIndex mIndex;
+        mutable std::once_flag mCreateIndexOnce;
+        void CreateIndex() const;
+    };
+
+    /**
+     * Returns a read-only snapshot of the mempool contents. This will copy all
+     * the mempool entries.
+     */
+    Slice GetSnapshot() const;
+    
+    /**
+     * Retreival modes for GetTxSnapshot().
+     */
+    enum class TxSnapshotKind
+    {
+        /// Retreive only one transaction.
+        SINGLE,
+        /// Retreive the transaction and all its ancestors.
+        TX_WITH_ANCESTORS,
+        /// Retreive only the transaction's ancestors.
+        ONLY_ANCESTORS,
+        /// Retreive the transaction and all its descendants.
+        TX_WITH_DESCENDANTS,
+        /// Retreive only the transaction's descendants.
+        ONLY_DESCENDANTS
+    };
+
+    /**
+     * Returns a read-only snapshot of the mempool for one entry, identified by
+     * @a hash, and/or optionally its ancestors or descendants, selected by
+     * @a kind. This will also fill the transaction ID cache with the inputs of
+     * the copied mempool entries (Slice#TxIdExists() will return @c true for
+     * the hashes of those input transactions even if the entries are not in the
+     * snapshot).
+     *
+     * If a transaction with the given @a hash does not exist, the returned
+     * snapshot will be invalid, that is: Slice#IsValid() will return @c false.
+     */
+    Slice GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const;
 
 private:
 
