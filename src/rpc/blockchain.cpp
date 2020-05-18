@@ -306,7 +306,9 @@ std::string EntryDescriptionString() {
            "       ... ]\n";
 }
 
-void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e, CJSONWriter& jWriter, bool pushId = true)
+void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
+                               const CTxMemPool::Slice &snapshot,
+                               CJSONWriter& jWriter, bool pushId = true)
 {
     if (pushId)
     {
@@ -334,9 +336,9 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e, CJSONWriter& jWriter, b
     const CTransaction& tx = e.GetTx();
     for (const CTxIn& txin : tx.vin)
     {
-        if (mempool.ExistsNL(txin.prevout.GetTxId()))
-        {
-            deps.insert(txin.prevout.GetTxId().ToString());
+        const auto& hash = txin.prevout.GetTxId();
+        if (snapshot.TxIdExists(hash)) {
+            deps.insert(hash.ToString());
         }
     }
     jWriter.writeBeginArray("depends");
@@ -352,17 +354,20 @@ void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false)
 {
     if (fVerbose)
     {
-        std::shared_lock lock(mempool.smtx);
+        const auto snapshot = mempool.GetSnapshot();
         jWriter.writeBeginObject();
-        for (const auto& entry : mempool.mapTx)
+        for (const auto& entry : snapshot)
         {
-            writeMempoolEntryToJsonNL(entry, jWriter);
+            writeMempoolEntryToJsonNL(entry, snapshot, jWriter);
         }
         jWriter.writeEndObject();
     }
     else
     {
         std::vector<uint256> vtxids;
+        // FIXME: This causes a really expensive copy & sort of the mempool
+        //        index. Is sorting really necessary? Note that the verbose
+        //        variant returns transactions in a different order.
         mempool.QueryHashes(vtxids);
 
         jWriter.writeBeginArray();
@@ -521,19 +526,14 @@ void getmempoolancestors(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    std::shared_lock lock(mempool.smtx);
+    const auto kind = CTxMemPool::TxSnapshotKind::ONLY_ANCESTORS;
+    const auto snapshot = mempool.GetTxSnapshot(hash, kind);
 
-    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
-    if (txIter == mempool.mapTx.end()) {
+    // Check if tx is present in the mempool
+    if (!snapshot.IsValid()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-    CTxMemPool::setEntries setAncestors;
-    uint64_t noLimit = std::numeric_limits<uint64_t>::max();
-    std::string dummy;
-    mempool.CalculateMemPoolAncestorsNL(*txIter, setAncestors, noLimit, noLimit,
-                                        noLimit, noLimit, dummy, false);
-
     if (!processedInBatch)
     {
         httpReq.WriteHeader("Content-Type", "application/json");
@@ -549,16 +549,16 @@ void getmempoolancestors(const Config &config,
 
         if (!fVerbose) {
             jWriter.writeBeginArray();
-            for (CTxMemPool::txiter ancestorIt : setAncestors)
+            for (const auto& entry : snapshot)
             {
-                jWriter.pushV(ancestorIt->GetTx().GetId().ToString());
+                jWriter.pushV(entry.GetTx().GetId().ToString());
             }
             jWriter.writeEndArray();
         } else {
             jWriter.writeBeginObject();
-            for (CTxMemPool::txiter ancestorIt : setAncestors)
+            for (const auto& entry : snapshot)
             {
-                writeMempoolEntryToJsonNL(*ancestorIt, jWriter);
+                writeMempoolEntryToJsonNL(entry, snapshot, jWriter);
             }
             jWriter.writeEndObject();
         }
@@ -610,19 +610,14 @@ void getmempooldescendants(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    std::shared_lock lock(mempool.smtx);
+    const auto kind = CTxMemPool::TxSnapshotKind::ONLY_DESCENDANTS;
+    const auto snapshot = mempool.GetTxSnapshot(hash, kind);
 
     // Check if tx is present in the mempool
-    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
-    if (txIter == mempool.mapTx.end()) {
+    if (!snapshot.IsValid()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-    CTxMemPool::setEntries setDescendants;
-    // Calculate descendants
-    mempool.CalculateDescendantsNL(txIter, setDescendants);
-    // Exclude the given tx from the output
-    setDescendants.erase(txIter);
 
     if (!processedInBatch)
     {
@@ -639,16 +634,16 @@ void getmempooldescendants(const Config &config,
 
         if (!fVerbose) {
             jWriter.writeBeginArray();
-            for (CTxMemPool::txiter descendantIt : setDescendants)
+            for (const auto& entry : snapshot)
             {
-                jWriter.pushV(descendantIt->GetTx().GetId().ToString());
+                jWriter.pushV(entry.GetTx().GetId().ToString());
             }
             jWriter.writeEndArray();
         } else {
             jWriter.writeBeginObject();
-            for (CTxMemPool::txiter descendantIt : setDescendants)
+            for (const auto& entry : snapshot)
             {
-                writeMempoolEntryToJsonNL(*descendantIt, jWriter);
+                writeMempoolEntryToJsonNL(entry, snapshot, jWriter);
             }
             jWriter.writeEndObject();
         }
@@ -686,15 +681,14 @@ void getmempoolentry(const Config &config,
 
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
-    std::shared_lock lock(mempool.smtx);
+    const auto kind = CTxMemPool::TxSnapshotKind::SINGLE;
+    const auto snapshot = mempool.GetTxSnapshot(hash, kind);
 
-    CTxMemPool::txiter txIter = mempool.mapTx.find(hash);
-    if (txIter == mempool.mapTx.end()) {
+    // Check if tx is present in the mempool
+    if (!snapshot.IsValid() || snapshot.empty()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                            "Transaction not in mempool");
     }
-    const CTxMemPoolEntry &e = *txIter;
-
     if (!processedInBatch)
     {
         httpReq.WriteHeader("Content-Type", "application/json");
@@ -708,7 +702,7 @@ void getmempoolentry(const Config &config,
         jWriter.writeBeginObject();
         jWriter.pushKNoComma("result");
 
-        writeMempoolEntryToJsonNL(e, jWriter, false);
+        writeMempoolEntryToJsonNL(*snapshot.cbegin(), snapshot, jWriter, false);
 
         jWriter.pushKV("error", nullptr);
         jWriter.pushKVJSONFormatted("id", request.id.write());
