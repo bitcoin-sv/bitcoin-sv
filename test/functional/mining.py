@@ -73,6 +73,11 @@ class MiningTest(BitcoinTestFramework):
         assert_raises_rpc_error(-22, "Block does not start with a coinbase",
                                 node.submitblock, b2x(bad_block.serialize()))
 
+        bad_block.vtx = []
+        self.log.info("submitblock: Test missing coinbase transaction")
+        assert_raises_rpc_error(-22, "Block does not start with a coinbase",
+                                node.submitblock, b2x(bad_block.serialize()))
+
         self.log.info("getblocktemplate: Test truncated final transaction")
         assert_raises_rpc_error(-22, "Block decode failed", node.getblocktemplate,
                                 {'data': b2x(block.serialize()[:-1]), 'mode': 'proposal'})

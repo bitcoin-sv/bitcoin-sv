@@ -99,3 +99,8 @@ contrib/devtools/split-debug.sh
 
 # vagrant
 .vagrant
+
+.vscode
+
+# JetBrains, Clion, PyCharm etc...
+.idea

@@ -132,6 +132,14 @@ class AcceptBlockTest(BitcoinTestFramework):
         for x in self.nodes[0].getchaintips():
             if x['hash'] == blocks_h2f[0].hash:
                 assert_equal(x['status'], "headers-only")
+                # RPC getblockheader does not return field num_tx because block is not on disk
+                result = self.nodes[0].getblockheader(x['hash'])
+                assert_equal(result.get('num_tx'), None)
+                try:
+                    result = self.nodes[0].getblock(x['hash'])
+                    assert(False);
+                except JSONRPCException as e:
+                    assert('Block not found on disk' in repr(e))
 
         for x in self.nodes[1].getchaintips():
             if x['hash'] == blocks_h2f[1].hash:

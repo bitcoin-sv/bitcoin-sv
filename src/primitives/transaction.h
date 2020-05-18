@@ -331,6 +331,8 @@ public:
         return a.hash != b.hash;
     }
 
+    bool HasP2SHOutput() const;
+
     std::string ToString() const;
 };
 
@@ -387,12 +389,9 @@ static inline CTransactionRef MakeTransactionRef(Tx &&txIn) {
 struct PrecomputedTransactionData {
     uint256 hashPrevouts, hashSequence, hashOutputs;
 
-    PrecomputedTransactionData()
-        : hashPrevouts(), hashSequence(), hashOutputs() {}
-
-    PrecomputedTransactionData(const PrecomputedTransactionData &txdata)
-        : hashPrevouts(txdata.hashPrevouts), hashSequence(txdata.hashSequence),
-          hashOutputs(txdata.hashOutputs) {}
+    PrecomputedTransactionData() = default;
+    PrecomputedTransactionData(const PrecomputedTransactionData&) = default;
+    PrecomputedTransactionData& operator=(const PrecomputedTransactionData&) = default;
 
     PrecomputedTransactionData(const CTransaction &tx);
 };

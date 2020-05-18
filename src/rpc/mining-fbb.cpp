@@ -18,6 +18,7 @@
 #include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
+#include "primitives/transaction.h"
 #include "rpc/server.h"
 #include "tinyformat.h"
 #include "util.h"
@@ -179,6 +180,10 @@ UniValue MkMiningCandidateJson(bool coinbaseRequired, CMiningCandidateRef &candi
     ret.push_back(Pair("time", block->GetBlockTime()));
     ret.push_back(Pair("height", block->GetHeightFromCoinbase()));
 
+    // number of transactions including coinbase transaction
+    ret.push_back(Pair("num_tx", static_cast<uint64_t>(block->GetTransactionCount())));
+    ret.push_back(Pair("sizeWithoutCoinbase", static_cast<uint64_t>(block->GetSizeWithoutCoinbase())));
+
     // merkleProof:
     std::vector<uint256> brancharr = GetMerkleProofBranches(block);
     UniValue merkleProof(UniValue::VARR);
@@ -208,14 +213,16 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
                     "1. \"coinbase\"        (boolean, optional) True if a coinbase transaction is required in result"
                     "\nResult: (json string)\n"
                     "    {\n                         \n"
-                    "        \"id\": n,              (string) Candidate identifier for submitminingsolution\n"
-                    "        \"prevhash\": \"xxxx\", (hex string) Hash of the previous block\n"
-                    "        \"coinbase\": \"xxxx\", (optional hex string encoded binary transaction) Coinbase transaction\n"
-                    "        \"version\": n,         (integer) Block version\n"
-                    "        \"nBits\": \"xxxx\",    (hex string) Difficulty\n"
-                    "        \"time\": n,            (integer) Block time\n"
-                    "        \"height\": n,          (integer) Current Block Height\n"
-                    "        \"merkleProof\": [      (list of hex strings) Merkle branch for the block\n"
+                    "        \"id\": n,                  (string) Candidate identifier for submitminingsolution\n"
+                    "        \"prevhash\": \"xxxx\",     (hex string) Hash of the previous block\n"
+                    "        \"coinbase\": \"xxxx\",     (optional hex string encoded binary transaction) Coinbase transaction\n"
+                    "        \"version\": n,             (integer) Block version\n"
+                    "        \"nBits\": \"xxxx\",        (hex string) Difficulty\n"
+                    "        \"time\": n,                (integer) Block time\n"
+                    "        \"height\": n,              (integer) Current Block Height\n"
+                    "        \"num_tx\": n,              (integer) Number of transactions the current candidate has including coinbase transaction\n"
+                    "        \"sizeWithoutCoinbase\": n, (integer) Size of current block candidate in bytes without coinbase transaction\n"
+                    "        \"merkleProof\": [          (list of hex strings) Merkle branch for the block\n"
                     "                          xxxx,\n"
                     "                          yyyy,\n"
                     "                         ]\n"

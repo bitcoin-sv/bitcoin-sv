@@ -248,8 +248,13 @@ class BitcoinTestFramework():
         assert_equal(len(extra_args), num_nodes)
         assert_equal(len(binaries), num_nodes)
         for i in range(num_nodes):
-            self.nodes.append(TestNode(i, self.options.tmpdir, extra_args[i], rpchost, timewait=timewait,
-                                       binary=binaries[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+            self.add_node(i, extra_args[i], rpchost, timewait, binaries[i])
+
+    def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
+        self.nodes.append(TestNode(i, self.options.tmpdir, extra_args, rpchost, timewait, binary, stderr=None,
+                                   mocktime=self.mocktime, coverage_dir=self.options.coveragedir))
+        if init_data_dir:
+            initialize_datadir(self.options.tmpdir, i)
 
     def start_node(self, i, extra_args=None, stderr=None):
         """Start a bitcoind"""
@@ -338,6 +343,11 @@ class BitcoinTestFramework():
         for node in self.nodes:
             # Wait for nodes to stop
             node.wait_until_stopped()
+
+    def restart_node(self, i, extra_args=None):
+        """Stop and start a test node"""
+        self.stop_node(i)
+        self.start_node(i, extra_args)
 
     def assert_start_raises_init_error(self, i, extra_args=None, expected_msg=None):
         with tempfile.SpooledTemporaryFile(max_size=2**16) as log_stderr:
@@ -499,8 +509,6 @@ class BitcoinTestFramework():
                 os.remove(log_filename(self.options.cachedir, i, "bitcoind.log"))
                 os.remove(log_filename(self.options.cachedir, i, "db.log"))
                 os.remove(log_filename(self.options.cachedir, i, "peers.dat"))
-                os.remove(log_filename(
-                    self.options.cachedir, i, "fee_estimates.dat"))
 
         for i in range(self.num_nodes):
             from_dir = os.path.join(self.options.cachedir, "node" + str(i))

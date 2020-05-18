@@ -17,6 +17,7 @@
 #include "mining/factory.h"
 #include "net.h"
 #include "policy/policy.h"
+#include "primitives/transaction.h"
 #include "pow.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
@@ -164,6 +165,11 @@ UniValue generateBlocks(const Config &config,
 
         std::shared_ptr<const CBlock> shared_pblock =
             std::make_shared<const CBlock>(*pblock);
+
+        if (shared_pblock->vtx[0]->HasP2SHOutput()) {
+            throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
+        }
+
         if (!ProcessNewBlock(config, shared_pblock, true, nullptr)) {
             throw JSONRPCError(RPC_INTERNAL_ERROR,
                                "ProcessNewBlock, block not accepted");
@@ -717,6 +723,10 @@ UniValue processBlock(
                            "Block does not start with a coinbase");
     }
 
+    if (block.vtx[0]->HasP2SHOutput()) {
+        throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
+    }
+
     uint256 hash = block.GetHash();
     bool fBlockPresent = false;
     {
@@ -830,45 +840,6 @@ static UniValue submitblock(const Config &config,
     return processBlock(config, blockptr, submitBlock);
 }
 
-static UniValue estimatefee(const Config &config,
-                            const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() != 1) {
-        throw std::runtime_error(
-            "estimatefee nblocks\n"
-            "\nEstimates the approximate fee per kilobyte needed for a "
-            "transaction to begin\n"
-            "confirmation within nblocks blocks.\n"
-            "\nArguments:\n"
-            "1. nblocks     (numeric, required)\n"
-            "\nResult:\n"
-            "n              (numeric) estimated fee-per-kilobyte\n"
-            "\n"
-            "A negative value is returned if not enough transactions and "
-            "blocks\n"
-            "have been observed to make an estimate.\n"
-            "-1 is always returned for nblocks == 1 as it is impossible to "
-            "calculate\n"
-            "a fee that is high enough to get reliably included in the next "
-            "block.\n"
-            "\nExample:\n" +
-            HelpExampleCli("estimatefee", "6"));
-    }
-
-    RPCTypeCheck(request.params, {UniValue::VNUM});
-
-    int nBlocks = request.params[0].get_int();
-    if (nBlocks < 1) {
-        nBlocks = 1;
-    }
-
-    CFeeRate feeRate = mempool.EstimateFee(nBlocks);
-    if (feeRate == CFeeRate(Amount(0))) {
-        return -1.0;
-    }
-
-    return ValueFromAmount(feeRate.GetFeePerK());
-}
-
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category   name                     actor (function)       okSafeMode
@@ -881,8 +852,6 @@ static const CRPCCommand commands[] = {
     {"mining",     "submitblock",           submitblock,           true, {"hexdata", "parameters"}},
 
     {"generating", "generatetoaddress",     generatetoaddress,     true, {"nblocks", "address", "maxtries"}},
-
-    {"util",       "estimatefee",           estimatefee,           true, {"nblocks"}},
 };
 // clang-format on
 

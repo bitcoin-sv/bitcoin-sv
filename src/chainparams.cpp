@@ -18,7 +18,7 @@
 #include "chainparamsseeds.h"
 
 #define GENESIS_ACTIVATION_MAIN                 620538
-#define GENESIS_ACTIVATION_STN                  14896
+#define GENESIS_ACTIVATION_STN                  100
 #define GENESIS_ACTIVATION_TESTNET              1344302
 #define GENESIS_ACTIVATION_REGTEST              10000
 
@@ -324,7 +324,8 @@ public:
 
         checkpointData = {  { 
                 {0, uint256S("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943")},
-                {1, uint256S("00000000e23f9436cc8a6d6aaaa515a7b84e7a1720fc9f92805c0007c77420c4")}
+                {1, uint256S("00000000e23f9436cc8a6d6aaaa515a7b84e7a1720fc9f92805c0007c77420c4")},
+                {2, uint256S("0000000040f8f40b5111d037b8b7ff69130de676327bcbd76ca0e0498a06c44a")}
         }};
 
         defaultBlockSizeParams = DefaultBlockSizeParams{

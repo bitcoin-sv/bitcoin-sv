@@ -49,6 +49,7 @@ create_test_suite(bitcoin)
 add_dependencies(check check-bitcoin)
 
 add_test_to_suite(bitcoin test_bitcoin
+	alertnotify_tests.cpp
 	arith_uint256_tests.cpp
 	addrman_tests.cpp
 	amount_tests.cpp
@@ -103,7 +104,6 @@ add_test_to_suite(bitcoin test_bitcoin
 	net_tests.cpp
 	netbase_tests.cpp
 	pmt_tests.cpp
-	policyestimator_tests.cpp
 	pow_tests.cpp
 	prevector_tests.cpp
 	protocol_tests.cpp
@@ -138,6 +138,7 @@ add_test_to_suite(bitcoin test_bitcoin
     threadpool_tests.cpp
 	timedata_tests.cpp
     time_locked_mempool_tests.cpp
+	ttor_tests.cpp
 	transaction_tests.cpp
 	txvalidationcache_tests.cpp
 	uint256_tests.cpp

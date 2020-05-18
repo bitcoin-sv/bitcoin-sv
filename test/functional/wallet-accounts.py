@@ -21,7 +21,9 @@ class WalletAccountsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
-        self.extra_args = [[]]
+        # We have to set minrelaytxfee to get fees high enough to provide the transaction below
+        # node.sendfrom("", common_address, fee) enough fee to prevent: Transaction amount too small.
+        self.extra_args = [["-minrelaytxfee=0.0001"]]
 
     def run_test(self):
         node = self.nodes[0]

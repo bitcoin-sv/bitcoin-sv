@@ -57,12 +57,12 @@ public:
     inline void SerializationOp(Stream &s, Operation ser_action) 
     {
         // Legacy 32 bit sizes used for reading and writing. 
-        // When writing size larger or equal than max 32 bit value,
-        // max 32 bit value (0xFFFFFFFF) is written in 32 bit field
+        // When writing size larger or equal than max 32 bit value, 
+        // max 32 bit value (0xFFFFFFFF) is written in 32 bit field 
         // and actual size is written in separate 64 bit field. 
         // When reading, separate 64 bit value should be read when 32 bit value
         // is max (0xFFFFFFFF).
-        unsigned int nSizeLegacy;
+        unsigned int nSizeLegacy; 
         unsigned int nUndoSizeLegacy;
         if (nSize >= std::numeric_limits<uint32_t>::max())
         {

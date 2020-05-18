@@ -76,6 +76,10 @@
   "time": 382
  },
  {
+  "name": "bsv-block-stalling-test.py",
+  "time": 220
+ },
+ {
   "name": "dbcrash.py",
   "time": 1257
  },

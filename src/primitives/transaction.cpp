@@ -113,6 +113,14 @@ unsigned int CTransaction::GetTotalSize() const {
     return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
 }
 
+bool CTransaction::HasP2SHOutput() const {
+     return std::any_of(vout.begin(), vout.end(), 
+            [](const CTxOut& o){ 
+                return o.scriptPubKey.IsPayToScriptHash(); 
+            }
+        );
+}
+
 std::string CTransaction::ToString() const {
     std::string str;
     str += strprintf("CTransaction(txid=%s, ver=%d, vin.size=%u, vout.size=%u, "

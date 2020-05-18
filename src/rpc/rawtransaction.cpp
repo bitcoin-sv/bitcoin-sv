@@ -1167,7 +1167,7 @@ static UniValue sendrawtransaction(const Config &config,
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 3) {
         throw std::runtime_error(
-            "sendrawtransaction \"hexstring\" ( allowhighfees )\n"
+            "sendrawtransaction \"hexstring\" ( allowhighfees dontcheckfee )\n"
             "\nSubmits raw transaction (serialized, hex-encoded) to local node "
             "and network.\n"
             "\nAlso see createrawtransaction and signrawtransaction calls.\n"
