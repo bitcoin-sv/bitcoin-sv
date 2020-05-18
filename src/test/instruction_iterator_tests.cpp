@@ -15,7 +15,7 @@ BOOST_AUTO_TEST_SUITE(instruction_iterator_tests)
 
 BOOST_AUTO_TEST_CASE(decode_instruction_tests)
 {
-    // clang-format off
+    // input script, expected opcode, expected offset, expected length] : test_data)
     using test_data_type = tuple< vector<uint8_t>, int, size_t, size_t>;
 
     vector<test_data_type> test_data {
@@ -93,7 +93,6 @@ BOOST_AUTO_TEST_CASE(decode_instruction_tests)
         { {OP_PUBKEY}, OP_PUBKEY, 0, 0 },
         { {OP_INVALIDOPCODE}, OP_INVALIDOPCODE, 0, 0 } 
     };
-    // clang-format on
     for(const auto& [ip, exp_opcode, exp_offset, exp_len] : test_data)
     {
         const CScript script(begin(ip), end(ip));
@@ -107,7 +106,6 @@ BOOST_AUTO_TEST_CASE(decode_instruction_tests)
 
 BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
 {
-    // clang-format off
     vector<uint8_t> ip = {
                             0,
                             1, 42,
@@ -130,7 +128,6 @@ BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
                                     {OP_PUSHDATA4, 4, ip.data() + 20, 1},
                                     {OP_DUP, 0, ip.data() + 22, 0}
                                 };
-    // clang-format on
 
     instruction_iterator it_begin{span{ip.data(), ip.size()}};
     instruction_iterator it_end{span{ip.data() + ip.size(), 0}};
@@ -155,11 +152,9 @@ BOOST_AUTO_TEST_CASE(instruction_iterator_happy_case)
 
 BOOST_AUTO_TEST_CASE(too_short_single_instruction)
 {
-    // clang-format off
     vector<uint8_t> ip = {
                             OP_PUSHDATA4, 1, 0, 0, 0, //42, <- not enough data
                          };
-    // clang-format on
 
     instruction_iterator it_begin{span{ip.data(), ip.size()}};
     instruction_iterator it_end{span{ip.data() + ip.size(), 0}};
@@ -174,7 +169,6 @@ BOOST_AUTO_TEST_CASE(too_short_single_instruction)
 
 BOOST_AUTO_TEST_CASE(too_short_two_instructions)
 {
-    // clang-format off
     vector<uint8_t> ip = {
                             OP_PUSHDATA4, 1, 0, 0, 0, 42, 
                             OP_PUSHDATA4, 1, 0, 0, 0, //42, <- not enough data
@@ -183,7 +177,6 @@ BOOST_AUTO_TEST_CASE(too_short_two_instructions)
                                     {OP_PUSHDATA4, 0, ip.data() + 5, 1},
                                     {OP_INVALIDOPCODE, 0, ip.data() + ip.size(), 0},
                                 };
-    // clang-format on
 
     instruction_iterator it_begin{span{ip.data(), ip.size()}};
     instruction_iterator it_end{span{ip.data() + ip.size(), 0}};

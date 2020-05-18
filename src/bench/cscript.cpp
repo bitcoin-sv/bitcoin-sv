@@ -6,7 +6,6 @@
 
 #include "script/script.h"
 
-// clang-format off
 namespace 
 {
     const std::vector<uint8_t> v
@@ -18,7 +17,6 @@ namespace
         OP_CHECKSIG
     };
 }
-// clang-format on
 
 static void cscript_GetSigOpCount(benchmark::State& state)
 {

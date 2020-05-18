@@ -9,7 +9,7 @@
 namespace bsv
 {
     // Returns: opcode, offset to operand (see OP_PUSHDATA*), length of operand
-    inline constexpr std::tuple<opcodetype, size_t, size_t>
+    inline constexpr std::tuple<opcodetype, int8_t, size_t>
     decode_instruction(span<const uint8_t> s)
     {
         if(s.empty())

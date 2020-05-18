@@ -11,10 +11,18 @@
 
 namespace bsv
 {
+    // An instruction is an opcode and an operand (data).
+    // Most opcodes have no data, in which case the the operand is an empty
+    // range. However, some opcodes do have data e.g.
+    //     1-75,
+    //     OP_PUSHDATAn (were n=1,2,4).
+    // For 1-75 the data follows immediately after the opcode.
+    // For OP_PUSHDATAn the data is an extra 1,2,4 bytes after the opcode.
+    // Therefore, and additional offset is also stored.
     class instruction
     {
         opcodetype opcode_;
-        size_t offset_{};
+        int8_t offset_{};
         using operand_type = bsv::span<const uint8_t>;
         operand_type operand_{};
 
@@ -22,7 +30,7 @@ namespace bsv
         constexpr instruction(opcodetype opcode) noexcept : opcode_{opcode} {}
 
         constexpr instruction(opcodetype opcode,
-                              size_t offset,
+                              int8_t offset,
                               const uint8_t* p,
                               size_t n) noexcept
             : opcode_{opcode}, offset_{offset}, operand_{p, n}
@@ -35,17 +43,14 @@ namespace bsv
         {
             return operand_;
         }
-
     };
 
     inline constexpr bool operator==(const instruction& a,
                                      const instruction& b) noexcept
     {
-        // clang-format off
-    return a.opcode() == b.opcode() && 
-           a.operand().data() == b.operand().data() && 
-           a.operand().size() == b.operand().size();
-        // clang-format on
+        return a.opcode() == b.opcode() &&
+               a.operand().data() == b.operand().data() &&
+               a.operand().size() == b.operand().size();
     }
 
     inline constexpr bool operator!=(const instruction& a,

@@ -7,13 +7,12 @@
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
-using namespace bsv;
 
 BOOST_AUTO_TEST_SUITE(cscript_tests)
 
 BOOST_AUTO_TEST_CASE(GetOp2)
 {
-    // clang-format off
+    // input script, expected status, expected opcode, expected output script] 
     using test_data_type = tuple< vector<uint8_t>, bool, opcodetype, vector<uint8_t> >;
 
     vector<test_data_type> test_data {
@@ -51,13 +50,12 @@ BOOST_AUTO_TEST_CASE(GetOp2)
         { {OP_PUSHDATA4, 0, 0, 1}, false, OP_INVALIDOPCODE, {} },
         { {OP_PUSHDATA4, 0, 0, 0, 1}, false, OP_INVALIDOPCODE, {} },
     };
-    // clang-format on
     for(const auto& [ip, exp_status, exp_opcode, exp_v] : test_data)
     {
         const CScript script(begin(ip), end(ip));
         auto it{script.begin()};
         opcodetype opcode;
-        vector<uint8_t> v{exp_v};
+        vector<uint8_t> v;
         const auto s = script.GetOp2(it, opcode, &v);
         BOOST_CHECK_EQUAL(exp_status, s);
         BOOST_CHECK_EQUAL(exp_opcode, opcode);
