@@ -867,8 +867,10 @@ class CompactBlocksTest(BitcoinTestFramework):
             self.ex_softfork_node, self.nodes[1], version=2)
         self.test_end_to_end_block_relay(
             self.nodes[0], [self.ex_softfork_node, self.test_node, self.old_node])
+        sync_blocks(self.nodes) # wait until node1 receives and processes this block otherwise we could create the next block using the wrong tip
         self.test_end_to_end_block_relay(
             self.nodes[1], [self.ex_softfork_node, self.test_node, self.old_node])
+        sync_blocks(self.nodes)
 
         self.log.info("\tTesting handling of invalid compact blocks...")
         self.test_invalid_tx_in_compactblock(self.nodes[0], self.test_node)
