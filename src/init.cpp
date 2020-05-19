@@ -1714,7 +1714,7 @@ bool AppInitParameterInteraction(Config &config) {
     // mempool limits
     int64_t nMempoolSizeMax =
         gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
-    int64_t nMempoolSizeMin = nMempoolSizeMax * 0.3;
+    constexpr int64_t nMempoolSizeMin = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE * 0.3;
     if (nMempoolSizeMax < 0 || nMempoolSizeMax < nMempoolSizeMin)
         return InitError(strprintf(_("-maxmempool must be at least %d MB"),
                                    std::ceil(nMempoolSizeMin / 1000000.0)));

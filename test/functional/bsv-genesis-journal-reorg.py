@@ -20,13 +20,11 @@ class JournalReorg(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 2
         self.extra_args = [['-whitelist=127.0.0.1',
-                            '-maxmempool=1',
                             '-debug=journal',
                             '-blockassembler=journaling',
                             '-genesisactivationheight=400',
                             '-maxgenesisgracefulperiod=0' ],
                            ['-whitelist=127.0.0.1',
-                            '-maxmempool=1',
                             '-checkmempool=1',
                             '-debug=journal',
                             '-blockassembler=journaling',
