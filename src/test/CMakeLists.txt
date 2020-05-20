@@ -76,6 +76,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	config_tests.cpp
 	core_io_tests.cpp
 	crypto_tests.cpp
+	cscript_tests.cpp
 	cuckoocache_tests.cpp
 	dbwrapper_tests.cpp
 	DoS_tests.cpp
@@ -86,6 +87,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	hash_tests.cpp
 	inv_tests.cpp
     int_serialization_tests.cpp
+    instruction_iterator_tests.cpp
 	journal_tests.cpp
 	json_tests.cpp
 	jsonutil.cpp

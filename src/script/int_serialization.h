@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <iterator>
 #include <vector>
+
+#include "span.h"
 
 namespace bsv
 {
@@ -65,7 +67,7 @@ namespace bsv
         // pre-condition: bounded_range(f, l) and f < l
         assert(f != l);
 
-        const auto d{static_cast<size_t>(distance(f, l))};
+        const auto d{static_cast<size_t>(std::distance(f, l))};
 
         T result{0};
         for(size_t i{0}; i < d - 1; ++i)
@@ -74,7 +76,7 @@ namespace bsv
             tmp <<= (8 * i);
             result |= tmp;
 
-            f = next(f);
+            f = std::next(f);
         }
 
         if(d > sizeof(T))
@@ -93,15 +95,16 @@ namespace bsv
         return negative ? -result : result;
     }
 
-    inline bool IsMinimallyEncoded(const std::vector<uint8_t>& vch,
+    inline bool IsMinimallyEncoded(bsv::span<const uint8_t> span,
                                    size_t nMaxNumSize)
     {
-        if(vch.size() > nMaxNumSize)
+        const size_t size = span.size();
+        if(size > nMaxNumSize)
         {
             return false;
         }
 
-        if(vch.size() > 0)
+        if(size > 0)
         {
             // Check that the number is encoded with the minimum possible number
             // of bytes.
@@ -109,14 +112,14 @@ namespace bsv
             // If the most-significant-byte - excluding the sign bit - is zero
             // then we're not minimal. Note how this test also rejects the
             // negative-zero encoding, 0x80.
-            if((vch.back() & 0x7f) == 0)
+            if((span.back() & 0x7f) == 0)
             {
                 // One exception: if there's more than one byte and the most
                 // significant bit of the second-most-significant-byte is set it
                 // would conflict with the sign bit. An example of this case is
                 // +-255, which encode to 0xff00 and 0xff80 respectively.
                 // (big-endian).
-                if(vch.size() <= 1 || (vch[vch.size() - 2] & 0x80) == 0)
+                if(size <= 1 || (span[size - 2] & 0x80) == 0)
                 {
                     return false;
                 }

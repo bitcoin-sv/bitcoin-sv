@@ -524,15 +524,15 @@ std::vector<uint8_t> bsv::bint::serialize() const
     return result;
 }
 
-bsv::bint bsv::bint::deserialize(const vector<uint8_t>& v)
+bsv::bint bsv::bint::deserialize(bsv::span<const uint8_t> s)
 {
-    const auto size{v.size()};
+    const auto size{s.size()};
     vector<uint8_t> tmp(size + length_in_bytes);
     tmp[0] = (size >> 24) & 0xff;
     tmp[1] = (size >> 16) & 0xff;
     tmp[2] = (size >> 8) & 0xff;
     tmp[3] = (size >> 0) & 0xff;
-    reverse_copy(begin(v), end(v), begin(tmp) + length_in_bytes);
+    reverse_copy(begin(s), end(s), begin(tmp) + length_in_bytes);
     auto p{BN_mpi2bn(tmp.data(), tmp.size(), nullptr)};
     bint b;
     b.value_.reset(p);

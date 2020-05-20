@@ -189,6 +189,11 @@ class CScriptNum;
 
 typedef prevector<28, uint8_t> CScriptBase;
 
+namespace bsv
+{
+    class instruction_iterator;
+}
+
 /** Serialized script, used inside transaction inputs and outputs */
 class CScript : public CScriptBase {
 protected:
@@ -268,6 +273,9 @@ public:
                 "not intended, use + to concatenate!");
         return *this;
     }
+
+    bsv::instruction_iterator begin_instructions() const;
+    bsv::instruction_iterator end_instructions() const;
 
     bool GetOp(iterator &pc, opcodetype &opcodeRet,
                std::vector<uint8_t> &vchRet) {
