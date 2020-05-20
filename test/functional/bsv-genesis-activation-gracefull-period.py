@@ -110,7 +110,7 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         sleep(1)
         
         assert_equal(len(rejected_txs), 1) # rejected
-        assert_equal(rejected_txs[0].reason, b'mandatory-script-verify-flag-failed (Script number overflow)')
+        assert_equal(rejected_txs[0].reason, b'max-script-num-length-policy-limit-violated (Script number overflow)')
         assert len(self.nodes[0].listbanned()) == 1  # and banned
         self.nodes[0].clearbanned()
         assert len(self.nodes[0].listbanned()) == 0  # and not banned

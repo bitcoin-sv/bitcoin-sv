@@ -1286,7 +1286,7 @@ CTxnValResult TxnValidation(
         }
     }
 
-    // Check for non-standard pay-to-script-hash in inputs
+    // Checking for non-standard outputs as inputs.
     if (!acceptNonStandardOutput)
     {
         auto res =
@@ -1304,6 +1304,18 @@ CTxnValResult TxnValidation(
         {
             state.Invalid(false, REJECT_NONSTANDARD,
                          "bad-txns-nonstandard-inputs");
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
+    }
+    else if (fUseLimits && (TxValidationPriority::low != pTxInputData->mTxValidationPriority))
+    {
+        auto res =
+            AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
+        if (!res.has_value() || !res.value()) {
+            state.SetValidationTimeoutExceeded();
+            state.DoS(0, false, REJECT_NONSTANDARD,
+                     "too-long-validation-time",
+                      false);
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }
@@ -3101,7 +3113,15 @@ std::optional<bool> CheckInputs(
         {
             bool genesisGracefulPeriod = IsGenesisGracefulPeriod(config, spendHeight);
             const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-
+            // A violation of policy limit, for max-script-num-length, results in an increase of banning score by 10.
+            // A failure is detected by a script number overflow in computations.
+            if (!genesisGracefulPeriod && !consensus && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError()) {
+                return state.DoS(
+                    10, false, REJECT_INVALID,
+                    strprintf("max-script-num-length-policy-limit-violated (%s)",
+                              ScriptErrorString(check.GetScriptError())));
+            }
+            // Checking script conditions with non-mandatory flags.
             if (hasNonMandatoryFlags)
             {
                 // Check whether the failure was caused by a non-mandatory
