@@ -512,15 +512,7 @@ uint64_t GetP2SHSigOpCount(const Config &config,
         bool genesisEnabled = true;
         if (coin.GetHeight() != MEMPOOL_HEIGHT){
             genesisEnabled = IsGenesisEnabled(config, coin.GetHeight());
-        } else {
-            // When this function is called from CTxnValidator, we could be spending UTXOS from mempool
-            // CTxnValidator already takes cs_main lock when starting validation in it's main thread
-            AssertLockHeld(cs_main);
-
-            // TODO: in releases after genesis upgrade this part could be removed
-            genesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
         }
-
         if (genesisEnabled) {
             continue;
         }
