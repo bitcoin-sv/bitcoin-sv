@@ -2109,7 +2109,6 @@ static void AddToMempoolForReorg(const Config &config,
     DisconnectedBlockTransactions &disconnectpool,
     const CJournalChangeSetPtr& changeSet) {
     AssertLockHeld(cs_main);
-    const bool fAddToMempool = true;
     TxInputDataSPtrVec vTxInputData {};
     // disconnectpool's insertion_order index sorts the entries from oldest to
     // newest, but the oldest entry will be the last tx from the latest mined
@@ -2119,6 +2118,7 @@ static void AddToMempoolForReorg(const Config &config,
     // previously seen in a block.
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
+        const bool fAddToMempool = true;
         bool fRemoveRecursive { !fAddToMempool || (*it)->IsCoinBase() };
         if (fRemoveRecursive) {
             // If the transaction doesn't make it in to the mempool, remove any
@@ -2185,7 +2185,6 @@ static void RemoveFromMempoolForReorg(const Config &config,
     DisconnectedBlockTransactions &disconnectpool,
     const CJournalChangeSetPtr& changeSet) {
     AssertLockHeld(cs_main);
-    const bool fAddToMempool = false;
     TxInputDataSPtrVec vTxInputData {};
     // disconnectpool's insertion_order index sorts the entries from oldest to
     // newest, but the oldest entry will be the last tx from the latest mined
@@ -2195,6 +2194,7 @@ static void RemoveFromMempoolForReorg(const Config &config,
     // previously seen in a block.
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
+        const bool fAddToMempool = false;
         bool fRemoveRecursive { !fAddToMempool || (*it)->IsCoinBase() };
         if (fRemoveRecursive) {
             // If the transaction doesn't make it in to the mempool, remove any
