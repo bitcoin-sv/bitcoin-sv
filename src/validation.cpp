@@ -2183,7 +2183,6 @@ static void RemoveFromMempoolForReorg(const Config &config,
     DisconnectedBlockTransactions &disconnectpool,
     const CJournalChangeSetPtr& changeSet) {
     AssertLockHeld(cs_main);
-    TxInputDataSPtrVec vTxInputData {};
     // disconnectpool's insertion_order index sorts the entries from oldest to
     // newest, but the oldest entry will be the last tx from the latest mined
     // block that was disconnected.
@@ -2196,21 +2195,8 @@ static void RemoveFromMempoolForReorg(const Config &config,
         ++it;
     }
     disconnectpool.queuedTx.clear();
-    // Validate a set of transactions
-    g_connman->getTxnValidator()->processValidation(vTxInputData, changeSet, true);
     // Mempool related updates
     std::vector<uint256> vHashUpdate {};
-    for (const auto& txInputData : vTxInputData) {
-        auto const& txid = txInputData->GetTxnPtr()->GetId();
-        if (mempool.Exists(txid)) {
-            // A set of transaction hashes from a disconnected block re-added to the mempool.
-            vHashUpdate.emplace_back(txid);
-        } else {
-            // If the transaction doesn't make it in to the mempool, remove any
-            // transactions that depend on it (which would now be orphans).
-            mempool.RemoveRecursive(*(txInputData->GetTxnPtr()), changeSet, MemPoolRemovalReason::REORG);
-        }
-    }
     // Validator/addUnchecked all assume that new mempool entries have
     // no in-mempool children, which is generally not true when adding
     // previously-confirmed transactions back to the mempool.
