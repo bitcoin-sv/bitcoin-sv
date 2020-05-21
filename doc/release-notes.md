@@ -1,6 +1,23 @@
 # Bitcoin SV version 1.0.4 Release Notes
 
 ## List of Changes since 1.0.3
+* Gitian build fix: instruction[_iterator].h location in Makefile.am.
+* Ban nodes that violate the `maxscriptnumlengthpolicy` policy setting.
+* Fix race condition in bsv-trigger-safe-mode-by-invalid-chain.py.
+* Fix: bug in thread pool tests.
+* Fix: Failing unit tests in debug on develop branch.
+* Fix: P2P stops sending data under some circumstances.
+* Fix hash comparison in bsv-no-safe-mode-by-large-distant-fork.py.
+* Remove excess physical dependencies (#includes) on script.h.
+* Fix: Missing debug flags in CMake.
+* Minimum mempool size should be at least 30% of default mempool size.
+* Optimise frequent malloc calls in GetOp2.
+* Reduce the number of orphan transactions during PTV processing.
+* Windows build; Separate running tests from C++ build.
+* Fix: Unintended formatting of floating point number in log messages.
+* Implement caching invalid signatures.
+* Fix: P2P getaddr returns very polluted results.
+* Adjust default parameters (such as DEFAULT_MAX_SCRIPT_CACHE_SIZE) to increase performance.
 
 ## Scaling Test Network (STN) Reset
 N/A
