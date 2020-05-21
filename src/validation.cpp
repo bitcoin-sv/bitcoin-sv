@@ -4163,21 +4163,10 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     }
 
     if (disconnectpool) {
-        // Save transactions to re-add to mempool at end of reorg
-        for (const auto &tx : boost::adaptors::reverse(block.vtx)) {
-            disconnectpool->addTransaction(tx);
-        }
-
-
         //  The amount of transactions we are willing to store during reorg is the same as max mempool size
         uint64_t maxDisconnectedTxPoolSize = config.GetMaxMempool();
-        while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
-            // Drop the earliest entry, and remove its children from the
-            // mempool.
-            auto it = disconnectpool->queuedTx.get<insertion_order>().begin();
-            mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
-            disconnectpool->removeEntry(it);
-        }
+        // Save transactions to re-add to mempool at end of reorg
+        mempool.AddToDisconnectPoolUpToLimit(changeSet, disconnectpool, maxDisconnectedTxPoolSize, block.vtx);
     }
 
     // Update chainActive and related variables.

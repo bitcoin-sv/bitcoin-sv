@@ -2157,6 +2157,26 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
     changeSet->apply();
 }
 
+void CTxMemPool::AddToDisconnectPoolUpToLimit(
+    const mining::CJournalChangeSetPtr &changeSet,
+    DisconnectedBlockTransactions *disconnectpool,
+    uint64_t maxDisconnectedTxPoolSize,
+    const std::vector<CTransactionRef> &vtx) {
+    for (const auto &tx : boost::adaptors::reverse(vtx)) {
+        disconnectpool->addTransaction(tx);
+    }
+    // FIXME: SVDEV-460 add only upto limit and drop the rest. Figure out all this reversal and what to drop
+
+    while (disconnectpool->DynamicMemoryUsage() > maxDisconnectedTxPoolSize) {
+        // Drop the earliest entry, and remove its children from the
+        // mempool.
+        auto it = disconnectpool->queuedTx.get<insertion_order>().begin();
+        mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+        disconnectpool->removeEntry(it);
+    }
+}
+
+
 void CTxMemPool::updateChildNL(txiter entry, txiter child, bool add) {
     setEntries s;
     if (add && mapLinks[entry].children.insert(child).second) {

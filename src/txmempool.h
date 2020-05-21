@@ -1023,6 +1023,16 @@ public:
         DisconnectedBlockTransactions &disconnectpool,
         const mining::CJournalChangeSetPtr& changeSet);
 
+    /**
+     * Add vtx to disconnectpool observing the limit. block transactions that do not make it
+     * into disconnectpool need to have their descendants removed from mempool, too
+     */
+    void AddToDisconnectPoolUpToLimit(
+        const mining::CJournalChangeSetPtr &changeSet,
+        DisconnectedBlockTransactions *disconnectpool,
+        uint64_t maxDisconnectedTxPoolSize,
+        const std::vector<CTransactionRef> &vtx);
+
 private:
 
     // A non-locking version of CheckMempool
@@ -1298,9 +1308,12 @@ struct DisconnectedBlockTransactions {
     // reorg, besides draining this object).
     ~DisconnectedBlockTransactions() { assert(queuedTx.empty()); }
 
+private:
     indexed_disconnected_transactions queuedTx;
     uint64_t cachedInnerUsage = 0;
 
+    friend class CTxMemPool;
+public:
     // Estimate the overhead of queuedTx to be 6 pointers + an allocation, as
     // no exact formula for boost::multi_index_contained is implemented.
     size_t DynamicMemoryUsage() const {
