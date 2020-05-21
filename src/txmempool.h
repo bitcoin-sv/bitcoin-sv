@@ -657,13 +657,6 @@ public:
         const mining::CJournalChangeSetPtr& changeSet,
         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
-    void RemoveForReorg(
-            const Config &config,
-            const CoinsDB& coinsTip,
-            const mining::CJournalChangeSetPtr& changeSet,
-            const CBlockIndex& tip,
-            int flags);
-
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             int32_t nBlockHeight,
@@ -1047,6 +1040,13 @@ private:
 
     // A non-locking version of IsSpent
     bool IsSpentNL(const COutPoint &outpoint) const;
+
+    void RemoveForReorg(
+        const Config &config,
+        const CoinsDB& coinsTip,
+        const mining::CJournalChangeSetPtr& changeSet,
+        const CBlockIndex& tip,
+        int flags);
 
     /**
      * updateForDescendantsNL is used by UpdateTransactionsFromBlock to update the

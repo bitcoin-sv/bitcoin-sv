@@ -2054,7 +2054,8 @@ void CTxMemPool::AddUnchecked(
 
 void CTxMemPool::AddToMempoolForReorg(const Config &config,
     DisconnectedBlockTransactions &disconnectpool,
-    const CJournalChangeSetPtr& changeSet) {
+    const CJournalChangeSetPtr& changeSet)
+{
     AssertLockHeld(cs_main);
     TxInputDataSPtrVec vTxInputData {};
     // disconnectpool's insertion_order index sorts the entries from oldest to
@@ -2068,7 +2069,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         if ((*it)->IsCoinBase()) {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
-            mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+            RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
         } else {
             vTxInputData.emplace_back(
                 std::make_shared<CTxInputData>(
@@ -2088,13 +2089,13 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
     std::vector<uint256> vHashUpdate {};
     for (const auto& txInputData : vTxInputData) {
         auto const& txid = txInputData->GetTxnPtr()->GetId();
-        if (mempool.Exists(txid)) {
+        if (Exists(txid)) {
             // A set of transaction hashes from a disconnected block re-added to the mempool.
             vHashUpdate.emplace_back(txid);
         } else {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
-            mempool.RemoveRecursive(*(txInputData->GetTxnPtr()), changeSet, MemPoolRemovalReason::REORG);
+            RemoveRecursive(*(txInputData->GetTxnPtr()), changeSet, MemPoolRemovalReason::REORG);
         }
     }
     // Validator/addUnchecked all assume that new mempool entries have
@@ -2103,12 +2104,11 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
     // UpdateTransactionsFromBlock finds descendants of any transactions in the
     // disconnectpool that were added back and cleans up the mempool state.
     LogPrint(BCLog::MEMPOOL, "Update transactions from block\n");
-    mempool.UpdateTransactionsFromBlock(vHashUpdate, changeSet);
+    UpdateTransactionsFromBlock(vHashUpdate, changeSet);
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
     const CBlockIndex& tip = *chainActive.Tip();
-    mempool.
-        RemoveForReorg(
+    RemoveForReorg(
             config,
             *pcoinsTip,
             changeSet,
@@ -2116,7 +2116,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
             StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
 
     // Check mempool & journal
-    mempool.CheckMempool(*pcoinsTip, changeSet);
+    CheckMempool(*pcoinsTip, changeSet);
 
     // Mempool is now consistent. Synchronize with journal.
     changeSet->apply();
@@ -2125,7 +2125,8 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
 
 void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
     DisconnectedBlockTransactions &disconnectpool,
-    const CJournalChangeSetPtr& changeSet) {
+    const CJournalChangeSetPtr& changeSet)
+{
     AssertLockHeld(cs_main);
     // disconnectpool's insertion_order index sorts the entries from oldest to
     // newest, but the oldest entry will be the last tx from the latest mined
@@ -2135,15 +2136,14 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
     // previously seen in a block.
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
-        mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+        RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
         ++it;
     }
     disconnectpool.queuedTx.clear();
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
     const CBlockIndex& tip = *chainActive.Tip();
-    mempool.
-        RemoveForReorg(
+    RemoveForReorg(
             config,
             *pcoinsTip,
             changeSet,
@@ -2151,7 +2151,7 @@ void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
             StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
 
     // Check mempool & journal
-    mempool.CheckMempool(*pcoinsTip, changeSet);
+    CheckMempool(*pcoinsTip, changeSet);
 
     // Mempool is now consistent. Synchronize with journal.
     changeSet->apply();
