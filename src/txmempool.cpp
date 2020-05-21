@@ -16,6 +16,8 @@
 #include "utiltime.h"
 #include "validation.h"
 #include "validationinterface.h"
+#include "txn_validator.h"
+#include "version.h"
 #include <boost/range/adaptor/reversed.hpp>
 #include <config.h>
 
@@ -2047,6 +2049,112 @@ void CTxMemPool::AddUnchecked(
     }
     // Notify entry added without holding the mempool's lock
     NotifyEntryAdded(entry.GetSharedTx());
+}
+
+
+void CTxMemPool::AddToMempoolForReorg(const Config &config,
+    DisconnectedBlockTransactions &disconnectpool,
+    const CJournalChangeSetPtr& changeSet) {
+    AssertLockHeld(cs_main);
+    TxInputDataSPtrVec vTxInputData {};
+    // disconnectpool's insertion_order index sorts the entries from oldest to
+    // newest, but the oldest entry will be the last tx from the latest mined
+    // block that was disconnected.
+    // Iterate disconnectpool in reverse, so that we add transactions back to
+    // the mempool starting with the earliest transaction that had been
+    // previously seen in a block.
+    auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
+    while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
+        if ((*it)->IsCoinBase()) {
+            // If the transaction doesn't make it in to the mempool, remove any
+            // transactions that depend on it (which would now be orphans).
+            mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+        } else {
+            vTxInputData.emplace_back(
+                std::make_shared<CTxInputData>(
+                    TxIdTrackerWPtr{}, // TxIdTracker is not used during reorgs
+                    *it,              // a pointer to the tx
+                    TxSource::reorg,  // tx source
+                    TxValidationPriority::normal,  // tx validation priority
+                    GetTime(),        // nAcceptTime
+                    false));          // fLimitFree
+        }
+        ++it;
+    }
+    disconnectpool.queuedTx.clear();
+    // Validate a set of transactions
+    g_connman->getTxnValidator()->processValidation(vTxInputData, changeSet, true);
+    // Mempool related updates
+    std::vector<uint256> vHashUpdate {};
+    for (const auto& txInputData : vTxInputData) {
+        auto const& txid = txInputData->GetTxnPtr()->GetId();
+        if (mempool.Exists(txid)) {
+            // A set of transaction hashes from a disconnected block re-added to the mempool.
+            vHashUpdate.emplace_back(txid);
+        } else {
+            // If the transaction doesn't make it in to the mempool, remove any
+            // transactions that depend on it (which would now be orphans).
+            mempool.RemoveRecursive(*(txInputData->GetTxnPtr()), changeSet, MemPoolRemovalReason::REORG);
+        }
+    }
+    // Validator/addUnchecked all assume that new mempool entries have
+    // no in-mempool children, which is generally not true when adding
+    // previously-confirmed transactions back to the mempool.
+    // UpdateTransactionsFromBlock finds descendants of any transactions in the
+    // disconnectpool that were added back and cleans up the mempool state.
+    LogPrint(BCLog::MEMPOOL, "Update transactions from block\n");
+    mempool.UpdateTransactionsFromBlock(vHashUpdate, changeSet);
+    // We also need to remove any now-immature transactions
+    LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
+    const CBlockIndex& tip = *chainActive.Tip();
+    mempool.
+        RemoveForReorg(
+            config,
+            *pcoinsTip,
+            changeSet,
+            tip,
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
+
+    // Check mempool & journal
+    mempool.CheckMempool(*pcoinsTip, changeSet);
+
+    // Mempool is now consistent. Synchronize with journal.
+    changeSet->apply();
+}
+
+
+void CTxMemPool::RemoveFromMempoolForReorg(const Config &config,
+    DisconnectedBlockTransactions &disconnectpool,
+    const CJournalChangeSetPtr& changeSet) {
+    AssertLockHeld(cs_main);
+    // disconnectpool's insertion_order index sorts the entries from oldest to
+    // newest, but the oldest entry will be the last tx from the latest mined
+    // block that was disconnected.
+    // Iterate disconnectpool in reverse, so that we add transactions back to
+    // the mempool starting with the earliest transaction that had been
+    // previously seen in a block.
+    auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
+    while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
+        mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+        ++it;
+    }
+    disconnectpool.queuedTx.clear();
+    // We also need to remove any now-immature transactions
+    LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
+    const CBlockIndex& tip = *chainActive.Tip();
+    mempool.
+        RemoveForReorg(
+            config,
+            *pcoinsTip,
+            changeSet,
+            tip,
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
+
+    // Check mempool & journal
+    mempool.CheckMempool(*pcoinsTip, changeSet);
+
+    // Mempool is now consistent. Synchronize with journal.
+    changeSet->apply();
 }
 
 void CTxMemPool::updateChildNL(txiter entry, txiter child, bool add) {

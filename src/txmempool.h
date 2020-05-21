@@ -421,6 +421,8 @@ public:
     }
 };
 
+struct DisconnectedBlockTransactions;
+
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain transactions that
  * may be included in the next block.
@@ -995,6 +997,38 @@ public:
      * snapshot will be invalid, that is: Snapshot#IsValid() will return @c false.
      */
     Snapshot GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const;
+
+    /**
+     * Make mempool consistent after a reorg, by re-adding
+     * disconnected block transactions from the mempool, and also removing any other
+     * transactions from the mempool that are no longer valid given the new
+     * tip/height, most notably coinbase transactions and their descendants.
+     *
+     * Note: we assume that disconnectpool only contains transactions that are NOT
+     * confirmed in the current chain nor already in the mempool (otherwise,
+     * in-mempool descendants of such transactions would be removed).
+     *
+     * Note: this function currently still runs under `cs_main` and does *not*
+     * lock mempool. It calls mempool-locking functions internally, and
+     * not their `NL` variants. Therefore it should *not* have the `NL` postfix.
+     */
+    void AddToMempoolForReorg(
+        const Config &config,
+        DisconnectedBlockTransactions &disconnectpool,
+        const mining::CJournalChangeSetPtr& changeSet);
+
+    /**
+     * Make mempool consistent after a reorg, by recursively erasing
+     * disconnected block transactions from the mempool
+     *
+     * Note: this function currently still runs under `cs_main` and does *not*
+     * lock mempool. It calls mempool-locking functions internally, and
+     * not their `NL` variants. Therefore it should *not* have the `NL` postfix.
+     */
+    void RemoveFromMempoolForReorg(
+        const Config &config,
+        DisconnectedBlockTransactions &disconnectpool,
+        const mining::CJournalChangeSetPtr& changeSet);
 
 private:
 
