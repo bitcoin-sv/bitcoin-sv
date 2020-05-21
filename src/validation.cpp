@@ -2118,9 +2118,7 @@ static void AddToMempoolForReorg(const Config &config,
     // previously seen in a block.
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
-        const bool fAddToMempool = true;
-        bool fRemoveRecursive { !fAddToMempool || (*it)->IsCoinBase() };
-        if (fRemoveRecursive) {
+        if ((*it)->IsCoinBase()) {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
             mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
@@ -2194,22 +2192,7 @@ static void RemoveFromMempoolForReorg(const Config &config,
     // previously seen in a block.
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
-        const bool fAddToMempool = false;
-        bool fRemoveRecursive { !fAddToMempool || (*it)->IsCoinBase() };
-        if (fRemoveRecursive) {
-            // If the transaction doesn't make it in to the mempool, remove any
-            // transactions that depend on it (which would now be orphans).
-            mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
-        } else {
-            vTxInputData.emplace_back(
-                std::make_shared<CTxInputData>(
-                    TxIdTrackerWPtr{}, // TxIdTracker is not used during reorgs
-                    *it,              // a pointer to the tx
-                    TxSource::reorg,  // tx source
-                    TxValidationPriority::normal,  // tx validation priority
-                    GetTime(),        // nAcceptTime
-                    false));          // fLimitFree
-        }
+        mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
         ++it;
     }
     disconnectpool.queuedTx.clear();
