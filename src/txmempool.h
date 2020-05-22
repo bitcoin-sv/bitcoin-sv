@@ -73,6 +73,14 @@ struct LockPoints {
 
 class CTxMemPool;
 
+class CTxMemPoolBase {
+public:
+    virtual ~CTxMemPoolBase() {}
+
+    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() = 0;
+};
+
+
 /**
  * Shared ancestor/descendant count information.
  */
@@ -137,14 +145,17 @@ using GroupID = std::optional<uint64_t>;
 
 class CTransactionRefWrapper {
 private:
-    CTransactionRef tx;
-    TxId txid;
+    CTransactionRef tx {};
+    // Transaction Id
+    TxId txid {};
+    // Mempool Transaction database
+    std::shared_ptr<CMempoolTxDB> mempoolTxDB {};
 
     CTransactionRef GetTxFromDB() const;
 
 public:
-    CTransactionRefWrapper();
-    CTransactionRefWrapper(const CTransactionRef &tx);
+    CTransactionRefWrapper() {};
+    CTransactionRefWrapper(const CTransactionRef &tx, std::shared_ptr<CMempoolTxDB> txDB);
 
     CTransactionRef GetTx() const;
     const TxId& GetId() const;
@@ -198,7 +209,8 @@ public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime, double _entryPriority,
                     int32_t _entryHeight, Amount _inChainInputValue,
-                    bool spendsCoinbase, LockPoints lp);
+                    bool spendsCoinbase, LockPoints lp,
+                    CTxMemPoolBase &mempoolIn);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
@@ -409,7 +421,7 @@ struct DisconnectedBlockTransactions;
  * entry as "dirty", and set the feerate for sorting purposes to be equal the
  * feerate of the transaction without any descendants.
  */
-class CTxMemPool {
+class CTxMemPool : public CTxMemPoolBase {
 private:
     //!< Value n means that n times in 2^32 we check.
     std::atomic_uint32_t nCheckFrequency;
@@ -587,7 +599,7 @@ public:
 
     void InitMempoolTxDB();
     // Get MempoolTxDB
-    std::shared_ptr<CMempoolTxDB> GetMempoolTxDB();
+    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() override;
 
     uint64_t GetDiskUsage();
 

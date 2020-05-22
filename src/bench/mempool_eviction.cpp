@@ -18,12 +18,11 @@ static void AddTx(const CTransaction &tx, const Amount &nFee,
     double dPriority = 10.0;
     int32_t nHeight = 1;
     bool spendsCoinbase = false;
-    unsigned int sigOpCost = 4;
     LockPoints lp;
     pool.AddUnchecked(tx.GetId(),
                       CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime,
                                       dPriority, nHeight, tx.GetValueOut(),
-                                      spendsCoinbase, lp),
+                                      spendsCoinbase, lp, pool),
                       nullChangeSet);
 }
 

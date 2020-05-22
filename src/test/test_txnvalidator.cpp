@@ -408,7 +408,8 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
                 height,
                 tx.GetValueOut(),
                 spendsCoinbase,
-                lp},
+                lp,
+                mempool},
             nullChangeSet);
 
         CValidationState state;
