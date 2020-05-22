@@ -393,10 +393,12 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-loadblock=<file>",
         _("Imports blocks from external blk000??.dat file on startup"));
+
     strUsage += HelpMessageOpt("-maxmempool=<n>",
-                               strprintf(_("Keep the transaction memory pool "
-                                           "below <n> megabytes (default: %u)"),
-                                         DEFAULT_MAX_MEMPOOL_SIZE));
+                   strprintf(_("Keep the transaction memory pool below <n> megabytes "
+                               "(default: %u%s)"),
+                             DEFAULT_MAX_MEMPOOL_SIZE,
+                             showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : ""));
     strUsage +=
         HelpMessageOpt("-mempoolexpiry=<n>",
                        strprintf(_("Do not keep transactions in the mempool "
@@ -1713,11 +1715,11 @@ bool AppInitParameterInteraction(Config &config) {
 
     // mempool limits
     int64_t nMempoolSizeMax =
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
+        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
     constexpr int64_t nMempoolSizeMin = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE * 0.3;
-    if (nMempoolSizeMax < 0 || nMempoolSizeMax < nMempoolSizeMin)
+    if (nMempoolSizeMax < 0 || (nMempoolSizeMax && nMempoolSizeMax < nMempoolSizeMin))
         return InitError(strprintf(_("-maxmempool must be at least %d MB"),
-                                   std::ceil(nMempoolSizeMin / 1000000.0)));
+                                   std::ceil(nMempoolSizeMin / static_cast<double>(ONE_MEGABYTE))));
 
 
     // script validation settings
@@ -2466,7 +2468,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
     int64_t nMempoolSizeMax =
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
+        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / 1024 / 1024));
