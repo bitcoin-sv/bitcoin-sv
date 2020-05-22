@@ -2358,7 +2358,7 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
 
     // Check if second time code runs much faster since invalid signatures are cached.
     // It usually runs 50-60 times faster.
-    BOOST_CHECK(duration.count() >  (duration2.count() * 10));
+    BOOST_TEST(duration.count() > (duration2.count() * 3));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
