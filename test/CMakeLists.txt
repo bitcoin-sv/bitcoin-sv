@@ -76,7 +76,7 @@ add_custom_target(testrunner
         ${CMAKE_CURRENT_BINARY_DIR}/util/bitcoin-util-test.py
 )
 
-IF (MSVC)
+IF (MSVC OR XCODE_VERSION)
 	# MSVC build requires configuration name to find buildbitcoind.exe
 	SET(extra_runner_prams --buildconfig  $<CONFIG>)
 endif()
