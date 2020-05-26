@@ -27,6 +27,7 @@
 #include "validation.h"
 #include "validationinterface.h"
 #include "invalid_txn_publisher.h"
+#include "rpc/http_protocol.h"
 
 #include <univalue.h>
 
@@ -337,8 +338,9 @@ static UniValue BIP22ValidationResult(const Config &config,
     return "valid?";
 }
 
-static UniValue getblocktemplate(const Config &config,
-                                 const JSONRPCRequest &request) {
+void getblocktemplate(const Config& config,
+                      const JSONRPCRequest& request, HTTPRequest& httpReq, bool processedInBatch = true)
+{
     if (request.fHelp || request.params.size() > 1) {
         throw std::runtime_error(
             "getblocktemplate ( TemplateRequest )\n"
@@ -483,28 +485,66 @@ static UniValue getblocktemplate(const Config &config,
 
             uint256 hash = block.GetHash();
             BlockMap::iterator mi = mapBlockIndex.find(hash);
+            // result is of type UniValue because of BIP22ValidationResult return type
+            UniValue result;
             if (mi != mapBlockIndex.end()) {
                 CBlockIndex *pindex = mi->second;
-                if (pindex->IsValid(BlockValidity::SCRIPTS)) {
-                    return "duplicate";
+                if (pindex->IsValid(BlockValidity::SCRIPTS))
+                {
+                    result = "duplicate";
                 }
-                if (pindex->nStatus.isInvalid()) {
-                    return "duplicate-invalid";
+                else if (pindex->nStatus.isInvalid())
+                {
+                    result = "duplicate-invalid";
                 }
-                return "duplicate-inconclusive";
+                else
+                {
+                    result = "duplicate-inconclusive";
+                }
+
+            }
+            else
+            {
+                CBlockIndex *const pindexPrev = chainActive.Tip();
+                // TestBlockValidity only supports blocks built on the current Tip
+                if (block.hashPrevBlock != pindexPrev->GetBlockHash())
+                {
+                    result = "inconclusive-not-best-prevblk";
+                }
+                else
+                {
+                    CValidationState state;
+                    BlockValidationOptions validationOptions =
+                        BlockValidationOptions(false, true);
+                    TestBlockValidity(config, state, block, pindexPrev,
+                                      validationOptions);
+                    result = BIP22ValidationResult(config, state);
+                }
             }
 
-            CBlockIndex *const pindexPrev = chainActive.Tip();
-            // TestBlockValidity only supports blocks built on the current Tip
-            if (block.hashPrevBlock != pindexPrev->GetBlockHash()) {
-                return "inconclusive-not-best-prevblk";
+            // after start of writing chunks no exception must be thrown, otherwise JSON response will be invalid
+            if (!processedInBatch)
+            {
+                httpReq.WriteHeader("Content-Type", "application/json");
+                httpReq.StartWritingChunks(HTTP_OK);
             }
-            CValidationState state;
-            BlockValidationOptions validationOptions =
-                BlockValidationOptions(false, true);
-            TestBlockValidity(config, state, block, pindexPrev,
-                              validationOptions);
-            return BIP22ValidationResult(config, state);
+
+            {
+                CHttpTextWriter httpWriter(httpReq);
+                CJSONWriter jWriter(httpWriter, false);
+                jWriter.writeBeginObject();
+                jWriter.pushKVJSONFormatted("result", result.write());
+                jWriter.pushKV("error", nullptr);
+                jWriter.pushKV("id", request.id.write());
+                jWriter.writeEndObject();
+                jWriter.flush();
+            }
+
+            if (!processedInBatch)
+            {
+                httpReq.StopWritingChunks();
+            }
+            return;  
         }
     }
 
@@ -613,83 +653,112 @@ static UniValue getblocktemplate(const Config &config,
     UpdateTime(pblock, config, pindexPrev);
     pblock->nNonce = 0;
 
-    UniValue aCaps(UniValue::VARR);
-    aCaps.push_back("proposal");
-
-    UniValue transactions(UniValue::VARR);
-    std::map<uint256, int64_t> setTxIndex;
-    int i = 0;
-    for (const auto &it : pblock->vtx) {
-        const CTransaction &tx = *it;
-        uint256 txId = tx.GetId();
-        setTxIndex[txId] = i++;
-
-        if (tx.IsCoinBase()) {
-            continue;
-        }
-
-        UniValue entry(UniValue::VOBJ);
-
-        entry.push_back(Pair("data", EncodeHexTx(tx)));
-        entry.push_back(Pair("txid", txId.GetHex()));
-        entry.push_back(Pair("hash", tx.GetHash().GetHex()));
-
-        UniValue deps(UniValue::VARR);
-        for (const CTxIn &in : tx.vin) {
-            if (setTxIndex.count(in.prevout.GetTxId())) {
-                deps.push_back(setTxIndex[in.prevout.GetTxId()]);
-            }
-        }
-        entry.push_back(Pair("depends", deps));
-
-        int index_in_template = i - 1;
-        entry.push_back(Pair(
-            "fee", pblocktemplate->vTxFees[index_in_template].GetSatoshis()));
-        int64_t nTxSigOps = pblocktemplate->vTxSigOpsCount[index_in_template];
-        entry.push_back(Pair("sigops", nTxSigOps));
-
-        transactions.push_back(entry);
+    // after start of writing chunks no exception must be thrown, otherwise JSON response will be invalid
+    if (!processedInBatch)
+    {
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
     }
 
-    UniValue aux(UniValue::VOBJ);
-    aux.push_back(
-        Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+    {
+        CHttpTextWriter httpWriter(httpReq);
+        CJSONWriter jWriter(httpWriter, false);
 
-    arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+        jWriter.writeBeginObject();
+        jWriter.pushKNoComma("result");
+        jWriter.writeBeginObject();
 
-    UniValue aMutable(UniValue::VARR);
-    aMutable.push_back("time");
-    aMutable.push_back("transactions");
-    aMutable.push_back("prevblock");
+        jWriter.writeBeginArray("capabilities");
+        jWriter.pushV("proposal");
+        jWriter.writeEndArray();
 
-    UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("capabilities", aCaps));
-    result.push_back(Pair("version", pblock->nVersion));
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("transactions", transactions));
-    result.push_back(Pair("coinbaseaux", aux));
-    result.push_back(
-        Pair("coinbasevalue",
-             (int64_t)pblock->vtx[0]->vout[0].nValue.GetSatoshis()));
-    result.push_back(Pair("longpollid",
-                          chainActive.Tip()->GetBlockHash().GetHex() +
-                              i64tostr(nTransactionsUpdatedLast)));
-    result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(
-        Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1));
-    result.push_back(Pair("mutable", aMutable));
-    result.push_back(Pair("noncerange", "00000000ffffffff"));
+        jWriter.pushKV("version", pblock->nVersion);
+        jWriter.pushKV("previousblockhash", pblock->hashPrevBlock.GetHex());
+        jWriter.writeBeginArray("transactions");
 
-    auto defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
-    // FIXME: Allow for mining block greater than 1M.
-    result.push_back(
-        Pair("sigoplimit", INT64_MAX));
-    result.push_back(Pair("sizelimit", defaultmaxBlockSize));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
-    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
-    result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight + 1)));
+        std::map<uint256, int64_t> setTxIndex;
+        int i = 0;
+        for (const auto &it : pblock->vtx) {
+            const CTransaction &tx = *it;
+            uint256 txId = tx.GetId();
+            setTxIndex[txId] = i++;
 
-    return result;
+            if (tx.IsCoinBase()) {
+                continue;
+            }
+
+            jWriter.writeBeginObject();
+
+            jWriter.pushK("data");
+            jWriter.pushQuote();
+            jWriter.flush();
+            // EncodeHexTx supports streaming (large transaction's hex should be chunked)
+            EncodeHexTx(tx, httpWriter, RPCSerializationFlags());
+            jWriter.pushQuote();
+
+            jWriter.pushKV("txid", txId.GetHex());
+            jWriter.pushKV("hash", tx.GetHash().GetHex());
+
+            jWriter.writeBeginArray("depends");
+            for (const CTxIn &in : tx.vin) {
+                if (setTxIndex.count(in.prevout.GetTxId())) {
+                    jWriter.pushV(setTxIndex[in.prevout.GetTxId()]);
+                }
+            }
+            jWriter.writeEndArray();
+
+            unsigned int index_in_template = i - 1;
+            jWriter.pushKV("fee", pblocktemplate->vTxFees[index_in_template].GetSatoshis());
+            int64_t nTxSigOps = pblocktemplate->vTxSigOpsCount[index_in_template];
+            jWriter.pushKV("sigops", nTxSigOps);
+
+            jWriter.writeEndObject();
+        }
+
+        jWriter.writeEndArray();
+
+        jWriter.writeBeginObject("coinbaseaux");
+        jWriter.pushKV("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end()));
+        jWriter.writeEndObject();
+
+        jWriter.pushKV("coinbasevalue", (int64_t)pblock->vtx[0]->vout[0].nValue.GetSatoshis());
+
+        jWriter.pushKV("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast));
+
+        arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
+        jWriter.pushKV("target", hashTarget.GetHex());
+
+        jWriter.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast() + 1);
+
+        jWriter.writeBeginArray("mutable");
+        jWriter.pushV("time");
+        jWriter.pushV("transactions");
+        jWriter.pushV("prevblock");
+        jWriter.writeEndArray();
+
+        jWriter.pushKV("noncerange", "00000000ffffffff");
+        // FIXME: Allow for mining block greater than 1M.
+        jWriter.pushKV("sigoplimit", INT64_MAX);
+
+        int64_t defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
+        jWriter.pushKV("sizelimit", defaultmaxBlockSize);
+
+        jWriter.pushKV("curtime", pblock->GetBlockTime());
+        jWriter.pushKV("bits", strprintf("%08x", pblock->nBits));
+        jWriter.pushKV("height", (int64_t)(pindexPrev->nHeight + 1));
+
+        jWriter.writeEndObject();
+
+        jWriter.pushKV("error", nullptr);
+        jWriter.pushKV("id", request.id.write());
+        jWriter.writeEndObject();
+        jWriter.flush();
+    }
+
+    if (!processedInBatch)
+    {
+        httpReq.StopWritingChunks();
+    } 
 }
 
 class submitblock_StateCatcher : public CValidationInterface {
