@@ -71,7 +71,6 @@ CCriticalSection cs_main;
 
 BlockMap mapBlockIndex;
 CChain chainActive;
-CChainActiveSharedData chainActiveSharedData;
 CBlockIndex *pindexBestHeader = nullptr;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -4078,8 +4077,6 @@ void PruneAndFlush() {
  */
 static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
     chainActive.SetTip(pindexNew);
-    chainActiveSharedData.SetChainActiveHeight(chainActive.Height());
-    chainActiveSharedData.SetChainActiveTipBlockHash(chainActive.Tip()->GetBlockHash());
 
     // New best block
     mempool.AddTransactionsUpdated(1);
@@ -6402,9 +6399,6 @@ void LoadChainTip(const CChainParams &chainparams) {
     }
 
     chainActive.SetTip(it->second);
-    chainActiveSharedData.SetChainActiveHeight(chainActive.Height());
-    chainActiveSharedData.SetChainActiveTipBlockHash(chainActive.Tip()->GetBlockHash());
-
     PruneBlockIndexCandidates();
 
     LogPrintf(
@@ -6775,8 +6769,6 @@ void UnloadBlockIndex() {
 
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
-    chainActiveSharedData.SetChainActiveHeight(0);
-    chainActiveSharedData.SetChainActiveTipBlockHash(uint256());
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
     mempool.Clear();

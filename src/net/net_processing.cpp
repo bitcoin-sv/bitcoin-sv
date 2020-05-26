@@ -1067,7 +1067,7 @@ bool AlreadyHave(const CInv &inv) {
 bool IsTxnKnown(const CInv &inv) {
     if (MSG_TX == inv.type) {
         const uint256& activeTipBlockHash {
-            chainActiveSharedData.GetChainActiveTipBlockHash()
+            chainActive.Tip()->GetBlockHash()
         };
         if (activeTipBlockHash != hashRecentRejectsChainTip) {
             // If the chain tip has changed previously rejected transactions
