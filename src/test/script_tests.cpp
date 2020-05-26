@@ -2294,6 +2294,67 @@ BOOST_AUTO_TEST_CASE(txout_IsDust) {
     BOOST_CHECK(CTxOut(Amount(10), opReturn).IsDust(feerate, true)); // single "OP_RETURN" is not considered data after Genesis upgrade, so it is considered dust
 }
 
+namespace {
+    class InstrumentedChecker : public CachingTransactionSignatureChecker
+    {
+    public:
+        struct Durations
+        {
+            std::chrono::microseconds check{};
+            std::chrono::microseconds verify{};
+
+            void TestCompareToFaster(const Durations& faster) const
+            {
+                BOOST_TEST(verify.count() > (faster.verify.count() * 10));
+                BOOST_TEST(check.count() > (faster.check.count() * 10));
+            }
+        };
+
+        InstrumentedChecker(
+            Durations& duration,
+            const CTransaction& txToIn,
+            const Amount amount,
+            PrecomputedTransactionData& txdataIn)
+            : CachingTransactionSignatureChecker{&txToIn, 1, amount, true, txdataIn}
+            , mDuration{duration}
+        {}
+
+        bool VerifySignature(
+            const std::vector<uint8_t>& vchSig,
+            const CPubKey& vchPubKey,
+            const uint256& sighash) const override
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            bool res = CachingTransactionSignatureChecker::VerifySignature(vchSig, vchPubKey, sighash);
+            mDuration.verify +=
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::high_resolution_clock::now() - start);
+
+            return res;
+        }
+
+        bool CheckSig(
+            const std::vector<uint8_t>& scriptSig,
+            const std::vector<uint8_t>& vchPubKey,
+            const CScript& scriptCode,
+            bool enabledSighashForkid) const override
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            bool res =
+                CachingTransactionSignatureChecker::CheckSig(
+                    scriptSig, vchPubKey, scriptCode, enabledSighashForkid);
+            mDuration.check +=
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::high_resolution_clock::now() - start);
+
+            return res;
+        }
+
+    private:
+        Durations& mDuration;
+    };
+}
+
 BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
     ScriptError err;
     auto source = task::CCancellationSource::Make();
@@ -2324,7 +2385,8 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
 
     // Verify the same script twice. In the second iteration it should run
     // much faster, since we cached invalid signatures.
-    auto start = std::chrono::high_resolution_clock::now();    
+    InstrumentedChecker::Durations durations;
+    auto start = std::chrono::high_resolution_clock::now();
     auto res =
         VerifyScript(
             testConfig,
@@ -2333,12 +2395,13 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
             scriptSig,
             scriptPubKey,
             flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-            CachingTransactionSignatureChecker(&nmSpendingTx, true, nmCreditingTx.vout[0].nValue, true, txdata),
+            InstrumentedChecker(durations, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
             &err);
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start); 
     BOOST_CHECK(res.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+    InstrumentedChecker::Durations durationsCached;
     auto start2 = std::chrono::high_resolution_clock::now();
     auto res2 =
         VerifyScript(
@@ -2348,13 +2411,15 @@ BOOST_AUTO_TEST_CASE(caching_invalid_signatures) {
             scriptSig,
             scriptPubKey,
             flags | SCRIPT_UTXO_AFTER_GENESIS | SCRIPT_GENESIS,
-            CachingTransactionSignatureChecker(&nmSpendingTx, true, nmCreditingTx.vout[0].nValue, true, txdata),
+            InstrumentedChecker(durationsCached, nmSpendingTx, nmCreditingTx.vout[0].nValue, txdata),
             &err);
     auto stop2 = std::chrono::high_resolution_clock::now();
     auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(stop2 - start2); 
     
     BOOST_CHECK(res2.value());
     BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
+
+    durations.TestCompareToFaster(durationsCached);
 
     // Check if second time code runs much faster since invalid signatures are cached.
     // It usually runs 50-60 times faster.
