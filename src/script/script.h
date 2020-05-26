@@ -6,10 +6,11 @@
 #ifndef BITCOIN_SCRIPT_SCRIPT_H
 #define BITCOIN_SCRIPT_SCRIPT_H
 
+#include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "prevector.h"
 #include "serialize.h"
-#include "consensus/consensus.h"
+#include "span.h"
 
 #include <cassert>
 #include <climits>
@@ -455,6 +456,8 @@ public:
 
 std::ostream &operator<<(std::ostream &, const CScript &);
 std::string to_string(const CScript&);
+
+size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 
 struct CScriptWitness {
     // Note that this encodes the data elements being pushed, rather than

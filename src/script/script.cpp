@@ -545,3 +545,12 @@ std::string to_string(const CScript& s)
     return oss.str();
 }
 
+size_t CountOp(const bsv::span<const uint8_t> s, const opcodetype opcode)
+{
+    using namespace bsv;
+    instruction_iterator first{s};
+    instruction_iterator last{s.last(0)};
+    return std::count_if(first, last, [opcode](const instruction& inst) {
+        return inst.opcode() == opcode;
+    });
+}
