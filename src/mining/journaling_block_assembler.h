@@ -19,6 +19,9 @@ class JournalingBlockAssembler : public BlockAssembler
 {
   public:
 
+    // Default config values
+    static constexpr uint64_t DEFAULT_MAX_SLOT_TRANSACTIONS {20000};
+
     // Construction/destruction
     JournalingBlockAssembler(const Config& config);
     ~JournalingBlockAssembler();
@@ -31,6 +34,9 @@ class JournalingBlockAssembler : public BlockAssembler
 
     // Get (and reset) whether we might produce an updated template
     bool GetTemplateUpdated() override;
+
+    // (Re)read our configuration parameters (for unit testing)
+    void ReadConfigParameters();
 
   private:
 
@@ -70,8 +76,7 @@ class JournalingBlockAssembler : public BlockAssembler
     std::chrono::milliseconds mRunFrequency {DEFAULT_RUN_FREQUENCY_MILLIS};
 
     // Maximum number of transactions to process per time slot
-    static constexpr size_t DEFAULT_MAX_TRANSACTIONS {1000};
-    size_t mMaxTransactions {DEFAULT_MAX_TRANSACTIONS};
+    std::atomic_uint64_t mMaxSlotTransactions {DEFAULT_MAX_SLOT_TRANSACTIONS};
 
     // The journal we're reading from and our current position in that journal
     CJournalPtr mJournal {nullptr};

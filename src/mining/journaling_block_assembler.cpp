@@ -15,9 +15,18 @@
 using mining::CBlockTemplate;
 using mining::JournalingBlockAssembler;
 
+namespace
+{
+    // Getters for config values
+    uint64_t GetMaxTxnBatch()
+    {
+        return static_cast<uint64_t>(gArgs.GetArg("-jbamaxtxnbatch", JournalingBlockAssembler::DEFAULT_MAX_SLOT_TRANSACTIONS));
+    }
+}
+
 // Construction
 JournalingBlockAssembler::JournalingBlockAssembler(const Config& config)
-: BlockAssembler{config}
+: BlockAssembler{config}, mMaxSlotTransactions{GetMaxTxnBatch()}
 {
     // Create a new starting block
     newBlock();
@@ -34,6 +43,14 @@ JournalingBlockAssembler::~JournalingBlockAssembler()
 {
     promise_.set_value(); // Tell worker to finish
     future_.wait();       // Wait for worker to finish
+}
+
+
+// (Re)read our configuration parameters (for unit testing)
+void JournalingBlockAssembler::ReadConfigParameters()
+{
+    // Get config values
+    mMaxSlotTransactions = GetMaxTxnBatch();
 }
 
 
@@ -189,7 +206,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
 
                 // We're finished if we've reached the end of the journal, or we've added
                 // as many transactions this iteration as we're allowed.
-                finished = (mJournalPos == journalLock.end() || txnNum >= mMaxTransactions);
+                finished = (mJournalPos == journalLock.end() || txnNum >= mMaxSlotTransactions);
             }
             else
             {

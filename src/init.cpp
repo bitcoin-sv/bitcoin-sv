@@ -23,6 +23,7 @@
 #include "httpserver.h"
 #include "key.h"
 #include "mining/journal_builder.h"
+#include "mining/journaling_block_assembler.h"
 #include "mining/legacy.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -1018,11 +1019,17 @@ std::string HelpMessage(HelpMessageMode mode) {
                            "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
     }
 
+    /** Block assembler */
     strUsage += HelpMessageOpt(
         "-blockassembler=<type>",
         strprintf(_("Set the type of block assembler to use for mining. Supported options are "
                     "LEGACY or JOURNALING. (default: %s)"),
                   enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
+    strUsage += HelpMessageOpt( 
+        "-jbamaxtxnbatch=<max batch size>",
+        strprintf(_("Set the maximum number of transactions processed in a batch by the journaling block assembler "
+                "(default: %d)"), mining::JournalingBlockAssembler::DEFAULT_MAX_SLOT_TRANSACTIONS)
+    );
 
     strUsage += HelpMessageGroup(_("RPC server options:"));
     strUsage += HelpMessageOpt("-server",
