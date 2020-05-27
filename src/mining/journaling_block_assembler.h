@@ -21,6 +21,7 @@ class JournalingBlockAssembler : public BlockAssembler
 
     // Default config values
     static constexpr uint64_t DEFAULT_MAX_SLOT_TRANSACTIONS {20000};
+    static constexpr bool DEFAULT_NEW_BLOCK_FILL {false};
 
     // Construction/destruction
     JournalingBlockAssembler(const Config& config);
@@ -44,7 +45,7 @@ class JournalingBlockAssembler : public BlockAssembler
     void threadBlockUpdate() noexcept;
 
     // Update our block template with some new transactions
-    void updateBlock(const CBlockIndex* pindex);
+    void updateBlock(const CBlockIndex* pindex, uint64_t maxTxns);
 
     // Create a new block for us to start working on
     void newBlock();
@@ -77,6 +78,9 @@ class JournalingBlockAssembler : public BlockAssembler
 
     // Maximum number of transactions to process per time slot
     std::atomic_uint64_t mMaxSlotTransactions {DEFAULT_MAX_SLOT_TRANSACTIONS};
+    // Whether every call to CreateNewBlock returns all txns from the journal,
+    // or whether sometimes only a subset may be returned.
+    std::atomic_bool mNewBlockFill {DEFAULT_NEW_BLOCK_FILL};
 
     // The journal we're reading from and our current position in that journal
     CJournalPtr mJournal {nullptr};

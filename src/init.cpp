@@ -1030,6 +1030,18 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf(_("Set the maximum number of transactions processed in a batch by the journaling block assembler "
                 "(default: %d)"), mining::JournalingBlockAssembler::DEFAULT_MAX_SLOT_TRANSACTIONS)
     );
+    if (showDebug) {
+        strUsage += HelpMessageOpt( 
+            "-jbafillafternewblock",
+            strprintf(_("After a new block has been found it can take a short while for the journaling block assembler "
+                        "to catch up and return a new candidate containing every transaction in the mempool. "
+                        "If this flag is 1, calling getminingcandidate will wait until the JBA has caught up "
+                        "and always return a candidate with every available transaction. If it is 0, calls to "
+                        "getminingcandidate will always return straight away but may occasionally only contain a "
+                        "subset of the available transactions from the mempool (default: %d)"),
+                mining::JournalingBlockAssembler::DEFAULT_NEW_BLOCK_FILL)
+        );
+    }
 
     strUsage += HelpMessageGroup(_("RPC server options:"));
     strUsage += HelpMessageOpt("-server",

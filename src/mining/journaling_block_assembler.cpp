@@ -12,6 +12,8 @@
 #include <util.h>
 #include <validation.h>
 
+#include <limits>
+
 using mining::CBlockTemplate;
 using mining::JournalingBlockAssembler;
 
@@ -22,11 +24,15 @@ namespace
     {
         return static_cast<uint64_t>(gArgs.GetArg("-jbamaxtxnbatch", JournalingBlockAssembler::DEFAULT_MAX_SLOT_TRANSACTIONS));
     }
+    bool GetFillAfterNewBlock()
+    {
+        return gArgs.GetBoolArg("-jbafillafternewblock", JournalingBlockAssembler::DEFAULT_NEW_BLOCK_FILL);
+    }
 }
 
 // Construction
 JournalingBlockAssembler::JournalingBlockAssembler(const Config& config)
-: BlockAssembler{config}, mMaxSlotTransactions{GetMaxTxnBatch()}
+: BlockAssembler{config}, mMaxSlotTransactions{GetMaxTxnBatch()}, mNewBlockFill{GetFillAfterNewBlock()}
 {
     // Create a new starting block
     newBlock();
@@ -51,6 +57,7 @@ void JournalingBlockAssembler::ReadConfigParameters()
 {
     // Get config values
     mMaxSlotTransactions = GetMaxTxnBatch();
+    mNewBlockFill = GetFillAfterNewBlock();
 }
 
 
@@ -67,7 +74,7 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
         std::unique_lock<std::mutex> lock { mMtx };
 
         // Get our best block even if the background thread hasn't run for a while
-        updateBlock(pindexPrevNew);
+        updateBlock(pindexPrevNew, mNewBlockFill? std::numeric_limits<uint64_t>::max() : mMaxSlotTransactions.load());
         // Copy our current transactions into the block
         block->vtx = mBlockTxns;
     }
@@ -146,7 +153,7 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
 
                 // Update block template
                 std::unique_lock<std::mutex> lock { mMtx };
-                updateBlock(pindex);
+                updateBlock(pindex, mMaxSlotTransactions);
             }
             else if(status == std::future_status::ready)
                 break;
@@ -161,9 +168,9 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
 }
 
 // Update our block template with some new transactions - Caller holds mutex
-void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
+void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t maxTxns)
 {
-    size_t txnNum {0};
+    uint64_t txnNum {0};
 
     try
     {
@@ -206,7 +213,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
 
                 // We're finished if we've reached the end of the journal, or we've added
                 // as many transactions this iteration as we're allowed.
-                finished = (mJournalPos == journalLock.end() || txnNum >= mMaxSlotTransactions);
+                finished = (mJournalPos == journalLock.end() || txnNum >= maxTxns);
             }
             else
             {
@@ -222,7 +229,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex)
 
     if(txnNum > 0)
     {
-        LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler processed %d transactions from the journal\n", txnNum);
+        LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler processed %llu transactions from the journal\n", txnNum);
     }
 }
 
