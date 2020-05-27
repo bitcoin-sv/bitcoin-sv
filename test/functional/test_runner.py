@@ -129,6 +129,8 @@ def main():
         '--exclude', '-x', help='specify a comma-seperated-list of scripts to exclude. Do not include the .py extension in the name.')
     parser.add_argument('--extended', action='store_true',
                         help='run the extended test suite in addition to the basic tests')
+    parser.add_argument('--list-tests', action='store_true',
+                        help='just show the tests that would be run')
     parser.add_argument('--help', '-h', '-?',
                         action='store_true', help='print help text and exit')
     parser.add_argument('--jobs', '-j', type=int, default=4,
@@ -244,6 +246,10 @@ def main():
         parser.print_help()
         subprocess.check_call(
             [sys.executable, os.path.join(tests_dir, test_list[0]), '-h'])
+        sys.exit(0)
+
+    if args.list_tests:
+        print("\n".join(test_list))
         sys.exit(0)
 
     if not args.keepcache:
