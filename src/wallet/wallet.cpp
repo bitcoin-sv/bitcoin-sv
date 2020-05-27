@@ -83,7 +83,7 @@ struct CompareValueOnly {
 };
 
 bool CWallet::ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet) {
-    bool isGenesisEnabled = scriptPubKey.IsPayToScriptHash() ? false : true;
+    const bool isGenesisEnabled = !IsPayToScriptHash(scriptPubKey);
     return ::ExtractDestination(scriptPubKey, isGenesisEnabled, addressRet);
 }
 
@@ -107,7 +107,7 @@ public:
         std::vector<CTxDestination> vDest;
         int nRequired;
         // We will treat all scripts as after genesis except P2SH.
-        bool isGenesisEnabled = script.IsPayToScriptHash() ? false : true;
+        const bool isGenesisEnabled = !IsPayToScriptHash(script);
         if (ExtractDestinations(script, isGenesisEnabled, type, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest) {
                 boost::apply_visitor(*this, dest);
@@ -2326,7 +2326,9 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
             if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
                 !IsLockedCoin((*it).first, i) &&
                 (pcoin->tx->vout[i].nValue > Amount(0) || fIncludeZeroValue) &&
-                !(pcoin->tx->vout[i].scriptPubKey.IsPayToScriptHash() && pcoin->IsGenesisEnabled()) && // we don't want to select p2sh utxos created after genesis
+                !(IsPayToScriptHash(pcoin->tx->vout[i].scriptPubKey) &&
+                  pcoin->IsGenesisEnabled()) && // we don't want to select p2sh
+                                                // utxos created after genesis
                 (!coinControl || !coinControl->HasSelected() ||
                  coinControl->fAllowOtherInputs ||
                  coinControl->IsSelected(COutPoint((*it).first, i)))) {

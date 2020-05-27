@@ -116,7 +116,7 @@ unsigned int CTransaction::GetTotalSize() const {
 bool CTransaction::HasP2SHOutput() const {
      return std::any_of(vout.begin(), vout.end(), 
             [](const CTxOut& o){ 
-                return o.scriptPubKey.IsPayToScriptHash(); 
+                return IsPayToScriptHash(o.scriptPubKey); 
             }
         );
 }
