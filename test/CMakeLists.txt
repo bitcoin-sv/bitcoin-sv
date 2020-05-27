@@ -71,6 +71,7 @@ make_link(
 add_custom_target(testrunner
     DEPENDS
         ../src/bitcoind
+        ../src/bitcoin-cli
         ${CMAKE_CURRENT_BINARY_DIR}/functional/test_runner.py
         ${CMAKE_CURRENT_BINARY_DIR}/functional/create_cache.py
         ${CMAKE_CURRENT_BINARY_DIR}/util/bitcoin-util-test.py
