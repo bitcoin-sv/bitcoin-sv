@@ -20,7 +20,7 @@ namespace
         static uint32_t lockTime {0};
         CMutableTransaction txn {};
         txn.nLockTime = lockTime++;
-        return { MakeTransactionRef(std::move(txn)), std::make_shared<AncestorDescendantCounts>(1), Amount{0}, 0 };
+        return { MakeTransactionRef(std::move(txn)), std::make_shared<AncestorCounts>(1), Amount{0}, 0 };
     }
     // Generate a new random transaction that depends on another
     CJournalEntry NewTxn(std::initializer_list<CTransactionRef> other)
@@ -31,7 +31,7 @@ namespace
             txn.vin.emplace_back(CTxIn{COutPoint(prev->GetHash(), 0), CScript()});
         }
         txn.nLockTime = lockTime++;
-        return { MakeTransactionRef(std::move(txn)), std::make_shared<AncestorDescendantCounts>(1, 1), Amount{0}, 0 };
+        return { MakeTransactionRef(std::move(txn)), std::make_shared<AncestorCounts>(1), Amount{0}, 0 };
     }
 
     CJournalChangeSetPtr changeSet(CJournalBuilder* builder, JournalUpdateReason reason, std::initializer_list<std::pair<CJournalChangeSet::Operation, CJournalEntry>> ops)

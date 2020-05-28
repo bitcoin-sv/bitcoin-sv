@@ -125,7 +125,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
     nModSize = tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(tx);
 
-    ancestorDescendantCounts = std::make_shared<AncestorDescendantCounts>(1);
+    ancestorCounts = std::make_shared<AncestorCounts>(1);
     Amount nValueIn = tx->GetValueOut() + nFee;
     assert(inChainInputValue <= nValueIn);
 
@@ -455,8 +455,8 @@ void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, Amount modifyFee,
     nSizeWithAncestors += modifySize;
     assert(int64_t(nSizeWithAncestors) > 0);
     nModFeesWithAncestors += modifyFee;
-    ancestorDescendantCounts->nCountWithAncestors += modifyCount;
-    assert(int64_t(ancestorDescendantCounts->nCountWithAncestors) > 0);
+    ancestorCounts->nCountWithAncestors += modifyCount;
+    assert(int64_t(ancestorCounts->nCountWithAncestors) > 0);
     nSigOpCountWithAncestors += modifySigOps;
     assert(int(nSigOpCountWithAncestors) >= 0);
 }
@@ -1169,8 +1169,9 @@ void CTxMemPool::RebuildJournal() const
         std::stable_sort(entries.begin(), entries.end(),
                          [](const CTxMemPoolEntry& entry1, const CTxMemPoolEntry& entry2)
                          {
-            const auto& count1 = entry1.GetAncestorDescendantCounts();
-            const auto& count2 = entry2.GetAncestorDescendantCounts();
+
+            const auto& count1 = entry1.GetAncestorCounts();
+            const auto& count2 = entry2.GetAncestorCounts();
             return (count1->nCountWithAncestors < count2->nCountWithAncestors);
         });
         for(const auto& entry : entries)

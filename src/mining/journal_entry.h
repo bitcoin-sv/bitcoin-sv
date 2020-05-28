@@ -18,19 +18,19 @@ class CJournalEntry
   public:
 
     // Constructors
-    CJournalEntry(const CTransactionRef& txn, const AncestorDescendantCountsPtr& count,
+    CJournalEntry(const CTransactionRef& txn, const AncestorCountsPtr& count,
                   const Amount& fee, int64_t sigOps)
     : mTxn{txn}, mAncestorCount{count}, mFee{fee}, mSigOpsCount{sigOps}
     {}
 
     CJournalEntry(const CTxMemPoolEntry& entry)
-    : CJournalEntry{entry.GetSharedTx(), entry.GetAncestorDescendantCounts(), entry.GetFee(),
+    : CJournalEntry{entry.GetSharedTx(), entry.GetAncestorCounts(), entry.GetFee(),
                     entry.GetSigOpCount()}
     {}
 
     // Accessors
     const CTransactionRef& getTxn() const { return mTxn; }
-    const AncestorDescendantCountsPtr& getAncestorCount() const { return mAncestorCount; }
+    const AncestorCountsPtr& getAncestorCount() const { return mAncestorCount; }
     const Amount& getFee() const { return mFee; }
     int64_t getSigOpsCount() const { return mSigOpsCount; }
 
@@ -40,7 +40,7 @@ class CJournalEntry
     CTransactionRef mTxn {};
 
     // Shared pointer to the ancestor count information
-    AncestorDescendantCountsPtr mAncestorCount {};
+    AncestorCountsPtr mAncestorCount {};
 
     // Fee and sig ops count for the transaction
     Amount mFee {0};
