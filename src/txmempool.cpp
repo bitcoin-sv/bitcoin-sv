@@ -1850,60 +1850,65 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     const mining::CJournalChangeSetPtr& changeSet,
     std::vector<COutPoint>* pvNoSpendsRemaining) {
 
-    std::unique_lock lock(smtx);
+    // FIXME: Disabled to remove references on mempool descendant score.
+    // TODO: CORE-130
 
-    unsigned nTxnRemoved = 0;
-    CFeeRate maxFeeRateRemoved(Amount(0));
-    std::vector<TxId> vRemovedTxIds {};
-    while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
-        indexed_transaction_set::index<descendant_score>::type::iterator it =
-            mapTx.get<descendant_score>().begin();
+    // std::unique_lock lock(smtx);
 
-        // We set the new mempool min fee to the feerate of the removed set,
-        // plus the "minimum reasonable fee rate" (ie some value under which we
-        // consider txn to have 0 fee). This way, we don't allow txn to enter
-        // mempool with feerate equal to txn which were removed with no block in
-        // between.
-        CFeeRate removed(it->GetModFeesWithDescendants(),
-                         it->GetSizeWithDescendants());
-        removed += MEMPOOL_FULL_FEE_INCREMENT;
+    // unsigned nTxnRemoved = 0;
+    // CFeeRate maxFeeRateRemoved(Amount(0));
+    // std::vector<TxId> vRemovedTxIds {};
+    // while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
+    //     indexed_transaction_set::index<descendant_score>::type::iterator it =
+    //         mapTx.get<descendant_score>().begin();
 
-        trackPackageRemovedNL(removed);
-        maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
+    //     // We set the new mempool min fee to the feerate of the removed set,
+    //     // plus the "minimum reasonable fee rate" (ie some value under which we
+    //     // consider txn to have 0 fee). This way, we don't allow txn to enter
+    //     // mempool with feerate equal to txn which were removed with no block in
+    //     // between.
+    //     CFeeRate removed(it->GetModFeesWithDescendants(),
+    //                      it->GetSizeWithDescendants());
+    //     removed += MEMPOOL_FULL_FEE_INCREMENT;
 
-        setEntries stage;
-        CalculateDescendantsNL(mapTx.project<0>(it), stage);
-        nTxnRemoved += stage.size();
+    //     trackPackageRemovedNL(removed);
+    //     maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
-        std::vector<CTransaction> txn;
-        if (pvNoSpendsRemaining) {
-            txn.reserve(stage.size());
-            for (txiter iter : stage) {
-                txn.push_back(iter->GetTx());
-                vRemovedTxIds.emplace_back(iter->GetTx().GetId());
-            }
-        }
-        removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::SIZELIMIT);
-        if (pvNoSpendsRemaining) {
-            for (const CTransaction &tx : txn) {
-                for (const CTxIn &txin : tx.vin) {
-                    if (ExistsNL(txin.prevout.GetTxId())) {
-                        continue;
-                    }
-                    if (!mapNextTx.count(txin.prevout)) {
-                        pvNoSpendsRemaining->push_back(txin.prevout);
-                    }
-                }
-            }
-        }
-    }
+    //     setEntries stage;
+    //     CalculateDescendantsNL(mapTx.project<0>(it), stage);
+    //     nTxnRemoved += stage.size();
 
-    if (maxFeeRateRemoved > CFeeRate(Amount(0))) {
-        LogPrint(BCLog::MEMPOOL,
-                 "Removed %u txn, rolling minimum fee bumped to %s\n",
-                 nTxnRemoved, maxFeeRateRemoved.ToString());
-    }
-    return vRemovedTxIds;
+    //     std::vector<CTransaction> txn;
+    //     if (pvNoSpendsRemaining) {
+    //         txn.reserve(stage.size());
+    //         for (txiter iter : stage) {
+    //             txn.push_back(iter->GetTx());
+    //             vRemovedTxIds.emplace_back(iter->GetTx().GetId());
+    //         }
+    //     }
+    //     removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::SIZELIMIT);
+    //     if (pvNoSpendsRemaining) {
+    //         for (const CTransaction &tx : txn) {
+    //             for (const CTxIn &txin : tx.vin) {
+    //                 if (ExistsNL(txin.prevout.GetTxId())) {
+    //                     continue;
+    //                 }
+    //                 if (!mapNextTx.count(txin.prevout)) {
+    //                     pvNoSpendsRemaining->push_back(txin.prevout);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // if (maxFeeRateRemoved > CFeeRate(Amount(0))) {
+    //     LogPrint(BCLog::MEMPOOL,
+    //              "Removed %u txn, rolling minimum fee bumped to %s\n",
+    //              nTxnRemoved, maxFeeRateRemoved.ToString());
+    // }
+    // return vRemovedTxIds;
+
+    return std::vector<TxId>();
 }
 
 bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
