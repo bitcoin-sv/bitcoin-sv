@@ -125,9 +125,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
     nModSize = tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(tx);
 
-    ancestorDescendantCounts = std::make_shared<AncestorDescendantCounts>(1, 1);
-    nSizeWithDescendants = GetTxSize();
-    nModFeesWithDescendants = nFee;
+    ancestorDescendantCounts = std::make_shared<AncestorDescendantCounts>(1);
     Amount nValueIn = tx->GetValueOut() + nFee;
     assert(inChainInputValue <= nValueIn);
 
@@ -151,7 +149,6 @@ double CTxMemPoolEntry::GetPriority(int32_t currentHeight) const {
 }
 
 void CTxMemPoolEntry::UpdateFeeDelta(Amount newFeeDelta) {
-    nModFeesWithDescendants += newFeeDelta - feeDelta;
     nModFeesWithAncestors += newFeeDelta - feeDelta;
     feeDelta = newFeeDelta;
 }
@@ -206,8 +203,6 @@ void CTxMemPool::updateForDescendantsNL(txiter updateIt,
                                                updateIt->GetSigOpCount()));
         }
     }
-    mapTx.modify(updateIt,
-                 update_descendant_state(modifySize, modifyFee, modifyCount));
 }
 
 // vHashesToUpdate is the set of transaction hashes from a disconnected block
@@ -329,21 +324,6 @@ bool CTxMemPool::CalculateMemPoolAncestorsNL(
         parentHashes.erase(stageit);
         totalSizeWithAncestors += stageit->GetTxSize();
 
-        if (stageit->GetSizeWithDescendants() + entry.GetTxSize() >
-            limitDescendantSize) {
-            errString = strprintf(
-                "exceeds descendant size limit for tx %s [limit: %u]",
-                stageit->GetTx().GetId().ToString(), limitDescendantSize);
-            return false;
-        }
-
-        if (stageit->GetCountWithDescendants() + 1 > limitDescendantCount) {
-            errString = strprintf("too many descendants for tx %s [limit: %u]",
-                                  stageit->GetTx().GetId().ToString(),
-                                  limitDescendantCount);
-            return false;
-        }
-
         if (totalSizeWithAncestors > limitAncestorSize) {
             errString = strprintf("exceeds ancestor size limit [limit: %u]",
                                   limitAncestorSize);
@@ -376,13 +356,6 @@ void CTxMemPool::updateAncestorsOfNL(bool add,
     // add or remove this tx as a child of each parent
     for (txiter piter : parentIters) {
         updateChildNL(piter, it, add);
-    }
-    const int64_t updateCount = (add ? 1 : -1);
-    const int64_t updateSize = updateCount * it->GetTxSize();
-    const Amount updateFee = updateCount * it->GetModifiedFee();
-    for (txiter ancestorIt : setAncestors) {
-        mapTx.modify(ancestorIt, update_descendant_state(updateSize, updateFee,
-                                                         updateCount));
     }
 }
 
@@ -474,16 +447,6 @@ void CTxMemPool::updateForRemoveFromMempoolNL(const setEntries &entriesToRemove,
     for (txiter removeIt : entriesToRemove) {
         updateChildrenForRemovalNL(removeIt);
     }
-}
-
-void CTxMemPoolEntry::UpdateDescendantState(int64_t modifySize,
-                                            Amount modifyFee,
-                                            int64_t modifyCount) {
-    nSizeWithDescendants += modifySize;
-    assert(int64_t(nSizeWithDescendants) > 0);
-    nModFeesWithDescendants += modifyFee;
-    ancestorDescendantCounts->nCountWithDescendants += modifyCount;
-    assert(int64_t(ancestorDescendantCounts->nCountWithDescendants) > 0);
 }
 
 void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, Amount modifyFee,
@@ -1067,10 +1030,6 @@ void CTxMemPool::CheckMempoolImplNL(
             }
         }
         assert(setChildrenCheck == GetMemPoolChildrenNL(it)); // MARK: also used by legacy
-        // Also check to make sure size is greater than sum with immediate
-        // children. Just a sanity check, not definitive that this calc is
-        // correct...
-        assert(it->GetSizeWithDescendants() >= childSizes + it->GetTxSize());
 
         if (fDependsWait) {
             waitingOnDependants.push_back(&(*it));
@@ -1437,10 +1396,6 @@ void CTxMemPool::prioritiseTransactionNL(
             nNoLimit,
             dummy,
             false);
-        for (txiter ancestorIt : setAncestors) {
-            mapTx.modify(ancestorIt,
-                         update_descendant_state(0, nFeeDelta, 0));
-        }
 
         // Now update all descendants' modified fees with ancestors
         setEntries setDescendants;
@@ -1915,8 +1870,7 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
                                              size_t chainLimit) const {
     std::shared_lock lock(smtx);
     auto it = mapTx.find(txid);
-    return it == mapTx.end() || (it->GetCountWithAncestors() < chainLimit &&
-                                 it->GetCountWithDescendants() < chainLimit);
+    return it == mapTx.end() || (it->GetCountWithAncestors() < chainLimit);
 }
 
 unsigned long CTxMemPool::Size() {

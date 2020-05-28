@@ -326,9 +326,6 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
     jWriter.pushKV("height", static_cast<uint64_t>(e.GetHeight()));
     jWriter.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
     jWriter.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
-    jWriter.pushKV("descendantcount", e.GetCountWithDescendants());
-    jWriter.pushKV("descendantsize", e.GetSizeWithDescendants());
-    jWriter.pushKV("descendantfees", e.GetModFeesWithDescendants().GetSatoshis());
     jWriter.pushKV("ancestorcount", e.GetCountWithAncestors());
     jWriter.pushKV("ancestorsize", e.GetSizeWithAncestors());  // MARK: also used by legacy
     jWriter.pushKV("ancestorfees", e.GetModFeesWithAncestors().GetSatoshis()); // MARK: also used by legacy

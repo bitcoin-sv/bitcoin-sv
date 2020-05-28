@@ -75,14 +75,13 @@ class CTxMemPool;
  */
 struct AncestorDescendantCounts
 {
-    AncestorDescendantCounts(uint64_t ancestors, uint64_t descendants)
-    : nCountWithAncestors{ancestors}, nCountWithDescendants{descendants}
+    AncestorDescendantCounts(uint64_t ancestors)
+        : nCountWithAncestors{ancestors}
     {}
 
     // These don't actually need to be atomic currently, but there's no cost
     // if they are and we might want to access them across threads in the future.
     std::atomic_uint64_t nCountWithAncestors   {0};
-    std::atomic_uint64_t nCountWithDescendants {0};
 };
 using AncestorDescendantCountsPtr = std::shared_ptr<AncestorDescendantCounts>;
 
@@ -159,10 +158,6 @@ private:
     // correct.
     //!< number of descendant transactions
     AncestorDescendantCountsPtr ancestorDescendantCounts;
-    //!< ... and size
-    uint64_t nSizeWithDescendants;
-    //!< ... and total fees (all including us)
-    Amount nModFeesWithDescendants;
 
     // Analogous statistics for ancestor transactions
     uint64_t nSizeWithAncestors;
@@ -199,9 +194,6 @@ public:
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints &GetLockPoints() const { return lockPoints; }
 
-    // Adjusts the descendant state, if this entry is not dirty.
-    void UpdateDescendantState(int64_t modifySize, Amount modifyFee,
-                               int64_t modifyCount);
     // Adjusts the ancestor state
     void UpdateAncestorState(int64_t modifySize, Amount modifyFee,
                              int64_t modifyCount, int modifySigOps);
@@ -212,9 +204,6 @@ public:
     void UpdateLockPoints(const LockPoints &lp);
 
     const AncestorDescendantCountsPtr& GetAncestorDescendantCounts() const { return ancestorDescendantCounts; }
-    uint64_t GetCountWithDescendants() const { return ancestorDescendantCounts->nCountWithDescendants; }
-    uint64_t GetSizeWithDescendants() const { return nSizeWithDescendants; }
-    Amount GetModFeesWithDescendants() const { return nModFeesWithDescendants; }
 
     bool GetSpendsCoinbase() const { return spendsCoinbase; }
 
@@ -227,23 +216,6 @@ public:
 
     //!< Index in mempool's vTxHashes
     mutable size_t vTxHashesIdx;
-};
-
-// Helpers for modifying CTxMemPool::mapTx, which is a boost multi_index.
-struct update_descendant_state {
-    update_descendant_state(int64_t _modifySize, Amount _modifyFee,
-                            int64_t _modifyCount)
-        : modifySize(_modifySize), modifyFee(_modifyFee),
-          modifyCount(_modifyCount) {}
-
-    void operator()(CTxMemPoolEntry &e) {
-        e.UpdateDescendantState(modifySize, modifyFee, modifyCount);
-    }
-
-private:
-    int64_t modifySize;
-    Amount modifyFee;
-    int64_t modifyCount;
 };
 
 struct update_ancestor_state {
