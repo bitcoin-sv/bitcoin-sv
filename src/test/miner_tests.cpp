@@ -4,6 +4,7 @@
 
 #include "mining/factory.h"
 #include "mining/journal_builder.h"
+#include "mining/journaling_block_assembler.h"
 
 #include "chainparams.h"
 #include "coins.h"
@@ -29,6 +30,7 @@
 
 using mining::BlockAssemblerRef;
 using mining::CBlockTemplate;
+using mining::JournalingBlockAssembler;
 
 namespace
 {
@@ -928,4 +930,91 @@ BOOST_AUTO_TEST_CASE(JournalingBlockAssembler_Construction)
     BOOST_CHECK_EQUAL(bt->GetBlockRef()->vtx.size(), 1);
 }
 
+BOOST_AUTO_TEST_CASE(CreateNewBlock_JBA_Config)
+{
+    CScript scriptPubKey =
+        CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
+                              "a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112"
+                              "de5c384df7ba0b8d578a4c702b6bf11d5f")
+                  << OP_CHECKSIG;
+    TestMemPoolEntryHelper entry {};
+    entry.nFee = Amount(11);
+    entry.dPriority = 111.0;
+    entry.nHeight = 11;
+
+    ResetConfig();
+    gArgs.ForceSetArg("-jbamaxtxnbatch", "1");
+    gArgs.ForceSetArg("-jbafillafternewblock", "0");
+    mining::CMiningFactory journalMiningFactory { configJournal };
+
+    LOCK(cs_main);
+    fCheckpointsEnabled = false;
+
+    // Simple block creation, nothing special yet:
+    CBlockIndex* pindexPrev {nullptr};
+    std::unique_ptr<CBlockTemplate> pblocktemplate {};
+    BOOST_CHECK(pblocktemplate = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+
+    // We can't make transactions until we have inputs. Therefore, load 100 blocks
+    std::vector<CTransactionRef> txFirst;
+    for (size_t i = 0; i < sizeof(blockinfo) / sizeof(*blockinfo); ++i) {
+        // pointer for convenience.
+        CBlockRef blockRef = pblocktemplate->GetBlockRef();
+        CBlock *pblock = blockRef.get();
+        pblock->nVersion = 1;
+        pblock->nTime = chainActive.Tip()->GetMedianTimePast() + 1;
+        CMutableTransaction txCoinbase(*pblock->vtx[0]);
+        txCoinbase.nVersion = 1;
+        txCoinbase.vin[0].scriptSig = CScript();
+        txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce);
+        txCoinbase.vin[0].scriptSig.push_back(chainActive.Height());
+        txCoinbase.vout.resize(1);
+        txCoinbase.vout[0].scriptPubKey = CScript();
+        pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+        if (txFirst.size() < 4)
+            txFirst.push_back(pblock->vtx[0]);
+        pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+        pblock->nNonce = blockinfo[i].nonce;
+        std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
+        BOOST_CHECK(ProcessNewBlock(config, shared_pblock, true, nullptr));
+        pblock->hashPrevBlock = pblock->GetHash();
+    }
+
+    const Amount BLOCKSUBSIDY { 50 * COIN };
+    const Amount LOWFEE {CENT};
+    constexpr unsigned NUM_TXNS {1000};
+
+    CMutableTransaction tx {};
+    tx.vin.resize(1);
+    tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
+    tx.vout.resize(1);
+    tx.vout[0].nValue = BLOCKSUBSIDY;
+    for (unsigned int i = 0; i < NUM_TXNS; ++i) {
+        tx.vout[0].nValue -= LOWFEE;
+        uint256 hash = tx.GetId();
+        // Only first tx spends coinbase.
+        bool spendsCoinbase = (i == 0) ? true : false;
+        mempool.AddUnchecked(hash,
+                             entry.Fee(LOWFEE)
+                                 .Time(GetTime())
+                                 .SpendsCoinbase(spendsCoinbase)
+                                 .SigOpsCost(1)
+                                 .FromTx(tx),
+                             nullChangeSet);
+        tx.vin[0].prevout = COutPoint(hash, 0);
+    }
+
+    // CreateNewBlock will only include what we have processed so far from the journal
+    BOOST_CHECK(pblocktemplate = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx.size() < NUM_TXNS);
+
+    gArgs.ForceSetArg("-jbamaxtxnbatch", "1");
+    gArgs.ForceSetArg("-jbafillafternewblock", "1");
+    std::shared_ptr<JournalingBlockAssembler> jba { std::dynamic_pointer_cast<JournalingBlockAssembler>(journalMiningFactory.GetAssembler()) };
+    jba->ReadConfigParameters();
+    // CreateNewBlock will finish processing and including everything in the journal
+    BOOST_CHECK(pblocktemplate = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), NUM_TXNS + 1);
+}
+ 
 BOOST_AUTO_TEST_SUITE_END()
