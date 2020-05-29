@@ -73,36 +73,37 @@ class PBVReorg(BitcoinTestFramework):
         self.chain.save_spendable_output()
         node0.send_message(msg_block(block))
 
-        for i in range(100):
+        num_blocks = 150
+        for i in range(num_blocks):
             block = self.chain.next_block(block_count)
             block_count += 1
             self.chain.save_spendable_output()
             node0.send_message(msg_block(block))
 
         out = []
-        for i in range(100):
+        for i in range(num_blocks):
             out.append(self.chain.get_spendable_output())
 
-        self.log.info("waiting for block height 101 via rpc")
-        self.nodes[0].waitforblockheight(101)
+        self.log.info("waiting for block height 151 via rpc")
+        self.nodes[0].waitforblockheight(num_blocks + 1)
 
         tip_block_num = block_count-1
 
         # left branch
-        block2 = self.chain.next_block(block_count, spend=out[0], extra_txns=8)
+        block2 = self.chain.next_block(block_count, spend=out[0:9], extra_txns=8)
         block_count += 1
         node0.send_message(msg_block(block2))
         self.log.info(f"block2 hash: {block2.hash}")
 
-        self.nodes[0].waitforblockheight(102)
+        self.nodes[0].waitforblockheight(num_blocks + 2)
 
         # send blocks 3,4 for parallel validation on left branch
         self.chain.set_tip(tip_block_num)
-        block3 = self.chain.next_block(block_count, spend=out[1], extra_txns=10)
+        block3 = self.chain.next_block(block_count, spend=out[10:19], extra_txns=10)
         block_count += 1
 
 
-        block4 = self.chain.next_block(block_count, spend=out[2], extra_txns=8)
+        block4 = self.chain.next_block(block_count, spend=out[20:29], extra_txns=8)
         block_count += 1
 
         # send two "hard" blocks, with waitaftervalidatingblock we artificially
@@ -123,6 +124,10 @@ class PBVReorg(BitcoinTestFramework):
         # right branch
         self.chain.set_tip(tip_block_num)
         block5 = self.chain.next_block(block_count)
+        # Add some txns from block2 & block3 to block5, just to check that they get
+        # filtered from the mempool and not re-added
+        block5_duplicated_txns = block3.vtx[1:3] + block2.vtx[1:3]
+        self.chain.update_block(block_count, block5_duplicated_txns)
         block_count += 1
         node0.send_message(msg_block(block5))
         self.log.info(f"block5 hash: {block5.hash}")
@@ -141,7 +146,7 @@ class PBVReorg(BitcoinTestFramework):
         self.log.info(f"block7 hash: {block7.hash}")
         block_count += 1
 
-        self.nodes[0].waitforblockheight(104)
+        self.nodes[0].waitforblockheight(num_blocks + 4)
         assert_equal(block7.hash, self.nodes[0].getbestblockhash())
 
         self.log.info("releasing wait status on parallel blocks to finish their validation")
@@ -153,18 +158,17 @@ class PBVReorg(BitcoinTestFramework):
         # block that arrived last on competing chain should be active
         assert_equal(block7.hash, self.nodes[0].getbestblockhash())
 
-        # make sure that transactions (except coinbase) from block2 and 3 are
-        # in mempool
-        mempool = self.nodes[0].getrawmempool()
+        # make sure that transactions from block2 and 3 (except coinbase, and those also
+        # in block 5) are in mempool
+        not_expected_in_mempool = set()
+        for txn in block5_duplicated_txns:
+            not_expected_in_mempool.add(txn.hash)
         expected_in_mempool = set()
-        iterator = iter(block2.vtx)
-        next(iterator)
-        for tx in iterator:
-            expected_in_mempool.add(tx.hash)
-        iterator = iter(block3.vtx)
-        next(iterator)
-        for tx in iterator:
-            expected_in_mempool.add(tx.hash)
+        for txn in block2.vtx[1:] + block3.vtx[1:]:
+            expected_in_mempool.add(txn.hash)
+        expected_in_mempool = expected_in_mempool.difference(not_expected_in_mempool)
+
+        mempool = self.nodes[0].getrawmempool()
         assert_equal(expected_in_mempool, set(mempool))
 
 

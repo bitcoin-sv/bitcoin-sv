@@ -4655,7 +4655,7 @@ static bool ActivateBestChainStep(
         if(fBlocksDisconnected)
         {
             LogPrintf("Exception caught during ActivateBestChainStep; updating mempool\n");
-            UpdateMempoolForReorg(config, disconnectpool, false, changeSet);
+            UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
         }
         throw;
     }
