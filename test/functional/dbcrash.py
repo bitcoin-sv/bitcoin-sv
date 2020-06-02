@@ -82,7 +82,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
             try:
                 # Any of these RPC calls could throw due to node crash
                 self.start_node(node_index)
-                self.nodes[node_index].waitforblock(expected_tip)
+                self.nodes[node_index].waitforblockheight(expected_tip)
                 utxo_hash = self.nodes[node_index].gettxoutsetinfo()[
                     'hash_serialized']
                 return utxo_hash
@@ -146,13 +146,13 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         blocks = []
         for block_hash in block_hashes:
             blocks.append(
-                [block_hash, self.nodes[3].getblock(block_hash, False)])
+                [block_hash, self.nodes[3].getblock(block_hash, False), self.nodes[3].getblock(block_hash, 1)['height']])
 
         # Deliver each block to each other node
         for i in range(3):
             nodei_utxo_hash = None
             self.log.debug("Syncing blocks to node %d", i)
-            for (block_hash, block) in blocks:
+            for (block_hash, block, block_height) in blocks:
                 # Get the block from node3, and submit to node_i
                 self.log.debug("submitting block %s", block_hash)
                 if not self.submit_block_catch_error(i, block):
@@ -161,7 +161,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
                     self.wait_for_node_exit(i, timeout=30)
                     self.log.debug(
                         "Restarting node %d after block hash %s", i, block_hash)
-                    nodei_utxo_hash = self.restart_node(i, block_hash)
+                    nodei_utxo_hash = self.restart_node(i, block_height)
                     assert nodei_utxo_hash is not None
                     self.restart_counts[i] += 1
                 else:
@@ -194,7 +194,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
             except OSError:
                 # probably a crash on db flushing
                 nodei_utxo_hash = self.restart_node(
-                    i, self.nodes[3].getbestblockhash())
+                    i, self.nodes[3].getblock(getbestblockhash(),1)['height'])
             assert_equal(nodei_utxo_hash, node3_utxo_hash)
 
     def generate_small_transactions(self, node, count, utxo_list):
