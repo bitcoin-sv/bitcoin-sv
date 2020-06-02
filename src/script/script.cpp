@@ -422,14 +422,18 @@ uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled,
     // This is a pay-to-script-hash scriptPubKey;
     // get the last item that the scriptSig
     // pushes onto the stack:
-    const_iterator pc = scriptSig.begin();
-    std::vector<uint8_t> data;
-    while (pc < scriptSig.end()) 
-    {
-        opcodetype opcode;
-        if (!scriptSig.GetOp(pc, opcode, data)) return 0;
-        if (opcode > OP_16) return 0;
-    }
+    bsv::span<const uint8_t> data;
+    const bool valid_script = all_of(scriptSig.begin_instructions(), scriptSig.end_instructions(),
+            [&data](const auto& inst)
+            {
+                if((inst.opcode() > OP_16) || (inst.opcode() == OP_INVALIDOPCODE))  
+                    return false;
+
+                data = inst.operand(); 
+                return true;
+            });
+    if(!valid_script)
+        return 0;
 
     if (isGenesisEnabled)
     {
