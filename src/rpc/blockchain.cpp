@@ -300,6 +300,42 @@ std::string EntryDescriptionString() {
            "       ... ]\n";
 }
 
+void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e, CJSONWriter& jWriter)
+{
+
+    jWriter.writeBeginObject(e.GetTx().GetId().ToString());
+
+    jWriter.pushKV("size", static_cast<uint64_t>(e.GetTxSize()));
+    jWriter.pushKV("fee", e.GetFee());
+    jWriter.pushKV("modifiedfee", e.GetModifiedFee());
+    jWriter.pushKV("time", e.GetTime());
+    jWriter.pushKV("height", static_cast<uint64_t>(e.GetHeight()));
+    jWriter.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
+    jWriter.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
+    jWriter.pushKV("descendantcount", e.GetCountWithDescendants());
+    jWriter.pushKV("descendantsize", e.GetSizeWithDescendants());
+    jWriter.pushKV("descendantfees", e.GetModFeesWithDescendants().GetSatoshis());
+    jWriter.pushKV("ancestorcount", e.GetCountWithAncestors());
+    jWriter.pushKV("ancestorsize", e.GetSizeWithAncestors());
+    jWriter.pushKV("ancestorfees", e.GetModFeesWithAncestors().GetSatoshis());
+    std::set<std::string> deps;
+    const CTransaction& tx = e.GetTx();
+    for (const CTxIn& txin : tx.vin)
+    {
+        if (mempool.ExistsNL(txin.prevout.GetTxId()))
+        {
+            deps.insert(txin.prevout.GetTxId().ToString());
+        }
+    }
+    jWriter.writeBeginArray("depends");
+    for (const auto& dep : deps)
+    {
+        jWriter.pushV(dep);
+    }
+    jWriter.writeEndArray();
+    jWriter.writeEndObject();
+}
+
 void entryToJSONNL(UniValue &info, const CTxMemPoolEntry &e) {
     info.push_back(Pair("size", (int)e.GetTxSize()));
     info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
@@ -333,31 +369,35 @@ void entryToJSONNL(UniValue &info, const CTxMemPoolEntry &e) {
     info.push_back(Pair("depends", depends));
 }
 
-UniValue mempoolToJSON(bool fVerbose = false) {
-    if (fVerbose) {
+void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false)
+{
+    if (fVerbose)
+    {
         std::shared_lock lock(mempool.smtx);
-        UniValue o(UniValue::VOBJ);
-        for (const CTxMemPoolEntry &e : mempool.mapTx) {
-            const uint256 &txid = e.GetTx().GetId();
-            UniValue info(UniValue::VOBJ);
-            entryToJSONNL(info, e);
-            o.push_back(Pair(txid.ToString(), info));
+        jWriter.writeBeginObject();
+        for (const auto& entry : mempool.mapTx)
+        {
+            writeMempoolEntryToJsonNL(entry, jWriter);
         }
-        return o;
-    } else {
+        jWriter.writeEndObject();
+    }
+    else
+    {
         std::vector<uint256> vtxids;
         mempool.QueryHashes(vtxids);
 
-        UniValue a(UniValue::VARR);
-        for (const uint256 &txid : vtxids) {
-            a.push_back(txid.ToString());
+        jWriter.writeBeginArray();
+        for (const uint256 &txid : vtxids)
+        {
+            jWriter.pushV(txid.ToString());
         }
-
-        return a;
+        jWriter.writeEndArray();
     }
 }
 
-UniValue getrawmempool(const Config &config, const JSONRPCRequest &request) {
+void getrawmempool(const Config &config, const JSONRPCRequest &request, HTTPRequest& httpReq,
+                       bool processedInBatch)
+{
     if (request.fHelp || request.params.size() > 1) {
         throw std::runtime_error(
             "getrawmempool ( verbose )\n"
@@ -387,7 +427,28 @@ UniValue getrawmempool(const Config &config, const JSONRPCRequest &request) {
         fVerbose = request.params[0].get_bool();
     }
 
-    return mempoolToJSON(fVerbose);
+    if (!processedInBatch)
+    {
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
+    }
+
+    {
+        CHttpTextWriter httpWriter(httpReq);
+        CJSONWriter jWriter(httpWriter, false);
+
+        httpWriter.Write("{\"result\": ");
+        writeMempoolToJson(jWriter, fVerbose);
+        jWriter.pushKV("error", nullptr);
+        jWriter.pushKV("id", request.id.write());
+        httpWriter.Write("}");
+        jWriter.flush();
+    }
+
+    if (!processedInBatch)
+    {
+        httpReq.StopWritingChunks();
+    }
 }
 
 UniValue getrawnonfinalmempool(const Config &config,

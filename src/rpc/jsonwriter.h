@@ -10,6 +10,7 @@
 #include <string_view>
 #include "text_writer.h"
 #include "univalue_escapes.h"
+#include "amount.h"
 
 // Class for building JSON document which streams the JSON content to the stream by writing chunks when the buffer 
 // of the class implementing CTextWriter is full. Building JSON document with CJSONWriter should be done when large 
@@ -32,7 +33,7 @@ public:
     class ScalarValue
     {
     public:
-        ScalarValue(std::string_view val, bool ignoreQuote = false) 
+        ScalarValue(std::string_view val, bool ignoreQuote = false)
         {
             if (!ignoreQuote)
             {
@@ -51,6 +52,8 @@ public:
             oss << std::setprecision(16) << val;
             _jsonValue = oss.str();
         }
+
+        ScalarValue(const Amount& val);
 
         ScalarValue(const std::string& val) : ScalarValue(std::string_view{ val }) {}
         ScalarValue(const char* val) : ScalarValue(std::string_view{ val }) {}
