@@ -64,7 +64,7 @@ LARGE_BLOCK_TESTS = [
     # Tests for block files larger than 4GB. 
     # This tests take really long time to execute so they are excluded by default. 
     # Use --large-block-tests command line parameter to run them.
-    "bsv-genesis-large-blockfile-io.py",    
+    "bsv-genesis-large-blockfile-io.py",
     "bsv-genesis-large-blockfile-reindex.py",
     "bsv-genesis-large-blockfile-max-32-bit.py",
     "bsv-large-blocks-txindex-data.py"
@@ -99,6 +99,7 @@ TEST_PARAMS = {
 # we only run a test if its execution time in seconds does not exceed EXTENDED_CUTOFF
 EXTENDED_CUTOFF = 40
 
+running_jobs = []
 
 def on_ci():
     return os.getenv('TRAVIS') == 'true' or os.getenv('TEAMCITY_VERSION') != None
@@ -148,13 +149,23 @@ def main():
                                            "for live viewing of the log files. If it is of the form 'nodeX' where X is integer, "
                                            "it will show bitcoind.log file of the specified node")
     parser.add_argument('--large-block-tests', action='store_true', help="Runs large block file tests.")
+    parser.add_argument('--output-type', type=int, default=2, help="Output type: 2 - Automatic detection. 0 - Primitive output suited for CI. 1 - Advanced suited for console.")
     args, unknown_args = parser.parse_known_args()
+
+    # Output type. Default is 2: automatic detection
+    if args.output_type == 2:
+        if os.name == 'nt':
+            console = False
+        else:
+            console = sys.stdout.isatty()
+    else:
+        console = args.output_type==1
 
     # Create a set to store arguments and create the passon string
     tests = set(arg for arg in unknown_args if arg[:2] != "--")
     passon_args = [arg for arg in unknown_args if arg[:2] == "--"]
     passon_args.append("--configfile=%s" % configfile)
-    
+
     # Set up logging
     logging_level = logging.INFO if args.quiet else logging.DEBUG
     logging.basicConfig(format='%(message)s', level=logging_level)
@@ -240,10 +251,10 @@ def main():
                                    "cache"), ignore_errors=True)
 
     run_tests(test_list, build_dir, tests_dir, args.junitouput,
-              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig, args.watch)
+              config["environment"]["EXEEXT"], tmpdir, args.jobs, args.coverage, passon_args, build_timings, args.buildconfig, args.watch, console)
 
 
-def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None):
+def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=1, enable_coverage=False, args=[],  build_timings=None, buildconfig="", file_for_monitoring=None, console=False):
     # Warn if bitcoind is already running (unix only)
     try:
         pidofOutput = subprocess.check_output(["pidof", "bitcoind"])
@@ -276,7 +287,6 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
             BOLD[1], BOLD[0], os.environ["BITCOINCLI"]))
         sys.exit(0)
 
-
     flags = [os.path.join("--srcdir={}".format(build_dir), "src")] + args
     flags.append("--cachedir=%s" % cache_dir)
 
@@ -296,7 +306,7 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
             raise
 
     # Run Tests
-    job_queue = TestHandler(jobs, tests_dir, tmpdir, test_list, flags, file_for_monitoring)
+    job_queue = TestHandler(jobs, tests_dir, tmpdir, test_list, flags, file_for_monitoring, console)
     time0 = time.time()
     test_results = []
 
@@ -307,13 +317,13 @@ def run_tests(test_list, build_dir, tests_dir, junitouput, exeext, tmpdir, jobs=
         test_results.append(test_result)
 
         if test_result.status == "Passed":
-            logging.debug("\n%s%s%s passed, Duration: %s s" % (
-                BOLD[1], test_result.name, BOLD[0], test_result.time))
+            print_log("\n%s%s%s passed, Duration: %s s" % (
+                BOLD[1], test_result.name, BOLD[0], test_result.time), console=console)
         elif test_result.status == "Skipped":
-            logging.debug("\n%s%s%s skipped" %
-                          (BOLD[1], test_result.name, BOLD[0]))
+            print_log("\n%s%s%s skipped" %
+                      (BOLD[1], test_result.name, BOLD[0]), console=console)
         else:
-            print("\n%s%s%s failed, Duration: %s s\n" %
+            print_log("\n%s%s%s failed, Duration: %s s\n" %
                   (BOLD[1], test_result.name, BOLD[0], test_result.time))
             print(BOLD[1] + 'stdout:\n' + BOLD[0] + test_result.stdout + '\n')
             print(BOLD[1] + 'stderr:\n' + BOLD[0] + test_result.stderr + '\n')
@@ -363,24 +373,24 @@ def print_results(test_results, max_len_name, runtime):
 
 
 class TestHandler:
-
     """
     Trigger the testscrips passed in via the list.
     """
 
-    def __init__(self, num_tests_parallel, tests_dir, tmpdir, test_list=None, flags=None, file_for_monitoring=None):
-        assert(num_tests_parallel >= 1)
+    def __init__(self, num_tests_parallel, tests_dir, tmpdir, test_list=None, flags=None, file_for_monitoring=None, console=False):
+        assert (num_tests_parallel >= 1)
         self.num_jobs = num_tests_parallel
         self.tests_dir = tests_dir
         self.tmpdir = tmpdir
         self.test_list = test_list
         self.flags = flags
         self.num_running = 0
+        self.ts = time.time()
+        self.console = console
         # In case there is a graveyard of zombie bitcoinds, we can apply a
         # pseudorandom offset to hopefully jump over them.
         # (625 is PORT_RANGE/MAX_NODES)
         self.portseed_offset = int(time.time() * 1000) % 625
-        self.jobs = []
         if (file_for_monitoring is not None):
             if file_for_monitoring[:4] == "node" and file_for_monitoring[4:].isnumeric():
                 file_for_monitoring = os.path.join(file_for_monitoring, "regtest", "bitcoind.log")
@@ -395,6 +405,7 @@ class TestHandler:
                 # Add tests
                 self.num_running += 1
                 t = self.test_list.pop(0)
+                print_log("  %s%s%s: started" % (BOLD[1], t, BOLD[0]), console=self.console)
                 portseed = len(self.test_list) + self.portseed_offset
                 portseed_arg = ["--portseed={}".format(portseed)]
                 log_stdout = tempfile.SpooledTemporaryFile(max_size=2**16)
@@ -402,14 +413,15 @@ class TestHandler:
                 test_argv = t.split()
                 tmpdir = [os.path.join("--tmpdir=%s", "%s_%s") %
                           (self.tmpdir, re.sub(".py$", "", t), portseed)]
-                self.jobs.append((t,
-                                  time.time(),
+                running_jobs.append((t,
+                             time.time(),
                                   subprocess.Popen([sys.executable, os.path.join(self.tests_dir, test_argv[0])] + test_argv[1:] + self.flags + portseed_arg + tmpdir,
-                                                   universal_newlines=True,
-                                                   stdout=log_stdout,
-                                                   stderr=log_stderr),
-                                  log_stdout,
-                                  log_stderr))
+                                 universal_newlines=True,
+                                 stdout=log_stdout,
+                                 stderr=log_stderr),
+                             log_stdout,
+                             log_stderr))
+
                 if self.file_for_monitoring is not None:
                     logfile = os.path.join(self.tmpdir, f"{t[:-3]}_{portseed}", self.file_for_monitoring)
                     print("\nWatching file: ", logfile, "\n\n\n")
@@ -424,12 +436,11 @@ class TestHandler:
                             break
                         time.sleep(1)
 
-
-            if not self.jobs:
+            if not running_jobs:
                 raise IndexError('pop from empty list')
             while True:
                 # Return first proc that finishes
-                for j in self.jobs:
+                for j in running_jobs:
                     (name, time0, proc, log_out, log_err) = j
                     if on_ci() and int(time.time() - time0) > 40 * 60:
                         # In travis, timeout individual tests after 20 minutes (to stop tests hanging and not
@@ -450,17 +461,28 @@ class TestHandler:
                         else:
                             status = "Failed"
                         self.num_running -= 1
-                        self.jobs.remove(j)
+                        running_jobs.remove(j)
 
                         return TestResult(name, status, int(time.time() - time0), stdout, stderr)
 
+                # In a console mode (interactive shell) the output can be more  user friendly
+                # and status of running tests will be constantly refreshed on the bottom.
+                # When output is to stdout, such as on CI, a more simple output is required.
+                # In this case we check every minute for jobs that are running for a long time and print them.
+                # This helps identify the jobs that gave up on life.
                 if not log_job:
-                    print('.', end='', flush=True)
+                    if self.console:
+                        # This will refresh job statuses
+                        print_log(jobs=running_jobs, console=self.console)
+                    else:
+                        # Check jobs every minute
+                        if time.time() - self.ts > 60:
+                            self.ts = time.time()
+                            check_jobs(running_jobs)
                     time.sleep(0.5)
         finally:
             if log_job:
                 log_job.terminate()
-
 
 
 class TestResult():
@@ -523,7 +545,7 @@ def get_tests_to_run(test_list, test_params, cutoff, src_timings, build_timings=
                 [test_name + " " + " ".join(p) for p in params])
 
     result = [t for t in tests_with_params if get_test_time(t) <= cutoff]
-    result.sort(key=lambda x:  (-get_test_time(x), x))
+    result.sort(key=lambda x: (-get_test_time(x), x))
     return result
 
 
@@ -671,13 +693,52 @@ class Timings():
         # we only save test that have passed - timings for failed test might be
         # wrong (timeouts or early fails)
         passed_results = [t for t in test_results if t.status == 'Passed']
-        new_timings = list(map(lambda t: {'name':  t.name, 'time': t.time},
+        new_timings = list(map(lambda t: {'name': t.name, 'time': t.time},
                                passed_results))
         merged_timings = self.get_merged_timings(new_timings)
 
         with open(self.timing_file, 'w') as f:
             json.dump(merged_timings, f, indent=True)
 
+# Prints a user friendly report of currently running jobs
+printed_lines = 0
+def print_log(data="", jobs=None, console=False):
+    global printed_lines
+    if not console:
+        if data:
+            print(data)
+    else:
+        # Clear * Running jobs *
+        for i in range(printed_lines):
+            sys.stdout.write("\033[F")  # back to previous line
+            printed_lines = 0
+
+        # Print data
+        for line in data.splitlines():
+            sys.stdout.write("\033[K")  # clear line
+            print(line)
+
+        # Print * Running jobs *
+        print("******* Running jobs *******")
+        printed_lines += 1
+        for job in running_jobs:
+            sys.stdout.write("\033[K")  # clear line
+            print("%s %ss" % (job[0], f"{time.time() - job[1]:.0f}"))
+            printed_lines += 1
+
+# Prints running jobs if they take a long time
+def check_jobs(jobs=None):
+    printed_header = False
+    for job in jobs:
+        if time.time() - job[1] > 90:
+            if not printed_header:
+                print("\n  ******* Long running jobs *******")
+                printed_header = True
+
+            print_log(data="  * %s is running for %s" % (job[0], f"{time.time() - job[1]:.0f}"), jobs=jobs)
+
+    if printed_header:
+        print("  *********************************")
 
 if __name__ == '__main__':
     main()
