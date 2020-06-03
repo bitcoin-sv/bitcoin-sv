@@ -278,23 +278,30 @@ class ChainManager():
         else:
             base_block_hash = self.tip.sha256
             block_time = self.tip.nTime + 1
+
+        # Single spend or list of spends?
+        spendable_outputs = None
+        if not spend is None:
+            if isinstance(spend, list):
+                spendable_outputs = deque(spend)
+            else:
+                spendable_outputs = deque([spend])
+
         # First create the coinbase
         height = self.block_heights[base_block_hash] + 1
         coinbase = create_coinbase(height=height, pubkey=coinbase_pubkey)
         coinbase.vout[0].nValue += additional_coinbase_value
         coinbase.rehash()
-        if spend == None:
+        if spendable_outputs == None:
             # We need to have something to spend to fill the block.
             assert_equal(block_size, 0)
             block = create_block(base_block_hash, coinbase, block_time)
         else:
             # all but one satoshi to fees
-            coinbase.vout[0].nValue += spend.tx.vout[spend.n].nValue - 1
+            first_spend = spendable_outputs[0]
+            coinbase.vout[0].nValue += first_spend.tx.vout[first_spend.n].nValue - 1
             coinbase.rehash()
             block = create_block(base_block_hash, coinbase, block_time)
-
-            # Make sure we have plenty engough to spend going forward.
-            spendable_outputs = deque([spend])
 
             def get_base_transaction():
                 # Create the new transaction

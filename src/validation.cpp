@@ -4553,101 +4553,112 @@ static bool ActivateBestChainStep(
     // Disconnect active blocks which are no longer in the best chain.
     bool fBlocksDisconnected = false;
     DisconnectedBlockTransactions disconnectpool;
-    while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
-        if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
-            // This is likely a fatal error, but keep the mempool consistent,
-            // just in case. Only remove from the mempool in this case.
-            UpdateMempoolForReorg(config, disconnectpool, false, changeSet);
-            return false;
+    try {
+        while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
+            if (!DisconnectTip(config, state, &disconnectpool, changeSet)) {
+                // This is likely a fatal error, but keep the mempool consistent,
+                // just in case. Only remove from the mempool in this case.
+                UpdateMempoolForReorg(config, disconnectpool, false, changeSet);
+                return false;
+            }
+            fBlocksDisconnected = true;
         }
-        fBlocksDisconnected = true;
-    }
 
-    // Build list of new blocks to connect.
-    std::vector<CBlockIndex *> vpindexToConnect;
-    bool fContinue = true;
-    int nHeight = pindexFork ? pindexFork->nHeight : -1;
-    while (fContinue && nHeight != pindexMostWork->nHeight) {
-        // Don't iterate the entire list of potential improvements toward the
-        // best tip, as we likely only need a few blocks along the way.
-        int nTargetHeight = std::min(nHeight + 32, pindexMostWork->nHeight);
-        vpindexToConnect.clear();
-        vpindexToConnect.reserve(nTargetHeight - nHeight);
-        CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
-        while (pindexIter && pindexIter->nHeight != nHeight) {
-            vpindexToConnect.push_back(pindexIter);
-            pindexIter = pindexIter->pprev;
-        }
-        nHeight = nTargetHeight;
+        // Build list of new blocks to connect.
+        std::vector<CBlockIndex *> vpindexToConnect;
+        bool fContinue = true;
+        int nHeight = pindexFork ? pindexFork->nHeight : -1;
+        while (fContinue && nHeight != pindexMostWork->nHeight) {
+            // Don't iterate the entire list of potential improvements toward the
+            // best tip, as we likely only need a few blocks along the way.
+            int nTargetHeight = std::min(nHeight + 32, pindexMostWork->nHeight);
+            vpindexToConnect.clear();
+            vpindexToConnect.reserve(nTargetHeight - nHeight);
+            CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
+            while (pindexIter && pindexIter->nHeight != nHeight) {
+                vpindexToConnect.push_back(pindexIter);
+                pindexIter = pindexIter->pprev;
+            }
+            nHeight = nTargetHeight;
 
-        // Connect new blocks.
-        for (CBlockIndex *pindexConnect :
-             boost::adaptors::reverse(vpindexToConnect)) {
-            if (!ConnectTip(
-                    /* We always want to get to the same nChainWork amount as
-                    we started with before enabling parallel validation as we
-                    don't want to end up in a situation where sibling blocks
-                    from older chain items are once again eligible for parallel
-                    validation thus wasting resources. We also don't wish to
-                    end up announcing older chain items as new best tip.*/
-                    pindexOldTip && chainActive.Tip()->nChainWork == pindexOldTip->nChainWork,
-                    token,
-                    config,
-                    state,
-                    pindexConnect,
-                    pindexConnect == pindexMostWork
-                        ? pblock
-                        : std::shared_ptr<const CBlock>(),
-                    connectTrace,
-                    disconnectpool,
-                    changeSet,
-                    pindexMostWork->nChainWork))
-            {
-                if (state.IsInvalid()) {
-                    // The block violates a consensus rule.
-                    if (!state.CorruptionPossible()) {
-                        InvalidChainFound(vpindexToConnect.back());
+            // Connect new blocks.
+            for (CBlockIndex *pindexConnect :
+                 boost::adaptors::reverse(vpindexToConnect)) {
+                if (!ConnectTip(
+                        /* We always want to get to the same nChainWork amount as
+                        we started with before enabling parallel validation as we
+                        don't want to end up in a situation where sibling blocks
+                        from older chain items are once again eligible for parallel
+                        validation thus wasting resources. We also don't wish to
+                        end up announcing older chain items as new best tip.*/
+                        pindexOldTip && chainActive.Tip()->nChainWork == pindexOldTip->nChainWork,
+                        token,
+                        config,
+                        state,
+                        pindexConnect,
+                        pindexConnect == pindexMostWork
+                            ? pblock
+                            : std::shared_ptr<const CBlock>(),
+                        connectTrace,
+                        disconnectpool,
+                        changeSet,
+                        pindexMostWork->nChainWork))
+                {
+                    if (state.IsInvalid()) {
+                        // The block violates a consensus rule.
+                        if (!state.CorruptionPossible()) {
+                            InvalidChainFound(vpindexToConnect.back());
+                        }
+                        state = CValidationState();
+                        fInvalidFound = true;
+                        fContinue = false;
+                        break;
+                    } else {
+                        // A system error occurred (disk space, database error,
+                        // ...).
+                        // Make the mempool consistent with the current tip, just in
+                        // case any observers try to use it before shutdown.
+                        UpdateMempoolForReorg(config, disconnectpool, false, changeSet);
+                        return false;
                     }
-                    state = CValidationState();
-                    fInvalidFound = true;
-                    fContinue = false;
-                    break;
                 } else {
-                    // A system error occurred (disk space, database error,
-                    // ...).
-                    // Make the mempool consistent with the current tip, just in
-                    // case any observers try to use it before shutdown.
-                    UpdateMempoolForReorg(config, disconnectpool, false, changeSet);
-                    return false;
-                }
-            } else {
-                PruneBlockIndexCandidates();
-                if (!pindexOldTip ||
-                    chainActive.Tip()->nChainWork > pindexOldTip->nChainWork) {
-                    // We're in a better position than we were. Return
-                    // temporarily to release the lock.
-                    fContinue = false;
-                    break;
+                    PruneBlockIndexCandidates();
+                    if (!pindexOldTip ||
+                        chainActive.Tip()->nChainWork > pindexOldTip->nChainWork) {
+                        // We're in a better position than we were. Return
+                        // temporarily to release the lock.
+                        fContinue = false;
+                        break;
+                    }
                 }
             }
         }
-    }
 
-    if (fBlocksDisconnected)
-    {
-        // Whatever we thought this change set might be for, it's now definitely a reorg
-        changeSet->updateForReorg();
+        if (fBlocksDisconnected)
+        {
+            // Whatever we thought this change set might be for, it's now definitely a reorg
+            changeSet->updateForReorg();
 
-        // If any blocks were disconnected, disconnectpool may be non empty. Add
-        // any disconnected transactions back to the mempool.
-        UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
-    }
+            // If any blocks were disconnected, disconnectpool may be non empty. Add
+            // any disconnected transactions back to the mempool.
+            UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
+        }
 
-    if(changeSet)
-    {
-        changeSet->apply();
+        if(changeSet)
+        {
+            changeSet->apply();
+        }
+        mempool.CheckMempool(pcoinsTip, changeSet);
     }
-    mempool.CheckMempool(pcoinsTip, changeSet);
+    catch(...) {
+        // We were probably cancelled. Make the mempool consistent with the current tip.
+        if(fBlocksDisconnected)
+        {
+            LogPrintf("Exception caught during ActivateBestChainStep; updating mempool\n");
+            UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
+        }
+        throw;
+    }
 
     return true;
 }
