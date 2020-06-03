@@ -3252,7 +3252,6 @@ static void ProcessFilterLoadMessage(const CNodePtr& pfrom, CDataStream& vRecv)
     else {
         LOCK(pfrom->cs_filter);
         pfrom->mFilter = std::move(filter);
-        pfrom->mFilter.UpdateEmptyFull();
         pfrom->fRelayTxes = true;
     }
 }
