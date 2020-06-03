@@ -16,7 +16,7 @@
 #include "key.h"
 #include "keystore.h"
 #include "mining/journal_builder.h"
-#include "net.h"
+#include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"

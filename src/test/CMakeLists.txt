@@ -100,6 +100,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	mempool_tests.cpp
 	merkle_tests.cpp
 	miner_tests.cpp
+    net_association_tests.cpp
 	object_stream_deserialization_tests.cpp
 	opcode_tests.cpp
 	multisig_tests.cpp

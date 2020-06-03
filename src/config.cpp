@@ -6,7 +6,6 @@
 #include "chainparams.h"
 #include "consensus/consensus.h"
 #include "validation.h"
-#include "net.h"
 #include "util.h"
 #include <boost/algorithm/string.hpp>
 

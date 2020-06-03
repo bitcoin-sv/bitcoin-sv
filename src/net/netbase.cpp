@@ -7,7 +7,7 @@
 #include "config/bitcoin-config.h"
 #endif
 
-#include "netbase.h"
+#include "net/netbase.h"
 
 #include "hash.h"
 #include "random.h"

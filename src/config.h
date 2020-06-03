@@ -10,7 +10,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "amount.h"
 #include "consensus/consensus.h"
 #include "mining/factory.h"
-#include "net.h"
+#include "net/net.h"
 #include "policy/policy.h"
 #include "script/standard.h"
 #include "txn_validation_config.h"

@@ -5,7 +5,7 @@
 #include "txn_validator.h"
 #include "txn_validation_config.h"
 #include "config.h"
-#include "net_processing.h"
+#include "net/net_processing.h"
 
 /** Constructor */
 CTxnValidator::CTxnValidator(

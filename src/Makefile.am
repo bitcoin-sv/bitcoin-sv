@@ -1,5 +1,5 @@
 # Copyright (c) 2013-2016 The Bitcoin Core developers
-# Copyright (c) 2018-2019 Bitcoin Association
+# Copyright (c) 2018-2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 DIST_SUBDIRS = secp256k1 univalue
@@ -137,10 +137,16 @@ BITCOIN_CORE_H = \
   mining/journal_entry.h \
   mining/journaling_block_assembler.h \
   mining/legacy.h \
-  net.h \
-  net_processing.h \
-  netaddress.h \
-  netbase.h \
+  net/association.h \
+  net/net.h \
+  net/netaddress.h \
+  net/netbase.h \
+  net/net_message.h \
+  net/net_processing.h \
+  net/net_types.h \
+  net/node_stats.h \
+  net/send_queue_bytes.h \
+  net/stream.h \
   netmessagemaker.h \
   noui.h \
   orphan_txns.h \
@@ -252,8 +258,11 @@ libbitcoin_server_a_SOURCES = \
   mining/journal_change_set.cpp \
   mining/journaling_block_assembler.cpp \
   mining/legacy.cpp \
-  net.cpp \
-  net_processing.cpp \
+  net/association.cpp \
+  net/net.cpp \
+  net/net_message.cpp \
+  net/net_processing.cpp \
+  net/stream.cpp \
   noui.cpp \
   orphan_txns.cpp \
   policy/fees.cpp \
@@ -399,8 +408,8 @@ libbitcoin_common_a_SOURCES = \
   core_write.cpp \
   key.cpp \
   keystore.cpp \
-  netaddress.cpp \
-  netbase.cpp \
+  net/netaddress.cpp \
+  net/netbase.cpp \
   protocol.cpp \
   rpc/jsonwriter.cpp \
   scheduler.cpp \

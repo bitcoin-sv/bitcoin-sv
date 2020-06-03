@@ -2,7 +2,7 @@
 #define BITCOIN_SEEDER_DB_H
 
 #include "bitcoin.h"
-#include "netbase.h"
+#include "net/netbase.h"
 #include "protocol.h"
 #include "sync.h"
 #include "util.h"

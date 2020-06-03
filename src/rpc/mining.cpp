@@ -15,7 +15,7 @@
 #include "dstencode.h"
 #include "init.h"
 #include "mining/factory.h"
-#include "net.h"
+#include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "pow.h"

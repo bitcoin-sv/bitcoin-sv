@@ -7,7 +7,7 @@
 #include <logging.h>
 #include <memusage.h>
 #include <mining/journal_change_set.h>
-#include <net.h>
+#include <net/net.h>
 #include <policy/policy.h>
 #include <scheduler.h>
 #include <time_locked_mempool.h>

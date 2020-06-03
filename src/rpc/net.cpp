@@ -7,9 +7,9 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
-#include "net.h"
-#include "net_processing.h"
-#include "netbase.h"
+#include "net/net.h"
+#include "net/net_processing.h"
+#include "net/netbase.h"
 #include "policy/policy.h"
 #include "protocol.h"
 #include "sync.h"
@@ -93,8 +93,20 @@ static UniValue getpeerinfo(const Config &config,
             "    \"sendsize\": n,             (numeric) Current size of queued messages for sending\n"
             "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
             "    \"pauserecv\": true|false,   (boolean) Are we paused for receiving\n"
-            "    \"spotrecvbw\": n,           (numeric) The spot average download bandwidth from this node (bytes/sec)\n"
-            "    \"minuterecvbw\": n,         (numeric) The 1 minute average download bandwidth from this node (bytes/sec)\n"
+            "    \"avgrecvbw\": n,            (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
+            "    \"streams\": [\n"
+            "       {\n"
+            "          \"streamtype\": \"TYPE\" (string) The type of this stream\n"
+            "          \"lastsend\": ttt,     (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last send\n"
+            "          \"lastrecv\": ttt,     (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last receive\n"
+            "          \"bytessent\": n,      (numeric) The total bytes sent\n"
+            "          \"bytesrecv\": n,      (numeric) The total bytes received\n"
+            "          \"sendsize\": n,       (numeric) Current size of queued messages for sending\n"
+            "          \"spotrecvbw\": n,     (numeric) The spot average download bandwidth over this stream (bytes/sec)\n"
+            "          \"minuterecvbw\": n    (numeric) The 1 minute average download bandwidth over this stream (bytes/sec)\n"
+            "       }\n"
+            "       ...\n"
+            "    ],\n"
             "    \"conntime\": ttt,           (numeric) The connection time in "
             "seconds since epoch (Jan 1 1970 GMT)\n"
             "    \"timeoffset\": ttt,         (numeric) The time offset in "
@@ -152,12 +164,12 @@ static UniValue getpeerinfo(const Config &config,
             "Error: Peer-to-peer functionality missing or disabled");
     }
 
-    std::vector<CNodeStats> vstats;
+    std::vector<NodeStats> vstats;
     g_connman->GetNodeStats(vstats);
 
     UniValue ret(UniValue::VARR);
 
-    for (const CNodeStats &stats : vstats) {
+    for (const NodeStats &stats : vstats) {
         UniValue obj(UniValue::VOBJ);
         CNodeStateStats statestats;
         bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
@@ -168,15 +180,30 @@ static UniValue getpeerinfo(const Config &config,
         }
         obj.push_back(Pair("services", strprintf("%016x", stats.nServices)));
         obj.push_back(Pair("relaytxes", stats.fRelayTxes));
-        obj.push_back(Pair("lastsend", stats.nLastSend));
-        obj.push_back(Pair("lastrecv", stats.nLastRecv));
-        obj.push_back(Pair("sendsize", stats.nSendSize));
+        obj.push_back(Pair("lastsend", stats.associationStats.nLastSend));
+        obj.push_back(Pair("lastrecv", stats.associationStats.nLastRecv));
+        obj.push_back(Pair("sendsize", stats.associationStats.nSendSize));
         obj.push_back(Pair("pausesend", stats.fPauseSend));
         obj.push_back(Pair("pauserecv", stats.fPauseRecv));
-        obj.push_back(Pair("bytessent", stats.nSendBytes));
-        obj.push_back(Pair("bytesrecv", stats.nRecvBytes));
-        obj.push_back(Pair("spotrecvbw", stats.nSpotBytesPerSec));
-        obj.push_back(Pair("minuterecvbw", stats.nMinuteBytesPerSec));
+        obj.push_back(Pair("bytessent", stats.associationStats.nSendBytes));
+        obj.push_back(Pair("bytesrecv", stats.associationStats.nRecvBytes));
+        obj.push_back(Pair("avgrecvbw", stats.associationStats.nAvgBandwidth));
+
+        UniValue streams(UniValue::VARR);
+        for (const StreamStats& streamStats : stats.associationStats.streamStats) {
+            UniValue streamDetails(UniValue::VOBJ);
+            streamDetails.push_back(Pair("streamtype", streamStats.streamType));
+            streamDetails.push_back(Pair("lastsend", streamStats.nLastSend));
+            streamDetails.push_back(Pair("lastrecv", streamStats.nLastRecv));
+            streamDetails.push_back(Pair("bytessent", streamStats.nSendBytes));
+            streamDetails.push_back(Pair("bytesrecv", streamStats.nRecvBytes));
+            streamDetails.push_back(Pair("sendsize", streamStats.nSendSize));
+            streamDetails.push_back(Pair("spotrecvbw", streamStats.nSpotBytesPerSec));
+            streamDetails.push_back(Pair("minuterecvbw", streamStats.nMinuteBytesPerSec));
+            streams.push_back(streamDetails);
+        }
+        obj.push_back(Pair("streams", streams));
+
         obj.push_back(Pair("conntime", stats.nTimeConnected));
         obj.push_back(Pair("timeoffset", stats.nTimeOffset));
         if (stats.dPingTime > 0.0) {
@@ -210,7 +237,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("whitelisted", stats.fWhitelisted));
 
         UniValue sendPerMsgCmd(UniValue::VOBJ);
-        for (const mapMsgCmdSize::value_type &i : stats.mapSendBytesPerMsgCmd) {
+        for (const mapMsgCmdSize::value_type &i : stats.associationStats.mapSendBytesPerMsgCmd) {
             if (i.second > 0) {
                 sendPerMsgCmd.push_back(Pair(i.first, i.second));
             }
@@ -218,7 +245,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("bytessent_per_msg", sendPerMsgCmd));
 
         UniValue recvPerMsgCmd(UniValue::VOBJ);
-        for (const mapMsgCmdSize::value_type &i : stats.mapRecvBytesPerMsgCmd) {
+        for (const mapMsgCmdSize::value_type &i : stats.associationStats.mapRecvBytesPerMsgCmd) {
             if (i.second > 0) {
                 recvPerMsgCmd.push_back(Pair(i.first, i.second));
             }

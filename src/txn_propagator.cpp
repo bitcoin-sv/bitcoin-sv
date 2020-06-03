@@ -2,7 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "txn_propagator.h"
-#include "net.h"
+#include "net/net.h"
 #include "util.h"
 
 // When we get C++17 we should loose this redundant definition, until then it's required.
