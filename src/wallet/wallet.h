@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_WALLET_WALLET_H
@@ -47,8 +47,6 @@ static const Amount DEFAULT_TRANSACTION_FEE(0);
 static const Amount DEFAULT_FALLBACK_FEE(20000);
 //! -mintxfee default
 static const Amount DEFAULT_TRANSACTION_MINFEE(1000);
-//! minimum recommended increment for BIP 125 replacement txs
-static const Amount WALLET_INCREMENTAL_RELAY_FEE(5000);
 //! target minimum change amount
 static const Amount MIN_CHANGE = CENT;
 //! final minimum change amount after paying for fees
