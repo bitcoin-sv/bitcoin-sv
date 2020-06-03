@@ -161,9 +161,9 @@ BOOST_AUTO_TEST_CASE(too_short_single_instruction)
 
     // check op++
     auto n = std::distance(it_begin, it_end);
-    BOOST_CHECK_EQUAL(0, n);
+    BOOST_CHECK_EQUAL(1, n);
 
-    const instruction expected{OP_INVALIDOPCODE, 0, ip.data() + ip.size(), 0};
+    const instruction expected{OP_INVALIDOPCODE, 0, ip.data() + 1, 0};
     BOOST_CHECK_EQUAL(expected, *it_begin);
 }
 
@@ -175,7 +175,7 @@ BOOST_AUTO_TEST_CASE(too_short_two_instructions)
                          };
     vector<instruction> expected{ 
                                     {OP_PUSHDATA4, 0, ip.data() + 5, 1},
-                                    {OP_INVALIDOPCODE, 0, ip.data() + ip.size(), 0},
+                                    {OP_INVALIDOPCODE, 0, ip.data() + 7, 0},
                                 };
 
     instruction_iterator it_begin{span{ip.data(), ip.size()}};
@@ -183,7 +183,7 @@ BOOST_AUTO_TEST_CASE(too_short_two_instructions)
 
     // check op++
     auto n = std::distance(it_begin, it_end);
-    BOOST_CHECK_EQUAL(expected.size() - 1, n);
+    BOOST_CHECK_EQUAL(expected.size(), n);
 
     for(size_t i{0}; i < expected.size(); ++i, ++it_begin)
     {

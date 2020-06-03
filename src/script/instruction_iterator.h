@@ -72,48 +72,35 @@ namespace bsv
         : public std::iterator<std::forward_iterator_tag, instruction>
 
     {
-        instruction instruction_;
         span<const uint8_t> span_;
+        instruction instruction_;
+
+        constexpr instruction next(span<const uint8_t> s)
+        {
+            const auto [opcode, offset, len]{decode_instruction(s)};
+            return instruction{opcode, offset, s.data() + 1 + offset, len};
+        }
 
     public:
-        constexpr instruction_iterator(span<const uint8_t> s) noexcept
-            : instruction_{OP_INVALIDOPCODE}, span_{s} {
-            const auto [opcode, offset, len]{decode_instruction(s)};
-            if(opcode != OP_INVALIDOPCODE)
-            {
-                instruction_ =
-                    instruction{opcode, offset, s.data() + 1 + offset, len};
-            }
-            else
-            {
-                // advance to end of range
-                span_ = span_.last(0);
-                instruction_ = instruction{opcode, offset, span_.data(), len};
-            }
-        }
+        constexpr instruction_iterator(span<const uint8_t> s) noexcept : 
+            span_{s}, 
+            instruction_(next(s))
+        {}
 
         constexpr instruction_iterator& operator++() noexcept
         {
             if(instruction_.opcode() == OP_INVALIDOPCODE)
+            {
+                // advance to end of script range
+                span_ = span_.last(0);
+                instruction_ = instruction{OP_INVALIDOPCODE, 0, span_.data(), 0};
                 return *this;
+            }
 
             const auto delta{1 + instruction_.offset() +
                              instruction_.operand().size()};
-
             span_ = span_.last(span_.size() - delta);
-
-            auto [opcode, offset, len]{decode_instruction(span_)};
-            if(opcode != OP_INVALIDOPCODE)
-            {
-                instruction_ =
-                    instruction{opcode, offset, span_.data() + 1 + offset, len};
-            }
-            else
-            {
-                // advance to end of range
-                span_ = span_.last(0);
-                instruction_ = instruction{opcode, offset, span_.data(), len};
-            }
+            instruction_ = next(span_);
             return *this;
         }
 
