@@ -121,5 +121,19 @@ class GetRawMempoolTest(BitcoinTestFramework):
             assert_equal(mempool[largeTx.hash]["depends"], [tx.hash for tx in transactions])
             assert_equal(mempool[largeTx.hash]["size"] > txSize, True)
 
+            # getmempooldescendants, verbosity = False
+            assert_equal(self.nodes[0].getmempooldescendants(transactions[0].hash), [largeTx.hash])
+            # getmempooldescendants, verbosity = True
+            mempoolDescendants = self.nodes[0].getmempooldescendants(transactions[0].hash, True)
+            self.check_getRawMempool(mempoolDescendants, [largeTx])
+            assert_equal(mempool[largeTx.hash], mempoolDescendants[largeTx.hash])
+
+            # getmempoolancestors, verbosity = False
+            assert_equal(set(self.nodes[0].getmempoolancestors(largeTx.hash)), set([tx.hash for tx in transactions]))
+            # getmempoolancestors, verbosity = True
+            mempoolAncestors = self.nodes[0].getmempoolancestors(largeTx.hash, True)
+            self.check_getRawMempool(mempoolAncestors, transactions)
+            assert_equal(mempool[transactions[0].hash], mempoolAncestors[transactions[0].hash])
+
 if __name__ == '__main__':
     GetRawMempoolTest().main()

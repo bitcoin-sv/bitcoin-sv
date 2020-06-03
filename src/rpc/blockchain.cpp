@@ -477,8 +477,9 @@ UniValue getrawnonfinalmempool(const Config &config,
     return arr;
 }
 
-UniValue getmempoolancestors(const Config &config,
-                             const JSONRPCRequest &request) {
+void getmempoolancestors(const Config &config,
+                         const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
+{
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 2) {
         throw std::runtime_error(
@@ -525,27 +526,50 @@ UniValue getmempoolancestors(const Config &config,
     std::string dummy;
     mempool.CalculateMemPoolAncestorsNL(*txIter, setAncestors, noLimit, noLimit,
                                         noLimit, noLimit, dummy, false);
-    if (!fVerbose) {
-        UniValue o(UniValue::VARR);
-        for (CTxMemPool::txiter ancestorIt : setAncestors) {
-            o.push_back(ancestorIt->GetTx().GetId().ToString());
+
+    if (!processedInBatch)
+    {
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
+    }
+
+    {
+        CHttpTextWriter httpWriter(httpReq);
+        CJSONWriter jWriter(httpWriter, false);
+
+        httpWriter.Write("{\"result\": ");
+
+        if (!fVerbose) {
+            jWriter.writeBeginArray();
+            for (CTxMemPool::txiter ancestorIt : setAncestors)
+            {
+                jWriter.pushV(ancestorIt->GetTx().GetId().ToString());
+            }
+            jWriter.writeEndArray();
+        } else {
+            jWriter.writeBeginObject();
+            for (CTxMemPool::txiter ancestorIt : setAncestors)
+            {
+                writeMempoolEntryToJsonNL(*ancestorIt, jWriter);
+            }
+            jWriter.writeEndObject();
         }
-        return o;
-    } else {
-        UniValue o(UniValue::VOBJ);
-        for (CTxMemPool::txiter ancestorIt : setAncestors) {
-            const CTxMemPoolEntry &e = *ancestorIt;
-            const uint256 &_hash = e.GetTx().GetId();
-            UniValue info(UniValue::VOBJ);
-            entryToJSONNL(info, e);
-            o.push_back(Pair(_hash.ToString(), info));
-        }
-        return o;
+
+        jWriter.pushKV("error", nullptr);
+        jWriter.pushKV("id", request.id.write());
+        httpWriter.Write("}");
+        jWriter.flush();
+    }
+
+    if (!processedInBatch)
+    {
+        httpReq.StopWritingChunks();
     }
 }
 
-UniValue getmempooldescendants(const Config &config,
-                               const JSONRPCRequest &request) {
+void getmempooldescendants(const Config &config,
+                           const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
+{
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 2) {
         throw std::runtime_error(
@@ -591,22 +615,44 @@ UniValue getmempooldescendants(const Config &config,
     mempool.CalculateDescendantsNL(txIter, setDescendants);
     // Exclude the given tx from the output
     setDescendants.erase(txIter);
-    if (!fVerbose) {
-        UniValue o(UniValue::VARR);
-        for (CTxMemPool::txiter descendantIt : setDescendants) {
-            o.push_back(descendantIt->GetTx().GetId().ToString());
+
+    if (!processedInBatch)
+    {
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
+    }
+
+    {
+        CHttpTextWriter httpWriter(httpReq);
+        CJSONWriter jWriter(httpWriter, false);
+
+        httpWriter.Write("{\"result\": ");
+
+        if (!fVerbose) {
+            jWriter.writeBeginArray();
+            for (CTxMemPool::txiter descendantIt : setDescendants)
+            {
+                jWriter.pushV(descendantIt->GetTx().GetId().ToString());
+            }
+            jWriter.writeEndArray();
+        } else {
+            jWriter.writeBeginObject();
+            for (CTxMemPool::txiter descendantIt : setDescendants)
+            {
+                writeMempoolEntryToJsonNL(*descendantIt, jWriter);
+            }
+            jWriter.writeEndObject();
         }
-        return o;
-    } else {
-        UniValue o(UniValue::VOBJ);
-        for (CTxMemPool::txiter descendantIt : setDescendants) {
-            const CTxMemPoolEntry &e = *descendantIt;
-            const uint256 &_hash = e.GetTx().GetId();
-            UniValue info(UniValue::VOBJ);
-            entryToJSONNL(info, e);
-            o.push_back(Pair(_hash.ToString(), info));
-        }
-        return o;
+
+        jWriter.pushKV("error", nullptr);
+        jWriter.pushKV("id", request.id.write());
+        httpWriter.Write("}");
+        jWriter.flush();
+    }
+
+    if (!processedInBatch)
+    {
+        httpReq.StopWritingChunks();
     }
 }
 
