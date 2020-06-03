@@ -300,10 +300,16 @@ std::string EntryDescriptionString() {
            "       ... ]\n";
 }
 
-void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e, CJSONWriter& jWriter)
+void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e, CJSONWriter& jWriter, bool pushId = true)
 {
-
-    jWriter.writeBeginObject(e.GetTx().GetId().ToString());
+    if (pushId)
+    {
+        jWriter.writeBeginObject(e.GetTx().GetId().ToString());
+    }
+    else
+    {
+        jWriter.writeBeginObject();
+    }
 
     jWriter.pushKV("size", static_cast<uint64_t>(e.GetTxSize()));
     jWriter.pushKV("fee", e.GetFee());
@@ -334,39 +340,6 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e, CJSONWriter& jWriter)
     }
     jWriter.writeEndArray();
     jWriter.writeEndObject();
-}
-
-void entryToJSONNL(UniValue &info, const CTxMemPoolEntry &e) {
-    info.push_back(Pair("size", (int)e.GetTxSize()));
-    info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
-    info.push_back(Pair("modifiedfee", ValueFromAmount(e.GetModifiedFee())));
-    info.push_back(Pair("time", e.GetTime()));
-    info.push_back(Pair("height", (int)e.GetHeight()));
-    info.push_back(Pair("startingpriority", e.GetPriority(e.GetHeight())));
-    info.push_back(
-        Pair("currentpriority", e.GetPriority(chainActive.Height())));
-    info.push_back(Pair("descendantcount", e.GetCountWithDescendants()));
-    info.push_back(Pair("descendantsize", e.GetSizeWithDescendants()));
-    info.push_back(
-        Pair("descendantfees", e.GetModFeesWithDescendants().GetSatoshis()));
-    info.push_back(Pair("ancestorcount", e.GetCountWithAncestors()));
-    info.push_back(Pair("ancestorsize", e.GetSizeWithAncestors()));
-    info.push_back(
-        Pair("ancestorfees", e.GetModFeesWithAncestors().GetSatoshis()));
-    const CTransaction &tx = e.GetTx();
-    std::set<std::string> setDepends;
-    for (const CTxIn &txin : tx.vin) {
-        if (mempool.ExistsNL(txin.prevout.GetTxId())) {
-            setDepends.insert(txin.prevout.GetTxId().ToString());
-        }
-    }
-
-    UniValue depends(UniValue::VARR);
-    for (const std::string &dep : setDepends) {
-        depends.push_back(dep);
-    }
-
-    info.push_back(Pair("depends", depends));
 }
 
 void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false)
@@ -656,7 +629,9 @@ void getmempooldescendants(const Config &config,
     }
 }
 
-UniValue getmempoolentry(const Config &config, const JSONRPCRequest &request) {
+void getmempoolentry(const Config &config,
+                     const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
+{
     if (request.fHelp || request.params.size() != 1) {
         throw std::runtime_error(
             "getmempoolentry txid\n"
@@ -683,9 +658,31 @@ UniValue getmempoolentry(const Config &config, const JSONRPCRequest &request) {
                            "Transaction not in mempool");
     }
     const CTxMemPoolEntry &e = *txIter;
-    UniValue info(UniValue::VOBJ);
-    entryToJSONNL(info, e);
-    return info;
+
+    if (!processedInBatch)
+    {
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
+    }
+
+    {
+        CHttpTextWriter httpWriter(httpReq);
+        CJSONWriter jWriter(httpWriter, false);
+
+        httpWriter.Write("{\"result\": ");
+
+        writeMempoolEntryToJsonNL(e, jWriter, false);
+
+        jWriter.pushKV("error", nullptr);
+        jWriter.pushKV("id", request.id.write());
+        httpWriter.Write("}");
+        jWriter.flush();
+    }
+
+    if (!processedInBatch)
+    {
+        httpReq.StopWritingChunks();
+    }
 }
 
 UniValue getblockhash(const Config &config, const JSONRPCRequest &request) {
