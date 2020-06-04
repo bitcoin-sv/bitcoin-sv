@@ -19,13 +19,14 @@ class CJournalEntry
 
     // Constructors
     CJournalEntry(const CTransactionRef& txn, const AncestorCountsPtr& count,
-                  const Amount& fee, int64_t sigOps)
+                  const Amount& fee, int64_t sigOps, GroupID groupId)
     : mTxn{txn}, mAncestorCount{count}, mFee{fee}, mSigOpsCount{sigOps}
+    , mGroupId(groupId)
     {}
 
     CJournalEntry(const CTxMemPoolEntry& entry)
     : CJournalEntry{entry.GetSharedTx(), entry.GetAncestorCounts(), entry.GetFee(),
-                    entry.GetSigOpCount()}
+                    entry.GetSigOpCount(), entry.GetCPFPGroupId()}
     {}
 
     // Accessors
@@ -33,6 +34,9 @@ class CJournalEntry
     const AncestorCountsPtr& getAncestorCount() const { return mAncestorCount; }
     const Amount& getFee() const { return mFee; }
     int64_t getSigOpsCount() const { return mSigOpsCount; }
+
+    // Which group of transactions if any does this entry belong to
+    const GroupID& getGroupId() const { return mGroupId; }
 
   private:
 
@@ -45,6 +49,8 @@ class CJournalEntry
     // Fee and sig ops count for the transaction
     Amount mFee {0};
     int64_t mSigOpsCount {0};
+
+    GroupID mGroupId {};
 };
 
 }

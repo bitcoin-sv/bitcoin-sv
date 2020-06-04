@@ -109,6 +109,16 @@ public:
     CTxPrioritizer& operator=(CTxPrioritizer&&) = delete;
 };
 
+/**
+ * \class GroupID
+ *
+ * GroupID identifies consecutive transactions in the journal that belong to
+ * the same CPFP group that should all be mined in the same block.
+ *
+ * The block assembler should not accept a partial group into the block template.
+ */
+using GroupID = std::optional<uint64_t>;
+
 /** \class CTxMemPoolEntry
  *
  * CTxMemPoolEntry stores data about the corresponding transaction, as well as
@@ -173,6 +183,8 @@ public:
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
+    // CPFP group, if any that this transaction belongs to.
+    GroupID GetCPFPGroupId() const { return std::nullopt; }
     const CTransaction &GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }
     /**
