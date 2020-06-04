@@ -52,8 +52,9 @@ class JournalingBlockAssembler : public BlockAssembler
     // Create a new block for us to start working on
     void newBlock();
 
-    // Test whether we can add another transaction to the next block and if so do it
-    bool addTransaction(const CBlockIndex* pindex);
+    // Test whether we can add another transaction to the next block and
+    // return the number of transactions actually added
+    size_t addTransaction(const CBlockIndex* pindex);
 
     // Our internal mutex
     mutable std::mutex mMtx {};

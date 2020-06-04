@@ -206,9 +206,12 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         while(!finished)
         {
             // Try to add another txn to the block
-            if(addTransaction(pindex))
+            // Since mMaxTransactions is an internal limit for scheduling
+            // reasons we'll simply exceed it when adding a group
+            size_t nAdded = addTransaction(pindex);
+            if(nAdded)
             {
-                ++txnNum;
+                txnNum += nAdded;
 
                 // We're finished if we've reached the end of the journal, or we've added
                 // as many transactions this iteration as we're allowed.
@@ -268,7 +271,7 @@ void JournalingBlockAssembler::newBlock()
 
 // Test whether we can add another transaction to the next block, and if
 // so do it - Caller holds mutex
-bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
+size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
 {
     const CJournalEntry& entry { mJournalPos.at() };
     const CTransactionRef& txn { entry.getTxn() };
@@ -279,7 +282,7 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
     uint64_t blockSizeWithTx { mBlockSize + txnSize };
     if(blockSizeWithTx >= maxBlockSize)
     {
-        return false;
+        return 0;
     }
 
     uint64_t txnSigOps{ static_cast<uint64_t>(entry.getSigOpsCount()) };
@@ -293,7 +296,7 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
      
         if (blockSigOpsWithTx >= maxBlockSigOps)
         {
-            return false;
+            return 0;
         }
     }
 
@@ -303,7 +306,7 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
         CValidationState state {};
         if(!ContextualCheckTransaction(mConfig, *txn, state, pindex->nHeight + 1, mLockTimeCutoff, false))
         {
-            return false;
+            return 0;
         }
     }
 
@@ -323,6 +326,6 @@ bool JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
     // Move to the next item in the journal
     ++mJournalPos;
 
-    return true;
+    return 1;
 }
 
