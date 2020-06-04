@@ -30,6 +30,11 @@ namespace bsv
         {
         }
 
+        template <size_t N>
+        constexpr span(element_type (&a)[N]) noexcept : p_{a}, n_{N}
+        {
+        }
+
         constexpr size_type size() const noexcept { return n_; }
         constexpr bool empty() const noexcept { return n_ == 0; }
 

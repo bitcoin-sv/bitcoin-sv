@@ -6,10 +6,11 @@
 #ifndef BITCOIN_SCRIPT_SCRIPT_H
 #define BITCOIN_SCRIPT_SCRIPT_H
 
+#include "consensus/consensus.h"
 #include "crypto/common.h"
 #include "prevector.h"
 #include "serialize.h"
-#include "consensus/consensus.h"
+#include "span.h"
 
 #include <cassert>
 #include <climits>
@@ -374,13 +375,6 @@ public:
 
         return nFound;
     }
-    int Find(opcodetype op) const {
-        int nFound = 0;
-        opcodetype opcode;
-        for (const_iterator pc = begin(); pc != end() && GetOp(pc, opcode);)
-            if (opcode == op) ++nFound;
-        return nFound;
-    }
 
     /**
      * Pre-version-0.6, Bitcoin always counted CHECKMULTISIGs as 20 sigops. With
@@ -462,6 +456,8 @@ public:
 
 std::ostream &operator<<(std::ostream &, const CScript &);
 std::string to_string(const CScript&);
+
+size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 
 struct CScriptWitness {
     // Note that this encodes the data elements being pushed, rather than
