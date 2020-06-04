@@ -54,6 +54,7 @@ class JournalingBlockAssembler : public BlockAssembler
 
     // Test whether we can add another transaction to the next block and
     // return the number of transactions actually added
+    size_t addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd);
     size_t addTransaction(const CBlockIndex* pindex);
 
     // Our internal mutex
@@ -102,6 +103,53 @@ class JournalingBlockAssembler : public BlockAssembler
     std::vector<CTransactionRef> mBlockTxns {};
     std::vector<Amount> mTxFees {};
     std::vector<int64_t> mTxSigOpsCount {};
+
     BlockAssemblyState mState {};
+
+    // When adding transaction group we optimize for the happy case
+    // and do serious extra work only when we need to rollback() when
+    // the group would push the block over the limit
+    class GroupCheckpoint {
+
+    private:
+        // track whether we should roll back the group.
+        bool mShouldRollback {true};
+
+        // reference of the block assembler
+        JournalingBlockAssembler& mAssembler;
+
+        // copy of internal state of the block assember that we need to restore
+        BlockAssemblyState mAssemblerStateCheckpoint {};
+
+        template<class T> class VectorCheckpoint {
+        private:
+            std::vector<T> &mVector;
+            size_t mVectorSize {0};
+        public:
+            VectorCheckpoint(std::vector<T> &vector)
+            : mVector(vector)
+            , mVectorSize(vector.size())
+            {
+            }
+            void trimToSize() {
+                mVector.erase(std::next(mVector.begin(), mVectorSize), mVector.end());
+            }
+        };
+        // for vectors, just remember the size as the iterators are very unstable
+        VectorCheckpoint<CTransactionRef> mBlockTxnsCheckpoint;
+        VectorCheckpoint<Amount> mTxFeesCheckpoint;
+        VectorCheckpoint<int64_t> mTxSigOpsCountCheckpoint;
+
+    public:
+        GroupCheckpoint(JournalingBlockAssembler& assembler);
+
+        GroupCheckpoint(const GroupCheckpoint&) = delete;
+        GroupCheckpoint& operator=(const GroupCheckpoint&) = delete;
+
+        ~GroupCheckpoint() { rollback(); }
+
+        void rollback();
+        void commit() { mShouldRollback = false; }
+    };
 };
 }

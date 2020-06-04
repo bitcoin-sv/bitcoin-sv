@@ -207,8 +207,10 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
 
         while(!finished)
         {
-            // Try to add another txn to the block
-            size_t nAdded = addTransaction(pindex);
+            // Try to add another txn or a whole group of txns to the block
+            // mMaxTransactions is an internal limit used to reduce lock contention
+            // When we're adding a group we may add more transactions and that's OK
+            size_t nAdded = addTransactionOrGroup(pindex, journalEnd);
             if(nAdded)
             {
                 txnNum += nAdded;
@@ -270,6 +272,51 @@ void JournalingBlockAssembler::newBlock()
 
     // Set updated flag
     mRecentlyUpdated = true;
+}
+
+size_t JournalingBlockAssembler::addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd)
+{
+    auto& groupId { mState.mJournalPos.at().getGroupId() };
+    if (!groupId)
+    {
+        return addTransaction(pindex);
+    }
+    else
+    {
+        GroupCheckpoint checkpoint {*this};
+        size_t nAddedTotal {0};
+        while (mState.mJournalPos != journalEnd && groupId == mState.mJournalPos.at().getGroupId()) {
+            size_t nAdded = addTransaction(pindex);
+            if (!nAdded) {
+                checkpoint.rollback();
+                return 0;
+            }
+            nAddedTotal += nAdded;
+        }
+        checkpoint.commit();
+        return nAddedTotal;
+    }
+}
+
+JournalingBlockAssembler::GroupCheckpoint::GroupCheckpoint(JournalingBlockAssembler& assembler)
+: mAssembler {assembler}
+, mAssemblerStateCheckpoint {assembler.mState}
+, mBlockTxnsCheckpoint {assembler.mBlockTxns}
+, mTxFeesCheckpoint {assembler.mTxFees}
+, mTxSigOpsCountCheckpoint {assembler.mTxSigOpsCount}
+{
+}
+
+void JournalingBlockAssembler::GroupCheckpoint::rollback()
+{
+    if (!mShouldRollback) {
+        return;
+    }
+    mShouldRollback = false;
+    mAssembler.mState = mAssemblerStateCheckpoint;
+    mBlockTxnsCheckpoint.trimToSize();
+    mTxFeesCheckpoint.trimToSize();
+    mTxSigOpsCountCheckpoint.trimToSize();
 }
 
 // Test whether we can add another transaction to the next block, and if
