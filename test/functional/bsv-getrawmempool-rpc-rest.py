@@ -140,5 +140,21 @@ class GetRawMempoolTest(BitcoinTestFramework):
             self.check_fieldsMempoolEntry(largeTxEntry)
             assert_equal(mempool[largeTx.hash], largeTxEntry)
 
+            # Test those calls in a batch
+            batch = self.nodes[0].batch([
+                self.nodes[0].getrawmempool.get_request(True),
+                self.nodes[0].getrawmempool.get_request(),
+                self.nodes[0].getmempooldescendants.get_request(transactions[0].hash, True),
+                self.nodes[0].getmempoolancestors.get_request(largeTx.hash),
+                self.nodes[0].getmempoolentry.get_request(largeTx.hash)])
+
+            assert_equal(batch[0]["error"], None)
+            assert_equal(batch[0]["result"], mempool)
+            assert_equal(batch[1]["error"], None)
+            assert_equal(batch[2]["result"][largeTx.hash], mempool[largeTx.hash])
+            assert_equal(batch[2]["error"], None)
+            assert_equal(batch[3]["error"], None)
+            assert_equal(batch[4]["error"], None)
+
 if __name__ == '__main__':
     GetRawMempoolTest().main()
