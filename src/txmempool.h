@@ -689,19 +689,6 @@ public:
             bool fSearchForParents = true) const;
 
     /**
-     * Populate setDescendants with all in-mempool descendants of hash.
-     * Assumes that setDescendants includes all in-mempool descendants of
-     * anything already in it.  */
-    void CalculateDescendants(
-            txiter it,
-            setEntries &setDescendants) const;
-    // A non-locking version of CalculateDescendants
-    // DEPRECATED - this will become private and ultimately changed or removed
-    void CalculateDescendantsNL(
-            txiter it,
-            setEntries &setDescendants) const;
-
-    /**
      * The minimum fee to get into the mempool, which may itself not be enough
      * for larger-sized transactions.
      */
@@ -771,6 +758,16 @@ public:
 
     void ClearPrioritisation(const uint256 &hash);
     void ClearPrioritisation(const std::vector<TxId>& vTxIds);
+
+private:
+    /**
+     * Populate setDescendants with all in-mempool descendants of hash.
+     * Assumes that setDescendants includes all in-mempool descendants of
+     * anything already in it.
+     */
+    void GetDescendantsNL(
+        txiter it,
+        setEntries &setDescendants) const;
 
 public:
     /** \class CTxMemPool::Snapshot

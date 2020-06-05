@@ -394,7 +394,7 @@ void CTxMemPool::updateForRemoveFromMempoolNL(const setEntries &entriesToRemove,
         // operations that need to traverse the mempool).
         for (txiter removeIt : entriesToRemove) {
             setEntries setDescendants;
-            CalculateDescendantsNL(removeIt, setDescendants);
+            GetDescendantsNL(removeIt, setDescendants);
             setDescendants.erase(removeIt); // don't update state for self
             int64_t modifySize = -((int64_t)removeIt->GetTxSize());
             Amount modifyFee = -1 * removeIt->GetModifiedFee();
@@ -658,18 +658,12 @@ void CTxMemPool::removeUncheckedNL(
 
 // Calculates descendants of entry that are not already in setDescendants, and
 // adds to setDescendants. Assumes entryit is already a tx in the mempool and
-// setMemPoolChildren is correct for tx and all descendants. Also assumes that
+// setDescendants is correct for tx and all descendants. Also assumes that
 // if an entry is in setDescendants already, then all in-mempool descendants of
 // it are already in setDescendants as well, so that we can save time by not
 // iterating over those entries.
-void CTxMemPool::CalculateDescendants(txiter entryit,
-                                      setEntries &setDescendants) const {
-    std::shared_lock lock(smtx);
-    CalculateDescendantsNL(entryit, setDescendants);
-}
-
-void CTxMemPool::CalculateDescendantsNL(txiter entryit,
-                                        setEntries &setDescendants) const {
+void CTxMemPool::GetDescendantsNL(txiter entryit,
+                                  setEntries &setDescendants) const {
     setEntries stage;
     if (setDescendants.count(entryit) == 0) {
         stage.insert(entryit);
@@ -734,7 +728,7 @@ void CTxMemPool::removeRecursiveNL(
     }
     setEntries setAllRemoves;
     for (txiter it : txToRemove) {
-        CalculateDescendantsNL(it, setAllRemoves);
+        GetDescendantsNL(it, setAllRemoves);
     }
 
     removeStagedNL(setAllRemoves, false, changeSet, reason, conflictedWith);
@@ -812,7 +806,7 @@ void CTxMemPool::RemoveForReorg(
 
     setEntries setAllRemoves;
     for (txiter it : txToRemove) {
-        CalculateDescendantsNL(it, setAllRemoves);
+        GetDescendantsNL(it, setAllRemoves);
     }
     removeStagedNL(setAllRemoves, false, changeSet, MemPoolRemovalReason::REORG);
 }
@@ -1388,23 +1382,22 @@ void CTxMemPool::prioritiseTransactionNL(
         setEntries setAncestors;
         uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
         std::string dummy;
-        CalculateMemPoolAncestorsNL(
-            *it,
-            setAncestors,
-            nNoLimit,
-            nNoLimit,
-            nNoLimit,
-            nNoLimit,
-            dummy,
-            false);
+        CalculateMemPoolAncestorsNL(*it,
+                                    setAncestors,
+                                    nNoLimit,
+                                    nNoLimit,
+                                    nNoLimit,
+                                    nNoLimit,
+                                    dummy,
+                                    false);
 
         // Now update all descendants' modified fees with ancestors
         setEntries setDescendants;
-        CalculateDescendantsNL(it, setDescendants);
+        GetDescendantsNL(it, setDescendants);
         setDescendants.erase(it);
         for (txiter descendantIt : setDescendants) {
             mapTx.modify(descendantIt,
-                         update_ancestor_state(0, nFeeDelta, 0, 0));
+                            update_ancestor_state(0, nFeeDelta, 0, 0));
         }
     }
 }
@@ -1552,7 +1545,7 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
 
     setEntries stage;
     for (txiter removeit : toremove) {
-        CalculateDescendantsNL(removeit, stage);
+        GetDescendantsNL(removeit, stage);
     }
 
     removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::EXPIRY);
@@ -1831,7 +1824,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     //     maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
     //     setEntries stage;
-    //     CalculateDescendantsNL(mapTx.project<0>(it), stage);
+    //     GetDescendantsNL(mapTx.project<0>(it), stage);
     //     nTxnRemoved += stage.size();
 
     //     std::vector<CTransaction> txn;
@@ -2010,7 +2003,7 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
         setEntries related;
         if (kind == TxSnapshotKind::TX_WITH_DESCENDANTS
             || kind == TxSnapshotKind::ONLY_DESCENDANTS) {
-            CalculateDescendantsNL(baseTx, related);
+            GetDescendantsNL(baseTx, related);
         }
         else {
             static constexpr auto noLimit = std::numeric_limits<uint64_t>::max();
@@ -2019,7 +2012,7 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
                                         noLimit, noLimit, noLimit, noLimit,
                                         dummyErrorString, false);
         }
-        // Quirks mode: CalculateDescendants() and CalculateMemPoolAncestors()
+        // Quirks mode: GetDescendantsNL() and CalculateMemPoolAncestors()
         // are not symmetric, the former includes the base transaction in the
         // results, but the latter does not.
         if (kind == TxSnapshotKind::TX_WITH_ANCESTORS) {
