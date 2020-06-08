@@ -213,6 +213,9 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
             {
                 txnNum += nAdded;
 
+                // Set updated flag
+                mRecentlyUpdated = true;
+
                 // We're finished if we've reached the end of the journal, or we've added
                 // as many transactions this iteration as we're allowed.
                 finished = (mJournalPos == journalLock.end() || txnNum >= maxTxns);
@@ -319,9 +322,6 @@ size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
     mBlockSize = blockSizeWithTx;
     mBlockSigOps = blockSigOpsWithTx;
     mBlockFees += entry.getFee();
-
-    // Set updated flag
-    mRecentlyUpdated = true;
 
     // Move to the next item in the journal
     ++mJournalPos;
