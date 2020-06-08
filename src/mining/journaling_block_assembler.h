@@ -93,6 +93,9 @@ class JournalingBlockAssembler : public BlockAssembler
     std::atomic_bool mRecentlyUpdated {false};
 
     // Variables used for mining statistics
-    std::atomic<BlockStats> mLastBlockStats;
+    std::atomic<BlockStats> mLastBlockStats {};
+
+    // Amount of fees in the current block template
+    Amount mBlockFees{0};
 };
 }

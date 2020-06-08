@@ -80,7 +80,7 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
     }
 
     // Fill in the block header fields
-    FillBlockHeader(block, pindexPrevNew, scriptPubKeyIn);
+    FillBlockHeader(block, pindexPrevNew, scriptPubKeyIn, mBlockFees);
 
     // If required, check block validity
     if(mConfig.GetTestBlockCandidateValidity())
