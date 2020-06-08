@@ -300,48 +300,50 @@ void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
     }
 }
 
-void FinalizeNode(NodeId nodeid, bool &fUpdateConnectionTime) {
+void FinalizeNode(NodeId nodeid, bool &fUpdateConnectionTime)
+{
+    // For mapBlocksInFlight and mapBlockSource
+    AssertLockHeld(cs_main);
 
     fUpdateConnectionTime = false;
-    LOCK(cs_main);
-    {
-        // Try to obtain an access to the node's state data.
-        const CNodeStateRef stateRef { GetState(nodeid) };
-        const CNodeStatePtr& state { stateRef.get() };
-        assert(state);
 
-        if (state->fSyncStarted) {
-            nSyncStarted--;
-        }
+    // Try to obtain an access to the node's state data.
+    const CNodeStateRef stateRef { GetState(nodeid) };
+    const CNodeStatePtr& state { stateRef.get() };
+    assert(state);
 
-        if (state->nMisbehavior == 0 && state->fCurrentlyConnected) {
-            fUpdateConnectionTime = true;
-        }
-
-        for (const QueuedBlock &entry : state->vBlocksInFlight) {
-            mapBlocksInFlight.erase(entry.hash);
-        }
-        // Get rid of stale mapBlockSource entries for this peer as they may leak
-        // if we don't clean them up (I saw on the order of ~100 stale entries on
-        // a full resynch in my testing -- these entries stay forever).
-        // Performance note: most of the time mapBlockSource has 0 or 1 entries.
-        // During synch of blockchain it may end up with as many as 1000 entries,
-        // which still only takes ~1ms to iterate through on even old hardware.
-        // So this memleak cleanup is not expensive and worth doing since even
-        // small leaks are bad. :)
-        for (auto it = mapBlockSource.begin(); it != mapBlockSource.end(); /*NA*/) {
-            if (it->second.first == nodeid) {
-                mapBlockSource.erase(it++);
-            } else {
-                ++it;
-            }
-        }
-        // Erase orphan txns received from the given nodeId
-        g_connman->EraseOrphanTxnsFromPeer(nodeid);
-        nPreferredDownload -= state->fPreferredDownload;
-        nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
-        assert(nPeersWithValidatedDownloads >= 0);
+    if (state->fSyncStarted) {
+        nSyncStarted--;
     }
+
+    if (state->nMisbehavior == 0 && state->fCurrentlyConnected) {
+        fUpdateConnectionTime = true;
+    }
+
+    for (const QueuedBlock &entry : state->vBlocksInFlight) {
+        mapBlocksInFlight.erase(entry.hash);
+    }
+    // Get rid of stale mapBlockSource entries for this peer as they may leak
+    // if we don't clean them up (I saw on the order of ~100 stale entries on
+    // a full resynch in my testing -- these entries stay forever).
+    // Performance note: most of the time mapBlockSource has 0 or 1 entries.
+    // During synch of blockchain it may end up with as many as 1000 entries,
+    // which still only takes ~1ms to iterate through on even old hardware.
+    // So this memleak cleanup is not expensive and worth doing since even
+    // small leaks are bad. :)
+    for (auto it = mapBlockSource.begin(); it != mapBlockSource.end(); /*NA*/) {
+        if (it->second.first == nodeid) {
+            mapBlockSource.erase(it++);
+        } else {
+            ++it;
+        }
+    }
+    // Erase orphan txns received from the given nodeId
+    g_connman->EraseOrphanTxnsFromPeer(nodeid);
+    nPreferredDownload -= state->fPreferredDownload;
+    nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
+    assert(nPeersWithValidatedDownloads >= 0);
+
     // Modify mapNodeState in an exclusive mode.
     {
         std::unique_lock<std::shared_mutex> lock { mapNodeStateMtx };
