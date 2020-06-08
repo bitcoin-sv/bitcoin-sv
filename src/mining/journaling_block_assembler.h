@@ -59,14 +59,9 @@ class JournalingBlockAssembler : public BlockAssembler
     // Our internal mutex
     mutable std::mutex mMtx {};
 
-    // All details for the block we are currently building
-    static constexpr uint64_t COINBASE_SIG_OPS {100};
-    static constexpr uint64_t COINBASE_SIZE {1000};
-    std::vector<CTransactionRef> mBlockTxns {};
-    uint64_t mBlockSigOps {COINBASE_SIG_OPS};
-    uint64_t mBlockSize {COINBASE_SIZE};
-    std::vector<Amount> mTxFees {};
-    std::vector<int64_t> mTxSigOpsCount {};
+    // Flag to indicate whether we have been updated
+    std::atomic_bool mRecentlyUpdated {false};
+
 
     // Chain context for the block
     int64_t mLockTimeCutoff {0};
@@ -87,15 +82,26 @@ class JournalingBlockAssembler : public BlockAssembler
 
     // The journal we're reading from and our current position in that journal
     CJournalPtr mJournal {nullptr};
-    CJournal::Index mJournalPos {};
-
-    // Flag to indicate whether we have been updated
-    std::atomic_bool mRecentlyUpdated {false};
 
     // Variables used for mining statistics
     std::atomic<BlockStats> mLastBlockStats {};
 
-    // Amount of fees in the current block template
-    Amount mBlockFees{0};
+    // All details for the block we are currently building
+    static constexpr uint64_t COINBASE_SIG_OPS {100};
+    static constexpr uint64_t COINBASE_SIZE {1000};
+
+    // Block assembly state, without the huge vectors
+    struct BlockAssemblyState {
+        uint64_t mBlockSigOps {COINBASE_SIG_OPS};
+        uint64_t mBlockSize {COINBASE_SIZE};
+        // Amount of fees in the current block template
+        Amount mBlockFees {0};
+        // Position where we're reading from the index
+        CJournal::Index mJournalPos {};
+    };
+    std::vector<CTransactionRef> mBlockTxns {};
+    std::vector<Amount> mTxFees {};
+    std::vector<int64_t> mTxSigOpsCount {};
+    BlockAssemblyState mState {};
 };
 }
