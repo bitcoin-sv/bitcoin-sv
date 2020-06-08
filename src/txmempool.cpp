@@ -349,9 +349,7 @@ bool CTxMemPool::CalculateMemPoolAncestorsNL(
     return true;
 }
 
-void CTxMemPool::updateAncestorsOfNL(bool add,
-                                     txiter it,
-                                     setEntries &setAncestors) {
+void CTxMemPool::updateAncestorsOfNL(bool add, txiter it) {
     setEntries parentIters = GetMemPoolParentsNL(it); // MARK: also used by legacy
     // add or remove this tx as a child of each parent
     for (txiter piter : parentIters) {
@@ -385,7 +383,6 @@ void CTxMemPool::updateForRemoveFromMempoolNL(const setEntries &entriesToRemove,
                                             bool updateDescendants) {
     // For each entry, walk back all ancestors and decrement size associated
     // with this transaction.
-    const uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
     if (updateDescendants) {
         // updateDescendants should be true whenever we're not recursively
         // removing a tx and all its descendants, eg when a transaction is
@@ -407,39 +404,9 @@ void CTxMemPool::updateForRemoveFromMempoolNL(const setEntries &entriesToRemove,
     }
 
     for (txiter removeIt : entriesToRemove) {
-        setEntries setAncestors;
-        const CTxMemPoolEntry &entry = *removeIt;
-        std::string dummy;
-        // Since this is a tx that is already in the mempool, we can call CMPA
-        // with fSearchForParents = false.  If the mempool is in a consistent
-        // state, then using true or false should both be correct, though false
-        // should be a bit faster.
-        // However, if we happen to be in the middle of processing a reorg, then
-        // the mempool can be in an inconsistent state. In this case, the set of
-        // ancestors reachable via mapLinks will be the same as the set of
-        // ancestors whose packages include this transaction, because when we
-        // add a new transaction to the mempool in AddUnchecked(), we assume it
-        // has no children, and in the case of a reorg where that assumption is
-        // false, the in-mempool children aren't linked to the in-block tx's
-        // until UpdateTransactionsFromBlock() is called. So if we're being
-        // called during a reorg, ie before UpdateTransactionsFromBlock() has
-        // been called, then mapLinks[] will differ from the set of mempool
-        // parents we'd calculate by searching, and it's important that we use
-        // the mapLinks[] notion of ancestor transactions as the set of things
-        // to update for removal.
-        CalculateMemPoolAncestorsNL(entry,
-                                    setAncestors,
-                                    nNoLimit,
-                                    nNoLimit,
-                                    nNoLimit,
-                                    nNoLimit,
-                                    dummy,
-                                    false);
         // Note that updateAncestorsOfNL severs the child links that point to
         // removeIt in the entries for the parents of removeIt.
-        updateAncestorsOfNL(false,
-                            removeIt,
-                            setAncestors);
+        updateAncestorsOfNL(false, removeIt);
     }
     // After updating all the ancestor sizes, we can now sever the link between
     // each transaction being removed and any mempool children (ie, update
@@ -584,7 +551,7 @@ void CTxMemPool::AddUncheckedNL(
             updateParentNL(newit, pit, true);
         }
     }
-    updateAncestorsOfNL(true, newit, setAncestors);
+    updateAncestorsOfNL(true, newit);
     updateEntryForAncestorsNL(newit, setAncestors);
 
     nTransactionsUpdated++;

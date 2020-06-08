@@ -984,8 +984,7 @@ private:
      */
     void updateAncestorsOfNL(
             bool add,
-            txiter hash,
-            setEntries &setAncestors);
+            txiter hash);
 
     /**
      * Set ancestor state for an entry
