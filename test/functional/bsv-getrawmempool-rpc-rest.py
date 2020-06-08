@@ -50,9 +50,6 @@ class GetRawMempoolTest(BitcoinTestFramework):
 
         assert 'startingpriority' in mempoolEntry
         assert 'currentpriority' in mempoolEntry
-        assert 'ancestorcount' in mempoolEntry
-        assert 'ancestorsize' in mempoolEntry
-        assert 'ancestorfees' in mempoolEntry
         assert 'depends' in mempoolEntry
 
     def check_getRawMempool(self, mempool, transactions):

@@ -288,18 +288,6 @@ std::string EntryDescriptionString() {
            "transaction entered pool\n"
            "    \"currentpriority\" : n,  (numeric) DEPRECATED. Transaction "
            "priority now\n"
-           "    \"descendantcount\" : n,  (numeric) number of in-mempool "
-           "descendant transactions (including this one)\n"
-           "    \"descendantsize\" : n,   (numeric) virtual transaction size "
-           "of in-mempool descendants (including this one)\n"
-           "    \"descendantfees\" : n,   (numeric) modified fees (see above) "
-           "of in-mempool descendants (including this one)\n"
-           "    \"ancestorcount\" : n,    (numeric) number of in-mempool "
-           "ancestor transactions (including this one)\n"
-           "    \"ancestorsize\" : n,     (numeric) virtual transaction size "
-           "of in-mempool ancestors (including this one)\n"
-           "    \"ancestorfees\" : n,     (numeric) modified fees (see above) "
-           "of in-mempool ancestors (including this one)\n"
            "    \"depends\" : [           (array) unconfirmed transactions "
            "used as inputs for this transaction\n"
            "        \"transactionid\",    (string) parent transaction id\n"
@@ -326,9 +314,6 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
     jWriter.pushKV("height", static_cast<uint64_t>(e.GetHeight()));
     jWriter.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
     jWriter.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
-    jWriter.pushKV("ancestorcount", e.GetCountWithAncestors());
-    jWriter.pushKV("ancestorsize", e.GetSizeWithAncestors());  // MARK: also used by legacy
-    jWriter.pushKV("ancestorfees", e.GetModFeesWithAncestors().GetSatoshis()); // MARK: also used by legacy
     std::set<std::string> deps;
     const CTransaction& tx = e.GetTx();
     for (const CTxIn& txin : tx.vin)
