@@ -1,7 +1,7 @@
 # %global selinux_variants mls strict targeted
 
 Name:		bitcoin-sv
-Version:	1.0.1
+Version:	1.0.2
 Release:	1%{?dist}
 Summary:	Peer to Peer Cryptographic Currency
 
