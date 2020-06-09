@@ -124,6 +124,7 @@ static const bool DEFAULT_FORCEDNSSEED = true;
 // Maximum sizes of queued messages for receiving and sending
 static const size_t DEFAULT_MAXRECEIVEBUFFER = 500 * 1000;
 static const size_t DEFAULT_MAXSENDBUFFER = 500 * 1000;
+static const size_t DEFAULT_MAXSENDBUFFER_MULTIPLIER = 10;
 
 static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);
 
@@ -892,7 +893,6 @@ public:
     const NodeId id {};
 
     const uint64_t nKeyedNetGroup {0};
-    std::atomic_bool fPauseSend {false};
 
 public:
     uint256 hashContinue { uint256() };
@@ -1031,6 +1031,9 @@ private:
     std::set<std::string> mSupportedStreamPolicies {};
     std::set<std::string> mCommonStreamPolicies {};
 
+    // Flag to indicate if we have just become paused for sending and receiving (to control logging)
+    bool mEnteredPauseSendRecv {false};
+
 public:
 
     /** Add some new transactions to our pending inventory list */
@@ -1062,6 +1065,7 @@ public:
                         const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent);
 
     bool GetDisconnect() const { return fDisconnect; }
+    bool GetPausedForSending(bool checkPauseRecv = false);
 
     void SetRecvVersion(int nVersionIn) { nRecvVersion = nVersionIn; }
     int GetRecvVersion() { return nRecvVersion; }

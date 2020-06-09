@@ -730,7 +730,7 @@ void CNode::copyStats(NodeStats &stats)
         LOCK(cs_filter);
         stats.fRelayTxes = fRelayTxes;
     }
-    stats.fPauseSend = fPauseSend;
+    stats.fPauseSend = GetPausedForSending();
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
     stats.addrName = GetAddrName();
@@ -928,6 +928,56 @@ std::string CNode::GetPreferredStreamPolicyName() const
     throw std::runtime_error("No available stream policies in common");
 }
 
+bool CNode::GetPausedForSending(bool checkPauseRecv)
+{
+    if(g_connman)
+    {
+        unsigned maxBuffSize { g_connman->GetSendBufferSize() };
+        bool pausedForReceiving {false};
+        if(checkPauseRecv && mAssociation.GetPausedForReceiving(Association::PausedFor::ANY))
+        {
+            pausedForReceiving = true;
+            // If we're paused for both sending and receiving, allow a temporary
+            // increase in send buffer size to get things moving
+            size_t multiplier { static_cast<size_t>(gArgs.GetArg("-maxsendbuffermult", DEFAULT_MAXSENDBUFFER_MULTIPLIER)) };
+            if(multiplier > 0)
+            {
+                maxBuffSize *= multiplier;
+            }
+        }
+
+        bool pausedForSending { mAssociation.GetTotalSendQueueSize() > maxBuffSize };
+
+        // This complex if/else is just to try and limit logging so that we only log
+        // as we enter or leave the pause send & recv state.
+        if(checkPauseRecv)
+        {
+            if(pausedForSending && pausedForReceiving)
+            {
+                if(!mEnteredPauseSendRecv)
+                {
+                    // Log that we have just become paused for both sending and receiving
+                    LogPrint(BCLog::NET, "Entered pause send and recv for peer=%d\n", id);
+                }
+                mEnteredPauseSendRecv = true;
+            }
+            else
+            {
+                if(mEnteredPauseSendRecv)
+                {
+                    // Log that we have just left paused for both sending and receiving
+                    LogPrint(BCLog::NET, "Cleared pause send and recv for peer=%d\n", id);
+                }
+                mEnteredPauseSendRecv = false;
+            }
+        }
+
+        return pausedForSending;
+    }
+
+    return false;
+}
+
 void CNode::SetSendVersion(int nVersionIn) {
     // Send version may only be changed in the version message, and only one
     // version message is allowed per session. We can therefore treat this value
@@ -970,9 +1020,6 @@ void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, C
     {
         connman.WakeMessageHandler();
     }
-
-    // Pause/unpause sending
-    fPauseSend = mAssociation.GetTotalSendQueueSize() > connman.GetSendBufferSize();
 
     //
     // Inactivity checking
@@ -2111,7 +2158,7 @@ void CConnman::ThreadMessageHandler()
             bool fMoreNodeWork = GetNodeSignals().ProcessMessages(
                 *config, pnode, *this, flagInterruptMsgProc,
                 mDebugP2PTheadStallsThreshold);
-            fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
+            fMoreWork |= (fMoreNodeWork && !pnode->GetPausedForSending());
 
             if (flagInterruptMsgProc) {
                 return;
@@ -2994,9 +3041,6 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, Strea
 uint64_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream)
 {
     uint64_t bytesSent { mAssociation.PushMessage(std::move(serialisedHeader), std::move(msg), stream) };
-
-    fPauseSend = (mAssociation.GetTotalSendQueueSize() > g_connman->GetSendBufferSize());
-
     return bytesSent;
 }
 

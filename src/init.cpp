@@ -612,6 +612,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer "
                                           "in kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB)."),
                                         DEFAULT_MAXSENDBUFFER));
+    strUsage += HelpMessageOpt("-maxsendbuffermult=<n>",
+        strprintf(_("Temporary multiplier applied to the -maxsendbuffer size to "
+                    "allow connections to unblock themselves in the unlikely "
+                    "situation where they have become paused for both sending and "
+                    "receiving (default: %d)"), DEFAULT_MAXSENDBUFFER_MULTIPLIER));
     strUsage += HelpMessageOpt(
         "-factormaxsendqueuesbytes=<n>",
         strprintf(_("Factor that will be multiplied with excessiveBlockSize"
