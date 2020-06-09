@@ -1146,19 +1146,6 @@ private:
     mutable std::map<TxId, CTransactionRef> mCache;
 };
 
-// We want to sort transactions by coin age priority
-typedef std::pair<double, CTxMemPool::txiter> TxCoinAgePriority; // MARK: only used by legacy
-
-struct TxCoinAgePriorityCompare { // MARK: only used by legacy
-    bool operator()(const TxCoinAgePriority &a, const TxCoinAgePriority &b) {
-        if (a.first == b.first) {
-            // Reverse order to make sort less than
-            return CompareTxMemPoolEntryByScore()(*(b.second), *(a.second));
-        }
-        return a.first < b.first;
-    }
-};
-
 /**
  * DisconnectedBlockTransactions
 
