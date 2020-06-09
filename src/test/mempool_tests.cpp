@@ -9,6 +9,7 @@
 #include "util.h"
 
 #include "test/test_bitcoin.h"
+#include "mempool_test_access.h"
 
 #include <boost/test/unit_test.hpp>
 #include <list>
@@ -54,6 +55,7 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     }
 
     CTxMemPool testPool;
+    CTxMemPoolTestAccess testPoolAccess(testPool);
 
     // Nothing in pool, remove should do nothing:
     unsigned int poolSize = testPool.Size();
@@ -121,6 +123,7 @@ BOOST_AUTO_TEST_CASE(MempoolClearTest) {
     }
 
     CTxMemPool testPool;
+    CTxMemPoolTestAccess testPoolAccess(testPool);
 
     // Nothing in pool, clear should do nothing:
     testPool.Clear();
@@ -130,15 +133,13 @@ BOOST_AUTO_TEST_CASE(MempoolClearTest) {
     testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), 1UL);
     BOOST_CHECK_EQUAL(testPool.mapTx.size(), 1UL);
-    BOOST_CHECK_EQUAL(testPool.mapNextTx.size(), 1UL);
-    BOOST_CHECK_EQUAL(testPool.vTxHashes.size(), 1UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.mapNextTx().size(), 1UL);
 
     // CTxMemPool's members should be empty after a clear
     testPool.Clear();
     BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
     BOOST_CHECK_EQUAL(testPool.mapTx.size(), 0UL);
-    BOOST_CHECK_EQUAL(testPool.mapNextTx.size(), 0UL);
-    BOOST_CHECK_EQUAL(testPool.vTxHashes.size(), 0UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.mapNextTx().size(), 0UL);
 }
 
 template <typename name>
@@ -607,26 +608,26 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
 
     std::vector<CTransactionRef> vtx;
     SetMockTime(42);
-    SetMockTime(42 + CTxMemPool::ROLLING_FEE_HALFLIFE);
+    SetMockTime(42 + CTestTxMemPool::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       maxFeeRateRemoved.GetFeePerK() + feeIncrement);
     // ... we should keep the same min fee until we get a block
     pool.RemoveForBlock(vtx, 1, nullChangeSet);
-    SetMockTime(42 + 2 * CTxMemPool::ROLLING_FEE_HALFLIFE);
+    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 2);
     // ... then feerate should drop 1/2 each halflife
 
-    SetMockTime(42 + 2 * CTxMemPool::ROLLING_FEE_HALFLIFE +
-                CTxMemPool::ROLLING_FEE_HALFLIFE / 2);
+    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE +
+                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 2);
     BOOST_CHECK_EQUAL(
         pool.GetMinFee(pool.DynamicMemoryUsage() * 5 / 2).GetFeePerK(),
         (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 4);
     // ... with a 1/2 halflife when mempool is < 1/2 its target size
 
-    SetMockTime(42 + 2 * CTxMemPool::ROLLING_FEE_HALFLIFE +
-                CTxMemPool::ROLLING_FEE_HALFLIFE / 2 +
-                CTxMemPool::ROLLING_FEE_HALFLIFE / 4);
+    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE +
+                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 2 +
+                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 4);
     BOOST_CHECK_EQUAL(
         pool.GetMinFee(pool.DynamicMemoryUsage() * 9 / 2).GetFeePerK(),
         (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 8);

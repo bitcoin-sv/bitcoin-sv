@@ -1084,6 +1084,10 @@ private:
 
     // A non-locking version of DynamicMemoryUsage.
     size_t DynamicMemoryUsageNL() const;
+
+public:
+    // Allow access to some mempool internals from unit tests.
+    template<typename X> struct UnitTestAccess;
 };
 
 /**
