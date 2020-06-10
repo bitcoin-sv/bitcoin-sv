@@ -495,9 +495,7 @@ private:
     void updateParentNL(txiter entry, txiter parent, bool add);
     void updateChildNL(txiter entry, txiter child, bool add);
 
-    std::vector<indexed_transaction_set::const_iterator>
-    getSortedDepthAndScoreNL() const;
-    // DEPRECATED - this will become private and ultimately changed or removed
+    std::vector<txiter> getSortedDepthAndScoreNL() const;
     indirectmap<COutPoint, const CTransaction *> mapNextTx;
 
 public:

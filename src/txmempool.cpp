@@ -742,8 +742,7 @@ void CTxMemPool::RemoveForReorg(
     // no-longer-final transactions.
     std::unique_lock lock(smtx);
     setEntries txToRemove;
-    for (indexed_transaction_set::const_iterator it = mapTx.begin();
-         it != mapTx.end(); it++) {
+    for (txiter it = mapTx.begin(); it != mapTx.end(); it++) {
         const CTransaction &tx = it->GetTx();
         LockPoints lp = it->GetLockPoints();
         bool validLP = TestLockPointValidity(&lp);
@@ -773,8 +772,7 @@ void CTxMemPool::RemoveForReorg(
             txToRemove.insert(it);
         } else if (it->GetSpendsCoinbase()) {
             for (const CTxIn &txin : tx.vin) {
-                indexed_transaction_set::const_iterator it2 =
-                    mapTx.find(txin.prevout.GetTxId());
+                txiter it2 = mapTx.find(txin.prevout.GetTxId());
                 if (it2 != mapTx.end()) {
                     continue;
                 }
@@ -936,8 +934,7 @@ void CTxMemPool::CheckMempoolImplNL(
     uint64_t innerUsage = 0;
 
     std::list<const CTxMemPoolEntry *> waitingOnDependants;
-    for (indexed_transaction_set::const_iterator it = mapTx.begin();
-         it != mapTx.end(); it++) {
+    for (txiter it = mapTx.begin(); it != mapTx.end(); it++) {
         unsigned int i = 0;
         checkTotal += it->GetTxSize();
         innerUsage += it->DynamicMemoryUsage();
@@ -954,8 +951,7 @@ void CTxMemPool::CheckMempoolImplNL(
         for (const CTxIn &txin : tx.vin) {
             // Check that every mempool transaction's inputs refer to available
             // coins, or other mempool tx's.
-            indexed_transaction_set::const_iterator it2 =
-                mapTx.find(txin.prevout.GetTxId());
+            txiter it2 = mapTx.find(txin.prevout.GetTxId());
             if (it2 != mapTx.end()) {
                 const CTransaction &tx2 = it2->GetTx();
                 assert(tx2.vout.size() > txin.prevout.GetN() &&
@@ -1060,7 +1056,7 @@ void CTxMemPool::CheckMempoolImplNL(
 
     for (auto it = mapNextTx.cbegin(); it != mapNextTx.cend(); it++) {
         uint256 txid = it->second->GetId();
-        indexed_transaction_set::const_iterator it2 = mapTx.find(txid);
+        txiter it2 = mapTx.find(txid);
         const CTransaction &tx = it2->GetTx();
         assert(it2 != mapTx.end());
         assert(&tx == it->second);
@@ -1112,7 +1108,7 @@ std::string CTxMemPool::checkJournalNL() const
     CJournalTester tester { mJournalBuilder.getCurrentJournal() };
 
     // Check mempool & journal agree on contents
-    for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
+    for(txiter it = mapTx.begin(); it != mapTx.end(); ++it)
     {
         // Check this mempool txn also appears in the journal
         const CJournalEntry tx { *it };
@@ -1235,12 +1231,11 @@ bool CTxMemPool::CompareDepthAndScoreNL(const uint256 &hasha,
     return DepthAndScoreComparator()(i, j);
 }
 
-std::vector<CTxMemPool::indexed_transaction_set::const_iterator>
+std::vector<CTxMemPool::txiter>
 CTxMemPool::getSortedDepthAndScoreNL() const {
-    std::vector<indexed_transaction_set::const_iterator> iters;
+    std::vector<txiter> iters;
     iters.reserve(mapTx.size());
-    for (indexed_transaction_set::iterator mi = mapTx.begin();
-         mi != mapTx.end(); ++mi) {
+    for (txiter mi = mapTx.begin(); mi != mapTx.end(); ++mi) {
         iters.push_back(mi);
     }
 
@@ -1281,7 +1276,7 @@ CTransactionRef CTxMemPool::Get(const uint256 &txid) const {
 }
 
 CTransactionRef CTxMemPool::GetNL(const uint256 &txid) const {
-    indexed_transaction_set::const_iterator i = mapTx.find(txid);
+    txiter i = mapTx.find(txid);
     if (i == mapTx.end()) {
         return nullptr;
     }
@@ -1290,7 +1285,7 @@ CTransactionRef CTxMemPool::GetNL(const uint256 &txid) const {
 
 TxMempoolInfo CTxMemPool::Info(const uint256 &txid) const {
     std::shared_lock lock(smtx);
-    indexed_transaction_set::const_iterator i = mapTx.find(txid);
+    txiter i = mapTx.find(txid);
     if (i == mapTx.end()) {
         return TxMempoolInfo();
     }
