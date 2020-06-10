@@ -9,6 +9,8 @@
 #include <net/netbase.h>
 #include <net/node_stats.h>
 
+#include <algorithm>
+
 namespace
 {
     // Take msg sizes per command per stream and combine into a single per command total
@@ -314,6 +316,23 @@ int64_t Association::GetLastRecvTime() const
     else
     {
         return *(std::max_element(streamTimes.begin(), streamTimes.end()));
+    }
+}
+
+bool Association::GetPausedForReceiving(PausedFor anyAll) const
+{
+    LOCK(cs_mStreams);
+
+    // Get whether ANY or ALL of our underlying streams are paused
+    if(anyAll == PausedFor::ANY)
+    {
+        return std::any_of(mStreams.begin(), mStreams.end(),
+            [](const auto& stream){ return stream.second->GetPausedForReceiving(); });
+    }
+    else
+    {
+        return std::all_of(mStreams.begin(), mStreams.end(),
+            [](const auto& stream){ return stream.second->GetPausedForReceiving(); });
     }
 }
 

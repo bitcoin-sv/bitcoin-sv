@@ -97,6 +97,10 @@ class Association
     int64_t GetLastSendTime() const;
     int64_t GetLastRecvTime() const;
 
+    // Get whether we are paused for receiving (ANY stream or ALL streams)
+    enum PausedFor { ANY, ALL };
+    bool GetPausedForReceiving(PausedFor anyAll) const;
+
   private:
 
     // Node we are for
