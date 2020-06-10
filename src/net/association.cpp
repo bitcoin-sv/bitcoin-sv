@@ -276,10 +276,15 @@ void Association::CopyStats(AssociationStats& stats) const
         }
     );
 
-    // Total send queue bytes for all our underlying streams
+    // Total send/recv queue bytes for all our underlying streams
     stats.nSendSize = std::accumulate(streamStats.begin(), streamStats.end(), 0ULL,
         [](const uint64_t& tot, const StreamStats& s) {
             return tot + s.nSendSize;
+        }
+    );
+    stats.nRecvSize = std::accumulate(streamStats.begin(), streamStats.end(), 0ULL,
+        [](const uint64_t& tot, const StreamStats& s) {
+            return tot + s.nRecvSize;
         }
     );
 
