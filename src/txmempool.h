@@ -496,9 +496,9 @@ private:
 
     std::vector<txiter> getSortedDepthAndScoreNL() const;
     indirectmap<COutPoint, const CTransaction *> mapNextTx;
+    std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
 public:
-    std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
     /** Create a new CTxMemPool.
      */
@@ -709,9 +709,6 @@ public:
     TxMempoolInfo Info(const uint256& hash) const;
 
     std::vector<TxMempoolInfo> InfoAll() const;
-    // A non-locking version of InfoAll
-    // DEPRECATED - this will become private and ultimately changed or removed
-    std::vector<TxMempoolInfo> InfoAllNL() const;
 
     size_t DynamicMemoryUsage() const;
 
@@ -724,7 +721,15 @@ public:
     void ClearPrioritisation(const uint256 &hash);
     void ClearPrioritisation(const std::vector<TxId>& vTxIds);
 
+    /**
+     * Retreive mempool data needed by DumpMempool().
+     */
+    void GetDeltasAndInfo(std::map<uint256, Amount>& deltas, std::vector<TxMempoolInfo>& info) const;
+
 private:
+    // A non-locking version of InfoAll
+    std::vector<TxMempoolInfo> InfoAllNL() const;
+
     /**
      * Try to calculate all in-mempool ancestors of @a entry.
      * See CheckAncestorLimits() for the meaning of the parameters.

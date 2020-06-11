@@ -7432,14 +7432,7 @@ void DumpMempool(void) {
 
     std::map<uint256, Amount> mapDeltas;
     std::vector<TxMempoolInfo> vinfo;
-
-    {
-        std::shared_lock lock(mempool.smtx);
-        for (const auto &i : mempool.mapDeltas) {
-            mapDeltas[i.first] = i.second.second;
-        }
-        vinfo = mempool.InfoAllNL();
-    }
+    mempool.GetDeltasAndInfo(mapDeltas, vinfo);
 
     int64_t mid = GetTimeMicros();
 

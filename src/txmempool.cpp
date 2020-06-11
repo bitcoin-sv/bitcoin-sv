@@ -1388,6 +1388,19 @@ void CTxMemPool::clearPrioritisationNL(const uint256& hash) {
     mapDeltas.erase(hash);
 }
 
+
+void CTxMemPool::GetDeltasAndInfo(std::map<uint256, Amount>& deltas,
+                                  std::vector<TxMempoolInfo>& info) const
+{
+    deltas.clear();
+    std::shared_lock lock {smtx};
+    for (const auto &i : mapDeltas) {
+        deltas[i.first] = i.second.second;
+    }
+    info = InfoAllNL();
+}
+
+
 bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const {
     std::shared_lock lock(smtx);
     for (const CTxIn &in : tx.vin) {
