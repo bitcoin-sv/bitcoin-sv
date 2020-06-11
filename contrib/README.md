@@ -41,4 +41,4 @@ Test and Verify Tools
 Utilities to generate test vectors for the data-driven Bitcoin tests.
 
 ### [Verify Binaries](/contrib/verifybinaries) ###
-This script attempts to download and verify the signature file SHA256SUMS.asc from bitcoin.org.
+This script attempts to download and verify the signature file SHA256SUMS.asc from bitcoinsv.io.
