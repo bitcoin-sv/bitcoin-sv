@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Copyright (c) 2016-2019 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2020 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-###   This script attempts to download the signature file SHA256SUMS.asc from
-###   bitcoincore.org and bitcoin.org and compares them.
+###   This script attempts to download the signature file SHA256SUMS.asc from bitcoinsv.io.
 ###   It first checks if the signature passes, and then downloads the files specified in
 ###   the file, and checks if the hashes of these files match those that are specified
 ###   in the signature file.
@@ -24,10 +23,9 @@ TMPFILE="hashes.tmp"
 
 SIGNATUREFILENAME="SHA256SUMS.asc"
 RCSUBDIR="test"
-HOST1="https://bitcoincore.org"
-HOST2="https://bitcoin.org"
-BASEDIR="/bin/"
-VERSIONPREFIX="bitcoin-core-"
+HOST1="https://download.bitcoinsv.io"
+BASEDIR="/bitcoinsv/"
+VERSIONPREFIX=""
 RCVERSIONSTRING="rc"
 
 if [ ! -d "$WORKINGDIR" ]; then
@@ -92,22 +90,6 @@ if ! WGETOUT=$(wget -N "$HOST1$BASEDIR$SIGNATUREFILENAME" 2>&1); then
    exit 2
 fi
 
-if ! WGETOUT=$(wget -N -O "$SIGNATUREFILENAME.2" "$HOST2$BASEDIR$SIGNATUREFILENAME" 2>&1); then
-   echo "bitcoin.org failed to provide signature file, but bitcoincore.org did?"
-   echo "wget output:"
-   # shellcheck disable=SC2001
-   echo "$WGETOUT"|sed 's/^/\t/g'
-   clean_up $SIGNATUREFILENAME
-   exit 3
-fi
-
-SIGFILEDIFFS="$(diff $SIGNATUREFILENAME $SIGNATUREFILENAME.2)"
-if [ "$SIGFILEDIFFS" != "" ]; then
-   echo "bitcoin.org and bitcoincore.org signature files were not equal?"
-   clean_up $SIGNATUREFILENAME $SIGNATUREFILENAME.2
-   exit 4
-fi
-
 #then we check it
 GPGOUT=$(gpg --yes --decrypt --output "$TMPFILE" "$SIGNATUREFILENAME" 2>&1)
 
@@ -122,7 +104,7 @@ if [ $RET -ne 0 ]; then
       echo "Bad signature."
    elif [ $RET -eq 2 ]; then
       #or if a gpg error has occurred
-      echo "gpg error. Do you have the Bitcoin Core binary release signing key installed?"
+      echo "gpg error. Do you have the Bitcoin SV binary release signing key installed?"
    fi
 
    echo "gpg output:"
