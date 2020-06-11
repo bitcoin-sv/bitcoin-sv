@@ -123,9 +123,7 @@ using GroupID = std::optional<uint64_t>;
 
 /** \class CTxMemPoolEntry
  *
- * CTxMemPoolEntry stores data about the corresponding transaction, as well as
- * data about all in-mempool transactions that depend on the transaction
- * ("descendant" transactions).
+ * CTxMemPoolEntry stores data about the corresponding transaction.
  *
  * When a new entry is added to the mempool, we update the descendant state
  * (nCountWithDescendants, nSizeWithDescendants, and nModFeesWithDescendants)
@@ -166,7 +164,7 @@ private:
     //!< number of ancestor transactions
     AncestorCountsPtr ancestorCounts;
 
-    // Analogous statistics for ancestor transactions
+    // Statistics for ancestor transactions
     uint64_t nSizeWithAncestors;
     Amount nModFeesWithAncestors;
     int64_t nSigOpCountWithAncestors;
@@ -352,11 +350,9 @@ struct DisconnectedBlockTransactions;
  *
  * CTxMemPool::mapTx, and CTxMemPoolEntry bookkeeping:
  *
- * mapTx is a boost::multi_index that sorts the mempool on 4 criteria:
+ * mapTx is a boost::multi_index that sorts the mempool on 2 criteria:
  * - transaction hash
- * - feerate [we use max(feerate of tx, feerate of tx with all descendants)]
  * - time in mempool
- * - mining score (feerate modified by any fee deltas from PrioritiseTransaction)
  *
  * Note: mapTx will become private and may be modified extensively in the future. It will
  * not be part of the public definition of this class.
@@ -364,12 +360,6 @@ struct DisconnectedBlockTransactions;
  * Note: the term "descendant" refers to in-mempool transactions that depend on
  * this one, while "ancestor" refers to in-mempool transactions that a given
  * transaction depends on.
- *
- * Note: the feerate sort (referenced below) will be removed in future.
- * In order for the feerate sort to remain correct, we must update transactions
- * in the mempool when new descendants arrive. To facilitate this, we track the
- * set of in-mempool direct parents and direct children in mapLinks. Within each
- * CTxMemPoolEntry, we track the size and fees of all descendants.
  *
  * Note: tracking of ancestors and descendants may be removed in the future.
  *
@@ -404,14 +394,14 @@ struct DisconnectedBlockTransactions;
  * in-block transactions by calling UpdateTransactionsFromBlock(). Note that
  * until this is called, the mempool state is not consistent, and in particular
  * mapLinks may not be correct (and therefore functions like
- * CalculateMemPoolAncestors() and CalculateDescendants() that rely on them to
- * walk the mempool are not generally safe to use).
+ * CalculateMemPoolAncestorsNL() and CalculateDescendantsNL() that rely on them
+ * to walk the mempool are not generally safe to use).
  *
  * Computational limits:
  *
  * Updating all in-mempool ancestors of a newly added transaction can be slow,
  * if no bound exists on how many in-mempool ancestors there may be.
- * CalculateMemPoolAncestors() takes configurable limits that are designed to
+ * CalculateMemPoolAncestorsNL() takes configurable limits that are designed to
  * prevent these calculations from being too CPU intensive.
  *
  * Adding transactions from a disconnected block can be very time consuming,
@@ -522,10 +512,8 @@ public:
     /** Rebuild the journal contents so they match the mempool */
     void RebuildJournal() const;
 
-    // AddUnchecked must updated state for all ancestors of a given transaction,
-    // to track size/count of descendant transactions. First version of
-    // AddUnchecked can be used to have it call CalculateMemPoolAncestors(), and
-    // then invoke the second version.
+    // AddUnchecked must update the state for all ancestors of a given
+    // transaction, to track size/count of descendant transactions.
     void AddUnchecked(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
