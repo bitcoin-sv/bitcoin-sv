@@ -448,7 +448,7 @@ private:
     CTimeLockedMempool mTimeLockedPool {};
 
 public:
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     typedef boost::multi_index_container<
         CTxMemPoolEntry, boost::multi_index::indexed_by<
                              // sorted by txid
@@ -461,9 +461,9 @@ public:
                                  CompareTxMemPoolEntryByEntryTime>>>
         indexed_transaction_set;
 
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     mutable std::shared_mutex smtx;
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     indexed_transaction_set mapTx;
 
 private:
@@ -499,9 +499,7 @@ private:
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
 public:
-
-    /** Create a new CTxMemPool.
-     */
+    /** Create a new CTxMemPool. */
     CTxMemPool();
     ~CTxMemPool();
 
@@ -545,19 +543,16 @@ public:
     bool CompareDepthAndScore(
             const uint256 &hasha,
             const uint256 &hashb);
-    // A non-locking version of CompareDepthAndScore
-    // DEPRECATED - this will become private and ultimately changed or removed
-    bool CompareDepthAndScoreNL(
-            const uint256 &hasha,
-            const uint256 &hashb);
 
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
     // Returns const pointer to transaction that spends outpoint.
     // Pointer is valid and transaction will not change as long as mempool smtx lock is held
     const CTransaction* IsSpentBy(const COutPoint &outpoint) const;
+
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
+
     /**
      * Check that none of this transactions inputs are in the mempool, and thus
      * the tx is not dependent on other mempool transactions to be included in a
@@ -577,12 +572,6 @@ public:
             const Amount nFeeDelta);
 
     void ApplyDeltas(
-            const uint256& hash,
-            double &dPriorityDelta,
-            Amount &nFeeDelta) const;
-    // A non-locking version of ApplyDeltas
-    // DEPRECATED - this will become private and ultimately changed or removed
-    void ApplyDeltasNL(
             const uint256& hash,
             double &dPriorityDelta,
             Amount &nFeeDelta) const;
@@ -688,17 +677,17 @@ public:
 
     bool Exists(const uint256& hash) const;
     // A non-locking version of Exists
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     bool ExistsNL(const uint256& hash) const;
 
     bool Exists(const COutPoint &outpoint) const;
     // A non-locking version of Exists
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     bool ExistsNL(const COutPoint &outpoint) const;
 
     CTransactionRef Get(const uint256& hash) const;
     // A non-locking version of Get
-    // DEPRECATED - this will become private and ultimately changed or removed
+    // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     CTransactionRef GetNL(const uint256& hash) const;
 
     TxMempoolInfo Info(const uint256& hash) const;
@@ -1003,6 +992,17 @@ private:
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
+
+    // A non-locking version of CompareDepthAndScore
+    bool CompareDepthAndScoreNL(
+        const uint256 &hasha,
+        const uint256 &hashb);
+
+    // A non-locking version of ApplyDeltas
+    void ApplyDeltasNL(
+        const uint256& hash,
+        double &dPriorityDelta,
+        Amount &nFeeDelta) const;
 
     /**
      * Update ancestors of hash to add/remove it as a descendant transaction.
