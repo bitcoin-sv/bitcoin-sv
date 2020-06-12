@@ -23,6 +23,7 @@
 #include "httpserver.h"
 #include "key.h"
 #include "mining/journal_builder.h"
+#include "mining/journaling_block_assembler.h"
 #include "mining/legacy.h"
 #include "net/net.h"
 #include "net/net_processing.h"
@@ -1018,11 +1019,29 @@ std::string HelpMessage(HelpMessageMode mode) {
                            "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
     }
 
+    /** Block assembler */
     strUsage += HelpMessageOpt(
         "-blockassembler=<type>",
         strprintf(_("Set the type of block assembler to use for mining. Supported options are "
                     "LEGACY or JOURNALING. (default: %s)"),
                   enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
+    strUsage += HelpMessageOpt( 
+        "-jbamaxtxnbatch=<max batch size>",
+        strprintf(_("Set the maximum number of transactions processed in a batch by the journaling block assembler "
+                "(default: %d)"), mining::JournalingBlockAssembler::DEFAULT_MAX_SLOT_TRANSACTIONS)
+    );
+    if (showDebug) {
+        strUsage += HelpMessageOpt( 
+            "-jbafillafternewblock",
+            strprintf(_("After a new block has been found it can take a short while for the journaling block assembler "
+                        "to catch up and return a new candidate containing every transaction in the mempool. "
+                        "If this flag is 1, calling getminingcandidate will wait until the JBA has caught up "
+                        "and always return a candidate with every available transaction. If it is 0, calls to "
+                        "getminingcandidate will always return straight away but may occasionally only contain a "
+                        "subset of the available transactions from the mempool (default: %d)"),
+                mining::JournalingBlockAssembler::DEFAULT_NEW_BLOCK_FILL)
+        );
+    }
 
     strUsage += HelpMessageGroup(_("RPC server options:"));
     strUsage += HelpMessageOpt("-server",
