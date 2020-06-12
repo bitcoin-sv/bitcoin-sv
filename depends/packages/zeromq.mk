@@ -1,9 +1,9 @@
 package=zeromq
-$(package)_version=4.3.1
+$(package)_version=4.3.2
 $(package)_download_path=https://github.com/zeromq/libzmq/releases/download/v$($(package)_version)/
 $(package)_file_name=$(package)-$($(package)_version).tar.gz
-$(package)_sha256_hash=bcbabe1e2c7d0eec4ed612e10b94b112dd5f06fcefa994a0c79a45d835cd21eb
-$(package)_patches=0001-disable-pthread_set_name_np.patch
+$(package)_sha256_hash=ebd7b5c830d6428956b67a0454a7f8cbed1de74b3b01e5c33c5378e22740f763
+$(package)_patches=0001-fix-build-with-mingw-thread-name-fix.patch 0002-no-void-pointer-to-store-function-pointer.patch
 
 define $(package)_set_vars
   $(package)_config_opts=--without-docs --disable-shared --without-libsodium --disable-curve --disable-curve-keygen --disable-perf --disable-Werror
@@ -12,7 +12,8 @@ define $(package)_set_vars
 endef
 
 define $(package)_preprocess_cmds
-   patch -p1 < $($(package)_patch_dir)/0001-disable-pthread_set_name_np.patch && \
+   patch -p1 < $($(package)_patch_dir)/0001-fix-build-with-mingw-thread-name-fix.patch && \
+   patch -p1 < $($(package)_patch_dir)/0002-no-void-pointer-to-store-function-pointer.patch && \
    cp -f $(BASEDIR)/config.guess $(BASEDIR)/config.sub config
 endef
 

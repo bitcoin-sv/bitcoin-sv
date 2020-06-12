@@ -40,7 +40,7 @@ Optional dependencies:
  miniupnpc   | UPnP Support     | Firewall-jumping support
  libdb       | Berkeley DB      | Wallet storage (only needed when wallet enabled)
  univalue    | Utility          | JSON parsing and encoding (bundled version will be used unless --with-system-univalue passed to configure)
- libzmq3     | ZMQ notification | Optional, allows generating ZMQ notifications (requires ZMQ version >= 4.x)
+ libzmq3     | ZMQ notification | Optional, allows generating ZMQ notifications (requires ZMQ version >= 4.3.2)
  tcmalloc    | Memory allocator | Alternative memory allocator (may be helpful for nodes on the STN)
 
 For the versions used in the release, see [release-process.md](release-process.md) under *Fetch and build inputs*.
