@@ -2215,7 +2215,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 
     if (logger.fPrintToDebugLog) {
-        logger.OpenDebugLog();
+        if (logger.OpenDebugLog()) {
+            return InitError(strprintf(_("Unable to open log file.")));
+        }
     }
 
     if (!logger.fLogTimestamps) {
