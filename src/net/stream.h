@@ -14,6 +14,7 @@
 
 #include <list>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <boost/circular_buffer.hpp>

@@ -111,7 +111,7 @@ static const int DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 72;
 static const int MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 7200;
 
 // Default policy value for maximum number of non-push operations per script
-static const int DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = UINT32_MAX;
+static const uint64_t DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = UINT32_MAX;
 
 // Default policy value for maximum number of public keys per multisig after GENESIS
 static const uint64_t DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS = UINT32_MAX;
