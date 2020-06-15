@@ -1543,6 +1543,10 @@ class NodeConnCB():
 
     # Message receiving helper methods
 
+    def clear_messages(self):
+        with mininode_lock:
+            self.message_count.clear()
+
     def wait_for_block(self, blockhash, timeout=60):
         def test_function(): return self.last_message.get(
             "block") and self.last_message["block"].block.rehash() == blockhash
