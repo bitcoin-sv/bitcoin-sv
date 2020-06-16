@@ -206,6 +206,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txdb.h \
   txmempool.h \
+  txmempoolevictioncandidates.h \
   tx_mempool_info.h \
   txn_double_spend_detector.h \
   txn_handlers.h \
@@ -308,6 +309,7 @@ libbitcoin_server_a_SOURCES = \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
+  txmempoolevictioncandidates.cpp \
   tx_mempool_info.cpp \
   txn_double_spend_detector.cpp \
   txn_propagator.cpp \

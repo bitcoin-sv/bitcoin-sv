@@ -61,6 +61,7 @@ BITCOIN_TESTS =\
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
   test/enum_cast_tests.cpp \
+  test/eviction_candidates_tracker_tests.cpp \
   test/excessiveblock_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \

@@ -200,6 +200,8 @@ public:
     GroupID GetCPFPGroupId() const { return std::nullopt; }
     const CTransaction &GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }
+    TxId GetTxId() const { return this->tx->GetId(); }
+
     /**
      * Fast calculation of lower bound of current priority as update from entry
      * priority. Only inputs that were originally in-chain will age.
@@ -340,7 +342,7 @@ enum class MemPoolRemovalReason {
 class SaltedTxidHasher {
 private:
     /** Salt */
-    const uint64_t k0, k1;
+    uint64_t k0, k1;
 
 public:
     SaltedTxidHasher();
@@ -455,6 +457,7 @@ private:
     // Sub-pool for time locked txns
     CTimeLockedMempool mTimeLockedPool {};
 
+    friend class CEvictionCandidateTracker;
     friend struct CPFPGroup;
 
 public:
@@ -1257,5 +1260,6 @@ struct CPFPGroup
     std::vector<CTxMemPool::txiter> transactions; // topologicaly sorted
     CTxMemPool::txiter PayingTransaction() { return transactions.back(); }
 };
+
 
 #endif // BITCOIN_TXMEMPOOL_H
