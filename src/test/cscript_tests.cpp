@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
+#include <array>
 #include "script/script.h"
 #include "script_macros.h"
 
