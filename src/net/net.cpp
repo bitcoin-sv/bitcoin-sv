@@ -47,6 +47,8 @@
 #include <optional>
 #include <utility>
 
+#include <boost/algorithm/string.hpp>
+
 // Dump addresses to peers.dat and banlist.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
@@ -862,6 +864,48 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
     mInvList.erase(std::begin(mInvList), endIt);
 
     return results;
+}
+
+/** Set peers known stream policies */
+void CNode::SetSupportedStreamPolicies(const std::string& policies)
+{
+    LogPrint(BCLog::NET, "Setting known stream policies to %s for peer=%d\n", policies, id);
+
+    std::set<std::string> ourPolicies { g_connman->GetStreamPolicyFactory().GetPolicyNames() };
+
+    LOCK(cs_supportedStreamPolicies);
+    mSupportedStreamPolicies.clear();
+    boost::split(mSupportedStreamPolicies, policies, boost::is_any_of(","));
+
+    // Filter common stream policies
+    mCommonStreamPolicies.clear();
+    std::set_intersection(
+        ourPolicies.begin(), ourPolicies.end(),
+        mSupportedStreamPolicies.begin(), mSupportedStreamPolicies.end(),
+        std::inserter(mCommonStreamPolicies, mCommonStreamPolicies.begin())
+    );
+    LogPrint(BCLog::NET, "Set common stream policies to %s for peer=%d\n", GetCommonStreamPoliciesStr(), id);
+}
+
+/** Get stream polices in common with this peer as a string formatted list */
+std::string CNode::GetCommonStreamPoliciesStr() const
+{
+    std::string commonPolicies {};
+
+    LOCK(cs_supportedStreamPolicies);
+    for(const std::string& name : mCommonStreamPolicies)
+    {
+        if(commonPolicies.empty())
+        {
+            commonPolicies += name;
+        }
+        else
+        {
+            commonPolicies += "," + name;
+        }
+    }
+
+    return commonPolicies;
 }
 
 void CNode::SetSendVersion(int nVersionIn) {

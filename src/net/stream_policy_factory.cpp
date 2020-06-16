@@ -25,3 +25,31 @@ std::unique_ptr<StreamPolicy> StreamPolicyFactory::Make(const std::string& polic
     return (*(makerIt->second))();
 }
 
+std::set<std::string> StreamPolicyFactory::GetPolicyNames() const
+{
+    std::set<std::string> names {};
+    for(const auto& maker : mMakers)
+    {
+        names.insert(maker.first);
+    }
+
+    return names;
+}
+
+std::string StreamPolicyFactory::GetPolicyNamesStr() const
+{
+    std::string names {};
+    for(const auto& maker : mMakers)
+    {
+        if(names.empty())
+        {
+            names += maker.first;
+        }
+        else
+        {
+            names += "," + maker.first;
+        }
+    }
+
+    return names;
+}

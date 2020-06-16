@@ -24,9 +24,6 @@ class StreamPolicy
 {
   public:
 
-    // Maximum length for a serialised StreamPolicy name.
-    static constexpr size_t MAX_STREAM_POLICY_NAME_LENGTH {64};
-
     virtual ~StreamPolicy() = default;
 
     // Return the policy name

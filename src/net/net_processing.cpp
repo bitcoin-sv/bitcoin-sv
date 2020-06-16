@@ -256,7 +256,7 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
                             : CAddress(CService(), addr.nServices));
     CAddress addrMe = CAddress(CService(), nLocalNodeServices);
 
-    // Include association ID if we have one
+    // Include association ID if we have one and supported stream policies
     std::vector<uint8_t> assocIDBytes {};
     std::string assocIDStr { "Null" };
     AssociationIDPtr assocID { pnode->GetAssociation().GetAssociationID() };
@@ -274,8 +274,7 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
 
     if (fLogIPs) {
         LogPrint(BCLog::NET, "send version message: version %d, blocks=%d, "
-                             "us=%s, them=%s, assocID=%s, peer=%d\n",
-                 PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(),
+                             "us=%s, them=%s, assocID=%s, peer=%d\n", PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(),
                  addrYou.ToString(), assocIDStr, nodeid);
     } else {
         LogPrint(
@@ -285,11 +284,16 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
     }
 }
 
-void PushProtoconf(const CNodePtr& pnode, CConnman &connman) {
+void PushProtoconf(const CNodePtr& pnode, CConnman& connman)
+{
+    std::string streamPolicies { connman.GetStreamPolicyFactory().GetPolicyNamesStr() };
     connman.PushMessage(
-            pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::PROTOCONF, CProtoconf(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH)));
+        pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::PROTOCONF,
+            CProtoconf(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, streamPolicies)
+    ));
 
-    LogPrint(BCLog::NET, "send protoconf message: max size %d, number of fields =%d, ", MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, 1);
+    LogPrint(BCLog::NET, "send protoconf message: max size %d, stream policies %s, number of fields %d\n",
+        MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, streamPolicies, 2);
 }
 
 static void PushCreateStream(const CNodePtr& pnode, CConnman& connman, StreamType streamType,
@@ -1724,7 +1728,7 @@ static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string&
     std::string streamPolicyName {};
     vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
     vRecv >> streamTypeRaw;
-    vRecv >> LIMITED_STRING(streamPolicyName, StreamPolicy::MAX_STREAM_POLICY_NAME_LENGTH);
+    vRecv >> LIMITED_STRING(streamPolicyName, MAX_STREAM_POLICY_NAME_LENGTH);
 
     // Which association is this for?
     try
@@ -1933,7 +1937,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
                 }
             }
             catch(std::exception& e) {
-                LogPrint(BCLog::NET, "peer=%d bad association ID (%s); disconnecting\n", pfrom->id, e.what());
+                LogPrint(BCLog::NET, "peer=%d bad association ID or stream policy list (%s); disconnecting\n", pfrom->id, e.what());
                 connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION)
                     .Make(NetMsgType::REJECT, strCommand, REJECT_STREAM_SETUP, std::string(e.what())));
                 pfrom->fDisconnect = true;
@@ -2029,8 +2033,8 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     LogPrint(BCLog::NET, "receive version message: [%s] %s: version %d, blocks=%d, "
               "us=%s, assocID=%s, peer=%d%s\n",
               peerAddr.ToString().c_str(), cleanSubVer, pfrom->nVersion,
-              pfrom->nStartingHeight, addrMe.ToString(), assocIDStr, pfrom->id,
-              remoteAddr);
+              pfrom->nStartingHeight, addrMe.ToString(), assocIDStr,
+              pfrom->id, remoteAddr);
 
     int64_t nTimeOffset = nTime - GetTime();
     pfrom->nTimeOffset = nTimeOffset;
@@ -2080,9 +2084,6 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s\n",
                   pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
                   (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
-
-        // Create any required further streams to this peer
-        pfrom->GetAssociation().OpenRequiredStreams(connman);
     }
     else {
         LogPrintf("New inbound peer connected: version: %d, subver: %s, blocks=%d, peer=%d%s\n",
@@ -3567,7 +3568,8 @@ static void ProcessFeeFilterMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 /**
 * Process protoconf message.
 */
-static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, const std::string& strCommand)
+static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, CConnman& connman,
+    const std::string& strCommand)
 {
     if (pfrom->protoconfReceived) {
         pfrom->fDisconnect = true;
@@ -3601,9 +3603,21 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, c
         // that is running a newer version sends us large size, that we are not prepared to handle. 
         pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, protoconf.maxRecvPayloadLength));
 
+        // Parse supported stream policies if we have them
+        if(protoconf.numberOfFields >= 2) {
+            pfrom->SetSupportedStreamPolicies(protoconf.streamPolicies);
+        }
+
         LogPrint(BCLog::NET, "Protoconf received \"%s\" from peer=%d; peer's proposed max message size: %d," 
-            "absolute maximal allowed message size: %d, calculated maximal number of Inv elements in a message = %d\n",
-            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, pfrom->maxInvElements);
+            "absolute maximal allowed message size: %d, calculated maximal number of Inv elements in a message = %d, "
+            "their stream policies: %s, common stream policies: %s\n",
+            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, pfrom->maxInvElements,
+            protoconf.streamPolicies, pfrom->GetCommonStreamPoliciesStr());
+    }
+
+    if(!pfrom->fInbound) {
+        // For outbound connections, now we can create any required further streams to this peer
+        pfrom->GetAssociation().OpenRequiredStreams(connman);
     }
 
     return true;
@@ -3762,7 +3776,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::PROTOCONF) {
-        return ProcessProtoconfMessage(pfrom, vRecv, strCommand);
+        return ProcessProtoconfMessage(pfrom, vRecv, connman, strCommand);
     }
 
     else if (strCommand == NetMsgType::NOTFOUND) {

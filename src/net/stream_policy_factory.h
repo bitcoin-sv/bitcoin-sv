@@ -6,6 +6,7 @@
 #include <net/stream_policy.h>
 
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -22,6 +23,10 @@ class StreamPolicyFactory
 
     // Create and return the named stream policy
     std::unique_ptr<StreamPolicy> Make(const std::string& policyName) const;
+
+    // Return list of supported stream policy names
+    std::set<std::string> GetPolicyNames() const;
+    std::string GetPolicyNamesStr() const;
 
   private:
 

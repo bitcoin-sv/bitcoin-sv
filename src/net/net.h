@@ -287,6 +287,9 @@ public:
     void QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID,
         const std::string& streamPolicyName = "");
 
+    /** Get reference to stream policy factory */
+    const StreamPolicyFactory& GetStreamPolicyFactory() const { return mStreamPolicyFactory; }
+
     /** Enqueue a new transaction for later sending to our peers */
     void EnqueueTransaction(const CTxnSendingDetails& txn);
     /** Remove some transactions from our peers list of new transactions */
@@ -985,6 +988,11 @@ private:
     // Peer association details
     Association mAssociation;
 
+    // Peer known stream policy names and common policy names
+    mutable CCriticalSection cs_supportedStreamPolicies {};
+    std::set<std::string> mSupportedStreamPolicies {};
+    std::set<std::string> mCommonStreamPolicies {};
+
 public:
 
     /** Add some new transactions to our pending inventory list */
@@ -999,6 +1007,11 @@ public:
     // Fetch peer association details
     const Association& GetAssociation() const { return mAssociation; }
     Association& GetAssociation() { return mAssociation; }
+
+    // Set peers known stream policies
+    void SetSupportedStreamPolicies(const std::string& policies);
+    // Get stream polices in common with this peer as a string formatted list
+    std::string GetCommonStreamPoliciesStr() const;
 
     uint64_t GetLocalNonce() const { return nLocalHostNonce; }
 
