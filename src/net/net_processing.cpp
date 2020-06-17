@@ -4304,8 +4304,7 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         Amount currentFilter =
             mempool
                 .GetMinFee(
-                    gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) *
-                    1000000)
+                    gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE)
                 .GetFeePerK();
         int64_t timeNow = GetTimeMicros();
         if (timeNow > pto->nextSendTimeFeeFilter) {

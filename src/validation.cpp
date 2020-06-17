@@ -856,8 +856,7 @@ static Amount GetMempoolRejectFee(
     unsigned int nTxSize) {
     // Get mempool reject fee
     return pool.GetMinFee(
-                gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) *
-                1000000)
+                gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE)
             .GetFee(nTxSize);
 }
 
@@ -1046,7 +1045,7 @@ void CommitTxToMempool(
         LimitMempoolSize(
             pool,
             changeSet,
-            gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000,
+            gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE,
             gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
         if (!pool.Exists(txid)) {
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
@@ -3965,7 +3964,7 @@ bool FlushStateToDisk(
                 nLastSetChain = nNow;
             }
             int64_t nMempoolSizeMax =
-                gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
+                gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
             int64_t cacheSize = pcoinsTip->DynamicMemoryUsage();
             int64_t nTotalSpace =
                 nCoinCacheUsage +
