@@ -26,8 +26,8 @@ namespace
 }
 
 // Initialise policy names
-const std::string DefaultStreamPolicy::POLICY_NAME { "Default" };
-const std::string BlockPriorityStreamPolicy::POLICY_NAME { "BlockPriority" };
+//const std::string DefaultStreamPolicy::POLICY_NAME { "Default" };
+//const std::string BlockPriorityStreamPolicy::POLICY_NAME { "BlockPriority" };
 
 
 /*****************************/

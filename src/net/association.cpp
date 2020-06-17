@@ -107,23 +107,22 @@ void Association::Shutdown()
 
 void Association::OpenRequiredStreams(CConnman& connman)
 {
-    // If required, queue attempts to create additional streams to our peer
-    AssociationIDPtr assocID { GetAssociationID() };
-    if(assocID)
+    // On inbound connections we wait to see what the other side wants to do
+    if(!mNode->fInbound)
     {
-        LOCK(cs_mStreams);
-
-        // Set stream policy to use on outbound connections (inbound connections
-        // we wait to see what the other side asks for).
-        if(!mNode->fInbound)
+        // If required, queue attempts to create additional streams to our peer
+        AssociationIDPtr assocID { GetAssociationID() };
+        if(assocID)
         {
-            // In future if we implement more stream policies we will want to make this
-            // configurable. For now, this is the only option.
-            mStreamPolicy = std::make_shared<BlockPriorityStreamPolicy>();
-        }
+            LOCK(cs_mStreams);
 
-        LogPrint(BCLog::NET, "Queuing new stream requests to peer=%d\n", mNode->id);
-        mStreamPolicy->SetupStreams(connman, mPeerAddr, assocID);
+            // Create policy
+            mStreamPolicy = connman.GetStreamPolicyFactory().Make(mNode->GetPreferredStreamPolicyName());
+
+            // Queue messages to setup an further required streams
+            LogPrint(BCLog::NET, "Queuing new stream requests to peer=%d\n", mNode->id);
+            mStreamPolicy->SetupStreams(connman, mPeerAddr, assocID);
+        }
     }
     else
     {

@@ -126,6 +126,10 @@ static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
 
 // Multiple streams enabled by default
 static const bool DEFAULT_STREAMS_ENABLED = true;
+// Default prioritised list of stream policies to use
+static const std::string DEFAULT_STREAM_POLICY_LIST =
+    std::string{BlockPriorityStreamPolicy::POLICY_NAME} + "," +
+    std::string{DefaultStreamPolicy::POLICY_NAME};
 
 /**
  * Default maximum amount of concurrent async tasks per node before node message
@@ -1012,6 +1016,8 @@ public:
     void SetSupportedStreamPolicies(const std::string& policies);
     // Get stream polices in common with this peer as a string formatted list
     std::string GetCommonStreamPoliciesStr() const;
+    // Get the name of the preferred stream policy to use to this peer
+    std::string GetPreferredStreamPolicyName() const;
 
     uint64_t GetLocalNonce() const { return nLocalHostNonce; }
 

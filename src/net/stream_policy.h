@@ -27,7 +27,7 @@ class StreamPolicy
     virtual ~StreamPolicy() = default;
 
     // Return the policy name
-    virtual const std::string& GetPolicyName() const = 0;
+    virtual const std::string GetPolicyName() const = 0;
 
     // Create the required streams for this policy
     virtual void SetupStreams(CConnman& connman, const CAddress& peerAddr,
@@ -65,10 +65,10 @@ class DefaultStreamPolicy : public StreamPolicy
     DefaultStreamPolicy() = default;
 
     // Our name for registering with the factory
-    static const std::string POLICY_NAME;
+    static constexpr const char* POLICY_NAME { "Default" };
 
     // Return the policy name
-    const std::string& GetPolicyName() const override { return POLICY_NAME; }
+    const std::string GetPolicyName() const override { return POLICY_NAME; }
 
     // Create the required streams for this policy
     void SetupStreams(CConnman& connman, const CAddress& peerAddr,
@@ -110,10 +110,10 @@ class BlockPriorityStreamPolicy : public StreamPolicy
     BlockPriorityStreamPolicy() = default;
 
     // Our name for registering with the factory
-    static const std::string POLICY_NAME;
+    static constexpr const char* POLICY_NAME { "BlockPriority" };
 
     // Return the policy name
-    const std::string& GetPolicyName() const override { return POLICY_NAME; }
+    const std::string GetPolicyName() const override { return POLICY_NAME; }
 
     // Create the required streams for this policy
     void SetupStreams(CConnman& connman, const CAddress& peerAddr,
