@@ -51,6 +51,28 @@ using StreamPolicyPtr = std::shared_ptr<StreamPolicy>;
 
 
 /**
+ * Implement standard basic stream policy functions.
+ */
+class BasicStreamPolicy : public StreamPolicy
+{
+  public:
+    BasicStreamPolicy() = default;
+
+    // Service the sockets of the streams
+    void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
+                        fd_set& setError, const Config& config, bool& gotNewMsgs,
+                        uint64_t& bytesRecv, uint64_t& bytesSent) override;
+
+  protected:
+
+    // Common PushMessage functionality
+    uint64_t PushMessageCommon(StreamMap& streams, StreamType streamType, bool exactMatch,
+                               std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+                               uint64_t nPayloadLength, uint64_t nTotalSize);
+};
+
+
+/**
  * The default stream policy.
  *
  * Used when no other better policy has been configured.
@@ -59,7 +81,7 @@ using StreamPolicyPtr = std::shared_ptr<StreamPolicy>;
  * and gives equal priority to all traffic. I.e; this policy behaves just like
  * the old single stream P2P model.
  */
-class DefaultStreamPolicy : public StreamPolicy
+class DefaultStreamPolicy : public BasicStreamPolicy
 {
   public:
     DefaultStreamPolicy() = default;
@@ -77,11 +99,6 @@ class DefaultStreamPolicy : public StreamPolicy
 
     // Fetch the next message for processing
     bool GetNextMessage(StreamMap& streams, std::list<CNetMessage>& msg) override;
-
-    // Service the sockets of the streams
-    void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
-                        fd_set& setError, const Config& config, bool& gotNewMsgs,
-                        uint64_t& bytesRecv, uint64_t& bytesSent) override;
 
     // Queue an outgoing message on the appropriate stream
     uint64_t PushMessage(StreamMap& streams, StreamType streamType,
@@ -104,7 +121,7 @@ class DefaultStreamPolicy : public StreamPolicy
  *
  * Gives equal priority to all stream sockets for reading and writing.
  */
-class BlockPriorityStreamPolicy : public StreamPolicy
+class BlockPriorityStreamPolicy : public BasicStreamPolicy
 {
   public:
     BlockPriorityStreamPolicy() = default;
@@ -121,11 +138,6 @@ class BlockPriorityStreamPolicy : public StreamPolicy
 
     // Fetch the next message for processing
     bool GetNextMessage(StreamMap& streams, std::list<CNetMessage>& msg) override;
-
-    // Service the sockets of the streams
-    void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
-                        fd_set& setError, const Config& config, bool& gotNewMsgs,
-                        uint64_t& bytesRecv, uint64_t& bytesSent) override;
 
     // Queue an outgoing message on the appropriate stream
     uint64_t PushMessage(StreamMap& streams, StreamType streamType,

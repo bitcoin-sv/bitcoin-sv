@@ -25,9 +25,59 @@ namespace
     }
 }
 
-// Initialise policy names
-//const std::string DefaultStreamPolicy::POLICY_NAME { "Default" };
-//const std::string BlockPriorityStreamPolicy::POLICY_NAME { "BlockPriority" };
+
+/*************************/
+/** A BasicStreamPolicy **/
+/*************************/
+
+void BasicStreamPolicy::ServiceSockets(StreamMap& streams, fd_set& setRecv,
+    fd_set& setSend, fd_set& setError, const Config& config, bool& gotNewMsgs,
+    uint64_t& bytesRecv, uint64_t& bytesSent)
+{
+    // Service each stream socket
+    for(auto& stream : streams)
+    {   
+        uint64_t streamBytesRecv {0};
+        uint64_t streamBytesSent {0};
+        stream.second->ServiceSocket(setRecv, setSend, setError, config, gotNewMsgs,
+            streamBytesRecv, streamBytesSent);
+        bytesRecv += streamBytesRecv;
+        bytesSent += streamBytesSent;
+    }
+}
+
+uint64_t BasicStreamPolicy::PushMessageCommon(StreamMap& streams, StreamType streamType,
+    bool exactMatch, std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+    uint64_t nPayloadLength, uint64_t nTotalSize)
+{
+    // Find the appropriate stream
+    StreamPtr destStream {nullptr};
+    for(const auto& [type, stream] : streams)
+    {
+        if(type == streamType)
+        {
+            // Got the requested stream type
+            destStream = stream;
+            break;
+        }
+        else if(!exactMatch && type == StreamType::GENERAL)
+        {
+            // Can always send anything over a GENERAL stream
+            destStream = stream;
+        }
+    }
+
+    // If we found a stream, send
+    if(!destStream)
+    {
+        std::stringstream err {};
+        err << "No stream avilable of type " << enum_cast<std::string>(streamType)
+            << " for message of type " << msg.Command();
+        throw std::runtime_error(err.str());
+    }
+
+    return destStream->PushMessage(std::move(serialisedHeader), std::move(msg), nPayloadLength, nTotalSize);
+}
 
 
 /*****************************/
@@ -45,28 +95,22 @@ bool DefaultStreamPolicy::GetNextMessage(StreamMap& streams, std::list<CNetMessa
     return false;
 }
 
-void DefaultStreamPolicy::ServiceSockets(StreamMap& streams, fd_set& setRecv,
-    fd_set& setSend, fd_set& setError, const Config& config, bool& gotNewMsgs,
-    uint64_t& bytesRecv, uint64_t& bytesSent)
-{
-    // Check we have a stream available (if we do we will have the GENERAL stream)
-    if(streams.size() > 0)
-    {   
-        streams[StreamType::GENERAL]->ServiceSocket(setRecv, setSend, setError, config, gotNewMsgs, bytesRecv, bytesSent);
-    }
-}
-
 uint64_t DefaultStreamPolicy::PushMessage(StreamMap& streams, StreamType streamType,
     std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
     uint64_t nPayloadLength, uint64_t nTotalSize)
 {
-    // Check we have a stream available (if we do we will have the GENERAL stream)
-    if(streams.size() > 0)
+    // Have we been told which stream to use?
+    bool exactMatch { streamType != StreamType::UNKNOWN };
+
+    // If we haven't been told which stream to use, decide which we would prefer
+    if(!exactMatch)
     {
-        return streams[StreamType::GENERAL]->PushMessage(std::move(serialisedHeader), std::move(msg), nPayloadLength, nTotalSize);
+        // Send over the GENERAL stream
+        streamType = StreamType::GENERAL;
     }
 
-    throw std::runtime_error("DefaultStreamPolicy has no stream available for sending");
+    return PushMessageCommon(streams, streamType, exactMatch, std::move(serialisedHeader),
+        std::move(msg), nPayloadLength, nTotalSize);
 }
 
 
@@ -103,22 +147,6 @@ bool BlockPriorityStreamPolicy::GetNextMessage(StreamMap& streams, std::list<CNe
     return false;
 }
 
-void BlockPriorityStreamPolicy::ServiceSockets(StreamMap& streams, fd_set& setRecv,
-    fd_set& setSend, fd_set& setError, const Config& config, bool& gotNewMsgs,
-    uint64_t& bytesRecv, uint64_t& bytesSent)
-{
-    // Service each stream socket
-    for(auto& stream : streams)
-    {   
-        uint64_t streamBytesRecv {0};
-        uint64_t streamBytesSent {0};
-        stream.second->ServiceSocket(setRecv, setSend, setError, config, gotNewMsgs,
-            streamBytesRecv, streamBytesSent);
-        bytesRecv += streamBytesRecv;
-        bytesSent += streamBytesSent;
-    }
-}
-
 uint64_t BlockPriorityStreamPolicy::PushMessage(StreamMap& streams, StreamType streamType,
     std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
     uint64_t nPayloadLength, uint64_t nTotalSize)
@@ -142,32 +170,7 @@ uint64_t BlockPriorityStreamPolicy::PushMessage(StreamMap& streams, StreamType s
         }
     }
 
-    // Find the appropriate stream
-    StreamPtr destStream {nullptr};
-    for(const auto& [type, stream] : streams)
-    {
-        if(type == streamType)
-        {
-            // Got the requested stream type
-            destStream = stream;
-            break;
-        }
-        else if(!exactMatch && type == StreamType::GENERAL)
-        {
-            // Can always send anything over a GENERAL stream
-            destStream = stream;
-        }
-    }
-
-    // If we found a stream, send
-    if(!destStream)
-    {
-        std::stringstream err {};
-        err << "No stream avilable of type " << enum_cast<std::string>(streamType)
-            << " for message of type " << msg.Command();
-        throw std::runtime_error(err.str());
-    }
-
-    return destStream->PushMessage(std::move(serialisedHeader), std::move(msg), nPayloadLength, nTotalSize);
+    return PushMessageCommon(streams, streamType, exactMatch, std::move(serialisedHeader),
+        std::move(msg), nPayloadLength, nTotalSize);
 }
 
