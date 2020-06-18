@@ -342,7 +342,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             return all((t.hash in mempool) for t in to_accept)
 
         wait_until(tt,
-                   timeout=10, check_interval=0.2,
+                   timeout=60, check_interval=0.2,
                    label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept) }")
 
         self.check_mp()
