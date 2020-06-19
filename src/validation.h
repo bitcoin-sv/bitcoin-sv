@@ -1161,4 +1161,26 @@ static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
 /** AlertNotify */
 void AlertNotify(const std::string &strMessage);
 
+
+/** Default value for parameter -frozentxodbcache: cache size for database holding a list of frozen transaction outputs (in bytes) */
+constexpr std::size_t DEFAULT_FROZEN_TXO_DB_CACHE = 128 * ONE_KILOBYTE;
+
+/**
+ * Initialize FrozenTXODB database by calling CFrozenTXODB::Init() with given parameters.
+ *
+ * FrozenTXOLogger is also initialized by calling CFrozenTXOLogger::Init().
+ *
+ * This should typically only be called during application initialization.
+ *
+ * @param cache_size @see CFrozenTXODB::Init()
+ */
+void InitFrozenTXO(std::size_t cache_size);
+
+/**
+ * Shutdown FrozenTXODB database and FrozenTXOLogger by calling CFrozenTXODB::Shutdown() and CFrozenTXOLogger::Shutdown(), respectively.
+ *
+ * This should typically only be called before application quits.
+ */
+void ShutdownFrozenTXO();
+
 #endif // BITCOIN_VALIDATION_H

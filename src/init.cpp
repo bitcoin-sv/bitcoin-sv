@@ -238,7 +238,7 @@ void Shutdown() {
     }
     vpwallets.clear();
 #endif
-
+    ShutdownFrozenTXO();
     BlockIndexStoreLoader(mapBlockIndex).ForceClear();
 
     LogPrintf("%s: done\n", __func__);
@@ -346,6 +346,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(
             _("Set database cache size in megabytes (%d to %d, default: %d). The value may be given in megabytes or with unit (B, KiB, MiB, GiB)."),
             nMinDbCache, nMaxDbCache, nDefaultDbCache));
+
+    strUsage += HelpMessageOpt(
+        "-frozentxodbcache=<n>",
+        strprintf(
+            _("Set cache size for database holding a list of frozen transaction outputs in bytes (default: %u)"),
+            DEFAULT_FROZEN_TXO_DB_CACHE));
+
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-feefilter", strprintf("Tell other nodes to filter invs to us by "
@@ -3002,6 +3009,13 @@ bool AppInitMain(ConfigInit &config, boost::thread_group &threadGroup,
               nCoinCacheUsage * (1.0 / 1024 / 1024),
               limits.Memory() * (1.0 / 1024 / 1024),
               limits.Disk() * (1.0 / 1024 / 1024));
+
+    std::int64_t frozen_txo_db_cache_size = gArgs.GetArg("-frozentxodbcache", static_cast<std::int64_t>(DEFAULT_FROZEN_TXO_DB_CACHE));
+    if(frozen_txo_db_cache_size<0)
+    {
+        return InitError(_("Negative value specified for -frozentxodbcache!"));
+    }
+    InitFrozenTXO(static_cast<std::size_t>(frozen_txo_db_cache_size));
 
     bool fLoaded = false;
     while (!fLoaded && !shutdownToken.IsCanceled()) {

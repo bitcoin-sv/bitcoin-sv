@@ -19,6 +19,7 @@
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
 #include "disk_tx_pos.h"
+#include "frozentxo_db.h"
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
@@ -7270,3 +7271,13 @@ double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pin
     return pindex->GetChainTx() / fTxTotal;
 }
 
+
+void InitFrozenTXO(std::size_t cache_size)
+{
+    CFrozenTXODB::Init(cache_size);
+}
+
+void ShutdownFrozenTXO()
+{
+    CFrozenTXODB::Shutdown();
+}

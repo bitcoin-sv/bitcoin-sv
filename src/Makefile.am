@@ -122,6 +122,7 @@ BITCOIN_CORE_H = \
   double_spend/time_limited_blacklist.h \
   dstencode.h \
   enum_cast.h \
+  frozentxo_db.h \
   fs.h \
   httprpc.h \
   httpserver.h \
@@ -280,6 +281,7 @@ libbitcoin_server_a_SOURCES = \
   block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
+  frozentxo_db.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
