@@ -53,6 +53,7 @@ class HeightBasedTestsCase:
     COINBASE_KEY = None
     ADDITIONAL_CONNECTIONS = []
     ARGS = []
+    P2P_ACCEPT_TIMEOUT = 10
 
     _UTXO_KEY = None
     _NUMBER_OF_UTXOS_PER_HEIGHT = 24
@@ -268,7 +269,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
         tip = connection.rpc.getblock(connection.rpc.getbestblockhash())
         block, coinbase_tx = self._new_block(connection, tip_hash=tip["hash"], tip_height=tip["height"], txs=txs)
         wait_until(lambda: connection.rpc.getbestblockhash() == block.hash,
-                   timeout=10, check_interval=0.2, label="Waiting for block to become current tip " + label)
+                   timeout=60, check_interval=0.2, label="Waiting for block to become current tip " + label)
 
         blk_ht = connection.rpc.getblock(connection.rpc.getbestblockhash())["height"]
         if txs:
@@ -332,7 +333,8 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                     assert rejects[0].reason == reason, f"Mismatching rejection reason: got {rejects[0].reason} expected {reason}"
                     self.log.info(f"Tx {loghash(tx.hash)} is rejected as expected for reason {reason}")
 
-    def _process_p2p_accepts(self, connection, to_accept, test_label, height_label):
+    def _process_p2p_accepts(self, connection, to_accept, test_label, height_label, p2p_accept_timeout):
+        # self.log.info(f"Max timeout set={p2p_accept_timeout}")
         for tx in to_accept:
             self.log.info(f"Sending and processing the accept tx {loghash(tx.hash)}")
             connection.send_message(msg_tx(tx))
@@ -342,7 +344,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             return all((t.hash in mempool) for t in to_accept)
 
         wait_until(tt,
-                   timeout=60, check_interval=0.2,
+                   timeout=p2p_accept_timeout, check_interval=0.2,
                    label=f"Waiting txs to be accepted. At {test_label} {height_label} tx:{','.join(tx.hash[:8]+'...' for tx in to_accept) }")
 
         self.check_mp()
@@ -367,14 +369,14 @@ class SimplifiedTestFramework(BitcoinTestFramework):
             self.log.info(f"No transactions to test at height {label} height={height}")
 
         if tx_col.mempool_txs:
-            self._process_p2p_accepts(conn, tx_col.mempool_txs, test_label=test.NAME, height_label=label + " ADDING MEMPOOL UTXOS")
+            self._process_p2p_accepts(conn, tx_col.mempool_txs, test_label=test.NAME, height_label=label + " ADDING MEMPOOL UTXOS", p2p_accept_timeout=test.P2P_ACCEPT_TIMEOUT)
 
         if tx_col.p2p_invalid_txs:
             txs, reasons = zip(*tx_col.p2p_invalid_txs)
             self._process_p2p_rejects(conn, txs, reasons, test_label=test.NAME, height_label=label)
 
         if tx_col.p2p_valid_txs:
-            self._process_p2p_accepts(conn, tx_col.p2p_valid_txs, test_label=test.NAME, height_label=label)
+            self._process_p2p_accepts(conn, tx_col.p2p_valid_txs, test_label=test.NAME, height_label=label, p2p_accept_timeout=test.P2P_ACCEPT_TIMEOUT)
 
         if tx_col.block_invalid_txs:
             txs, reasons = zip(*tx_col.block_invalid_txs)
