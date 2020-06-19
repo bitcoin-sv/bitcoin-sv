@@ -109,7 +109,7 @@ CTxPrioritizer::~CTxPrioritizer()
 /**
  * class CTransactionRefWrapper
  */
-CTransactionRefWrapper::CTransactionRefWrapper(const CTransactionRef &_tx, std::shared_ptr<CMempoolTxDB> txDB)
+CTransactionRefWrapper::CTransactionRefWrapper(const CTransactionRef &_tx, const std::shared_ptr<CMempoolTxDB>& txDB)
 : tx{_tx}
 , txid{_tx->GetId()}
 , mempoolTxDB{txDB}
@@ -137,6 +137,30 @@ CTransactionRef CTransactionRefWrapper::GetTx() const {
     return GetTxFromDB();
 }
 
+void CTransactionRefWrapper::MoveTxToDisk() {
+    if (tx) 
+    {
+        if (mempoolTxDB)
+        {
+            mempoolTxDB->AddTransaction(txid, tx);
+            tx = nullptr;
+        }
+        else
+        {
+            LogPrint(BCLog::MEMPOOL, "Transaction %s has no DB configured\n", txid.ToString());
+        }
+    }
+    else
+    {
+        LogPrint(BCLog::MEMPOOL, "Transaction %s is already on disk\n", txid.ToString());
+    }
+}
+
+bool CTransactionRefWrapper::IsInMemory() const
+{
+    return tx != nullptr;
+}
+
 /**
  * class CTxMemPoolEntry
  */
@@ -148,12 +172,12 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  Amount _inChainInputValue,
                                  bool _spendsCoinbase,
                                  LockPoints lp, CTxMemPoolBase &mempoolIn)
-    : nFee{_nFee}, nTime{_nTime}, entryPriority{_entryPriority},
+    : tx{_tx, mempoolIn.GetMempoolTxDB()},
+      nFee{_nFee}, nTime{_nTime}, entryPriority{_entryPriority},
       inChainInputValue{_inChainInputValue},
       lockPoints{lp}, entryHeight{_entryHeight}, spendsCoinbase{_spendsCoinbase},
       group{nullptr}, groupingData{std::nullopt}
 {
-    tx = CTransactionRefWrapper {_tx, mempoolIn.GetMempoolTxDB()};
     nTxSize = _tx->GetTotalSize();
     nModSize = _tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(_tx);
@@ -183,6 +207,15 @@ void CTxMemPoolEntry::UpdateFeeDelta(Amount newFeeDelta) {
 void CTxMemPoolEntry::UpdateLockPoints(const LockPoints &lp) {
     lockPoints = lp;
 }
+
+void CTxMemPoolEntry::MoveTxToDisk() {
+    tx.MoveTxToDisk();
+}
+
+bool CTxMemPoolEntry::IsInMemory() const {
+    return tx.IsInMemory();
+}
+
 
 bool CTxMemPool::CheckAncestorLimits(
     const CTxMemPoolEntry& entry,

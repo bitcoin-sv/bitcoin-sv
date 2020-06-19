@@ -154,12 +154,14 @@ private:
     CTransactionRef GetTxFromDB() const;
 
 public:
-    CTransactionRefWrapper() {};
-    CTransactionRefWrapper(const CTransactionRef &tx, std::shared_ptr<CMempoolTxDB> txDB);
+    CTransactionRefWrapper() {}
+    CTransactionRefWrapper(const CTransactionRef &tx, const std::shared_ptr<CMempoolTxDB>& txDB);
 
     CTransactionRef GetTx() const;
     const TxId& GetId() const;
 
+    void MoveTxToDisk();
+    bool IsInMemory() const;
 };
 
 /** \class CTxMemPoolEntry
@@ -246,6 +248,9 @@ public:
 
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     bool IsCPFPGroupMember() const { return group != nullptr; }
+
+    void MoveTxToDisk();
+    bool IsInMemory() const;
 };
 
 struct update_fee_delta {

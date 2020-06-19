@@ -26,9 +26,10 @@ namespace std
  * differentiated for type safety.
  */
 struct TxId : public uint256 {
-    TxId() {}
-    explicit TxId(const uint256 &b) : uint256(b) {}
-    TxId(const TxId& b): uint256(b) {}
+    TxId() = default;
+    explicit TxId(const uint256 &b) : uint256{b} {}
+    TxId(const TxId& b) = default;
+    TxId& operator=(const TxId& b) = default;
 };
 
 /**
