@@ -26,7 +26,7 @@ bool fLogIPs = DEFAULT_LOGIPS;
  * ee3374234c60aba2cc4c5cd5cac1c0aefc2d817c.
  */
 BCLog::Logger &GetLogger() {
-    static BCLog::Logger *const logger = new BCLog::Logger();
+    static BCLog::Logger *const logger = new BCLog::Logger(LOGFILE);
     return *logger;
 }
 
@@ -38,7 +38,7 @@ bool BCLog::Logger::OpenDebugLog() {
     std::lock_guard<std::mutex> scoped_lock(mutexDebugLog);
 
     assert(fileout == nullptr);
-    fs::path pathDebug = GetDataDir() / LOGFILE;
+    fs::path pathDebug = GetDataDir() / this->fileName;
     fileout = fsbridge::fopen(pathDebug, "a");
     if (fileout) {
         // Unbuffered.
@@ -122,6 +122,11 @@ std::string ListLogCategories() {
     return ret;
 }
 
+BCLog::Logger::Logger(const char* fileName)
+: fileName(fileName)
+{
+}
+
 BCLog::Logger::~Logger() {
     if (fileout) {
         fclose(fileout);
@@ -184,7 +189,7 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
             // Reopen the log file, if requested.
             if (fReopenDebugLog) {
                 fReopenDebugLog = false;
-                fs::path pathDebug = GetDataDir() / LOGFILE;
+                fs::path pathDebug = GetDataDir() / this->fileName;
                 if (fsbridge::freopen(pathDebug, "a", fileout) != nullptr) {
                     // unbuffered.
                     setbuf(fileout, nullptr);
@@ -201,7 +206,7 @@ void BCLog::Logger::ShrinkDebugFile() {
     // Amount of LOGFILE to save at end when shrinking (must fit in memory)
     constexpr size_t RECENT_DEBUG_HISTORY_SIZE = 10 * 1000000;
     // Scroll LOGFILE if it's getting too big.
-    fs::path pathLog = GetDataDir() / LOGFILE;
+    fs::path pathLog = GetDataDir() / this->fileName;
     FILE *file = fsbridge::fopen(pathLog, "r");
     // If LOGFILE is more than 10% bigger the RECENT_DEBUG_HISTORY_SIZE
     // trim it down by saving only the last RECENT_DEBUG_HISTORY_SIZE bytes.

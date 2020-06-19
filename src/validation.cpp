@@ -20,6 +20,7 @@
 #include "consensus/validation.h"
 #include "disk_tx_pos.h"
 #include "frozentxo_db.h"
+#include "frozentxo_logging.h"
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
@@ -7274,10 +7275,12 @@ double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pin
 
 void InitFrozenTXO(std::size_t cache_size)
 {
+    CFrozenTXOLogger::Init();
     CFrozenTXODB::Init(cache_size);
 }
 
 void ShutdownFrozenTXO()
 {
     CFrozenTXODB::Shutdown();
+    CFrozenTXOLogger::Shutdown();
 }

@@ -123,6 +123,7 @@ BITCOIN_CORE_H = \
   dstencode.h \
   enum_cast.h \
   frozentxo_db.h \
+  frozentxo_logging.h \
   fs.h \
   httprpc.h \
   httpserver.h \
@@ -282,6 +283,7 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   frozentxo_db.cpp \
+  frozentxo_logging.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \

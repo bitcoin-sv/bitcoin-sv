@@ -185,7 +185,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 # Boost packages
-set(BOOST_PACKAGES_REQUIRED chrono filesystem program_options thread)
+set(BOOST_PACKAGES_REQUIRED chrono date_time filesystem program_options thread)
 
 function(prepend var prefix)
 	set(listVar "")
@@ -402,6 +402,8 @@ add_library(server
 	double_spend/time_limited_blacklist.h
 	frozentxo_db.cpp
 	frozentxo_db.h
+	frozentxo_logging.cpp
+	frozentxo_logging.h
 	httprpc.cpp
 	httprpc.h
 	httpserver.cpp
