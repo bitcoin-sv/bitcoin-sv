@@ -19,7 +19,10 @@ namespace {
 /**
  * Valid signature cache, to avoid doing expensive ECDSA signature checking
  * twice for every transaction (once when accepted into memory pool, and
- * again when accepted into the block chain)
+ * again when accepted into the block chain). 
+ * Invalid signature cache, to avoid doing expensive ECDSA signature checking
+ * in case of an attack (invalid signature is cached and does not need to be
+ * calculated again).
  */
 class CSignatureCache {
 private:
@@ -27,6 +30,7 @@ private:
     uint256 nonce;
     typedef CuckooCache::cache<uint256, SignatureCacheHasher> map_type;
     map_type setValid;
+    map_type setInvalid;
     boost::shared_mutex cs_sigcache;
 
 public:
@@ -48,11 +52,24 @@ public:
         return setValid.contains(entry, erase);
     }
 
+    bool GetInvalid(const uint256 &entry, const bool erase) {
+        boost::shared_lock lock(cs_sigcache);
+        return setInvalid.contains(entry, erase);
+    }
+
     void Set(uint256 &entry) {
         boost::unique_lock<boost::shared_mutex> lock(cs_sigcache);
         setValid.insert(entry);
     }
+
+    void SetInvalid(uint256 &entry) {
+        std::scoped_lock lock(cs_sigcache);
+        setInvalid.insert(entry);
+    }
+
     uint32_t setup_bytes(size_t n) { return setValid.setup_bytes(n); }
+
+    uint32_t setup_bytes_invalid(size_t n) { return setInvalid.setup_bytes(n); }
 };
 
 /**
@@ -66,20 +83,22 @@ static CSignatureCache signatureCache;
 } // namespace
 
 // To be called once in AppInit2/TestingSetup to initialize the signatureCache
+
 void InitSignatureCache() {
     // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
     // setup_bytes creates the minimum possible cache (2 elements).
-    size_t nMaxCacheSize =
-        std::min(std::max(int64_t(0),
-                          gArgs.GetArg("-maxsigcachesize",
-                                       DEFAULT_MAX_SIG_CACHE_SIZE)),
-                 MAX_MAX_SIG_CACHE_SIZE) *
-        (size_t(1) << 20);
-    size_t nElems = signatureCache.setup_bytes(nMaxCacheSize);
-    LogPrintf("Using %zu MiB out of %zu requested for signature cache, able to "
-              "store %zu elements\n",
-              (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, nElems);
+    auto initCache = [](std::string argName, unsigned int defaultSize, std::string_view type, auto& classInstance, auto callback){
+      size_t nMaxCacheSize = std::min(std::max(int64_t(0), gArgs.GetArg(argName, defaultSize)), MAX_MAX_SIG_CACHE_SIZE) *
+      (size_t(1) << 20);
+      auto nElems = (classInstance.*callback)(nMaxCacheSize);
+      LogPrintf("Using %zu MiB out of %zu requested for %ssignature cache, able to "
+            "store %zu elements\n", (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, type, nElems);
+    };
+
+    initCache("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE, "", signatureCache, &CSignatureCache::setup_bytes);
+    initCache("-maxinvalidsigcachesize", DEFAULT_INVALID_MAX_SIG_CACHE_SIZE, "invalid ", signatureCache, &CSignatureCache::setup_bytes_invalid);
 }
+
 
 bool CachingTransactionSignatureChecker::VerifySignature(
     const std::vector<uint8_t> &vchSig, const CPubKey &pubkey,
@@ -89,8 +108,14 @@ bool CachingTransactionSignatureChecker::VerifySignature(
     if (signatureCache.Get(entry, !store)) {
         return true;
     }
+    if (signatureCache.GetInvalid(entry, !store)) {
+        return false;
+    }
+
     if (!TransactionSignatureChecker::VerifySignature(vchSig, pubkey,
                                                       sighash)) {
+       
+        signatureCache.SetInvalid(entry);
         return false;
     }
     if (store) {

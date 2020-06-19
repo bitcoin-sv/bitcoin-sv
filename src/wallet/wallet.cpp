@@ -1757,13 +1757,14 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
             ret = nullptr;
         }
 
-        pindex = chainActive.Next(pindex);
         if (GetTime() >= nNow + 60) {
             nNow = GetTime();
             LogPrintf("Still rescanning. At block %d. Progress=%f\n",
                       pindex->nHeight,
                       GuessVerificationProgress(chainParams.TxData(), pindex));
         }
+
+        pindex = chainActive.Next(pindex);
     }
 
     return ret;

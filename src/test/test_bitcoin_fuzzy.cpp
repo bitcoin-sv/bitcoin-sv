@@ -15,7 +15,6 @@
 #include "primitives/block.h"
 #include "protocol.h"
 #include "pubkey.h"
-#include "script/script.h"
 #include "streams.h"
 #include "undo.h"
 #include "version.h"

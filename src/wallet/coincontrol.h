@@ -5,8 +5,6 @@
 #ifndef BITCOIN_WALLET_COINCONTROL_H
 #define BITCOIN_WALLET_COINCONTROL_H
 
-#include "primitives/transaction.h"
-
 /** Coin Control Features. */
 class CCoinControl {
 public:

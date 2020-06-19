@@ -540,7 +540,7 @@ DBErrors CWalletDB::LoadWallet(CWallet *pwallet) {
     bool fNoncriticalErrors = false;
     DBErrors result = DB_LOAD_OK;
 
-    LOCK(pwallet->cs_wallet);
+    LOCK2(cs_main, pwallet->cs_wallet);
     try {
         int nMinVersion = 0;
         if (batch.Read((std::string) "minversion", nMinVersion)) {
@@ -826,7 +826,7 @@ bool CWalletDB::RecoverKeysOnlyFilter(void *callbackData, CDataStream ssKey,
     bool fReadOK;
     {
         // Required in LoadKeyMetadata():
-        LOCK(dummyWallet->cs_wallet);
+        LOCK2(cs_main, dummyWallet->cs_wallet);
         fReadOK = ReadKeyValue(dummyWallet, ssKey, ssValue, dummyWss, strType,
                                strErr);
     }

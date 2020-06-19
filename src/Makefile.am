@@ -361,6 +361,8 @@ libbitcoin_consensus_a_SOURCES = \
   pubkey.h \
   script/bitcoinconsensus.cpp \
   script/sighashtype.h \
+  script/instruction.h \
+  script/instruction_iterator.h \
   script/interpreter.cpp \
   script/interpreter.h \
   script/int_serialization.h \
@@ -374,6 +376,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_error.cpp \
   script/script_error.h \
   serialize.h \
+  span.h \
   tinyformat.h \
   uint256.cpp \
   uint256.h \

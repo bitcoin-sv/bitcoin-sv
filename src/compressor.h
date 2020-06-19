@@ -8,7 +8,6 @@
 
 #include "consensus/consensus.h"
 #include "primitives/transaction.h"
-#include "script/script.h"
 #include "serialize.h"
 
 class CKeyID;

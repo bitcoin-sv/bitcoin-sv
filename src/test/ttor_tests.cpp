@@ -51,6 +51,12 @@ BOOST_FIXTURE_TEST_SUITE(ttor_tests, TestingSetup)
  */
 BOOST_AUTO_TEST_CASE(invalidate_chain)
 {
+    // Due to static assertion checking (in debug mode), It is required to explicitly lock cs_main.
+    // The checks are done (explicitly and implicitly) through functions:
+    // - AddToBlockIndex
+    // - IsValid
+    // - InvalidateChain
+    LOCK(cs_main);
     std::vector<CBlockIndex*> blocks(14);
     for (size_t i = 0; i < blocks.size(); ++i)
     {

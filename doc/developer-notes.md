@@ -169,8 +169,12 @@ Development tips and tricks
 
 **compiling for debugging**
 
-Run configure with the --enable-debug option, then make. Or run configure with
+- Autotools
+Run configure with the --enable-debug option (this will also enable -DDEBUG_LOCKORDER), then make. Or run configure with
 CXXFLAGS="-g -ggdb -O0" or whatever debug flags you need.
+
+- CMake
+To enable debug in CMake run `cmake -DCMAKE_BUILD_TYPE=Debug`. Add the `--enable-debug` option to enable -DDEBUG_LOCKORDER. Then run make.
 
 **bitcoind.log**
 

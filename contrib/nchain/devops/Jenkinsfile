@@ -32,7 +32,7 @@ pipeline {
 
         stage ('Build') {
             steps {
-                bitbucketStatusNotify(buildState: 'BUILDING')
+                bitbucketStatusNotify(buildState: 'INPROGRESS', buildName: 'Build')
                 sh 'python3 entrypoint.py'
             }
         }
@@ -40,37 +40,37 @@ pipeline {
 
         stage('Unit Tests') {
             steps {
-                bitbucketStatusNotify(buildState: 'UNIT TESTING')
+                bitbucketStatusNotify(buildState: 'INPROGRESS', buildName: 'UNIT TESTING')
                 sh 'python3 pipe-unittests.py'
             }
         }
         stage('secp256k1 Tests') {
             steps {
-                bitbucketStatusNotify(buildState: 'EC TESTING')
+                bitbucketStatusNotify(buildState:  'INPROGRESS', buildName: 'EC TESTING')
                 sh 'python3 pipe-secp256k1tests.py'
             }
         }
         stage('univalue Tests') {
             steps {
-                bitbucketStatusNotify(buildState: 'UNIVALUE TESTING')
+                bitbucketStatusNotify(buildState:  'INPROGRESS', buildName: 'UNIVALUE TESTING')
                 sh 'python3 pipe-univaluetests.py'
             }
         }
         stage('leveldb Tests') {
             steps {
-                bitbucketStatusNotify(buildState: 'LEVELDB TESTING')
+                bitbucketStatusNotify(buildState: 'INPROGRESS', buildName:  'LEVELDB TESTING')
                 sh 'python3 pipe-leveldbtests.py'
             }
         }
         stage('Util Tests') {
             steps {
-                bitbucketStatusNotify(buildState: 'UTIL TESTING')
+                bitbucketStatusNotify(buildState: 'INPROGRESS', buildName:  'UTIL TESTING')
                 sh 'python3 pipe-utiltests.py'
             }
         }
         stage('Functional Tests') {
             steps {
-                bitbucketStatusNotify(buildState: 'FUNCTIONAL TESTING')
+                bitbucketStatusNotify(buildState: 'INPROGRESS', buildName: 'FUNCTIONAL TESTING')
                 sh 'python3 pipe-functionaltests.py'
             }
         }

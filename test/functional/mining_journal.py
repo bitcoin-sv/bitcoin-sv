@@ -163,7 +163,7 @@ class MiningJournal(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.maxblocksize = 1 * ONE_MEGABYTE
         self.num_nodes = 2
-        self.extra_args = [['-whitelist=127.0.0.1', '-maxmempool=20', '-maxtipage={}'.format(max_tip_age),
+        self.extra_args = [['-whitelist=127.0.0.1', '-maxmempool=300', '-maxtipage={}'.format(max_tip_age),
                             '-debug=journal', '-blockassembler=journaling',
                             '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool']] * self.num_nodes
         self.conncbs = []

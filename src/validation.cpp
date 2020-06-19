@@ -29,7 +29,6 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "random.h"
-#include "script/script.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -513,15 +512,7 @@ uint64_t GetP2SHSigOpCount(const Config &config,
         bool genesisEnabled = true;
         if (coin.GetHeight() != MEMPOOL_HEIGHT){
             genesisEnabled = IsGenesisEnabled(config, coin.GetHeight());
-        } else {
-            // When this function is called from CTxnValidator, we could be spending UTXOS from mempool
-            // CTxnValidator already takes cs_main lock when starting validation in it's main thread
-            AssertLockHeld(cs_main);
-
-            // TODO: in releases after genesis upgrade this part could be removed
-            genesisEnabled = IsGenesisEnabled(config, chainActive.Height() + 1);
         }
-
         if (genesisEnabled) {
             continue;
         }
@@ -1287,7 +1278,7 @@ CTxnValResult TxnValidation(
         }
     }
 
-    // Check for non-standard pay-to-script-hash in inputs
+    // Checking for non-standard outputs as inputs.
     if (!acceptNonStandardOutput)
     {
         auto res =
@@ -1305,6 +1296,18 @@ CTxnValResult TxnValidation(
         {
             state.Invalid(false, REJECT_NONSTANDARD,
                          "bad-txns-nonstandard-inputs");
+            return Result{state, pTxInputData, vCoinsToUncache};
+        }
+    }
+    else if (fUseLimits && (TxValidationPriority::low != pTxInputData->mTxValidationPriority))
+    {
+        auto res =
+            AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
+        if (!res.has_value() || !res.value()) {
+            state.SetValidationTimeoutExceeded();
+            state.DoS(0, false, REJECT_NONSTANDARD,
+                     "too-long-validation-time",
+                      false);
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }
@@ -1573,48 +1576,61 @@ CValidationState HandleTxnProcessingException(
     return state;
 }
 
-std::pair<CTxnValResult, CTask::Status> TxnValidationProcessingTask(
-    const TxInputDataSPtr& txInputData,
+std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask(
+    const TxInputDataSPtrRefVec& vTxInputData,
     const Config& config,
     CTxMemPool& pool,
     CTxnHandlers& handlers,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
-    // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
-    if (!(std::chrono::steady_clock::time_point(std::chrono::milliseconds(0)) == end_time_point) &&
-        !(std::chrono::steady_clock::now() < end_time_point)) {
-        return {{CValidationState(), txInputData}, CTask::Status::Canceled};
+
+    size_t chainLength = vTxInputData.size();
+    if (chainLength > 1) {
+        LogPrint(BCLog::TXNVAL,
+                "A non-trivial chain detected, length=%zu\n", chainLength);
     }
-    CTxnValResult result {};
-    try
-    {
-        // Execute validation for the given txn
-        result =
-            TxnValidation(
-                txInputData,
-                config,
-                pool,
-                handlers.mpTxnDoubleSpendDetector,
-                fUseLimits);
-        // Process validated results
-        ProcessValidatedTxn(pool, result, handlers, false);
-    } catch (const std::exception& e) {
-        return { { HandleTxnProcessingException("An exception thrown in txn processing: " + std::string(e.what()),
-                      txInputData,
+    std::vector<std::pair<CTxnValResult, CTask::Status>> results {};
+    results.reserve(chainLength);
+    for (const auto& elem : vTxInputData) {
+        // Check if time to trigger validation elapsed (skip this check if end_time_point == 0).
+        if (!(std::chrono::steady_clock::time_point(std::chrono::milliseconds(0)) == end_time_point) &&
+            !(std::chrono::steady_clock::now() < end_time_point)) {
+            results.emplace_back(CTxnValResult{CValidationState(), elem.get()}, CTask::Status::Canceled);
+            continue;
+        }
+        CTxnValResult result {};
+        try {
+            // Execute validation for the given txn
+            result =
+                TxnValidation(
+                        elem,
+                        config,
+                        pool,
+                        handlers.mpTxnDoubleSpendDetector,
+                        fUseLimits);
+            // Process validated results
+            ProcessValidatedTxn(pool, result, handlers, false);
+            // Forward results to the next processing stage
+            results.emplace_back(std::move(result), CTask::Status::RanToCompletion);
+        } catch (const std::exception& e) {
+            results.emplace_back(
+                    CTxnValResult{HandleTxnProcessingException("An exception thrown in txn processing: " + std::string(e.what()),
+                      elem.get(),
                       result,
                       pool,
-                      handlers), txInputData },
-                   CTask::Status::Faulted };
-    } catch (...) {
-        return { { HandleTxnProcessingException("Unexpected exception in txn processing",
-                      txInputData,
+                      handlers), elem.get()},
+                    CTask::Status::Faulted);
+        } catch (...) {
+            results.emplace_back(
+                    CTxnValResult{HandleTxnProcessingException("Unexpected exception in txn processing",
+                      elem.get(),
                       result,
                       pool,
-                      handlers), txInputData },
-                   CTask::Status::Faulted };
+                      handlers), elem.get()},
+                    CTask::Status::Faulted);
+        }
     }
-    // Forward results to the next processing stage
-    return {result, CTask::Status::RanToCompletion};
+    return results;
 }
 
 static void HandleInvalidP2POrphanTxn(
@@ -2580,6 +2596,31 @@ const CBlockIndex* FindInvalidBlockOnFork(const CBlockIndex* pindexForkTip)
 }
 
 /**
+ * Checks if block is part of one of the forks that are causing safe mode
+ */
+bool IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew)
+{
+    AssertLockHeld(cs_safeModeLevelForks);
+
+    // if we received only header then block is not yet part of the fork 
+    // so check only for blocks with data
+    if (pindexNew->nStatus.hasData())
+    {
+        for (auto const& fork : safeModeForks)
+        {
+            auto pindexWalk = fork.first;
+            while (pindexWalk && pindexWalk != fork.second)
+            {
+                if (pindexWalk == pindexNew)
+                    return true;
+                pindexWalk = pindexWalk->pprev;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * Method tries to find invalid block from fork tip to active chain. If invalid
  * block is found, it sets status withFailedParent to all of its descendants.
  */
@@ -2714,47 +2755,29 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
     SafeModeLevel safeModeLevel = SafeModeLevel::NONE;
     // fork triggering safe mode level change
     const CBlockIndex* pindexForkTip = nullptr;
+    bool checkExistingForks = false;
 
-    if (chainActive.Tip() == pindexNew->pprev || chainActive.Contains(pindexNew))
+    if (chainActive.Tip() == pindexNew->pprev || chainActive.Contains(pindexNew) || IsBlockPartOfExistingSafeModeFork(pindexNew))
     {
-        // When we are extending or updating active chain only check if we have to exit safe mode
-        if (GetSafeModeLevel() != SafeModeLevel::UNKNOWN)
+        // When we are extending active chain or updating any of the forks or main chain 
+        // then only check all existing forks if we should stay in safe mode. If block is part
+        // of existing safe mode fork than check whole fork (and all other forks) not just
+        // from fork base to pindexNew
+        if (GetSafeModeLevel() != SafeModeLevel::NONE)
         {
             // Check all forks if they still meet conditions for safe mode
-            for (auto it = safeModeForks.cbegin(); it != safeModeForks.cend();)
-            {
-                SafeModeLevel safeModeLevelForks = ShouldForkTriggerSafeMode(it->first, it->second);
-                if (safeModeLevelForks == SafeModeLevel::NONE)
-                {
-                    it = safeModeForks.erase(it);
-                }
-                else
-                {
-                    // check if this fork rises safe mode level
-                    if (safeModeLevelForks > safeModeLevel)
-                    {
-                        safeModeLevel = safeModeLevelForks;
-                        pindexForkTip = it->first;
-                    }
-                    ++it;
-                }
-            }
+            checkExistingForks = true;
         }
     }
     else
     {
         const CBlockIndex* pindexForkBase = pindexNew;
-        if (safeModeForks.find(pindexNew->pprev) != safeModeForks.end())
+        auto itPPrev = safeModeForks.find(pindexNew->pprev);
+        if (itPPrev != safeModeForks.end())
         {
             // Check if we are extending existing fork that caused safe mode
-            pindexForkBase = safeModeForks[pindexNew->pprev];
-            safeModeForks.erase(pindexNew->pprev);
-        }
-        else if (safeModeForks.find(pindexNew) != safeModeForks.end())
-        {
-            // Check if we are updating block status of existing fork tip (e.g. unknown -> valid)
-            pindexForkBase = safeModeForks[pindexNew];
-            safeModeForks.erase(pindexNew);
+            pindexForkBase = itPPrev->second;
+            safeModeForks.erase(itPPrev);
         }
         else
         {
@@ -2766,12 +2789,42 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
         if (safeModeLevelFork != SafeModeLevel::NONE)
         {
             // Add fork to collection of forks that cause safe mode
-            safeModeForks[pindexNew] = pindexForkBase;
+            safeModeForks.insert(std::pair<const CBlockIndex*, const CBlockIndex*>(pindexNew, pindexForkBase));
+            // Check if we increased safe mode level
+            if (safeModeLevelFork > safeModeLevel)
+            {
+                safeModeLevel = safeModeLevelFork;
+                pindexForkTip = pindexNew;
+            }
         }
-        if (safeModeLevelFork > safeModeLevel)
+        else
         {
-            safeModeLevel = safeModeLevelFork;
-            pindexForkTip = pindexNew;
+            // This fork does not cause safe mode so check if any of 
+            // existing forks still cause safe mode
+            checkExistingForks = true;
+        }
+    }
+
+    // If needed, check existing forks and remove those that no longer cause safe mode
+    if (checkExistingForks)
+    {
+        for (auto it = safeModeForks.cbegin(); it != safeModeForks.cend();)
+        {
+            SafeModeLevel safeModeLevelForks = ShouldForkTriggerSafeMode(it->first, it->second);
+            if (safeModeLevelForks == SafeModeLevel::NONE)
+            {
+                it = safeModeForks.erase(it);
+            }
+            else
+            {
+                // check if this fork rises safe mode level
+                if (safeModeLevelForks > safeModeLevel)
+                {
+                    safeModeLevel = safeModeLevelForks;
+                    pindexForkTip = it->first;
+                }
+                ++it;
+            }
         }
     }
 
@@ -3057,7 +3110,15 @@ std::optional<bool> CheckInputs(
         {
             bool genesisGracefulPeriod = IsGenesisGracefulPeriod(config, spendHeight);
             const bool hasNonMandatoryFlags = ((flags | perInputScriptFlags) & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
-
+            // A violation of policy limit, for max-script-num-length, results in an increase of banning score by 10.
+            // A failure is detected by a script number overflow in computations.
+            if (!genesisGracefulPeriod && !consensus && SCRIPT_ERR_SCRIPTNUM_OVERFLOW == check.GetScriptError()) {
+                return state.DoS(
+                    10, false, REJECT_INVALID,
+                    strprintf("max-script-num-length-policy-limit-violated (%s)",
+                              ScriptErrorString(check.GetScriptError())));
+            }
+            // Checking script conditions with non-mandatory flags.
             if (hasNonMandatoryFlags)
             {
                 // Check whether the failure was caused by a non-mandatory
@@ -6702,6 +6763,10 @@ bool RewindBlockIndex(const Config &config) {
 // logic assumes a consistent block index state
 void UnloadBlockIndex() {
     LOCK(cs_main);
+
+    LOCK(cs_safeModeLevelForks);
+    safeModeForks.clear();
+
     setBlockIndexCandidates.clear();
     chainActive.SetTip(nullptr);
     chainActiveSharedData.SetChainActiveHeight(0);
@@ -7402,7 +7467,7 @@ void DumpMempool(void) {
         RenameOver(GetDataDir() / "mempool.dat.new",
                    GetDataDir() / "mempool.dat");
         int64_t last = GetTimeMicros();
-        LogPrintf("Dumped mempool: %gs to copy, %gs to dump\n",
+        LogPrintf("Dumped mempool: %.6fs to copy, %.6fs to dump\n",
                   (mid - start) * 0.000001, (last - mid) * 0.000001);
     } catch (const std::exception &e) {
         LogPrintf("Failed to dump mempool: %s. Continuing anyway.\n", e.what());

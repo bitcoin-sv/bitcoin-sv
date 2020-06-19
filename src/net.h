@@ -295,44 +295,93 @@ public:
             bool fUseTimedCancellationSource,
             std::chrono::milliseconds maxasynctasksrunduration)
         -> std::vector<std::future<typename std::result_of<
-            Callable(const TxInputDataSPtr&,
+            Callable(const TxInputDataSPtrRefVec&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
                 bool,
                 std::chrono::steady_clock::time_point)>::type>> {
         using resultType = typename std::result_of<
-            Callable(const TxInputDataSPtr&,
+            Callable(const TxInputDataSPtrRefVec&,
                 const Config*,
                 CTxMemPool*,
                 CTxnHandlers&,
                 bool,
                 std::chrono::steady_clock::time_point)>::type;
-        // A variable which stors results
+        // Reserve a space for the result set (a pessimistic estimation).
         std::vector<std::future<resultType>> results {};
-        // Allocate a buffer for results
         results.reserve(vNewTxns.size());
-        // Set the time point
+        // Set end_time_point based on the current time and max duration for async tasks.
         std::chrono::steady_clock::time_point zero_time_point(std::chrono::milliseconds(0));
         std::chrono::steady_clock::time_point end_time_point =
             std::chrono::steady_clock::time_point(maxasynctasksrunduration) == zero_time_point
                 ? zero_time_point : std::chrono::steady_clock::now() + maxasynctasksrunduration;
-        // Create validation tasks
-        for (const TxInputDataSPtr& txn : vNewTxns) {
-            results.emplace_back(
-                make_task(
-                    mValidatorThreadPool,
-                    txn->mTxValidationPriority == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High,
-                    func,
-                    txn,
-                    config,
-                    pool,
-                    handlers,
-                    fUseTimedCancellationSource,
-                    end_time_point));
-        }
+        // A helper lambda to create a task.
+        auto create_task {
+            [&](TxInputDataSPtrVecIter begin, TxInputDataSPtrVecIter end, TxValidationPriority priority) {
+                results.emplace_back(
+                    make_task(
+                        mValidatorThreadPool,
+                        priority == TxValidationPriority::low ? CTask::Priority::Low : CTask::Priority::High,
+                        func,
+                        TxInputDataSPtrRefVec(begin, end),
+                        config,
+                        pool,
+                        handlers,
+                        fUseTimedCancellationSource,
+                        end_time_point));
+            }
+        };
+        auto chunkBeginIter = vNewTxns.begin();
+        auto chunkEndIter = chunkBeginIter;
+        // mChains is used to track transacions belonging to the same chain (among the given vNewTxns set).
+        std::size_t chainId = 0;
+        std::map<TxId, std::size_t> mChains {};
+        mChains.emplace(chunkBeginIter->get()->mpTx->GetId(), ++chainId);
+        // A helper lambda used to identify a continuous chain
+        // (a sequence of transactions compliant with the parent-child rule).
+        auto is_continuous_chain {
+            [&mChains, &chunkEndIter](std::size_t chainId) -> std::pair<bool, std::size_t> {
+                for (const auto& txin : chunkEndIter->get()->mpTx->vin) {
+                    const TxId& txhash = txin.prevout.GetTxId();
+                    const auto& foundParentIter = mChains.find(txhash);
+                    if (foundParentIter != mChains.end()) {
+                        return {foundParentIter->second == chainId, foundParentIter->second};
+                    }
+                }
+                return {false, 0};
+            }
+        };
+        // The main loop responsible for creating tasks and assigning txns to them.
+        // If a continuous chain of transactions is detected, then all txns from such a chain are being assiged to a single task
+        // - txn's priority is taken into account during that process
+        // As an example, the following sequence of chains [ A1, B1, B2, C1, C2, C3, D1, C4, C5 ] will be assigned into:
+        // a) an optimistic split: 5 different tasks (if the same txn priority occurs within the chain)
+        // b) a pessimistic split: 9 different tasks (if a different txn priority occurs, alternately, within the chain)
+        TxValidationPriority chunkInitialPriority = chunkBeginIter->get()->mTxValidationPriority;
+        do {
+            ++chunkEndIter;
+            if (chunkEndIter != vNewTxns.end()) {
+                const auto& result = is_continuous_chain(chainId);
+                if (!result.first || !(chunkInitialPriority == chunkEndIter->get()->mTxValidationPriority)) {
+                    create_task(chunkBeginIter, chunkEndIter, chunkInitialPriority);
+                    chunkBeginIter = chunkEndIter;
+                    chunkInitialPriority = chunkBeginIter->get()->mTxValidationPriority;
+                }
+                // Assign the same id to newly detected txn if it belongs to the known chain, otherwise use a new id.
+                const TxId& txhash = chunkEndIter->get()->mpTx->GetId();
+                if (!result.second) {
+                    mChains.try_emplace(txhash, ++chainId);
+                } else {
+                    mChains.try_emplace(txhash, result.second);
+                }
+            } else {
+                create_task(chunkBeginIter, chunkEndIter, chunkInitialPriority);
+                break;
+            }
+        } while (true);
         return results;
-    };
+    }
 
     /** Get a handle to our transaction validator */
     std::shared_ptr<CTxnValidator> getTxnValidator();

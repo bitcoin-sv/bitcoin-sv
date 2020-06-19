@@ -441,6 +441,11 @@ class PVQTimeoutTest(BitcoinTestFramework):
             # The test case produces rejected txns with a reason 'too-long-validation-time' for standard ('high' priority txns).
             # All standard txns are then forwarded to the non-standard validation queue where the validation timeout is longer.
             # The timeout set for non-standard txns is not sufficient to process txns (forwarded from the standard queue).
+            #
+            # Due to the fact, that an invalid sigcache was introduced (and a definition of the redeem_script used in the test case)
+            # signature verification is much faster than before.
+            # If -maxinvalidsigcachesize is set to zero, setup_bytes creates the minimum possible cache (2 elements).
+            # That is why the number of inputs needs to be increased.
             [
                 # Sync node scenario
                 nodoublespends(),
@@ -449,17 +454,19 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 "-maxstdtxvalidationduration=5 "
                 "-maxnonstdtxvalidationduration=10 "
                 "-checkmempool=0 "
-                "-broadcastdelay=0",
+                "-broadcastdelay=0"
+                "-maxinvalidsigcachesize=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=5',
                  '-maxnonstdtxvalidationduration=10',
                  '-checkmempool=0',
-                 '-broadcastdelay=0'],
+                 '-broadcastdelay=0',
+                 '-maxinvalidsigcachesize=0'],
                 TxType.standard,
                 # A number of spend money txns used in the test
                 10,
                 # A number of inputs in the spend money txn
-                10,
+                50,
                 # A number of accepted txns
                 0,
                 # A number of tx reject messages created during a test (created by 'low' priority tasks)
@@ -626,6 +633,11 @@ class PVQTimeoutTest(BitcoinTestFramework):
             # The test case produces rejected txns with a reason 'too-long-validation-time' for standard ('high' priority txns).
             # All standard txns are then forwarded to the non-standard validation queue where the validation timeout is longer.
             # The timeout set for non-standard txns is not sufficient to process txns (forwarded from the standard queue).
+            #
+            # Due to the fact, that an invalid sigcache was introduced (and a definition of the redeem_script used in the test case)
+            # signature verification is much faster than before.
+            # If -maxinvalidsigcachesize is set to zero, setup_bytes creates the minimum possible cache (2 elements).
+            # That is why the number of inputs needs to be increased.
             [
                 # Sync node scenario
                 doublespends(),
@@ -634,17 +646,19 @@ class PVQTimeoutTest(BitcoinTestFramework):
                 "-maxstdtxvalidationduration=5 "
                 "-maxnonstdtxvalidationduration=10 "
                 "-checkmempool=0 "
-                "-broadcastdelay=0",
+                "-broadcastdelay=0"
+                "-maxinvalidsigcachesize=0",
                 # Node's configuration
                 ['-maxstdtxvalidationduration=5',
                  '-maxnonstdtxvalidationduration=10',
                  '-checkmempool=0',
-                 '-broadcastdelay=0'],
+                 '-broadcastdelay=0',
+                 '-maxinvalidsigcachesize=0'],
                 TxType.standard,
                 # A number of spend money txns used in the test
                 10,
                 # A number of inputs in the spend money txn
-                10,
+                50,
                 # A number of accepted txns
                 0,
                 # A number of tx reject messages created during a test.

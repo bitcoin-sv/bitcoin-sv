@@ -23,6 +23,10 @@ foreach (flags
         "${flags}" "${${flags}}")
 endforeach()
 
+option(enable_debug "Enable debug (lockorder)" OFF)
+if(enable_debug)
+    add_definitions(-DDEBUG -DDEBUG_LOCKORDER)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "primitives/block.h"
-#include "primitives/transaction.h"
 #include "uint256.h"
 
 uint256 ComputeMerkleRoot(const std::vector<uint256> &leaves,

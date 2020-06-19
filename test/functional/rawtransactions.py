@@ -25,7 +25,7 @@ class RawTransactionsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 4
-        self.extra_args = [[],[],[],['-maxmempool=1']]
+        self.extra_args = [[],[],[],['-maxmempool=300']]
 
     def setup_network(self, split=False):
         super().setup_network()
@@ -283,29 +283,45 @@ class RawTransactionsTest(BitcoinTestFramework):
         #
         # Submit transaction without checking fee 2/2 #
         #
-        txouts = gen_return_txouts()
         relayfee = self.nodes[3].getnetworkinfo()['relayfee']
+        base_fee = relayfee * 1000
+        utxos = create_confirmed_utxos(relayfee, self.nodes[3], 335)
+        # fill up mempool
+        for j in range(332):
+            txn = utxos.pop()
+            send_value = txn['amount'] - base_fee
+            inputs = []
+            inputs.append({"txid": txn["txid"], "vout": txn["vout"]})
+            outputs = {}
+            addr = self.nodes[3].getnewaddress()
+            outputs[addr] = satoshi_round(send_value)
+            outputs["data"] = bytes_to_hex_str(bytearray(900000))
 
-        utxos = create_confirmed_utxos(relayfee, self.nodes[3], 14)
-        us0 = utxos.pop()
-
-        base_fee = relayfee * 100
-        create_lots_of_big_transactions(self.nodes[3], txouts, utxos, 13, base_fee)
-
-        inputs = [{"txid": us0["txid"], "vout": us0["vout"]}]
-        outputs = {}
-        outputs = {self.nodes[3].getnewaddress(): us0["amount"]}
-        rawtx = self.nodes[3].createrawtransaction(inputs, outputs)
-        newtx = rawtx[0:92]
-        newtx = newtx + txouts
-        newtx = newtx + rawtx[94:]
-        signresult = self.nodes[3].signrawtransaction(newtx, None, None, "NONE|FORKID")
+            rawTxn = self.nodes[3].createrawtransaction(inputs, outputs)
+            signedTxn = self.nodes[3].signrawtransaction(rawTxn)["hex"]
+            self.nodes[3].sendrawtransaction(signedTxn, False, False)
+        
+        # create new transaction
         mempoolsize = self.nodes[3].getmempoolinfo()['size']
+        txn = utxos.pop()
+        # now without fee
+        send_value = txn['amount']
+        inputs = []
+        inputs.append({"txid": txn["txid"], "vout": txn["vout"]})
+        outputs = {}
+        addr = self.nodes[3].getnewaddress()
+        outputs[addr] = satoshi_round(send_value)
+        outputs["data"] = bytes_to_hex_str(bytearray(999000))
+
+        rawTxn = self.nodes[3].createrawtransaction(inputs, outputs)
+        signedTxn = self.nodes[3].signrawtransaction(rawTxn)["hex"]
+        # without sufficient fee shouldn't get to mempool
         assert_raises_rpc_error(
-            -26, "insufficient priority", self.nodes[3].sendrawtransaction, signresult["hex"], False, False
+            -26, "insufficient priority", self.nodes[3].sendrawtransaction, signedTxn, False, False
         )
-        txid_new = self.nodes[3].sendrawtransaction(signresult["hex"], False, True)
+        txid_new = self.nodes[3].sendrawtransaction(signedTxn, False, True)
         mempoolsize_new = self.nodes[3].getmempoolinfo()['size']
+        # with 'dontcheckfee' other txn should be evicted
         assert(txid_new in self.nodes[3].getrawmempool())
         assert_equal(mempoolsize_new, mempoolsize)
 

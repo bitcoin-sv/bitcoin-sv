@@ -4,8 +4,9 @@
 #ifndef BITCOIN_SCRIPT_LIMITEDSTACK_H
 #define BITCOIN_SCRIPT_LIMITEDSTACK_H
 
-#include "script/script.h"
-
+#include <cstdint>
+#include <functional>
+#include <stdexcept>
 #include <vector>
 
 typedef std::vector<uint8_t> valtype;
