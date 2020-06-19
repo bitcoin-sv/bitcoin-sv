@@ -12,7 +12,7 @@ import ctypes.util
 import hashlib
 import sys
 
-ssl = ctypes.cdll.LoadLibrary(ctypes.util.find_library('ssl') or 'libeay32')
+ssl = ctypes.cdll.LoadLibrary(ctypes.util.find_library('ssl') or ctypes.util.find_library('libcrypto-1_1-x64') or ctypes.util.find_library('libeay32'))
 
 ssl.BN_new.restype = ctypes.c_void_p
 ssl.BN_new.argtypes = []
