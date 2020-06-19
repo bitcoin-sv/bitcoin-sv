@@ -73,12 +73,8 @@ class BroadcastDelayTest(BitcoinTestFramework):
         self.num_nodes = 1
         self.num_peers = 3
 
-    def setup_nodes(self):
-        self.add_nodes(self.num_nodes)
-
     def setup_network(self):
-        self.add_nodes(self.num_nodes)
-        self.start_node(0)
+        self.setup_nodes()
 
     # submits requested number of transactions from txs and returns timings
     def syncNodesWithTransaction(self, num_transactions, txs, connection1, connection2):

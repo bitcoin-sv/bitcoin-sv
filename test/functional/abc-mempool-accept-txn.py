@@ -23,14 +23,6 @@ TXNS_TOO_MANY_SIGOPS_ERROR = b'bad-txns-too-many-sigops'
 RPC_TXNS_TOO_MANY_SIGOPS_ERROR = "64: " + \
     TXNS_TOO_MANY_SIGOPS_ERROR.decode("utf-8")
 
-
-class PreviousSpendableOutput():
-
-    def __init__(self, tx=CTransaction(), n=-1):
-        self.tx = tx
-        self.n = n  # the output we're spending
-
-
 class FullBlockTest(ComparisonTestFramework):
 
     # Can either run this test as 1 node with expected answers, or two and compare them.
@@ -46,12 +38,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.tip = None
         self.blocks = {}
-
-    def setup_network(self):
         self.extra_args = [['-norelaypriority']]
-        self.add_nodes(self.num_nodes, self.extra_args)
-        self.start_nodes()
-        self.init_network()
 
     def add_options(self, parser):
         super().add_options(parser)
@@ -61,135 +48,24 @@ class FullBlockTest(ComparisonTestFramework):
     def run_test(self):
         self.test.run()
 
-    def add_transactions_to_block(self, block, tx_list):
-        [tx.rehash() for tx in tx_list]
-        block.vtx.extend(tx_list)
-
-    # this is a little handier to use than the version in blocktools.py
-    def create_tx(self, spend_tx, n, value, script=CScript([OP_TRUE])):
-        tx = create_transaction(spend_tx, n, b"", value, script)
-        return tx
-
-    # sign a transaction, using the key we know about
-    # this signs input 0 in tx, which is assumed to be spending output n in
-    # spend_tx
-    def sign_tx(self, tx, spend_tx, n):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-        if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
-            tx.vin[0].scriptSig = CScript()
-            return
-        sighash = SignatureHashForkId(
-            spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
-        tx.vin[0].scriptSig = CScript(
-            [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
-
-    def create_and_sign_transaction(self, spend_tx, n, value, script=CScript([OP_TRUE])):
-        tx = self.create_tx(spend_tx, n, value, script)
-        self.sign_tx(tx, spend_tx, n)
-        tx.rehash()
-        return tx
-
-    def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE])):
-        if self.tip == None:
-            base_block_hash = self.genesis_hash
-            block_time = int(time.time()) + 1
-        else:
-            base_block_hash = self.tip.sha256
-            block_time = self.tip.nTime + 1
-        # First create the coinbase
-        height = self.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height, self.coinbase_pubkey)
-        coinbase.vout[0].nValue += additional_coinbase_value
-        coinbase.rehash()
-        if spend == None:
-            block = create_block(base_block_hash, coinbase, block_time)
-        else:
-            # all but one satoshi to fees
-            coinbase.vout[0].nValue += spend.tx.vout[
-                spend.n].nValue - 1
-            coinbase.rehash()
-            block = create_block(base_block_hash, coinbase, block_time)
-            # spend 1 satoshi
-            tx = create_transaction(spend.tx, spend.n, b"", 1, script)
-            self.sign_tx(tx, spend.tx, spend.n)
-            self.add_transactions_to_block(block, [tx])
-            block.hashMerkleRoot = block.calc_merkle_root()
-        # Do PoW, which is very inexpensive on regnet
-        block.solve()
-        self.tip = block
-        self.block_heights[block.sha256] = height
-        assert number not in self.blocks
-        self.blocks[number] = block
-        return block
-
     def get_tests(self):
-        self.genesis_hash = int(self.nodes[0].getbestblockhash(), 16)
-        self.block_heights[self.genesis_hash] = 0
-        spendable_outputs = []
-
-        # save the current tip so it can be spent by a later block
-        def save_spendable_output():
-            spendable_outputs.append(self.tip)
-
-        # get an output that we previously marked as spendable
-        def get_spendable_output():
-            return PreviousSpendableOutput(spendable_outputs.pop(0).vtx[0], 0)
-
-        # returns a test case that asserts that the current tip was accepted
-        def accepted():
-            return TestInstance([[self.tip, True]])
-
-        # returns a test case that asserts that the current tip was rejected
-        def rejected(reject=None):
-            if reject is None:
-                return TestInstance([[self.tip, False]])
-            else:
-                return TestInstance([[self.tip, reject]])
-
-        # move the tip back to a previous block
-        def tip(number):
-            self.tip = self.blocks[number]
-
-        # adds transactions to the block and updates state
-        def update_block(block_number, new_transactions):
-            block = self.blocks[block_number]
-            self.add_transactions_to_block(block, new_transactions)
-            old_sha256 = block.sha256
-            block.hashMerkleRoot = block.calc_merkle_root()
-            block.solve()
-            # Update the internal state just like in next_block
-            self.tip = block
-            if block.sha256 != old_sha256:
-                self.block_heights[
-                    block.sha256] = self.block_heights[old_sha256]
-                del self.block_heights[old_sha256]
-            self.blocks[block_number] = block
-            return block
-
         # shorthand for functions
-        block = self.next_block
-        create_tx = self.create_tx
+        block = self.chain.next_block
+        update_block = self.chain.update_block
+        save_spendable_output = self.chain.save_spendable_output
+        get_spendable_output = self.chain.get_spendable_output
+        accepted = self.accepted
 
         # shorthand for variables
         node = self.nodes[0]
-
+        self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
         # Create a new block
         block(0)
-        save_spendable_output()
         yield accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(99):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.tip, True])
-            save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 99, 33)
 
-        # Collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(33):
-            out.append(get_spendable_output())
+        yield test
 
         # P2SH
         # Build the redeem script, hash it, use hash to create the p2sh script
@@ -216,8 +92,8 @@ class FullBlockTest(ComparisonTestFramework):
 
         # P2SH tests
         # Create a p2sh transaction
-        p2sh_tx = self.create_and_sign_transaction(
-            out[0].tx, out[0].n, 1, p2sh_script)
+        p2sh_tx = create_and_sign_transaction(
+            out[0].tx, out[0].n, 1, p2sh_script, self.coinbase_key)
 
         # Add the transaction to the block
         block(1)

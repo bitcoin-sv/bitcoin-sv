@@ -85,7 +85,7 @@ Genesis height is 600.
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE
-from test_framework.blocktools import create_transaction
+from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, p2p_port, wait_until
 from test_framework.comptool import TestManager, TestInstance, TestNode, RejectResult, DiscardResult
 from test_framework.mininode import NodeConn, NodeConnCB, NetworkThread, msg_getdata, msg_tx, CInv, mininode_lock
@@ -183,24 +183,12 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         node = self.nodes[0]
         self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        # Also, move block height on beyond BIP68 activation at 576
-        test = TestInstance(sync_every_block=False)
-        for i in range(580):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 580, 200)
 
-        # Collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(200):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         # Create block on height 581 with some transactions for us to spend
         nLockTime = self.start_time

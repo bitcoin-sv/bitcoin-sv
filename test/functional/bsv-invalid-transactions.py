@@ -10,7 +10,7 @@ from test_framework.key import CECKey
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block
 from test_framework.script import CScript, SignatureHashForkId, SIGHASH_ALL, SIGHASH_FORKID, OP_CHECKSIG
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until
+from test_framework.util import wait_until, check_mempool_equals
 
 _lan_ip = None
 def get_lan_ip():
@@ -175,9 +175,6 @@ class InvalidTx(BitcoinTestFramework):
     def check_rejected(self, rejected_txs, should_be_rejected_tx_set):
         wait_until(lambda: {tx.data for tx in rejected_txs} == {o.sha256 for o in should_be_rejected_tx_set}, timeout=20)
 
-    def check_mempool(self, rpc, should_be_in_mempool):
-        wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool}, timeout=20)
-
     def check_relayed(self, relayed_txs, should_be_relayed_tx_set):
         wait_until(lambda: set(relayed_txs) == {o.sha256 for o in should_be_relayed_tx_set}, timeout=20)
 
@@ -252,7 +249,7 @@ class InvalidTx(BitcoinTestFramework):
             conn.send_message(msg_tx(parent_tx2))
 
             # all transactions should be accepted to mempool
-            self.check_mempool(conn.rpc, orphans + [parent_tx1, parent_tx2])
+            check_mempool_equals(conn.rpc, orphans + [parent_tx1, parent_tx2])
             assert len(rejected_txs) == 0, "No transactions should be rejected!"
 
 
@@ -273,12 +270,12 @@ class InvalidTx(BitcoinTestFramework):
 
             # sending first parent
             conn.send_message(msg_tx(parent_tx1))
-            self.check_mempool(conn.rpc, [parent_tx1])
+            check_mempool_equals(conn.rpc, [parent_tx1])
             assert len(rejected_txs) == 0, "No transactions should be rejected yet!"
 
             # sending second parent
             conn.send_message(msg_tx(parent_tx2))
-            self.check_mempool(conn.rpc, [parent_tx1, parent_tx2])
+            check_mempool_equals(conn.rpc, [parent_tx1, parent_tx2])
 
             # check that all orphans are rejected, but we are not banned
             self.check_rejected(rejected_txs, orphans)
@@ -301,11 +298,11 @@ class InvalidTx(BitcoinTestFramework):
             assert len(rejected_txs) == 0, "No transactions should be rejected yet!"
 
             conn.send_message(msg_tx(parent_tx1))
-            self.check_mempool(conn.rpc, [parent_tx1])  # Only parent_tx1 should be in the mempool
+            check_mempool_equals(conn.rpc, [parent_tx1])  # Only parent_tx1 should be in the mempool
             assert len(rejected_txs) == 0, "No transactions should be rejected yet!"
 
             conn.send_message(msg_tx(parent_tx2))
-            self.check_mempool(conn.rpc, [parent_tx1, parent_tx2]) # Only parent_tx1 and parent_tx2 should be in the mempool
+            check_mempool_equals(conn.rpc, [parent_tx1, parent_tx2]) # Only parent_tx1 and parent_tx2 should be in the mempool
 
             # we must be banned
             conn.cb.wait_for_disconnect(timeout=20) # will be disconnected
@@ -330,11 +327,11 @@ class InvalidTx(BitcoinTestFramework):
             assert len(rejected_txs) == 0, "No transactions should be rejected yet!"
 
             conn.send_message(msg_tx(valid_parent_tx))
-            self.check_mempool(conn.rpc, [valid_parent_tx])  # Only valid_parent_tx should be in the mempool
+            check_mempool_equals(conn.rpc, [valid_parent_tx])  # Only valid_parent_tx should be in the mempool
             assert len(rejected_txs) == 0, "No transactions should be rejected yet!"
 
             conn.send_message(msg_tx(invalid_parent_tx))
-            self.check_mempool(conn.rpc, [valid_parent_tx])  # Still only valid_parent_tx should be in the mempool
+            check_mempool_equals(conn.rpc, [valid_parent_tx])  # Still only valid_parent_tx should be in the mempool
             self.check_rejected(rejected_txs, [invalid_parent_tx]) # And only invalid parent is rejected
             sleep(1)
             assert len(conn.rpc.listbanned()) == 0  # not banned

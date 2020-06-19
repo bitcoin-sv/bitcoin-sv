@@ -128,7 +128,7 @@ class JournalReorg(BitcoinTestFramework):
         wait_until(lambda: self.got_chain_tip(self.nodes[1], 425, "active"))
 
         # check we didn't hit a reorg error
-        assert(not check_for_log_msg("ERROR: Failed to find and remove txn", self.options.tmpdir + "/node1"))
+        assert(not check_for_log_msg(self, "ERROR: Failed to find and remove txn", "/node1"))
 
 if __name__ == '__main__':
     JournalReorg().main()

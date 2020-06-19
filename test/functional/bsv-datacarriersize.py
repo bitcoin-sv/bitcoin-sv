@@ -26,10 +26,6 @@ class DataCarrierSizeTest(BitcoinTestFramework):
     def setup_network(self):
         self.setup_nodes()
 
-    def setup_nodes(self):
-        self.add_nodes(self.num_nodes)
-        self.start_node(0)    
-
     @staticmethod
     def _split_int(n, n_parts):
         rest = n

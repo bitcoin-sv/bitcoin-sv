@@ -22,8 +22,8 @@
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import *
-from test_framework.blocktools import create_transaction, create_block, create_coinbase
-from test_framework.util import assert_equal
+from test_framework.blocktools import create_transaction, create_block, create_coinbase, prepare_init_chain
+from test_framework.util import assert_equal, hashToHex
 from test_framework.comptool import TestInstance
 from test_framework.mininode import msg_tx, msg_block
 from time import sleep
@@ -50,24 +50,13 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         block = self.chain.next_block
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
-        
-        # Create a new block
+
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(101):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 101, 100)
 
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         ########## SCENARIO 1
 
@@ -139,7 +128,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         assert_equal(True, tx4.hash in node.getrawmempool())
 
         # Invalidate block -->  we are then at state before Genesis. Mempool is cleared.
-        node.invalidateblock(format(block103.sha256, 'x'))
+        node.invalidateblock(hashToHex(block103.sha256))
         assert_equal(False, tx3.hash in node.getrawmempool())
         assert_equal(False, tx4.hash in node.getrawmempool())
 
@@ -187,7 +176,7 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         assert_equal(True, tx6.hash in node.getblock(node.getbestblockhash())['tx'])
 
         # Invalidate block 104. tx5 and tx6 are in now in mempool.
-        node.invalidateblock(format(blockGenesis.sha256, 'x'))
+        node.invalidateblock(hashToHex(blockGenesis.sha256))
         assert_equal(True, tx5.hash in node.getrawmempool())
         assert_equal(True, tx6.hash in node.getrawmempool())
 

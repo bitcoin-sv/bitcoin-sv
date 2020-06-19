@@ -27,7 +27,8 @@ NOTE: Blocks have to be sent from the same node for the test to be deterministic
 import time
 import glob
 
-from test_framework.blocktools import (create_block, create_coinbase)
+from test_framework.blocktools import sign_tx
+from test_framework.blocktools import (create_block, create_coinbase, prepare_init_chain)
 from test_framework.mininode import (
     NetworkThread,
     NodeConn,
@@ -38,8 +39,7 @@ from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
     p2p_port,
     assert_equal,
-    wait_until,
-)
+    wait_until)
 from test_framework.script import *
 from test_framework.blocktools import create_transaction
 from test_framework.key import CECKey
@@ -63,16 +63,6 @@ class PBVWithSigOps(BitcoinTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.chain = ChainManager()
 
-    def sign_tx(self, tx, spend_tx, n):
-        scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-        if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
-            tx.vin[0].scriptSig = CScript()
-            return
-        sighash = SignatureHashForkId(
-            spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
-        tx.vin[0].scriptSig = CScript(
-            [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
-
     def sign_expensive_tx(self, tx, spend_tx, n, sigChecks):
         sighash = SignatureHashForkId(
             spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
@@ -83,47 +73,12 @@ class PBVWithSigOps(BitcoinTestFramework):
             + [self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID])),
                self.coinbase_pubkey])
 
-    def next_block(self, number, spend=None, additional_coinbase_value=0, script=CScript([OP_TRUE])):
-        if self.chain.tip == None:
-            base_block_hash = self.chain._genesis_hash
-            block_time = int(time.time()) + 1
-        else:
-            base_block_hash = self.chain.tip.sha256
-            block_time = self.chain.tip.nTime + 1
-        # First create the coinbase
-        height = self.chain.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height, self.coinbase_pubkey)
-        coinbase.vout[0].nValue += additional_coinbase_value
-        coinbase.rehash()
-        if spend == None:
-            block = create_block(base_block_hash, coinbase, block_time)
-        else:
-            # All but one satoshi for each txn to fees
-            for s in spend:
-                coinbase.vout[0].nValue += s.tx.vout[s.n].nValue - 1
-                coinbase.rehash()
-            block = create_block(base_block_hash, coinbase, block_time)
-            # Add as many txns as required
-            for s in spend:
-                # Spend 1 satoshi
-                tx = create_transaction(s.tx, s.n, b"", 1, script)
-                self.sign_tx(tx, s.tx, s.n)
-                self.chain.add_transactions_to_block(block, [tx])
-                block.hashMerkleRoot = block.calc_merkle_root()
-        # Do PoW, which is very inexpensive on regnet
-        block.solve()
-        self.chain.tip = block
-        self.chain.block_heights[block.sha256] = height
-        assert number not in self.chain.blocks
-        self.chain.blocks[number] = block
-        return block
-
     def get_hard_transactions(self, spend, money_to_spend, num_of_transactions, num_of_sig_checks, expensive_script):
         txns = []
         for _ in range(0, num_of_transactions):
             money_to_spend = money_to_spend - 1  # one satoshi to fee
             tx2 = create_transaction(spend.tx, spend.n, b"", money_to_spend, CScript(expensive_script))
-            self.sign_tx(tx2, spend.tx, spend.n)
+            sign_tx(tx2, spend.tx, spend.n, self.coinbase_key)
             tx2.rehash()
             txns.append(tx2)
 
@@ -150,20 +105,8 @@ class PBVWithSigOps(BitcoinTestFramework):
         node0.wait_for_verack()
 
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
-        block = self.chain.next_block(block_count)
-        block_count += 1
-        self.chain.save_spendable_output()
-        node0.send_message(msg_block(block))
 
-        for i in range(100):
-            block = self.next_block(block_count)
-            block_count += 1
-            self.chain.save_spendable_output()
-            node0.send_message(msg_block(block))
-
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
+        _, out, block_count = prepare_init_chain(self.chain, 101, 100, block_0=False, start_block=0, node=node0)
 
         self.log.info("waiting for block height 101 via rpc")
         self.nodes[0].waitforblockheight(101)
@@ -183,7 +126,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         money_to_spend = 5000000000
         spend = out[0]
 
-        block2_hard = self.next_block(block_count)
+        block2_hard = self.chain.next_block(block_count)
 
         # creates 4000 hard transaction and 4000 transaction to spend them. It will be 8k transactions in total
         add_txns = self.get_hard_transactions(spend, money_to_spend=money_to_spend, num_of_transactions=4000,
@@ -194,7 +137,7 @@ class PBVWithSigOps(BitcoinTestFramework):
         self.log.info(f"block2_hard hash: {block2_hard.hash}")
 
         self.chain.set_tip(block1_num)
-        block3_easier = self.next_block(block_count)
+        block3_easier = self.chain.next_block(block_count)
         add_txns = self.get_hard_transactions(spend, money_to_spend=money_to_spend, num_of_transactions=1000,
                                               num_of_sig_checks=num_of_sig_checks,
                                               expensive_script=expensive_scriptPubKey)

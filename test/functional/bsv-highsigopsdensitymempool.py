@@ -5,7 +5,7 @@
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import assert_equal
 from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import create_transaction, CScript, msg_tx
+from test_framework.blocktools import create_transaction, CScript, msg_tx, prepare_init_chain
 from test_framework.script import OP_CHECKMULTISIG, OP_TRUE
 
 # We create 100 high and 10 low sigops density transactions and make sure that low density transactions are mined too.
@@ -27,24 +27,12 @@ class MempoolHighSigopsDensity(ComparisonTestFramework):
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(300):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        # Test 2
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 300, 300)
 
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(300):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         # send 100 transactions with high sigops density
         txsMultisigs = []

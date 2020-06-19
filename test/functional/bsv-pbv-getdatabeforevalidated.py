@@ -28,7 +28,6 @@ Second test (__test_getblocks):
    request has been made before that point)
 5. Complete validation of block2 just to finish the test
 """
-import glob
 
 from test_framework.mininode import (
     NetworkThread,
@@ -44,8 +43,8 @@ from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
     assert_equal,
     p2p_port,
-    wait_until
-)
+    wait_until,
+    check_for_log_msg)
 from bsv_pbv_common import (
     wait_for_waiting_blocks,
     wait_for_validating_blocks
@@ -100,14 +99,7 @@ class PBVCallGetDataBeforeBlockIsValidated(BitcoinTestFramework):
         node0.on_block = on_block
         node0.send_message(msg_getdata([CInv(2, int(block.hash, 16))]))
 
-        def wait_for_log():
-            line_text = block.hash + " is still waiting as a candidate"
-            for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-                if line_text in line:
-                    self.log.info("Found line: %s", line.strip())
-                    return True
-            return False
-        wait_until(wait_for_log)
+        wait_until(lambda: check_for_log_msg(self, block.hash + " is still waiting as a candidate", "/node0"))
 
         # remove block validating status to finish validation
         self.nodes[0].waitaftervalidatingblock(block.hash, "remove")
@@ -141,14 +133,7 @@ class PBVCallGetDataBeforeBlockIsValidated(BitcoinTestFramework):
 
         self.__send_blocking_validation_waiting_block(block2, node0)
 
-        def wait_for_log():
-            line_text = "Blocks that were received before getblocks message"
-            for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-                if line_text in line:
-                    self.log.info("Found line: %s", line)
-                    return True
-            return False
-        wait_until(wait_for_log)
+        wait_until(lambda: check_for_log_msg(self, "Blocks that were received before getblocks message", "/node0"))
 
         # remove block validating status to finish validation
         self.nodes[0].waitaftervalidatingblock(block1.hash, "remove")

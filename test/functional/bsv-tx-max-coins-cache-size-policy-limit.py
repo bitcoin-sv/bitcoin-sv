@@ -11,8 +11,9 @@
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_TRUE, OP_RETURN, CTransaction, CTxOut
-from test_framework.blocktools import assert_equal, CTxIn, COutPoint
+from test_framework.blocktools import assert_equal, CTxIn, COutPoint, prepare_init_chain
 from test_framework.comptool import TestInstance, TestNode, RejectResult
+
 
 class BSVTxMaxCoinsCacheSizePolicyLimit(ComparisonTestFramework):
 
@@ -35,18 +36,9 @@ class BSVTxMaxCoinsCacheSizePolicyLimit(ComparisonTestFramework):
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(105):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 105, 105, block_0=False)
 
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(105):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         assert_equal(node.getblock(node.getbestblockhash())['height'], 105)
 
