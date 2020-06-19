@@ -45,6 +45,7 @@ class CBlockTreeDB;
 class CBloomFilter;
 class CChainParams;
 class CConnman;
+class CFrozenTXOCheck;
 class CInv;
 class Config;
 class CScriptCheck;
@@ -441,6 +442,7 @@ bool VerifyNewBlock(const Config &config,
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
                      bool fForceProcessing, bool *fNewBlock, 
+                     const CBlockSource& source,
                      const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
@@ -457,6 +459,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
     bool* fNewBlock,
+    const CBlockSource& source,
     const BlockValidationOptions& validationOptions = BlockValidationOptions());
 
 /**
@@ -917,6 +920,7 @@ std::optional<bool> CheckInputs(
     bool sigCacheStore,
     bool scriptCacheStore,
     const PrecomputedTransactionData& txdata,
+    CFrozenTXOCheck& frozenTXOCheck,
     std::vector<CScriptCheck>* pvChecks = nullptr);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
@@ -938,7 +942,8 @@ namespace Consensus {
  * sigs. Preconditions: tx.IsCoinBase() is false.
  */
 bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
-                   const CCoinsViewCache &inputs, int32_t nSpendHeight);
+                   const CCoinsViewCache &inputs, int32_t nSpendHeight,
+                   CFrozenTXOCheck& frozenTXOCheck);
 
 } // namespace Consensus
 

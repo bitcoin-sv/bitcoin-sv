@@ -563,6 +563,8 @@ void CTimeLockedMempool::periodicChecks()
             removeNL(txn);
 
             // For full belt-and-braces safety, resubmit newly final transaction for revalidation
+            // This revalidation is mandatory as some of the transactions might become frozen
+            // in the meantime
             std::string reason {};
             bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->GetHeight() + 1, reason) };
             g_connman->EnqueueTxnForValidator(

@@ -299,7 +299,9 @@ enum class MemPoolRemovalReason {
     //! Removed for conflict with in-block transaction
     CONFLICT,
     //! Removed for replacement
-    REPLACED
+    REPLACED,
+    //! Removed because input was frozen
+    FROZEN_INPUT
 };
 
 struct DisconnectedBlockTransactions;
@@ -409,6 +411,7 @@ private:
     std::atomic_bool suspendSanityCheck {false};
 
     std::atomic_uint nTransactionsUpdated {0};
+    std::atomic_uint mFrozenTxnUpdatedAt {0};
 
     // fee that a transaction or a group needs to pay to enter the primary mempool
     CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
@@ -702,6 +705,8 @@ public:
             const mining::CJournalChangeSetPtr& changeSet,
             const uint256& blockhash);
 
+    void RemoveFrozen(const mining::CJournalChangeSetPtr& changeSet);
+
     void Clear();
 
     void QueryHashes(std::vector<uint256> &vtxid);
@@ -709,6 +714,7 @@ public:
     CTransactionWrapperRef IsSpentBy(const COutPoint &outpoint) const;
 
     unsigned int GetTransactionsUpdated() const;
+    unsigned int GetFrozenTxnUpdatedAt() const {return mFrozenTxnUpdatedAt;}
     void AddTransactionsUpdated(unsigned int n);
 
     /**

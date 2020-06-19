@@ -212,6 +212,23 @@ struct CDiskBlockMetaData
 
 arith_uint256 GetBlockProof(const CBlockIndex &block);
 
+//! Identifier of source from which we received the first instance of a block.
+class CBlockSource
+{
+private:
+    std::string mSource;
+
+    CBlockSource(std::string&& source) : mSource( std::move(source) ) {}
+
+public:
+    static CBlockSource MakeUnknown() { return {"unknown"}; }
+    static CBlockSource MakeLocal(const std::string& extra) { return {"local: " + extra}; }
+    static CBlockSource MakeP2P(const std::string& address) { return {"p2p address: " + address}; }
+    static CBlockSource MakeRPC() { return {"rpc"}; }
+
+    const std::string& ToString() const { return mSource; }
+};
+
 /**
  * CBlockIndex holds information about block header as well as its context in the blockchain.
  * For holding information about the containing chain, pprev must always be set.
@@ -329,6 +346,9 @@ private:
     //! (memory only) Maximum nTime in the chain upto and including this block.
     unsigned int nTimeMax{ 0 };
 
+    //! (memory only) Source from which we received the first instance of a block.
+    CBlockSource mBlockSource{CBlockSource::MakeUnknown()};
+
 public:
     /**
      * Used after indexes are loaded from the database to update their chain
@@ -424,6 +444,7 @@ public:
         size_t transactionsCount,
         const CDiskBlockPos& pos,
         CDiskBlockMetaData metaData,
+        const CBlockSource& source,
         DirtyBlockIndexStore& notifyDirty)
     {
         std::lock_guard lock { GetMutex() };
@@ -441,6 +462,8 @@ public:
             mDiskBlockMetaData = std::move(metaData);
             nStatus = nStatus.withDiskBlockMetaData();
         }
+
+        mBlockSource = source;
     }
 
     /**
@@ -691,6 +714,8 @@ public:
     //! Efficiently find an ancestor of this block.
     CBlockIndex *GetAncestor(int32_t height);
     const CBlockIndex *GetAncestor(int32_t height) const;
+
+    const CBlockSource& GetBlockSource() const { return mBlockSource; }
 
     std::optional<CBlockUndo> GetBlockUndo() const;
 

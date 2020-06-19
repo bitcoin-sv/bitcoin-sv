@@ -95,6 +95,8 @@ add_test_to_suite(bitcoin test_bitcoin
 	excessiveblock_tests.cpp
 	eviction_candidates_tracker_tests.cpp
 	frozentxo_db_tests.cpp
+	frozentxo_mempool_tests.cpp
+	frozentxo_tests.cpp
 	getarg_tests.cpp
 	hash_tests.cpp
 	inv_tests.cpp

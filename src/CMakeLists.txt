@@ -400,6 +400,8 @@ add_library(server
 	double_spend/dstxn_serialiser.cpp
 	double_spend/dstxn_serialiser.h
 	double_spend/time_limited_blacklist.h
+	frozentxo.cpp
+	frozentxo.h
 	frozentxo_db.cpp
 	frozentxo_db.h
 	frozentxo_logging.cpp
