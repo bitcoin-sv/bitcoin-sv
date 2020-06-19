@@ -23,6 +23,8 @@ void RegisterMiningFBBRPCCommands(CRPCTable &tableRPC);
 void RegisterRawTransactionRPCCommands(CRPCTable &tableRPC);
 /** Register ABC RPC commands */
 void RegisterABCRPCCommands(CRPCTable &tableRPC);
+/** Register Frozen transactions RPC command */
+void RegisterFrozenTransactionRPCCommands(CRPCTable& tableRPC);
 
 static inline void RegisterAllRPCCommands(CRPCTable &t) {
     RegisterBlockchainRPCCommands(t);
@@ -32,6 +34,7 @@ static inline void RegisterAllRPCCommands(CRPCTable &t) {
     RegisterMiningFBBRPCCommands(t);
     RegisterRawTransactionRPCCommands(t);
     RegisterABCRPCCommands(t);
+    RegisterFrozenTransactionRPCCommands(t);
 }
 
 #endif

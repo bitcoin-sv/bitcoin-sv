@@ -465,6 +465,7 @@ add_library(server
 	rpc/abc.cpp
 	rpc/blockchain.cpp
 	rpc/blockchain.h
+	rpc/frozentxo_rpc.cpp
 	rpc/http_protocol.h
 	rpc/mining-fbb.cpp
 	rpc/mining.cpp

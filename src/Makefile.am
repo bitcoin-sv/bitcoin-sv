@@ -328,6 +328,7 @@ libbitcoin_server_a_SOURCES = \
   rest.cpp \
   rpc/abc.cpp \
   rpc/blockchain.cpp \
+  rpc/frozentxo_rpc.cpp \
   rpc/mining.cpp \
   rpc/mining-fbb.cpp \
   rpc/misc.cpp \
