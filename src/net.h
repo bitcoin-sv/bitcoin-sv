@@ -334,21 +334,18 @@ public:
         };
         auto chunkBeginIter = vNewTxns.begin();
         auto chunkEndIter = chunkBeginIter;
-        // vChains is used to track transacions belonging to the same chain (among the given vNewTxns set).
+        // mChains is used to track transacions belonging to the same chain (among the given vNewTxns set).
         std::size_t chainId = 0;
-        std::vector<std::pair<TxId, std::size_t>> vChains {};
-        vChains.reserve(vNewTxns.size());
-        vChains.emplace_back(chunkBeginIter->get()->mpTx->GetId(), ++chainId);
+        std::map<TxId, std::size_t> mChains {};
+        mChains.emplace(chunkBeginIter->get()->mpTx->GetId(), ++chainId);
         // A helper lambda used to identify a continuous chain
         // (a sequence of transactions compliant with the parent-child rule).
         auto is_continuous_chain {
-            [&vChains, &chunkEndIter](const std::size_t& chainId) -> std::pair<bool, std::size_t> {
+            [&mChains, &chunkEndIter](std::size_t chainId) -> std::pair<bool, std::size_t> {
                 for (const auto& txin : chunkEndIter->get()->mpTx->vin) {
                     const TxId& txhash = txin.prevout.GetTxId();
-                    auto foundParentIter =
-                        std::find_if(vChains.begin(), vChains.end(),
-                             [&txhash](const std::pair<TxId, std::size_t>& elem) { return txhash == elem.first; });
-                    if (foundParentIter != vChains.end()) {
+                    const auto& foundParentIter = mChains.find(txhash);
+                    if (foundParentIter != mChains.end()) {
                         return {foundParentIter->second == chainId, foundParentIter->second};
                     }
                 }
@@ -374,9 +371,9 @@ public:
                 // Assign the same id to newly detected txn if it belongs to the known chain, otherwise use a new id.
                 const TxId& txhash = chunkEndIter->get()->mpTx->GetId();
                 if (!result.second) {
-                    vChains.emplace_back(txhash, ++chainId);
+                    mChains.try_emplace(txhash, ++chainId);
                 } else {
-                    vChains.emplace_back(txhash, result.second);
+                    mChains.try_emplace(txhash, result.second);
                 }
             } else {
                 create_task(chunkBeginIter, chunkEndIter, chunkInitialPriority);
