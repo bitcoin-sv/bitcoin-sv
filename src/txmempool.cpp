@@ -2008,7 +2008,7 @@ std::vector<CTransactionRef> CTxMemPool::GetTransactions() const
 
 static const uint64_t MEMPOOL_DUMP_VERSION = 1;
 
-bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
+bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
 {
     try {
         int64_t nExpiryTimeout = config.GetMemPoolExpiry();
@@ -2044,14 +2044,14 @@ bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownT
             file >> nFeeDelta;
             Amount amountdelta(nFeeDelta);
             if (amountdelta != Amount(0)) {
-                mempool.PrioritiseTransaction(tx->GetId(),
+                PrioritiseTransaction(tx->GetId(),
                                               tx->GetId().ToString(),
                                               prioritydummy, amountdelta);
             }
             if (nTime + nExpiryTimeout > nNow) {
                 // Mempool Journal ChangeSet
                 CJournalChangeSetPtr changeSet {
-                    mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
+                    getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
                 };
                 const CValidationState& state {
                     // Execute txn validation synchronously.
@@ -2083,7 +2083,7 @@ bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownT
         file >> mapDeltas;
 
         for (const auto &i : mapDeltas) {
-            mempool.PrioritiseTransaction(i.first, i.first.ToString(),
+            PrioritiseTransaction(i.first, i.first.ToString(),
                                           prioritydummy, i.second);
         }
 
@@ -2098,15 +2098,15 @@ bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownT
     }
 
     // Restore non-final transactions
-    return mempool.getNonFinalPool().loadMempool(shutdownToken);
+    return getNonFinalPool().loadMempool(shutdownToken);
 }
 
-void DumpMempool(void) {
+void CTxMemPool::DumpMempool(void) {
     int64_t start = GetTimeMicros();
 
     std::map<uint256, Amount> mapDeltas;
     std::vector<TxMempoolInfo> vinfo;
-    mempool.GetDeltasAndInfo(mapDeltas, vinfo);
+    GetDeltasAndInfo(mapDeltas, vinfo);
 
     int64_t mid = GetTimeMicros();
 
@@ -2142,7 +2142,7 @@ void DumpMempool(void) {
     }
 
     // Dump non-final pool
-    mempool.getNonFinalPool().dumpMempool();
+    getNonFinalPool().dumpMempool();
 }
 
 
