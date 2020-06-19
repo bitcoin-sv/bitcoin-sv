@@ -628,7 +628,7 @@ void CTxMemPool::removeUncheckedNL(
     }
     else
     {
-        CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
+        CJournalChangeSetPtr tmpChangeSet { getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
         tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
     }
 
