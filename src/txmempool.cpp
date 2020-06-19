@@ -1691,7 +1691,7 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
         // Drop the earliest entry, and remove its children from the
         // mempool.
         auto it = disconnectpool->queuedTx.get<insertion_order>().begin();
-        mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
+        RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
         disconnectpool->removeEntry(it);
     }
 }
