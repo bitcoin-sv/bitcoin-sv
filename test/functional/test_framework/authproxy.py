@@ -118,9 +118,10 @@ class AuthServiceProxy():
                 return self._get_response()
             else:
                 raise
-        except (BrokenPipeError, ConnectionResetError):
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             # Python 3.5+ raises BrokenPipeError instead of BadStatusLine when the connection was reset
             # ConnectionResetError happens on FreeBSD with Python 3.4
+            # ConnectionAbortedError happens on Windows
             self.__conn.close()
             self.__conn.request(method, path, postdata, headers)
             return self._get_response()

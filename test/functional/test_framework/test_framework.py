@@ -21,7 +21,7 @@ from test_framework.mininode import NetworkThread
 
 from .authproxy import JSONRPCException
 from . import coverage
-from .test_node import TestNode
+from .test_node import TestNode, TestNode_process_list
 from .util import (
     MAX_NODES,
     PortSeed,
@@ -156,6 +156,15 @@ class BitcoinTestFramework():
         else:
             self.log.info(
                 "Note: bitcoinds were not stopped and may still be running")
+            # Remove all node processes from list of running external processes
+            # so that they will not be killed when Python exists.
+            TestNode_process_list.clear()
+
+        if len(TestNode_process_list)>0:
+            self.log.warning("%i process(es) started by test are still running and will be killed." % len(TestNode_process_list))
+            if success != TestStatus.FAILED:
+                self.log.error("Because not all started processes were properly stopped, test is considered to have failed!")
+                success = TestStatus.FAILED
 
         if not self.options.nocleanup and not self.options.noshutdown and success != TestStatus.FAILED:
             self.log.info("Cleaning up {} on exit".format(self.options.tmpdir))
@@ -355,9 +364,8 @@ class BitcoinTestFramework():
                 self.start_node(i, extra_args, stderr=log_stderr)
                 self.stop_node(i)
             except Exception as e:
+                self.wait_for_node_exit(i,1) # wait until process properly terminates and resources are cleaned up
                 assert 'bitcoind exited' in str(e)  # node must have shutdown
-                self.nodes[i].running = False
-                self.nodes[i].process = None
                 if expected_msg is not None:
                     log_stderr.seek(0)
                     stderr = log_stderr.read().decode('utf-8')
@@ -372,7 +380,7 @@ class BitcoinTestFramework():
                 raise AssertionError(assert_msg)
 
     def wait_for_node_exit(self, i, timeout):
-        self.nodes[i].process.wait(timeout)
+        self.nodes[i].wait_for_exit(timeout)
 
     def split_network(self):
         """

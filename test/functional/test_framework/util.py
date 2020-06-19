@@ -350,11 +350,13 @@ def get_auth_cookie(datadir):
                     assert password is None  # Ensure that there is only one rpcpassword line
                     password = line.split("=")[1].strip("\n")
     if os.path.isfile(os.path.join(datadir, "regtest", ".cookie")):
-        with open(os.path.join(datadir, "regtest", ".cookie"), 'r') as f:
-            userpass = f.read()
-            split_userpass = userpass.split(':')
-            user = split_userpass[0]
-            password = split_userpass[1]
+        try:
+            with open(os.path.join(datadir, "regtest", ".cookie"), 'r') as f:
+                userpass = f.read()
+                split_userpass = userpass.split(':')
+                user = split_userpass[0]
+                password = split_userpass[1]
+        except: pass # any failures while reading the cookie file are treated as if the file was not there
     if user is None or password is None:
         raise ValueError("No RPC credentials")
     return user, password
