@@ -545,17 +545,6 @@ void CTxMemPool::AddUncheckedNL(
     indexed_transaction_set::iterator newit = mapTx.insert(entry).first;
     mapLinks.insert(make_pair(newit, TxLinks()));
 
-    // Apply to the current journal, either via the passed in change set or directly ourselves
-    if(changeSet)
-    {
-        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
-    }
-    else
-    {
-        CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
-    }
-
     // Update transaction for any feeDelta created by PrioritiseTransaction
     // TODO: refactor so that the fee delta is calculated before inserting into
     // mapTx.
@@ -605,6 +594,17 @@ void CTxMemPool::AddUncheckedNL(
     }
     if (pnDynamicMemoryUsage) {
         *pnDynamicMemoryUsage = DynamicMemoryUsageNL();
+    }
+
+    // Apply to the current journal, either via the passed in change set or directly ourselves
+    if(changeSet)
+    {
+        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
+    }
+    else
+    {
+        CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
+        tmpChangeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
     }
 }
 
