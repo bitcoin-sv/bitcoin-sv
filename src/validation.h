@@ -1100,12 +1100,6 @@ static const unsigned int REJECT_CONFLICT = 0x102;
 /** No space for transaction */
 static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
 
-/** Dump the mempool to disk. */
-void DumpMempool();
-
-/** Load the mempool from disk. */
-bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
-
 /** AlertNotify */
 void AlertNotify(const std::string &strMessage);
 

@@ -2005,3 +2005,145 @@ std::vector<CTransactionRef> CTxMemPool::GetTransactions() const
     }
     return result;
 }
+
+static const uint64_t MEMPOOL_DUMP_VERSION = 1;
+
+bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
+{
+    try {
+        int64_t nExpiryTimeout = config.GetMemPoolExpiry();
+        FILE *filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
+        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+        if (file.IsNull()) {
+            throw std::runtime_error("Failed to open mempool file from disk");
+        }
+
+        int64_t count = 0;
+        int64_t skipped = 0;
+        int64_t failed = 0;
+        int64_t nNow = GetTime();
+
+        uint64_t version;
+        file >> version;
+        if (version != MEMPOOL_DUMP_VERSION) {
+            throw std::runtime_error("Bad mempool dump version");
+        }
+        uint64_t num;
+        file >> num;
+        double prioritydummy = 0;
+        // Take a reference to the validator.
+        const auto& txValidator = g_connman->getTxnValidator();
+        // A pointer to the TxIdTracker.
+        const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
+        while (num--) {
+            CTransactionRef tx;
+            int64_t nTime;
+            int64_t nFeeDelta;
+            file >> tx;
+            file >> nTime;
+            file >> nFeeDelta;
+            Amount amountdelta(nFeeDelta);
+            if (amountdelta != Amount(0)) {
+                mempool.PrioritiseTransaction(tx->GetId(),
+                                              tx->GetId().ToString(),
+                                              prioritydummy, amountdelta);
+            }
+            if (nTime + nExpiryTimeout > nNow) {
+                // Mempool Journal ChangeSet
+                CJournalChangeSetPtr changeSet {
+                    mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
+                };
+                const CValidationState& state {
+                    // Execute txn validation synchronously.
+                    txValidator->processValidation(
+                        std::make_shared<CTxInputData>(
+                            pTxIdTracker, // a pointer to the TxIdTracker
+                            tx,    // a pointer to the tx
+                            TxSource::file, // tx source
+                            TxValidationPriority::normal,  // tx validation priority
+                            nTime, // nAcceptTime
+                            true),  // fLimitFree
+                        changeSet, // an instance of the mempool journal
+                        true) // fLimitMempoolSize
+                };
+                // Check results
+                if (state.IsValid()) {
+                    ++count;
+                } else {
+                    ++failed;
+                }
+            } else {
+                ++skipped;
+            }
+            if (shutdownToken.IsCanceled()) {
+                return false;
+            }
+        }
+        std::map<uint256, Amount> mapDeltas;
+        file >> mapDeltas;
+
+        for (const auto &i : mapDeltas) {
+            mempool.PrioritiseTransaction(i.first, i.first.ToString(),
+                                          prioritydummy, i.second);
+        }
+
+        LogPrintf("Imported mempool transactions from disk: %i successes, %i "
+                  "failed, %i expired\n",
+                  count, failed, skipped);
+
+    }
+    catch (const std::exception &e) {
+        LogPrintf("Failed to deserialize mempool data on disk: %s. Continuing anyway.\n",
+                  e.what());
+    }
+
+    // Restore non-final transactions
+    return mempool.getNonFinalPool().loadMempool(shutdownToken);
+}
+
+void DumpMempool(void) {
+    int64_t start = GetTimeMicros();
+
+    std::map<uint256, Amount> mapDeltas;
+    std::vector<TxMempoolInfo> vinfo;
+    mempool.GetDeltasAndInfo(mapDeltas, vinfo);
+
+    int64_t mid = GetTimeMicros();
+
+    try {
+        FILE *filestr = fsbridge::fopen(GetDataDir() / "mempool.dat.new", "wb");
+        if (!filestr) {
+            return;
+        }
+
+        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+
+        uint64_t version = MEMPOOL_DUMP_VERSION;
+        file << version;
+
+        file << (uint64_t)vinfo.size();
+        for (const auto &i : vinfo) {
+            file << *(i.tx);
+            file << (int64_t)i.nTime;
+            file << (int64_t)i.nFeeDelta.GetSatoshis();
+            mapDeltas.erase(i.tx->GetId());
+        }
+
+        file << mapDeltas;
+        FileCommit(file.Get());
+        file.fclose();
+        RenameOver(GetDataDir() / "mempool.dat.new",
+                   GetDataDir() / "mempool.dat");
+        int64_t last = GetTimeMicros();
+        LogPrintf("Dumped mempool: %.6fs to copy, %.6fs to dump\n",
+                  (mid - start) * 0.000001, (last - mid) * 0.000001);
+    } catch (const std::exception &e) {
+        LogPrintf("Failed to dump mempool: %s. Continuing anyway.\n", e.what());
+    }
+
+    // Dump non-final pool
+    mempool.getNonFinalPool().dumpMempool();
+}
+
+
+

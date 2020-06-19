@@ -1105,6 +1105,13 @@ public:
     template<typename X> struct UnitTestAccess;
 };
 
+/** Dump the mempool to disk. */
+void DumpMempool();
+
+/** Load the mempool from disk. */
+bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
+
+
 /**
  * ICoinsView that brings transactions from a memorypool into view.
  * If a transaction is in mempool this class will return an unspent coin even
