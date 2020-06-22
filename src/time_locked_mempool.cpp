@@ -63,7 +63,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
 
                 // For full belt-and-braces safety, resubmit newly final transaction for revalidation
                 std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainActiveSharedData.GetChainActiveHeight() + 1, reason) };
+                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainActive.Tip()->nHeight + 1, reason) };
                 g_connman->ResubmitTxnForValidator(
                     std::make_shared<CTxInputData>(
                         TxSource::finalised,
@@ -292,7 +292,7 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
                     mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT)
                 };
                 std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActiveSharedData.GetChainActiveHeight() + 1, reason) };
+                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActive.Tip()->nHeight + 1, reason) };
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
@@ -537,15 +537,7 @@ void CTimeLockedMempool::periodicChecks()
 {
     // Get current time
     int64_t now { GetTime() };
-
-    // Get next block height and MTP
-    int nextBlockHeight {};
-    int medianTimePast {};
-    {
-        LOCK(cs_main);
-        nextBlockHeight = chainActive.Height() + 1;
-        medianTimePast = chainActive.Tip()->GetMedianTimePast();
-    }
+    const CBlockIndex* chainTip = chainActive.Tip();
 
     std::unique_lock lock { mMtx };
 
@@ -562,16 +554,16 @@ void CTimeLockedMempool::periodicChecks()
         ++it;
 
         // Lock time passed?
-        if(IsFinalTx(*txn, nextBlockHeight, medianTimePast))
+        if(IsFinalTx(*txn, chainTip->nHeight + 1, chainTip->GetMedianTimePast()))
         {
             LogPrint(BCLog::MEMPOOL, "Finalising non-final transaction %s at block height %d, mtp %d\n",
-                txn->GetId().ToString(), nextBlockHeight, medianTimePast);
+                txn->GetId().ToString(), chainTip->nHeight + 1, chainTip->GetMedianTimePast());
 
             removeNL(txn);
 
             // For full belt-and-braces safety, resubmit newly final transaction for revalidation
             std::string reason {};
-            bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, nextBlockHeight, reason) };
+            bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->nHeight + 1, reason) };
             g_connman->ResubmitTxnForValidator(
                 std::make_shared<CTxInputData>(
                     TxSource::finalised,

@@ -144,16 +144,9 @@ void JournalingBlockAssembler::threadBlockUpdate() noexcept
             const auto status = future.wait_for(mRunFrequency);
             if(status == std::future_status::timeout)
             {
-                // Get chain tip
-                const CBlockIndex* pindex {nullptr};
-                {
-                    LOCK(cs_main);
-                    pindex = chainActive.Tip();
-                }
-
                 // Update block template
                 std::unique_lock<std::mutex> lock { mMtx };
-                updateBlock(pindex, mMaxSlotTransactions);
+                updateBlock(chainActive.Tip(), mMaxSlotTransactions);
             }
             else if(status == std::future_status::ready)
                 break;

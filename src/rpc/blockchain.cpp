@@ -38,14 +38,8 @@
 #include <cstdint>
 #include <mutex>
 
-struct CUpdatedBlock {
-    uint256 hash;
-    int height;
-};
-
 static std::mutex cs_blockchange;
 static std::condition_variable cond_blockchange;
-static CUpdatedBlock latestblock;
 
 static double GetDifficultyFromBits(uint32_t nBits) {
     int nShift = (nBits >> 24) & 0xff;
@@ -150,11 +144,6 @@ UniValue getbestblockhash(const Config &config, const JSONRPCRequest &request) {
 }
 
 void RPCNotifyBlockChange(bool ibd, const CBlockIndex *pindex) {
-    if (pindex) {
-        std::lock_guard<std::mutex> lock(cs_blockchange);
-        latestblock.hash = pindex->GetBlockHash();
-        latestblock.height = pindex->nHeight;
-    }
     cond_blockchange.notify_all();
 }
 
@@ -184,83 +173,24 @@ UniValue waitfornewblock(const Config &config, const JSONRPCRequest &request) {
         timeout = request.params[0].get_int();
     }
 
-    CUpdatedBlock block;
-    {
-        std::unique_lock<std::mutex> lock(cs_blockchange);
-        block = latestblock;
-        if (timeout) {
-            cond_blockchange.wait_for(
-                lock, std::chrono::milliseconds(timeout), [&block] {
-                    return latestblock.height != block.height ||
-                           latestblock.hash != block.hash || !IsRPCRunning();
-                });
-        } else {
-            cond_blockchange.wait(lock, [&block] {
-                return latestblock.height != block.height ||
-                       latestblock.hash != block.hash || !IsRPCRunning();
-            });
-        }
-        block = latestblock;
-    }
-    UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("hash", block.hash.GetHex()));
-    ret.push_back(Pair("height", block.height));
-    return ret;
-}
-
-UniValue waitforblock(const Config &config, const JSONRPCRequest &request) {
-    if (request.fHelp || request.params.size() < 1 ||
-        request.params.size() > 2) {
-        throw std::runtime_error(
-            "waitforblock <blockhash> (timeout)\n"
-            "\nWaits for a specific new block and returns useful info about "
-            "it.\n"
-            "\nReturns the current block on timeout or exit.\n"
-            "\nArguments:\n"
-            "1. \"blockhash\" (required, string) Block hash to wait for.\n"
-            "2. timeout       (int, optional, default=0) Time in milliseconds "
-            "to wait for a response. 0 indicates no timeout.\n"
-            "\nResult:\n"
-            "{                           (json object)\n"
-            "  \"hash\" : {       (string) The blockhash\n"
-            "  \"height\" : {     (int) Block height\n"
-            "}\n"
-            "\nExamples:\n" +
-            HelpExampleCli("waitforblock", "\"0000000000079f8ef3d2c688c244eb7a4"
-                                           "570b24c9ed7b4a8c619eb02596f8862\", "
-                                           "1000") +
-            HelpExampleRpc("waitforblock", "\"0000000000079f8ef3d2c688c244eb7a4"
-                                           "570b24c9ed7b4a8c619eb02596f8862\", "
-                                           "1000"));
-    }
-
-    int timeout = 0;
-
-    uint256 hash = uint256S(request.params[0].get_str());
-
-    if (request.params.size() > 1) {
-        timeout = request.params[1].get_int();
-    }
-
-    CUpdatedBlock block;
-    {
-        std::unique_lock<std::mutex> lock(cs_blockchange);
-        if (timeout) {
-            cond_blockchange.wait_for(
-                lock, std::chrono::milliseconds(timeout), [&hash] {
-                    return latestblock.hash == hash || !IsRPCRunning();
-                });
-        } else {
-            cond_blockchange.wait(lock, [&hash] {
-                return latestblock.hash == hash || !IsRPCRunning();
-            });
-        }
-        block = latestblock;
+    const CBlockIndex* indexNext = chainActive.Tip();
+    std::unique_lock<std::mutex> lock(cs_blockchange);
+    if (timeout) {
+        cond_blockchange.wait_for(
+            lock, std::chrono::milliseconds(timeout), [index = chainActive.Tip(), &indexNext] {
+            indexNext = chainActive.Tip();
+            return (indexNext != index || !IsRPCRunning());
+        });
+    } else {
+        cond_blockchange.wait(lock, [index = chainActive.Tip(), &indexNext] {
+            indexNext = chainActive.Tip();
+            return (indexNext != index || !IsRPCRunning());
+        });
     }
 
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("hash", block.hash.GetHex()));
-    ret.push_back(Pair("height", block.height));
+    ret.push_back(Pair("hash", indexNext->GetBlockHash().GetHex()));
+    ret.push_back(Pair("height", indexNext->nHeight));
     return ret;
 }
 
@@ -296,24 +226,24 @@ UniValue waitforblockheight(const Config &config,
         timeout = request.params[1].get_int();
     }
 
-    CUpdatedBlock block;
-    {
-        std::unique_lock<std::mutex> lock(cs_blockchange);
-        if (timeout) {
-            cond_blockchange.wait_for(
-                lock, std::chrono::milliseconds(timeout), [&height] {
-                    return latestblock.height >= height || !IsRPCRunning();
-                });
-        } else {
-            cond_blockchange.wait(lock, [&height] {
-                return latestblock.height >= height || !IsRPCRunning();
+    const CBlockIndex* indexNext = chainActive.Tip();
+    std::unique_lock<std::mutex> lock(cs_blockchange);
+    if (timeout) {
+        cond_blockchange.wait_for(
+            lock, std::chrono::milliseconds(timeout), [&height, &indexNext] {
+            indexNext = chainActive.Tip();
+            return indexNext->nHeight >= height || !IsRPCRunning();
             });
-        }
-        block = latestblock;
+    } else {
+        cond_blockchange.wait(lock, [&height, &indexNext] {
+            indexNext = chainActive.Tip();
+            return indexNext->nHeight >= height || !IsRPCRunning();
+        });
     }
+
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("hash", block.hash.GetHex()));
-    ret.push_back(Pair("height", block.height));
+    ret.push_back(Pair("hash", indexNext->GetBlockHash().GetHex()));
+    ret.push_back(Pair("height", indexNext->nHeight));
     return ret;
 }
 
@@ -2760,7 +2690,6 @@ static const CRPCCommand commands[] = {
     { "hidden",             "invalidateblock",        invalidateblock,        true,  {"blockhash"} },
     { "hidden",             "reconsiderblock",        reconsiderblock,        true,  {"blockhash"} },
     { "hidden",             "waitfornewblock",        waitfornewblock,        true,  {"timeout"} },
-    { "hidden",             "waitforblock",           waitforblock,           true,  {"blockhash","timeout"} },
     { "hidden",             "waitforblockheight",     waitforblockheight,     true,  {"height","timeout"} },
     { "hidden",             "getblockchainactivity",  getblockchainactivity,  true,  {} },
     { "hidden",             "getcurrentlyvalidatingblocks",     getcurrentlyvalidatingblocks,     true,  {} },
