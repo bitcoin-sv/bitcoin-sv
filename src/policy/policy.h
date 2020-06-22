@@ -92,8 +92,10 @@ static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
  * standard and should be done with care and ideally rarely. It makes sense to
  * only increase the dust limit after prior releases were already not creating
  * outputs below the new threshold.
+ * We will statically assert this to be the same value as DEFAULT_MIN_RELAY_TX_FEE
+ * because of CORE-647
  */
-static const Amount DUST_RELAY_TX_FEE(1000);
+static constexpr Amount DUST_RELAY_TX_FEE(250);
 
 /*
 * Number of blocks around GENESIS activation (72 blocks before and 72 blocks after) when
