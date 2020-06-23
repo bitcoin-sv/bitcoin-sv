@@ -48,6 +48,44 @@ bool IsBlockLike(const std::string &strCommand) {
            strCommand == NetMsgType::CMPCTBLOCK ||
            strCommand == NetMsgType::BLOCKTXN;
 }
+
+uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
+{
+    if (command == NetMsgType::PROTOCONF)
+    {
+        // If the message is PROTOCONF, it is limited to LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH.
+        return LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH;
+    }
+    else if (command == NetMsgType::TX)
+    {
+        // If the message is TX, it is limited to max consensus tx size after Genesis
+        // can not use policy limit because of banning rules.
+        return config.GetMaxTxSize(true, true);
+    }
+    else if (command == NetMsgType::GETBLOCKTXN)
+    {
+        // Minimum realistic transaction size in bytes
+        static constexpr unsigned MIN_TX_SIZE { 215 };
+        // Short TXID size in bytes
+        static constexpr unsigned SHORT_TXID_SIZE { 6 };
+
+        // If the message is GETBLOCKTXN, it is limited to an estimate of the maximum number of
+        // short TXIDs the message could contain.
+        return (config.GetMaxBlockSize() / MIN_TX_SIZE * SHORT_TXID_SIZE) + CMessageHeader::HEADER_SIZE;
+    }
+    else if (!NetMsgType::IsBlockLike(command))
+    {
+        // If the message doesn't not contain a block content,
+        // it is limited to MAX_PROTOCOL_RECV_PAYLOAD_LENGTH.
+        return MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+    }
+    else
+    {
+        // Maximum accepted block type message size
+        return config.GetMaxBlockSize();
+    }
+}
+
 }; // namespace NetMsgType
 
 /**
@@ -164,39 +202,7 @@ bool CMessageHeader::IsValidWithoutConfig(const MessageMagic &magic) const {
 
 bool CMessageHeader::IsOversized(const Config &config) const 
 {
-    const std::string command = GetCommand();
-
-    // If the message is PROTOCONF, it is limited to LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH.
-    if (command == NetMsgType::PROTOCONF)
-    {
-        if (nPayloadLength > LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
-        {
-            return true;
-        }
-    }
-    // If the message is TX, it is limited to max consensus tx size after Genesis
-    // can not use policy limit because of banning rules.
-    else if (command == NetMsgType::TX)
-    {
-        if (nPayloadLength > config.GetMaxTxSize(true, true))
-        {
-            return true;
-        }   
-    }
-    // If the message doesn't not contain a block content, check against MAX_PROTOCOL_RECV_PAYLOAD_LENGTH.
-    else if (!NetMsgType::IsBlockLike(command))
-    {
-        if (nPayloadLength > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH)
-        {
-            return true;
-        }
-    }
-    // maximum accepted size with the block size.
-    else if (nPayloadLength > config.GetMaxBlockSize()) 
-    {
-        return true;
-    }
-    return false;
+    return nPayloadLength > NetMsgType::GetMaxMessageLength(GetCommand(), config);
 }
 
 CAddress::CAddress() : CService() {
