@@ -647,8 +647,8 @@ BOOST_AUTO_TEST_CASE(test_IsStandard) {
     BOOST_CHECK(IsStandardTx(testConfig, CTransaction(t), 1, reason));
 
     // Check dust with default relay fee:
-    Amount nDustThreshold = 3 * 182 * dustRelayFee.GetFeePerK() / 1000;
-    BOOST_CHECK_EQUAL(nDustThreshold, Amount(546));
+    Amount nDustThreshold = 3 * Amount(182 * dustRelayFee.GetFeePerK() / 1000);
+    BOOST_CHECK_EQUAL(nDustThreshold, Amount(135));
     // dust:
     t.vout[0].nValue = nDustThreshold - Amount(1);
     BOOST_CHECK(!IsStandardTx(testConfig, CTransaction(t), 1, reason));
