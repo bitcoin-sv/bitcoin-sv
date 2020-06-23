@@ -165,7 +165,7 @@ int BCLog::Logger::LogPrintStr(const std::string &str) {
         // Buffer if we haven't opened the log yet.
         if (fileout == nullptr) {
             // Stop logging if buffer gets too big
-            if (vMsgsBeforeOpenLog.size() > 100000000) {
+            if (vMsgsBeforeOpenLog.size() > 1000) {
                 ret = 0;
             }
             else {
