@@ -219,6 +219,8 @@ public:
     // Adjusts the ancestor state
     void UpdateAncestorState(int64_t modifySize, Amount modifyFee,
                              int64_t modifyCount, int modifySigOps);
+    // Removes all ancestor data
+    void ResetAncestorState();
     // Updates the fee delta used for mining priority score, and the
     // modified fees with descendants.
     void UpdateFeeDelta(Amount feeDelta);
@@ -291,6 +293,7 @@ struct mempoolentry_txid {
     }
 };
 
+
 /** \class CompareTxMemPoolEntryByScore
  *
  *  Sort by score of entry ((fee+delta)/size) in descending order
@@ -316,6 +319,7 @@ public:
 
 // Multi_index tag names
 struct entry_time {};
+struct insertion_order {};
 
 
 /**
@@ -471,7 +475,10 @@ public:
                              boost::multi_index::ordered_non_unique<
                                  boost::multi_index::tag<entry_time>,
                                  boost::multi_index::identity<CTxMemPoolEntry>,
-                                 CompareTxMemPoolEntryByEntryTime>>>
+                                 CompareTxMemPoolEntryByEntryTime>,
+                             // arranged by insertion order
+                             boost::multi_index::sequenced<
+                                 boost::multi_index::tag<insertion_order>>>>
         indexed_transaction_set;
 
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
@@ -975,23 +982,6 @@ private:
         const CBlockIndex& tip,
         int flags);
 
-    /**
-     * updateForDescendantsNL is used by UpdateTransactionsFromBlock to update the
-     * descendants for a single transaction that has been added to the mempool
-     * but may have child transactions in the mempool, eg during a chain reorg.
-     * setExclude is the set of descendant transactions in the mempool that must
-     * not be accounted for (because any descendants in setExclude were added to
-     * the mempool after the transaction being updated and hence their state is
-     * already reflected in the parent state).
-     *
-     * cachedDescendants will be updated with the descendants of the transaction
-     * being updated, so that future invocations don't need to walk the same
-     * transaction again, if encountered in another transaction chain.
-     */
-    void updateForDescendantsNL(
-            txiter updateIt,
-            cacheMap &cachedDescendants,
-            const std::set<uint256> &setExclude);
 
     // A non-locking version of AddUnchecked
     // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
@@ -1189,7 +1179,6 @@ private:
 
 // multi_index tag names
 struct txid_index {};
-struct insertion_order {};
 
 struct DisconnectedBlockTransactions {
     typedef boost::multi_index_container<
