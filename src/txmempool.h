@@ -220,23 +220,6 @@ public:
     bool IsCPFPGroupMember() const { return group != nullptr; }
 };
 
-struct update_ancestor_state {
-    update_ancestor_state(int64_t _modifySize, Amount _modifyFee,
-                          int64_t _modifyCount, int64_t _modifySigOpsCost)
-        : modifySize(_modifySize), modifyFee(_modifyFee),
-          modifyCount(_modifyCount), modifySigOpsCost(_modifySigOpsCost) {}
-
-    void operator()(CTxMemPoolEntry &e) {
-        // FIXME: will not update ancestors any more
-    }
-
-private:
-    int64_t modifySize;
-    Amount modifyFee;
-    int64_t modifyCount;
-    int64_t modifySigOpsCost;
-};
-
 struct update_fee_delta {
     update_fee_delta(Amount _feeDelta) : feeDelta(_feeDelta) {}
 
@@ -963,7 +946,6 @@ private:
     void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
@@ -985,13 +967,6 @@ private:
     void updateAncestorsOfNL(
             bool add,
             txiter hash);
-
-    /**
-     * Set ancestor state for an entry
-     */
-    void updateEntryForAncestorsNL(
-            txiter it,
-            const setEntries &setAncestors);
 
     /**
      * For each transaction being removed, update ancestors and any direct
