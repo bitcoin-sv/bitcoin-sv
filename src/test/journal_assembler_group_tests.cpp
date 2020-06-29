@@ -27,7 +27,7 @@ namespace
         std::vector<uint8_t> stuff;
         stuff.resize(txnSize - 32); // make serialized transaction 500 bytes
         txn.vout[0].scriptPubKey = CScript() << stuff << OP_DROP << unique++ << OP_DROP;
-        return { MakeTransactionRef(std::move(txn)), std::make_shared<AncestorCounts>(0), Amount{0}, 0, groupId };
+        return { MakeTransactionRef(std::move(txn)), Amount{0}, groupId };
     }
     // Generate a new random transaction group
     CJournalEntry NewTxn()
@@ -90,8 +90,7 @@ namespace
              ++iter, --transactionsToDrop)
         {
             auto txn = *iter;
-            CJournalEntry entry { MakeTransactionRef(*txn), std::make_shared<AncestorCounts>(0), Amount{0}, 0,
-                std::nullopt };
+            CJournalEntry entry { MakeTransactionRef(*txn), Amount{0}, std::nullopt };
             changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, entry);
         }
         changeSet->apply();

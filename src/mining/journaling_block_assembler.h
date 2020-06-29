@@ -102,10 +102,9 @@ class JournalingBlockAssembler : public BlockAssembler
     };
     std::vector<CTransactionRef> mBlockTxns {};
     std::vector<Amount> mTxFees {};
-    std::vector<int64_t> mTxSigOpsCount {};
+    std::vector<int64_t> mTxSigOpsCount {};    // FIXME: this is not utilized anymore. consider removing.
 
     BlockAssemblyState mState {};
-
     // When adding transaction group we optimize for the happy case
     // and do serious extra work only when we need to rollback() when
     // the group would push the block over the limit
@@ -138,7 +137,6 @@ class JournalingBlockAssembler : public BlockAssembler
         // for vectors, just remember the size as the iterators are very unstable
         VectorCheckpoint<CTransactionRef> mBlockTxnsCheckpoint;
         VectorCheckpoint<Amount> mTxFeesCheckpoint;
-        VectorCheckpoint<int64_t> mTxSigOpsCountCheckpoint;
 
     public:
         GroupCheckpoint(JournalingBlockAssembler& assembler);
