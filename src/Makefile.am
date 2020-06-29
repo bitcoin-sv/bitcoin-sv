@@ -377,11 +377,13 @@ libbitcoin_consensus_a_SOURCES = \
   script/int_serialization.h \
   script/limitedstack.cpp \
   script/limitedstack.h \
+  script/opcodes.cpp \
+  script/opcodes.h \
   script/script_flags.h \
   script/script.cpp \
+  script/script.h \
   script/script_num.cpp \
   script/script_num.h \
-  script/script.h \
   script/script_error.cpp \
   script/script_error.h \
   serialize.h \
