@@ -36,7 +36,7 @@ namespace
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
 }
 
-Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, size_t maxRecvBuffSize)
+Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize)
 : mNode{node}, mStreamType{streamType}, mSocket{socket}, mMaxRecvBuffSize{maxRecvBuffSize}
 {
     // Setup bytes count per message type
@@ -102,7 +102,7 @@ bool Stream::SetSocketForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setErr
 }
 
 void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
-                           bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent)
+                           bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     //
     // Receive
@@ -139,7 +139,7 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
             }
             if (nBytes > 0)
             {
-                bytesRecv = static_cast<size_t>(nBytes);
+                bytesRecv = static_cast<uint64_t>(nBytes);
                 const RECV_STATUS status = ReceiveMsgBytes(config, pchBuf, bytesRecv, gotNewMsgs);
                 if (status != RECV_OK)
                 {   
@@ -191,10 +191,10 @@ void Stream::ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, c
     }
 }
 
-size_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-    size_t nPayloadLength, size_t nTotalSize)
+uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+    uint64_t nPayloadLength, uint64_t nTotalSize)
 {   
-    size_t nBytesSent {0};
+    uint64_t nBytesSent {0};
 
     LOCK(cs_mNode);
     LOCK(cs_mSendMsgQueue);
@@ -308,7 +308,7 @@ AverageBandwidth Stream::GetAverageBandwidth() const
     return {0,0};
 }
 
-size_t Stream::GetSendQueueSize() const
+uint64_t Stream::GetSendQueueSize() const
 {
     LOCK(cs_mSendMsgQueue);
     return mSendMsgQueueSize.getSendQueueBytes();
@@ -320,7 +320,7 @@ void Stream::SetOwningNode(CNode* newNode)
     mNode = newNode;
 }
 
-Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pch, size_t nBytes,
+Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes,
     bool& complete)
 {
     AssertLockHeld(cs_mNode);
@@ -382,11 +382,11 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
     return RECV_OK;
 }   
 
-size_t Stream::SocketSendData()
+uint64_t Stream::SocketSendData()
 {   
-    size_t nSentSize = 0;
-    size_t nMsgCount = 0;
-    size_t nSendBufferMaxSize = g_connman->GetSendBufferSize();
+    uint64_t nSentSize = 0;
+    uint64_t nMsgCount = 0;
+    uint64_t nSendBufferMaxSize = g_connman->GetSendBufferSize();
 
     AssertLockHeld(cs_mNode);
     LOCK(cs_mSendMsgQueue);
@@ -418,7 +418,7 @@ size_t Stream::SocketSendData()
 
 void Stream::GetNewMsgs()
 {
-    size_t nSizeAdded {0};
+    uint64_t nSizeAdded {0};
 
     LOCK(cs_mRecvMsgQueue);
     auto it { mRecvMsgQueue.begin() };
@@ -428,7 +428,7 @@ void Stream::GetNewMsgs()
         {   
             break;
         }
-        size_t msgSize { it->vRecv.size() + CMessageHeader::HEADER_SIZE };
+        uint64_t msgSize { it->vRecv.size() + CMessageHeader::HEADER_SIZE };
         nSizeAdded += msgSize;
 
         // Update recieved msg counts
@@ -449,7 +449,7 @@ void Stream::GetNewMsgs()
     mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
 }
 
-Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize)
+Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint64_t maxChunkSize)
 {
     AssertLockHeld(cs_mNode);
 
@@ -458,11 +458,11 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_
         // if maxChunkSize is 0 assign some default chunk size value
         maxChunkSize = 1024;
     }
-    size_t sentSize = 0;
+    uint64_t sentSize = 0;
 
     do
     {   
-        int nBytes = 0;
+        ssize_t nBytes = 0;
         if (!mSendChunk)
         {   
             mSendChunk = data.ReadAsync(maxChunkSize);
@@ -511,7 +511,7 @@ Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, size_
         mLastSendTime = GetSystemTimeInSeconds();
         mTotalBytesSent += nBytes;
         sentSize += nBytes;
-        if (static_cast<size_t>(nBytes) != mSendChunk->Size())
+        if (static_cast<uint64_t>(nBytes) != mSendChunk->Size())
         {
             // could not send full message; stop sending more
             mSendChunk =

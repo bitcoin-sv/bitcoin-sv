@@ -20,7 +20,7 @@ namespace
 
     void CheckInitialStreamStats(const StreamStats& stats)
     {
-        BOOST_CHECK_EQUAL(stats.streamType, "GENERAL");
+        BOOST_CHECK_EQUAL(stats.streamType, enum_cast<std::string>(StreamType::GENERAL));
         BOOST_CHECK_EQUAL(stats.nLastSend, 0);
         BOOST_CHECK_EQUAL(stats.nLastRecv, 0);
         BOOST_CHECK_EQUAL(stats.nSendBytes, 0);
@@ -30,6 +30,21 @@ namespace
         BOOST_CHECK_EQUAL(stats.nSpotBytesPerSec, 0);
         BOOST_CHECK_EQUAL(stats.fPauseRecv, false);
     }
+
+    CNodePtr MakeDummyNode(const CAddress& dummyAddr, CConnman::CAsyncTaskPool& taskPool)
+    {
+        return CNode::Make(
+            0,
+            NODE_NETWORK,
+            0,
+            INVALID_SOCKET,
+            dummyAddr,
+            0u,
+            0u,
+            taskPool,
+            "",
+            true);
+    }
 }
 
 BOOST_FIXTURE_TEST_SUITE(TestNetAssociation, TestingSetup)
@@ -37,21 +52,10 @@ BOOST_FIXTURE_TEST_SUITE(TestNetAssociation, TestingSetup)
 // Basic stream testing only without a real network connection
 BOOST_AUTO_TEST_CASE(TestBasicStream)
 {
-    // Create dummy CNode just to be abke to pass it to the CStream
-    CAddress dummy_addr{ ip(0xa0b0c001), NODE_NONE };
+    // Create dummy CNode just to be able to pass it to the CStream
+    CAddress dummyAddr{ ip(0xa0b0c001), NODE_NONE };
     CConnman::CAsyncTaskPool asyncTaskPool { GlobalConfig::GetConfig() };
-    CNodePtr pDummyNode =
-        CNode::Make(
-            0,
-            NODE_NETWORK,
-            0,
-            INVALID_SOCKET,
-            dummy_addr,
-            0u,
-            0u,
-            asyncTaskPool,
-            "",
-            true);
+    CNodePtr pDummyNode { MakeDummyNode(dummyAddr, asyncTaskPool) };
 
     // Create a stream
     Stream stream { pDummyNode.get(), StreamType::GENERAL, INVALID_SOCKET, 1000 };
@@ -77,24 +81,13 @@ BOOST_AUTO_TEST_CASE(TestBasicStream)
 // Basic association testing only without a real network connection
 BOOST_AUTO_TEST_CASE(TestBasicAssociation)
 {
-    // Create dummy CNode just to be abke to pass it to the CStream
-    CAddress dummy_addr{ ip(0xa0b0c001), NODE_NONE };
+    // Create dummy CNode just to be able to pass it to the CStream
+    CAddress dummyAddr{ ip(0xa0b0c001), NODE_NONE };
     CConnman::CAsyncTaskPool asyncTaskPool { GlobalConfig::GetConfig() };
-    CNodePtr pDummyNode =
-        CNode::Make(
-            0,
-            NODE_NETWORK,
-            0,
-            INVALID_SOCKET,
-            dummy_addr,
-            0u,
-            0u,
-            asyncTaskPool,
-            "",
-            true);
+    CNodePtr pDummyNode { MakeDummyNode(dummyAddr, asyncTaskPool) };
 
     // Create an association
-    Association association { pDummyNode.get(), INVALID_SOCKET, dummy_addr };
+    Association association { pDummyNode.get(), INVALID_SOCKET, dummyAddr };
 
     // Check initial state
     CAddress peerAddr { association.GetPeerAddr() };
@@ -111,7 +104,7 @@ BOOST_AUTO_TEST_CASE(TestBasicAssociation)
     BOOST_CHECK_EQUAL(stats.nSendBytes, 0);
     BOOST_CHECK_EQUAL(stats.nRecvBytes, 0);
     BOOST_CHECK_EQUAL(stats.nSendSize, 0);
-    BOOST_CHECK_EQUAL(stats.assocID, "Null");
+    BOOST_CHECK_EQUAL(stats.assocID, AssociationID::NULL_ID_STR);
     for(const auto& cmdTot : stats.mapSendBytesPerMsgCmd)
     {
         BOOST_CHECK_EQUAL(cmdTot.second, 0);

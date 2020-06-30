@@ -941,7 +941,7 @@ bool CNode::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setErr
 }
 
 void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
-                           const Config& config, size_t& bytesRecv, size_t& bytesSent)
+                           const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     // Let association service its sockets
     bool newMsgs {false};
@@ -1432,8 +1432,8 @@ void CConnman::ThreadSocketHandler() {
                 return;
             }
 
-            size_t bytesRecv {0};
-            size_t bytesSent {0};
+            uint64_t bytesRecv {0};
+            uint64_t bytesSent {0};
             pnode->ServiceSockets(fdsetRecv, fdsetSend, fdsetError, *this, *config, bytesRecv, bytesSent);
 
             if(bytesRecv > 0) {
@@ -2941,7 +2941,7 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
 }
 
 void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream) {
-    size_t nPayloadLength = msg.Size();
+    uint64_t nPayloadLength = msg.Size();
     if (nPayloadLength > std::numeric_limits<uint32_t>::max())
     {
         LogPrint(BCLog::NET, "message %s (%d bytes) cannot be sent because it exceeds max P2P message limit peer=%d\n",
@@ -2959,16 +2959,16 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, Strea
 
     CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
 
-    size_t nBytesSent { pnode->PushMessage(std::move(serializedHeader), std::move(msg), stream) };
+    uint64_t nBytesSent { pnode->PushMessage(std::move(serializedHeader), std::move(msg), stream) };
     if (nBytesSent > 0)
     {
         RecordBytesSent(nBytesSent);
     }
 }
 
-size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream)
+uint64_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream)
 {
-    size_t bytesSent { mAssociation.PushMessage(std::move(serialisedHeader), std::move(msg), stream) };
+    uint64_t bytesSent { mAssociation.PushMessage(std::move(serialisedHeader), std::move(msg), stream) };
 
     fPauseSend = (mAssociation.GetTotalSendQueueSize() > g_connman->GetSendBufferSize());
 

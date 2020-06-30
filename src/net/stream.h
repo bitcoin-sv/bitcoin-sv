@@ -69,7 +69,7 @@ class BanStream : public std::exception
 class Stream
 {
   public:
-    Stream(CNode* node, StreamType streamType, SOCKET socket, size_t maxRecvBuffSize);
+    Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize);
     ~Stream();
 
     Stream(const Stream&) = delete;
@@ -85,12 +85,12 @@ class Stream
 
     // Service our socket for reading and writing
     void ServiceSocket(fd_set& setRecv, fd_set& setSend, fd_set& setError, const Config& config,
-                       bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent);
+                       bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent);
 
 
     // Add new message to our list for sending
-    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-                       size_t nPayloadLength, size_t nTotalSize);
+    uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+                         uint64_t nPayloadLength, uint64_t nTotalSize);
 
     // Fetch the next message for processing.
     // Returns true if there are more queued messages available, and false if not.
@@ -110,7 +110,7 @@ class Stream
     AverageBandwidth GetAverageBandwidth() const;
 
     // Get current send queue size
-    size_t GetSendQueueSize() const;
+    uint64_t GetSendQueueSize() const;
 
     // Get/Set stream type
     StreamType GetStreamType() const { return mStreamType; }
@@ -142,7 +142,7 @@ class Stream
     // Receive message queue
     std::list<CNetMessage> mRecvMsgQueue {};
     uint64_t mTotalBytesRecv {0};
-    size_t mRecvMsgQueueSize {0};
+    uint64_t mRecvMsgQueueSize {0};
     std::atomic_bool mPauseRecv {false};
     mapMsgCmdSize mRecvBytesPerMsgCmd {};
     std::list<CNetMessage> mRecvCompleteMsgQueue {};
@@ -153,14 +153,14 @@ class Stream
     std::atomic<int64_t> mLastRecvTime {0};
 
     // Maximum receieve queue size
-    const size_t mMaxRecvBuffSize {0};
+    const uint64_t mMaxRecvBuffSize {0};
 
     // Process some newly read bytes from our underlying socket
     enum RECV_STATUS {RECV_OK, RECV_BAD_LENGTH, RECV_FAIL};
-    RECV_STATUS ReceiveMsgBytes(const Config& config, const char* pch, size_t nBytes, bool& complete);
+    RECV_STATUS ReceiveMsgBytes(const Config& config, const char* pch, uint64_t nBytes, bool& complete);
 
     // Write the next batch of data to the wire
-    size_t SocketSendData();
+    uint64_t SocketSendData();
 
     /** Average bandwidth measurements */
     // Keep enough spot measurements to cover 1 minute
@@ -189,14 +189,14 @@ class Stream
     struct CSendResult
     {
         bool sendComplete {false};
-        size_t sentSize {0};
+        uint64_t sentSize {0};
     };
 
     // Move newly read completed messages to another queue
     void GetNewMsgs();
 
     // Message sending
-    CSendResult SendMessage(CForwardAsyncReadonlyStream& data, size_t maxChunkSize);
+    CSendResult SendMessage(CForwardAsyncReadonlyStream& data, uint64_t maxChunkSize);
 
 };
 

@@ -78,10 +78,10 @@ class Association
 
     // Service all sockets that are ready
     void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
-                        const Config& config, bool& gotNewMsgs, size_t& bytesRecv, size_t& bytesSent);
+                        const Config& config, bool& gotNewMsgs, uint64_t& bytesRecv, uint64_t& bytesSent);
 
     // Get current total send queue size
-    size_t GetTotalSendQueueSize() const;
+    uint64_t GetTotalSendQueueSize() const;
 
     // Update average bandwidth measurements
     void AvgBandwithCalc();
@@ -91,7 +91,7 @@ class Association
     AverageBandwidth GetAverageBandwidth(const StreamType streamType) const;
 
     // Add new message to our list for sending
-    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType);
+    uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType);
 
     // Get last send/receive time for any stream
     int64_t GetLastSendTime() const;

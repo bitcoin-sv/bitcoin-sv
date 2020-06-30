@@ -47,7 +47,7 @@ bool DefaultStreamPolicy::GetNextMessage(StreamMap& streams, std::list<CNetMessa
 
 void DefaultStreamPolicy::ServiceSockets(StreamMap& streams, fd_set& setRecv,
     fd_set& setSend, fd_set& setError, const Config& config, bool& gotNewMsgs,
-    size_t& bytesRecv, size_t& bytesSent)
+    uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     // Check we have a stream available (if we do we will have the GENERAL stream)
     if(streams.size() > 0)
@@ -56,9 +56,9 @@ void DefaultStreamPolicy::ServiceSockets(StreamMap& streams, fd_set& setRecv,
     }
 }
 
-size_t DefaultStreamPolicy::PushMessage(StreamMap& streams, StreamType streamType,
+uint64_t DefaultStreamPolicy::PushMessage(StreamMap& streams, StreamType streamType,
     std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-    size_t nPayloadLength, size_t nTotalSize)
+    uint64_t nPayloadLength, uint64_t nTotalSize)
 {
     // Check we have a stream available (if we do we will have the GENERAL stream)
     if(streams.size() > 0)
@@ -105,13 +105,13 @@ bool BlockPriorityStreamPolicy::GetNextMessage(StreamMap& streams, std::list<CNe
 
 void BlockPriorityStreamPolicy::ServiceSockets(StreamMap& streams, fd_set& setRecv,
     fd_set& setSend, fd_set& setError, const Config& config, bool& gotNewMsgs,
-    size_t& bytesRecv, size_t& bytesSent)
+    uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     // Service each stream socket
     for(auto& stream : streams)
     {   
-        size_t streamBytesRecv {0};
-        size_t streamBytesSent {0};
+        uint64_t streamBytesRecv {0};
+        uint64_t streamBytesSent {0};
         stream.second->ServiceSocket(setRecv, setSend, setError, config, gotNewMsgs,
             streamBytesRecv, streamBytesSent);
         bytesRecv += streamBytesRecv;
@@ -119,9 +119,9 @@ void BlockPriorityStreamPolicy::ServiceSockets(StreamMap& streams, fd_set& setRe
     }
 }
 
-size_t BlockPriorityStreamPolicy::PushMessage(StreamMap& streams, StreamType streamType,
+uint64_t BlockPriorityStreamPolicy::PushMessage(StreamMap& streams, StreamType streamType,
     std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-    size_t nPayloadLength, size_t nTotalSize)
+    uint64_t nPayloadLength, uint64_t nTotalSize)
 {
     // Have we been told which stream to use?
     bool exactMatch { streamType != StreamType::UNKNOWN };

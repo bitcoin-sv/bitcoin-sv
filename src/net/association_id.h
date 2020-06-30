@@ -26,6 +26,9 @@ class AssociationID
     // to identify the type + 128 bytes of data
     static constexpr size_t MAX_ASSOCIATION_ID_LENGTH {129};
 
+    // String used to denote a null (not-set) association ID
+    static constexpr const char* NULL_ID_STR { "Not-Set" };
+
     // Supported association ID types
     enum class IDType : uint8_t { UUID = 0 };
 

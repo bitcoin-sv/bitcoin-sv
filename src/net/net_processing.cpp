@@ -258,7 +258,7 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
 
     // Include association ID if we have one and supported stream policies
     std::vector<uint8_t> assocIDBytes {};
-    std::string assocIDStr { "Null" };
+    std::string assocIDStr { AssociationID::NULL_ID_STR };
     AssociationIDPtr assocID { pnode->GetAssociation().GetAssociationID() };
     if(assocID) {
         assocIDBytes = assocID->GetBytes();
@@ -1909,7 +1909,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
         vRecv >> fRelay;
     }
 
-    std::string assocIDStr { "Null" };
+    std::string assocIDStr { AssociationID::NULL_ID_STR };
     if(!vRecv.empty()) {
         vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
         if(gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {

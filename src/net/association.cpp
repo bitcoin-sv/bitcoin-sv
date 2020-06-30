@@ -221,7 +221,7 @@ void Association::CopyStats(AssociationStats& stats) const
         }
         else
         {
-            stats.assocID = "Null";
+            stats.assocID = AssociationID::NULL_ID_STR;
         }
     }
 
@@ -341,7 +341,7 @@ bool Association::GetNextMessage(std::list<CNetMessage>& msg)
 
 void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError,
                                   CConnman& connman, const Config& config, bool& gotNewMsgs,
-                                  size_t& bytesRecv, size_t& bytesSent)
+                                  uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     bytesRecv = bytesSent = 0;
 
@@ -364,22 +364,22 @@ void Association::AvgBandwithCalc()
     ForEachStream([](StreamPtr& stream){ stream->AvgBandwithCalc(); });
 }
 
-size_t Association::GetTotalSendQueueSize() const
+uint64_t Association::GetTotalSendQueueSize() const
 {
     // Get total of all stream send queue sizes
     LOCK(cs_mStreams);
     return std::accumulate(mStreams.begin(), mStreams.end(), 0,
-        [](const size_t& tot, const auto& stream) {
+        [](const uint64_t& tot, const auto& stream) {
             return tot + stream.second->GetSendQueueSize();
         }
     );
 }
 
-size_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType)
+uint64_t Association::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType)
 {
-    size_t nPayloadLength { msg.Size() };
-    size_t nTotalSize { nPayloadLength + CMessageHeader::HEADER_SIZE };
-    size_t nBytesSent {0};
+    uint64_t nPayloadLength { msg.Size() };
+    uint64_t nTotalSize { nPayloadLength + CMessageHeader::HEADER_SIZE };
+    uint64_t nBytesSent {0};
 
     try
     {

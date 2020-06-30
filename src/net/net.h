@@ -1019,7 +1019,7 @@ public:
 
     bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
     void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
-                        const Config& config, size_t& bytesRecv, size_t& bytesSent);
+                        const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent);
 
     bool GetDisconnect() const { return fDisconnect; }
 
@@ -1028,7 +1028,7 @@ public:
     void SetSendVersion(int nVersionIn);
     int GetSendVersion() const;
 
-    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream);
+    uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream);
 
     void AddAddressKnown(const CAddress &_addr) {
         addrKnown.insert(_addr.GetKey());

@@ -68,11 +68,17 @@ class P2PAssociation(BitcoinTestFramework):
         for i in range(len(peerinfos)):
             peerinfo = peerinfos[i]
             expected = expecteds[i]
+            expectedPeerID = expected['id']
             expectedAssocID = expected['associd']
             expectedStreamPolicy = expected['streampolicy']
+
+            peerinfoID = peerinfo['id']
+            if peerinfoID != expectedPeerID:
+                return False
+
             if expectedAssocID == '<UNKNOWN>':
                 # Expecting a defined but unknown to us ID
-                if peerinfo['associd'] == 'Null':
+                if peerinfo['associd'] == 'Not-Set':
                     return False
             else:
                 if peerinfo['associd'] != expectedAssocID:
@@ -95,6 +101,9 @@ class P2PAssociation(BitcoinTestFramework):
             
 
     def run_test(self):
+        # Create all the connections we will need to node0 at the start because they all need to be
+        # setup before we call NetworkThread().start()
+
         # Create a P2P connection with no association ID (old style)
         oldStyleConnCB = TestNode()
         oldStyleConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], oldStyleConnCB, nullAssocID=True)
@@ -109,10 +118,12 @@ class P2PAssociation(BitcoinTestFramework):
         newStyleFirstConnCB = TestNode()
         newStyleFirstConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleFirstConnCB)
         newStyleFirstConnCB.add_connection(newStyleFirstConn)
-        # By setting the assocID on these NodeConn we prevent them sending a version message
+        # By setting the assocID on this second NodeConn we prevent it sending a version message
         newStyleSecondConnCB = TestNode()
         newStyleSecondConn = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSecondConnCB, assocID=newStyleFirstConn.assocID)
         newStyleSecondConnCB.add_connection(newStyleSecondConn)
+
+        # Some connections we will use to test setup of DATA2, DATA3, DATA4 streams
         newStyleSecondConnCB_Data2 = TestNode()
         newStyleSecondConn_Data2 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSecondConnCB_Data2, assocID=newStyleFirstConn.assocID)
         newStyleSecondConnCB_Data2.add_connection(newStyleSecondConn_Data2)
@@ -123,7 +134,7 @@ class P2PAssociation(BitcoinTestFramework):
         newStyleSecondConn_Data4 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSecondConnCB_Data4, assocID=newStyleFirstConn.assocID)
         newStyleSecondConnCB_Data4.add_connection(newStyleSecondConn_Data4)
 
-        # Some other connections we will need later
+        # Some connections we will use to test error scenarios
         newStyleThirdConnCB = TestNode()
         badStreamConn1 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleThirdConnCB, assocID=create_association_id())
         newStyleThirdConnCB.add_connection(badStreamConn1)
@@ -159,57 +170,68 @@ class P2PAssociation(BitcoinTestFramework):
         with mininode_lock: assert_equal(len(newStyleSecondConnCB_Data4.message_count), 0)
         expected = [
                 {
-                    'associd'      : 'Null',
+                    'id'           : 0,                                 # oldStyleConn
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
+                    'id'           : 1,                                 # newStyleConn
                     'associd'      : str(newStyleConn.assocID),
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
+                    'id'           : 2,                                 # newStyleFirstConn
                     'associd'      : str(newStyleFirstConn.assocID),
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 3,                                 # newStyleSecondConn
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 4,                                 # newStyleSecondConn_Data2
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 5,                                 # newStyleSecondConn_Data3
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 6,                                 # newStyleSecondConn_Data4
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 7,                                 # badStreamConn1
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 8,                                 # badStreamConn2
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 9,                                 # badStreamConn3
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 10,                                # badStreamConn4
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
@@ -231,52 +253,62 @@ class P2PAssociation(BitcoinTestFramework):
         newStyleSecondConn.send_message(msg_createstream(stream_type=2, stream_policy=b"BlockPriority", assocID=newStyleFirstConn.assocID))
         expected = [
                 {
-                    'associd'      : 'Null',
+                    'id'           : 0,                                 # oldStyleConn
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : str(newStyleConn.assocID),
+                    'id'           : 1,
+                    'associd'      : str(newStyleConn.assocID),         # newStyleConn
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : str(newStyleFirstConn.assocID),
+                    'id'           : 2,
+                    'associd'      : str(newStyleFirstConn.assocID),    # newStyleFirstConn & newStyleSecondConn
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 4,                                 # newStyleSecondConn_Data2
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 5,                                 # newStyleSecondConn_Data3
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 6,                                 # newStyleSecondConn_Data4
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 7,                                 # badStreamConn1
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 8,                                 # badStreamConn2
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 9,                                 # badStreamConn3
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 10,                                # badStreamConn4
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
@@ -323,32 +355,38 @@ class P2PAssociation(BitcoinTestFramework):
         # Check streams are in the expected state after all those errors
         expected = [
                 {
-                    'associd'      : 'Null',
+                    'id'           : 0,                                 # oldStyleConn
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
+                    'id'           : 1,                                 # newStyleConn
                     'associd'      : str(newStyleConn.assocID),
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
+                    'id'           : 2,                                 # newStyleFirstConn & newStyleSecondConn
                     'associd'      : str(newStyleFirstConn.assocID),
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 4,                                 # newStyleSecondConn_Data2
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 5,                                 # newStyleSecondConn_Data3
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 6,                                 # newStyleSecondConn_Data4
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
@@ -361,17 +399,20 @@ class P2PAssociation(BitcoinTestFramework):
         newStyleSecondConn_Data4.send_message(msg_createstream(stream_type=5, assocID=newStyleFirstConn.assocID))
         expected = [
                 {
-                    'associd'      : 'Null',
+                    'id'           : 0,                                 # oldStyleConn
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : str(newStyleConn.assocID),
+                    'id'           : 1,
+                    'associd'      : str(newStyleConn.assocID),         # newStyleConn
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : str(newStyleFirstConn.assocID),
+                    'id'           : 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
+                    'associd'      : str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4' ]
                 },
@@ -382,21 +423,25 @@ class P2PAssociation(BitcoinTestFramework):
         connect_nodes(self.nodes[0], 1)
         expected0 = [
                 {
-                    'associd'      : 'Null',
+                    'id'           : 0,                                 # oldStyleConn
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
+                    'id'           : 1,                                 # newStyleConn
                     'associd'      : str(newStyleConn.assocID),
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : str(newStyleFirstConn.assocID),
+                    'id'           : 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
+                    'associd'      : str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4' ]
                 },
                 {
+                    'id'           : 11,                                # A new association established to node1
                     'associd'      : '<UNKNOWN>',
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1' ]
@@ -405,6 +450,7 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected0), timeout=5)
         expected1 = [
                 {
+                    'id'           : 0,                                 # An association to node0
                     'associd'      : '<UNKNOWN>',
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1' ]
@@ -416,27 +462,32 @@ class P2PAssociation(BitcoinTestFramework):
         connect_nodes(self.nodes[0], 2)
         expected0 = [
                 {
-                    'associd'      : 'Null',
+                    'id'           : 0,                                 # oldStyleConn
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
+                    'id'           : 1,                                 # newStyleConn
                     'associd'      : str(newStyleConn.assocID),
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
                 {
-                    'associd'      : str(newStyleFirstConn.assocID),
+                    'id'           : 2,                                 # newStyleFirstConn, newStyleSecondConn, newStyleSecondConn_Data2,
+                    'associd'      : str(newStyleFirstConn.assocID),    # newStyleSecondConn_Data3, newStyleSecondConn_Data4
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4' ]
                 },
                 {
+                    'id'           : 11,                                # Association to node 1
                     'associd'      : '<UNKNOWN>',
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1' ]
                 },
                 {
-                    'associd'      : 'Null',
+                    'id'           : 13,                                # Old style association to node 2
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
@@ -444,7 +495,8 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected0), timeout=5)
         expected2 = [
                 {
-                    'associd'      : 'Null',
+                    'id'           : 0,                                 # An association to node0
+                    'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },

@@ -39,12 +39,12 @@ class StreamPolicy
     // Service the sockets of the streams
     virtual void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
                                 fd_set& setError, const Config& config, bool& gotNewMsgs,
-                                size_t& bytesRecv, size_t& bytesSent) = 0;
+                                uint64_t& bytesRecv, uint64_t& bytesSent) = 0;
 
     // Queue an outgoing message on the appropriate stream
-    virtual size_t PushMessage(StreamMap& streams, StreamType streamType,
-                               std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-                               size_t nPayloadLength, size_t nTotalSize) = 0;
+    virtual uint64_t PushMessage(StreamMap& streams, StreamType streamType,
+                                 std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+                                 uint64_t nPayloadLength, uint64_t nTotalSize) = 0;
 
 };
 using StreamPolicyPtr = std::shared_ptr<StreamPolicy>;
@@ -81,12 +81,12 @@ class DefaultStreamPolicy : public StreamPolicy
     // Service the sockets of the streams
     void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
                         fd_set& setError, const Config& config, bool& gotNewMsgs,
-                        size_t& bytesRecv, size_t& bytesSent) override;
+                        uint64_t& bytesRecv, uint64_t& bytesSent) override;
 
     // Queue an outgoing message on the appropriate stream
-    size_t PushMessage(StreamMap& streams, StreamType streamType,
-                       std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-                       size_t nPayloadLength, size_t nTotalSize) override;
+    uint64_t PushMessage(StreamMap& streams, StreamType streamType,
+                         std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+                         uint64_t nPayloadLength, uint64_t nTotalSize) override;
 };
 
 
@@ -125,11 +125,11 @@ class BlockPriorityStreamPolicy : public StreamPolicy
     // Service the sockets of the streams
     void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
                         fd_set& setError, const Config& config, bool& gotNewMsgs,
-                        size_t& bytesRecv, size_t& bytesSent) override;
+                        uint64_t& bytesRecv, uint64_t& bytesSent) override;
 
     // Queue an outgoing message on the appropriate stream
-    size_t PushMessage(StreamMap& streams, StreamType streamType,
-                       std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
-                       size_t nPayloadLength, size_t nTotalSize) override;
+    uint64_t PushMessage(StreamMap& streams, StreamType streamType,
+                         std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
+                         uint64_t nPayloadLength, uint64_t nTotalSize) override;
 };
 
