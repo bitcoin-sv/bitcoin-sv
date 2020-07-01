@@ -258,7 +258,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     ResetConfig();
 
     mining::CMiningFactory miningFactory { config };
-    mining::CMiningFactory journalMiningFactory { configJournal };
+    auto journalMiningFactory { std::make_shared<mining::CMiningFactory>(configJournal) };
 
     LOCK(cs_main);
     fCheckpointsEnabled = false;
@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     // Just to make sure we can still make simple blocks.
     BOOST_CHECK(pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
 
     const Amount BLOCKSUBSIDY = 50 * COIN;
     const Amount LOWFEE = CENT;
@@ -335,11 +335,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     config.SetTestBlockCandidateValidity(false);
     configJournal.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK_NO_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     config.SetTestBlockCandidateValidity(true);
     configJournal.SetTestBlockCandidateValidity(true);
     BOOST_CHECK_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
-    BOOST_CHECK_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
     mempool.Clear();
 
@@ -362,7 +362,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
     BOOST_CHECK(pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.Clear();
 
     // block size > limit
@@ -390,7 +390,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
     BOOST_CHECK(pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.Clear();
 
     // Orphan in mempool, template creation fails.
@@ -399,11 +399,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     config.SetTestBlockCandidateValidity(false);
     configJournal.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK_NO_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     config.SetTestBlockCandidateValidity(true);
     configJournal.SetTestBlockCandidateValidity(true);
     BOOST_CHECK_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
-    BOOST_CHECK_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
     mempool.Clear();
 
@@ -428,7 +428,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         entry.Fee(HIGHERFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
         nullChangeSet);
     BOOST_CHECK(pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.Clear();
 
     // Coinbase in mempool, template creation fails.
@@ -445,11 +445,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     config.SetTestBlockCandidateValidity(false);
     configJournal.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK_NO_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     config.SetTestBlockCandidateValidity(true);
     configJournal.SetTestBlockCandidateValidity(true);
     BOOST_CHECK_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
-    BOOST_CHECK_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
     mempool.Clear();
 
@@ -486,11 +486,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     config.SetTestBlockCandidateValidity(false);
     configJournal.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK_NO_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     config.SetTestBlockCandidateValidity(true);
     configJournal.SetTestBlockCandidateValidity(true);
     BOOST_CHECK_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
-    BOOST_CHECK_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
 
     mempool.Clear();
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
@@ -518,11 +518,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     config.SetTestBlockCandidateValidity(false);
     configJournal.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK_NO_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK_NO_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     config.SetTestBlockCandidateValidity(true);
     configJournal.SetTestBlockCandidateValidity(true);
     BOOST_CHECK_THROW(miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
-    BOOST_CHECK_THROW(journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
+    BOOST_CHECK_THROW(journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev), std::runtime_error);
     mempool.Clear();
 
     // Subsidy changing.
@@ -539,7 +539,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         chainActive.SetTip(next);
     }
     BOOST_CHECK(pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     // Extend to a 210000-long block chain.
     while (chainActive.Tip()->nHeight < 210000) {
         CBlockIndex *prev = chainActive.Tip();
@@ -552,8 +552,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         chainActive.SetTip(next);
     }
     BOOST_CHECK(pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     // Delete the dummy blocks again.
+    journalMiningFactory.reset();
     while (chainActive.Tip()->nHeight > nHeight) {
         CBlockIndex *del = chainActive.Tip();
         chainActive.SetTip(del->pprev);
@@ -561,6 +562,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
         delete del->phashBlock;
         delete del;
     }
+    journalMiningFactory = std::make_shared<mining::CMiningFactory>(configJournal);
 
     // non-final txs in mempool
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
@@ -749,7 +751,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
     BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), flags));
 
     BOOST_CHECK(pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
 
     // None of the of the absolute height/time locked tx should have made it
     // into the template because we still check IsFinalTx in CreateNewBlock, but
@@ -769,7 +771,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity) {
 
     BOOST_CHECK(pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), 5UL);
-    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    BOOST_CHECK(pblocktemplateJournal = journalMiningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK_EQUAL(pblocktemplateJournal->GetBlockRef()->vtx.size(), 5UL);
 
     chainActive.Tip()->nHeight--;
