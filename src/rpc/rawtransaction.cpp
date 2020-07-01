@@ -1251,10 +1251,13 @@ static UniValue sendrawtransaction(const Config &config,
         txinfo = mempool.getNonFinalPool().getInfo(txid);
     }
 
-    // It is possible that we relay txn which was added and removed from the mempool, because:
+    // It is possible that txn was added and removed from the mempool, because:
     // - block was mined
     // - the Validator's asynch mode removed the txn (and triggered reject msg)
-    g_connman->EnqueueTransaction( {inv, txinfo} );
+    // - this txn is final version of timelocked txn and is still being validated
+    if (txinfo.tx != nullptr){
+        g_connman->EnqueueTransaction({ inv, txinfo });
+    }
 
     LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
         inv.hash.ToString(), request.authUser.c_str());
