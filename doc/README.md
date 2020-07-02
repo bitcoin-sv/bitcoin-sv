@@ -20,9 +20,9 @@ To run Bitcoin SV on Linux:
 * unpack the files into a directory
 * run `bin/bitcoind`
 
-A docker image is available from https://hub.docker.com/repository/docker/bitcoinsv/bitcoin-sv. Images are tagged with 
+A docker image is available from https://hub.docker.com/r/bitcoinsv/bitcoin-sv. Images are tagged with 
 the release version number. The `latest` tag is updated as new versions are released. The source for this image 
-(Dockerfiles etc) are maintained in a GitHub repository: https://github.com/bitcoin-sv/docker-sv. 
+(Dockerfiles etc) is maintained in a GitHub repository: https://github.com/bitcoin-sv/docker-sv. 
  
 ### Need Help?
 
