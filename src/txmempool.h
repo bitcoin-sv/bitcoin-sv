@@ -145,7 +145,7 @@ using GroupID = std::optional<uint64_t>;
 
 class CTransactionRefWrapper {
 private:
-    CTransactionRef tx {};
+    mutable CTransactionRef tx {};
     // Transaction Id
     TxId txid {};
     // Mempool Transaction database
@@ -160,7 +160,7 @@ public:
     CTransactionRef GetTx() const;
     const TxId& GetId() const;
 
-    void MoveTxToDisk();
+    void MoveTxToDisk() const;
     bool IsInMemory() const;
 };
 
@@ -249,7 +249,7 @@ public:
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     bool IsCPFPGroupMember() const { return group != nullptr; }
 
-    void MoveTxToDisk();
+    void MoveTxToDisk() const;
     bool IsInMemory() const;
 };
 
@@ -607,6 +607,8 @@ public:
     virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() override;
 
     uint64_t GetDiskUsage();
+
+    void SaveTxsToDisk(uint64_t required_size);
 
 public:
     /**

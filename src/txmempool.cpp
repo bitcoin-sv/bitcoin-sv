@@ -117,7 +117,8 @@ CTransactionRefWrapper::CTransactionRefWrapper(const CTransactionRef &_tx, const
 }
 
 CTransactionRef CTransactionRefWrapper::GetTxFromDB() const {
-    if (mempoolTxDB != nullptr) {
+    if (mempoolTxDB != nullptr)
+    {
         CTransactionRef txRef;
 	    mempoolTxDB->GetTransaction(txid, txRef);
         return txRef;
@@ -131,14 +132,15 @@ const TxId& CTransactionRefWrapper::GetId() const {
 }
 
 CTransactionRef CTransactionRefWrapper::GetTx() const {
-    if (tx != nullptr) {
+    if (tx != nullptr)
+    {
         return tx;
     }
     return GetTxFromDB();
 }
 
-void CTransactionRefWrapper::MoveTxToDisk() {
-    if (tx) 
+void CTransactionRefWrapper::MoveTxToDisk() const {
+    if (tx)
     {
         if (mempoolTxDB)
         {
@@ -208,7 +210,7 @@ void CTxMemPoolEntry::UpdateLockPoints(const LockPoints &lp) {
     lockPoints = lp;
 }
 
-void CTxMemPoolEntry::MoveTxToDisk() {
+void CTxMemPoolEntry::MoveTxToDisk() const {
     tx.MoveTxToDisk();
 }
 
@@ -1135,10 +1137,12 @@ void CTxMemPool::InitMempoolTxDB() {
 }
 
 std::shared_ptr<CMempoolTxDB> CTxMemPool::GetMempoolTxDB() {
-    if (!this) {
+    if (!this)
+    {
         return nullptr;
     }
-    if (mempoolTxDB == nullptr) {
+    if (mempoolTxDB == nullptr)
+    {
         InitMempoolTxDB();
     }
     return mempoolTxDB;
@@ -1149,6 +1153,27 @@ uint64_t CTxMemPool::GetDiskUsage() {
     mempoolTxDB->GetDiskUsage(usage);
     return usage;
 };
+
+void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize)
+{
+    /* Decide which transactions we want to store first */
+    auto mi = mapTx.get<entry_time>().begin();
+    uint64_t movedToDiskSize = 0;
+    if (!mempoolTxDB)
+    {
+        InitMempoolTxDB();
+    }
+    while (movedToDiskSize < requiredSize && !mapTx.empty() && mi != mapTx.get<entry_time>().end())
+    {
+        if (mi->IsInMemory())
+        {
+            mi->MoveTxToDisk();
+            movedToDiskSize += mi->GetTxSize();
+            mi++;
+        }
+
+    }
+}
 
 void CTxMemPool::QueryHashes(std::vector<uint256> &vtxid) {
     std::shared_lock lock(smtx);
