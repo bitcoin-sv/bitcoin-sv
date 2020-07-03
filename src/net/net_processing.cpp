@@ -2289,8 +2289,6 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
     }
 
     LOCK(cs_main);
-    std::vector<CInv> vToFetch;
-
     for(size_t nInv = 0; nInv < vInv.size(); nInv++) {
         CInv &inv = vInv[nInv];
 
@@ -2337,10 +2335,6 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
 
         // Track requests for our stuff
         GetMainSignals().Inventory(inv.hash);
-    }
-
-    if(!vToFetch.empty()) {
-        connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vToFetch));
     }
 }
 
