@@ -92,8 +92,8 @@ limitedmap<uint256, int64_t> mapAlreadyAskedFor(CInv::estimateMaxInvElements(MAX
 
 /** The maximum number of entries in mapAskFor */
 static const size_t MAPASKFOR_MAX_SIZE = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
-/** The maximum number of entries in setAskFor (larger due to getdata latency)*/
-static const size_t SETASKFOR_MAX_SIZE = MAPASKFOR_MAX_SIZE * 4;
+/** The maximum number of entries in indexAskFor (larger due to getdata latency)*/
+static const size_t INDEXASKFOR_MAX_SIZE = MAPASKFOR_MAX_SIZE * 4;
 
 // Signals for message handling
 static CNodeSignals g_signals;
@@ -2914,14 +2914,14 @@ CNode::~CNode()
 void CNode::AskFor(const CInv &inv) {
     LOCK(cs_invQueries);
     // if mapAskFor is too large, we will never ask for it (it becomes lost)
-    if (mapAskFor.size() > MAPASKFOR_MAX_SIZE ||
-        setAskFor.size() > SETASKFOR_MAX_SIZE) {
+    auto& idIndex { indexAskFor.get<TagTxnID>() };
+    if (mapAskFor.size() > MAPASKFOR_MAX_SIZE || idIndex.size() > INDEXASKFOR_MAX_SIZE) {
         return;
     }
 
     // a peer may not have multiple non-responded queue positions for a single
     // inv item.
-    if (!setAskFor.insert(inv.hash).second) {
+    if (idIndex.find(inv.hash) != idIndex.end()) {
         return;
     }
 
@@ -2947,13 +2947,18 @@ void CNode::AskFor(const CInv &inv) {
     nLastTime = nNow;
 
     // Each retry is 1 minute after the last
-    nRequestTime = std::max(nRequestTime + 1 * 60 * MICROS_PER_SECOND, nNow);
+    nRequestTime = std::max(nRequestTime + TXN_REREQUEST_INTERVAL, nNow);
     if (it != mapAlreadyAskedFor.end()) {
         mapAlreadyAskedFor.update(it, nRequestTime);
     } else {
         mapAlreadyAskedFor.insert(std::make_pair(inv.hash, nRequestTime));
     }
     mapAskFor.insert(std::make_pair(nRequestTime, inv));
+
+    // Set expiry time from indexAskFor to be 10 minutes after request time,
+    // that should be plenty long enough to have waited for a response.
+    int64_t expiryTime { nRequestTime + TXN_EXPIRY_INTERVAL };
+    idIndex.insert( { inv.hash, expiryTime } );
 }
 
 bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {

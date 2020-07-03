@@ -48,6 +48,9 @@
 #include <arpa/inet.h>
 #endif
 
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/ordered_index.hpp>
 #include <boost/signals2/signal.hpp>
 
 class CAddrMan;
@@ -108,6 +111,10 @@ static const bool DEFAULT_BLOCKSONLY = false;
 static const unsigned int DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES = 4;
 /** Microseconds in a second */
 static const unsigned int MICROS_PER_SECOND = 1000000;
+/** Time between transaction re-requests (1 minute) */
+static const unsigned int TXN_REREQUEST_INTERVAL = 1 * 60 * MICROS_PER_SECOND;
+/** Time until transaction request expiry (10 minutes) */
+static const unsigned int TXN_EXPIRY_INTERVAL = 10 * TXN_REREQUEST_INTERVAL;
 
 // Force DNS seed use ahead of UAHF fork, to ensure peers are found
 // as long as seeders are working.
@@ -899,6 +906,33 @@ public:
     int64_t nNextAddrSend {0};
     int64_t nNextLocalAddrSend {0};
 
+    // Simple struct to store details of txns we are going to ask this peer for
+    struct TxnAskFor
+    {
+        uint256 id {};
+        int64_t expiryTime {0};
+    };
+    /* A multi-index type to store TxnAskFor into which we can lookup quickly
+     * based on TxnID or expiry time.
+     */
+    struct TagTxnID {};
+    struct TagInsertionTime {};
+    using TxnAskForMultiIndex = boost::multi_index_container<
+        TxnAskFor,
+        boost::multi_index::indexed_by<
+            // By TxnID
+            boost::multi_index::ordered_unique<
+                boost::multi_index::tag<TagTxnID>,
+                boost::multi_index::member<TxnAskFor, uint256, &TxnAskFor::id>
+            >,
+            // By expiry time
+            boost::multi_index::ordered_non_unique<
+                boost::multi_index::tag<TagInsertionTime>,
+                boost::multi_index::member<TxnAskFor, int64_t, &TxnAskFor::expiryTime>
+            >
+        >
+    >;
+
     // Inventory based relay.
     CRollingBloomFilter filterInventoryKnown { 50000, 0.000001 };
     // Set of transaction ids we still have to announce. They are sorted by the
@@ -909,7 +943,7 @@ public:
     // requested.
     std::vector<uint256> vInventoryBlockToSend {};
     CCriticalSection cs_inventory {};
-    std::set<uint256> setAskFor {};
+    TxnAskForMultiIndex indexAskFor {};
     std::multimap<int64_t, CInv> mapAskFor {};
     int64_t nNextInvSend {0};
     // Used for headers announcements - unfiltered blocks to relay. Also
