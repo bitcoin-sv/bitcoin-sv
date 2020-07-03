@@ -276,6 +276,8 @@ class SendHeadersTest(BitcoinTestFramework):
                 test_node.wait_for_getdata([new_block.sha256])
                 test_node.send_message(msg_block(new_block))
                 test_node.sync_with_ping()  # make sure this block is processed
+                inv_node.check_last_announcement(inv=[new_block.hash])  # wait until inv for this block is received before continuing so that
+                                                                        # it does not arrive later while we're already expecting the next one
                 inv_node.clear_last_announcement()
                 test_node.clear_last_announcement()
 
