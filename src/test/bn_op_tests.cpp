@@ -806,28 +806,31 @@ BOOST_AUTO_TEST_CASE(op_lshift)
 {
     const Config& config = GlobalConfig::GetConfig();
 
-    using test_args = tuple<opcodetype, vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>, vector<uint8_t>>;
     // clang-format off
     vector<test_args> test_data = 
     {
-        {OP_0, {0x0, 0x1}},
-        {OP_1, {0x0, 0x2}},
-        {OP_2, {0x0, 0x4}},
-        {OP_8, {0x1, 0x0}},
-        {OP_16, {0x0, 0x0}},
+        {{OP_0}, {0x0, 0x1}},
+        {{OP_1}, {0x0, 0x2}},
+        {{OP_2}, {0x0, 0x4}},
+        {{OP_8}, {0x1, 0x0}},
+        {{OP_16}, {0x0, 0x0}},
+        {{1, 0x7f}, {0x0, 0x0}},
+        {{2, 0xff, 0x0}, {0x0, 0x0}},
+        {{2, 0xff, 0x7f}, {0x0, 0x0}},
+        {{3, 0xff, 0xff, 0x0}, {0x0, 0x0}},
+        {{4, 0xff, 0xff, 0xff, 0x7f}, {0x0, 0x0}},
+        {{5, 0xff, 0xff, 0xff, 0xff, 0x0}, {0x0, 0x0}},
+        {{8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f}, {0x0, 0x0}},
+        {{9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, {0x0, 0x0}},
     };
     // clang-format on
 
-    for(const auto [pos, expected] : test_data)
+    for(const auto [n_shift, expected] : test_data)
     {
-        vector<uint8_t> args;
-        args.push_back(0x2);
-        args.push_back(0x0);
-        args.push_back(0x1);
-        args.push_back(pos);
-
+        vector<uint8_t> args{0x2, 0x0, 0x1}; // 0000 0000 0000 0001 <- bits to shift
+        args.insert(args.end(), n_shift.begin(), n_shift.end());
         args.push_back(OP_LSHIFT);
-
         CScript script(args.begin(), args.end());
 
         const auto cancellation_source{task::CCancellationSource::Make()};
@@ -851,28 +854,32 @@ BOOST_AUTO_TEST_CASE(op_rshift)
 {
     const Config& config = GlobalConfig::GetConfig();
 
-    using test_args = tuple<opcodetype, vector<uint8_t>>;
+    using test_args = tuple<vector<uint8_t>, vector<uint8_t>>;
     // clang-format off
     vector<test_args> test_data = 
     {
-        {OP_0, {0x80, 0x0}},
-        {OP_1, {0x40, 0x0}},
-        {OP_2, {0x20, 0x0}},
-        {OP_8, {0x0, 0x80}},
-        {OP_16, {0x0, 0x0}},
+        {{OP_0}, {0x80, 0x0}},
+        {{OP_1}, {0x40, 0x0}},
+        {{OP_7}, {0x01, 0x0}},
+        {{OP_8}, {0x0, 0x80}},
+        {{OP_15}, {0x0, 0x1}},
+        {{OP_16}, {0x0, 0x0}},
+        {{1, 0x7f}, {0x0, 0x0}},
+        {{2, 0xff, 0x0}, {0x0, 0x0}},
+        {{2, 0xff, 0x7f}, {0x0, 0x0}},
+        {{3, 0xff, 0xff, 0x0}, {0x0, 0x0}},
+        {{4, 0xff, 0xff, 0xff, 0x7f}, {0x0, 0x0}},
+        {{5, 0xff, 0xff, 0xff, 0xff, 0x0}, {0x0, 0x0}},
+        {{8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f}, {0x0, 0x0}},
+        {{9, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0}, {0x0, 0x0}},
     };
     // clang-format on
 
-    for(const auto [pos, expected] : test_data)
+    for(const auto [n_shift, expected] : test_data)
     {
-        vector<uint8_t> args;
-        args.push_back(0x2);
-        args.push_back(0x80);
-        args.push_back(0x0);
-        args.push_back(pos);
-
+        vector<uint8_t> args{0x2, 0x80, 0x0}; // 1000 0000 0000 0000 <- bits to shift
+        args.insert(args.end(), n_shift.begin(), n_shift.end());
         args.push_back(OP_RSHIFT);
-
         CScript script(args.begin(), args.end());
 
         const auto cancellation_source{task::CCancellationSource::Make()};
@@ -890,6 +897,54 @@ BOOST_AUTO_TEST_CASE(op_rshift)
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack.front()), end(stack.front()),
                                       begin(expected), end(expected));
     }
+}
+
+BOOST_AUTO_TEST_CASE(op_rshift_far)
+{
+    constexpr vector<uint8_t>::size_type size{INT32_MAX / 8};
+    std::vector<uint8_t> data(size + 1l, 0x0);
+    data[0] = 0x80;
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack = LimitedStack({data}, INT64_MAX);
+    const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    ScriptError err;
+    const auto r =
+        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
+                   CScript() << INT32_MAX << OP_RSHIFT, flags,
+                   BaseSignatureChecker{}, &err);
+    BOOST_CHECK(r.value());
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
+    const auto& top = stack.front();
+    const auto& values = top.GetElement();
+    const auto it{find_if(begin(values), end(values),
+                          [](const auto n) { return n != 0; })};
+    BOOST_CHECK_EQUAL(distance(begin(values), it), values.size() - 1);
+    BOOST_CHECK_EQUAL(1, values[values.size() - 1]);
+}
+
+BOOST_AUTO_TEST_CASE(op_lshift_far)
+{
+    constexpr vector<uint8_t>::size_type size{INT32_MAX / 8};
+    std::vector<uint8_t> data(size + 1l, 0x0);
+    data[size] = 0x1;
+
+    auto source = task::CCancellationSource::Make();
+    LimitedStack stack = LimitedStack({data}, INT64_MAX);
+    const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
+    ScriptError err;
+    const auto r =
+        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
+                   CScript() << INT32_MAX << OP_LSHIFT, flags,
+                   BaseSignatureChecker{}, &err);
+    BOOST_CHECK(r.value());
+    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
+    const auto& top = stack.front();
+    const auto& values = top.GetElement();
+    const auto it{find_if(begin(values), end(values),
+                          [](const auto n) { return n != 0; })};
+    BOOST_CHECK_EQUAL(distance(begin(values), it), 0);
+    BOOST_CHECK_EQUAL(0x80, values[0]);
 }
 
 namespace
@@ -1029,54 +1084,6 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
         BOOST_CHECK_EQUAL_COLLECTIONS(begin(stack_0), end(stack_0),
                                       begin(exp_stack_top), end(exp_stack_top));
     }
-}
-
-BOOST_AUTO_TEST_CASE(op_rshift_far)
-{
-    constexpr vector<uint8_t>::size_type size{INT32_MAX / 8};
-    std::vector<uint8_t> data(size + 1l, 0x0);
-    data[0] = 0x80;
-
-    auto source = task::CCancellationSource::Make();
-    LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
-    const auto r =
-        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
-                   CScript() << (size * 8) + 7 << OP_RSHIFT, flags,
-                   BaseSignatureChecker{}, &err);
-    BOOST_CHECK(r.value());
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
-    const auto top = stack.front();
-    const auto values = top.GetElement();
-    const auto it{find_if(begin(values), end(values),
-                          [](const auto n) { return n != 0; })};
-    BOOST_CHECK_EQUAL(distance(begin(values), it), values.size() - 1);
-    BOOST_CHECK_EQUAL(1, values[values.size() - 1]);
-}
-
-BOOST_AUTO_TEST_CASE(op_lshift_far)
-{
-    constexpr vector<uint8_t>::size_type size{INT32_MAX / 8};
-    std::vector<uint8_t> data(size + 1l, 0x0);
-    data[size] = 0x1;
-
-    auto source = task::CCancellationSource::Make();
-    LimitedStack stack = LimitedStack({data}, INT64_MAX);
-    const auto flags{SCRIPT_UTXO_AFTER_GENESIS};
-    ScriptError err;
-    const auto r =
-        EvalScript(GlobalConfig::GetConfig(), true, source->GetToken(), stack,
-                   CScript() << (size * 8) + 7 << OP_LSHIFT, flags,
-                   BaseSignatureChecker{}, &err);
-    BOOST_CHECK(r.value());
-    BOOST_CHECK_EQUAL(SCRIPT_ERR_OK, err);
-    const auto top = stack.front();
-    const auto values = top.GetElement();
-    const auto it{find_if(begin(values), end(values),
-                          [](const auto n) { return n != 0; })};
-    BOOST_CHECK_EQUAL(distance(begin(values), it), 0);
-    BOOST_CHECK_EQUAL(0x80, values[0]);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
