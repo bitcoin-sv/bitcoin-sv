@@ -2600,14 +2600,19 @@ bool IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew)
 {
     AssertLockHeld(cs_safeModeLevelForks);
 
-    for (auto const& fork : safeModeForks)
+    // if we received only header then block is not yet part of the fork 
+    // so check only for blocks with data
+    if (pindexNew->nStatus.hasData())
     {
-        auto pindexWalk = fork.first;
-        while (pindexWalk && pindexWalk != fork.second)
+        for (auto const& fork : safeModeForks)
         {
-            if (pindexWalk == pindexNew)
-                return true;
-            pindexWalk = pindexWalk->pprev;
+            auto pindexWalk = fork.first;
+            while (pindexWalk && pindexWalk != fork.second)
+            {
+                if (pindexWalk == pindexNew)
+                    return true;
+                pindexWalk = pindexWalk->pprev;
+            }
         }
     }
     return false;
