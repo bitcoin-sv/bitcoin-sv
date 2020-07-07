@@ -424,8 +424,10 @@ void getrawmempool(const Config &config, const JSONRPCRequest &request, HTTPRequ
     }
 }
 
-UniValue getrawnonfinalmempool(const Config &config,
-                               const JSONRPCRequest &request) {
+void getrawnonfinalmempool(const Config &config,
+                            const JSONRPCRequest &request, HTTPRequest& httpReq,
+                            bool processedInBatch)
+{
     if (request.fHelp || request.params.size() > 0) {
         throw std::runtime_error(
             "getrawnonfinalmempool\n"
@@ -442,12 +444,36 @@ UniValue getrawnonfinalmempool(const Config &config,
             HelpExampleRpc("getrawnonfinalmempool", ""));
     }
 
-    UniValue arr{UniValue::VARR};
-    for (const uint256 &txid : mempool.getNonFinalPool().getTxnIDs()) {
-        arr.push_back(txid.ToString());
+    if (!processedInBatch)
+    {
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
     }
 
-    return arr;
+    {
+        CHttpTextWriter httpWriter(httpReq);
+        CJSONWriter jWriter(httpWriter, false);
+
+        httpWriter.Write("{\"result\": ");
+
+        jWriter.writeBeginArray();
+        for (const uint256 &txid : mempool.getNonFinalPool().getTxnIDs())
+        {
+            jWriter.pushV(txid.ToString());
+        }
+
+        jWriter.writeEndArray();
+
+        jWriter.pushKV("error", nullptr);
+        jWriter.pushKV("id", request.id.write());
+        httpWriter.Write("}");
+        jWriter.flush();
+    }
+
+    if (!processedInBatch)
+    {
+        httpReq.StopWritingChunks();
+    }
 }
 
 void getmempoolancestors(const Config &config,
