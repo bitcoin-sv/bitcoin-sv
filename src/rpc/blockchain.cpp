@@ -732,7 +732,7 @@ void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
     if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
         jsonRPCReq.params.size() > 2) {
         throw std::runtime_error(
-            "getblock \"blockhash\" ( verbosity ) \n"
+            "getblock \"blockhash\" ( verbosity )\n"
             "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is "
             "serialized, "
             "hex-encoded data for block 'hash'.\n"
@@ -880,7 +880,7 @@ void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
     if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
         jsonRPCReq.params.size() > 2) {
         throw std::runtime_error(
-            "getblockbyheight height ( verbosity ) \n"
+            "getblockbyheight height ( verbosity )\n"
             "\nIf verbosity is 0 or RAW_BLOCK, returns a string that is "
             "serialized, "
             "hex-encoded data for block 'hash'.\n"
