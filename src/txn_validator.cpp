@@ -348,6 +348,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         nMaxTxnValidatorAsyncTasksRunDuration -= mConfig.GetMaxNonStdTxnValidationDuration();
         // Get mempool limits.
         size_t nMaxMempoolSize = mConfig.GetMaxMempool();
+        size_t nMaxMempoolSizeDisk = mConfig.GetMaxMempoolSizeDisk();
         unsigned long nMempoolExpiry = mConfig.GetMemPoolExpiry();
         // The main running loop
         while(mRunning) {

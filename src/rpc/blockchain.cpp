@@ -2294,7 +2294,9 @@ UniValue mempoolInfoToJSON(const Config& config) {
         Pair("nonfinalusage",
              (int64_t)mempool.getNonFinalPool().estimateMemoryUsage()));
     size_t maxmempool = config.GetMaxMempool();
+    size_t maxmempoolsizedisk = config.GetMaxMempoolSizeDisk();
     ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
+    ret.push_back(Pair("maxmempoolsizedisk", (int64_t)maxmempoolsizedisk));
     ret.push_back(
         Pair("mempoolminfee",
              ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK())));

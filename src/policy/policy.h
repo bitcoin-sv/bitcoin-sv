@@ -95,6 +95,9 @@ static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
 /** Default for -maxscriptsizepolicy **/
 static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
+/** Default -maxmempoolsizedisk, maximum megabytes of total mempool disk usage (memory usage included) */
+static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE_DISK = 10 * DEFAULT_MAX_MEMPOOL_SIZE;
+
 /**
  * Min feerate for defining dust. Historically this has been the same as the
  * minRelayTxFee, however changing the dust limit changes which transactions are

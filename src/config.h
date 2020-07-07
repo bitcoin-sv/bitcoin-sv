@@ -166,6 +166,9 @@ public:
     virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
     virtual uint64_t GetMaxMempool() const = 0;
 
+    virtual bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) = 0;
+    virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
+
     virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
     virtual uint64_t GetMemPoolExpiry() const = 0;
 
@@ -349,6 +352,9 @@ public:
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override;
     uint64_t GetMaxMempool() const override;
 
+    bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) override;
+    uint64_t GetMaxMempoolSizeDisk() const override;
+
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override;
     uint64_t GetMemPoolExpiry() const override;
 
@@ -455,6 +461,7 @@ private:
     uint64_t mMaxCoinsProviderCacheSize;
 
     uint64_t mMaxMempool;
+    uint64_t mMaxMempoolSizeDisk;
     uint64_t mMemPoolExpiry;
     uint64_t mLimitFreeRelay;
     uint64_t mMaxOrphanTxSize;
@@ -730,6 +737,14 @@ public:
         return true;
     }
     uint64_t GetMaxMempool() const override { return DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE; }
+
+    bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMaxMempoolSizeDisk() const override { return DEFAULT_MAX_MEMPOOL_SIZE_DISK * ONE_MEGABYTE; }
 
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override
     {

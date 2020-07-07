@@ -72,6 +72,7 @@ void GlobalConfig::Reset()
     mMaxCoinsProviderCacheSize = 0;
     
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
+    mMaxMempoolSizeDisk = DEFAULT_MAX_MEMPOOL_SIZE_DISK * ONE_MEGABYTE;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
     mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
@@ -1165,7 +1166,7 @@ uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus)
 }
 
 bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
-    if (LessThanZero(maxMempool, err, "Policy value for maximum memory pool must not be less than 0."))
+    if (LessThanZero(maxMempool, err, "Policy value for maximum resident memory pool must not be less than 0."))
     {
         return false;
     }
@@ -1173,7 +1174,7 @@ bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
     {
         if (err)
         {
-            *err = strprintf(_("Policy value for maximum memory pool must be at least %d MB"), std::ceil(DEFAULT_MAX_MEMPOOL_SIZE * 0.3));
+            *err = strprintf(_("Policy value for maximum resident memory pool must be at least %d MB"), std::ceil(DEFAULT_MAX_MEMPOOL_SIZE * 0.3));
         }
         return false;
     }
@@ -1185,6 +1186,21 @@ bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
 
 uint64_t GlobalConfig::GetMaxMempool() const {
     return mMaxMempool;
+}
+
+bool GlobalConfig::SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) {
+    if (LessThanZero(maxMempoolSizeDisk, err, "Policy value for maximum on-disk memory pool must not be less than 0."))
+    {
+        return false;
+    }
+
+    mMaxMempoolSizeDisk = static_cast<uint64_t>(maxMempoolSizeDisk);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxMempoolSizeDisk() const {
+    return mMaxMempoolSizeDisk;
 }
 
 bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
