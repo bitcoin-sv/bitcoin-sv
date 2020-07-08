@@ -21,7 +21,7 @@ from test_framework.mininode import NetworkThread
 
 from .authproxy import JSONRPCException
 from . import coverage
-from .test_node import TestNode, TestNode_process_list
+from .test_node import TestNode, TestNode_process_list, BITCOIND_PROC_WAIT_TIMEOUT
 from .util import (
     MAX_NODES,
     PortSeed,
@@ -72,6 +72,7 @@ class BitcoinTestFramework():
         self.nodes = []
         self.mocktime = 0
         self.runNodesWithRequiredParams = True
+        self.bitcoind_proc_wait_timeout = BITCOIND_PROC_WAIT_TIMEOUT
         self.set_test_params()
 
         assert hasattr(
@@ -341,7 +342,7 @@ class BitcoinTestFramework():
     def stop_node(self, i):
         """Stop a bitcoind test node"""
         self.nodes[i].stop_node()
-        self.nodes[i].wait_until_stopped()
+        self.nodes[i].wait_until_stopped(timeout=self.bitcoind_proc_wait_timeout)
 
     def stop_nodes(self):
         """Stop multiple bitcoind test nodes"""
@@ -351,7 +352,7 @@ class BitcoinTestFramework():
 
         for node in self.nodes:
             # Wait for nodes to stop
-            node.wait_until_stopped()
+            node.wait_until_stopped(timeout=self.bitcoind_proc_wait_timeout)
 
     def restart_node(self, i, extra_args=None):
         """Stop and start a test node"""
