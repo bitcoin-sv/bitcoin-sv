@@ -42,12 +42,10 @@ class StallingTest(ComparisonTestFramework):
         block = self.chain.next_block
         node = get_rpc_proxy(self.nodes[0].url, 1, timeout=6000, coveragedir=self.nodes[0].coverage_dir)
 
-        # Create a new block
+        # Create a new block & setup initial chain with spendable outputs
         self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
-
         test, out, _ = prepare_init_chain(self.chain, self.num_blocks, self.num_blocks+1)
         yield test
 
