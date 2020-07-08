@@ -34,7 +34,11 @@ public:
      */
     bool AddTransaction(const uint256 &txid, const CTransactionRef &tx);
 
-    
+    /*
+     * Used to add a batch of new transactions into the database
+     */
+    bool AddTransactions(std::vector<CTransactionRef> &txs);
+
     /*
      * Used to retrieve transaction from the database.
      */

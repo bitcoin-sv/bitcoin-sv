@@ -953,20 +953,35 @@ size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue) {
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const CJournalChangeSetPtr& changeSet,
-    size_t limit,
+    size_t limitMemory,
+    size_t limitDisk,
     unsigned long age) {
+
+    size_t limitTotal = limitMemory + limitDisk;
 
     int expired = pool.Expire(GetTime() - age, changeSet);
     if (expired != 0) {
         LogPrint(BCLog::MEMPOOL,
                  "Expired %i transactions from the memory pool\n", expired);
     }
+    size_t usageTotal = pool.DynamicMemoryUsage();
 
     std::vector<COutPoint> vNoSpendsRemaining;
-    std::vector<TxId> vRemovedTxIds = pool.TrimToSize(
-                                                limit,
-                                                changeSet,
-                                                &vNoSpendsRemaining);
+    std::vector<TxId> vRemovedTxIds;
+
+    if (usageTotal > limitTotal)
+    {
+        size_t targetSize = limitTotal;
+        vRemovedTxIds =
+            pool.TrimToSize(targetSize, changeSet, &vNoSpendsRemaining);
+        usageTotal = pool.DynamicMemoryUsage();
+    }
+    size_t usageDisk = pool.GetDiskUsage();
+    size_t usageMemory = usageTotal - usageDisk;
+    if (usageMemory > limitMemory) {
+        size_t toWriteOut = usageMemory - limitMemory;
+        pool.SaveTxsToDiskBatch(toWriteOut);
+    }
     pcoinsTip->Uncache(vNoSpendsRemaining);
     return vRemovedTxIds;
 }
@@ -1010,6 +1025,7 @@ void CommitTxToMempool(
             pool,
             changeSet,
             GlobalConfig::GetConfig().GetMaxMempool(),
+            GlobalConfig::GetConfig().GetMaxMempoolSizeDisk(),
             GlobalConfig::GetConfig().GetMemPoolExpiry());
         if (!pool.Exists(txid)) {
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,

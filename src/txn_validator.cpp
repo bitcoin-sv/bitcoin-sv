@@ -297,6 +297,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
                 mMempool,
                 changeSet,
                 mConfig.GetMaxMempool(),
+                mConfig.GetMaxMempoolSizeDisk(),
                 mConfig.GetMemPoolExpiry());
     }
     // Execute post processing steps.
@@ -432,6 +433,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                         mMempool,
                                         handlers.mJournalChangeSet,
                                         nMaxMempoolSize,
+                                        nMaxMempoolSizeDisk,
                                         nMempoolExpiry)
                                 };
                                 // Execute post processing steps.

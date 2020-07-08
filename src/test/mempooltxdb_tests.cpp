@@ -15,6 +15,7 @@ mining::CJournalChangeSetPtr nullChangeSet{nullptr};
 BOOST_FIXTURE_TEST_SUITE(mempooltxdb_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(save_on_full_mempool)
 {
+    mempool.Clear();
     TestMemPoolEntryHelper entry;
     // Parent transaction with three children, and three grand-children:
     CMutableTransaction txParent;
@@ -46,7 +47,7 @@ BOOST_AUTO_TEST_CASE(save_on_full_mempool)
 
     // Nothing in pool, remove should do nothing:
     unsigned int poolSize = mempool.Size();
-    mempool.SaveTxsToDisk(10000);
+    mempool.SaveTxsToDiskBatch(10000);
     BOOST_CHECK_EQUAL(mempool.Size(), poolSize);
     uint64_t diskUsage;
     uint64_t sizeTXsAdded = 0;
@@ -66,10 +67,8 @@ BOOST_AUTO_TEST_CASE(save_on_full_mempool)
         mempool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), nullChangeSet);
     }
 
-    poolSize = mempool.Size();
-    mempool.SaveTxsToDisk(10000);
-    std::cout << poolSize << std::endl;
-    std::cout << mempool.Size() << std::endl;
+    mempool.SaveTxsToDiskBatch(10000);
+
     auto mi = mempool.mapTx.get<entry_time>().begin();
     while (mi != mempool.mapTx.get<entry_time>().end())
     {

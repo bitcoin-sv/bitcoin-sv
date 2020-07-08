@@ -161,6 +161,7 @@ public:
     const TxId& GetId() const;
 
     void MoveTxToDisk() const;
+    void UpdateMoveTxToDisk() const;
     bool IsInMemory() const;
 };
 
@@ -250,6 +251,7 @@ public:
     bool IsCPFPGroupMember() const { return group != nullptr; }
 
     void MoveTxToDisk() const;
+    void UpdateMoveTxToDisk() const;
     bool IsInMemory() const;
 };
 
@@ -609,6 +611,8 @@ public:
     uint64_t GetDiskUsage();
 
     void SaveTxsToDisk(uint64_t required_size);
+    void UpdateMoveTxsToDisk(std::vector<const CTxMemPoolEntry*> toBeUpdated);
+    void SaveTxsToDiskBatch(uint64_t requiredSize);
 
 public:
     /**

@@ -3,7 +3,6 @@
 // LICENSE.
 
 #include "mempooltxdb.h"
-#include "txmempool.h"
 #include <core_read.cpp>
 
 CMempoolTxDB::CMempoolTxDB(size_t nCacheSize, bool fMemory, bool fWipe)
@@ -26,6 +25,24 @@ bool CMempoolTxDB::AddTransaction(
 
     return mempoolTxDB.WriteBatch(batch, true);
 
+}
+
+bool CMempoolTxDB::AddTransactions(std::vector<CTransactionRef> &txs) {
+    CDBBatch batch(mempoolTxDB);
+    uint64_t diskUsage;
+    if (!GetDiskUsage(diskUsage)) 
+    {
+        diskUsage = 0;
+    }
+    for (unsigned int i = 0; i < txs.size(); i++)
+    {
+        CTransactionRef tx = txs[i];
+        batch.Write(std::make_pair(DB_TRANSACTIONS, tx->GetId()), tx);
+
+        diskUsage += tx->GetTotalSize();
+    }
+    batch.Write(DB_DISK_USAGE, diskUsage);
+    return mempoolTxDB.WriteBatch(batch, true);
 }
 
 bool CMempoolTxDB::GetTransaction(const uint256 &txid, CTransactionRef &tx) {

@@ -668,13 +668,15 @@ size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
  * @param pool A reference to the mempool
  * @param changeSet A reference to the Jorunal ChangeSet
  * @param limit A size limit for txn to remove
+ * @param limit A size limit for txn to move to disk
  * @param age Time limit for txn to remove
  * @return A vector with all TxIds which were removed from the mempool
  */
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const mining::CJournalChangeSetPtr& changeSet,
-    size_t limit,
+    size_t limitMemory,
+    size_t limitDisk,
     unsigned long age);
 
 /**

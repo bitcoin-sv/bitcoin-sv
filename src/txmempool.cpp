@@ -158,6 +158,10 @@ void CTransactionRefWrapper::MoveTxToDisk() const {
     }
 }
 
+void CTransactionRefWrapper::UpdateMoveTxToDisk() const {
+    tx = nullptr;
+}
+
 bool CTransactionRefWrapper::IsInMemory() const
 {
     return tx != nullptr;
@@ -212,6 +216,10 @@ void CTxMemPoolEntry::UpdateLockPoints(const LockPoints &lp) {
 
 void CTxMemPoolEntry::MoveTxToDisk() const {
     tx.MoveTxToDisk();
+}
+
+void CTxMemPoolEntry::UpdateMoveTxToDisk() const {
+    tx.UpdateMoveTxToDisk();
 }
 
 bool CTxMemPoolEntry::IsInMemory() const {
@@ -1172,6 +1180,46 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize)
             mi++;
         }
 
+    }
+}
+
+void CTxMemPool::UpdateMoveTxsToDisk(std::vector<const CTxMemPoolEntry*> toBeUpdated) {
+    for (const CTxMemPoolEntry* entry : toBeUpdated)
+    {
+        entry->UpdateMoveTxToDisk();
+    }
+}
+
+void CTxMemPool::SaveTxsToDiskBatch(uint64_t requiredSize) {
+    /* Decide which transactions we want to store first */
+    auto mi = mapTx.get<entry_time>().begin();
+    uint64_t movedToDiskSize = 0;
+    std::vector<CTransactionRef> toBeMoved;
+    std::vector<const CTxMemPoolEntry*> toBeUpdated;
+    if (!mempoolTxDB) {
+        InitMempoolTxDB();
+    }
+    while (movedToDiskSize < requiredSize && !mapTx.empty() &&
+           mi != mapTx.get<entry_time>().end()) {
+        if (mi->IsInMemory()) {
+            toBeMoved.push_back(mi->GetSharedTx());
+            toBeUpdated.push_back(&*mi);
+            movedToDiskSize += mi->GetTxSize();
+            mi++;
+        }
+    }
+    if (mempoolTxDB->AddTransactions(toBeMoved))
+    {
+        UpdateMoveTxsToDisk(toBeUpdated);
+    }
+    else
+    {
+        LogPrint(BCLog::MEMPOOL, "WriteBatch failed. Transactions were not moved to DB successfully.");
+    }
+    
+    if (movedToDiskSize < requiredSize)
+    {
+        LogPrint(BCLog::MEMPOOL, "Less than required amount of memory was freed. Required: %d,  freed: %d\n", requiredSize, movedToDiskSize);
     }
 }
 
