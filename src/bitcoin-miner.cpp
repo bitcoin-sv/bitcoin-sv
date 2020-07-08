@@ -61,7 +61,7 @@ bool static ScanHash(const CBlockHeader *pblock, uint32_t &nNonce, uint256 *phas
 
         // Return the nonce if the hash has at least some zero bits,
         // caller will check if it has enough to reach the target
-        if (((uint16_t *)phash)[15] == 0)
+        if (*std::next(phash->begin(), 31) == 0 && *std::next(phash->begin(), 30) == 0)
             return true;
 
         // If nothing found after trying for a while, return -1
@@ -246,7 +246,7 @@ static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coin
         {
             ++nExtraNonce;
             unsigned char *pbytes = (unsigned char *)coinbaseBytes.data();            
-            *(extra_nonce_type *)(pbytes + offset_extra_nonce) = nExtraNonce;
+            memcpy(pbytes + offset_extra_nonce, &nExtraNonce, sizeof(nExtraNonce));
             uint256 hash;
             CHash256().Write(pbytes, coinbaseBytes.size()).Finalize(hash.begin());
 
