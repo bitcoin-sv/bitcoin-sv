@@ -194,7 +194,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
             except OSError:
                 # probably a crash on db flushing
                 nodei_utxo_hash = self.restart_node(
-                    i, self.nodes[3].getblock(getbestblockhash(),1)['height'])
+                    i, self.nodes[3].getblock(self.nodes[3].getbestblockhash(),1)['height'])
             assert_equal(nodei_utxo_hash, node3_utxo_hash)
 
     def generate_small_transactions(self, node, count, utxo_list):
