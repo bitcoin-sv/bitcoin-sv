@@ -84,7 +84,7 @@ class COrphanTxns {
     /** Limit a number of orphan transactions size */
     unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, bool fSkipRndEviction=false);
     /** Collect dependent transactions which might be processed later */
-    std::vector<TxInputDataSPtr> collectDependentTxnsForRetry();
+    std::vector<TxInputDataSPtr> collectDependentTxnsForRetry(const TxIdTrackerWPtr& pTxIdTracker = TxIdTrackerWPtr{});
     /** Collect txn's outpoints which will be used to find any dependant orphan txn */
     void collectTxnOutpoints(const CTransaction& tx);
     /** Erase collected outpoints */

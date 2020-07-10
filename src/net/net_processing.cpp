@@ -1086,8 +1086,11 @@ bool IsTxnKnown(const CInv &inv) {
                mempool.Exists(inv.hash) ||
                mempool.getNonFinalPool().exists(inv.hash) ||
                mempool.getNonFinalPool().recentlyRemoved(inv.hash) ||
-               g_connman->CheckOrphanTxnExists(inv.hash) ||
-               g_connman->CheckTxnExistsInValidatorsQueue(inv.hash) ||
+               // A call to the TxIdTracker is sufficient to verify, if currently:
+               // - txn is already received from the network and then moved into ptv queues
+               // - txn is already detected as an orphan and it is still being kept
+               //   (until evicted or accepted)
+               g_connman->GetTxIdTracker()->Contains(TxId(inv.hash)) ||
                // It is safe to refer to pcoinsTip (without holding cs_main) as:
                // - pcoinsTip is initialized before CConnman object is created
                // - HaveCoinInCache is protected by an internal mtx
@@ -2380,14 +2383,15 @@ static void ProcessTxMessage(const Config& config,
         // By default, treat a received txn as a 'high' priority txn.
         // If the validation timeout occurs the txn is moved to the 'low' priority queue.
         connman.EnqueueTxnForValidator(
-					std::make_shared<CTxInputData>(
-                                        TxSource::p2p,  // tx source
-                                        TxValidationPriority::high,  // tx validation priority
-                                        std::move(ptx), // a pointer to the tx
-                                        GetTime(),      // nAcceptTime
-                                        true,           // fLimitFree
-                                        Amount(0),      // nAbsurdFee
-                                        pfrom));        // pNode
+            std::make_shared<CTxInputData>(
+                connman.GetTxIdTracker(),
+                std::move(ptx), // a pointer to the tx
+                TxSource::p2p,  // tx source
+                TxValidationPriority::high,  // tx validation priority
+                GetTime(),      // nAcceptTime
+                true,           // fLimitFree
+                Amount(0),      // nAbsurdFee
+                pfrom));        // pNode
     } else {
         // Always relay transactions received from whitelisted peers,
         // even if they were already in the mempool or rejected from it

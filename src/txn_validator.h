@@ -7,13 +7,13 @@
 #include "orphan_txns.h"
 #include "txn_double_spend_detector.h"
 #include "txn_handlers.h"
-#include "txn_validation_data.h"
 #include "txn_recent_rejects.h"
+#include "txn_util.h"
+#include "txn_validation_data.h"
 
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
-#include <mutex>
 #include <shared_mutex>
 #include <thread>
 #include <vector>
@@ -64,7 +64,8 @@ class CTxnValidator final
     CTxnValidator(
         const Config& mConfig,
         CTxMemPool& mpool,
-        TxnDoubleSpendDetectorSPtr dsDetector);
+        TxnDoubleSpendDetectorSPtr dsDetector,
+        TxIdTrackerWPtr pTxIdTracker);
     ~CTxnValidator();
 
     // Forbid copying/assignment
@@ -110,9 +111,9 @@ class CTxnValidator final
     /** Get a pointer to the object which controls recently rejected txns */
     std::shared_ptr<CTxnRecentRejects> getTxnRecentRejectsPtr();
 
-    /** Wait for the Validator to process all queued txns (through asynch interface) */
-    void waitForEmptyQueue(bool fCheckOrphanQueueEmpty=true);
-
+    /**
+     * An interface to query validator's state.
+     */
     /** Get number of transactions that are still unvalidated */
     size_t GetTransactionsInQueueCount() const;
 
@@ -120,8 +121,14 @@ class CTxnValidator final
     uint64_t GetStdQueueMemUsage() const { return mStdTxnsMemSize; }
     uint64_t GetNonStdQueueMemUsage() const { return mNonStdTxnsMemSize; }
 
+    /**
+     * An interface to facilitate Unit Tests.
+     */
+    /** Wait for the Validator to process all queued txns (through asynch interface) */
+    void waitForEmptyQueue(bool fCheckOrphanQueueEmpty=true);
+
     /** Check if the given txn is already queued for processing (or being processed)
-     *  in asynch mode by the Validator */
+     *  in asynch mode by the Validator. */
     bool isTxnKnown(const uint256& txid) const;
 
   private:
@@ -188,9 +195,9 @@ class CTxnValidator final
     inline bool isSpaceForTxnNL(const TxInputDataSPtr& txn, const std::atomic<uint64_t>& currMemUsage) const;
 
     /** Add a standard txn to the queue */
-    void enqueueStdTxnNL(const TxInputDataSPtr& txn);
+    bool enqueueStdTxnNL(const TxInputDataSPtr& txn);
     /** Add a non-standard txn to the queue */
-    void enqueueNonStdTxnNL(const TxInputDataSPtr& txn);
+    bool enqueueNonStdTxnNL(const TxInputDataSPtr& txn);
 
     /** Add some txns (standard or non-standard) to the queue */
     template<typename Iterator, typename Callable>
@@ -267,6 +274,8 @@ class CTxnValidator final
     TxnRecentRejectsSPtr mpTxnRecentRejects {nullptr};
     /** Double spend detector */
     TxnDoubleSpendDetectorSPtr mpTxnDoubleSpendDetector {nullptr};
+    /** A weak pointer to the TxIdTracker */
+    TxIdTrackerWPtr mpTxIdTracker {};
 
     /** Our main thread */
     std::thread mNewTxnsThread {};

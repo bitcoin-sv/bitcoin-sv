@@ -272,6 +272,8 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
 
         // Take a reference to the validator.
         const auto& txValidator { g_connman->getTxnValidator() };
+        // A pointer to the TxIdTracker.
+        const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
         while(numTxns--)
         {
             CTransactionRef tx {};
@@ -290,14 +292,15 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
-                                        std::make_shared<CTxInputData>(
-                                                            TxSource::file, // tx source
-                                                            standard ? TxValidationPriority::high : TxValidationPriority::low,
-                                                            tx,    // a pointer to the tx
-                                                            nTime, // nAcceptTime
-                                                            true),  // fLimitFree
-                                        changeSet, // an instance of the mempool journal
-                                        true) // fLimitMempoolSize
+                        std::make_shared<CTxInputData>(
+                            pTxIdTracker, // a pointer to the TxIdTracker
+                            tx,    // a pointer to the tx
+                            TxSource::file, // tx source
+                            standard ? TxValidationPriority::high : TxValidationPriority::low,
+                            nTime, // nAcceptTime
+                            true),  // fLimitFree
+                        changeSet, // an instance of the mempool journal
+                        true) // fLimitMempoolSize
                 };
 
                 // Check results
@@ -535,6 +538,8 @@ void CTimeLockedMempool::periodicChecks()
 
     std::unique_lock lock { mMtx };
 
+    // A pointer to the TxIdTracker.
+    const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
     // Iterate over transactions in unlocking time order
     auto& index { mTransactionMap.get<TagUnlockingTime>() };
     auto it { index.begin() };
@@ -560,9 +565,10 @@ void CTimeLockedMempool::periodicChecks()
             bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->nHeight + 1, reason) };
             g_connman->EnqueueTxnForValidator(
                 std::make_shared<CTxInputData>(
+                    pTxIdTracker,
+                    txn,
                     TxSource::finalised,
                     standard ? TxValidationPriority::high : TxValidationPriority::low,
-                    txn,
                     GetTime()));
         }
         // Purge age passed?

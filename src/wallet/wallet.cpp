@@ -4571,14 +4571,15 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
     // to wait until the transaction is processed.
     const auto& txValidator = g_connman->getTxnValidator();
     state = txValidator->processValidation(
-                            std::make_shared<CTxInputData>(
-                                                TxSource::wallet, // tx source
-                                                TxValidationPriority::normal, // tx validation priority
-                                                tx,           // a pointer to the tx
-                                                GetTime(),    // nAcceptTime
-                                                true,         // fLimitFree
-                                                nAbsurdFee),  // nAbsurdFee
-                            changeSet, // an instance of the mempool journal
-                            true); // fLimitMempoolSize
+        std::make_shared<CTxInputData>(
+            g_connman->GetTxIdTracker(),
+            tx,           // a pointer to the tx
+            TxSource::wallet, // tx source
+            TxValidationPriority::normal, // tx validation priority
+            GetTime(),    // nAcceptTime
+            true,         // fLimitFree
+            nAbsurdFee),  // nAbsurdFee
+        changeSet, // an instance of the mempool journal
+        true); // fLimitMempoolSize
     return state.IsValid();
 }

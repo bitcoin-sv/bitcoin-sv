@@ -32,9 +32,10 @@ namespace {
             GetScriptForDestination(key.GetPubKey().GetID());
         // Return a shared object with txn's input data
         return std::make_shared<CTxInputData>(
-                                    source,                   // tx source
-                                    TxValidationPriority::normal,          // tx validation priority
-                                    MakeTransactionRef(tx));  // a pointer to the tx
+                   g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
+                   MakeTransactionRef(tx),  // a pointer to the tx
+                   source,                   // tx source
+                   TxValidationPriority::normal);          // tx validation priority
     }
 }
 

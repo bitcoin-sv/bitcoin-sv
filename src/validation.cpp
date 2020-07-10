@@ -2125,12 +2125,13 @@ static void UpdateMempoolForReorg(const Config &config,
             mempool.RemoveRecursive(**it, changeSet, MemPoolRemovalReason::REORG);
         } else {
             vTxInputData.emplace_back(
-                    std::make_shared<CTxInputData>(
-                                        TxSource::reorg,  // tx source
-                                        TxValidationPriority::normal,  // tx validation priority
-                                        *it,              // a pointer to the tx
-                                        GetTime(),        // nAcceptTime
-                                        false));          // fLimitFree
+                std::make_shared<CTxInputData>(
+                    TxIdTrackerWPtr{}, // TxIdTracker is not used during reorgs
+                    *it,              // a pointer to the tx
+                    TxSource::reorg,  // tx source
+                    TxValidationPriority::normal,  // tx validation priority
+                    GetTime(),        // nAcceptTime
+                    false));          // fLimitFree
         }
         ++it;
     }
@@ -7364,6 +7365,8 @@ bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownT
         double prioritydummy = 0;
         // Take a reference to the validator.
         const auto& txValidator = g_connman->getTxnValidator();
+        // A pointer to the TxIdTracker.
+        const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
         while (num--) {
             CTransactionRef tx;
             int64_t nTime;
@@ -7385,14 +7388,15 @@ bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownT
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
-                                        std::make_shared<CTxInputData>(
-                                                            TxSource::file, // tx source
-                                                            TxValidationPriority::normal,  // tx validation priority
-                                                            tx,    // a pointer to the tx
-                                                            nTime, // nAcceptTime
-                                                            true),  // fLimitFree
-                                        changeSet, // an instance of the mempool journal
-                                        true) // fLimitMempoolSize
+                        std::make_shared<CTxInputData>(
+                            pTxIdTracker, // a pointer to the TxIdTracker
+                            tx,    // a pointer to the tx
+                            TxSource::file, // tx source
+                            TxValidationPriority::normal,  // tx validation priority
+                            nTime, // nAcceptTime
+                            true),  // fLimitFree
+                        changeSet, // an instance of the mempool journal
+                        true) // fLimitMempoolSize
                 };
                 // Check results
                 if (state.IsValid()) {

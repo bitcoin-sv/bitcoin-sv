@@ -1201,15 +1201,16 @@ static UniValue sendrawtransaction(const Config &config,
         const auto& txValidator = g_connman->getTxnValidator();
         const CValidationState& status {
             txValidator->processValidation(
-                            std::make_shared<CTxInputData>(
-                                                TxSource::rpc, // tx source
-                                                TxValidationPriority::normal, // tx validation priority
-                                                std::move(tx), // a pointer to the tx
-                                                GetTime(),     // nAcceptTime
-                                                false,         // fLimitFree
-                                                nMaxRawTxFee), // nAbsurdFee
-                            changeSet, // an instance of the journal
-                            true) // fLimitMempoolSize
+                std::make_shared<CTxInputData>(
+                    g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
+                    std::move(tx), // a pointer to the tx
+                    TxSource::rpc, // tx source
+                    TxValidationPriority::normal, // tx validation priority
+                    GetTime(),     // nAcceptTime
+                    false,         // fLimitFree
+                    nMaxRawTxFee), // nAbsurdFee
+                changeSet, // an instance of the journal
+                true) // fLimitMempoolSize
         };
         // Check if the transaction was accepted by the mempool.
         // Due to potential race-condition we have to explicitly call exists() instead of

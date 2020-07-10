@@ -52,6 +52,7 @@ class CAddrMan;
 class Config;
 class CNode;
 class CScheduler;
+class CTxIdTracker;
 class CTxnPropagator;
 class CTxnValidator;
 
@@ -381,14 +382,14 @@ public:
         return results;
     }
 
+    /** Get a handle to the TxIdTracker */
+    const TxIdTrackerSPtr& GetTxIdTracker();
     /** Get a handle to our transaction validator */
     std::shared_ptr<CTxnValidator> getTxnValidator();
     /** Enqueue a new transaction for validation */
     void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
     /* Support for a vector */
     void EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData);
-    /** Check if the given txn is already known by the Validator */
-    bool CheckTxnExistsInValidatorsQueue(const uint256& txHash) const;
     /* Find node by it's id */
     CNodePtr FindNodeById(int64_t nodeId);
     /* Erase transaction from the given peer */
@@ -663,6 +664,9 @@ private:
     std::condition_variable condMsgProc;
     std::mutex mutexMsgProc;
     std::atomic<bool> flagInterruptMsgProc;
+
+    /** TxIdTracker */
+    TxIdTrackerSPtr mTxIdTracker {nullptr};
 
     /** Transaction tracker/propagator */
     std::shared_ptr<CTxnPropagator> mTxnPropagator {};

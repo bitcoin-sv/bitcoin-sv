@@ -214,6 +214,8 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         nodes.push_back(pNode);
     }
 
+    // Get a pointer to the TxIdTracker.
+    const TxIdTrackerSPtr& pTxIdTracker = connman->GetTxIdTracker();
     // 50 orphan transactions:
     for (NodeId i = 0; i < 50; i++) {
         CKey key;
@@ -232,13 +234,14 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         // Add txn input data to the queue
         orphanTxns->addTxn(
             std::make_shared<CTxInputData>(
-                                TxSource::p2p, // tx source
-                                TxValidationPriority::normal, // tx validation priority
-                                MakeTransactionRef(tx),  // a pointer to the tx
-                                GetTime(),     // nAcceptTime
-                                false,         // mfLimitFree
-                                Amount(0),     // nAbsurdFee
-                                nodes[i]));    // pNode
+                pTxIdTracker, // a pointer to the TxIdTracker
+                MakeTransactionRef(tx),  // a pointer to the tx
+                TxSource::p2p, // tx source
+                TxValidationPriority::normal, // tx validation priority
+                GetTime(),     // nAcceptTime
+                false,      // mfLimitFree
+                Amount(0),     // nAbsurdFee
+                nodes[i]));    // pNode
     }
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 50);
 
@@ -266,13 +269,14 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         // Add txn input data to the queue
         orphanTxns->addTxn(
             std::make_shared<CTxInputData>(
-                                TxSource::p2p, // tx source
-                                TxValidationPriority::normal, // tx validation priority
-                                MakeTransactionRef(tx),  // a pointer to the tx
-                                GetTime(),     // nAcceptTime
-                                false,         // mfLimitFree
-                                Amount(0),     // nAbsurdFee
-                                pRndTxInputData->mpNode)); // pNode
+                pTxIdTracker, // a pointer to the TxIdTracker
+                MakeTransactionRef(tx),  // a pointer to the tx
+                TxSource::p2p, // tx source
+                TxValidationPriority::normal, // tx validation priority
+                GetTime(),     // nAcceptTime
+                false, // mfLimitFree
+                Amount(0),     // nAbsurdFee
+                pRndTxInputData->mpNode)); // pNode
     }
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 100);
 
@@ -305,13 +309,14 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         // Create a shared object with txn input data
         auto pTxInputData {
             std::make_shared<CTxInputData>(
-                                TxSource::p2p, // tx source
-                                TxValidationPriority::normal, // tx validation priority
-                                MakeTransactionRef(tx),  // a pointer to the tx
-                                GetTime(),     // nAcceptTime
-                                false,         // mfLimitFree
-                                Amount(0),     // nAbsurdFee
-                                pRndTxInputData->mpNode) // pNode
+                pTxIdTracker, // a pointer to the TxIdTracker
+                MakeTransactionRef(tx),  // a pointer to the tx
+                TxSource::p2p, // tx source
+                TxValidationPriority::normal, // tx validation priority
+                GetTime(),     // nAcceptTime
+                false,         // mfLimitFree
+                Amount(0),     // nAbsurdFee
+                pRndTxInputData->mpNode) // pNode
         };
         // Add txn input data to the queue
         orphanTxns->addTxn(pTxInputData);

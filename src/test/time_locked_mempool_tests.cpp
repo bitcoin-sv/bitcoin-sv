@@ -221,12 +221,14 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
     original.vin[0].nSequence = 1;
     original.vout.resize(1);
 
+    const TxIdTrackerSPtr& pTxIdTracker = std::make_shared<CTxIdTracker>();
     CTransactionRef txnRef { MakeTransactionRef(original) };
     TxInputDataSPtr pTxInputData {
         std::make_shared<CTxInputData>(
+            pTxIdTracker,
+            txnRef,
             TxSource::unknown,
             TxValidationPriority::high,
-            txnRef,
             GetTime()
         )
     };

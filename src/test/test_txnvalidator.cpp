@@ -96,30 +96,34 @@ namespace {
                                 std::shared_ptr<CNode> pNode = nullptr) {
         // Return txn's input data
         return std::make_shared<CTxInputData>(
-                                   source,   // tx source
-                                   TxValidationPriority::normal, // tx validation priority
-                                   MakeTransactionRef(spend),// a pointer to the tx
-                                   GetTime(),// nAcceptTime
-                                   false,    // mfLimitFree
-                                   Amount(0),// nAbsurdFee
-                                   pNode);   // pNode
+                   g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
+                   MakeTransactionRef(spend),// a pointer to the tx
+                   source,   // tx source
+                   TxValidationPriority::normal, // tx validation priority
+                   GetTime(),// nAcceptTime
+                   false,    // mfLimitFree
+                   Amount(0), // nAbsurdFee
+                   pNode);   // pNode
     }
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
                                                 std::vector<CMutableTransaction>& spends,
                                                 std::shared_ptr<CNode> pNode = nullptr) {
         std::vector<TxInputDataSPtr> vTxInputData {};
+        // Get a pointer to the TxIdTracker.
+        const TxIdTrackerSPtr& pTxIdTracker = g_connman->GetTxIdTracker();
         for (auto& elem : spends) {
             vTxInputData.
                 emplace_back(
-                        std::make_shared<CTxInputData>(
-                                            source,   // tx source
-                                            TxValidationPriority::normal, // tx validation priority
-                                            MakeTransactionRef(elem),  // a pointer to the tx
-                                            GetTime(),// nAcceptTime
-                                            false,    // mfLimitFree
-                                            Amount(0),// nAbsurdFee
-                                            pNode));   // pNode
+                    std::make_shared<CTxInputData>(
+                        pTxIdTracker, // a pointer to the TxIdTracker
+                        MakeTransactionRef(elem),  // a pointer to the tx
+                        source,   // tx source
+                        TxValidationPriority::normal, // tx validation priority
+                        GetTime(),// nAcceptTime
+                        false,    // mfLimitFree
+                        Amount(0), // nAbsurdFee
+                        pNode));   // pNode
         }
         return vTxInputData;
     }
@@ -132,7 +136,8 @@ namespace {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
                     mempool,
-                    std::make_shared<CTxnDoubleSpendDetector>())
+                    std::make_shared<CTxnDoubleSpendDetector>(),
+                    g_connman->GetTxIdTracker())
         };
         // Clear mempool before validation
         mempool.Clear();
@@ -150,7 +155,8 @@ namespace {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
                     mempool,
-                    std::make_shared<CTxnDoubleSpendDetector>())
+                    std::make_shared<CTxnDoubleSpendDetector>(),
+                    g_connman->GetTxIdTracker())
         };
         // Clear mempool before validation
         mempool.Clear();
@@ -167,7 +173,8 @@ namespace {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
                     mempool,
-                    std::make_shared<CTxnDoubleSpendDetector>())
+                    std::make_shared<CTxnDoubleSpendDetector>(),
+                    g_connman->GetTxIdTracker())
         };
         // Clear mempool before validation
         mempool.Clear();
@@ -192,7 +199,8 @@ namespace {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
                     mempool,
-                    std::make_shared<CTxnDoubleSpendDetector>())
+                    std::make_shared<CTxnDoubleSpendDetector>(),
+                    g_connman->GetTxIdTracker())
         };
         // Clear mempool before validation
         mempool.Clear();
@@ -225,7 +233,8 @@ BOOST_AUTO_TEST_CASE(txn_validator_creation) {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
                 mempool,
-                std::make_shared<CTxnDoubleSpendDetector>())
+                std::make_shared<CTxnDoubleSpendDetector>(),
+                g_connman->GetTxIdTracker())
     };
     // Check if the Validator was created
     BOOST_REQUIRE(txnValidator);
@@ -241,7 +250,8 @@ BOOST_AUTO_TEST_CASE(txn_validator_set_get_frequency) {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
                 mempool,
-                std::make_shared<CTxnDoubleSpendDetector>())
+                std::make_shared<CTxnDoubleSpendDetector>(),
+                g_connman->GetTxIdTracker())
     };
     auto defaultfreq = std::chrono::milliseconds(CTxnValidator::DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS);
     BOOST_CHECK(defaultfreq == txnValidator->getRunFrequency());
@@ -255,7 +265,8 @@ BOOST_AUTO_TEST_CASE(txn_validator_istxnknown) {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
                 mempool,
-                std::make_shared<CTxnDoubleSpendDetector>())
+                std::make_shared<CTxnDoubleSpendDetector>(),
+                g_connman->GetTxIdTracker())
     };
     // Schedule txns for processing.
     txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, spendsN));
@@ -424,7 +435,8 @@ BOOST_AUTO_TEST_CASE(txnvalidator_limit_memory_usage)
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
                 mempool,
-                std::make_shared<CTxnDoubleSpendDetector>())
+                std::make_shared<CTxnDoubleSpendDetector>(),
+                g_connman->GetTxIdTracker())
     };
 
     // Attempt to enqueue all txns and verify that we stopped when we hit the max size limit
@@ -458,7 +470,8 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
                 mempool,
-                std::make_shared<CTxnDoubleSpendDetector>())
+                std::make_shared<CTxnDoubleSpendDetector>(),
+                g_connman->GetTxIdTracker())
     };
     // Case1:
     // spendsN_nValue_OutOfRange (a copy of spendsN) with unsupported nValue amount.

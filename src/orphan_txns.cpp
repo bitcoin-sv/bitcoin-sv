@@ -223,7 +223,7 @@ unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
     return nEvicted;
 }
 
-std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
+std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry(const TxIdTrackerWPtr& pTxIdTracker) {
     std::vector<TxInputDataSPtr> vRetryTxns {};
     std::set<TxInputDataSPtr, CTxnIdComparator> setRetryTxns {};
     {
@@ -277,14 +277,15 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
                 setRetryTxns.
                     insert(
                         std::make_shared<CTxInputData>(
-                                           pTxInputData->mTxSource,   // tx source
-                                           pTxInputData->mTxValidationPriority,     // tx validation priority
-                                           pTxInputData->mpTx,        // a pointer to the tx
-                                           GetTime(),                 // nAcceptTime
-                                           pTxInputData->mfLimitFree, // fLimitFree
-                                           pTxInputData->mnAbsurdFee, // nAbsurdFee
-                                           pTxInputData->mpNode,      // pNode
-                                           pTxInputData->mfOrphan));  // fOrphan
+                            pTxIdTracker,
+                            pTxInputData->mpTx,        // a pointer to the tx
+                            pTxInputData->mTxSource,   // tx source
+                            pTxInputData->mTxValidationPriority,     // tx validation priority
+                            GetTime(),                 // nAcceptTime
+                            pTxInputData->mfLimitFree, // fLimitFree
+                            pTxInputData->mnAbsurdFee, // nAbsurdFee
+                            pTxInputData->mpNode,      // pNode
+                            pTxInputData->mfOrphan));  // fOrphan
             }
             // We cannot simply return all dependent orphan txns to the given tx.vout of the parent tx.
             // The limit for descendant size & counter would not be properly calculated/updated.

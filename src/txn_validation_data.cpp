@@ -68,7 +68,7 @@ CTxInputData::CTxInputData(
     // - a shared pointer to the tracker is reachable
     // - txid is not known yet
     TxIdTrackerSPtr pTracker = mpTxIdTracker.lock();
-    if (pTracker && pTracker->insert(mpTx->GetId())) {
+    if (pTracker && pTracker->Insert(mpTx->GetId())) {
         mfTxIdStored = true;
     }
 }
@@ -83,7 +83,7 @@ CTxInputData::~CTxInputData()
         if (mfTxIdStored) {
             TxIdTrackerSPtr pTracker = mpTxIdTracker.lock();
             if (pTracker) {
-                pTracker->erase(mpTx->GetId());
+                pTracker->Erase(mpTx->GetId());
             }
         }
     } catch(...) {

@@ -68,13 +68,14 @@ namespace {
         tx.vout = vTxnOutputs;
         // Return txn's input data
         return std::make_shared<CTxInputData>(
-                                   source,   // tx source
-                                   TxValidationPriority::normal, // tx validation priority
-                                   MakeTransactionRef(tx),// a pointer to the tx
-                                   0,        // nAcceptTime
-                                   false,    // mfLimitFree
-                                   Amount(0),// nAbsurdFee
-                                   pNode);   // pNode
+                   g_connman->GetTxIdTracker(),
+                   MakeTransactionRef(tx), // a pointer to the tx
+                   source,   // tx source
+                   TxValidationPriority::normal, // tx validation priority
+                   0,        // nAcceptTime
+                   false,    // mfLimitFree
+                   Amount(0), // nAbsurdFee
+                   pNode);   // pNode
     }
     // Populate orphan txn's object with a given number of txns.
     void OrphanTxnsObjectCreateNOrphanTxns(
