@@ -14,6 +14,7 @@ from test_framework.util import get_rpc_proxy, wait_until, check_for_log_msg
 class StallingTest(ComparisonTestFramework):
 
     def set_test_params(self):
+        self.bitcoind_proc_wait_timeout = 120
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.genesisactivationheight = 101
@@ -42,12 +43,10 @@ class StallingTest(ComparisonTestFramework):
         block = self.chain.next_block
         node = get_rpc_proxy(self.nodes[0].url, 1, timeout=6000, coveragedir=self.nodes[0].coverage_dir)
 
-        # Create a new block
+        # Create a new block & setup initial chain with spendable outputs
         self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
-
         test, out, _ = prepare_init_chain(self.chain, self.num_blocks, self.num_blocks+1)
         yield test
 
