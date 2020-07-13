@@ -11,6 +11,15 @@
 #include "serialize.h"
 #include "uint256.h"
 
+struct TxId;
+/**
+ * Specialise std::hash for TxId.
+ */
+namespace std
+{
+    template<> class hash<TxId> : public hash<uint256> {};
+}
+
 static const int SERIALIZE_TRANSACTION = 0x00;
 
 /**
