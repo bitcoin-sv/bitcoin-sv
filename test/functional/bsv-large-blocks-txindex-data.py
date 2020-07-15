@@ -37,7 +37,7 @@ class BlockFileStore(ComparisonTestFramework):
             '-whitelist=127.0.0.1',
             '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
             '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
-            '-maxmempool=%d' % ONE_GIGABYTE * 10,
+            '-maxmempool=%d' % (ONE_GIGABYTE * 10),
             '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
             '-maxscriptsizepolicy=0',
             '-maxstdtxvalidationduration=55000',
