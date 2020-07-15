@@ -240,7 +240,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         self.chain.update_block(3, [spend_tx2, spend_tx3, spend_tx4, spend_tx5, spend_tx6])
         yield self.accepted()
 
-        # Check txn with empty vin is rejected with teh expected code (fix for CORE-430).
+        # Check txn with empty vin is rejected with the expected code (fix for CORE-430).
         tx2 = self.create_locked_transaction(spend_tx2, 0, CScript(), 1000, CScript([OP_TRUE]), nLockTime, 0x00000001)
         tx2.vin = []
         tx2.rehash()
@@ -259,8 +259,7 @@ class BSVGenesis_Restore_nLockTime_nSequence(ComparisonTestFramework):
         tx3 = self.create_locked_transaction(spend_tx3, 0, CScript(), 1000, CScript([OP_TRUE]), nLockTime, 0x00000003)
         tx4 = self.create_locked_transaction(spend_tx4, 0, CScript(), 1000, CScript([OP_TRUE]), nLockTime, 0x00000003)
         tx5 = self.create_locked_transaction(spend_tx5, 0, CScript(), 1000, CScript([OP_TRUE]), nLockTime + 30, 0x00000003)
-        # The transactions should be accepted into the non-final-mempool but not the main mempool and
-        # will not be inv'd over P2P.
+        # The transactions should be accepted into the non-final-mempool but not the main mempool.
         yield TestInstance([[tx3, DiscardResult()], [tx4, DiscardResult()], [tx5, DiscardResult()]])
         mempool = self.nodes[0].getrawmempool()
         nonfinalmempool = self.nodes[0].getrawnonfinalmempool()
