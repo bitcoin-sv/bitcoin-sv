@@ -3974,9 +3974,8 @@ bool FlushStateToDisk(
             // but we have time now (not in the middle of a block processing).
             bool fCacheLarge =
                 mode == FLUSH_STATE_PERIODIC &&
-                cacheSize > std::max((9 * nTotalSpace) / 10,
-                                     nTotalSpace -
-                                         MAX_BLOCK_COINSDB_USAGE * 1024 * 1024);
+                cacheSize > std::max(static_cast<uint64_t>((9 * nTotalSpace) / 10),
+                                     nTotalSpace - MAX_BLOCK_COINSDB_USAGE * ONE_MEBIBYTE);
             // The cache is over the limit, we have to write now.
             bool fCacheCritical =
                 mode == FLUSH_STATE_IF_NEEDED && cacheSize > nTotalSpace;

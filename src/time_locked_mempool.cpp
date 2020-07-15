@@ -18,9 +18,9 @@ using namespace mining;
 CTimeLockedMempool::CTimeLockedMempool()
 {
     // Set some sane default values for config
-    mMaxMemory = DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE * 1024 * 1024;
+    mMaxMemory = DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE * ONE_MEBIBYTE;
     mPeriodRunFreq = DEFAULT_NONFINAL_CHECKS_FREQ;
-    mPurgeAge = DEFAULT_NONFINAL_MEMPOOL_EXPIRY * 60 * 60;
+    mPurgeAge = DEFAULT_NONFINAL_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
 }
 
 // Add or update a time-locked transaction
@@ -360,11 +360,11 @@ void CTimeLockedMempool::loadConfig()
     std::unique_lock lock { mMtx };
 
     // Get max memory size in bytes
-    mMaxMemory = gArgs.GetArgAsBytes("-maxmempoolnonfinal", DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE, 1024 * 1024);
+    mMaxMemory = gArgs.GetArgAsBytes("-maxmempoolnonfinal", DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE, ONE_MEBIBYTE);
     // Get periodic checks run frequency
     mPeriodRunFreq = gArgs.GetArg("-checknonfinalfreq", DEFAULT_NONFINAL_CHECKS_FREQ);
     // Get configured purge age (convert hours to seconds)
-    mPurgeAge = gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * 60 * 60;
+    mPurgeAge = gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * SECONDS_IN_ONE_HOUR;
 }
 
 // Fetch all transactions updated by the given new transaction.

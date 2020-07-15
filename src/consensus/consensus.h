@@ -14,6 +14,14 @@ static const uint64_t ONE_KILOBYTE = 1000;
 static const uint64_t ONE_MEGABYTE = ONE_KILOBYTE * 1000;
 /** 1GB */
 static const uint64_t ONE_GIGABYTE = ONE_MEGABYTE * 1000;
+/** 1KiB = 1024 */
+static const uint64_t ONE_KIBIBYTE = 1024;
+/** 1MiB = 1024 * 1024 */
+static const uint64_t ONE_MEBIBYTE = ONE_KIBIBYTE * 1024;
+/** 1GiB = 1024 * 1024 * 1024 */
+static const uint64_t ONE_GIBIBYTE = ONE_MEBIBYTE * 1024;
+/** 1 hour in seconds */
+static constexpr unsigned SECONDS_IN_ONE_HOUR { 60 * 60 };
 /** The maximum allowed size for a transaction before Genesis, in bytes*/
 static const uint64_t MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS = ONE_MEGABYTE;
 /** The maximum allowed size for a transaction after Genesis (max value of uint32), in bytes */

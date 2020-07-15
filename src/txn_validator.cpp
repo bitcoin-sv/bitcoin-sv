@@ -42,7 +42,7 @@ CTxnValidator::CTxnValidator(
     mMaxQueueMemSize =
         static_cast<uint64_t>(
                 gArgs.GetArgAsBytes("-txnvalidationqueuesmaxmemory",
-                        DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES, 1024 * 1024));
+                        DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES, ONE_MEBIBYTE));
  
     // Create a shared object for rejected transaction
     mpTxnRecentRejects = std::make_shared<CTxnRecentRejects>();

@@ -491,7 +491,7 @@ std::string HelpMessage(HelpMessageMode mode) {
               "(default: 0 = disable pruning blocks, 1 = allow manual pruning "
               "via RPC, >%u = automatically prune block files to stay under "
               "the specified target size in MiB)"),
-            MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
+            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE));
     strUsage += HelpMessageOpt(
         "-reindex-chainstate",
         _("Rebuild chain state from the currently indexed blocks"));
@@ -1763,7 +1763,7 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure memory pool expiry
     if (std::string err; !config.SetMemPoolExpiry(
-        gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60, &err))
+        gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * SECONDS_IN_ONE_HOUR, &err))
     {
         return InitError(err);
     }
@@ -1914,7 +1914,7 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(
             _("Prune cannot be configured with a negative value."));
     }
-    nPruneTarget = (uint64_t)nPruneArg * 1024 * 1024;
+    nPruneTarget = (uint64_t)nPruneArg * ONE_MEBIBYTE;
     if (nPruneArg == 1) { // manual pruning: -prune=1
         LogPrintf("Block pruning enabled.  Use RPC call "
                   "pruneblockchain(height) to manually prune block and undo "
@@ -1926,11 +1926,11 @@ bool AppInitParameterInteraction(Config &config) {
             return InitError(
                 strprintf(_("Prune configured below the minimum of %d MiB.  "
                             "Please use a higher number."),
-                          MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
+                          MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE));
         }
         LogPrintf("Prune configured to target %uMiB on disk for block and undo "
                   "files.\n",
-                  nPruneTarget / 1024 / 1024);
+                  nPruneTarget / ONE_MEBIBYTE);
         fPruneMode = true;
     }
 
@@ -2500,8 +2500,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
     if (gArgs.IsArgSet("-maxuploadtarget")) {
         nMaxOutboundLimit =
-            gArgs.GetArgAsBytes("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET, 1024 *
-                1024);
+            gArgs.GetArgAsBytes("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET, ONE_MEBIBYTE);
     }
 
     // Step 7: load block chain
@@ -2510,7 +2509,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     bool fReindexChainState = gArgs.GetBoolArg("-reindex-chainstate", false);
 
     // cache size calculations
-    int64_t nTotalCache = gArgs.GetArgAsBytes("-dbcache", nDefaultDbCache, 1024 * 1024);
+    int64_t nTotalCache = gArgs.GetArgAsBytes("-dbcache", nDefaultDbCache, ONE_MEBIBYTE);
     // total cache cannot be less than nMinDbCache
     nTotalCache = std::max(nTotalCache, nMinDbCache << 20);
     // total cache cannot be greater than nMaxDbcache
@@ -2533,13 +2532,13 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     int64_t nMempoolSizeMax = config.GetMaxMempool();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
-              nBlockTreeDBCache * (1.0 / 1024 / 1024));
+              nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for chain state database\n",
-              nCoinDBCache * (1.0 / 1024 / 1024));
+              nCoinDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
               "unused mempool space)\n",
-              nCoinCacheUsage * (1.0 / 1024 / 1024),
-              nMempoolSizeMax * (1.0 / 1024 / 1024));
+              nCoinCacheUsage * (1.0 / ONE_MEBIBYTE),
+              nMempoolSizeMax * (1.0 / ONE_MEBIBYTE));
 
     bool fLoaded = false;
     while (!fLoaded && !shutdownToken.IsCanceled()) {

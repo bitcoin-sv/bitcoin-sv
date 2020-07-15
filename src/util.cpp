@@ -270,7 +270,7 @@ int64_t ArgsManager::parseUnit(std::string argValue, int64_t nMultiples)
         }
         else if (matchUnit == "KIB")
         {
-            argNum = std::stold(matchNumber) * 1024;
+            argNum = std::stold(matchNumber) * ONE_KIBIBYTE;
         }
         else if (matchUnit == "MB")
         {
@@ -278,7 +278,7 @@ int64_t ArgsManager::parseUnit(std::string argValue, int64_t nMultiples)
         }
         else if (matchUnit == "MIB")
         {
-            argNum = std::stold(matchNumber) * 1024 * 1024;
+            argNum = std::stold(matchNumber) * ONE_MEBIBYTE;
         }
         else if (matchUnit == "GB")
         {
@@ -286,7 +286,7 @@ int64_t ArgsManager::parseUnit(std::string argValue, int64_t nMultiples)
         }
         else if (matchUnit == "GIB")
         {
-            argNum = std::stold(matchNumber) * 1024 * 1024 * 1024;
+            argNum = std::stold(matchNumber) * ONE_GIBIBYTE;
         }
         else if (matchUnit == "B")
         {

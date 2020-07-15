@@ -373,6 +373,8 @@ private:
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;
 
+    bool LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage);
+
 };
 
 // Dummy for subclassing in unittests
@@ -384,13 +386,13 @@ public:
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override {  }
 
     bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override {
-        if (err) *err = "This is dummy config"; 
+        SetErrorMsg(err);
         return false; 
     }
     uint64_t GetMaxBlockSize() const override { return 0; }
 
     bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override {
-        if (err) *err = "This is dummy config";  
+        SetErrorMsg(err);
         return false; 
     }
     uint64_t GetMaxGeneratedBlockSize() const override { return 0; };
@@ -398,23 +400,20 @@ public:
     bool MaxGeneratedBlockSizeOverridden() const override { return false; }
 
     bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override {
-        if (err) *err = "This is dummy config";  
+        SetErrorMsg(err);
         return false; 
     }
     int64_t GetBlockSizeActivationTime() const override { return 0; }
 
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override {
-        if (err) *err = "This is dummy config";
+        SetErrorMsg(err);
         return false;
     }
     uint8_t GetBlockPriorityPercentage() const override { return 0; }
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
     {
-        if (err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
         maxTxSizePolicy = value;
         return false;
     }
@@ -463,10 +462,7 @@ public:
         int maxConcurrentAsyncTasksPerNode,
         std::string* error = nullptr) override
     {
-        if(error)
-        {
-            *error = "This is dummy config";
-        }
+        SetErrorMsg(error);
 
         return false;
     }
@@ -478,10 +474,7 @@ public:
         int perValidatorThreadMaxBatchSize,
         std::string* error = nullptr) override
     {
-        if(error)
-        {
-            *error = "This is dummy config";
-        }
+        SetErrorMsg(error);
 
         return false;
     }
@@ -527,10 +520,7 @@ public:
 
     bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) override
     {
-        if(err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return false;
     }
@@ -541,10 +531,7 @@ public:
 
     bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override
     {
-        if(err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return false;
     }
@@ -555,7 +542,7 @@ public:
 
     bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override 
     {
-        if (err) *err = "This is dummy config";
+        SetErrorMsg(err);
         maxScriptSizePolicy = static_cast<uint64_t>(maxScriptSizePolicyIn);
         return true; 
     };
@@ -582,10 +569,7 @@ public:
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override
     {
-        if(err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return false;
     }
@@ -593,10 +577,7 @@ public:
 
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override
     {
-        if (err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return true;
     }
@@ -604,21 +585,15 @@ public:
 
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override
     {
-        if (err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return true;
     }
-    uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * 60 * 60; }
+    uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR; }
 
     bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override
     {
-        if (err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return true;
     }
@@ -626,10 +601,7 @@ public:
 
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override
     {
-        if (err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return true;
     }
@@ -637,10 +609,7 @@ public:
 
     bool SetStopAtHeight(int64_t stopAtHeight, std::string* err) override
     {
-        if (err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return true;
     }
@@ -648,10 +617,7 @@ public:
 
     bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) override
     {
-        if (err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return true;
     }
@@ -692,6 +658,14 @@ private:
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;
+
+    void SetErrorMsg(std::string* err)
+    {
+        if (err)
+        {
+            *err = "This is dummy config"; 
+        } 
+    }
 };
 
 #endif

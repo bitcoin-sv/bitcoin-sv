@@ -65,7 +65,7 @@ void GlobalConfig::Reset()
     mMaxCoinsViewCacheSize = 0;
     
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
-    mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * 60 * 60;
+    mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
     mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
     mStopAtHeight = DEFAULT_STOPATHEIGHT;
@@ -101,6 +101,19 @@ void GlobalConfig::CheckSetDefaultCalled() const
         throw std::runtime_error(
             "GlobalConfig::SetDefaultBlockSizeParams must be called before accessing block size related parameters");
     }
+}
+
+bool GlobalConfig::LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage)
+{
+    if (argValue < 0) 
+    {
+        if (err) 
+        {
+            *err = errorMessage;
+        }
+        return true;
+    }
+    return false;
 }
 
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
@@ -197,12 +210,8 @@ uint8_t GlobalConfig::GetBlockPriorityPercentage() const {
 
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
 {
-    if (maxTxSizePolicyIn < 0)
+    if (LessThanZero(maxTxSizePolicyIn, err, "Policy value for max tx size must not be less than 0"))
     {
-        if (err)
-        {
-            *err = "Policy value for max tx size must not be less than 0";
-        }
         return false;
     }
     if (maxTxSizePolicyIn == 0)
@@ -296,12 +305,8 @@ const CChainParams &GlobalConfig::GetChainParams() const {
 
 bool GlobalConfig::SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err)
 {
-    if (maxPubKeysPerMultiSigIn < 0)
+    if (LessThanZero(maxPubKeysPerMultiSigIn, err, "Policy value for maximum public keys per multisig must not be less than zero"))
     {
-        if (err)
-        {
-            *err = "Policy value for maximum public keys per multisig must not be less than zero";
-        }
         return false;
     }
     
@@ -343,12 +348,8 @@ uint64_t GlobalConfig::GetMaxPubKeysPerMultiSig(bool isGenesisEnabled, bool cons
 
 bool GlobalConfig::SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err)
 {
-    if (genesisGracefulPeriodIn < 0)
+    if (LessThanZero(genesisGracefulPeriodIn, err, "Value for Genesis graceful period must not be less than zero."))
     {
-        if (err)
-        {
-            *err = "Value for Genesis graceful period must not be less than zero.";
-        }
         return false;
     }
 
@@ -533,12 +534,8 @@ int GlobalConfig::GetPerBlockScriptValidationMaxBatchSize() const
 
 bool GlobalConfig::SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error)
 {
-    if (maxOpsPerScriptPolicyIn < 0)
+    if (LessThanZero(maxOpsPerScriptPolicyIn, error, "Policy value for MaxOpsPerScript cannot be less than zero."))
     {
-        if (error)
-        {
-            *error = "Policy value for MaxOpsPerScript cannot be less than zero.";
-        }
         return false;
     }
     uint64_t maxOpsPerScriptPolicyInUnsigned = static_cast<uint64_t>(maxOpsPerScriptPolicyIn);
@@ -698,12 +695,8 @@ uint64_t GlobalConfig::GetMaxStackMemoryUsage(bool isGenesisEnabled, bool consen
 
 bool GlobalConfig::SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err)
 {
-    if (maxScriptNumLengthIn < 0)
+    if (LessThanZero(maxScriptNumLengthIn, err, "Policy value for maximum script number length must not be less than 0."))
     {
-        if (err)
-        {
-            *err = "Policy value for maximum script number length must not be less than 0.";
-        }
         return false;
     }
 
@@ -762,12 +755,8 @@ bool GlobalConfig::GetAcceptNonStandardOutput(bool isGenesisEnabled) const
 
 bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
 {
-    if (max < 0)
+    if (LessThanZero(max, err, "Policy value for maximum coins view cache size must not be less than 0."))
     {
-        if (err)
-        {
-            *err = _("Policy value for maximum coins view cache size must not be less than 0.");
-        }
         return false;
     }
 
@@ -847,12 +836,8 @@ CFeeRate GlobalConfig::GetMinFeePerKB() const {
 }
 bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err)
 {
-    if (maxTxSigOpsCountIn < 0)
+    if (LessThanZero(maxTxSigOpsCountIn, err, "Policy value for maximum allowed number of signature operations per transaction cannot be less than 0"))
     {
-        if (err)
-        {
-            *err = _("Policy value for maximum allowed number of signature operations per transaction cannot be less than 0");
-        }
         return false;
     }
     uint64_t maxTxSigOpsCountInUnsigned = static_cast<uint64_t>(maxTxSigOpsCountIn);
@@ -891,12 +876,8 @@ uint64_t GlobalConfig::GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const
 }
 
 bool GlobalConfig::SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err) {
-    if (maxScriptSizePolicyIn < 0)
+    if (LessThanZero(maxScriptSizePolicyIn, err, "Policy value for max script size must not be less than 0"))
     {
-        if (err)
-        {
-            *err = "Policy value for max script size must not be less than 0";
-        }
         return false;
     }
     uint64_t maxScriptSizePolicyInUnsigned = static_cast<uint64_t>(maxScriptSizePolicyIn);
@@ -931,12 +912,8 @@ uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus)
 }
 
 bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
-    if (maxMempool < 0)
+    if (LessThanZero(maxMempool, err, "Policy value for maximum memory pool must not be less than 0."))
     {
-        if (err)
-        {
-            *err = _("Policy value for maximum memory pool must not be less than 0.");
-        }
         return false;
     }
     if (maxMempool > 0 && maxMempool < DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE * 0.3)
@@ -958,12 +935,8 @@ uint64_t GlobalConfig::GetMaxMempool() const {
 }
 
 bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
-    if (memPoolExpiry < 0)
+    if (LessThanZero(memPoolExpiry, err, "Policy value for memory pool expiry must not be less than 0."))
     {
-        if (err)
-        {
-            *err = _("Policy value for memory pool expiry must not be less than 0.");
-        }
         return false;
     }
 
@@ -977,12 +950,8 @@ uint64_t GlobalConfig::GetMemPoolExpiry() const {
 }
 
 bool GlobalConfig::SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) {
-    if (limitFreeRelay < 0)
+    if (LessThanZero(limitFreeRelay, err, "Policy value for rate-limit free transactions must not be less than 0."))
     {
-        if (err)
-        {
-            *err = _("Policy value for rate-limit free transactions must not be less than 0.");
-        }
         return false;
     }
 
@@ -996,12 +965,8 @@ uint64_t GlobalConfig::GetLimitFreeRelay() const {
 }
 
 bool GlobalConfig::SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) {
-    if (maxOrphanTxSize < 0)
+    if (LessThanZero(maxOrphanTxSize, err, "Policy value for maximum orphan transaction size must not be less than 0."))
     {
-        if (err)
-        {
-            *err = _("Policy value for maximum orphan transaction size must not be less than 0.");
-        }
         return false;
     }
 
@@ -1015,12 +980,8 @@ uint64_t GlobalConfig::GetMaxOrphanTxSize() const {
 }
 
 bool GlobalConfig::SetStopAtHeight(int64_t stopAtHeight, std::string* err) {
-    if (stopAtHeight < 0)
+    if (LessThanZero(stopAtHeight, err, "Policy value for stop at height in the main chain must not be less than 0."))
     {
-        if (err)
-        {
-            *err = _("Policy value for stop at height in the main chain must not be less than 0.");
-        }
         return false;
     }
 
@@ -1034,12 +995,8 @@ uint64_t GlobalConfig::GetStopAtHeight() const {
 }
 
 bool GlobalConfig::SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) {
-    if (promiscuousMempoolFlags < 0)
+    if (LessThanZero(promiscuousMempoolFlags, err, "Promiscuous mempool flags value must not be less than 0."))
     {
-        if (err)
-        {
-            *err = _("Promiscuous mempool flags value must not be less than 0.");
-        }
         return false;
     }
     mPromiscuousMempoolFlags = static_cast<uint64_t>(promiscuousMempoolFlags);
