@@ -93,6 +93,7 @@ static UniValue getpeerinfo(const Config &config,
             "    \"sendsize\": n,             (numeric) Current size of queued messages for sending\n"
             "    \"recvsize\": n,             (numeric) Current size of queued messages for receiving\n"
             "    \"pausesend\": true|false,   (boolean) Are we paused for sending\n"
+            "    \"unpausesend\": true|false, (boolean) Have we temporarily unpaused sending\n"
             "    \"avgrecvbw\": n,            (numeric) The 1 minute average download bandwidth across all streams (bytes/sec)\n"
             "    \"associd\": \"xxxxxxx\"       (string) The association ID if set by the peer, otherwise Null\n"
             "    \"streampolicy\": \"xxxxxxx\"  (string) The stream policy in use\n"
@@ -189,6 +190,7 @@ static UniValue getpeerinfo(const Config &config,
         obj.push_back(Pair("sendsize", stats.associationStats.nSendSize));
         obj.push_back(Pair("recvsize", stats.associationStats.nRecvSize));
         obj.push_back(Pair("pausesend", stats.fPauseSend));
+        obj.push_back(Pair("unpausesend", stats.fUnpauseSend));
         obj.push_back(Pair("bytessent", stats.associationStats.nSendBytes));
         obj.push_back(Pair("bytesrecv", stats.associationStats.nRecvBytes));
         obj.push_back(Pair("avgrecvbw", stats.associationStats.nAvgBandwidth));

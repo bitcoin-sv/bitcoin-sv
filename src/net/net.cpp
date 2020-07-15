@@ -731,6 +731,7 @@ void CNode::copyStats(NodeStats &stats)
         stats.fRelayTxes = fRelayTxes;
     }
     stats.fPauseSend = GetPausedForSending();
+    stats.fUnpauseSend = stats.fPauseSend && !GetPausedForSending(true);
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
     stats.addrName = GetAddrName();

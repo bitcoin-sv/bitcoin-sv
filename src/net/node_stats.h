@@ -51,6 +51,7 @@ public:
     ServiceFlags nServices;
     bool fRelayTxes;
     bool fPauseSend;
+    bool fUnpauseSend;
     bool fInbound;
     bool fAddnode;
     bool fWhitelisted;
