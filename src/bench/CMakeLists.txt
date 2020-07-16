@@ -19,6 +19,7 @@ add_executable(bench_bitcoin
         checkqueue.cpp
         $<$<BOOL:${BUILD_BITCOIN_WALLET}>:coin_selection.cpp>
         crypto_hash.cpp
+        interpreter.cpp
         lockedpool.cpp
         mempool_eviction.cpp
         perf.cpp

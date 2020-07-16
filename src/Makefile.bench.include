@@ -25,7 +25,8 @@ bench_bench_bitcoin_SOURCES = \
   bench/lockedpool.cpp \
   bench/perf.cpp \
   bench/perf.h \
-  bench/cscript.cpp
+  bench/cscript.cpp \
+  bench/interpreter.cpp
 
 bench_bench_bitcoin_SOURCES += bench/data/hexhdr.py
 

@@ -35,6 +35,8 @@ inline bool set_error(ScriptError *ret, const ScriptError serror) {
     return false;
 }
 
+constexpr auto bits_per_byte{8};
+
 } // namespace
 
 inline uint8_t make_rshift_mask(size_t n) {
@@ -974,14 +976,21 @@ std::optional<bool> EvalScript(
                         stack.pop_back();
                         stack.pop_back();
                         auto values{vch1.GetElement()};
-                        do
-                        {
-                            values = LShift(values, n.getint());
-                            n -= utxo_after_genesis
-                                     ? CScriptNum{bsv::bint{INT32_MAX}}
-                                     : CScriptNum{INT32_MAX};
-                        } while(n > 0);
 
+                        if(n >= values.size() * bits_per_byte)
+                            fill(begin(values), end(values), 0);
+                        else
+                        {
+                            do
+                            {
+                                values = LShift(values, n.getint());
+                                if(token.IsCanceled())
+                                    return {};
+                                n -= utxo_after_genesis
+                                         ? CScriptNum{bsv::bint{INT32_MAX}}
+                                         : CScriptNum{INT32_MAX};
+                            } while(n > 0);
+                        }
                         stack.push_back(values);
                     }
                     break;
@@ -1008,14 +1017,21 @@ std::optional<bool> EvalScript(
                         stack.pop_back();
                         stack.pop_back();
                         auto values{vch1.GetElement()};
-                        do
-                        {
-                            values = RShift(values, n.getint());
-                            n -= utxo_after_genesis
-                                     ? CScriptNum{bsv::bint{INT32_MAX}}
-                                     : CScriptNum{INT32_MAX};
-                        } while(n > 0);
 
+                        if(n >= values.size() * bits_per_byte)
+                            fill(begin(values), end(values), 0);
+                        else
+                        {
+                            do
+                            {
+                                values = RShift(values, n.getint());
+                                if(token.IsCanceled())
+                                    return {};
+                                n -= utxo_after_genesis
+                                         ? CScriptNum{bsv::bint{INT32_MAX}}
+                                         : CScriptNum{INT32_MAX};
+                            } while(n > 0);
+                        }
                         stack.push_back(values);
                     }
                     break;
