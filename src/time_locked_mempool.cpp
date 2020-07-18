@@ -389,7 +389,17 @@ std::set<CTransactionRef> CTimeLockedMempool::getTransactionsUpdatedByNL(const C
 void CTimeLockedMempool::insertNL(const TxMempoolInfo& info, CValidationState& state)
 {
     const CTransactionRef& txn { info.tx };
-
+    
+    // Do not add transaction if max memory would be exceeded
+    size_t memUsage { estimateMemoryUsageNL() };
+    if (memUsage + txn->GetTotalSize() > mMaxMemory)
+    {
+        LogPrint(BCLog::MEMPOOL, "Dropping non-final tx %s because mempool is full\n",
+            txn->GetId().ToString());
+        state.Invalid(false, REJECT_MEMPOOL_FULL, "non-final-pool-full");
+        return;
+    }
+    
     // Put new txn in the main index
     auto& index { mTransactionMap.get<TagTxID>() };
     index.emplace(info);
@@ -402,21 +412,9 @@ void CTimeLockedMempool::insertNL(const TxMempoolInfo& info, CValidationState& s
 
     // Track memory used by this txn
     mTxnMemoryUsage += txn->GetTotalSize();
-
-    // Check we haven't exceeded max memory
-    size_t memUsage { estimateMemoryUsageNL() };
-    if(memUsage > mMaxMemory)
-    {
-        LogPrint(BCLog::MEMPOOL, "Dropping non-final tx %s because mempool is full\n",
-            txn->GetId().ToString());
-        state.Invalid(false, REJECT_MEMPOOL_FULL, "non-final-pool-full");
-        removeNL(txn);
-    }
-    else
-    {
-        LogPrint(BCLog::MEMPOOL, "Added non-final tx: %s, mem: %d\n", txn->GetId().ToString(),
-            memUsage);
-    }
+    
+    LogPrint(BCLog::MEMPOOL, "Added non-final tx: %s, mem: %d\n", txn->GetId().ToString(),
+      memUsage);
 }
 
 // Remove an old transaction
