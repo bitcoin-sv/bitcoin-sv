@@ -5,7 +5,7 @@
 
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import p2p_port, disconnect_nodes
+from test_framework.util import p2p_port
 from test_framework.blocktools import create_block, create_coinbase, assert_equal
 
 import datetime

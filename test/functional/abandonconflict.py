@@ -39,7 +39,7 @@ class AbandonConflictTest(BitcoinTestFramework):
         balance = newbalance
 
         # Disconnect nodes so node0's transactions don't get into node1's mempool
-        disconnect_nodes(self.nodes[0], 1)
+        disconnect_nodes_bi(self.nodes, 0, 1)
 
         # Identify the 10btc outputs
         nA = next(i for i, vout in enumerate(self.nodes[0].getrawtransaction(

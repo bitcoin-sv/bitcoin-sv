@@ -371,18 +371,25 @@ def set_node_times(nodes, t):
     for node in nodes:
         node.setmocktime(t)
 
-
+# Disconnects only the outbound connection "from_connection -> node_num"
+# If nodes were connected with connect_nodes_bi (default setup_network) use disconnect_nodes_bi to completely split the nodes if needed
 def disconnect_nodes(from_connection, node_num):
-    for peer_id in [peer['id'] for peer in from_connection.getpeerinfo() if "testnode%d" % node_num in peer['subver']]:
+    subver = "testnode%d" % node_num
+    for peer_id in [peer['id'] for peer in from_connection.getpeerinfo() if subver in peer['subver'] and not peer['inbound']]:
         from_connection.disconnectnode(nodeid=peer_id)
 
     for _ in range(50):
-        if [peer['id'] for peer in from_connection.getpeerinfo() if "testnode%d" % node_num in peer['subver']] == []:
+        if [peer['id'] for peer in from_connection.getpeerinfo() if subver in peer['subver'] and not peer['inbound']] == []:
             break
         time.sleep(0.1)
     else:
         raise AssertionError("timed out waiting for disconnect")
 
+# Disconnects both outbound and inbound connections between nodes[node_a_index] and nodes[node_b_index]
+# Inbound connection on one node is implicitly closed as a result of closing the outbound connection on the other node
+def disconnect_nodes_bi(nodes, node_a_index, node_b_index):
+    disconnect_nodes(nodes[node_a_index], node_b_index)
+    disconnect_nodes(nodes[node_b_index], node_a_index)
 
 def connect_nodes(from_connection, node_num):
     ip_port = "127.0.0.1:" + str(p2p_port(node_num))

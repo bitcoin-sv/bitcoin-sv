@@ -4,7 +4,7 @@
 
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import p2p_port, disconnect_nodes
+from test_framework.util import p2p_port
 from test_framework.blocktools import create_block, create_coinbase, assert_equal
 
 import contextlib
@@ -32,40 +32,6 @@ class LogTimeDiffTest(BitcoinTestFramework):
         block = create_block(tip, create_coinbase(height=height, outputValue=25), block_time)
         block.solve()
         return block
-
-    @contextlib.contextmanager
-    def run_node_with_connections(self, title, node_index, args, number_of_connections):
-        logger.debug("setup %s", title)
-
-        self.start_node(node_index, args)
-
-        connectionCbs = []
-        for i in range(number_of_connections):
-            connectionCbs.append(NodeConnCB())
-
-        connections = []
-        for connCb in connectionCbs:
-            connection = NodeConn('127.0.0.1', p2p_port(0), self.nodes[node_index], connCb)
-            connections.append(connection)
-            connCb.add_connection(connection)
-
-        thr = NetworkThread()
-        thr.start()
-        for connCb in connectionCbs:
-            connCb.wait_for_verack()
-
-        logger.debug("before %s", title)
-        yield connections
-        logger.debug("after %s", title)
-
-        for connection in connections:
-            connection.close()
-        del connections
-        # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
-        thr.join()
-        disconnect_nodes(self.nodes[node_index],1)
-        self.stop_node(node_index)
-        logger.debug("finished %s", title)
 
     def run_test(self):
 
