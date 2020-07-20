@@ -1268,15 +1268,28 @@ void CTxMemPool::RebuildJournal() const
 
     CJournalChangeSetPtr changeSet { mJournalBuilder.getNewChangeSet(JournalUpdateReason::RESET) };
 
-    std::shared_lock lock(smtx);
-
-    setEntries allTxs;
-    for(txiter entry = mapTx.cbegin(); entry != mapTx.cend(); entry++)
     {
-        allTxs.insert(entry);
+        std::shared_lock lock(smtx);
+        CoinsDBView coinsView{ *pcoinsTip };
+
+        // FIXME: once mempool properly maintains own toposort the copying and explicit sorting can be replaced with sorted iteration
+        std::vector<std::reference_wrapper<const CTxMemPoolEntry>> entries{
+            mapTx.cbegin(),
+            mapTx.cend() };
+        std::stable_sort(entries.begin(), entries.end(),
+                         [](const CTxMemPoolEntry& entry1, const CTxMemPoolEntry& entry2)
+                         {
+            const auto& count1 = entry1.GetAncestorDescendantCounts();
+            const auto& count2 = entry2.GetAncestorDescendantCounts();
+            return (count1->nCountWithAncestors < count2->nCountWithAncestors);
+        });
+        for(const auto& entry : entries)
+        {
+            changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
+        }
+
+        CheckMempoolNL(coinsView, changeSet);
     }
-    
-    checkJournalAcceptanceNL(allTxs, *changeSet);
 
     // Apply the changes
     changeSet->apply();

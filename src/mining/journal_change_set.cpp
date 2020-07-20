@@ -179,23 +179,6 @@ void CJournalChangeSet::applyNL()
 {
     if(!mChangeSet.empty())
     {
-        // sort RESET change sets here because they have been created directly
-        // from the mempool with no attempt to put things in the correct order.
-
-        if(mUpdateReason == JournalUpdateReason::RESET)
-        {
-            // FIXME: Once C++17 parallel algorithms are widely supported, make this
-            // use them.
-            std::stable_sort(mChangeSet.begin(), mChangeSet.end(),
-                [](const Change& change1, const Change& change2)
-                {
-                    const AncestorDescendantCountsPtr& count1 { change1.second.getAncestorCount() };
-                    const AncestorDescendantCountsPtr& count2 { change2.second.getAncestorCount() };
-                    return count1->nCountWithAncestors < count2->nCountWithAncestors;
-                }
-            );
-        }
-
         mBuilder.applyChangeSet(*this);
 
         // Make sure we don't get applied again if we are later called by the destructor
