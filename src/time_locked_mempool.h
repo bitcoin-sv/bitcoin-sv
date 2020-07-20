@@ -6,6 +6,7 @@
 #include <bloom.h>
 #include <consensus/validation.h>
 #include <tx_mempool_info.h>
+#include <txn_validation_data.h>
 #include <utiltime.h>
 #include <taskcancellation.h>
 
@@ -44,7 +45,9 @@ class CTimeLockedMempool final
     CTimeLockedMempool& operator=(CTimeLockedMempool&&) = delete;
 
     // Add or update a time-locked transaction
-    void addOrUpdateTransaction(const TxMempoolInfo& info, CValidationState& state);
+    void addOrUpdateTransaction(const TxMempoolInfo& info,
+        const TxInputDataSPtr& pTxInputData,
+        CValidationState& state);
 
     // Get IDs of all held transactions
     std::vector<TxId> getTxnIDs() const;

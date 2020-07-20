@@ -24,8 +24,10 @@ CTimeLockedMempool::CTimeLockedMempool()
 }
 
 // Add or update a time-locked transaction
-void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
-                                                CValidationState& state)
+void CTimeLockedMempool::addOrUpdateTransaction(
+    const TxMempoolInfo& info,
+    const TxInputDataSPtr& pTxInputData,
+    CValidationState& state)
 {
     const CTransactionRef& txn { info.tx };
 
@@ -60,18 +62,10 @@ void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
             if(finalised)
             {
                 LogPrint(BCLog::MEMPOOL, "Finalising non-final tx: %s\n", txn->GetId().ToString());
-
                 // For full belt-and-braces safety, resubmit newly final transaction for revalidation
-                std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainActive.Tip()->nHeight + 1, reason) };
-                g_connman->ResubmitTxnForValidator(
-                    std::make_shared<CTxInputData>(
-                        TxSource::finalised,
-                        standard ? TxValidationPriority::high : TxValidationPriority::low,
-                        txn,
-                        GetTime()
-                    )
-                );
+                pTxInputData->mTxSource = TxSource::finalised;
+                pTxInputData->mnAcceptTime = GetTime();
+                state.SetResubmitTx();
             }
             else
             {
@@ -564,14 +558,12 @@ void CTimeLockedMempool::periodicChecks()
             // For full belt-and-braces safety, resubmit newly final transaction for revalidation
             std::string reason {};
             bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->nHeight + 1, reason) };
-            g_connman->ResubmitTxnForValidator(
+            g_connman->EnqueueTxnForValidator(
                 std::make_shared<CTxInputData>(
                     TxSource::finalised,
                     standard ? TxValidationPriority::high : TxValidationPriority::low,
                     txn,
-                    GetTime()
-                )
-            );
+                    GetTime()));
         }
         // Purge age passed?
         else if(timeInPool >= mPurgeAge)

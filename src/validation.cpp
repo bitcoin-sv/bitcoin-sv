@@ -1008,7 +1008,7 @@ std::vector<TxId> LimitMempoolSize(
 }
 
 void CommitTxToMempool(
-    const CTransactionRef &ptx,
+    const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& pMempoolEntry,
     CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
@@ -1018,6 +1018,7 @@ void CommitTxToMempool(
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
+    const CTransactionRef& ptx = pTxInputData->mpTx;
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
 
@@ -1026,7 +1027,7 @@ void CommitTxToMempool(
     {
         // Post-genesis, non-final txns have their own mempool
         TxMempoolInfo info { pMempoolEntry };
-        pool.getNonFinalPool().addOrUpdateTransaction(info, state);
+        pool.getNonFinalPool().addOrUpdateTransaction(info, pTxInputData, state);
         return;
     }
 
@@ -1768,7 +1769,7 @@ void ProcessValidatedTxn(
         bool fMempoolLogs = LogAcceptCategory(BCLog::MEMPOOL) || LogAcceptCategory(BCLog::MEMPOOLREJ);
         // Commit transaction
         CommitTxToMempool(
-            ptx,
+            txStatus.mTxInputData,
             *(txStatus.mpEntry),
             txStatus.mSetAncestors,
             pool,

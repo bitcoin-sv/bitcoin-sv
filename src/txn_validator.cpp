@@ -159,27 +159,6 @@ void CTxnValidator::newTransaction(TxInputDataSPtrVec vTxInputData) {
     }
 }
 
-/** Resubmit a transaction for reprocessing */
-void CTxnValidator::resubmitTransaction(TxInputDataSPtr pTxInputData) {
-    const TxId& txid = pTxInputData->mpTx->GetId();
-    const TxValidationPriority& txpriority = pTxInputData->mTxValidationPriority;
-
-    // Check if exists in mStdTxns
-    if (TxValidationPriority::high == txpriority || TxValidationPriority::normal == txpriority) {
-        std::unique_lock lock { mStdTxnsMtx };
-        if(!isTxnKnownInSetNL(txid, mStdTxns)) {
-            enqueueStdTxnNL(pTxInputData);
-        }
-    }
-    // Check if exists in mNonStdTxns
-    else if (TxValidationPriority::low == txpriority) {
-        std::unique_lock lock { mNonStdTxnsMtx };
-        if (!isTxnKnownInSetNL(txid, mNonStdTxns)) {
-            enqueueNonStdTxnNL(pTxInputData);
-        }
-    }
-}
-
 /** Process a new txn in synchronous mode */
 CValidationState CTxnValidator::processValidation(
     const TxInputDataSPtr& pTxInputData,
@@ -449,6 +428,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                 FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
                             }
                         }
+                        // Clear the processing queue, as a result:
+                        // - destroy any CTxInputData objects which are no longer being referenced by the owning shared ptr
+                        {
+                            std::unique_lock lockPQ { mProcessingQueueMtx };
+                            mProcessingQueue.clear();
+                        }
                     }
                     // If there are any low priority transactions then move them to the low priority queue.
                     size_t nDetectedLowPriorityTxnsNum = imdResult.mDetectedLowPriorityTxns.size();
@@ -461,6 +446,15 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         enqueueTxnsNL(imdResult.mDetectedLowPriorityTxns.begin(), imdResult.mDetectedLowPriorityTxns.end(),
                             [this](const TxInputDataSPtr& txn){ enqueueNonStdTxnNL(txn); }
                         );
+                    }
+                    // Move back into the processing queue any txns which were re-submitted.
+                    size_t nResubmittedTxnsNum = imdResult.mResubmittedTxns.size();
+                    if (nResubmittedTxnsNum) {
+                        LogPrint(BCLog::TXNVAL,
+                                "Txnval-asynch: The number of re-submitted txns that need to be reprocessed is %d\n",
+                                 nResubmittedTxnsNum);
+                        std::unique_lock lockPQ { mProcessingQueueMtx };
+                        mProcessingQueue = std::move_if_noexcept(imdResult.mResubmittedTxns);
                     }
                     // Copy orphan p2p txns for reprocessing (if any exists)
                     size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForReprocessing(imdResult.mCancelledTxns);
@@ -478,7 +472,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                  enum_cast<std::string>(TxSource::p2p),
                                  nCancelledTxnsNum);
                         std::unique_lock lockPQ { mProcessingQueueMtx };
-                        if (nOrphanP2PTxnsNum) {
+                        if (nOrphanP2PTxnsNum || nResubmittedTxnsNum) {
                             mProcessingQueue.insert(mProcessingQueue.end(),
                                 std::make_move_iterator(imdResult.mCancelledTxns.begin()),
                                 std::make_move_iterator(imdResult.mCancelledTxns.end()));
@@ -486,12 +480,11 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                             mProcessingQueue = std::move_if_noexcept(imdResult.mCancelledTxns);
                         }
                     }
-                    // Clear the processing queue when orphan and cancelled transactions were not detected.
-                    if (!nOrphanP2PTxnsNum && !nCancelledTxnsNum) {
-                        {
-                            std::unique_lock lockPQ { mProcessingQueueMtx };
-                            mProcessingQueue.clear();
-                        }
+                    // If no orphan, cancelled and resubmitted transactions were detected, then:
+                    // - the processing queue is empty
+                    // - unblock one of the waiting threads (if any exists)
+                    if (!nOrphanP2PTxnsNum && !nCancelledTxnsNum && !nResubmittedTxnsNum) {
+                        std::shared_lock lockPQ { mProcessingQueueMtx };
                         mTxnsProcessedCV.notify_one();
                     }
                 } catch (const std::exception& e) {
@@ -571,8 +564,14 @@ void CTxnValidator::postValidationStepsNL(
     }
     // Check validation state
     if (state.IsValid()) {
-        // Txns accepted by the mempool
-        imdResult.mAcceptedTxns.emplace_back(txStatus.mTxInputData);
+        if (state.IsResubmittedTx()) {
+            // Txns resubmitted for revalidation
+            // - currently only finalised txns can be re-submitted
+            imdResult.mResubmittedTxns.emplace_back(txStatus.mTxInputData);
+        } else {
+            // Txns accepted by the mempool
+            imdResult.mAcceptedTxns.emplace_back(txStatus.mTxInputData);
+        }
     } else if (state.IsValidationTimeoutExceeded()) {
         // If validation timeout occurred for 'high' priority txn then change it's priority to 'low'.
         TxValidationPriority& txpriority = txStatus.mTxInputData->mTxValidationPriority;
@@ -651,7 +650,13 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtr
         nOrphanTxnsNum = vOrphanTxns.size();
         if (nOrphanTxnsNum) {
             std::unique_lock lockPQ { mProcessingQueueMtx };
-            mProcessingQueue = std::move_if_noexcept(vOrphanTxns);
+            if (mProcessingQueue.empty()) {
+                mProcessingQueue = std::move_if_noexcept(vOrphanTxns);
+            } else {
+                mProcessingQueue.insert(mProcessingQueue.end(),
+                    std::make_move_iterator(vOrphanTxns.begin()),
+                    std::make_move_iterator(vOrphanTxns.end()));
+            }
         }
     }
     return nOrphanTxnsNum;

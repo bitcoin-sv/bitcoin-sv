@@ -38,6 +38,7 @@ private:
     bool nonFinal {false};
     bool fValidationTimeoutExceeded {false};
     bool fStandardTx {false};
+    bool fResubmitTx {false};
 
 public:
     bool DoS(int level, bool ret = false, unsigned int chRejectCodeIn = 0,
@@ -89,6 +90,7 @@ public:
     bool IsNonFinal() const { return nonFinal; }
     bool IsValidationTimeoutExceeded() const { return fValidationTimeoutExceeded; };
     bool IsStandardTx() const { return fStandardTx; };
+    bool IsResubmittedTx() const { return fResubmitTx; };
 
     void SetCorruptionPossible() { corruptionPossible = true; }
     void SetMissingInputs() { fMissingInputs = true; }
@@ -97,6 +99,7 @@ public:
     void SetNonFinal(bool nf = true) { nonFinal = nf; }
     void SetValidationTimeoutExceeded() { fValidationTimeoutExceeded = true; };
     void SetStandardTx() { fStandardTx = true; };
+    void SetResubmitTx(bool nf = true) { fResubmitTx = nf; };
 
     int GetNDoS() const { return nDoS; }
     unsigned int GetRejectCode() const { return chRejectCode; }
