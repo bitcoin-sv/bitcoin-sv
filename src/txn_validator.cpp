@@ -280,14 +280,15 @@ void CTxnValidator::processValidation(
     // Process a set of given txns
     do {
         // Execute parallel validation.
-        // The result is a tuple of three vectors:
-        // - the first one contains accepted (by the mempool) txns
-        // - the second one contains detected low priority txns
-        // - the third one contains cancelled txns
-        // There will be no detected non-standard and cancelled txns as:
+        // The imdResult is an object containing four vectors of pointers, to:
+        // - accepted (by the mempool) txns
+        // - detected low priority txns
+        // - cancelled txns
+        // - txns that need to be re-submitted
+        // There will be no detected non-standard, cancelled and re-submitted txns as:
         // - timed cancellation is not set
         // - maxasynctasksrunduration is not set to non-zero value
-        auto result {
+        CIntermediateResult imdResult {
             processNewTransactionsNL(
                 vTxInputData,
                 handlers,
@@ -295,8 +296,8 @@ void CTxnValidator::processValidation(
                 std::chrono::milliseconds(0))
         };
         vAcceptedTxns.insert(vAcceptedTxns.end(),
-            std::make_move_iterator(std::get<0>(result).begin()),
-            std::make_move_iterator(std::get<0>(result).end()));
+            std::make_move_iterator(imdResult.mAcceptedTxns.begin()),
+            std::make_move_iterator(imdResult.mAcceptedTxns.end()));
         // Get dependent orphans (if any exists)
         vTxInputData = handlers.mpOrphanTxns->collectDependentTxnsForRetry();
         vTxInputDataSize = vTxInputData.size();
@@ -367,11 +368,12 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
             if(mRunning) {
                 // Catch an exception if it occurs
                 try {
-                    // The result is a tuple of three vectors:
-                    // - the first one contains accepted (by the mempool) txns
-                    // - the second one contains detected low priority txns
-                    // - the third one contains cancelled txns
-                    std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> result {};
+                    // The imdResult is an object containing four vectors of pointers, to:
+                    // - accepted (by the mempool) txns
+                    // - detected low priority txns
+                    // - cancelled txns
+                    // - txns that need to be re-submitted
+                    CIntermediateResult imdResult {};
                     {
                         // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
                         // An asynchronous interface locks mtxs in the following order:
@@ -425,7 +427,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     mpTxnRecentRejects
                                 };
                                 // Validate txns and try to submit them to the mempool
-                                result =
+                                imdResult =
                                     processNewTransactionsNL(
                                         mProcessingQueue,
                                         handlers,
@@ -440,7 +442,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                         nMempoolExpiry)
                                 };
                                 // Execute post processing steps.
-                                postProcessingStepsNL(std::get<0>(result), vRemovedTxIds, handlers);
+                                postProcessingStepsNL(imdResult.mAcceptedTxns, vRemovedTxIds, handlers);
                                 // After we've (potentially) uncached entries, ensure our coins cache is
                                 // still within its size limits
                                 CValidationState dummyState;
@@ -449,19 +451,19 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         }
                     }
                     // If there are any low priority transactions then move them to the low priority queue.
-                    size_t nDetectedLowPriorityTxnsNum = std::get<1>(result).size();
+                    size_t nDetectedLowPriorityTxnsNum = imdResult.mDetectedLowPriorityTxns.size();
                     if (nDetectedLowPriorityTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
                                 "Txnval-asynch: Validation timeout occurred for %d txn(s) received from the Standard queue "
                                 "(forwarding them to the Non-standard queue)\n",
                                  nDetectedLowPriorityTxnsNum);
                         std::unique_lock lock { mNonStdTxnsMtx };
-                        enqueueTxnsNL(std::get<1>(result).begin(), std::get<1>(result).end(),
+                        enqueueTxnsNL(imdResult.mDetectedLowPriorityTxns.begin(), imdResult.mDetectedLowPriorityTxns.end(),
                             [this](const TxInputDataSPtr& txn){ enqueueNonStdTxnNL(txn); }
                         );
                     }
                     // Copy orphan p2p txns for reprocessing (if any exists)
-                    size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForReprocessing(std::get<2>(result));
+                    size_t nOrphanP2PTxnsNum = scheduleOrphanP2PTxnsForReprocessing(imdResult.mCancelledTxns);
                     if (nOrphanP2PTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
                                 "Txnval-asynch: The number of orphan %s txns that need to be reprocessed is %d\n",
@@ -469,7 +471,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                  nOrphanP2PTxnsNum);
                     }
                     // Move back into the processing queue any txns which were cancelled.
-                    size_t nCancelledTxnsNum = std::get<2>(result).size();
+                    size_t nCancelledTxnsNum = imdResult.mCancelledTxns.size();
                     if (nCancelledTxnsNum) {
                         LogPrint(BCLog::TXNVAL,
                                 "Txnval-asynch: The number of %s txn(s) which were cancelled and moved to the next iteration is %d\n",
@@ -478,10 +480,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                         std::unique_lock lockPQ { mProcessingQueueMtx };
                         if (nOrphanP2PTxnsNum) {
                             mProcessingQueue.insert(mProcessingQueue.end(),
-                                std::make_move_iterator(std::get<2>(result).begin()),
-                                std::make_move_iterator(std::get<2>(result).end()));
+                                std::make_move_iterator(imdResult.mCancelledTxns.begin()),
+                                std::make_move_iterator(imdResult.mCancelledTxns.end()));
                         } else {
-                            mProcessingQueue = std::move_if_noexcept(std::get<2>(result));
+                            mProcessingQueue = std::move_if_noexcept(imdResult.mCancelledTxns);
                         }
                     }
                     // Clear the processing queue when orphan and cancelled transactions were not detected.
@@ -511,7 +513,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
 /**
 * Process all new transactions.
 */
-std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValidator::processNewTransactionsNL(
+CTxnValidator::CIntermediateResult CTxnValidator::processNewTransactionsNL(
     std::vector<TxInputDataSPtr>& txns,
     CTxnHandlers& handlers,
     bool fUseLimits,
@@ -542,28 +544,20 @@ std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> CTxnValid
                 fUseLimits,
                 maxasynctasksrunduration)
     };
-    // All txns accepted by the mempool and not removed from there.
-    std::vector<TxInputDataSPtr> vAcceptedTxns {};
-    // If there is any standard 'high' priority txn for which validation timeout occurred, then
-    // change it's priority to 'low' and forward it to the low priority queue.
-    std::vector<TxInputDataSPtr> vDetectedLowPriorityTxns {};
-    // A vector of cancelled txns.
-    std::vector<TxInputDataSPtr> vCancelledTxns {};
+    CIntermediateResult imdResult {};
     // Process validation results
     for(auto& task_result : results) {
         auto vBatchResults = task_result.get();
         for (auto& result : vBatchResults) {
-            postValidationStepsNL(result, vAcceptedTxns, vDetectedLowPriorityTxns, vCancelledTxns);
+            postValidationStepsNL(result, imdResult);
         }
     }
-    return {vAcceptedTxns, vDetectedLowPriorityTxns, vCancelledTxns};
+    return imdResult;
 }
 
 void CTxnValidator::postValidationStepsNL(
     const std::pair<CTxnValResult, CTask::Status>& result,
-    std::vector<TxInputDataSPtr>& vAcceptedTxns,
-    std::vector<TxInputDataSPtr>& vDetectedLowPriorityTxns,
-    std::vector<TxInputDataSPtr>& vCancelledTxns) const {
+    CIntermediateResult& imdResult) {
 
     const CTxnValResult& txStatus = result.first;
     const CValidationState& state = txStatus.mState;
@@ -572,19 +566,19 @@ void CTxnValidator::postValidationStepsNL(
         return;
     }
     else if (CTask::Status::Canceled == result.second) {
-        vCancelledTxns.emplace_back(txStatus.mTxInputData);
+        imdResult.mCancelledTxns.emplace_back(txStatus.mTxInputData);
         return;
     }
     // Check validation state
     if (state.IsValid()) {
         // Txns accepted by the mempool
-        vAcceptedTxns.emplace_back(txStatus.mTxInputData);
+        imdResult.mAcceptedTxns.emplace_back(txStatus.mTxInputData);
     } else if (state.IsValidationTimeoutExceeded()) {
         // If validation timeout occurred for 'high' priority txn then change it's priority to 'low'.
         TxValidationPriority& txpriority = txStatus.mTxInputData->mTxValidationPriority;
         if (TxValidationPriority::high == txpriority) {
             txpriority = TxValidationPriority::low;
-            vDetectedLowPriorityTxns.emplace_back(txStatus.mTxInputData);
+            imdResult.mDetectedLowPriorityTxns.emplace_back(txStatus.mTxInputData);
         }
     }
 }

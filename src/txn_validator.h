@@ -28,6 +28,28 @@
  */
 class CTxnValidator final
 {
+    /**
+     * A local structure used to extend lifetime of CTxInputData objects (controlled by shared ptrs)
+     * which are being returned by processNewTransactionsNL call.
+     * An additional actions are executed as a part of post porcessing steps and txn reprocessing.
+     */
+	struct CIntermediateResult final
+	{
+        // Defaults
+        CIntermediateResult(CIntermediateResult&&) = default;
+        CIntermediateResult(const CIntermediateResult&) = default;
+        CIntermediateResult& operator=(CIntermediateResult&&) = default;
+        CIntermediateResult& operator=(const CIntermediateResult&) = default;
+        // Txns accepted by the mempool and not removed from there.
+        TxInputDataSPtrVec mAcceptedTxns {};
+        // Low priority txns detected during processing.
+        TxInputDataSPtrVec mDetectedLowPriorityTxns {};
+        // Cancelled txns.
+        TxInputDataSPtrVec mCancelledTxns {};
+        // Txns that need to be re-submitted.
+        TxInputDataSPtrVec mResubmittedTxns {};
+	};
+
   public:
     // Default run frequency in asynch mode
     static constexpr unsigned DEFAULT_ASYNCH_RUN_FREQUENCY_MILLIS {100};
@@ -107,8 +129,8 @@ class CTxnValidator final
     /** Thread entry point for new transaction queue handling */
     void threadNewTxnHandler() noexcept;
 
-    /** Process all newly arrived transactions. Return txns accepted by the mempool */
-    std::tuple<TxInputDataSPtrVec, TxInputDataSPtrVec, TxInputDataSPtrVec> processNewTransactionsNL(
+    /** Process all newly arrived transactions. */
+    CTxnValidator::CIntermediateResult processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,
         CTxnHandlers& handlers,
         bool fUseLimits,
@@ -117,9 +139,7 @@ class CTxnValidator final
     /** Post validation step for txns before limit mempool size is done*/
     void postValidationStepsNL(
         const std::pair<CTxnValResult, CTask::Status>& result,
-        std::vector<TxInputDataSPtr>& vAcceptedTxns,
-        std::vector<TxInputDataSPtr>& vNonStdTxns,
-        std::vector<TxInputDataSPtr>& vCancelledTxns) const;
+        CIntermediateResult& processedTxns);
 
     /** Post processing step for txns when limit mempool size is done */
     void postProcessingStepsNL(
