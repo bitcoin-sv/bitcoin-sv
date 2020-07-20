@@ -234,8 +234,10 @@ class TestManager():
             )
 
         # --> error if not requested
-        wait_until(blocks_requested, attempts=20 *
-                   num_blocks, lock=mininode_lock)
+        # Measured values for processing blocks range from 0.008 to 0.035 s/block (debug build)
+        # Processing gets slower with the amount of blocks (0.008 s/block @ 200 blocks, 0.035 s/block @ 1000 blocks)
+        # We use a slightly higher value of 0.05s + an extra 30s for good measure.
+        wait_until(blocks_requested, timeout=0.05*num_blocks+30, lock=mininode_lock)
 
         # Wait for all the blocks to finish processing
         [c.cb.send_ping(self.ping_counter) for c in self.connections]
