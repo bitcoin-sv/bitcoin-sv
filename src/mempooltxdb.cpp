@@ -17,6 +17,13 @@ bool CMempoolTxDB::AddTransaction(
 
     batch.Write(std::make_pair(DB_TRANSACTIONS, txid), *tx);
 
+    uint64_t diskUsage;
+    if (!GetDiskUsage(diskUsage))
+    {
+        diskUsage = 0;
+    }
+    batch.Write(DB_DISK_USAGE, diskUsage + tx->GetTotalSize());
+
     return mempoolTxDB.WriteBatch(batch, true);
 
 }
@@ -34,7 +41,7 @@ bool CMempoolTxDB::GetTransaction(const uint256 &txid, CTransactionRef &tx) {
 }
 
 bool CMempoolTxDB::RemoveTransactions(
-    const std::vector<uint256> &txidsRemoved) {
+    const std::vector<uint256> &txidsRemoved, uint64_t diskUsageRemoved) {
 
     CDBBatch batch(mempoolTxDB);
 
@@ -43,5 +50,16 @@ bool CMempoolTxDB::RemoveTransactions(
         batch.Erase(std::make_pair(DB_TRANSACTIONS,txid));
     }
 
+    uint64_t diskUsage;
+    if (!GetDiskUsage(diskUsage)) {
+        diskUsage = diskUsageRemoved;
+    }
+    batch.Write(DB_DISK_USAGE, diskUsage - diskUsageRemoved);
+
     return mempoolTxDB.WriteBatch(batch, true);
+}
+
+bool CMempoolTxDB::GetDiskUsage(uint64_t& diskUsageOut)
+{
+    return mempoolTxDB.Read(DB_DISK_USAGE, diskUsageOut);
 }

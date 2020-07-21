@@ -14,6 +14,8 @@ private:
     // Prefix to store map of Transaction values with txid as a
     // key
     static constexpr char DB_TRANSACTIONS = 'T';
+    // Prefix to store disk usage
+    static constexpr char DB_DISK_USAGE = 'D';
 
     CDBWrapper mempoolTxDB;
 
@@ -41,7 +43,13 @@ public:
     /*
      * Used to remove all transactions from the database.
      */
-    bool RemoveTransactions(const std::vector<uint256> &transactionsToRemove);
+    bool RemoveTransactions(const std::vector<uint256> &transactionsToRemove, uint64_t diskUsageRemoved);
+
+    /**
+     * Read disk usage value stored in the database to diskUsageOut.
+     * Returns false in case record could not be read from the database.
+     */
+    bool GetDiskUsage(uint64_t &diskUsageOut);
 };
 
 #endif // BITCOIN_MEMPOOLDB_H
