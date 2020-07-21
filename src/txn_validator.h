@@ -173,16 +173,16 @@ class CTxnValidator final
 				vTxns.begin(),
 				vTxns.end(),
 				[&txid](const TxInputDataSPtr& ptxInputData){
-					return ptxInputData->mpTx->GetId() == txid; });
+					return ptxInputData->GetTxnPtr()->GetId() == txid; });
 	}
 
     /** Increase memory used counters for queued transactions */
     void incMemUsedNL(std::atomic<uint64_t>& mem, const TxInputDataSPtr& txn) {
-        mem += txn->mpTx->GetTotalSize();
+        mem += txn->GetTxnPtr()->GetTotalSize();
     }
     /** Decrease memory used counters for queued transactions */
     void decMemUsedNL(std::atomic<uint64_t>& mem, const TxInputDataSPtr& txn) {
-        auto txnSize { txn->mpTx->GetTotalSize() };
+        auto txnSize { txn->GetTxnPtr()->GetTotalSize() };
         if(mem <= txnSize) {
             mem = 0;
         }

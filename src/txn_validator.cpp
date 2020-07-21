@@ -107,7 +107,7 @@ size_t CTxnValidator::GetTransactionsInQueueCount() const {
 
 /** Handle a new transaction */
 void CTxnValidator::newTransaction(TxInputDataSPtr pTxInputData) {
-    const TxValidationPriority& txpriority = pTxInputData->mTxValidationPriority;
+    const TxValidationPriority& txpriority = pTxInputData->GetTxValidationPriority();
     // Add transaction to the right queue based on priority.
     if (TxValidationPriority::high == txpriority || TxValidationPriority::normal == txpriority) {
         std::unique_lock lock { mStdTxnsMtx };
@@ -133,7 +133,7 @@ CValidationState CTxnValidator::processValidation(
     const mining::CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize) {
 
-    const CTransactionRef& ptx = pTxInputData->mpTx;
+    const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     LogPrint(BCLog::TXNVAL,
             "Txnval-synch: Got a new txn= %s \n", tx.GetId().ToString());
@@ -152,7 +152,7 @@ CValidationState CTxnValidator::processValidation(
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
         mpTxnDoubleSpendDetector, // Double Spend Detector
-        TxSource::p2p == pTxInputData->mTxSource ? mpOrphanTxnsP2PQ : nullptr, // Orphan txns queue
+        TxSource::p2p == pTxInputData->GetTxSource() ? mpOrphanTxnsP2PQ : nullptr, // Orphan txns queue
         mpTxnRecentRejects // Recent rejects queue
     };
     try
@@ -182,7 +182,7 @@ CValidationState CTxnValidator::processValidation(
     // Notify subscribers that a new txn was added to the mempool and not
     // removed from there due to LimitMempoolSize.
     if (result.mState.IsValid()) {
-        GetMainSignals().TransactionAddedToMempool(result.mTxInputData->mpTx);
+        GetMainSignals().TransactionAddedToMempool(result.mTxInputData->GetTxnPtr());
     }
     // After we've (potentially) uncached entries, ensure our coins cache is
     // still within its size limits
@@ -544,7 +544,7 @@ void CTxnValidator::postValidationStepsNL(
         }
     } else if (state.IsValidationTimeoutExceeded()) {
         // If validation timeout occurred for 'high' priority txn then change it's priority to 'low'.
-        TxValidationPriority& txpriority = txStatus.mTxInputData->mTxValidationPriority;
+        TxValidationPriority& txpriority = txStatus.mTxInputData->GetTxValidationPriority();
         if (TxValidationPriority::high == txpriority) {
             txpriority = TxValidationPriority::low;
             imdResult.mDetectedLowPriorityTxns.emplace_back(txStatus.mTxInputData);
@@ -570,9 +570,9 @@ void CTxnValidator::postProcessingStepsNL(
             std::find(
                 vRemovedTxIds.begin(),
                 vRemovedTxIds.end(),
-                pTxInputDataSPtr->mpTx->GetId()) != vRemovedTxIds.end()) {
+                pTxInputDataSPtr->GetTxnPtr()->GetId()) != vRemovedTxIds.end()) {
             // Removed p2p txns from the mempool
-            if (TxSource::p2p == pTxInputDataSPtr->mTxSource) {
+            if (TxSource::p2p == pTxInputDataSPtr->GetTxSource()) {
                 // Create a reject message for the removed txn
                 CreateTxRejectMsgForP2PTxn(
                     pTxInputDataSPtr,
@@ -583,7 +583,7 @@ void CTxnValidator::postProcessingStepsNL(
             // Notify subscribers that a new txn was added to the mempool.
             // At this stage we do know that the signal won't be triggered for removed txns.
             // This needs to be here due to cs_main lock held by wallet's implementation of the signal
-            GetMainSignals().TransactionAddedToMempool(pTxInputDataSPtr->mpTx);
+            GetMainSignals().TransactionAddedToMempool(pTxInputDataSPtr->GetTxnPtr());
         }
     }
     /**
@@ -608,7 +608,7 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtr
         // Remove those orphans which are present in the set of cancelled txns or already enqueued.
         eraseTxnIfNL(vOrphanTxns,
             [this, &vCancelledTxns](const TxInputDataSPtr& txn){
-                const TxId& txid = txn->mpTx->GetId();
+                const TxId& txid = txn->GetTxnPtr()->GetId();
                 return isTxnKnownInSetNL(txid, vCancelledTxns); });
         // Move txns into the processing queue.
         nOrphanTxnsNum = vOrphanTxns.size();
@@ -627,12 +627,12 @@ size_t CTxnValidator::scheduleOrphanP2PTxnsForReprocessing(const TxInputDataSPtr
 }
 
 inline bool CTxnValidator::isSpaceForTxnNL(const TxInputDataSPtr& txn, const std::atomic<uint64_t>& currMemUsage) const {
-    return (currMemUsage + txn->mpTx->GetTotalSize()) <= mMaxQueueMemSize;
+    return (currMemUsage + txn->GetTxnPtr()->GetTotalSize()) <= mMaxQueueMemSize;
 }
 
 bool CTxnValidator::enqueueStdTxnNL(const TxInputDataSPtr& txn) {
-    if (!txn->mfTxIdStored) {
-        LogPrint(BCLog::TXNVAL, "Dropping known std txn= %s\n", txn->mpTx->GetId().ToString());
+    if (!txn->IsTxIdStored()) {
+        LogPrint(BCLog::TXNVAL, "Dropping known std txn= %s\n", txn->GetTxnPtr()->GetId().ToString());
         return false;
     }
     if(isSpaceForTxnNL(txn, mStdTxnsMemSize)) {
@@ -643,14 +643,14 @@ bool CTxnValidator::enqueueStdTxnNL(const TxInputDataSPtr& txn) {
         return true;
     }
     else {
-        LogPrint(BCLog::TXNVAL, "Dropping txn %s due to full std txn queue\n", txn->mpTx->GetId().ToString());
+        LogPrint(BCLog::TXNVAL, "Dropping txn %s due to full std txn queue\n", txn->GetTxnPtr()->GetId().ToString());
     }
     return false;
 }
 
 bool CTxnValidator::enqueueNonStdTxnNL(const TxInputDataSPtr& txn) {
-    if (!(txn->mfTxIdStored || txn->mfOrphan)) {
-        LogPrint(BCLog::TXNVAL, "Dropping known non-std txn= %s\n", txn->mpTx->GetId().ToString());
+    if (!(txn->IsTxIdStored() || txn->IsOrphanTxn())) {
+        LogPrint(BCLog::TXNVAL, "Dropping known non-std txn= %s\n", txn->GetTxnPtr()->GetId().ToString());
         return false;
     }
     if(isSpaceForTxnNL(txn, mNonStdTxnsMemSize)) {
@@ -661,7 +661,7 @@ bool CTxnValidator::enqueueNonStdTxnNL(const TxInputDataSPtr& txn) {
         return true;
     }
     else {
-        LogPrint(BCLog::TXNVAL, "Dropping txn %s due to full non-std txn queue\n", txn->mpTx->GetId().ToString());
+        LogPrint(BCLog::TXNVAL, "Dropping txn %s due to full non-std txn queue\n", txn->GetTxnPtr()->GetId().ToString());
     }
     return false;
 }

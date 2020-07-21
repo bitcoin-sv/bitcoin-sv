@@ -1018,7 +1018,7 @@ void CommitTxToMempool(
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
-    const CTransactionRef& ptx = pTxInputData->mpTx;
+    const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
 
@@ -1089,12 +1089,12 @@ CTxnValResult TxnValidation(
 
     using Result = CTxnValResult;
 
-    const CTransactionRef& ptx = pTxInputData->mpTx;
+    const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
-    const bool fLimitFree = pTxInputData->mfLimitFree;
-    const int64_t nAcceptTime = pTxInputData->mnAcceptTime;
-    const Amount nAbsurdFee = pTxInputData->mnAbsurdFee;
+    const bool fLimitFree = pTxInputData->IsLimitFree();
+    const int64_t nAcceptTime = pTxInputData->GetAcceptTime();
+    const Amount nAbsurdFee = pTxInputData->GetAbsurdFee();
 
     CValidationState state;
     std::vector<COutPoint> vCoinsToUncache {};
@@ -1151,8 +1151,8 @@ CTxnValResult TxnValidation(
     auto source =
         fUseLimits ?
             task::CTimedCancellationSource::Make(
-                (TxValidationPriority::high == pTxInputData->mTxValidationPriority ||
-                 TxValidationPriority::normal == pTxInputData->mTxValidationPriority)
+                (TxValidationPriority::high == pTxInputData->GetTxValidationPriority() ||
+                 TxValidationPriority::normal == pTxInputData->GetTxValidationPriority())
                     ? config.GetMaxStdTxnValidationDuration() : config.GetMaxNonStdTxnValidationDuration())
             : task::CCancellationSource::Make();
 
@@ -1298,7 +1298,7 @@ CTxnValResult TxnValidation(
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }
-    else if (fUseLimits && (TxValidationPriority::low != pTxInputData->mTxValidationPriority))
+    else if (fUseLimits && (TxValidationPriority::low != pTxInputData->GetTxValidationPriority()))
     {
         auto res =
             AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
@@ -1552,7 +1552,7 @@ CValidationState HandleTxnProcessingException(
     const CTxMemPool& pool,
     CTxnHandlers& handlers) {
 
-    const CTransactionRef& ptx = pTxInputData->mpTx;
+    const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     // Clean-up steps.
     if (!txnValResult.mCoinsToUncache.empty() && !pool.Exists(tx.GetId())) {
@@ -1569,7 +1569,7 @@ CValidationState HandleTxnProcessingException(
     }
     LogPrint(BCLog::TXNVAL, "%s: %s txn= %s: %s\n",
              __func__,
-             enum_cast<std::string>(pTxInputData->mTxSource),
+             enum_cast<std::string>(pTxInputData->GetTxSource()),
              tx.GetId().ToString(),
              sTxnStateMsg);
     return state;
@@ -1657,11 +1657,11 @@ static void PostValidationStepsForFinalisedTxn(
     CTxnHandlers& handlers);
 
 static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
-    const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
-    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const bool fOrphanTxn = txStatus.mTxInputData->IsOrphanTxn();
+    const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
-    const TxSource source = txStatus.mTxInputData->mTxSource;
+    const TxSource source = txStatus.mTxInputData->GetTxSource();
     std::string sTxnStatusMsg;
     if (state.IsMissingInputs()) {
         sTxnStatusMsg = "detected orphan";
@@ -1683,12 +1683,12 @@ static void LogTxnCommitStatus(
     const size_t& nMempoolSize,
     const size_t& nDynamicMemoryUsage) {
 
-    const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
-    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const bool fOrphanTxn = txStatus.mTxInputData->IsOrphanTxn();
+    const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
-    const CNodePtr& pNode = txStatus.mTxInputData->mpNode.lock();
-    const TxSource source = txStatus.mTxInputData->mTxSource;
+    const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
+    const TxSource source = txStatus.mTxInputData->GetTxSource();
     const std::string csPeerId {
         TxSource::p2p == source ? (pNode ? std::to_string(pNode->GetId()) : "-1")  : ""
     };
@@ -1725,10 +1725,10 @@ void ProcessValidatedTxn(
     bool fLimitMempoolSize) {
 
     TxSource source {
-        txStatus.mTxInputData->mTxSource
+        txStatus.mTxInputData->GetTxSource()
     };
     CValidationState& state = txStatus.mState;
-    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     /**
      * 1. Txn validation has failed
@@ -1746,7 +1746,7 @@ void ProcessValidatedTxn(
     if (!state.IsValid()) {
         // Handle an invalid state for p2p txn.
         if (TxSource::p2p == source) {
-            const bool fOrphanTxn = txStatus.mTxInputData->mfOrphan;
+            const bool fOrphanTxn = txStatus.mTxInputData->IsOrphanTxn();
             if (fOrphanTxn) {
                 HandleInvalidP2POrphanTxn(txStatus, handlers);
             } else {
@@ -1829,7 +1829,7 @@ static void HandleOrphanAndRejectedP2PTxns(
     const CTxnValResult& txStatus,
     CTxnHandlers& handlers) {
 
-    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     // It may be the case that the orphans parents have all been rejected.
     bool fRejectedParents = false;
@@ -1877,7 +1877,7 @@ void CreateTxRejectMsgForP2PTxn(
     unsigned int nRejectCode,
     const std::string& sRejectReason) {
 
-    const CNodePtr& pNode = pTxInputData->mpNode.lock();
+    const CNodePtr& pNode = pTxInputData->GetNodePtr().lock();
     // Never send validation's internal codes over P2P.
     if (pNode && nRejectCode > 0 && nRejectCode < REJECT_INTERNAL) {
         const CNetMsgMaker msgMaker(pNode->GetSendVersion());
@@ -1888,7 +1888,7 @@ void CreateTxRejectMsgForP2PTxn(
                             NetMsgType::REJECT, std::string(NetMsgType::TX),
                             uint8_t(nRejectCode),
                             sRejectReason.substr(0, MAX_REJECT_MESSAGE_LENGTH),
-                            pTxInputData->mpTx->GetId()));
+                            pTxInputData->GetTxnPtr()->GetId()));
     }
 }
 
@@ -1896,17 +1896,17 @@ static void HandleInvalidP2POrphanTxn(
     const CTxnValResult& txStatus,
     CTxnHandlers& handlers) {
 
-    const CNodePtr& pNode = txStatus.mTxInputData->mpNode.lock();
+    const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
         LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
         return;
     }
-    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
     // Check if the given p2p txn is considered as fully processed (validated)
     const bool fTxProcessingCompleted =
-        (TxValidationPriority::low == txStatus.mTxInputData->mTxValidationPriority ||
+        (TxValidationPriority::low == txStatus.mTxInputData->GetTxValidationPriority() ||
          !state.IsValidationTimeoutExceeded());
     // Handle invalid orphan txn for which all inputs are known
     if (!state.IsMissingInputs()) {
@@ -1947,7 +1947,7 @@ static void HandleInvalidP2PNonOrphanTxn(
     const CTxnValResult& txStatus,
     CTxnHandlers& handlers) {
 
-    const CNodePtr& pNode = txStatus.mTxInputData->mpNode.lock();
+    const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
         LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
         return;
@@ -1973,11 +1973,11 @@ static void HandleInvalidStateForP2PNonOrphanTxn(
     int nDoS,
     CTxnHandlers& handlers) {
 
-    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const CValidationState& state = txStatus.mState;
     // Check if the given p2p txn is considered as fully processed (validated).
-    if (TxValidationPriority::low == txStatus.mTxInputData->mTxValidationPriority ||
+    if (TxValidationPriority::low == txStatus.mTxInputData->GetTxValidationPriority() ||
         !state.IsValidationTimeoutExceeded()) {
         // Check corruption flag
         if (!state.CorruptionPossible()) {
@@ -2039,12 +2039,12 @@ static void PostValidationStepsForP2PTxn(
     CTxMemPool& pool,
     CTxnHandlers& handlers) {
 
-    const CNodePtr& pNode = txStatus.mTxInputData->mpNode.lock();
+    const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
         LogPrint(BCLog::TXNVAL, "An invalid reference: Node doesn't exist");
         return;
     }
-    const CTransactionRef& ptx = txStatus.mTxInputData->mpTx;
+    const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CValidationState& state = txStatus.mState;
     // Post processing step for successfully commited txns (non-orphans & orphans)
     if (state.IsValid()) {
@@ -2066,7 +2066,7 @@ static void PostValidationStepsForP2PTxn(
         // Create and send a reject message when all the following conditions are met:
         // a) the txn is fully processed
         // b) a non-internal reject code was returned from txn validation.
-        if (TxValidationPriority::low == txStatus.mTxInputData->mTxValidationPriority ||
+        if (TxValidationPriority::low == txStatus.mTxInputData->GetTxValidationPriority() ||
             !state.IsValidationTimeoutExceeded()) {
             CreateTxRejectMsgForP2PTxn(
                 txStatus.mTxInputData,
@@ -2081,7 +2081,7 @@ static void PostValidationStepsForFinalisedTxn(
     CTxMemPool& pool,
     CTxnHandlers& handlers)
 {
-    const CTransactionRef& ptx { txStatus.mTxInputData->mpTx };
+    const CTransactionRef& ptx { txStatus.mTxInputData->GetTxnPtr() };
     const CValidationState& state { txStatus.mState };
 
     if(state.IsValid())
@@ -2141,14 +2141,14 @@ static void UpdateMempoolForReorg(const Config &config,
     // Mempool related updates
     std::vector<uint256> vHashUpdate {};
     for (const auto& txInputData : vTxInputData) {
-        auto const& txid = txInputData->mpTx->GetId();
+        auto const& txid = txInputData->GetTxnPtr()->GetId();
         if (mempool.Exists(txid)) {
             // A set of transaction hashes from a disconnected block re-added to the mempool.
             vHashUpdate.emplace_back(txid);
         } else {
             // If the transaction doesn't make it in to the mempool, remove any
             // transactions that depend on it (which would now be orphans).
-            mempool.RemoveRecursive(*(txInputData->mpTx), changeSet, MemPoolRemovalReason::REORG);
+            mempool.RemoveRecursive(*(txInputData->GetTxnPtr()), changeSet, MemPoolRemovalReason::REORG);
         }
     }
     // Validator/addUnchecked all assume that new mempool entries have

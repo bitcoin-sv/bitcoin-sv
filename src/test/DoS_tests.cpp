@@ -256,7 +256,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         };
         BOOST_CHECK(pRndTxInputData);
 
-        CTransactionRef txPrev = pRndTxInputData->mpTx;
+        CTransactionRef txPrev = pRndTxInputData->GetTxnPtr();
         // Create a dependant txn
         CMutableTransaction tx;
         tx.vin.resize(1);
@@ -276,7 +276,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                 GetTime(),     // nAcceptTime
                 false, // mfLimitFree
                 Amount(0),     // nAbsurdFee
-                pRndTxInputData->mpNode)); // pNode
+                pRndTxInputData->GetNodePtr())); // pNode
     }
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 100);
 
@@ -291,7 +291,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
         };
         BOOST_CHECK(pRndTxInputData);
 
-        CTransactionRef txPrev = pRndTxInputData->mpTx;
+        CTransactionRef txPrev = pRndTxInputData->GetTxnPtr();
         CMutableTransaction tx;
         tx.vout.resize(1);
         tx.vout[0].nValue = 1 * CENT;
@@ -316,11 +316,11 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                 GetTime(),     // nAcceptTime
                 false,         // mfLimitFree
                 Amount(0),     // nAbsurdFee
-                pRndTxInputData->mpNode) // pNode
+                pRndTxInputData->GetNodePtr()) // pNode
         };
         // Add txn input data to the queue
         orphanTxns->addTxn(pTxInputData);
-        BOOST_CHECK(!orphanTxns->checkTxnExists(pTxInputData->mpTx->GetId()));
+        BOOST_CHECK(!orphanTxns->checkTxnExists(pTxInputData->GetTxnPtr()->GetId()));
     }
     // Test erase orphans from a given peer:
     for (NodeId i = 0; i < 3; i++) {

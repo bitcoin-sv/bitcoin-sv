@@ -336,12 +336,12 @@ public:
         // mChains is used to track transacions belonging to the same chain (among the given vNewTxns set).
         std::size_t chainId = 0;
         std::map<TxId, std::size_t> mChains {};
-        mChains.emplace(chunkBeginIter->get()->mpTx->GetId(), ++chainId);
+        mChains.emplace(chunkBeginIter->get()->GetTxnPtr()->GetId(), ++chainId);
         // A helper lambda used to identify a continuous chain
         // (a sequence of transactions compliant with the parent-child rule).
         auto is_continuous_chain {
             [&mChains, &chunkEndIter](std::size_t chainId) -> std::pair<bool, std::size_t> {
-                for (const auto& txin : chunkEndIter->get()->mpTx->vin) {
+                for (const auto& txin : chunkEndIter->get()->GetTxnPtr()->vin) {
                     const TxId& txhash = txin.prevout.GetTxId();
                     const auto& foundParentIter = mChains.find(txhash);
                     if (foundParentIter != mChains.end()) {
@@ -357,18 +357,18 @@ public:
         // As an example, the following sequence of chains [ A1, B1, B2, C1, C2, C3, D1, C4, C5 ] will be assigned into:
         // a) an optimistic split: 5 different tasks (if the same txn priority occurs within the chain)
         // b) a pessimistic split: 9 different tasks (if a different txn priority occurs, alternately, within the chain)
-        TxValidationPriority chunkInitialPriority = chunkBeginIter->get()->mTxValidationPriority;
+        TxValidationPriority chunkInitialPriority = chunkBeginIter->get()->GetTxValidationPriority();
         do {
             ++chunkEndIter;
             if (chunkEndIter != vNewTxns.end()) {
                 const auto& result = is_continuous_chain(chainId);
-                if (!result.first || !(chunkInitialPriority == chunkEndIter->get()->mTxValidationPriority)) {
+                if (!result.first || !(chunkInitialPriority == chunkEndIter->get()->GetTxValidationPriority())) {
                     create_task(chunkBeginIter, chunkEndIter, chunkInitialPriority);
                     chunkBeginIter = chunkEndIter;
-                    chunkInitialPriority = chunkBeginIter->get()->mTxValidationPriority;
+                    chunkInitialPriority = chunkBeginIter->get()->GetTxValidationPriority();
                 }
                 // Assign the same id to newly detected txn if it belongs to the known chain, otherwise use a new id.
-                const TxId& txhash = chunkEndIter->get()->mpTx->GetId();
+                const TxId& txhash = chunkEndIter->get()->GetTxnPtr()->GetId();
                 if (!result.second) {
                     mChains.try_emplace(txhash, ++chainId);
                 } else {

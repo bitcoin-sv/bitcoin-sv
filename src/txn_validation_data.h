@@ -34,9 +34,10 @@ const enumTableT<TxValidationPriority>& enumTable(TxValidationPriority);
 class CNode;
 
 /**
- * The class used to provide an input data to the txn Validator.
+ * This class is used to provide an input data to the TxnValidator.
+ * It includes a pointer to a transaction and it's associated data.
  */
-class CTxInputData {
+class CTxInputData final {
 public:
     // Constructor
     CTxInputData(
@@ -55,7 +56,81 @@ public:
     // Destructor
     ~CTxInputData();
 
-public:
+    /**
+     * Getters
+     */
+    // GetTxnPtr
+    const CTransactionRef& GetTxnPtr() const {
+        return mpTx;
+    }
+    // GetNodePtr
+    const std::weak_ptr<CNode>& GetNodePtr() {
+        return mpNode;
+    }
+    // GetAbsurdFee
+    Amount& GetAbsurdFee() {
+        return mnAbsurdFee;
+    }
+    const Amount& GetAbsurdFee() const {
+        return mnAbsurdFee;
+    }
+    // GetAcceptTime
+    int64_t& GetAcceptTime() {
+        return mnAcceptTime;
+    }
+    const int64_t& GetAcceptTime() const {
+        return mnAcceptTime;
+    }
+    // GetTxSource
+    TxSource& GetTxSource() {
+        return mTxSource;
+    }
+    const TxSource& GetTxSource() const {
+        return mTxSource;
+    }
+    // GetTxValidationPriority
+    TxValidationPriority& GetTxValidationPriority() {
+        return mTxValidationPriority;
+    }
+    const TxValidationPriority& GetTxValidationPriority() const {
+        return mTxValidationPriority;
+    }
+    // IsLimitFree
+    bool IsLimitFree() const {
+        return mfLimitFree;
+    }
+    // IsOrphanTxn
+    bool IsOrphanTxn() const {
+        return mfOrphan;
+    }
+    // IsTxIdStored
+    bool IsTxIdStored() const {
+        return mfTxIdStored;
+    }
+
+    /**
+     * Setters
+     */
+    // SetAcceptTime
+    void SetAcceptTime(int64_t acceptTime) {
+        mnAcceptTime = acceptTime;
+    }
+    // SetTxSource
+    void SetTxSource(TxSource txSource) {
+        mTxSource = txSource;
+    }
+    // SetTxValidationPriority
+    void SetTxValidationPriority(TxValidationPriority txValidationPriority) {
+        mTxValidationPriority = txValidationPriority;
+    }
+    // SetOrphanTxn
+    void SetOrphanTxn(bool fOrphan=true) {
+        mfOrphan = fOrphan;
+    }
+
+// Optimizing for memory footprint:
+// - members are ordered by decreasing alignment
+private:
     CTransactionRef mpTx {nullptr};
     std::weak_ptr<CNode> mpNode {};
     TxIdTrackerWPtr mpTxIdTracker {};

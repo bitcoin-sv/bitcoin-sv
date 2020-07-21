@@ -188,9 +188,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_checktxnexists) {
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Create a txns which is not present in queue
     auto txn = CreateOrphanTxn(TxSource::p2p);
-    BOOST_CHECK(!orphanTxns->checkTxnExists(txn->mpTx->GetId()));
+    BOOST_CHECK(!orphanTxns->checkTxnExists(txn->GetTxnPtr()->GetId()));
     orphanTxns->addTxn(txn);
-    BOOST_CHECK(orphanTxns->checkTxnExists(txn->mpTx->GetId()));
+    BOOST_CHECK(orphanTxns->checkTxnExists(txn->GetTxnPtr()->GetId()));
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber+1);
 }
 
@@ -213,7 +213,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxn) {
     auto txn = CreateOrphanTxn(TxSource::p2p);
     orphanTxns->addTxn(txn);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber+1);
-    auto txnToErase = txn->mpTx->GetId();
+    auto txnToErase = txn->GetTxnPtr()->GetId();
     // Erase a given txn
     orphanTxns->eraseTxn(txnToErase);
     // Check if txn was erased
@@ -267,12 +267,12 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_maxcollectedoutpoints) {
                     CreateTxnOutputs(nMaxCollectedOutpoints));
     // Create a vector with expected outpoints from txn1
     std::vector<COutPoint> vExpectedOutpoints {};
-    auto txn1id = txn1->mpTx->GetId();
+    auto txn1id = txn1->GetTxnPtr()->GetId();
     for (size_t i=0; i<nMaxCollectedOutpoints; ++i) {
         vExpectedOutpoints.emplace_back(COutPoint{txn1id, (uint32_t)i});
     }
     // Collect outpoints from txn1
-    orphanTxns->collectTxnOutpoints(*(txn1->mpTx));
+    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
     // Get collected outpoints
     auto vReturnedOutpoints = orphanTxns->getCollectedOutpoints();
     BOOST_CHECK(
@@ -292,7 +292,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_maxcollectedoutpoints) {
                        TxSource::p2p,
                        CreateTxnInputs(1),
                        CreateTxnOutputs(nTxnNumOfOutpoints));
-        orphanTxns->collectTxnOutpoints(*(txn->mpTx));
+        orphanTxns->collectTxnOutpoints(*(txn->GetTxnPtr()));
         // Check if rotate can be applied to remove the oldest outpoints
         if (nTxnNumOfOutpoints < nMaxCollectedOutpoints) {
                 std::rotate(
@@ -303,7 +303,7 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_maxcollectedoutpoints) {
         } else {
             vExpectedOutpoints.clear();
         }
-        auto txnid = txn->mpTx->GetId();
+        auto txnid = txn->GetTxnPtr()->GetId();
         for (size_t i=0; i<nTxnNumOfOutpoints; ++i) {
             vExpectedOutpoints.emplace_back(COutPoint{txnid, (uint32_t)i});
         }
@@ -333,19 +333,19 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
                     TxSource::p2p,
                     CreateTxnInputs(1),
                     CreateTxnOutputs(nTxn1NumOfOutpoints));
-    auto txn1id = txn1->mpTx->GetId();
+    auto txn1id = txn1->GetTxnPtr()->GetId();
     // Create txn2
     auto txn2 = CreateOrphanTxn(
                     TxSource::p2p,
                     CreateTxnInputs(1),
                     CreateTxnOutputs(nTxn2NumOfOutpoints));
-    auto txn2id = txn2->mpTx->GetId();
+    auto txn2id = txn2->GetTxnPtr()->GetId();
     // Create txn3
     auto txn3 = CreateOrphanTxn(
                     TxSource::p2p,
                     CreateTxnInputs(1),
                     CreateTxnOutputs(nTxn3NumOfOutpoints));
-    auto txn3id = txn3->mpTx->GetId();
+    auto txn3id = txn3->GetTxnPtr()->GetId();
     // Create a vector with expected outpoints from txn1
     std::vector<COutPoint> vTxn1ExpectedOutpoints {};
     for (size_t i=0; i<nTxn1NumOfOutpoints; ++i) {
@@ -358,15 +358,15 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
     }
     // Collect outpoints from txn1. Then, remove all outpoints from txn1
     {
-        orphanTxns->collectTxnOutpoints(*(txn1->mpTx));
+        orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
         orphanTxns->eraseCollectedOutpointsFromTxns(std::vector<TxId>{txn1id});
         auto vReturnedOutpoints = orphanTxns->getCollectedOutpoints();
         BOOST_CHECK(vReturnedOutpoints.empty());
     }
     // Collect outpoints from txn1 & txn2. Then, remove outpoints from txn2
     {
-        orphanTxns->collectTxnOutpoints(*(txn1->mpTx));
-        orphanTxns->collectTxnOutpoints(*(txn2->mpTx));
+        orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
+        orphanTxns->collectTxnOutpoints(*(txn2->GetTxnPtr()));
         orphanTxns->eraseCollectedOutpointsFromTxns(std::vector<TxId>{txn2id});
         auto vReturnedOutpoints = orphanTxns->getCollectedOutpoints();
         BOOST_CHECK(vReturnedOutpoints.size() == nTxn1NumOfOutpoints);
@@ -380,9 +380,9 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasecollectedoutpointsfromtxns) {
     orphanTxns->eraseCollectedOutpoints();
     // Collect outpoints from txn1, txn2 & txn3. Then, remove outpoints from txn2
     {
-        orphanTxns->collectTxnOutpoints(*(txn1->mpTx));
-        orphanTxns->collectTxnOutpoints(*(txn2->mpTx));
-        orphanTxns->collectTxnOutpoints(*(txn3->mpTx));
+        orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
+        orphanTxns->collectTxnOutpoints(*(txn2->GetTxnPtr()));
+        orphanTxns->collectTxnOutpoints(*(txn3->GetTxnPtr()));
         orphanTxns->eraseCollectedOutpointsFromTxns(std::vector<TxId>{txn2id});
         auto vReturnedOutpoints = orphanTxns->getCollectedOutpoints();
         BOOST_CHECK(vReturnedOutpoints.size() == nTxn1NumOfOutpoints + nTxn3NumOfOutpoints);
@@ -424,22 +424,22 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
     // Create dependent orphan txns:
     // dependent_txn1 takes txn1 as an input.
     auto dependent_txn1 {
-        CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn1->mpTx->GetId(), 0)}))
+        CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn1->GetTxnPtr()->GetId(), 0)}))
     };
     orphanTxns->addTxn(dependent_txn1);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber+1);
     // Test case 1: Collect dependent txns for retry
-    orphanTxns->collectTxnOutpoints(*(txn1->mpTx));
+    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
     auto vOrphanTxnsForRetry = orphanTxns->collectDependentTxnsForRetry();
     // Check if txn1 was taken from the orphan set.
-    size_t nDependentTxn1VoutSize = dependent_txn1->mpTx->vout.size();
+    size_t nDependentTxn1VoutSize = dependent_txn1->GetTxnPtr()->vout.size();
     BOOST_CHECK(vOrphanTxnsForRetry.size() == nDependentTxn1VoutSize);
-    auto dependent_txn1_id = dependent_txn1->mpTx->GetId();
+    auto dependent_txn1_id = dependent_txn1->GetTxnPtr()->GetId();
     auto fdependenttxn1 {
         std::find_if(vOrphanTxnsForRetry.begin(),
                      vOrphanTxnsForRetry.end(),
                      [&dependent_txn1_id](const TxInputDataSPtr& txn) {
-                            return dependent_txn1_id == txn->mpTx->GetId();
+                            return dependent_txn1_id == txn->GetTxnPtr()->GetId();
                         })
     };
     BOOST_CHECK(fdependenttxn1 != vOrphanTxnsForRetry.end());
@@ -448,12 +448,12 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry) {
     auto txn6 = CreateOrphanTxn(TxSource::p2p);
     orphanTxns->addTxn(txn6);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber+2);
-    orphanTxns->collectTxnOutpoints(*(txn6->mpTx));
+    orphanTxns->collectTxnOutpoints(*(txn6->GetTxnPtr()));
     BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
     // Test case 3:
     // There is no newly added dependent orphan txn. There should be nothing for re-try.
     auto txn7 = CreateOrphanTxn(TxSource::p2p);
-    orphanTxns->collectTxnOutpoints(*(txn7->mpTx));
+    orphanTxns->collectTxnOutpoints(*(txn7->GetTxnPtr()));
     BOOST_CHECK(orphanTxns->collectDependentTxnsForRetry().empty());
 }
 
@@ -471,15 +471,15 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     // Create orphan transaction of type 1-2 (one input - two outputs):
     auto txn1 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs(1), CreateTxnOutputs(2));
     // txn2 takes the first output from txn1 
-    auto txn2 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn1->mpTx->GetId(), 0)}));
+    auto txn2 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn1->GetTxnPtr()->GetId(), 0)}));
     // txn3 takes the second output from txn1 
-    auto txn3 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn1->mpTx->GetId(), 1)}));
+    auto txn3 = CreateOrphanTxn(TxSource::p2p, CreateTxnInputs({COutPoint(txn1->GetTxnPtr()->GetId(), 1)}));
     // Add txn2 to orphans
     orphanTxns->addTxn(txn2);
     // Add txn3 to orphans
     orphanTxns->addTxn(txn3);
     // We presume that txn1 is submitted to the mempool so collect it's outpoints
-    orphanTxns->collectTxnOutpoints(*(txn1->mpTx));
+    orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
     // For the same parent we can not simply return both orphans.
     // It is due to txn descendant count & size calculations.
     //
@@ -488,20 +488,20 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     {
         auto vRetryTxns = orphanTxns->collectDependentTxnsForRetry();
         BOOST_CHECK(vRetryTxns.size() == 1);
-        BOOST_CHECK(*(vRetryTxns[0]->mpTx) == *(txn2->mpTx));
+        BOOST_CHECK(*(vRetryTxns[0]->GetTxnPtr()) == *(txn2->GetTxnPtr()));
         // Remove txn2 from orphans. It simulates a possible use cases:
         // - txn2 was accepted to the mempool
         // - txn2 was rejected as being invalid orphan txn.
-        orphanTxns->eraseTxn(txn2->mpTx->GetId());
+        orphanTxns->eraseTxn(txn2->GetTxnPtr()->GetId());
     }
     // Test case2:
     // Call collectDependentTxnsForRetry to get the second related orphan txn 
     {
         auto vRetryTxns = orphanTxns->collectDependentTxnsForRetry();
         BOOST_CHECK(vRetryTxns.size() == 1);
-        BOOST_CHECK(*(vRetryTxns[0]->mpTx) == *(txn3->mpTx));
+        BOOST_CHECK(*(vRetryTxns[0]->GetTxnPtr()) == *(txn3->GetTxnPtr()));
         // Remove txn3 from orphans.
-        orphanTxns->eraseTxn(txn3->mpTx->GetId());
+        orphanTxns->eraseTxn(txn3->GetTxnPtr()->GetId());
     }
 
     // At this stage there is no orphans and collected outpoints in the queue.
@@ -514,16 +514,16 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_collectdependenttxnsforretry2) {
     {
         orphanTxns->addTxn(txn2);
         orphanTxns->addTxn(txn3);
-        orphanTxns->collectTxnOutpoints(*(txn1->mpTx));
+        orphanTxns->collectTxnOutpoints(*(txn1->GetTxnPtr()));
         {
             auto vRetryTxns = orphanTxns->collectDependentTxnsForRetry();
             BOOST_CHECK(vRetryTxns.size() == 1);
-            BOOST_CHECK(*(vRetryTxns[0]->mpTx) == *(txn2->mpTx));
+            BOOST_CHECK(*(vRetryTxns[0]->GetTxnPtr()) == *(txn2->GetTxnPtr()));
         }
         {
             auto vRetryTxns = orphanTxns->collectDependentTxnsForRetry();
             BOOST_CHECK(vRetryTxns.size() == 1);
-            BOOST_CHECK(*(vRetryTxns[0]->mpTx) == *(txn2->mpTx) || *(vRetryTxns[0]->mpTx) == *(txn3->mpTx));
+            BOOST_CHECK(*(vRetryTxns[0]->GetTxnPtr()) == *(txn2->GetTxnPtr()) || *(vRetryTxns[0]->GetTxnPtr()) == *(txn3->GetTxnPtr()));
         }
     }
 }

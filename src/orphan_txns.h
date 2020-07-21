@@ -25,7 +25,7 @@ struct IterComparator {
 
 struct CTxnIdComparator {
     bool operator ()(const TxInputDataSPtr& lhs, const TxInputDataSPtr& rhs) const {
-        return lhs->mpTx->GetId() < rhs->mpTx->GetId();
+        return lhs->GetTxnPtr()->GetId() < rhs->GetTxnPtr()->GetId();
     }
 };
 
