@@ -153,13 +153,31 @@ void CTxMemPool::updateForDescendantsNL(txiter updateIt,
                  update_descendant_state(modifySize, modifyFee, modifyCount));
 }
 
+namespace {
+// Takes given change set if not empty, creates new otherwise
+class CEnsureNonNullChangeSet
+{
+    CJournalChangeSetPtr replacement;
+    const CJournalChangeSetPtr& cs;
+public:
+    CEnsureNonNullChangeSet(CTxMemPool& theMempool,  const CJournalChangeSetPtr& changeSet)
+        : replacement(changeSet ? nullptr : theMempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN))
+        , cs(changeSet ? changeSet : replacement) 
+    {}
+
+    CJournalChangeSet& Get() { return *cs; }
+};
+}
+
+
 // vHashesToUpdate is the set of transaction hashes from a disconnected block
 // which has been re-added to the mempool. For each entry, look for descendants
 // that are outside hashesToUpdate, and add fee/size information for such
 // descendants to the parent. For each such descendant, also update the ancestor
 // state to include the parent.
 void CTxMemPool::UpdateTransactionsFromBlock(
-    const std::vector<uint256> &vHashesToUpdate) {
+    const std::vector<uint256> &vHashesToUpdate,
+    const CJournalChangeSetPtr &changeSet) {
     std::unique_lock lock(smtx);
     // For each entry in vHashesToUpdate, store the set of in-mempool, but not
     // in-vHashesToUpdate transactions, so that we don't have to recalculate
@@ -176,6 +194,7 @@ void CTxMemPool::UpdateTransactionsFromBlock(
     // This maximizes the benefit of the descendant cache and guarantees that
     // setMemPoolChildren will be updated, an assumption made in
     // updateForDescendantsNL.
+    setEntries addedTransactions;
     for (const uint256 &hash : boost::adaptors::reverse(vHashesToUpdate)) {
         // we cache the in-mempool children to avoid duplicate updates
         setEntries setChildren;
@@ -184,6 +203,7 @@ void CTxMemPool::UpdateTransactionsFromBlock(
         if (it == mapTx.end()) {
             continue;
         }
+        addedTransactions.insert(it);
         auto iter = mapNextTx.lower_bound(COutPoint(hash, 0));
         // First calculate the children, and update setMemPoolChildren to
         // include them, and update their setMemPoolParents to include this tx.
@@ -203,6 +223,15 @@ void CTxMemPool::UpdateTransactionsFromBlock(
         updateForDescendantsNL(it, mapMemPoolDescendantsToUpdate,
                              setAlreadyIncluded);
     }
+
+    CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+
+    // Now we will recheck added transactions 
+    // We are doing this because it could be that a newly added transaction
+    // did not end up in the journal but have descendants which are in the journal already.
+    // This kind of is suboptimal because we will check fees for second time for most of the transactions
+    extendWithConnectedNL(addedTransactions);
+    checkJournalAcceptanceNL(addedTransactions, nonNullChangeSet.Get());
 }
 
 bool CTxMemPool::CalculateMemPoolAncestors(
@@ -509,17 +538,6 @@ void CTxMemPool::AddUncheckedNL(
     indexed_transaction_set::iterator newit = mapTx.insert(entry).first;
     mapLinks.insert(make_pair(newit, TxLinks()));
 
-    // Apply to the current journal, either via the passed in change set or directly ourselves
-    if(changeSet)
-    {
-        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
-    }
-    else
-    {
-        CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
-    }
-
     // Update transaction for any feeDelta created by PrioritiseTransaction
     // TODO: refactor so that the fee delta is calculated before inserting into
     // mapTx.
@@ -573,6 +591,37 @@ void CTxMemPool::AddUncheckedNL(
     if (pnDynamicMemoryUsage) {
         *pnDynamicMemoryUsage = DynamicMemoryUsageNL();
     }
+    
+    // Check if the transaction by itself pays enough for mining.
+    // If not it will not enter the journal nor any other transaction will be affected, so
+    // we can skip journal related stuff
+    if (blockMinTxfee.GetFee(newit->GetTxSize()) <= newit->GetModifiedFee())
+    {
+        // transaction pays enough for mining
+
+        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+        setEntries affected;
+        affected.insert(newit);
+        auto filterOutAlreadyAccepted = [this, &changeSet](txiter entry)
+        {
+            auto txid = entry->GetTx().GetId();
+            if (mJournalBuilder->getCurrentJournal()->checkTxnExists(txid))
+            {
+                return false;
+            }
+                
+            if (changeSet && changeSet->checkTxnAdded(txid))
+            {
+                return false;
+            }
+            return true;
+        };
+        // we will limit ourself to check limited number of transactions in order 
+        // to prevent possible attacks. 
+        constexpr size_t MAX_TX_TO_CONSIDER = 100;
+        extendWithConnectedNL(affected, filterOutAlreadyAccepted, MAX_TX_TO_CONSIDER);
+        checkJournalAcceptanceNL(affected, nonNullChangeSet.Get());
+    }
 }
 
 void CTxMemPool::removeUncheckedNL(
@@ -598,15 +647,8 @@ void CTxMemPool::removeUncheckedNL(
     }
 
     // Apply to the current journal, either via the passed in change set or directly ourselves
-    if(changeSet)
-    {
-        changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
-    }
-    else
-    {
-        CJournalChangeSetPtr tmpChangeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
-    }
+    CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+    nonNullChangeSet.Get().addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
 
     totalTxSize -= it->GetTxSize();
     cachedInnerUsage -= it->DynamicMemoryUsage();
@@ -1051,19 +1093,7 @@ std::string CTxMemPool::checkJournalNL() const
     LogPrint(BCLog::JOURNAL, "Checking mempool against journal\n");
     std::stringstream res {};
 
-    // Check mempool and journal have the same number of entries
     CJournalTester tester { mJournalBuilder->getCurrentJournal() };
-    if(mapTx.size() != tester.journalSize())
-    {
-        res << "Mempool size = " << mapTx.size() << ", journal size = " << tester.journalSize() << std::endl;
-        res << "Mempool contents:" << std::endl;
-        for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
-        {
-            res << it->GetTx().GetId().ToString() << std::endl;
-        }
-        res << "Journal contents:" << std::endl;
-        tester.dumpJournalContents(res);
-    }
 
     // Check mempool & journal agree on contents
     for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
@@ -1072,7 +1102,8 @@ std::string CTxMemPool::checkJournalNL() const
         const CJournalEntry tx { *it };
         if(!tester.checkTxnExists(tx))
         {
-            res << "Txn " << tx.getTxn()->GetId().ToString() << " is in the mempool but not the journal" << std::endl;
+            // it is not in the journal so we will not check it's ancestors
+            continue;
         }
 
         for(const CTxIn& txin : tx.getTxn()->vin)
@@ -1106,12 +1137,13 @@ void CTxMemPool::RebuildJournal() const
 
     std::shared_lock lock(smtx);
 
-    // Build a change set that contains all our transactions. No need to try and
-    // order them correctly because that will be done later for us.
-    for(const auto& entry : mapTx)
+    setEntries allTxs;
+    for(txiter entry = mapTx.cbegin(); entry != mapTx.cend(); entry++)
     {
-        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
+        allTxs.insert(entry);
     }
+    
+    checkJournalAcceptanceNL(allTxs, *changeSet);
 
     // Apply the changes
     changeSet->apply();
@@ -1271,6 +1303,7 @@ void CTxMemPool::PrioritiseTransaction(
         for(const TxId& txid: vTxToPrioritise) {
             prioritiseTransactionNL(txid, dPriorityDelta, nFeeDelta);
         }
+
     }
     for(const TxId& txid: vTxToPrioritise) {
         LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n",
@@ -1338,6 +1371,12 @@ void CTxMemPool::prioritiseTransactionNL(
             mapTx.modify(descendantIt,
                          update_ancestor_state(0, nFeeDelta, 0, 0));
         }
+
+        setEntries affectedTxs;
+        affectedTxs.insert(it);
+        extendWithConnectedNL(affectedTxs);
+        CJournalChangeSetPtr tmpChangeSet { getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN) };
+        checkJournalAcceptanceNL(affectedTxs, *tmpChangeSet);
     }
 }
 
@@ -1397,6 +1436,281 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
            memusage::DynamicUsage(vTxHashes) + cachedInnerUsage;
 }
 
+void CTxMemPool::extendWithConnectedNL(CTxMemPool::setEntries& entries, std::function<bool(txiter)> filter, std::optional<size_t> limit) const
+{
+    // tracking of the unvisited children with preserving order of insertion 
+    // these variables and lambdas deserve their own class but as this is one-release change
+    // it is better to have it here, will be easier to remove them later
+    setEntries unvisitedChildren;
+    std::queue<txiter> unvisitedChildrenOrder;
+
+    auto pushUnvisitedChild =  [&unvisitedChildren, &unvisitedChildrenOrder](txiter entry){
+        auto success = unvisitedChildren.insert(entry);
+        if(success.second)
+        {
+            unvisitedChildrenOrder.push(entry);
+        }
+    };
+
+    auto popUnvisitedChild =  [&unvisitedChildren, &unvisitedChildrenOrder](){
+        txiter entry = unvisitedChildrenOrder.front();
+        unvisitedChildrenOrder.pop();
+        unvisitedChildren.erase(entry);
+        return entry;
+    };
+
+    auto hasUnvisitedChildren =  [&unvisitedChildren](){
+        return !unvisitedChildren.empty();
+    };
+
+    // adds children to the list of the unvisited children
+    auto addChildrenToTheUnvisited = [this, &entries, &pushUnvisitedChild](txiter entry){
+        for(txiter child: GetMemPoolChildrenNL(entry))
+        {
+            if(entries.find(child) != entries.end())
+            {
+                continue;
+            }
+            pushUnvisitedChild(child);
+        }
+    };
+
+    // adds all ancestors of the given entry to the set, and their children to the list of the unvisited children
+    auto addAncestors = [this, &entries, &filter, &addChildrenToTheUnvisited](txiter child){
+        setEntries nextStep = {child};
+        while(!nextStep.empty())
+        {
+            setEntries newNextStep;
+            for(txiter entry: nextStep)
+            {
+                for(txiter parent: GetMemPoolParentsNL(entry))
+                {
+                    if(!filter(parent))
+                    {
+                        continue;
+                    }
+
+                    auto success = entries.insert(parent);
+                    if(success.second)
+                    {
+                        newNextStep.insert(parent);
+                        addChildrenToTheUnvisited(parent);
+                    }                
+                }
+            }
+            nextStep = std::move(newNextStep);
+        }
+    };
+
+
+    // first find any direct children that we have in order 
+    // to add them first to list of the unvisited children
+    for(txiter entry: entries)
+    {
+        addChildrenToTheUnvisited(entry);
+    }
+
+    // ensure that we add all parents
+    for(txiter entry: entries)
+    {
+        addAncestors(entry);
+    }
+
+
+    // continue adding unvisited entries (with their parents) until we have them
+    while(hasUnvisitedChildren())
+    {
+        if(limit.has_value() && (entries.size() >= limit.value()) )
+        {
+            break;
+        }
+
+        txiter entry = popUnvisitedChild();
+        
+        if(!filter(entry))
+        {
+            continue;
+        }
+
+         auto success = entries.insert(entry);
+        if(success.second)
+        {
+            addChildrenToTheUnvisited(entry);
+            addAncestors(entry);
+        }
+    }
+}
+
+void CTxMemPool::extendWithConnectedNL(setEntries& entries) const
+{
+    auto allwaysTrue = [](txiter){ return true; };
+    extendWithConnectedNL(entries, allwaysTrue, 0);
+}
+
+void CTxMemPool::checkJournalAcceptanceNL(const CTxMemPool::setEntries& affectedTransactions, CJournalChangeSet& changeSet) const
+{
+    // ensures that transaction will end up in the journal if it is not there already, and that it will not be removed if it is inside.
+    auto ensureAdded = [this, &changeSet](txiter entry){
+        auto txid = entry->GetTx().GetId();
+        bool alreadyInJournal = mJournalBuilder->getCurrentJournal()->checkTxnExists(txid);
+        if(!alreadyInJournal)
+        {
+            if(!changeSet.checkTxnAdded(txid))
+            {
+                changeSet.addOperation(CJournalChangeSet::Operation::ADD, { *entry });
+            }
+        }
+        else
+        {
+            if(changeSet.checkTxnRemoved(txid))
+            {
+                changeSet.addOperation(CJournalChangeSet::Operation::ADD, { *entry });
+            }
+        }
+    };
+
+    // ensures that transaction will be removed from journal if it is inside, and if not inside journal it will not be added
+    auto ensureRemoved = [this, &changeSet](txiter entry){
+        auto txid = entry->GetTx().GetId();
+        bool isInJournal = mJournalBuilder->getCurrentJournal()->checkTxnExists(txid);
+        if(isInJournal)
+        {
+            if(!changeSet.checkTxnRemoved(txid))
+            {
+                changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, { *entry });
+            }
+        }
+        else
+        {
+            if(changeSet.checkTxnAdded(txid))
+            {
+                changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, { *entry });
+            }
+        }
+    };
+
+    // returns topo sorted vector of transactions
+    auto topoSortedTxFromSet = [](const setEntries& txSet){
+        std::vector<txiter> txs(txSet.begin(), txSet.end());
+        std::sort(txs.begin(), txs.end(),
+            [](const txiter& entry1, const txiter& entry2)
+            {
+                return entry1->GetCountWithAncestors() < entry2->GetCountWithAncestors();
+            }
+        );
+        return txs;
+    };
+
+    // returns debt of the transaction, regardless of the parents
+    auto calculateDebt = [this](txiter entry){
+        auto fee = entry->GetModifiedFee();
+        auto neededFee = blockMinTxfee.GetFee(entry->GetTxSize());
+        if(fee < neededFee)
+        {
+            return neededFee - fee;
+        }
+        return Amount(0);
+    };
+
+
+    
+    auto txsToCheck = topoSortedTxFromSet(affectedTransactions);
+    
+    // limit ourself to fixed number of recalculation rounds
+    constexpr int MAX_RECHECK_COUNT = 3;
+
+    for(int round = 0; round < MAX_RECHECK_COUNT; round++)
+    {
+        // flag that signals that we have detected cpfp (child pays for parent) scenario and we have added
+        // previously visited transactions (parents) to the journal. this can result in not accepting transaction
+        // that could be accepted
+        // for example: we have two transactions (tx1, tx2) that share a common low-paying parent. tx1 does not pay
+        // enough for the parent but pays enough for itself. tx2 pays enough for itself and the parent. 
+        // in this case if we visit tx1 first, we will not add it to the journal. but after tx2 and its parent 
+        // has been moved to the journal, tx1  is now free of it parent's debt and can be moved to the journal. 
+        // so if we accepted transactions through cpfp we will revisit all transactions that did not make it to the journal
+        bool cpfpExecuted = false;
+
+        // keys are entries that do not pay enough, values are sets of the their's ancestors which do not pay enough
+        std::map<txiter, setEntries, CompareIteratorByHash> nonPayingTxWithAncestors;
+
+        for(txiter ent: txsToCheck)
+        {
+            // let's collect all non-paying ancestors
+            setEntries nonpayingAncestors;
+            for(txiter parent: GetMemPoolParentsNL(ent))
+            {
+                // is parent in debt?
+                auto parentDebtIt = nonPayingTxWithAncestors.find(parent);
+                if (parentDebtIt == nonPayingTxWithAncestors.end())
+                {
+                    continue;
+                }
+
+                // our parent is in debt, let's collect theirs non paying ancestors too
+                nonpayingAncestors.insert(parentDebtIt->second.cbegin(), parentDebtIt->second.cend());
+                nonpayingAncestors.insert(parent);
+            }
+
+            // now sum up all ancestor's debt (if any)
+            Amount ancestorsDebt(0);
+            for(txiter ancestor: nonpayingAncestors)
+            {
+                ancestorsDebt += calculateDebt(ancestor);
+            }
+
+            Amount fee = ent->GetModifiedFee();
+            Amount excessFee = fee - blockMinTxfee.GetFee(ent->GetTxSize()); 
+
+            if(excessFee >= ancestorsDebt)
+            {
+                // Great! This transactions pays enough, first remove ancestors from the debt list (if any) 
+                // and add them to the journal (in topo-order)
+                for(auto ancestor: topoSortedTxFromSet(nonpayingAncestors))
+                {
+                    ensureAdded(ancestor);
+                    nonPayingTxWithAncestors.erase(ancestor);
+                    cpfpExecuted = true;
+                }
+                
+                ensureAdded(ent);
+            }
+            else
+            {
+                // Lets put the tx on the debt list
+                nonPayingTxWithAncestors.insert(std::make_pair(ent, nonpayingAncestors));
+            }
+        }
+
+        bool lastRound = (round + 1) >= MAX_RECHECK_COUNT;
+
+        if(cpfpExecuted && !lastRound)
+        {
+            // we have executed cpfp (child pays for parent) so we should revisit all transaction
+            // that did not make it to the journal, see explanation in comment at the beginning of the outer loop
+            // optimization suggestion: we could limit re-check on the transaction that are connected with transactions in the cpfp groups
+            setEntries nonPayingTxs;
+            for(const auto& nonPaying: nonPayingTxWithAncestors)
+            {
+                nonPayingTxs.insert(nonPaying.first);
+            }
+            txsToCheck = topoSortedTxFromSet(nonPayingTxs);
+        }
+        else
+        {
+            // cpfp is not executed in this round or this is the last round, 
+            // transactions that do not pay enough
+            // have no more chance to enter the journal (and be mined)
+            // so lets ensure that they are out of the journal
+            for(const auto& nonPaying: nonPayingTxWithAncestors)
+            {
+                ensureRemoved(nonPaying.first);
+            }
+            break;
+        }
+    }
+}
+
 void CTxMemPool::removeStagedNL(
     setEntries &stage,
     bool updateDescendants,
@@ -1404,9 +1718,21 @@ void CTxMemPool::removeStagedNL(
     MemPoolRemovalReason reason) {
 
     updateForRemoveFromMempoolNL(stage, updateDescendants);
+
+    // let's find all transactions which acceptance to the journal could be affected with removing these transactions
+    setEntries affected = stage;
+    extendWithConnectedNL(affected);
+
+    setEntries affectedStillInMempool;
+    std::set_difference(affected.begin(), affected.end(), stage.begin(), stage.end(), 
+                        std::inserter(affectedStillInMempool, affectedStillInMempool.begin()), CompareIteratorByHash());
+
     for (const txiter &it : stage) {
         removeUncheckedNL(it, changeSet, reason);
     }
+    
+    CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+    checkJournalAcceptanceNL(affectedStillInMempool, nonNullChangeSet.Get());    
 }
 
 int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)

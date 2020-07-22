@@ -2155,7 +2155,7 @@ static void UpdateMempoolForReorg(const Config &config,
     // UpdateTransactionsFromBlock finds descendants of any transactions in the
     // disconnectpool that were added back and cleans up the mempool state.
     LogPrint(BCLog::MEMPOOL, "Update transactions from block\n");
-    mempool.UpdateTransactionsFromBlock(vHashUpdate);
+    mempool.UpdateTransactionsFromBlock(vHashUpdate, changeSet);
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
     int height { chainActive.Height() };

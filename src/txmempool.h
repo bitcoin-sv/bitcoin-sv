@@ -747,11 +747,19 @@ public:
      * UpdateTransactionsFromBlock() will find child transactions and update the
      * descendant state for each transaction in hashesToUpdate (excluding any
      * child transactions present in hashesToUpdate, which are already accounted
-     * for).  Note: hashesToUpdate should be the set of transactions from the
-     * disconnected block that have been accepted back into the mempool.
+     * for).  
+     * Note: hashesToUpdate should be the set of transactions from the
+     *       disconnected block that have been accepted back into the mempool.
+     * Note: if the transaction from the disconnected block does not enter the journal
+     *       but their descendants are already in the journal we have to remove 
+     *       them using the changeSet. this can happen when low paying tx is mined
+     *       and we have its descendant in the mempool and journal, and when the block 
+     *       is disconnected low paying tx will end up in the mempool but will not be in the
+     *       journal while its descendants are already in
      */
     void UpdateTransactionsFromBlock(
-            const std::vector<uint256> &hashesToUpdate);
+            const std::vector<uint256> &hashesToUpdate,
+            const mining::CJournalChangeSetPtr &changeSet);
 
     /**
      * Try to calculate all in-mempool ancestors of entry.
@@ -982,6 +990,25 @@ private:
 
     // A non-locking version of DynamicMemoryUsage.
     size_t DynamicMemoryUsageNL() const;
+
+    // extends a set of entries with transactions which are connected to any of items in the given set. transactions are considered "connected"  
+    // if one transaction can reach another trough one or more child or parent relations
+    // - only transactions for which filter returns true are considered
+    // - every transaction from the set will have all its in-mempool ancestors included in the set (if they pass filter)
+    // - if the limit is not std::nullopt, not all children/siblings will be added. adding new transactions to the set is stopped when the size of the 
+    //   entries set is reached, but we have to ensure that all parents of all transactions in the set, so
+    //   we have to add parents of the last added entry too, this can extend the size of the entries set by up to {-limitdescendantcount - 1} transactions
+    void extendWithConnectedNL(setEntries& entries, std::function<bool(txiter)> filter, std::optional<size_t> limit = std::nullopt) const;
+    
+    // extends a set of entries with all transactions which are connected to any of items in the given set.
+    void extendWithConnectedNL(setEntries& entries) const;
+
+    // checks if affected transactions have met conditions to be mined, 
+    // - if they could be mined but they are not in the journal they are added to the changeSet as ADD
+    // - if they could not be mined but they are in the journal they are added to the changeSet as REMOVE
+    // - "Child pays for parent" (cpfp) is taken into account here
+    // - parents which are not in the affectedTransactions set are considered to be already mined or accepted to the journal
+    void checkJournalAcceptanceNL(const setEntries& affectedTransactions, mining::CJournalChangeSet& changeSet) const;
 };
 
 /**
