@@ -25,7 +25,7 @@ from test_framework.test_framework import ComparisonTestFramework, wait_until
 from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal
 from test_framework.comptool import TestInstance
-from test_framework.mininode import msg_tx
+from test_framework.mininode import msg_tx, mininode_lock
 from test_framework.cdefs import GENESIS_GRACEFULL_ACTIVATION_PERIOD
 from test_framework.key import CECKey
 from time import sleep
@@ -67,11 +67,10 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
     
     def get_tests(self):
 
-
         rejected_txs = []
         def on_reject(conn, msg):
-            #print("mytest: ", msg)
-            rejected_txs.append(msg)
+            if msg.message == b'tx':
+                rejected_txs.append(msg)
         
         self.test.connections[0].cb.on_reject = on_reject
 
@@ -96,18 +95,18 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         txOpAdd2 = create_transaction(txOpAdd1, 0, b'', 1, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpAdd2))
         # wait for transaction processing
-        sleep(1)
-        
+        wait_until(lambda: txOpAdd2.sha256 in [msg.data for msg in rejected_txs], timeout=5, lock=mininode_lock)
+
         assert_equal(len(rejected_txs), 1) # rejected
         assert_equal(rejected_txs[0].reason, b'max-script-num-length-policy-limit-violated (Script number overflow)')
-        assert len(self.nodes[0].listbanned()) == 1  # and banned
+        wait_until(lambda: len(self.nodes[0].listbanned()) == 1, timeout=5)  # and banned
         self.nodes[0].clearbanned()
-        assert len(self.nodes[0].listbanned()) == 0  # and not banned
+        wait_until(lambda: len(self.nodes[0].listbanned()) == 0, timeout=5)  # and not banned
         rejected_txs = []
-
 
         # node was banned we need to restart the node
         self.restart_network()
+        # TODO: This sleep needs to be replaced with a proper wait_until function
         sleep(3)
         self.test.connections[0].cb.on_reject = on_reject
 
@@ -177,13 +176,12 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         txOpAdd2 = create_transaction(txOpAdd1, 0, b'', 3, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpAdd2))
         # wait for transaction processing
-        sleep(1)
 
-        assert_equal(len(rejected_txs), 1) #rejected
+        wait_until(lambda: len(rejected_txs) > 0, timeout=5, lock=mininode_lock) #rejected
+        assert_equal(len(rejected_txs), 1)
         assert_equal(rejected_txs[0].reason, b'genesis-script-verify-flag-failed (Script number overflow)')
         assert len(self.nodes[0].listbanned()) == 0  # and not banned
         rejected_txs = []
-
 
         # generate a block, height is  genesis gracefull height + 1
         block(4)
@@ -204,13 +202,12 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         assert_equal(len(rejected_txs), 0) # not rejected
         assert len(self.nodes[0].listbanned()) == 0  # not banned
 
-
         # Create transaction that will check if CheckRegularTransaction method inside TxnValidation method will reject instead ban the node
         txPubKeys = create_transaction(out[7].tx, out[7].n, b'', 100000, CScript(([OP_1] + makePubKeys(1) + [5000, OP_CHECKMULTISIG])*1001))
         self.test.connections[0].send_message(msg_tx(txPubKeys))
         # wait for transaction processing
-        sleep(1)
-        assert_equal(len(rejected_txs), 1) #rejected
+        wait_until(lambda: len(rejected_txs) > 0, timeout=5, lock=mininode_lock) #rejected
+        assert_equal(len(rejected_txs), 1)
         assert_equal(rejected_txs[0].reason, b'flexible-bad-txn-sigops')
         assert len(self.nodes[0].listbanned()) == 0  # not banned
         rejected_txs = []
@@ -236,9 +233,8 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         txOpElse2 = create_transaction(txOpElse1, 0, b'', 4, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpElse2))
         # wait for transaction processing
-        sleep(1)
-
-        assert_equal(len(rejected_txs), 1) #rejected
+        wait_until(lambda: len(rejected_txs) > 0, timeout=5, lock=mininode_lock) #rejected
+        assert_equal(len(rejected_txs), 1)
         assert_equal(rejected_txs[0].reason, b'genesis-script-verify-flag-failed (Invalid OP_IF construction)')
         assert len(self.nodes[0].listbanned()) == 0  # not banned
         rejected_txs = []
@@ -299,9 +295,8 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         txOpElseIsSpentInGenesis4 = create_transaction(txOpElseIsSpentInGenesis3, 0, b'', 4, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpElseIsSpentInGenesis4))
         # wait for transaction processing
-        sleep(1)
-
-        assert_equal(len(rejected_txs), 1) #rejected
+        wait_until(lambda: len(rejected_txs) > 0, timeout=5, lock=mininode_lock) #rejected
+        assert_equal(len(rejected_txs), 1)
         assert_equal(rejected_txs[0].reason, b'genesis-script-verify-flag-failed (Invalid OP_IF construction)')
         assert len(self.nodes[0].listbanned()) == 0  # not banned
         rejected_txs = []
@@ -366,19 +361,19 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         txOpElse2 = create_transaction(txOpElse1, 0, b'', 4, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txOpElse2))
         # wait for transaction processing
-        sleep(1)
-
-        assert_equal(len(rejected_txs), 1) #rejected
+        wait_until(lambda: len(rejected_txs) > 0, timeout=5, lock=mininode_lock) #rejected
+        assert_equal(len(rejected_txs), 1)
         assert_equal(rejected_txs[0].reason, b'mandatory-script-verify-flag-failed (Invalid OP_IF construction)')
-        assert len(self.nodes[0].listbanned()) == 1  # banned
+        wait_until(lambda: len(self.nodes[0].listbanned()) == 1, timeout=5) # banned
         rejected_txs = []
 
 
         self.nodes[0].clearbanned()
-        assert len(self.nodes[0].listbanned()) == 0  # and not banned
+        wait_until(lambda: len(self.nodes[0].listbanned()) == 0, timeout=5) # and not banned
         rejected_txs = []
         # node was banned we need to restart the node
         self.restart_network()
+        # TODO: This sleep needs to be replaced with a proper wait_until function
         sleep(3)
         self.test.connections[0].cb.on_reject = on_reject
 
@@ -392,8 +387,8 @@ class BSVGenesisActivationGracefullPeriod(ComparisonTestFramework):
         txPubKeys2 = create_transaction(txPubKeys, 0, b'', 4, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(txPubKeys2))
         # wait for transaction processing
-        sleep(1)
-        assert_equal(len(rejected_txs), 1) #rejected
+        wait_until(lambda: len(rejected_txs) > 0, timeout=5, lock=mininode_lock)  # rejected
+        assert_equal(len(rejected_txs), 1)
         assert_equal(rejected_txs[0].reason, b'non-mandatory-script-verify-flag (Operation limit exceeded)')
         assert len(self.nodes[0].listbanned()) == 0  # banned
         
