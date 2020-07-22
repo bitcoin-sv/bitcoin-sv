@@ -13,6 +13,7 @@
 #include "sync.h"
 #include "time_locked_mempool.h"
 #include "tx_mempool_info.h"
+#include "policy/policy.h"
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -516,6 +517,8 @@ private:
     std::atomic_uint32_t nCheckFrequency;
     std::atomic_uint nTransactionsUpdated;
 
+    CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
+
     //!< sum of all mempool tx's virtual sizes.
     uint64_t totalTxSize;
     //!< sum of dynamic memory usage of all the map elements (NOT the maps
@@ -626,6 +629,8 @@ public:
     std::string CheckJournal() const;
 
     void SetSanityCheck(double dFrequency = 1.0);
+
+    void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
 
     /** Rebuild the journal contents so they match the mempool */
     void RebuildJournal() const;

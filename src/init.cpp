@@ -2000,9 +2000,13 @@ bool AppInitParameterInteraction(Config &config) {
     // happens.
     if (gArgs.IsArgSet("-blockmintxfee")) {
         Amount n(0);
-        if (!ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n))
+        if (!ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n)) {
             return InitError(AmountErrMsg("blockmintxfee",
                                           gArgs.GetArg("-blockmintxfee", "")));
+        }
+        mempool.SetBlockMinTxFee(CFeeRate(n));
+    } else {
+        mempool.SetBlockMinTxFee(CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE));
     }
 
     // Feerate used to define dust.  Shouldn't be changed lightly as old
