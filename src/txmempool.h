@@ -439,6 +439,7 @@ private:
     std::atomic_uint32_t nCheckFrequency {0};
     std::atomic_uint nTransactionsUpdated {0};
 
+    // fee that a transaction or a group needs to pay to enter the primary mempool
     CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
 
     //!< sum of all mempool tx's virtual sizes.
