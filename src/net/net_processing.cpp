@@ -6,6 +6,7 @@
 #include <chrono>
 #include <optional>
 #include <shared_mutex>
+#include <algorithm>
 #include "net/net_processing.h"
 
 #include "addrman.h"
@@ -3868,12 +3869,31 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
     assert(state);
     std::vector<CBlock> vHeaders {};
 
+    LOCK(pto->cs_inventory);
+
+    // Array vBlockHashesToAnnounce must be sorted in ascending order according to block height since this
+    // is assumed by algorithms below. E.g.: If hash of block with the largest height is not the last in array,
+    // that block may never be announced.
+    // Note that even if blocks are always processed according to height, hashes are added to this array
+    // asynchronously making the ordering arbitrary.
+    // This sort should not affect performance much since array vBlockHashesToAnnounce contains only small number
+    // of hashes (often just one). This is because each time a new hash is added after tip was updated, network
+    // thread is also woken up so that we immediately try to send them. As a result, this function is also called
+    // shortly after and array vBlockHashesToAnnounce is always cleared before it completes.
+    std::sort(pto->vBlockHashesToAnnounce.begin(), pto->vBlockHashesToAnnounce.end(), [](const auto& h1, const auto& h2){
+        auto it_blk_idx1 = mapBlockIndex.find(h1);
+        auto it_blk_idx2 = mapBlockIndex.find(h2);
+        assert(it_blk_idx1 != mapBlockIndex.end());
+        assert(it_blk_idx2 != mapBlockIndex.end());
+
+        return it_blk_idx1->second->nHeight < it_blk_idx2->second->nHeight;
+    });
+
     // If we have less than MAX_BLOCKS_TO_ANNOUNCE in our list of block
     // hashes we're relaying, and our peer wants headers announcements, then
     // find the first header not yet known to our peer but would connect,
     // and send. If no header would connect, or if we have too many blocks,
     // or if the peer doesn't want headers, just add all to the inv queue.
-    LOCK(pto->cs_inventory);
     bool fRevertToInv =
         ((!state->fPreferHeaders &&
           (!state->fPreferHeaderAndIDs ||
