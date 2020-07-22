@@ -452,7 +452,7 @@ public:
 
     void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override {}
     mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override {
-        return mining::CMiningFactory::BlockAssemblerType::LEGACY;
+        return mining::CMiningFactory::BlockAssemblerType::JOURNALING;
     }
 
     bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn); return true; }

@@ -18,7 +18,7 @@ class PrioritiseTransactionTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
-        self.extra_args = [["-printpriority=1", "-blockmaxsize=32000000"]]
+        self.extra_args = [["-printpriority=1", "-blockmaxsize=32000000", "-blockassembler=legacy"]]
 
     def run_test(self):
         self.txouts = gen_return_txouts()

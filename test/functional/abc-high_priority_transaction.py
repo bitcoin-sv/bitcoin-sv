@@ -17,7 +17,7 @@ class HighPriorityTransactionTest(BitcoinTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
-        self.extra_args = [["-blockprioritypercentage=0", "-limitfreerelay=2"]]
+        self.extra_args = [["-blockprioritypercentage=0", "-limitfreerelay=2", "-blockassembler=legacy"]]
 
     def create_small_transactions(self, node, utxos, num, fee):
         addr = node.getnewaddress()
@@ -79,7 +79,7 @@ class HighPriorityTransactionTest(BitcoinTestFramework):
         # restart with default blockprioritypercentage
         self.stop_nodes()
         self.nodes = []
-        self.add_nodes(self.num_nodes, [["-limitfreerelay=2"]])
+        self.add_nodes(self.num_nodes, [["-limitfreerelay=2", "-blockassembler=legacy"]])
         self.start_nodes()
 
         # second test step: default reserved prio space in block (100K).
@@ -97,6 +97,7 @@ class HighPriorityTransactionTest(BitcoinTestFramework):
         self.nodes[0].generate(1)
 
         self.log.info("Assert that all high prio transactions have been mined")
+        i = self.nodes[0].getmempoolinfo()
         assert(self.nodes[0].getmempoolinfo()['bytes'] == 0)
 
 
