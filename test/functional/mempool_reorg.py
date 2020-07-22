@@ -77,6 +77,10 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
         # Broadcast and mine 103_1:
         spend_103_1_id = self.nodes[0].sendrawtransaction(spend_103_1_raw)
         last_block = self.nodes[0].generate(1)
+
+        # Have to wait for last_block to validate on node1 so that timelock_tx won't be rejected by node1 because it is still too immature to spend
+        self.sync_all()
+
         # Time-locked transaction can now be spent
         timelock_tx_id = self.nodes[0].sendrawtransaction(timelock_tx)
 
@@ -91,6 +95,10 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
 
         for node in self.nodes:
             node.invalidateblock(last_block[0])
+
+        # Have to wait nodes to sync after block invalidation
+        self.sync_all()
+
         # Time-locked transaction is now too immature and has been removed from the mempool
         # spend_103_1 has been re-orged out of the chain and is back in the mempool
         assert_equal(set(self.nodes[0].getrawmempool()), {
