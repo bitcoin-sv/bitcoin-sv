@@ -247,7 +247,6 @@ public:
     uint64_t GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const;
 
     bool IsPayToScriptHash() const;
-    bool IsWitnessProgram(int &version, std::vector<uint8_t> &program) const;
 
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it
      * consensus-critical). */
