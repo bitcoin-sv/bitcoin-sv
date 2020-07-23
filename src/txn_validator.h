@@ -18,6 +18,7 @@
 #include <thread>
 #include <vector>
 
+
 /**
  * A class representing txn Validator.
  *
@@ -28,10 +29,18 @@
  */
 class CTxnValidator final
 {
+  // Public type aliases
+  public:
+    using InvalidTxnStateUMap = std::unordered_map<TxId, CValidationState, std::hash<TxId>>;
+
+  private:
     /**
      * A local structure used to extend lifetime of CTxInputData objects (controlled by shared ptrs)
      * which are being returned by processNewTransactionsNL call.
-     * An additional actions are executed as a part of post porcessing steps and txn reprocessing.
+     * Then, an additional actions are executed on those results, as a part of:
+     * - post porcessing steps
+     * - txn reprocessing
+     * - tracking invalid txns (for instance, rpc interface support)
      */
 	struct CIntermediateResult final
 	{
@@ -48,6 +57,9 @@ class CTxnValidator final
         TxInputDataSPtrVec mCancelledTxns {};
         // Txns that need to be re-submitted.
         TxInputDataSPtrVec mResubmittedTxns {};
+        // Txns that were detected as invalid
+        // - we need to track a reason of failure as it might be used at the later stage
+        InvalidTxnStateUMap mInvalidTxns {};
 	};
 
   public:

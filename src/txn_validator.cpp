@@ -525,6 +525,7 @@ void CTxnValidator::postValidationStepsNL(
     const CValidationState& state = txStatus.mState;
     // Check task's status
     if (CTask::Status::Faulted == result.second) {
+        imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
         return;
     }
     else if (CTask::Status::Canceled == result.second) {
@@ -547,7 +548,11 @@ void CTxnValidator::postValidationStepsNL(
         if (TxValidationPriority::high == txpriority) {
             txpriority = TxValidationPriority::low;
             imdResult.mDetectedLowPriorityTxns.emplace_back(txStatus.mTxInputData);
+        } else {
+            imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
         }
+    } else if (!state.IsMissingInputs()) {
+        imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
     }
 }
 
