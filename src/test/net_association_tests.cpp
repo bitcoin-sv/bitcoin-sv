@@ -7,6 +7,7 @@
 #include <net/stream_policy_factory.h>
 #include <test/test_bitcoin.h>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/test/unit_test.hpp>
 
 namespace
@@ -186,6 +187,55 @@ BOOST_AUTO_TEST_CASE(TestStreamPolicyFactory)
     BOOST_CHECK_THROW(
         StreamPolicyPtr policy { factory.Make("Unknown policy name") };
     , std::runtime_error);
+}
+
+// Test configuring available stream policies
+BOOST_AUTO_TEST_CASE(TestStreamPolicyConfig)
+{
+    // Check unchanged supported stream policies
+    std::set<std::string> defaultStreamPolicyList {};
+    boost::split(defaultStreamPolicyList, DEFAULT_STREAM_POLICY_LIST, boost::is_any_of(","));
+    BOOST_CHECK(StreamPolicyFactory{}.GetSupportedPolicyNames() == defaultStreamPolicyList);
+
+    // Set the supported policy list as just Default
+    gArgs.ForceSetArg("-multistreampolicies", DefaultStreamPolicy::POLICY_NAME);
+    std::set<std::string> expected { DefaultStreamPolicy::POLICY_NAME };
+    BOOST_CHECK(StreamPolicyFactory{}.GetSupportedPolicyNames() == expected);
+
+    // Set the supported policy list as just BlockPriority, but we will always have Default available as well
+    gArgs.ForceSetArg("-multistreampolicies", BlockPriorityStreamPolicy::POLICY_NAME);
+    expected = { BlockPriorityStreamPolicy::POLICY_NAME, DefaultStreamPolicy::POLICY_NAME };
+    BOOST_CHECK(StreamPolicyFactory{}.GetSupportedPolicyNames() == expected);
+
+    // Try to configure an empty policy list, but we will still have Default
+    gArgs.ForceSetArg("-multistreampolicies", "");
+    expected = { DefaultStreamPolicy::POLICY_NAME };
+    BOOST_CHECK(StreamPolicyFactory{}.GetSupportedPolicyNames() == expected);
+
+    // Try to configure a non-existant policy name
+    gArgs.ForceSetArg("-multistreampolicies", "Wibble");
+    expected = { DefaultStreamPolicy::POLICY_NAME };
+    BOOST_CHECK(StreamPolicyFactory{}.GetSupportedPolicyNames() == expected);
+
+    // Configure the same policy name several times
+    std::stringstream str {};
+    str << BlockPriorityStreamPolicy::POLICY_NAME << "," << DefaultStreamPolicy::POLICY_NAME << "," <<
+           BlockPriorityStreamPolicy::POLICY_NAME << "," << DefaultStreamPolicy::POLICY_NAME;
+    gArgs.ForceSetArg("-multistreampolicies", str.str());
+    expected = { BlockPriorityStreamPolicy::POLICY_NAME, DefaultStreamPolicy::POLICY_NAME };
+    BOOST_CHECK(StreamPolicyFactory{}.GetSupportedPolicyNames() == expected);
+
+    // Check prioritisation of configured policy names
+    str.str("");
+    str << BlockPriorityStreamPolicy::POLICY_NAME << "," << DefaultStreamPolicy::POLICY_NAME;
+    gArgs.ForceSetArg("-multistreampolicies", str.str());
+    std::vector<std::string> expectedPri { BlockPriorityStreamPolicy::POLICY_NAME, DefaultStreamPolicy::POLICY_NAME };
+    BOOST_CHECK(StreamPolicyFactory{}.GetPrioritisedPolicyNames() == expectedPri);
+    str.str("");
+    str << DefaultStreamPolicy::POLICY_NAME << "," << BlockPriorityStreamPolicy::POLICY_NAME;
+    gArgs.ForceSetArg("-multistreampolicies", str.str());
+    expectedPri = { DefaultStreamPolicy::POLICY_NAME, BlockPriorityStreamPolicy::POLICY_NAME };
+    BOOST_CHECK(StreamPolicyFactory{}.GetPrioritisedPolicyNames() == expectedPri);
 }
 
 BOOST_AUTO_TEST_SUITE_END();
