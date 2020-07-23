@@ -94,7 +94,7 @@ try {
         stage('Functional Tests') {
             catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
             
-                def exclude_all = "bsv-mempool_ancestorsizelimit,bsv-ptv-txn-chains,bsv-pvq-timeouts,bsv-pbv-withsigops,bsv-genesis-general,abc-p2p-compactblocks,bsv-txnvalidator_p2p_txns,bsv-getblock-rest-rpc,mining_journal,pruning,dbcrash,rawtransactions,bsv-genesis-journal-reorg,bsv-p2p_inv_msg_time_order2,bsv-coinbase_P2SH,bsv-protoconf,p2p-compactblocks"
+                def exclude_all = "bsv-mempool_ancestorsizelimit,bsv-ptv-txn-chains,bsv-pvq-timeouts,bsv-pbv-withsigops,bsv-genesis-general,abc-p2p-compactblocks,bsv-txnvalidator_p2p_txns,bsv-getblock-rest-rpc,mining_journal,pruning,dbcrash,rawtransactions,bsv-genesis-journal-reorg,bsv-p2p_inv_msg_time_order2,bsv-coinbase_P2SH,bsv-protoconf,p2p-compactblocks,bsv-genesis-mempool-scriptcache,example-test,bsv-genesis-activation-transactions-beforeafter,bsv-sigopslimit-consensus-test,csv-activation,bsv-p2sh,listsinceblock,bsv-genesis-activation-gracefull-period,wallet-encryption,prioritise_transaction,txn_clone,assumevalid,bsv-protoconf-versions-compatibility,bsv-128Mb-blocks,bsv-2Mb-excessiveblock,disconnect_ban"
                 def exclude_extended = "${exclude_all},bsv-block-stalling-test,bsv-genesis-large-blockfile-io,bsv-genesis-large-blockfile-max-32-bit,bsv-genesis-large-blockfile-reindex,bsv-large-blocks-txindex-data,assumevalid"
                 def exclude_ubsan_asan = "${exclude_all},bsv-block-size-activation-generated-default,prioritise_transaction,blockchain,bsv-accept_max_sized_orphan,bipdersig-p2p,bip65-cltv-p2p"
                         
