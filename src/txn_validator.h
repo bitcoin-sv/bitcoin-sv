@@ -32,6 +32,8 @@ class CTxnValidator final
   // Public type aliases
   public:
     using InvalidTxnStateUMap = std::unordered_map<TxId, CValidationState, std::hash<TxId>>;
+    using RemovedTxns = std::vector<TxId>;
+    using RejectedTxns = std::pair<InvalidTxnStateUMap, RemovedTxns>;
 
   private:
     /**
@@ -109,7 +111,7 @@ class CTxnValidator final
         const mining::CJournalChangeSetPtr& changeSet,
         bool fLimitMempoolSize=false);
     /** Process a set of txns */
-    void processValidation(
+    CTxnValidator::RejectedTxns processValidation(
         TxInputDataSPtrVec vTxInputData,
         const mining::CJournalChangeSetPtr& changeSet,
         bool fLimitMempoolSize=false);
