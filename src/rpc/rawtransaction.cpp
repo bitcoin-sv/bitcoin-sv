@@ -1222,7 +1222,7 @@ static UniValue sendrawtransaction(const Config &config,
         if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
             if (!status.IsValid()) {
                 if (dontCheckFee) {
-                    mempool.clearPrioritisation(txid);
+                    mempool.ClearPrioritisation(txid);
                 }
                 if (status.IsMissingInputs()) {
                         throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
