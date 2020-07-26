@@ -1270,6 +1270,305 @@ static UniValue sendrawtransaction(const Config &config,
     return txid.GetHex();
 }
 
+/**
+ * Pushes a JSON object for invalid transactions to vInvalidRet.
+ */
+static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidTxns, UniValue &vInvalidRet) {
+    for (const auto& elem: invalidTxns) {
+        UniValue entry(UniValue::VOBJ);
+        entry.push_back(Pair("txid", elem.first.ToString()));
+        if (elem.second.IsMissingInputs()) {
+            entry.push_back(Pair("reject_code", REJECT_INVALID));
+            entry.push_back(Pair("reject_reason", "missing-inputs"));
+        } else {
+            entry.push_back(Pair("reject_code", uint64_t(elem.second.GetRejectCode())));
+            entry.push_back(Pair("reject_reason", elem.second.GetRejectReason()));
+        }
+        vInvalidRet.push_back(entry);
+    }
+}
+
+/**
+ * Pushes insufficient fee txns to vEvictedRet.
+ */
+static void EvictedTxnsToJSON(const CTxnValidator::RemovedTxns& evictedTxns, UniValue &vEvictedRet) {
+    for (const auto& elem: evictedTxns) {
+        vEvictedRet.push_back(elem.ToString());
+    }
+}
+
+/**
+ * Pushes known txns to vKnownRet.
+ */
+static void KnownTxnsToJSON(const std::vector<TxId>& evictedTxns, UniValue &vKnownRet) {
+    for (const auto& elem: evictedTxns) {
+        vKnownRet.push_back(elem.ToString());
+    }
+}
+
+static UniValue sendrawtransactions(const Config &config,
+                                   const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() < 1 ||
+        request.params.size() > 1) {
+        throw std::runtime_error(
+            "sendrawtransactions [{\"hex\": \"hexstring\", \"allowhighfees\": true|false, \"dontcheckfee\": true|false}, ...]\n"
+            "\nSubmits raw transactions (serialized, hex-encoded) to local node "
+            "and network.\n"
+            "\nTo maximise performance, transaction chains should be provided in inheritance order\n"
+            "(parent-child).\n"
+            "\nAlso see sendrawtransaction, createrawtransaction and signrawtransaction calls.\n"
+            "\nArguments:\n"
+            "1. \"inputs\"      (array, required) "
+            "A json array of json objects\n"
+            "     [\n"
+            "       {\n"
+            "         \"hex\":\"hexstring\",          (string, required) "
+            "The hex string of the raw transaction\n"
+            "         \"allowhighfees\": true|false,  (boolean, optional, default=false) "
+            "Allow high fees\n"
+            "         \"dontcheckfee\": true|false    (boolean, optional, default=false) "
+            "Don't check fee\n"
+            "       } \n"
+            "       ,...\n"
+            "     ]\n"
+
+            "\nResult:\n"
+            "{\n"
+            "  \"known\" : [                  (json array) "
+            "Already known transactions detected during processing (if there are any)\n"
+            "      \"txid\" : \"hash\",           (string) "
+            "The transaction id\n"
+            "      ,...\n"
+            "  ],\n"
+            "  \"evicted\" : [                (json array) "
+            "Transactions accepted by the mempool and then evicted due to insufficient fee (if there are any)\n"
+            "      \"txid\" : \"hash\",           (string) "
+            "The transaction id\n"
+            "      ,...\n"
+            "  ],\n"
+            "  \"invalid\" : [                (json array of objects) "
+            "Invalid transactions detected during validation (if there are any)\n"
+            "    {\n"
+            "      \"txid\" : \"hash\",           (string) "
+            "The transaction id\n"
+            "      \"reject_code\" : n,        (numeric) "
+            "The reject code set during validation\n"
+            "      \"reject_reason\" : \"text\",  (string) "
+            "The reject reason set during validation\n"
+            "      \"error\" : \"text\"           (string) "
+            "The error message related to the transaction\n"
+            "    }\n"
+            "    ,...\n"
+            "  ]\n"
+            "}\n"
+
+            "\nExamples:\n"
+            "\nCreate a transaction\n" +
+            HelpExampleCli("createrawtransaction",
+                           "\"[{\\\"txid\\\" : "
+                           "\\\"mytxid\\\",\\\"vout\\\":0}]\" "
+                           "\"{\\\"myaddress\\\":0.01}\"") +
+            "Sign the transaction, and get back the hex\n" +
+            HelpExampleCli("signrawtransaction", "\"myhex\"") +
+            "\nSend the transaction (signed hex)\n" +
+            HelpExampleCli("sendrawtransaction", "\"signedhex\"") +
+            "\nAs a json rpc call\n" +
+            HelpExampleRpc("sendrawtransaction", "\"signedhex\""));
+    }
+
+    RPCTypeCheck(request.params, {UniValue::VARR});
+
+    if (request.params[0].empty()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            std::string("Invalid parameter: An empty json array of objects"));
+    }
+    // Check if inputs are present
+    UniValue inputs = request.params[0].get_array();
+    // A vector to store input transactions.
+    TxInputDataSPtrVec vTxInputData {};
+    vTxInputData.reserve(inputs.size());
+    // A vector to store transactions that need to be prioritised.
+    std::vector<TxId> vTxToPrioritise {};
+    // A vector to sotre already known transactions.
+    std::vector<TxId> vKnownTxns {};
+
+    /**
+     * Parse an input data
+     * - read data from top to the bottom
+     * - throw an exception in case of any error
+     */
+    for (size_t idx = 0; idx < inputs.size(); ++idx) {
+        // Get json object.
+        const UniValue &input = inputs[idx];
+        const UniValue &o = input.get_obj();
+        if (o.empty()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    std::string("Invalid parameter: An empty json object"));
+        }
+        // Read and decode transaction's data.
+        const UniValue &txn_data = find_value(o, "hex");
+        if (txn_data.isNull() || !txn_data.isStr()) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    std::string("Invalid parameter: Missing the hex string of the raw transaction"));
+        }
+        CMutableTransaction mtx;
+        if (!DecodeHexTx(mtx, txn_data.get_str())) {
+            throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
+                    "TX decode failed");
+        }
+        CTransactionRef tx(MakeTransactionRef(std::move(mtx)));
+        const TxId& txid = tx->GetId();
+        // Read allowhighfees.
+        Amount nMaxRawTxFee = maxTxFee;
+        const UniValue &allowhighfees = find_value(o, "allowhighfees");
+        if (!allowhighfees.isNull()) {
+            if (!allowhighfees.isBool()) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER,
+                        std::string("allowhighfees: Invalid value"));
+            } else if (allowhighfees.isTrue()) {
+                nMaxRawTxFee = Amount(0);
+            }
+        }
+        // Read dontcheckfee.
+        bool fTxToPrioritise = false;
+        bool fTxInMempools = mempool.Exists(txid) || mempool.getNonFinalPool().exists(txid);
+        if (!fTxInMempools) {
+            const UniValue &dontcheckfee = find_value(o, "dontcheckfee");
+            if (!dontcheckfee.isNull()) {
+                if (!dontcheckfee.isBool()) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,
+                            std::string("dontcheckfee: Invalid value"));
+                } else if (dontcheckfee.isTrue()) {
+                    fTxToPrioritise = true;
+                }
+            }
+        } else {
+            vKnownTxns.emplace_back(txid);
+            continue;
+        }
+        // Create an object with transaction's input data.
+        TxInputDataSPtr pTxInputData =
+            std::make_shared<CTxInputData>(
+                g_connman->GetTxIdTracker(),    // a pointer to the TxIdTracker
+                std::move(tx),                  // a pointer to the tx
+                TxSource::rpc,                  // tx source
+                TxValidationPriority::normal,   // tx validation priority
+                GetTime(),                      // nAcceptTime
+                false,                          // fLimitFree
+                nMaxRawTxFee);                 // nAbsurdFee
+        // Check if transaction is already known
+        // - received through p2p interface or present in the mempools
+        if (!pTxInputData->IsTxIdStored() || fTxInMempools) {
+            vKnownTxns.emplace_back(txid);
+        // Move it to the vector of transactions awaiting to be processed
+        } else {
+            vTxInputData.emplace_back(std::move(pTxInputData));
+            // Check if txn needs to be prioritised
+            if (fTxToPrioritise) {
+                vTxToPrioritise.emplace_back(txid);
+            }
+        }
+    }
+
+    /**
+     * Run synchronous batch validation.
+     */
+    CTxnValidator::RejectedTxns rejectedTxns {};
+    // Applay journal changeSet straight after processValidation call.
+    {
+        // Mempool Journal ChangeSet
+        CJournalChangeSetPtr changeSet {
+            mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
+        };
+        // Prioritise transactions (if any were requested to prioritise)
+        // - mempool prioritisation cleanup is done during destruction
+        //   for those txns which are not accepted by the mempool
+        CTxPrioritizer txPrioritizer(mempool, std::move(vTxToPrioritise));
+        // Run synch batch validation and wait for results.
+        const auto& txValidator = g_connman->getTxnValidator();
+        rejectedTxns =
+            txValidator->processValidation(
+                vTxInputData, // A vector of txns that need to be processed
+                changeSet, // an instance of the journal
+                true); // fLimitMempoolSize
+    }
+
+    /**
+     * Enqueue INVs.
+     */
+    // Create a lookup table.
+    std::unordered_set<TxId, std::hash<TxId>>
+        usRemovedTxns(rejectedTxns.second.begin(), rejectedTxns.second.end());
+    for (const TxInputDataSPtr& pTxInputData: vTxInputData) {
+        const TxId& txid = pTxInputData->GetTxnPtr()->GetId();
+        if (!rejectedTxns.first.count(txid) && !usRemovedTxns.count(txid)) {
+            // Create an inv msg.
+            CInv inv(MSG_TX, txid);
+            TxMempoolInfo txinfo {};
+            if(mempool.Exists(txid)) {
+                txinfo = mempool.Info(txid);
+            }
+            else if(mempool.getNonFinalPool().exists(txid)) {
+                txinfo = mempool.getNonFinalPool().getInfo(txid);
+            }
+            // It is possible that txn was added and removed from the mempool, because:
+            // - a block was mined
+            // - PTV's asynch mode removed txn(s)
+            if (txinfo.tx != nullptr){
+                g_connman->EnqueueTransaction({ inv, txinfo });
+            }
+            LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",
+                inv.hash.ToString(), request.authUser.c_str());
+        }
+    }
+
+
+    /**
+     * Construct and return a result set, as a json object with rejected txids, which contains:
+     *
+     * 1. txid of a transaction which was detected as already known:
+     *   - exists in the mempool
+     *   - stored in ptv queues
+     *   - stored as an orphan txn received through p2p interface
+     * 2. txid of an invalid transaction, including validation state information:
+     *   - reject code
+     *   - reject reason
+     * 3. txid of a transaction evicted from the mempool during processing:
+     *   - txn which was accepted and then removed due to insufficient fee
+     *
+     * Accepted txids are not returned in the result set, as it could create false-positives,
+     * for accepted txns, if:
+     * - a block was mined
+     * - PTV's asynch mode removed txn(s)
+     * From the user's perspective, It could cause a misinterpretation.
+     *
+     * If the result set is empty, then all transactions are valid, and most likely,
+     * present in the mempool.
+     */
+    // A result json object.
+    UniValue result(UniValue::VOBJ);
+    // Known txns array.
+    UniValue uvKnownTxns(UniValue::VARR);
+    KnownTxnsToJSON(vKnownTxns, uvKnownTxns);
+    if (!uvKnownTxns.empty()) {
+        result.push_back(Pair("known", uvKnownTxns));
+    }
+    // Rejected txns array.
+    UniValue uvInvalidTxns(UniValue::VARR);
+    InvalidTxnsToJSON(rejectedTxns.first, uvInvalidTxns);
+    if (!uvInvalidTxns.empty()) {
+        result.push_back(Pair("invalid", uvInvalidTxns));
+    }
+    // Evicted txns array.
+    UniValue uvEvictedTxns(UniValue::VARR);
+    EvictedTxnsToJSON(rejectedTxns.second, uvEvictedTxns);
+    if (!uvEvictedTxns.empty()) {
+        result.push_back(Pair("evicted", uvEvictedTxns));
+    }
+
+    return result;
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
@@ -1279,6 +1578,7 @@ static const CRPCCommand commands[] = {
     { "rawtransactions",    "decoderawtransaction",   decoderawtransaction,   true,  {"hexstring"} },
     { "rawtransactions",    "decodescript",           decodescript,           true,  {"hexstring"} },
     { "rawtransactions",    "sendrawtransaction",     sendrawtransaction,     false, {"hexstring","allowhighfees","dontcheckfee"} },
+    { "rawtransactions",    "sendrawtransactions",    sendrawtransactions,    false, {"inputs"} },
     { "rawtransactions",    "signrawtransaction",     signrawtransaction,     false, {"hexstring","prevtxs","privkeys","sighashtype"} }, /* uses wallet if enabled */
 
     { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
