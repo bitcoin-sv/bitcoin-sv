@@ -373,6 +373,20 @@ void COrphanTxns::eraseCollectedOutpointsFromTxns(const std::vector<TxId>& vRemo
     }
 }
 
+/** Get TxIds of known orphan transactions */
+std::vector<TxId> COrphanTxns::getTxIds() const {
+    std::shared_lock lock {mOrphanTxnsMtx};
+    if (mOrphanTxns.empty()) {
+        return {};
+    }
+    std::vector<TxId> vTxIds;
+    vTxIds.reserve(mOrphanTxns.size());
+    for (const auto& elem: mOrphanTxns) {
+        vTxIds.emplace_back(elem.first);
+    }
+    return vTxIds;
+}
+
 size_t COrphanTxns::getTxnsNumber() {
     std::shared_lock lock {mOrphanTxnsMtx};
     return mOrphanTxns.size();
