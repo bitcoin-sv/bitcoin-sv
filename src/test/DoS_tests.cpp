@@ -183,7 +183,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
     };
     size_t maxTxSizePolicy {
         static_cast<size_t>(
-            gArgs.GetArg("-maxtxsizepolicy",
+            gArgs.GetArgAsBytes("-maxtxsizepolicy",
                       MAX_TX_SIZE_POLICY_BEFORE_GENESIS))
     };
 

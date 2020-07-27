@@ -1773,7 +1773,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
     return res;
 }
 
-UniValue mempoolInfoToJSON() {
+UniValue mempoolInfoToJSON(const Config& config) {
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("size", (int64_t)mempool.Size()));
     ret.push_back(Pair(
@@ -1786,8 +1786,7 @@ UniValue mempoolInfoToJSON() {
     ret.push_back(
         Pair("nonfinalusage",
              (int64_t)mempool.getNonFinalPool().estimateMemoryUsage()));
-    size_t maxmempool =
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
+    size_t maxmempool = config.GetMaxMempool();
     ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
     ret.push_back(
         Pair("mempoolminfee",
@@ -1823,7 +1822,7 @@ UniValue getmempoolinfo(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("getmempoolinfo", ""));
     }
 
-    return mempoolInfoToJSON();
+    return mempoolInfoToJSON(config);
 }
 
 UniValue preciousblock(const Config &config, const JSONRPCRequest &request) {

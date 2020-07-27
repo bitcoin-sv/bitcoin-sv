@@ -370,13 +370,13 @@ std::string HelpMessage(HelpMessageMode mode) {
         strUsage += HelpMessageOpt(
             "-dbbatchsize",
             strprintf(
-                "Maximum database write batch size in bytes (default: %u)",
+                "Maximum database write batch size in bytes (default: %u). The value may be given in bytes or with unit (B, kB, MB, GB).",
                 nDefaultDbBatchSize));
     }
     strUsage += HelpMessageOpt(
         "-dbcache=<n>",
         strprintf(
-            _("Set database cache size in megabytes (%d to %d, default: %d)"),
+            _("Set database cache size in megabytes (%d to %d, default: %d). The value may be given in megabytes or with unit (B, KiB, MiB, GiB)."),
             nMinDbCache, nMaxDbCache, nDefaultDbCache));
     if (showDebug) {
         strUsage += HelpMessageOpt(
@@ -396,10 +396,9 @@ std::string HelpMessage(HelpMessageMode mode) {
         _("Imports blocks from external blk000??.dat file on startup"));
 
     strUsage += HelpMessageOpt("-maxmempool=<n>",
-                   strprintf(_("Keep the transaction memory pool below <n> megabytes "
-                               "(default: %u%s)"),
-                             DEFAULT_MAX_MEMPOOL_SIZE,
-                             showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : ""));
+                               strprintf(_("Keep the transaction memory pool "
+                                           "below <n> megabytes (default: %u%s,  must be at least %d). The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+                                         DEFAULT_MAX_MEMPOOL_SIZE, showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "", std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
     strUsage +=
         HelpMessageOpt("-mempoolexpiry=<n>",
                        strprintf(_("Do not keep transactions in the mempool "
@@ -407,7 +406,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                                  DEFAULT_MEMPOOL_EXPIRY));
     strUsage += HelpMessageOpt("-maxmempoolnonfinal=<n>",
                                strprintf(_("Keep the non-final transaction memory pool "
-                                           "below <n> megabytes (default: %u)"),
+                                           "below <n> megabytes (default: %u). The value may be given in megabytes or with unit (B, KiB, MiB, GiB)."),
                                          DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE));
     strUsage +=
         HelpMessageOpt("-mempoolexpirynonfinal=<n>",
@@ -492,7 +491,7 @@ std::string HelpMessage(HelpMessageMode mode) {
               "(default: 0 = disable pruning blocks, 1 = allow manual pruning "
               "via RPC, >%u = automatically prune block files to stay under "
               "the specified target size in MiB)"),
-            MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
+            MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE));
     strUsage += HelpMessageOpt(
         "-reindex-chainstate",
         _("Rebuild chain state from the currently indexed blocks"));
@@ -578,12 +577,12 @@ std::string HelpMessage(HelpMessageMode mode) {
                   DEFAULT_MAX_PEER_CONNECTIONS));
     strUsage +=
         HelpMessageOpt("-maxreceivebuffer=<n>",
-                       strprintf(_("Maximum per-connection receive buffer, "
-                                   "<n>*1000 bytes (default: %u)"),
+                       strprintf(_("Maximum per-connection receive buffer "
+                                   "in kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB)."),
                                  DEFAULT_MAXRECEIVEBUFFER));
     strUsage += HelpMessageOpt(
-        "-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer, "
-                                          "<n>*1000 bytes (default: %u)"),
+        "-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer "
+                                          "in kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB)."),
                                         DEFAULT_MAXSENDBUFFER));
     strUsage += HelpMessageOpt(
         "-factormaxsendqueuesbytes=<n>",
@@ -688,7 +687,7 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-maxuploadtarget=<n>",
         strprintf(_("Tries to keep outbound traffic under the given target (in "
-                    "MiB per 24h), 0 = no limit (default: %d)"),
+                    "MiB per 24h), 0 = no limit (default: %d). The value may be given in megabytes or with unit (KiB, MiB, GiB)."),
                   DEFAULT_MAX_UPLOAD_TARGET));
 
 #ifdef ENABLE_WALLET
@@ -769,7 +768,7 @@ std::string HelpMessage(HelpMessageMode mode) {
             HelpMessageOpt("-limitancestorsize=<n>",
                            strprintf("Do not accept transactions whose size "
                                      "with all in-mempool ancestors exceeds "
-                                     "<n>*1000 bytes (default: %u)",
+                                     "<n> kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
                                      DEFAULT_ANCESTOR_SIZE_LIMIT));
         strUsage += HelpMessageOpt(
             "-limitdescendantcount=<n>",
@@ -779,8 +778,8 @@ std::string HelpMessage(HelpMessageMode mode) {
         strUsage += HelpMessageOpt(
             "-limitdescendantsize=<n>",
             strprintf("Do not accept transactions if any ancestor would have "
-                      "more than <n>*1000 bytes of in-mempool descendants "
-                      "(default: %u).",
+                      "more than <n> kilobytes of in-mempool descendants "
+                      "(default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
                       DEFAULT_DESCENDANT_SIZE_LIMIT));
     }
     strUsage += HelpMessageOpt(
@@ -829,8 +828,8 @@ std::string HelpMessage(HelpMessageMode mode) {
             "Change time that specifies when new defaults for -blockmaxsize are used");
         strUsage += HelpMessageOpt(
             "-limitfreerelay=<n>",
-            strprintf("Continuously rate-limit free transactions to <n>*1000 "
-                      "bytes per minute (default: %u)",
+            strprintf("Continuously rate-limit free transactions to <n> "
+                      "kilobytes per minute (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
                       DEFAULT_LIMITFREERELAY));
         strUsage +=
             HelpMessageOpt("-relaypriority",
@@ -839,15 +838,15 @@ std::string HelpMessage(HelpMessageMode mode) {
                                      DEFAULT_RELAYPRIORITY));
         strUsage += HelpMessageOpt(
             "-maxsigcachesize=<n>",
-            strprintf("Limit size of signature cache to <n> MiB (default: %u)",
+            strprintf("Limit size of signature cache to <n> MiB (default: %u). The value may be given in megabytes or with unit (B, KiB, MiB, GiB).",
                       DEFAULT_MAX_SIG_CACHE_SIZE));
         strUsage += HelpMessageOpt(
             "-maxinvalidsigcachesize=<n>",
-            strprintf("Limit size of invalid signature cache to <n> MiB (default: %u)",
+            strprintf("Limit size of invalid signature cache to <n> MiB (default: %u). The value may be given in megabytes or with unit (B, KiB, MiB, GiB).",
                       DEFAULT_INVALID_MAX_SIG_CACHE_SIZE));
         strUsage += HelpMessageOpt(
             "-maxscriptcachesize=<n>",
-            strprintf("Limit size of script cache to <n> MiB (default: %u)",
+            strprintf("Limit size of script cache to <n> MiB (default: %u). The value may be given in megabytes or with unit (B, KiB, MiB, GiB).",
                       DEFAULT_MAX_SCRIPT_CACHE_SIZE));
         strUsage += HelpMessageOpt(
             "-maxtipage=<n>",
@@ -887,7 +886,8 @@ std::string HelpMessage(HelpMessageMode mode) {
         HelpMessageOpt("-excessiveblocksize=<n>",
                        strprintf(_("Set the maximum block size in bytes we will accept "
                                    "from any source. This is the effective block size "
-                                   "hard limit and it is a required parameter (0 = unlimited).")));
+                                   "hard limit and it is a required parameter (0 = unlimited). "
+                                   "The value may be given in bytes or with unit (B, kB, MB, GB).")));
     if (showDebug) {
         strUsage += HelpMessageOpt(
             "-acceptnonstdtxn",
@@ -915,21 +915,22 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-datacarriersize",
         strprintf(_("Maximum size of data in data carrier transactions we "
-                    "relay and mine (default: %u)"),
+                    "relay and mine (default: %u). The value may be given in bytes or with unit (B, kB, MB, GB)."),
                   DEFAULT_DATA_CARRIER_SIZE));
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusageconsensus",
         strprintf(_("Set maximum stack memory usage in bytes used for script verification "
                     "we're willing to accept from any source (0 = unlimited) "
-                    "after Genesis is activated (consensus level). This is a required parameter.")));
+                    "after Genesis is activated (consensus level). This is a required parameter. "
+                    "The value may be given in bytes or with unit (B, kB, MB, GB).")));
     strUsage += HelpMessageOpt(
         "-maxstackmemoryusagepolicy",
         strprintf(_("Set maximum stack memory usage used for script verification "
                     "we're willing to relay/mine in a single transaction "
-                    "(default: %u bytes, 0 = unlimited) "
-                    "after Genesis is activated (policy level). "
+                    "(default: %u MB, 0 = unlimited) "
+                    "after Genesis is activated (policy level). The value may be given in bytes or with unit (B, kB, MB, GB)."
                     "Must be less or equal to -maxstackmemoryusageconsensus."),
-                  DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS));
+                  DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS/ONE_MEGABYTE));
     strUsage +=
         HelpMessageOpt("-maxopsperscriptpolicy=<n>",
             strprintf(_("Set maximum number of non-push operations "
@@ -959,18 +960,20 @@ std::string HelpMessage(HelpMessageMode mode) {
 
     strUsage +=
         HelpMessageOpt("-maxtxsizepolicy=<n>",
-            strprintf(_("Set maximum transaction size in bytes we relay and mine (default: %u, min: %u, 0 = unlimited) after Genesis is activated"),
-                DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS, MAX_TX_SIZE_POLICY_BEFORE_GENESIS));
+            strprintf(_("Set maximum transaction size in bytes we relay and mine (default: %u MB, min: %u B, 0 = unlimited) after Genesis is activated. "
+                        "The value may be given in bytes or with unit (B, kB, MB, GB)."),
+                DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS/ONE_MEGABYTE, MAX_TX_SIZE_POLICY_BEFORE_GENESIS));
 
     strUsage += HelpMessageOpt(
         "-maxscriptsizepolicy",
         strprintf("Set maximum script size in bytes we're willing to relay/mine per script after Genesis is activated. "
-            "(default: %u, 0 = unlimited).",
+            "(default: %u, 0 = unlimited). The value may be given in bytes or with unit (B, kB, MB, GB).",
             DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS));
 
     strUsage += HelpMessageOpt(
         "-maxscriptnumlengthpolicy=<n>",
-        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited) after Genesis is activated.",
+        strprintf("Set maximum allowed number length we're willing to relay/mine in scripts (default: %d, 0 = unlimited) after Genesis is activated. "
+            "The value may be given in bytes or with unit (B, kB, MB, GB).",
             DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS));
 
     strUsage += HelpMessageGroup(_("Block creation options:"));
@@ -978,15 +981,16 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-blockmaxsize=<n>",
         strprintf(_("Set maximum block size in bytes we will mine. "
                     "Size of the mined block will never exceed the maximum block size we will accept (-excessiveblocksize). "
+                    "The value may be given in bytes or with unit (B, kB, MB, GB). "
                     "If not specified, the following defaults are used: "
-                    "Mainnet: %d before %s and %d after, "
-                    "Testnet: %d before %s and %d after."),
-                    defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore,
+                    "Mainnet: %d MB before %s and %d MB after, "
+                    "Testnet: %d MB before %s and %d MB after."),
+                    defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore / ONE_MEGABYTE,
                     DateTimeStrFormat("%Y-%m-%d %H:%M:%S", defaultChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
-                    defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter,
-                    testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore,
+                    defaultChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter/ONE_MEGABYTE,
+                    testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeBefore / ONE_MEGABYTE,
                     DateTimeStrFormat("%Y-%m-%d %H:%M:%S", testnetChainParams->GetDefaultBlockSizeParams().blockSizeActivationTime),
-                    testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter
+                    testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter / ONE_MEGABYTE
                     ));
     strUsage += HelpMessageOpt(
         "-blockprioritypercentage=<n>",
@@ -1125,7 +1129,7 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-maxorphantxsize=<n>",
         strprintf(_("Keep at most <n> MB of unconnectable "
-                    "transactions in memory (default: %u MB)"),
+                    "transactions in memory (default: %u MB). The value may be given in megabytes or with unit (B, kB, MB, GB)."),
           COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE/ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxcollectedoutpoints=<n>",
@@ -1161,10 +1165,11 @@ std::string HelpMessage(HelpMessageMode mode) {
             CTxnValidator::DEFAULT_MAX_ASYNC_TASKS_RUN_DURATION.count())) ;
     strUsage += HelpMessageOpt(
         "-maxcoinsviewcachesize=<n>",
-        _("Set the maximum cumulative size of accepted transaction inputs inside coins cache (default: unlimited -> 0)"));
+        _("Set the maximum cumulative size of accepted transaction inputs inside coins cache (default: unlimited -> 0). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
-        strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d)",
+        strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
 
     strUsage += HelpMessageOpt(
@@ -1731,15 +1736,13 @@ bool AppInitParameterInteraction(Config &config) {
         LogPrintf("Warning: nMinimumChainWork set below default value of %s\n",
                   chainparams.GetConsensus().nMinimumChainWork.GetHex());
     }
-
-    // mempool limits
-    int64_t nMempoolSizeMax =
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
-    constexpr int64_t nMempoolSizeMin = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE * 0.3;
-    if (nMempoolSizeMax < 0 || (nMempoolSizeMax && nMempoolSizeMax < nMempoolSizeMin))
-        return InitError(strprintf(_("-maxmempool must be at least %d MB"),
-                                   std::ceil(nMempoolSizeMin / static_cast<double>(ONE_MEGABYTE))));
-
+    
+    // mempool limits  
+    if (std::string err; !config.SetMaxMempool(
+        gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
 
     // script validation settings
     if(std::string error; !config.SetBlockScriptValidatorsParams(
@@ -1758,15 +1761,54 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError("-maxparallelblocksperpeer: " + error);
     }
 
+    // Configure memory pool expiry
+    if (std::string err; !config.SetMemPoolExpiry(
+        gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * SECONDS_IN_ONE_HOUR, &err))
+    {
+        return InitError(err);
+    }
+    
+    // Configure free transactions limit 
+    if (std::string err; !config.SetLimitFreeRelay(
+        gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, ONE_KILOBYTE), &err))
+    {
+        return InitError(err);
+    }
+
+    // Configure max orphant Tx size
+    if (std::string err; !config.SetMaxOrphanTxSize(
+        gArgs.GetArgAsBytes("-maxorphantxsize", 
+            COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
+
+    // Configure height to stop running
+    if (std::string err; !config.SetStopAtHeight(
+        gArgs.GetArg("-stopatheight", DEFAULT_STOPATHEIGHT), &err))
+    {
+        return InitError(err);
+    }
+
+    // Configure promiscuous memory pool flags
+    if (gArgs.IsArgSet("-promiscuousmempoolflags"))
+    {
+        if (std::string err; !config.SetPromiscuousMempoolFlags(
+            gArgs.GetArg("-promiscuousmempoolflags", 0), &err))
+        {
+            return InitError(err);
+        }
+    }
+
     // Configure preferred size of blockfile.
     config.SetPreferredBlockFileSize(
-        gArgs.GetArg("-preferredblockfilesize",
+        gArgs.GetArgAsBytes("-preferredblockfilesize",
             DEFAULT_PREFERRED_BLOCKFILE_SIZE));
 
     // Configure excessive block size.
     if(gArgs.IsArgSet("-excessiveblocksize")) {
         const uint64_t nProposedExcessiveBlockSize =
-            gArgs.GetArg("-excessiveblocksize", 0);
+            gArgs.GetArgAsBytes("-excessiveblocksize", 0);
         if (std::string err; !config.SetMaxBlockSize(nProposedExcessiveBlockSize, &err)) {
             return InitError(err);
         }
@@ -1780,7 +1822,7 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure max generated block size.
     if(gArgs.IsArgSet("-blockmaxsize")) {
         const uint64_t nProposedMaxGeneratedBlockSize =
-            gArgs.GetArg("-blockmaxsize", 0 /* not used*/);
+            gArgs.GetArgAsBytes("-blockmaxsize", 0 /* not used*/);
         if (std::string err; !config.SetMaxGeneratedBlockSize(nProposedMaxGeneratedBlockSize, &err)) {
             return InitError(err);
         }
@@ -1810,7 +1852,7 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure data carrier size.
     if(gArgs.IsArgSet("-datacarriersize")) {
-        config.SetDataCarrierSize(gArgs.GetArg("-datacarriersize", DEFAULT_DATA_CARRIER_SIZE));
+        config.SetDataCarrierSize(gArgs.GetArgAsBytes("-datacarriersize", DEFAULT_DATA_CARRIER_SIZE));
     }
 
     // Configure descendant limit count.
@@ -1826,7 +1868,7 @@ bool AppInitParameterInteraction(Config &config) {
     // configure max transaction size policy
     if (gArgs.IsArgSet("-maxtxsizepolicy"))
     {
-        int64_t maxTxSizePolicy = gArgs.GetArg("-maxtxsizepolicy", DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
+        int64_t maxTxSizePolicy = gArgs.GetArgAsBytes("-maxtxsizepolicy", DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
         if (std::string err; !config.SetMaxTxSizePolicy(maxTxSizePolicy, &err)) {
             return InitError(err);
         }
@@ -1834,12 +1876,12 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure descendant limit size.
     if(gArgs.IsArgSet("-limitdescendantsize")) {
-        config.SetLimitDescendantSize(gArgs.GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT) * 1000);
+        config.SetLimitDescendantSize(gArgs.GetArgAsBytes("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT, ONE_KILOBYTE));
     }
 
     // Configure ancestor limit size.
     if(gArgs.IsArgSet("-limitancestorsize")) {
-        config.SetLimitAncestorSize(gArgs.GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT) * 1000);
+        config.SetLimitAncestorSize(gArgs.GetArgAsBytes("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT, ONE_KILOBYTE));
     }
 
     // Configure genesis activation height.
@@ -1849,8 +1891,8 @@ bool AppInitParameterInteraction(Config &config) {
     }
 
     if (std::string err; !config.SetMaxStackMemoryUsage(
-        gArgs.GetArg("-maxstackmemoryusageconsensus", 0),
-        gArgs.GetArg("-maxstackmemoryusagepolicy", DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS),
+        gArgs.GetArgAsBytes("-maxstackmemoryusageconsensus", 0),
+        gArgs.GetArgAsBytes("-maxstackmemoryusagepolicy", DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS),
         &err))
     {
         return InitError(err);
@@ -1858,7 +1900,7 @@ bool AppInitParameterInteraction(Config &config) {
 
     //Configure max script size after genesis
     if (gArgs.IsArgSet("-maxscriptsizepolicy")) {
-        int64_t maxScriptSize = gArgs.GetArg("-maxscriptsizepolicy", DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS);
+        int64_t maxScriptSize = gArgs.GetArgAsBytes("-maxscriptsizepolicy", DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS);
         if (std::string err; !config.SetMaxScriptSizePolicy(maxScriptSize, &err)) {
             return InitError(err);
         }
@@ -1872,7 +1914,7 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(
             _("Prune cannot be configured with a negative value."));
     }
-    nPruneTarget = (uint64_t)nPruneArg * 1024 * 1024;
+    nPruneTarget = (uint64_t)nPruneArg * ONE_MEBIBYTE;
     if (nPruneArg == 1) { // manual pruning: -prune=1
         LogPrintf("Block pruning enabled.  Use RPC call "
                   "pruneblockchain(height) to manually prune block and undo "
@@ -1884,11 +1926,11 @@ bool AppInitParameterInteraction(Config &config) {
             return InitError(
                 strprintf(_("Prune configured below the minimum of %d MiB.  "
                             "Please use a higher number."),
-                          MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
+                          MIN_DISK_SPACE_FOR_BLOCK_FILES / ONE_MEBIBYTE));
         }
         LogPrintf("Prune configured to target %uMiB on disk for block and undo "
                   "files.\n",
-                  nPruneTarget / 1024 / 1024);
+                  nPruneTarget / ONE_MEBIBYTE);
         fPruneMode = true;
     }
 
@@ -1923,7 +1965,7 @@ bool AppInitParameterInteraction(Config &config) {
     }
 
     if(std::string err; !config.SetMaxCoinsViewCacheSize(
-        gArgs.GetArg("-maxcoinsviewcachesize", 0), &err))
+        gArgs.GetArgAsBytes("-maxcoinsviewcachesize", 0), &err))
     {
         return InitError(err);
     }
@@ -2031,7 +2073,7 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure maximum length of numbers in scripts
     if (gArgs.IsArgSet("-maxscriptnumlengthpolicy"))
     {
-        const int64_t value = gArgs.GetArg("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
+        const int64_t value = gArgs.GetArgAsBytes("-maxscriptnumlengthpolicy", DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS);
         if (std::string err; !config.SetMaxScriptNumLengthPolicy(value, &err))
         {
             return InitError(err);
@@ -2458,8 +2500,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 
     if (gArgs.IsArgSet("-maxuploadtarget")) {
         nMaxOutboundLimit =
-            gArgs.GetArg("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET) * 1024 *
-            1024;
+            gArgs.GetArgAsBytes("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET, ONE_MEBIBYTE);
     }
 
     // Step 7: load block chain
@@ -2468,7 +2509,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     bool fReindexChainState = gArgs.GetBoolArg("-reindex-chainstate", false);
 
     // cache size calculations
-    int64_t nTotalCache = (gArgs.GetArg("-dbcache", nDefaultDbCache) << 20);
+    int64_t nTotalCache = gArgs.GetArgAsBytes("-dbcache", nDefaultDbCache, ONE_MEBIBYTE);
     // total cache cannot be less than nMinDbCache
     nTotalCache = std::max(nTotalCache, nMinDbCache << 20);
     // total cache cannot be greater than nMaxDbcache
@@ -2488,17 +2529,16 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     nTotalCache -= nCoinDBCache;
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
-    int64_t nMempoolSizeMax =
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
+    int64_t nMempoolSizeMax = config.GetMaxMempool();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
-              nBlockTreeDBCache * (1.0 / 1024 / 1024));
+              nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for chain state database\n",
-              nCoinDBCache * (1.0 / 1024 / 1024));
+              nCoinDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
               "unused mempool space)\n",
-              nCoinCacheUsage * (1.0 / 1024 / 1024),
-              nMempoolSizeMax * (1.0 / 1024 / 1024));
+              nCoinCacheUsage * (1.0 / ONE_MEBIBYTE),
+              nMempoolSizeMax * (1.0 / ONE_MEBIBYTE));
 
     bool fLoaded = false;
     while (!fLoaded && !shutdownToken.IsCanceled()) {
@@ -2777,10 +2817,10 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     connOptions.nMaxFeeler = 1;
     connOptions.nBestHeight = chainActive.Height();
     connOptions.uiInterface = &uiInterface;
-    connOptions.nSendBufferMaxSize =
-        1000 * gArgs.GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER);
+    connOptions.nSendBufferMaxSize = 
+        gArgs.GetArgAsBytes("-maxsendbuffer", DEFAULT_MAXSENDBUFFER, ONE_KILOBYTE);
     connOptions.nReceiveFloodSize =
-        1000 * gArgs.GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER);
+        gArgs.GetArgAsBytes("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER, ONE_KILOBYTE);
 
     connOptions.nMaxOutboundTimeframe = nMaxOutboundTimeframe;
     connOptions.nMaxOutboundLimit = nMaxOutboundLimit;

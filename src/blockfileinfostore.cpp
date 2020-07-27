@@ -294,8 +294,8 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
 
     LogPrint(BCLog::PRUNE, "Prune: target=%dMiB actual=%dMiB diff=%dMiB "
         "max_prune_height=%d found %d blk/rev pairs for removal\n",
-        nPruneTarget / 1024 / 1024, nCurrentUsage / 1024 / 1024,
-        ((int64_t)nPruneTarget - (int64_t)nCurrentUsage) / 1024 / 1024,
+        nPruneTarget / ONE_MEBIBYTE, nCurrentUsage / ONE_MEBIBYTE,
+        ((int64_t)nPruneTarget - (int64_t)nCurrentUsage) / ONE_MEBIBYTE,
         nLastBlockWeCanPrune, count);
 }
 

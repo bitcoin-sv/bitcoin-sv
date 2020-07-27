@@ -1197,7 +1197,7 @@ TxMempoolInfo CTxMemPool::Info(const uint256 &txid) const {
 
 CFeeRate CTxMemPool::estimateFee() const {
     uint64_t maxMempoolSize =
-        gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
+        GlobalConfig::GetConfig().GetMaxMempool();
 
     // return maximum of min fee per KB from config, min fee calculated from mempool 
     return std::max(GlobalConfig::GetConfig().GetMinFeePerKB(), GetMinFee(maxMempoolSize));

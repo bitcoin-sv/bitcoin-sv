@@ -430,7 +430,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_limit_memory_usage)
     // Attempt to enqueue all txns and verify that we stopped when we hit the max size limit
     txnValidator->newTransaction(txnsInputs);
     BOOST_CHECK(txnValidator->GetTransactionsInQueueCount() < txns.size());
-    BOOST_CHECK(txnValidator->GetStdQueueMemUsage() <= 1*1024*1024);
+    BOOST_CHECK(txnValidator->GetStdQueueMemUsage() <= 1*ONE_MEBIBYTE);
     BOOST_CHECK_EQUAL(txnValidator->GetNonStdQueueMemUsage(), 0);
 }
 

@@ -23,6 +23,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <orphan_txns.h>
 
 class CChainParams;
 struct DefaultBlockSizeParams;
@@ -136,6 +137,25 @@ public:
 
     virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
     virtual bool IsClientUABanned(const std::string uaClient) const = 0;
+
+    virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
+    virtual uint64_t GetMaxMempool() const = 0;
+
+    virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
+    virtual uint64_t GetMemPoolExpiry() const = 0;
+
+    virtual bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) = 0;
+    virtual uint64_t GetLimitFreeRelay() const = 0;
+
+    virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
+    virtual uint64_t GetMaxOrphanTxSize() const = 0;
+
+    virtual bool SetStopAtHeight(int64_t StopAtHeight, std::string* err) = 0;
+    virtual uint64_t GetStopAtHeight() const = 0;
+
+    virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
+    virtual uint64_t GetPromiscuousMempoolFlags() const = 0;
+    virtual bool IsSetPromiscuousMempoolFlags() const = 0;
 
 protected:
     ~Config() = default;
@@ -258,6 +278,25 @@ public:
     void SetBanClientUA(const std::set<std::string> uaClients) override;
     bool IsClientUABanned(const std::string uaClient) const override;
 
+    bool SetMaxMempool(int64_t maxMempool, std::string* err) override;
+    uint64_t GetMaxMempool() const override;
+
+    bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override;
+    uint64_t GetMemPoolExpiry() const override;
+
+    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override;
+    uint64_t GetLimitFreeRelay() const override;
+
+    bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override;
+    uint64_t GetMaxOrphanTxSize() const override;
+
+    bool SetStopAtHeight(int64_t stopAtHeight, std::string* err) override;
+    uint64_t GetStopAtHeight() const override;
+
+    bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) override;
+    uint64_t GetPromiscuousMempoolFlags() const override;
+    bool IsSetPromiscuousMempoolFlags() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -323,8 +362,18 @@ private:
 
     uint64_t mMaxCoinsViewCacheSize;
 
+    uint64_t mMaxMempool;
+    uint64_t mMemPoolExpiry;
+    uint64_t mLimitFreeRelay;
+    uint64_t mMaxOrphanTxSize;
+    uint64_t mStopAtHeight;
+    uint64_t mPromiscuousMempoolFlags;
+    bool mIsSetPromiscuousMempoolFlags;
+
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;
+
+    bool LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage);
 
 };
 
@@ -337,13 +386,13 @@ public:
     void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) override {  }
 
     bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) override {
-        if (err) *err = "This is dummy config"; 
+        SetErrorMsg(err);
         return false; 
     }
     uint64_t GetMaxBlockSize() const override { return 0; }
 
     bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) override {
-        if (err) *err = "This is dummy config";  
+        SetErrorMsg(err);
         return false; 
     }
     uint64_t GetMaxGeneratedBlockSize() const override { return 0; };
@@ -351,23 +400,20 @@ public:
     bool MaxGeneratedBlockSizeOverridden() const override { return false; }
 
     bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override {
-        if (err) *err = "This is dummy config";  
+        SetErrorMsg(err);
         return false; 
     }
     int64_t GetBlockSizeActivationTime() const override { return 0; }
 
     bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override {
-        if (err) *err = "This is dummy config";
+        SetErrorMsg(err);
         return false;
     }
     uint8_t GetBlockPriorityPercentage() const override { return 0; }
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
     {
-        if (err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
         maxTxSizePolicy = value;
         return false;
     }
@@ -416,10 +462,7 @@ public:
         int maxConcurrentAsyncTasksPerNode,
         std::string* error = nullptr) override
     {
-        if(error)
-        {
-            *error = "This is dummy config";
-        }
+        SetErrorMsg(error);
 
         return false;
     }
@@ -431,10 +474,7 @@ public:
         int perValidatorThreadMaxBatchSize,
         std::string* error = nullptr) override
     {
-        if(error)
-        {
-            *error = "This is dummy config";
-        }
+        SetErrorMsg(error);
 
         return false;
     }
@@ -480,10 +520,7 @@ public:
 
     bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) override
     {
-        if(err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return false;
     }
@@ -494,10 +531,7 @@ public:
 
     bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) override
     {
-        if(err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return false;
     }
@@ -508,7 +542,7 @@ public:
 
     bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) override 
     {
-        if (err) *err = "This is dummy config";
+        SetErrorMsg(err);
         maxScriptSizePolicy = static_cast<uint64_t>(maxScriptSizePolicyIn);
         return true; 
     };
@@ -535,14 +569,60 @@ public:
 
     bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) override
     {
-        if(err)
-        {
-            *err = "This is dummy config";
-        }
+        SetErrorMsg(err);
 
         return false;
     }
     uint64_t GetMaxCoinsViewCacheSize() const override {return 0; /* unlimited */}
+
+    bool SetMaxMempool(int64_t maxMempool, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMaxMempool() const override { return DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE; }
+
+    bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR; }
+
+    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetLimitFreeRelay() const override { return DEFAULT_LIMITFREERELAY * ONE_KILOBYTE; }
+
+    bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMaxOrphanTxSize() const override { return COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE; }
+
+    bool SetStopAtHeight(int64_t stopAtHeight, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetStopAtHeight() const override { return DEFAULT_STOPATHEIGHT; }
+
+    bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetPromiscuousMempoolFlags() const override { return 0; }
+    bool IsSetPromiscuousMempoolFlags() const override { return false; }
 
     void SetInvalidBlocks(const std::set<uint256>& hashes) override 
     { 
@@ -578,6 +658,14 @@ private:
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;
+
+    void SetErrorMsg(std::string* err)
+    {
+        if (err)
+        {
+            *err = "This is dummy config"; 
+        } 
+    }
 };
 
 #endif

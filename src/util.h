@@ -94,6 +94,9 @@ inline bool IsSwitchChar(char c) {
 }
 
 class ArgsManager {
+private:
+    int64_t parseUnit(std::string argValue, int64_t nMultiples);
+
 protected:
     CCriticalSection cs_args;
     std::map<std::string, std::string> mapArgs;
@@ -127,9 +130,20 @@ public:
      *
      * @param strArg Argument to get (e.g. "-foo")
      * @param default (e.g. 1)
-     * @return command-line argument (0 if invalid number) or default value
+     * @return command-line argument or default value
      */
     int64_t GetArg(const std::string &strArg, int64_t nDefault);
+
+    /**
+     * Return integer argument or default value in bytes. It's used only for byte sized arguments.
+     *
+     * @param strArg Argument to get (e.g. "-foo"). 
+     * @param default (e.g. 1)
+     * @param multiples units (e.g. 1000). If argument without a unit represents a multiple of the unit byte 
+     * (for e.g. MB), nMultiples is used to get proper value in bytes.
+     * @return command-line argument or default value representing bytes.
+     */
+    int64_t GetArgAsBytes(const std::string& strArg, int64_t nDefault, int64_t nMultiples = 1);
 
     /**
      * Return boolean argument or default value.

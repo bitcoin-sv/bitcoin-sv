@@ -4061,7 +4061,8 @@ std::string CWallet::GetWalletHelpString(bool showDebug) {
         strUsage += HelpMessageOpt(
             "-dblogsize=<n>",
             strprintf("Flush wallet database activity from memory to disk log "
-                      "every <n> megabytes (default: %u)",
+                      "every <n> megabytes (default: %u). "
+                      "The value may be given in megabytes or with unit (B, KiB, MiB, GiB).",
                       DEFAULT_WALLET_DBLOGSIZE));
         strUsage += HelpMessageOpt(
             "-flushwallet",

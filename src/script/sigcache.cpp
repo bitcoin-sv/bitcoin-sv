@@ -88,8 +88,7 @@ void InitSignatureCache() {
     // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
     // setup_bytes creates the minimum possible cache (2 elements).
     auto initCache = [](std::string argName, unsigned int defaultSize, std::string_view type, auto& classInstance, auto callback){
-      size_t nMaxCacheSize = std::min(std::max(int64_t(0), gArgs.GetArg(argName, defaultSize)), MAX_MAX_SIG_CACHE_SIZE) *
-      (size_t(1) << 20);
+      size_t nMaxCacheSize = std::min(static_cast<uint64_t>(std::max(int64_t(0), gArgs.GetArgAsBytes(argName, defaultSize, ONE_MEBIBYTE))), MAX_MAX_SIG_CACHE_SIZE * ONE_MEBIBYTE);
       auto nElems = (classInstance.*callback)(nMaxCacheSize);
       LogPrintf("Using %zu MiB out of %zu requested for %ssignature cache, able to "
             "store %zu elements\n", (nElems * sizeof(uint256)) >> 20, nMaxCacheSize >> 20, type, nElems);
