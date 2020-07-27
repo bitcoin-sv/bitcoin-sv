@@ -1274,17 +1274,27 @@ void CConnman::ThreadSocketHandler() {
         }
 
         // Delete disconnected nodes
-        auto nodeIt { vNodesDisconnected.begin() };
-        while(nodeIt != vNodesDisconnected.end())
+        if(!vNodesDisconnected.empty())
         {
-            // Wait until threads are done using it
-            const CNodePtr& node { *nodeIt };
-            if (node.use_count() <= 1) {
-                DeleteNode(node);
-                nodeIt = vNodesDisconnected.erase(nodeIt);
-            }
-            else {
-                ++nodeIt;
+            // To avoid blocking this socket handling thread, only do deletion
+            // if we're able to take cs_main without blocking. Otherwise we'll
+            // just try again next time.
+            TRY_LOCK(cs_main, lockMain);
+            if(lockMain)
+            {
+                auto nodeIt { vNodesDisconnected.begin() };
+                while(nodeIt != vNodesDisconnected.end())
+                {
+                    // Wait until threads are done using it
+                    const CNodePtr& node { *nodeIt };
+                    if (node.use_count() <= 1) {
+                        DeleteNode(node);
+                        nodeIt = vNodesDisconnected.erase(nodeIt);
+                    }
+                    else {
+                        ++nodeIt;
+                    }
+                }
             }
         }
 
@@ -2522,12 +2532,16 @@ void CConnman::Stop() {
         }
     }
 
-    // clean up some globals (to help leak detection)
-    for (const CNodePtr& pnode : vNodes) {
-        DeleteNode(pnode);
-    }
-    for (const CNodePtr& pnode : vNodesDisconnected) {
-        DeleteNode(pnode);
+    // Clean up some globals (to help leak detection)
+    {
+        // Lock cs_main for FinalizeNode()
+        LOCK(cs_main);
+        for (const CNodePtr& pnode : vNodes) {
+            DeleteNode(pnode);
+        }
+        for (const CNodePtr& pnode : vNodesDisconnected) {
+            DeleteNode(pnode);
+        }
     }
     vNodes.clear();
     vNodesDisconnected.clear();
