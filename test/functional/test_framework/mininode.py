@@ -28,6 +28,7 @@ from collections import defaultdict
 import copy
 import hashlib
 from contextlib import contextmanager
+from enum import Enum
 from io import BytesIO
 import logging
 import random
@@ -61,6 +62,15 @@ NODE_BLOOM = (1 << 2)
 NODE_WITNESS = (1 << 3)
 NODE_XTHIN = (1 << 4)
 NODE_BITCOIN_CASH = (1 << 5)
+
+# Stream types enumeration
+class StreamType(Enum):
+    UNKNOWN = 0
+    GENERAL = 1
+    DATA1 = 2
+    DATA2 = 3
+    DATA3 = 4
+    DATA4 = 5
 
 # Howmuch data will be read from the network at once
 READ_BUFFER_SIZE = 8192
@@ -1043,7 +1053,7 @@ class msg_createstream():
 class msg_streamack():
     command = b"streamack"
 
-    def __init__(self, assocID=None, stream_type=0):
+    def __init__(self, assocID=None, stream_type=StreamType.UNKNOWN.value):
         self.assocID = assocID
         self.stream_type = stream_type
 

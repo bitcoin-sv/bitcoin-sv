@@ -8,7 +8,7 @@ Test association and stream handling within P2P.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import (create_association_id, msg_createstream, mininode_lock,
-    NetworkThread, NodeConn, NodeConnCB, wait_until)
+    NetworkThread, NodeConn, NodeConnCB, wait_until, StreamType)
 from test_framework.util import assert_equal, connect_nodes, p2p_port
 import time
 
@@ -250,7 +250,7 @@ class P2PAssociation(BitcoinTestFramework):
         with mininode_lock: assert(not newStyleSecondConnCB_Data4.seen_block(tip))
 
         # Send create new stream message
-        newStyleSecondConn.send_message(msg_createstream(stream_type=2, stream_policy=b"BlockPriority", assocID=newStyleFirstConn.assocID))
+        newStyleSecondConn.send_message(msg_createstream(stream_type=StreamType.DATA1.value, stream_policy=b"BlockPriority", assocID=newStyleFirstConn.assocID))
         expected = [
                 {
                     'id'           : 0,                                 # oldStyleConn
@@ -317,7 +317,7 @@ class P2PAssociation(BitcoinTestFramework):
         with mininode_lock: assert(newStyleSecondConnCB.last_streamack is not None)
 
         # Send create stream with wrong association ID
-        badStreamConn1.send_message(msg_createstream(stream_type=3, assocID=badStreamConn1.assocID))
+        badStreamConn1.send_message(msg_createstream(stream_type=StreamType.DATA2.value, assocID=badStreamConn1.assocID))
         # Should receive reject, no streamack
         wait_until(lambda: newStyleThirdConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
         with mininode_lock: assert(newStyleThirdConnCB.last_streamack is None)
@@ -335,7 +335,7 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: badStreamConn2.state == "closed", lock=mininode_lock, timeout=5)
 
         # Send create stream for existing stream type
-        badStreamConn3.send_message(msg_createstream(stream_type=1, assocID=badStreamConn3.assocID))
+        badStreamConn3.send_message(msg_createstream(stream_type=StreamType.GENERAL.value, assocID=badStreamConn3.assocID))
         # Should receive reject, no streamack
         wait_until(lambda: newStyleFifthConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
         with mininode_lock: assert(newStyleFifthConnCB.last_streamack is None)
@@ -344,7 +344,7 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: badStreamConn3.state == "closed", lock=mininode_lock, timeout=5)
 
         # Send create stream with unknown stream policy specified
-        badStreamConn4.send_message(msg_createstream(stream_type=1, stream_policy=b"UnknownPolicy", assocID=badStreamConn3.assocID))
+        badStreamConn4.send_message(msg_createstream(stream_type=StreamType.GENERAL.value, stream_policy=b"UnknownPolicy", assocID=badStreamConn3.assocID))
         # Should receive reject, no streamack
         wait_until(lambda: newStyleSixthConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
         with mininode_lock: assert(newStyleSixthConnCB.last_streamack is None)
@@ -394,9 +394,9 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
 
         # See if we can establish all the possible stream types
-        newStyleSecondConn_Data2.send_message(msg_createstream(stream_type=3, assocID=newStyleFirstConn.assocID))
-        newStyleSecondConn_Data3.send_message(msg_createstream(stream_type=4, assocID=newStyleFirstConn.assocID))
-        newStyleSecondConn_Data4.send_message(msg_createstream(stream_type=5, assocID=newStyleFirstConn.assocID))
+        newStyleSecondConn_Data2.send_message(msg_createstream(stream_type=StreamType.DATA2.value, assocID=newStyleFirstConn.assocID))
+        newStyleSecondConn_Data3.send_message(msg_createstream(stream_type=StreamType.DATA3.value, assocID=newStyleFirstConn.assocID))
+        newStyleSecondConn_Data4.send_message(msg_createstream(stream_type=StreamType.DATA4.value, assocID=newStyleFirstConn.assocID))
         expected = [
                 {
                     'id'           : 0,                                 # oldStyleConn
