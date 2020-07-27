@@ -2462,45 +2462,51 @@ static UniValue walletpassphrase(const Config &config,
             HelpExampleRpc("walletpassphrase", "\"my pass phrase\", 60"));
     }
 
-    LOCK2(cs_main, pwallet->cs_wallet);
+    int64_t nSleepTime = 0;
+    {
+        LOCK2(cs_main, pwallet->cs_wallet);
 
-    if (request.fHelp) {
-        return true;
-    }
-
-    if (!pwallet->IsCrypted()) {
-        throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE,
-                           "Error: running with an unencrypted wallet, but "
-                           "walletpassphrase was called.");
-    }
-
-    // Note that the walletpassphrase is stored in request.params[0] which is
-    // not mlock()ed
-    SecureString strWalletPass;
-    strWalletPass.reserve(100);
-    // TODO: get rid of this .c_str() by implementing
-    // SecureString::operator=(std::string)
-    // Alternately, find a way to make request.params[0] mlock()'d to begin
-    // with.
-    strWalletPass = request.params[0].get_str().c_str();
-
-    if (strWalletPass.length() > 0) {
-        if (!pwallet->Unlock(strWalletPass)) {
-            throw JSONRPCError(
-                RPC_WALLET_PASSPHRASE_INCORRECT,
-                "Error: The wallet passphrase entered was incorrect.");
+        if (request.fHelp) {
+            return true;
         }
-    } else {
-        throw std::runtime_error(
-            "walletpassphrase <passphrase> <timeout>\n"
-            "Stores the wallet decryption key in memory for "
-            "<timeout> seconds.");
+
+        if (!pwallet->IsCrypted()) {
+            throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE,
+                "Error: running with an unencrypted wallet, but "
+                "walletpassphrase was called.");
+        }
+
+        // Note that the walletpassphrase is stored in request.params[0] which is
+        // not mlock()ed
+        SecureString strWalletPass;
+        strWalletPass.reserve(100);
+        // TODO: get rid of this .c_str() by implementing
+        // SecureString::operator=(std::string)
+        // Alternately, find a way to make request.params[0] mlock()'d to begin
+        // with.
+        strWalletPass = request.params[0].get_str().c_str();
+
+        if (strWalletPass.length() > 0) {
+            if (!pwallet->Unlock(strWalletPass)) {
+                throw JSONRPCError(
+                    RPC_WALLET_PASSPHRASE_INCORRECT,
+                    "Error: The wallet passphrase entered was incorrect.");
+            }
+        }
+        else {
+            throw std::runtime_error(
+                "walletpassphrase <passphrase> <timeout>\n"
+                "Stores the wallet decryption key in memory for "
+                "<timeout> seconds.");
+        }
+
+        pwallet->TopUpKeyPool();
+        nSleepTime = request.params[1].get_int64();
+        pwallet->nRelockTime = GetTime() + nSleepTime;
     }
 
-    pwallet->TopUpKeyPool();
-
-    int64_t nSleepTime = request.params[1].get_int64();
-    pwallet->nRelockTime = GetTime() + nSleepTime;
+    // We need to call RPCRunLater without lock for cs_wallet
+    // to prevent deadlock.
     RPCRunLater(strprintf("lockwallet(%s)", pwallet->GetName()),
                 boost::bind(LockWallet, pwallet), nSleepTime);
 
