@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include "primitives/transaction.h"
+#include "txn_util.h"
 #include <enum_cast.h>
 
 // Enumerate possible txn's source type
-enum class TxSource
+enum class TxSource : int
 {
     unknown,
     file,
@@ -34,42 +34,113 @@ const enumTableT<TxValidationPriority>& enumTable(TxValidationPriority);
 class CNode;
 
 /**
- * The class used to provide an input data to the txn Validator.
+ * This class is used to provide an input data to the TxnValidator.
+ * It includes a pointer to a transaction and it's associated data.
  */
-class CTxInputData {
+class CTxInputData final {
 public:
     // Constructor
     CTxInputData(
+        TxIdTrackerWPtr pTxIdTracker,
+        CTransactionRef ptx,
         TxSource txSource,
         TxValidationPriority txValidationPriority,
-        CTransactionRef ptx,
         int64_t nAcceptTime=0,
         bool fLimitFree=false,
         Amount nAbsurdFee=Amount(0),
         std::weak_ptr<CNode> pNode={},
-        bool fOrphan=false)
-    : mTxSource(txSource),
-      mTxValidationPriority(txValidationPriority),
-      mpTx(ptx),
-      mnAcceptTime(nAcceptTime),
-      mfLimitFree(fLimitFree),
-      mnAbsurdFee(nAbsurdFee),
-      mpNode(pNode),
-      mfOrphan(fOrphan)
-    {}
+        bool fOrphan=false);
     // Defaults
     CTxInputData(CTxInputData&&) = default;
     CTxInputData(const CTxInputData&) = default;
-    ~CTxInputData() = default;
+    // Destructor
+    ~CTxInputData();
 
+    /**
+     * Getters
+     */
+    // GetTxnPtr
+    const CTransactionRef& GetTxnPtr() const {
+        return mpTx;
+    }
+    // GetNodePtr
+    const std::weak_ptr<CNode>& GetNodePtr() {
+        return mpNode;
+    }
+    // GetAbsurdFee
+    Amount& GetAbsurdFee() {
+        return mnAbsurdFee;
+    }
+    const Amount& GetAbsurdFee() const {
+        return mnAbsurdFee;
+    }
+    // GetAcceptTime
+    int64_t& GetAcceptTime() {
+        return mnAcceptTime;
+    }
+    const int64_t& GetAcceptTime() const {
+        return mnAcceptTime;
+    }
+    // GetTxSource
+    TxSource& GetTxSource() {
+        return mTxSource;
+    }
+    const TxSource& GetTxSource() const {
+        return mTxSource;
+    }
+    // GetTxValidationPriority
+    TxValidationPriority& GetTxValidationPriority() {
+        return mTxValidationPriority;
+    }
+    const TxValidationPriority& GetTxValidationPriority() const {
+        return mTxValidationPriority;
+    }
+    // IsLimitFree
+    bool IsLimitFree() const {
+        return mfLimitFree;
+    }
+    // IsOrphanTxn
+    bool IsOrphanTxn() const {
+        return mfOrphan;
+    }
+    // IsTxIdStored
+    bool IsTxIdStored() const {
+        return mfTxIdStored;
+    }
+
+    /**
+     * Setters
+     */
+    // SetAcceptTime
+    void SetAcceptTime(int64_t acceptTime) {
+        mnAcceptTime = acceptTime;
+    }
+    // SetTxSource
+    void SetTxSource(TxSource txSource) {
+        mTxSource = txSource;
+    }
+    // SetTxValidationPriority
+    void SetTxValidationPriority(TxValidationPriority txValidationPriority) {
+        mTxValidationPriority = txValidationPriority;
+    }
+    // SetOrphanTxn
+    void SetOrphanTxn(bool fOrphan=true) {
+        mfOrphan = fOrphan;
+    }
+
+// Optimizing for memory footprint:
+// - members are ordered by decreasing alignment
+private:
+    CTransactionRef mpTx {nullptr};
+    std::weak_ptr<CNode> mpNode {};
+    TxIdTrackerWPtr mpTxIdTracker {};
+    Amount mnAbsurdFee {0};
+    int64_t mnAcceptTime {0};
     TxSource mTxSource {TxSource::unknown};
     TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
-    CTransactionRef mpTx {nullptr};
-    int64_t mnAcceptTime {0};
     bool mfLimitFree {false};
-    Amount mnAbsurdFee {0};
-    std::weak_ptr<CNode> mpNode {};
     bool mfOrphan {false};
+    bool mfTxIdStored {false};
 };
 
 using TxInputDataSPtr = std::shared_ptr<CTxInputData>;

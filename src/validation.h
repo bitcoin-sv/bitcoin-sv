@@ -694,7 +694,7 @@ std::vector<TxId> LimitMempoolSize(
  * @param pnDynamicMemoryUsage If not null store dynamic memory usage after txn is commited
  */
 void CommitTxToMempool(
-    const CTransactionRef &ptx,
+    const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& entry,
     bool fTxValidForFeeEstimation,
     CTxMemPool::setEntries& setAncestors,

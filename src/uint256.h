@@ -114,6 +114,21 @@ public:
 };
 
 /**
+ * Specialise std::hash for uint256.
+ */
+namespace std
+{
+    template<>
+    class hash<uint256> {
+      public:
+        size_t operator()(const uint256& u) const
+        {
+            return static_cast<size_t>(u.GetCheapHash());
+        }
+    };
+}
+
+/**
  * uint256 from const char *.
  * This is a separate function because the constructor uint256(const char*) can
  * result in dangerously catching uint256(0).

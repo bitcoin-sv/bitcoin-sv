@@ -199,6 +199,7 @@ BITCOIN_CORE_H = \
   txn_propagator.h \
   txn_recent_rejects.h \
   txn_sending_details.h \
+  txn_util.h \
   txn_validation_config.h \
   txn_validation_data.h \
   txn_validation_result.h \

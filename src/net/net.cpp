@@ -2309,13 +2309,17 @@ CConnman::CConnman(
     nBestHeight = 0;
     clientInterface = nullptr;
     flagInterruptMsgProc = false;
-    // Create an instance of the Validator
+    /** Create an instance of the CTxIdTracker class */
+    mTxIdTracker = std::make_shared<CTxIdTracker>();
+    /** Create an instance of the CTxnPropagator class */
+    mTxnPropagator = std::make_shared<CTxnPropagator>();
+    /** Create an instance of the CTxnValidator class */
     mTxnValidator =
         std::make_shared<CTxnValidator>(
             configIn,
             mempool,
-            std::make_shared<CTxnDoubleSpendDetector>());
-    mTxnPropagator = std::make_shared<CTxnPropagator>();
+            std::make_shared<CTxnDoubleSpendDetector>(),
+            mTxIdTracker);
 }
 
 NodeId CConnman::GetNewNodeId() {
@@ -2909,6 +2913,10 @@ size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNe
     return bytesSent;
 }
 
+const TxIdTrackerSPtr& CConnman::GetTxIdTracker() {
+    return mTxIdTracker;
+}
+
 std::shared_ptr<CTxnValidator> CConnman::getTxnValidator() {
 	return mTxnValidator;
 }
@@ -2920,16 +2928,6 @@ void CConnman::EnqueueTxnForValidator(std::shared_ptr<CTxInputData> pTxInputData
 /* Support for a vector */
 void CConnman::EnqueueTxnForValidator(std::vector<TxInputDataSPtr> vTxInputData) {
     mTxnValidator->newTransaction(std::move(vTxInputData));
-}
-
-/** Resubmit a transaction for validation */
-void CConnman::ResubmitTxnForValidator(TxInputDataSPtr pTxInputData) {
-    mTxnValidator->resubmitTransaction(std::move(pTxInputData));
-}
-
-/** Check if the txn is already known */
-bool CConnman::CheckTxnExistsInValidatorsQueue(const uint256& txid) const {
-    return mTxnValidator->isTxnKnown(txid);
 }
 
 /* Find node by it's id */

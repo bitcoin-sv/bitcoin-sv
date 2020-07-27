@@ -24,8 +24,10 @@ CTimeLockedMempool::CTimeLockedMempool()
 }
 
 // Add or update a time-locked transaction
-void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
-                                                CValidationState& state)
+void CTimeLockedMempool::addOrUpdateTransaction(
+    const TxMempoolInfo& info,
+    const TxInputDataSPtr& pTxInputData,
+    CValidationState& state)
 {
     const CTransactionRef& txn { info.tx };
 
@@ -60,18 +62,10 @@ void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
             if(finalised)
             {
                 LogPrint(BCLog::MEMPOOL, "Finalising non-final tx: %s\n", txn->GetId().ToString());
-
                 // For full belt-and-braces safety, resubmit newly final transaction for revalidation
-                std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainActive.Tip()->nHeight + 1, reason) };
-                g_connman->ResubmitTxnForValidator(
-                    std::make_shared<CTxInputData>(
-                        TxSource::finalised,
-                        standard ? TxValidationPriority::high : TxValidationPriority::low,
-                        txn,
-                        GetTime()
-                    )
-                );
+                pTxInputData->SetTxSource(TxSource::finalised);
+                pTxInputData->SetAcceptTime(GetTime());
+                state.SetResubmitTx();
             }
             else
             {
@@ -278,6 +272,8 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
 
         // Take a reference to the validator.
         const auto& txValidator { g_connman->getTxnValidator() };
+        // A pointer to the TxIdTracker.
+        const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
         while(numTxns--)
         {
             CTransactionRef tx {};
@@ -296,14 +292,15 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
-                                        std::make_shared<CTxInputData>(
-                                                            TxSource::file, // tx source
-                                                            standard ? TxValidationPriority::high : TxValidationPriority::low,
-                                                            tx,    // a pointer to the tx
-                                                            nTime, // nAcceptTime
-                                                            true),  // fLimitFree
-                                        changeSet, // an instance of the mempool journal
-                                        true) // fLimitMempoolSize
+                        std::make_shared<CTxInputData>(
+                            pTxIdTracker, // a pointer to the TxIdTracker
+                            tx,    // a pointer to the tx
+                            TxSource::file, // tx source
+                            standard ? TxValidationPriority::high : TxValidationPriority::low,
+                            nTime, // nAcceptTime
+                            true),  // fLimitFree
+                        changeSet, // an instance of the mempool journal
+                        true) // fLimitMempoolSize
                 };
 
                 // Check results
@@ -541,6 +538,8 @@ void CTimeLockedMempool::periodicChecks()
 
     std::unique_lock lock { mMtx };
 
+    // A pointer to the TxIdTracker.
+    const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
     // Iterate over transactions in unlocking time order
     auto& index { mTransactionMap.get<TagUnlockingTime>() };
     auto it { index.begin() };
@@ -564,14 +563,13 @@ void CTimeLockedMempool::periodicChecks()
             // For full belt-and-braces safety, resubmit newly final transaction for revalidation
             std::string reason {};
             bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->nHeight + 1, reason) };
-            g_connman->ResubmitTxnForValidator(
+            g_connman->EnqueueTxnForValidator(
                 std::make_shared<CTxInputData>(
+                    pTxIdTracker,
+                    txn,
                     TxSource::finalised,
                     standard ? TxValidationPriority::high : TxValidationPriority::low,
-                    txn,
-                    GetTime()
-                )
-            );
+                    GetTime()));
         }
         // Purge age passed?
         else if(timeInPool >= mPurgeAge)
