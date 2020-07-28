@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
+# Copyright (c) 2020 Bitcoin Association
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """rawtranscation RPCs QA test.
@@ -8,6 +9,7 @@
 #    - createrawtransaction
 #    - signrawtransaction
 #    - sendrawtransaction
+#    - sendrawtransactions
 #    - decoderawtransaction
 #    - getrawtransaction
 """
@@ -30,6 +32,17 @@ class RawTransactionsTest(BitcoinTestFramework):
     def setup_network(self, split=False):
         super().setup_network()
         connect_nodes_bi(self.nodes, 0, 2)
+
+    def make_data_transaction(self, conn, txn):
+        send_value = txn['amount']
+        inputs = []
+        inputs.append({"txid": txn["txid"], "vout": txn["vout"]})
+        outputs = {}
+        addr = conn.getnewaddress()
+        outputs[addr] = satoshi_round(send_value)
+        outputs["data"] = bytes_to_hex_str(bytearray(999000))
+        raw= conn.createrawtransaction(inputs, outputs)
+        return conn.signrawtransaction(raw)["hex"]
 
     def run_test(self):
         # prepare some coins for multiple *rawtransaction commands
@@ -303,18 +316,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         
         # create new transaction
         mempoolsize = self.nodes[3].getmempoolinfo()['size']
-        txn = utxos.pop()
-        # now without fee
-        send_value = txn['amount']
-        inputs = []
-        inputs.append({"txid": txn["txid"], "vout": txn["vout"]})
-        outputs = {}
-        addr = self.nodes[3].getnewaddress()
-        outputs[addr] = satoshi_round(send_value)
-        outputs["data"] = bytes_to_hex_str(bytearray(999000))
-
-        rawTxn = self.nodes[3].createrawtransaction(inputs, outputs)
-        signedTxn = self.nodes[3].signrawtransaction(rawTxn)["hex"]
+        signedTxn = self.make_data_transaction(self.nodes[3], utxos.pop())
         # without sufficient fee shouldn't get to mempool
         assert_raises_rpc_error(
             -26, "insufficient priority", self.nodes[3].sendrawtransaction, signedTxn, False, False
@@ -325,6 +327,32 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert(txid_new in self.nodes[3].getrawmempool())
         assert_equal(mempoolsize_new, mempoolsize)
 
+        #
+        # Submit transactions through sendrawtransactions interface.
+        #
+        # Test insufficient fee.
+        txnhex1 = self.make_data_transaction(self.nodes[3], utxos.pop())
+        txnhex2 = self.make_data_transaction(self.nodes[3], utxos.pop())
+        txid1 = self.nodes[3].decoderawtransaction(txnhex1)["txid"]
+        txid2 = self.nodes[3].decoderawtransaction(txnhex2)["txid"]
+        # Check fee.
+        rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': False }, {'hex': txnhex2, 'dontcheckfee': False}])
+        assert_equal(len(rejectedTxns), 1)
+        assert_equal(len(rejectedTxns['invalid']), 2)
+        assert_equal(rejectedTxns['invalid'][0]['reject_code'], 66)
+        assert_equal(rejectedTxns['invalid'][0]['reject_reason'], "mempool min fee not met")
+        mempool = self.nodes[3].getrawmempool()
+        assert(txid1 not in mempool)
+        assert(txid2 not in mempool)
+        # Don't check fee.
+        rejectedTxns = self.nodes[3].sendrawtransactions([{'hex': txnhex1, 'dontcheckfee': True }, {'hex': txnhex2, 'dontcheckfee': True}])
+        assert_equal(len(rejectedTxns), 1)
+        assert_equal(len(rejectedTxns['evicted']), 2)
+        mempool = self.nodes[3].getrawmempool()
+        assert(txid1 in mempool)
+        assert(txid2 in mempool)
+        assert(rejectedTxns['evicted'][0] not in mempool)
+        assert(rejectedTxns['evicted'][1] not in mempool)
 
 if __name__ == '__main__':
     RawTransactionsTest().main()
