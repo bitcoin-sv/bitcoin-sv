@@ -93,7 +93,7 @@ uint64_t CScript::GetSigOpCount(bool fAccurate, bool isGenesisEnabled, bool& sig
 uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const 
 {
     sigOpCountError = false;
-    if (!IsPayToScriptHash())
+    if(!IsP2SH(*this))
     {
         return GetSigOpCount(true, isGenesisEnabled, sigOpCountError);
     }
@@ -127,10 +127,10 @@ uint64_t CScript::GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled,
     }
 }
 
-bool CScript::IsPayToScriptHash() const {
+bool IsP2SH(const bsv::span<const uint8_t> script) {
     // Extra-fast test for pay-to-script-hash CScripts:
-    return (this->size() == 23 && (*this)[0] == OP_HASH160 &&
-            (*this)[1] == 0x14 && (*this)[22] == OP_EQUAL);
+    return script.size() == 23 && script[0] == OP_HASH160 &&
+           script[1] == 0x14 && script[22] == OP_EQUAL;
 }
 
 bool CScript::IsPushOnly(const_iterator pc) const {

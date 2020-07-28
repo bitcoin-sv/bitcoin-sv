@@ -658,7 +658,10 @@ void decoderawtransaction(const Config& config,
 
     CTransaction tx(std::move(mtx));
     //treat as after genesis if no output is P2SH
-    bool genesisEnabled = std::none_of(mtx.vout.begin(), mtx.vout.end(), [](const CTxOut& out) { return out.scriptPubKey.IsPayToScriptHash(); });
+    const bool genesisEnabled =
+        std::none_of(mtx.vout.begin(), mtx.vout.end(), [](const CTxOut& out) {
+            return IsP2SH(out.scriptPubKey);
+        });
     CJSONWriter jWriter(textWriter, false);
     TxToJSON(tx, uint256(), genesisEnabled, 0, jWriter);
     
@@ -704,9 +707,9 @@ static UniValue decodescript(const Config &config,
         // Empty scripts are valid.
     }
 
-    ScriptPubKeyToUniv(script,
-        true, 
-        script.IsPayToScriptHash() ? false : true,  // treat all transactions as post-Genesis, except P2SH 
+    ScriptPubKeyToUniv(
+        script, true,
+        !IsP2SH(script), // treat all transactions as post-Genesis, except P2SH
         r);
 
     UniValue type;
@@ -985,7 +988,8 @@ static UniValue signrawtransaction(const Config &config,
 
                 // except if we are trying to sign transactions that spends p2sh transaction, which
                 // are non-standard (and therefore cannot be signed) after genesis upgrade
-                if( coinHeight >= genesisActivationHeight && txout.scriptPubKey.IsPayToScriptHash()){
+                if (coinHeight >= genesisActivationHeight &&
+                    IsP2SH(txout.scriptPubKey)) {
                     coinHeight = genesisActivationHeight - 1;
                 }
 
@@ -995,7 +999,7 @@ static UniValue signrawtransaction(const Config &config,
             // If redeemScript given and not using the local wallet (private
             // keys given), add redeemScript to the tempKeystore so it can be
             // signed:
-            if (fGivenKeys && scriptPubKey.IsPayToScriptHash()) {
+            if (fGivenKeys && IsP2SH(scriptPubKey)) {
                 RPCTypeCheckObj(
                     prevOut,
                     {

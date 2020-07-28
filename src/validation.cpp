@@ -516,7 +516,7 @@ uint64_t GetP2SHSigOpCount(const Config &config,
             continue;
         }
         const CTxOut &prevout = coin.GetTxOut();
-        if (prevout.scriptPubKey.IsPayToScriptHash()) {
+        if (IsP2SH(prevout.scriptPubKey)) {
             nSigOps += prevout.scriptPubKey.GetSigOpCount(i.scriptSig, genesisEnabled, sigOpCountError);
             if (sigOpCountError) {
                 return nSigOps;
@@ -633,7 +633,7 @@ bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, ui
     {
         bool hasP2SHOutput = std::any_of(tx.vout.begin(), tx.vout.end(), 
             [](const CTxOut& o){ 
-                return o.scriptPubKey.IsPayToScriptHash(); 
+                return IsP2SH(o.scriptPubKey); 
             }
         );
         

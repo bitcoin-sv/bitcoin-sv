@@ -246,8 +246,6 @@ public:
      */
     uint64_t GetSigOpCount(const CScript &scriptSig, bool isGenesisEnabled, bool& sigOpCountError) const;
 
-    bool IsPayToScriptHash() const;
-
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it
      * consensus-critical). */
     bool IsPushOnly(const_iterator pc) const;
@@ -305,6 +303,8 @@ public:
 
 std::ostream &operator<<(std::ostream &, const CScript &);
 std::string to_string(const CScript&);
+
+bool IsP2SH(bsv::span<const uint8_t>);
 
 size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 

@@ -887,7 +887,7 @@ UniValue ProcessImport(CWallet *const pwallet, const UniValue &data,
             CScript redeemScript = CScript(vData.begin(), vData.end());
 
             // Invalid P2SH address
-            if (!script.IsPayToScriptHash()) {
+            if (!IsP2SH(script)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
                                    "Invalid P2SH address / script");
             }

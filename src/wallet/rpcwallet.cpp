@@ -3214,7 +3214,7 @@ static UniValue listunspent(const Config &config,
                     Pair("account", pwallet->mapAddressBook[address].name));
             }
 
-            if (scriptPubKey.IsPayToScriptHash()) {
+            if (IsP2SH(scriptPubKey)) {
                 const CScriptID &hash = boost::get<CScriptID>(address);
                 CScript redeemScript;
                 if (pwallet->GetCScript(hash, redeemScript)) {

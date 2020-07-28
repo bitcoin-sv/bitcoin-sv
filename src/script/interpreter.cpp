@@ -2094,7 +2094,7 @@ std::optional<bool> VerifyScript(
     // But only if if the utxo is before genesis
     if(  (flags & SCRIPT_VERIFY_P2SH) &&
         !(flags & SCRIPT_UTXO_AFTER_GENESIS) &&
-        scriptPubKey.IsPayToScriptHash())
+        IsP2SH(scriptPubKey))
     {
         // scriptSig must be literals-only or validation fails
         if (!scriptSig.IsPushOnly()) {
