@@ -46,7 +46,7 @@ isminetype IsMine(const CKeyStore &keystore, const CScript &scriptPubKey,
     txnouttype whichType;
     // We will assume that the utxo is before genesis if it is P2SH because we still want to recognize 
     // P2SH scripts as ours and we don't have utxo height here.
-    const bool isGenesisEnabled = !IsPayToScriptHash(scriptPubKey);
+    const bool isGenesisEnabled = !IsP2SH(scriptPubKey);
     if (!Solver(scriptPubKey, isGenesisEnabled, whichType, vSolutions)) {
         if (keystore.HaveWatchOnly(scriptPubKey))
             return ISMINE_WATCH_UNSOLVABLE;

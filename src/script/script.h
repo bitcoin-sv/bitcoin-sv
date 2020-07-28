@@ -304,7 +304,7 @@ public:
 std::ostream &operator<<(std::ostream &, const CScript &);
 std::string to_string(const CScript&);
 
-bool IsPayToScriptHash(bsv::span<const uint8_t>);
+bool IsP2SH(bsv::span<const uint8_t>);
 
 size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 

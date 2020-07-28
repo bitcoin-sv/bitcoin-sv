@@ -83,7 +83,7 @@ struct CompareValueOnly {
 };
 
 bool CWallet::ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet) {
-    const bool isGenesisEnabled = !IsPayToScriptHash(scriptPubKey);
+    const bool isGenesisEnabled = !IsP2SH(scriptPubKey);
     return ::ExtractDestination(scriptPubKey, isGenesisEnabled, addressRet);
 }
 
@@ -107,7 +107,7 @@ public:
         std::vector<CTxDestination> vDest;
         int nRequired;
         // We will treat all scripts as after genesis except P2SH.
-        const bool isGenesisEnabled = !IsPayToScriptHash(script);
+        const bool isGenesisEnabled = !IsP2SH(script);
         if (ExtractDestinations(script, isGenesisEnabled, type, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest) {
                 boost::apply_visitor(*this, dest);
@@ -2326,7 +2326,7 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
             if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
                 !IsLockedCoin((*it).first, i) &&
                 (pcoin->tx->vout[i].nValue > Amount(0) || fIncludeZeroValue) &&
-                !(IsPayToScriptHash(pcoin->tx->vout[i].scriptPubKey) &&
+                !(IsP2SH(pcoin->tx->vout[i].scriptPubKey) &&
                   pcoin->IsGenesisEnabled()) && // we don't want to select p2sh
                                                 // utxos created after genesis
                 (!coinControl || !coinControl->HasSelected() ||

@@ -648,7 +648,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
 
         // If redeemScript given and private keys given, add redeemScript to the
         // tempKeystore so it can be signed:
-        if (IsPayToScriptHash(scriptPubKey) &&
+        if (IsP2SH(scriptPubKey) &&
             prevOut.exists("redeemScript")) {
             UniValue v = prevOut["redeemScript"];
             std::vector<uint8_t> rsData(ParseHexUV(v, "redeemScript"));
@@ -672,7 +672,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         const Amount amount = coin.GetTxOut().nValue;
 
         // we will assume that script is after genesis for every script type except p2sh
-        bool assumeUtxoAfterGenesis = !IsPayToScriptHash(prevPubKey);
+        bool assumeUtxoAfterGenesis = !IsP2SH(prevPubKey);
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
@@ -776,7 +776,7 @@ static void OutputTxJSON(const CTransaction &tx) {
     //treat as after genesis if no output is P2SH
     bool genesisEnabled =
         std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) {
-            return IsPayToScriptHash(out.scriptPubKey);
+            return IsP2SH(out.scriptPubKey);
         });
 
     CStringWriter strWriter;
