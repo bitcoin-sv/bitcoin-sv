@@ -236,9 +236,9 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
     if attempts == float('inf') and timeout == float('inf'):
         timeout = 60
     attempt = 0
-    timeout += time.time()
+    timestamp = timeout + time.time()
 
-    while attempt < attempts and time.time() < timeout:
+    while attempt < attempts and time.time() < timestamp:
         if lock:
             with lock:
                 if predicate():
@@ -251,7 +251,7 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
 
     # Print the cause of the timeout
     assert attempts > attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
-    assert timeout >= time.time(), f"{label} : timeout exceeded {timeout}"
+    assert timestamp >= time.time(), f"{label} : timeout exceeded {timeout}"
     raise RuntimeError('Unreachable')
 
 # RPC/P2P connection constants and functions
