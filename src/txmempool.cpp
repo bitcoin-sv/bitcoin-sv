@@ -9,7 +9,6 @@
 #include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
-#include "mining/journal_builder.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "streams.h"
@@ -161,7 +160,7 @@ class CEnsureNonNullChangeSet
     const CJournalChangeSetPtr& cs;
 public:
     CEnsureNonNullChangeSet(CTxMemPool& theMempool,  const CJournalChangeSetPtr& changeSet)
-        : replacement(changeSet ? nullptr : theMempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN))
+        : replacement(changeSet ? nullptr : theMempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN))
         , cs(changeSet ? changeSet : replacement) 
     {}
 
@@ -477,10 +476,6 @@ CTxMemPool::CTxMemPool() : nTransactionsUpdated(0) {
     // transactions becomes O(N^2) where N is the number of transactions in the
     // pool
     nCheckFrequency = 0;
-
-
-    // Create the journal builder
-    mJournalBuilder = std::make_unique<CJournalBuilder>();
 }
 
 CTxMemPool::~CTxMemPool() {
@@ -603,7 +598,7 @@ void CTxMemPool::AddUncheckedNL(
         auto filterOutAlreadyAccepted = [this, &changeSet](txiter entry)
         {
             auto txid = entry->GetTx().GetId();
-            if (mJournalBuilder->getCurrentJournal()->checkTxnExists(txid))
+            if (mJournalBuilder.getCurrentJournal()->checkTxnExists(txid))
             {
                 return false;
             }
@@ -858,7 +853,7 @@ void CTxMemPool::RemoveForBlock(
     auto isTxOutsideJournal = [this, &changeSet](txiter entry)
     {
         auto txid = entry->GetTx().GetId();
-        if (mJournalBuilder->getCurrentJournal()->checkTxnExists(txid))
+        if (mJournalBuilder.getCurrentJournal()->checkTxnExists(txid))
         {
             return false;
         }
@@ -905,11 +900,7 @@ void CTxMemPool::clearNL() {
     blockSinceLastRollingFeeBump = false;
     rollingMinimumFeeRate = 0;
     ++nTransactionsUpdated;
-
-    if(mJournalBuilder)
-    {
-        mJournalBuilder->clearJournal();
-    }
+    mJournalBuilder.clearJournal();
 }
 
 void CTxMemPool::trackPackageRemovedNL(const CFeeRate &rate) {
@@ -1121,7 +1112,7 @@ std::string CTxMemPool::checkJournalNL() const
     LogPrint(BCLog::JOURNAL, "Checking mempool against journal\n");
     std::stringstream res {};
 
-    CJournalTester tester { mJournalBuilder->getCurrentJournal() };
+    CJournalTester tester { mJournalBuilder.getCurrentJournal() };
 
     // Check mempool & journal agree on contents
     for(indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); ++it)
@@ -1161,7 +1152,7 @@ void CTxMemPool::RebuildJournal() const
 {
     LogPrint(BCLog::JOURNAL, "Rebuilding journal\n");
 
-    CJournalChangeSetPtr changeSet { mJournalBuilder->getNewChangeSet(JournalUpdateReason::RESET) };
+    CJournalChangeSetPtr changeSet { mJournalBuilder.getNewChangeSet(JournalUpdateReason::RESET) };
 
     std::shared_lock lock(smtx);
 
@@ -1402,7 +1393,7 @@ void CTxMemPool::prioritiseTransactionNL(
 
         setEntries affectedTxs = getConnectedNL(setEntries{it});
         affectedTxs.insert(it);
-        CJournalChangeSetPtr tmpChangeSet { getJournalBuilder()->getNewChangeSet(JournalUpdateReason::UNKNOWN) };
+        CJournalChangeSetPtr tmpChangeSet { getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
         checkJournalAcceptanceNL(affectedTxs, *tmpChangeSet);
     }
 }
@@ -1599,7 +1590,7 @@ void CTxMemPool::checkJournalAcceptanceNL(const CTxMemPool::setEntries& affected
     // ensures that transaction will end up in the journal if it is not there already, and that it will not be removed if it is inside.
     auto ensureAdded = [this, &changeSet](txiter entry){
         auto txid = entry->GetTx().GetId();
-        bool alreadyInJournal = mJournalBuilder->getCurrentJournal()->checkTxnExists(txid);
+        bool alreadyInJournal = mJournalBuilder.getCurrentJournal()->checkTxnExists(txid);
         if(!alreadyInJournal)
         {
             if(!changeSet.checkTxnAdded(txid))
@@ -1619,7 +1610,7 @@ void CTxMemPool::checkJournalAcceptanceNL(const CTxMemPool::setEntries& affected
     // ensures that transaction will be removed from journal if it is inside, and if not inside journal it will not be added
     auto ensureRemoved = [this, &changeSet](txiter entry){
         auto txid = entry->GetTx().GetId();
-        bool isInJournal = mJournalBuilder->getCurrentJournal()->checkTxnExists(txid);
+        bool isInJournal = mJournalBuilder.getCurrentJournal()->checkTxnExists(txid);
         if(isInJournal)
         {
             if(!changeSet.checkTxnRemoved(txid))

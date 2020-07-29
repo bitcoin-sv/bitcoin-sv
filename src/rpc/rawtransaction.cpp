@@ -1195,7 +1195,7 @@ static UniValue sendrawtransaction(const Config &config,
         }
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
-            mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
+            mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
         };
         // Forward transaction to the validator and wait for results.
         // To support backward compatibility (of this interface) we need
@@ -1478,7 +1478,7 @@ static UniValue sendrawtransactions(const Config &config,
     {
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
-            mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
+            mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
         };
         // Prioritise transactions (if any were requested to prioritise)
         // - mempool prioritisation cleanup is done during destruction

@@ -9,6 +9,7 @@
 #include "amount.h"
 #include "coins.h"
 #include "indirectmap.h"
+#include "mining/journal_builder.h"
 #include "random.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
@@ -34,14 +35,6 @@
 class CAutoFile;
 class CBlockIndex;
 class Config;
-
-namespace mining
-{
-    class CJournalBuilder;
-    class CJournalChangeSet;
-    using CJournalBuilderPtr = std::unique_ptr<CJournalBuilder>;
-    using CJournalChangeSetPtr = std::unique_ptr<CJournalChangeSet>;
-}
 
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
@@ -531,7 +524,7 @@ private:
     mutable double rollingMinimumFeeRate;
 
     // Our journal builder
-    mining::CJournalBuilderPtr mJournalBuilder;
+    mutable mining::CJournalBuilder mJournalBuilder;
 
     // Sub-pool for time locked txns
     CTimeLockedMempool mTimeLockedPool {};
@@ -720,7 +713,7 @@ public:
             Amount &nFeeDelta) const;
 
     // Get a reference to the journal builder
-    const mining::CJournalBuilderPtr& getJournalBuilder() const { return mJournalBuilder; }
+    mining::CJournalBuilder& getJournalBuilder() { return mJournalBuilder; }
 
     // Get a reference to the time-locked (non-final txn) mempool
     CTimeLockedMempool& getNonFinalPool() { return mTimeLockedPool; }

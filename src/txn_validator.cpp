@@ -379,7 +379,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                          mProcessingQueue.size());
                                 // Special handlers
                                 mining::CJournalChangeSetPtr changeSet {
-                                    mMempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::NEW_TXN) };
+                                    mMempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::NEW_TXN) };
                                 CTxnHandlers handlers {
                                     changeSet,
                                     mpTxnDoubleSpendDetector,

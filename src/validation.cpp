@@ -5017,7 +5017,7 @@ bool PreciousBlock(const Config &config, CValidationState &state,
         }
     }
 
-    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::REORG) };
     auto source = task::CCancellationSource::Make();
     // state is used to report errors, not block related invalidity
     // (see description of ActivateBestChain)
@@ -5034,7 +5034,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     setBlockIndexCandidates.erase(pindex);
 
     DisconnectedBlockTransactions disconnectpool;
-    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::REORG) };
     if (chainActive.Contains(pindex))
     {
         while (chainActive.Contains(pindex))
@@ -6059,7 +6059,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
             // (see description of ActivateBestChain)
             CValidationState dummyState;
 
-            CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
+            CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_BLOCK) };
 
             if (!ActivateBestChain(
                     token,
@@ -6716,7 +6716,7 @@ bool RewindBlockIndex(const Config &config) {
     // tipheight + 1
     CValidationState state;
     CBlockIndex *pindex = chainActive.Tip();
-    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::REORG) };
     while (chainActive.Height() >= nHeight) {
         if (fPruneMode && !chainActive.Tip()->nStatus.hasData()) {
             // If pruning, don't try rewinding past the HAVE_DATA point; since
@@ -6982,7 +6982,7 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                     // dummyState is used to report errors, not block related invalidity - ignore it
                     // (see description of ActivateBestChain)
                     CValidationState dummyState;
-                    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::REORG) };
+                    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::REORG) };
                     auto source = task::CCancellationSource::Make();
                     if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, dummyState, changeSet)) {
                         break;
@@ -7379,7 +7379,7 @@ bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownT
             if (nTime + nExpiryTimeout > nNow) {
                 // Mempool Journal ChangeSet
                 CJournalChangeSetPtr changeSet {
-                    mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT)
+                    mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
                 };
                 const CValidationState& state {
                     // Execute txn validation synchronously.

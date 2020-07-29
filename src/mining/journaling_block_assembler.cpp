@@ -239,7 +239,7 @@ void JournalingBlockAssembler::newBlock()
     LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler replacing journal/iterator/block\n");
 
     // Get new current journal
-    mJournal = mempool.getJournalBuilder()->getCurrentJournal();
+    mJournal = mempool.getJournalBuilder().getCurrentJournal();
 
     // Reset transaction list
     mBlockTxns.clear();

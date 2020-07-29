@@ -1778,7 +1778,7 @@ UniValue mempoolInfoToJSON(const Config& config) {
     ret.push_back(Pair("size", (int64_t)mempool.Size()));
     ret.push_back(Pair(
         "journalsize",
-        (int64_t)mempool.getJournalBuilder()->getCurrentJournal()->size()));
+        (int64_t)mempool.getJournalBuilder().getCurrentJournal()->size()));
     ret.push_back(
         Pair("nonfinalsize", (int64_t)mempool.getNonFinalPool().getNumTxns()));
     ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
@@ -1935,7 +1935,7 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
     // (see description of ActivateBestChain)
     CValidationState state;
     mining::CJournalChangeSetPtr changeSet{
-        mempool.getJournalBuilder()->getNewChangeSet(
+        mempool.getJournalBuilder().getNewChangeSet(
             mining::JournalUpdateReason::REORG)};
     auto source = task::CCancellationSource::Make();
     ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
