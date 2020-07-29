@@ -5,6 +5,7 @@
 // LICENSE.
 #include "script_num.h"
 
+#include <limits>
 #include <iostream>
 #include <iterator>
 #include <limits>
