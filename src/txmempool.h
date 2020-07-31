@@ -970,7 +970,8 @@ private:
             setEntries &stage,
             bool updateDescendants,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
+            bool updateJournal = true);
 
     void prioritiseTransactionNL(
             const uint256& hash,
@@ -991,17 +992,17 @@ private:
     // A non-locking version of DynamicMemoryUsage.
     size_t DynamicMemoryUsageNL() const;
 
-    // extends a set of entries with transactions which are connected to any of items in the given set. transactions are considered "connected"  
+    // returns a set of entries which are connected to any of items in the given set, but not elements of the given set. transactions are considered "connected"  
     // if one transaction can reach another trough one or more child or parent relations
     // - only transactions for which filter returns true are considered
     // - every transaction from the set will have all its in-mempool ancestors included in the set (if they pass filter)
     // - if the limit is not std::nullopt, not all children/siblings will be added. adding new transactions to the set is stopped when the size of the 
     //   entries set is reached, but we have to ensure that all parents of all transactions in the set, so
     //   we have to add parents of the last added entry too, this can extend the size of the entries set by up to {-limitdescendantcount - 1} transactions
-    void extendWithConnectedNL(setEntries& entries, std::function<bool(txiter)> filter, std::optional<size_t> limit = std::nullopt) const;
+    setEntries getConnectedNL(const setEntries& entries, std::function<bool(txiter)> filter, std::optional<size_t> limit= std::nullopt) const;
     
-    // extends a set of entries with all transactions which are connected to any of items in the given set.
-    void extendWithConnectedNL(setEntries& entries) const;
+    // returns a set of entries which are connected to any of items in the given set, but not elements of the given set.
+    setEntries getConnectedNL(const setEntries& entries) const;
 
     // checks if affected transactions have met conditions to be mined, 
     // - if they could be mined but they are not in the journal they are added to the changeSet as ADD
