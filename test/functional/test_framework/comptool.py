@@ -252,7 +252,7 @@ class TestManager():
 
     # Analogous to sync_block (see above)
     def sync_transaction(self, txhash, num_events):
-        # Wait for nodes to request transaction (50ms sleep * 20 tries * num_events)
+        # Wait for nodes to request transaction
         def transaction_requested():
             return all(
                 txhash in node.tx_request_map and node.tx_request_map[txhash]
@@ -260,8 +260,9 @@ class TestManager():
             )
 
         # --> error if not requested
-        wait_until(transaction_requested, attempts=20 *
-                   num_events, lock=mininode_lock)
+        # Observed data shows that during testing some responses take up to 2 seconds.
+        # Timeout of 3s plus an extra 30s for good measure
+        wait_until(transaction_requested, timeout=3*num_events+30, lock=mininode_lock)
 
         # We must wait for node to finish processing transactions before 'mempool' p2p message is sent
         [c.cb.send_ping(self.ping_counter) for c in self.connections]
