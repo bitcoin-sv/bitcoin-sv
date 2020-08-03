@@ -133,6 +133,7 @@ BITCOIN_CORE_H = \
   mining/journaling_block_assembler.h \
   net/association.h \
   net/association_id.h \
+  net/block_download_tracker.h \
   net/net.h \
   net/netaddress.h \
   net/netbase.h \
@@ -274,6 +275,7 @@ libbitcoin_server_a_SOURCES = \
   mining/journaling_block_assembler.cpp \
   net/association.cpp \
   net/association_id.cpp \
+  net/block_download_tracker.cpp \
   net/net.cpp \
   net/net_message.cpp \
   net/net_processing.cpp \

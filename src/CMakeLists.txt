@@ -246,6 +246,7 @@ add_library(server
 	mining/journaling_block_assembler.cpp
     net/association.cpp
     net/association_id.cpp
+    net/block_download_tracker.cpp
 	net/net.cpp
     net/net_message.cpp
 	net/net_processing.cpp
