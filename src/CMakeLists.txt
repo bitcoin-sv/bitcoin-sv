@@ -249,6 +249,7 @@ add_library(server
 	net/net.cpp
     net/net_message.cpp
 	net/net_processing.cpp
+    net/node_state.cpp
     net/stream.cpp
     net/stream_policy.cpp
     net/stream_policy_factory.cpp

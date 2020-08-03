@@ -18,6 +18,7 @@
 #include "merkleblock.h"
 #include "net/net.h"
 #include "net/netbase.h"
+#include "net/node_state.h"
 #include "netmessagemaker.h"
 #include "policy/fees.h"
 #include "primitives/block.h"
@@ -74,16 +75,7 @@ uint256 hashRecentRejectsChainTip;
  * Blocks that are in flight, and that are in the queue to be downloaded.
  * Protected by cs_main.
  */
-struct QueuedBlock {
-    uint256 hash;
-    const CBlockIndex& blockIndex;
-    //!< Whether this block has validated headers at the time of request.
-    bool fValidatedHeaders;
-    //!< Optional, used for CMPCTBLOCK downloads
-    std::unique_ptr<PartiallyDownloadedBlock> partialBlock;
-};
-std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator>>
-    mapBlocksInFlight;
+std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator>> mapBlocksInFlight;
 
 /** Stack of nodes which we have set to announce using compact blocks */
 std::list<NodeId> lNodesAnnouncingHeaderAndIDs;
@@ -108,121 +100,6 @@ std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
 //
 
 namespace {
-
-struct CBlockReject {
-    uint8_t chRejectCode;
-    std::string strRejectReason;
-    uint256 hashBlock;
-};
-
-/**
- * Maintain validation-specific state about nodes, protected by cs_main, instead
- * by CNode's own locks. This simplifies asynchronous operation, where
- * processing of incoming data is done after the ProcessMessage call returns,
- * and we're no longer holding the node's locks.
- */
-struct CNodeState {
-    //! The peer's address
-    const CService address {};
-    //! Whether we have a fully established connection.
-    bool fCurrentlyConnected {false};
-    //! Accumulated misbehaviour score for this peer.
-    int nMisbehavior {0};
-    //! Whether this peer should be disconnected and banned (unless
-    //! whitelisted).
-    bool fShouldBan {false};
-    //! String name of this peer (debugging/logging purposes).
-    const std::string name {};
-    //! List of asynchronously-determined block rejections to notify this peer
-    //! about.
-    std::vector<CBlockReject> rejects {};
-    //! The best known block we know this peer has announced.
-    const CBlockIndex* pindexBestKnownBlock {nullptr};
-    //! The hash of the last unknown block this peer has announced.
-    uint256 hashLastUnknownBlock {};
-    //! The last full block we both have.
-    const CBlockIndex* pindexLastCommonBlock {nullptr};
-    //! The best header we have sent our peer.
-    const CBlockIndex* pindexBestHeaderSent {nullptr};
-    //! Length of current-streak of unconnecting headers announcements
-    int nUnconnectingHeaders {0};
-    //! Whether we've started headers synchronization with this peer.
-    bool fSyncStarted {false};
-    //! Since when we're stalling block download progress (in microseconds), or
-    //! 0.
-    int64_t nStallingSince {0};
-    std::list<QueuedBlock> vBlocksInFlight {};
-    //! When the first entry in vBlocksInFlight started downloading. Don't care
-    //! when vBlocksInFlight is empty.
-    int64_t nDownloadingSince {0};
-    int nBlocksInFlight {0};
-    int nBlocksInFlightValidHeaders {0};
-    //! Whether we consider this a preferred download peer.
-    bool fPreferredDownload {false};
-    //! Whether this peer wants invs or headers (when possible) for block
-    //! announcements.
-    bool fPreferHeaders {false};
-    //! Whether this peer wants invs or cmpctblocks (when possible) for block
-    //! announcements.
-    bool fPreferHeaderAndIDs {false};
-    /**
-     * Whether this peer will send us cmpctblocks if we request them.
-     * This is not used to gate request logic, as we really only care about
-     * fSupportsDesiredCmpctVersion, but is used as a flag to "lock in" the
-     * version of compact blocks we send.
-     */
-    bool fProvidesHeaderAndIDs {false};
-    /**
-     * If we've announced NODE_WITNESS to this peer: whether the peer sends
-     * witnesses in cmpctblocks/blocktxns, otherwise: whether this peer sends
-     * non-witnesses in cmpctblocks/blocktxns.
-     */
-    bool fSupportsDesiredCmpctVersion {false};
-
-    /*
-    * Capture the number and frequency of Invalid checksum
-    */
-    double dInvalidChecksumFrequency {0};
-    std::chrono::system_clock::time_point nTimeOfLastInvalidChecksumHeader { std::chrono::system_clock::now() };
-
-    int64_t nextSendThresholdTime {0};
-
-    /**
-    * A mutex for locking these details. Needs (at least for now) to be
-    * recursive because of all the legacy structure.
-    */
-    std::recursive_mutex mMtx {};
-
-    CNodeState(CAddress addrIn, std::string addrNameIn)
-        : address(addrIn), name(addrNameIn) {
-        hashLastUnknownBlock.SetNull();
-    }
-
-    bool CanSend() const {
-        return nextSendThresholdTime < GetTimeMicros();
-    }
-};
-
-using CNodeStatePtr = std::shared_ptr<CNodeState>;
-using CNodeStateRef = CLockedRef<CNodeStatePtr, std::unique_lock<std::recursive_mutex>>;
-
-/** Map maintaining per-node state. */
-std::map<NodeId, CNodeStatePtr> mapNodeState;
-std::shared_mutex mapNodeStateMtx {};
-
-// Fetch node state
-CNodeStateRef GetState(NodeId pnode) {
-    // Lock access for reading to the map of node states
-    std::shared_lock<std::shared_mutex> lock { mapNodeStateMtx };
-
-    auto it { mapNodeState.find(pnode) };
-    if(it == mapNodeState.end()) {
-        // Not found, return null
-        return {};
-    }
-    // Return a shared ref to the item in the map, locked appropriately
-    return { it->second, it->second->mMtx };
-}
 
 void UpdatePreferredDownload(const CNodePtr& pnode) {
     // Try to obtain an access to the node's state data.
