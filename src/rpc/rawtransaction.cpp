@@ -1172,7 +1172,7 @@ static UniValue sendrawtransaction(const Config &config,
     }
 
     CTransactionRef tx(MakeTransactionRef(std::move(mtx)));
-    const uint256 &txid = tx->GetId();
+    const TxId &txid = tx->GetId();
 
     Amount nMaxRawTxFee = maxTxFee;
     if (request.params.size() > 1 && request.params[1].get_bool()) {
@@ -1188,31 +1188,36 @@ static UniValue sendrawtransaction(const Config &config,
             RPC_CLIENT_P2P_DISABLED,
             "Error: Peer-to-peer functionality missing or disabled");
     }
+    // Make transaction's input data object.
+    TxInputDataSPtr pTxInputData =
+        std::make_shared<CTxInputData>(
+            g_connman->GetTxIdTracker(),    // a pointer to the TxIdTracker
+            std::move(tx),                  // a pointer to the tx
+            TxSource::rpc,                  // tx source
+            TxValidationPriority::normal,   // tx validation priority
+            GetTime(),                      // nAcceptTime
+            false,                          // fLimitFree
+            nMaxRawTxFee);                 // nAbsurdFee
+    // Check if transaction is already received through p2p interface,
+    // and thus, couldn't be added to the TxIdTracker.
+    if (!pTxInputData->IsTxIdStored()) {
+        throw JSONRPCError(RPC_TRANSACTION_REJECTED,
+                strprintf("%i: %s", REJECT_ALREADY_KNOWN, "txn-already-known"));
+    }
+    // Check if txn is present in one of the mempools.
     if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
         if (dontCheckFee) {
-            mempool.PrioritiseTransaction(tx->GetId(), tx->GetId().ToString(),
-                                          0.0, MAX_MONEY);
+            mempool.PrioritiseTransaction(txid, txid.ToString(), 0.0, MAX_MONEY);
         }
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
             mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
         };
         // Forward transaction to the validator and wait for results.
-        // To support backward compatibility (of this interface) we need
-        // to wait until the transaction is processed.
-        // At this stage any information about validation failure (or mempool rejects)
-        // are put into the log file.
         const auto& txValidator = g_connman->getTxnValidator();
         const CValidationState& status {
             txValidator->processValidation(
-                std::make_shared<CTxInputData>(
-                    g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
-                    std::move(tx), // a pointer to the tx
-                    TxSource::rpc, // tx source
-                    TxValidationPriority::normal, // tx validation priority
-                    GetTime(),     // nAcceptTime
-                    false,         // fLimitFree
-                    nMaxRawTxFee), // nAbsurdFee
+                std::move(pTxInputData), // txn's input data
                 changeSet, // an instance of the journal
                 true) // fLimitMempoolSize
         };
