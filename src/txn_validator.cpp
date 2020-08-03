@@ -192,7 +192,7 @@ CValidationState CTxnValidator::processValidation(
 }
 
 /** Process a set of txns in synchronous mode */
-void CTxnValidator::processValidation(
+CTxnValidator::RejectedTxns CTxnValidator::processValidation(
     TxInputDataSPtrVec vTxInputData,
     const mining::CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize) {
@@ -202,7 +202,7 @@ void CTxnValidator::processValidation(
             "Txnval-synch-batch: Got a set of %d new txns\n", vTxInputDataSize);
     // Check if there is anything to process
     if (!vTxInputDataSize) {
-        return;
+        return {};
     }
     // TODO: A temporary workaroud uses cs_main lock to control pcoinsTip change
     // A synchronous interface locks mtxs in the following order:
@@ -216,6 +216,8 @@ void CTxnValidator::processValidation(
     std::unique_lock lock { mMainMtx };
     // A vector of accepted txns
     std::vector<TxInputDataSPtr> vAcceptedTxns {};
+    // A hash table containing invalid transacions, including their validation state.
+    CTxnValidator::InvalidTxnStateUMap mInvalidTxns {};
     // Special handlers
     CTxnHandlers handlers {
         changeSet, // Mempool Journal ChangeSet
@@ -244,6 +246,8 @@ void CTxnValidator::processValidation(
         vAcceptedTxns.insert(vAcceptedTxns.end(),
             std::make_move_iterator(imdResult.mAcceptedTxns.begin()),
             std::make_move_iterator(imdResult.mAcceptedTxns.end()));
+        // Move invalid txns into the result hash table (if any exists)
+        mInvalidTxns.insert(imdResult.mInvalidTxns.begin(), imdResult.mInvalidTxns.end());
         // Get dependent orphans (if any exists)
         vTxInputData = handlers.mpOrphanTxns->collectDependentTxnsForRetry();
         vTxInputDataSize = vTxInputData.size();
@@ -269,6 +273,14 @@ void CTxnValidator::processValidation(
     // still within its size limits
     CValidationState dummyState;
     FlushStateToDisk(mConfig.GetChainParams(), dummyState, FLUSH_STATE_PERIODIC);
+    // If there are any orphan transactions, then include them in the result set
+    std::vector<TxId> vOrphanTxIds = handlers.mpOrphanTxns->getTxIds();
+    for (auto&& txid: vOrphanTxIds) {
+        CValidationState state;
+        state.SetMissingInputs();
+        mInvalidTxns.try_emplace(std::move(txid), std::move(state));
+    }
+    return {mInvalidTxns, vRemovedTxIds};
 }
 
 /** Thread entry point for new transaction queue handling */
@@ -525,6 +537,7 @@ void CTxnValidator::postValidationStepsNL(
     const CValidationState& state = txStatus.mState;
     // Check task's status
     if (CTask::Status::Faulted == result.second) {
+        imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
         return;
     }
     else if (CTask::Status::Canceled == result.second) {
@@ -547,7 +560,11 @@ void CTxnValidator::postValidationStepsNL(
         if (TxValidationPriority::high == txpriority) {
             txpriority = TxValidationPriority::low;
             imdResult.mDetectedLowPriorityTxns.emplace_back(txStatus.mTxInputData);
+        } else {
+            imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
         }
+    } else if (!state.IsMissingInputs()) {
+        imdResult.mInvalidTxns.try_emplace(txStatus.mTxInputData->GetTxnPtr()->GetId(), state);
     }
 }
 

@@ -93,6 +93,8 @@ class COrphanTxns {
     void eraseCollectedOutpointsFromTxns(const std::vector<TxId>& vRemovedTxIds);
     /** Get a number of orphan transactions queued */
     size_t getTxnsNumber();
+    /** Get TxIds of known orphan transactions */
+    std::vector<TxId> getTxIds() const;
     /** Get collected outpoints */
     std::vector<COutPoint> getCollectedOutpoints();
     /** Get a random orphan txn by a lower bound (needed for UTs) */

@@ -1,4 +1,5 @@
 // Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2020 Bitcoin Association
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -627,6 +628,41 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     // ... with a 1/4 halflife when mempool is < 1/4 its target size
 
     SetMockTime(0);
+}
+
+BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
+    TestMemPoolEntryHelper entry;
+    // Create a transaction
+    CMutableTransaction txParent;
+    txParent.vin.resize(1);
+    txParent.vin[0].scriptSig = CScript() << OP_11;
+    txParent.vout.resize(3);
+    for (int i = 0; i < 3; i++) {
+        txParent.vout[i].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+        txParent.vout[i].nValue = Amount(33000LL);
+    }
+
+    CTxMemPool testPool;
+    const TxId& txid = txParent.GetId();
+    // Add txn to the testPool
+    {
+        BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
+        testPool.AddUnchecked(txid, entry.FromTx(txParent), nullChangeSet);
+        BOOST_CHECK_EQUAL(testPool.Size(), 1UL);
+        BOOST_CHECK(!testPool.mapDeltas.count(txid));
+    }
+    // Instantiate txPrioritizer to prioritise txParent.
+    {
+        CTxPrioritizer txPrioritizer(testPool, txid);
+        // This should add a new entry into mapDeltas.
+        BOOST_CHECK(testPool.mapDeltas.count(txid));
+        BOOST_CHECK_EQUAL(testPool.mapDeltas[txid].first, 0UL);
+        BOOST_CHECK_EQUAL(testPool.mapDeltas[txid].second, MAX_MONEY);
+        // Remove txid from the mapTx.
+        testPool.mapTx.erase(txid);
+    }
+    // During txPrioritizer's destruction txid should be removed from mapDeltas.
+    BOOST_CHECK(!testPool.mapDeltas.count(txid));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

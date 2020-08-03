@@ -251,6 +251,35 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_erasetxnfrompeer) {
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 0);
 }
 
+BOOST_AUTO_TEST_CASE(test_gettxids) {
+    // Create orphan txn's object.
+    std::shared_ptr<COrphanTxns> orphanTxns {
+        std::make_shared<COrphanTxns>(
+                maxCollectedOutpoints,
+                maxExtraTxnsForCompactBlock,
+                maxTxSizePolicy)
+    };
+    // Create orphan transactions:
+    auto txn1 = CreateOrphanTxn(TxSource::p2p);
+    orphanTxns->addTxn(txn1);
+    auto txn2 = CreateOrphanTxn(TxSource::p2p);
+    orphanTxns->addTxn(txn2);
+    auto txn3 = CreateOrphanTxn(TxSource::p2p);
+    orphanTxns->addTxn(txn3);
+    // Store txids in the vector.
+    std::vector<TxId> vKnownTxIds {
+        txn1->GetTxnPtr()->GetId(),
+        txn2->GetTxnPtr()->GetId(),
+        txn3->GetTxnPtr()->GetId(),
+    };
+    std::sort(vKnownTxIds.begin(), vKnownTxIds.end());
+    // Get txids via getTxIds call.
+    auto vTxIds = orphanTxns->getTxIds();
+    std::sort(vTxIds.begin(), vTxIds.end());
+    // Check if vectors are equal.
+    BOOST_CHECK(vKnownTxIds == vTxIds);
+}
+
 BOOST_AUTO_TEST_CASE(test_orphantxns_maxcollectedoutpoints) {
     size_t nMaxCollectedOutpoints = 100;
     // Create orphan txn's object.

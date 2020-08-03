@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "txmempool.h"
@@ -24,6 +24,33 @@
 
 using namespace mining;
 
+/**
+ * class CTxPrioritizer
+ */
+CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, TxId txnToPrioritise)
+    : mMempool(mempool), mTxnsToPrioritise{std::move(txnToPrioritise)}
+{
+    mMempool.PrioritiseTransaction(mTxnsToPrioritise, 0.0, MAX_MONEY);
+}
+
+CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrioritise)
+    : mMempool(mempool), mTxnsToPrioritise(std::move(txnsToPrioritise))
+{
+    mMempool.PrioritiseTransaction(mTxnsToPrioritise, 0.0, MAX_MONEY);
+}
+
+CTxPrioritizer::~CTxPrioritizer()
+{
+    try {
+        mMempool.ClearPrioritisation(mTxnsToPrioritise);
+    } catch (...) {
+        LogPrint(BCLog::MEMPOOL, "~CTxPrioritizer: Unexpected exception during destruction.\n");
+    }
+}
+
+/**
+ * class CTxMemPoolEntry
+ */
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  const Amount _nFee,
                                  int64_t _nTime,
@@ -1002,9 +1029,21 @@ std::string CTxMemPool::CheckJournal() const {
     return checkJournalNL();
 }
 
-void CTxMemPool::clearPrioritisation(const uint256 &hash) {
+void CTxMemPool::ClearPrioritisation(const uint256 &hash) {
     std::unique_lock lock(smtx);
     clearPrioritisationNL(hash);
+}
+
+void CTxMemPool::ClearPrioritisation(const std::vector<TxId>& vTxIds) {
+    if (vTxIds.empty()) {
+        return;
+    }
+    std::unique_lock lock(smtx);
+    for (const TxId& txid: vTxIds) {
+        if (!ExistsNL(txid)) {
+            clearPrioritisationNL(txid);
+        }
+    }
 }
 
 std::string CTxMemPool::checkJournalNL() const
@@ -1205,47 +1244,40 @@ CFeeRate CTxMemPool::estimateFee() const {
   }
 
 
-void CTxMemPool::PrioritiseTransaction(const uint256& hash,
-                                       const std::string& strHash,
-                                       double dPriorityDelta,
-                                       const Amount nFeeDelta) {
+void CTxMemPool::PrioritiseTransaction(
+    const uint256& hash,
+    const std::string& strHash,
+    double dPriorityDelta,
+    const Amount nFeeDelta) {
+
     {
         std::unique_lock lock(smtx);
-        std::pair<double, Amount> &deltas = mapDeltas[hash];
-        deltas.first += dPriorityDelta;
-        deltas.second += nFeeDelta;
-        txiter it = mapTx.find(hash);
-        if (it != mapTx.end()) {
-            mapTx.modify(it, update_fee_delta(deltas.second));
-            // Now update all ancestors' modified fees with descendants
-            setEntries setAncestors;
-            uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
-            std::string dummy;
-            CalculateMemPoolAncestorsNL(*it,
-                                        setAncestors,
-                                        nNoLimit,
-                                        nNoLimit,
-                                        nNoLimit,
-                                        nNoLimit,
-                                        dummy,
-                                        false);
-            for (txiter ancestorIt : setAncestors) {
-                mapTx.modify(ancestorIt,
-                             update_descendant_state(0, nFeeDelta, 0));
-            }
-
-            // Now update all descendants' modified fees with ancestors
-            setEntries setDescendants;
-            CalculateDescendantsNL(it, setDescendants);
-            setDescendants.erase(it);
-            for (txiter descendantIt : setDescendants) {
-                mapTx.modify(descendantIt,
-                             update_ancestor_state(0, nFeeDelta, 0, 0));
-            }
-        }
+        prioritiseTransactionNL(hash, dPriorityDelta, nFeeDelta);
     }
     LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash,
-              dPriorityDelta, FormatMoney(nFeeDelta));
+        dPriorityDelta, FormatMoney(nFeeDelta));
+}
+
+void CTxMemPool::PrioritiseTransaction(
+    const std::vector<TxId>& vTxToPrioritise,
+    double dPriorityDelta,
+    const Amount nFeeDelta) {
+
+    if (vTxToPrioritise.empty()) {
+        return;
+    }
+    {
+        std::unique_lock lock(smtx);
+        for(const TxId& txid: vTxToPrioritise) {
+            prioritiseTransactionNL(txid, dPriorityDelta, nFeeDelta);
+        }
+    }
+    for(const TxId& txid: vTxToPrioritise) {
+        LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n",
+            txid.ToString(),
+            dPriorityDelta,
+            FormatMoney(nFeeDelta));
+    }
 }
 
 void CTxMemPool::ApplyDeltas(const uint256& hash, double &dPriorityDelta,
@@ -1267,6 +1299,46 @@ void CTxMemPool::ApplyDeltasNL(
     const std::pair<double, Amount> &deltas = pos->second;
     dPriorityDelta += deltas.first;
     nFeeDelta += deltas.second;
+}
+
+void CTxMemPool::prioritiseTransactionNL(
+    const uint256& hash,
+    double dPriorityDelta,
+    const Amount nFeeDelta) {
+
+    std::pair<double, Amount> &deltas = mapDeltas[hash];
+    deltas.first += dPriorityDelta;
+    deltas.second += nFeeDelta;
+    txiter it = mapTx.find(hash);
+    if (it != mapTx.end()) {
+        mapTx.modify(it, update_fee_delta(deltas.second));
+        // Now update all ancestors' modified fees with descendants
+        setEntries setAncestors;
+        uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+        std::string dummy;
+        CalculateMemPoolAncestorsNL(
+            *it,
+            setAncestors,
+            nNoLimit,
+            nNoLimit,
+            nNoLimit,
+            nNoLimit,
+            dummy,
+            false);
+        for (txiter ancestorIt : setAncestors) {
+            mapTx.modify(ancestorIt,
+                         update_descendant_state(0, nFeeDelta, 0));
+        }
+
+        // Now update all descendants' modified fees with ancestors
+        setEntries setDescendants;
+        CalculateDescendantsNL(it, setDescendants);
+        setDescendants.erase(it);
+        for (txiter descendantIt : setDescendants) {
+            mapTx.modify(descendantIt,
+                         update_ancestor_state(0, nFeeDelta, 0, 0));
+        }
+    }
 }
 
 void CTxMemPool::clearPrioritisationNL(const uint256& hash) {

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_TXMEMPOOL_H
@@ -88,6 +88,30 @@ struct AncestorDescendantCounts
     std::atomic_uint64_t nCountWithDescendants {0};
 };
 using AncestorDescendantCountsPtr = std::shared_ptr<AncestorDescendantCounts>;
+
+/** \class CTxPrioritizer
+ *
+ * The aim of this class is to support txn prioritisation and cleanup
+ * for the given set of transactions (in RAII style).
+ * If txn, that was prioritised, did not go to the mempool, then it's
+ * prioritisation entry needs to be cleared during destruction of the object.
+ */
+class CTxPrioritizer final
+{
+private:
+    CTxMemPool& mMempool;
+    std::vector<TxId> mTxnsToPrioritise {};
+
+public:
+    CTxPrioritizer(CTxMemPool& mempool, TxId txnToPrioritise);
+    CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrioritise);
+    ~CTxPrioritizer();
+    // Forbid copying/assignment
+    CTxPrioritizer(const CTxPrioritizer&) = delete;
+    CTxPrioritizer(CTxPrioritizer&&) = delete;
+    CTxPrioritizer& operator=(const CTxPrioritizer&) = delete;
+    CTxPrioritizer& operator=(CTxPrioritizer&&) = delete;
+};
 
 /** \class CTxMemPoolEntry
  *
@@ -674,6 +698,10 @@ public:
             const std::string& strHash,
             double dPriorityDelta,
             const Amount nFeeDelta);
+    void PrioritiseTransaction(
+            const std::vector<TxId>& vTxToPrioritise,
+            double dPriorityDelta,
+            const Amount nFeeDelta);
 
     void ApplyDeltas(
             const uint256& hash,
@@ -834,7 +862,8 @@ public:
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
         NotifyEntryRemoved;
 
-    void clearPrioritisation(const uint256 &hash);
+    void ClearPrioritisation(const uint256 &hash);
+    void ClearPrioritisation(const std::vector<TxId>& vTxIds);
 
 private:
     /**
@@ -929,6 +958,11 @@ private:
             bool updateDescendants,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+
+    void prioritiseTransactionNL(
+            const uint256& hash,
+            double dPriorityDelta,
+            const Amount nFeeDelta);
 
     void clearPrioritisationNL(const uint256& hash);
 
