@@ -250,7 +250,7 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
         time.sleep(check_interval)
 
     # Print the cause of the timeout
-    assert attempts >= attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
+    assert attempts > attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
     assert timeout >= time.time(), f"{label} : timeout exceeded {timeout}"
     raise RuntimeError('Unreachable')
 
