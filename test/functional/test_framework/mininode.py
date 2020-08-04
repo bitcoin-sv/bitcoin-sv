@@ -1867,10 +1867,15 @@ class NodeConn(asyncore.dispatcher):
         self.disconnect = True
 
 
+NetworkThread_should_stop = False
+def StopNetworkThread():
+    global NetworkThread_should_stop
+    NetworkThread_should_stop = True
+
 class NetworkThread(Thread):
 
     def run(self):
-        while mininode_socket_map:
+        while mininode_socket_map and not NetworkThread_should_stop:
             with network_thread_loop_intent_lock:
                 # Acquire and immediately release lock.
                 # This allows other threads to more easily acquire network_thread_loop_lock by

@@ -17,7 +17,7 @@ import time
 import traceback
 import contextlib
 from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.mininode import NetworkThread
+from test_framework.mininode import NetworkThread, StopNetworkThread
 
 from .authproxy import JSONRPCException
 from . import coverage
@@ -149,6 +149,9 @@ class BitcoinTestFramework():
         if success == TestStatus.FAILED and self.options.pdbonfailure:
             print("Testcase failed. Attaching python debugger. Enter ? for help")
             pdb.set_trace()
+
+        # Make the NetworkThread stop if it is still running so that it does not prevent test script from exiting.
+        StopNetworkThread()
 
         if not self.options.noshutdown:
             self.log.info("Stopping nodes")
