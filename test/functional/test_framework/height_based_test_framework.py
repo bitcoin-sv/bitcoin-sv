@@ -327,7 +327,7 @@ class SimplifiedTestFramework(BitcoinTestFramework):
                 del rejects[:]
                 connection.send_message(msg_tx(tx))
                 wait_until(lambda: (len(rejects) == 1) and rejects[0].data == tx.sha256,
-                           timeout=10, check_interval=0.2,
+                           timeout=30, check_interval=0.2,
                            label=f"Waiting tx to be rejected. Reason {reason} At {test_label} {height_label} tx:{tx.hash}")
                 if reason:
                     assert rejects[0].reason == reason, f"Mismatching rejection reason: got {rejects[0].reason} expected {reason}"
