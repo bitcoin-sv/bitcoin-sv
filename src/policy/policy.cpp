@@ -52,26 +52,61 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
     return whichType != TX_NONSTANDARD;
 }
 
-bool IsConsolidationTxn(const Config &config, const CTransaction &tx) noexcept
+// Check if a transaction is a consolidation transaction.
+// A consolidation transaction is a transaction which reduces the size of the UTXO database to
+// an extent that is rewarding enough for the miner to mine the transaction for free.
+bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int tipHeight)
 {
-    // A consolidation transaction is a transaction which reduces the size of the
-    // UTXO database and meets following criteria:
-    // The number of inputs and the number of input sizes measured in script memory allocation
-    // must exceed the number and size of output transactions by specified margins.
+    const uint64_t c = config.GetMinConsolidationFactor();
+    const uint64_t m = config.GetMinConsolidationInputMaturity();
+    const uint64_t s = config.GetMaxConsolidationInputScriptSize();
+
+    // Allow disabling free consolidation txns via configuring
+    // the consolidation factor to zero
+    if (c == 0)
+        return false;
 
     if (tx.IsCoinBase())
         return false;
 
-    if (tx.vin.size() <=  (tx.vout.size()))
+    // The consolidation transaction needs to reduce the count of UTXOS
+    if (tx.vin.size() < c * tx.vout.size())
         return false;
 
-    auto addSigSize = [](auto x, CTxIn const & y){return x + y.scriptSig.size();};
-    auto addPubKeySize = [](auto x, CTxOut const & y){return x + y.scriptPubKey.size();};
+    // Check all UTXOs are confirmed and prevent spam via big
+    // scriptSig sizes in the consolidation transaction inputs.
+    uint64_t sumScriptPubKeySizeOfTxInputs = 0;
+    for (CTxIn const & u: tx.vin) {
 
-    auto sin = std::accumulate(tx.vin.begin(), tx.vin.end(), CScript::size_type{}, addSigSize);
-    auto sout = std::accumulate(tx.vout.begin(), tx.vout.end(), CScript::size_type{}, addPubKeySize);
+        // accept only with many confirmations
+        const Coin &coin = inputs.AccessCoin(u.prevout);
+        const auto coinHeight = coin.GetHeight();
 
-    return sin > config.GetMinTxConsolidationFactor() * sout;
+        if (coinHeight == MEMPOOL_HEIGHT)
+            return false;
+
+        if (tipHeight + 1 - coinHeight < m && coinHeight != 0) // older versions did not store height
+            return false;
+
+        // sum up some script sizes
+        sumScriptPubKeySizeOfTxInputs += coin.GetTxOut().scriptPubKey.size();
+
+        // spam detection
+        if (u.scriptSig.size() > s)
+            return false;
+    }
+
+    // check ratio between sum of tx-scriptPubKeys to sum of parent-scriptPubKeys
+    uint64_t sumScriptPubKeySizeOfTxOutputs = 0;
+    for (CTxOut const & o: tx.vout) {
+        sumScriptPubKeySizeOfTxOutputs += o.scriptPubKey.size();
+    }
+
+    // prevent consolidation transactions that are not advantageous enough for miners
+    if(sumScriptPubKeySizeOfTxInputs < c * sumScriptPubKeySizeOfTxOutputs)
+        return false;
+
+    return true;
 }
 
 bool IsStandardTx(const Config &config, const CTransaction &tx, int nHeight, std::string &reason) {

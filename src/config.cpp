@@ -30,7 +30,9 @@ void GlobalConfig::Reset()
     maxGeneratedBlockSizeAfter = 0;
     maxGeneratedBlockSizeOverridden =  false;
     maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
-    minTxConsolidationFactor = DEFAULT_MIN_TX_CONSOLIDATION_FACTOR;
+    minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
+    maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
+    minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
@@ -261,19 +263,45 @@ uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) con
     return maxTxSizePolicy;
 }
 
-bool GlobalConfig::SetMinTxConsolidationFactor(uint64_t minTxConsolidationFactorIn, std::string* err)
+bool GlobalConfig::SetMinConsolidationFactor(uint64_t minConsolidationFactorIn, std::string* err)
 {
-    if (minTxConsolidationFactorIn == 0) {
-        minTxConsolidationFactor = DEFAULT_MIN_TX_CONSOLIDATION_FACTOR;
+    minConsolidationFactor = minConsolidationFactorIn;
+    return true;
+}
+
+uint64_t GlobalConfig::GetMinConsolidationFactor() const
+{
+    return minConsolidationFactor;
+}
+
+bool GlobalConfig::SetMaxConsolidationInputScriptSize(uint64_t maxConsolidationInputScriptSizeIn, std::string* err)
+{
+    if (maxConsolidationInputScriptSizeIn == 0) {
+        maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     } else {
-        minTxConsolidationFactor = static_cast<uint64_t>(minTxConsolidationFactorIn);
+        maxConsolidationInputScriptSize = maxConsolidationInputScriptSizeIn;
     }
     return true;
 }
 
-uint64_t GlobalConfig::GetMinTxConsolidationFactor() const
+uint64_t GlobalConfig::GetMaxConsolidationInputScriptSize() const
 {
-    return minTxConsolidationFactor;
+    return maxConsolidationInputScriptSize;
+}
+
+bool GlobalConfig::SetMinConsolidationInputMaturity(uint64_t minconsolidationinputmaturityIn, std::string* err)
+{
+    if (minconsolidationinputmaturityIn == 0) {
+        minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
+    } else {
+        minConsolidationInputMaturity = minconsolidationinputmaturityIn;
+    }
+    return true;
+}
+
+uint64_t GlobalConfig::GetMinConsolidationInputMaturity() const
+{
+    return minConsolidationInputMaturity;
 }
 
 void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {

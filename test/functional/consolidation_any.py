@@ -2,60 +2,38 @@
 # Copyright (c) 2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
-Verify that consolidation transactions are free uless they do not meet below conditions.
-
-Definition of a consolidation transaction.
-====================================================
-      A consolidation transaction is one that reduces the number of UTXO's by a margin that
-      is more valuable for the nework than the current fee for that transaction. Additionally
-      free consolidation transactions shall not be suitable for Denial of Service attack.
-      The profitability of DoS attacks is reduced by increasing the consolidation factor
-
-Minimal requirements for a consolidation transactions
-====================================================
-
-    - Every utxo used in the transaction needs to have been confirmed.
-    - The number of transaction inputs must exceed the number of transaction outputs.
-    - The cumulated number of input script sizes must exceed the number of cumulated
-      output script sizes by a configurable factor (default is 20)
-
-Remarks
-====================================================
-
-    - A consolidation transaction is not guaranteed to be mined in the next potential 
-      block of a miner because it may still be rejected by a full mempool.
-    - If this test fails, it does not prove something went wrong. It could mean
-      that new conditions of other projects overrule the consolidation transaction
-      rules
-
-Implementation Details
-====================================================
-      This test creates "spendable by anyone" scripts to easely tweak the
-      script sizes
+Verify that consolidation transactions pass if they do not pay any fee and also
+test if they are rejected if not fulfilling all criteria for a consolidation transaction
+This test creates "spendable by anyone" scripts to easely tweak the script sizes
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.script import CScript, OP_NOP, OP_DROP, OP_TRUE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
+from test_framework.script import CScript, OP_NOP, OP_DROP, OP_2DROP, OP_TRUE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
 from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, bytes_to_hex_str
 from test_framework.mininode import ToHex, FromHex, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, hex_str_to_bytes
 
 class ConsolidationP2PKHTest(BitcoinTestFramework):
 
     def set_test_params(self):
-        self.num_nodes = 2
+        self.num_nodes = 3
         self.setup_clean_chain = True
         self.COIN = 100000000
-        self.utxo_test_sats = 10000
+        self.utxo_test_sats = 100000
         self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / self.COIN)
         self.blockmintxfee_sats = 500
-        self.blockmintxfee_bsvs = satoshi_round(self.blockmintxfee_sats / self.COIN)
         self.mintxrelayfee_sats = 250
-        self.mintxrelayfee_bsvs = satoshi_round(self.mintxrelayfee_sats / self.COIN)
         self.extra_args = [[
             "-whitelist=127.0.0.1",
             "-mintxrelayfee={}".format(self.mintxrelayfee_sats),
             "-minblocktxfee={}".format(self.blockmintxfee_sats),
-            "-mintxconsolidationfactor=2",
+            "-minconsolidationfactor=2",
+            "-acceptnonstdtxn=1",
+            "-relaypriority=1"
+            ],[
+            "-whitelist=127.0.0.1",
+            "-mintxrelayfee={}".format(self.mintxrelayfee_sats),
+            "-minblocktxfee={}".format(self.blockmintxfee_sats),
+            #"-minconsolidationfactor=10",  #testing default setting, which is 10
             "-acceptnonstdtxn=1",
             "-relaypriority=1"
             "-txindex=1"
@@ -63,16 +41,17 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-whitelist=127.0.0.1",
             "-mintxrelayfee={}".format(self.mintxrelayfee_sats),
             "-minblocktxfee={}".format(self.blockmintxfee_sats),
-            #"-mintxconsolidationfactor=4",  #testing default setting, which is 20
+            "-minconsolidationfactor=0",  #disables consolidation factor
             "-acceptnonstdtxn=1",
             "-relaypriority=1"
-            "-txindex=1"
         ]]
 
-    def create_utxos_value10000(self, node, utxo_count, min_confirmations):
+    def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations):
 
         utxos = []
         addr = node.getnewaddress()
+
+        # create some confirmed UTXOs
         for i in range (utxo_count):
             txid = node.sendtoaddress(addr, self.utxo_test_bsvs)
             tx = FromHex(CTransaction(), node.getrawtransaction(txid))
@@ -81,32 +60,54 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
         node.generate(1)
 
+        # Convert those utxos to new UTXO's in one single transaction that anyone can spend
+        tx = None
+        fee = 0
 
-        # Convert those utxos to new utxo's that anyone can spend
-        tx = CTransaction()
-        scriptPubKey = CScript([OP_DROP, OP_TRUE])
-        fee = (107 + 25) * utxo_count + 200
-        for u in utxos:
-
-            for i in range(len(u.vout)):
-                uu = u.vout[i]
-                if uu.nValue <=  self.utxo_test_sats and uu.nValue > self.utxo_test_sats // 2:
-                    tx.vin.append(CTxIn(COutPoint(uint256_from_str(hex_str_to_bytes(u.hash)[::-1]), i), b''))
-                    break
-
+        for _ in range(2): # firs iteration is to calculate the fee
+            tx = CTransaction()
             amount = self.utxo_test_sats
-            if len(tx.vin) == utxo_count:
-                amount = amount - fee
-                tx.vout.append(CTxOut(amount, scriptPubKey))
-                break
-            else:
+            check_size = 0
+            for u in utxos:
+
+                # Each UTXO will have two outputs, one for change and another one
+                # amounting to roughly 10000 satoshis
+                for i in range(len(u.vout)):
+                    uu = u.vout[i]
+                    if uu.nValue <=  self.utxo_test_sats and uu.nValue > self.utxo_test_sats // 2:
+                        tx.vin.append(CTxIn(COutPoint(uint256_from_str(hex_str_to_bytes(u.hash)[::-1]), i), b''))
+                        break
+
+                adjust = 2
+                scriptPubKey = CScript([OP_DROP] + ([OP_NOP] * ((utxo_size // utxo_count) - adjust)) + [OP_TRUE])
+
+                if len(tx.vin) == utxo_count:
+                    amount = amount - fee
+
+                    while True:
+                        scriptPubKey = CScript([OP_DROP] + ([OP_NOP] * ((utxo_size // utxo_count) - adjust)) + [OP_TRUE])
+
+                        if check_size + len(scriptPubKey) > utxo_size:
+                            adjust = adjust + 1
+                            continue
+                        elif check_size + len(scriptPubKey) < utxo_size:
+                            adjust = adjust - 1
+                            continue
+                        break
+
+                check_size = check_size + len(scriptPubKey)
                 tx.vout.append(CTxOut(amount, scriptPubKey))
 
+            assert (len(tx.vout) == utxo_count)
+            assert (check_size == utxo_size)
 
-        # sign and send transaction
-        txHex = node.signrawtransaction(ToHex(tx))['hex']
-        tx = FromHex(CTransaction(), txHex)
-        tx.rehash()
+            # sign and send transaction
+            txHex = node.signrawtransaction(ToHex(tx))['hex']
+            tx = FromHex(CTransaction(), txHex)
+            tx.rehash()
+            tx_size = len(ToHex(tx))
+            fee = int(self.blockmintxfee_sats * tx_size / 1000)
+
         node.sendrawtransaction(ToHex(tx))
 
         if min_confirmations > 0:
@@ -114,13 +115,10 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
 
         return tx
 
-    def create_and_sign_tx(self, node, in_count, out_count, in_size, out_size, min_confirmations):
+    def create_and_sign_tx(self, node, in_count, out_count, in_size, out_size, min_confirmations, spam):
 
-        utx = self.create_utxos_value10000 (node, in_count, min_confirmations)
+        utx = self.create_utxos_value100000 (node, in_count, in_size, min_confirmations)
         sum_values_sats = 0
-
-        check_size = 0
-
         assert (len(utx.vout) == in_count)
         tx = CTransaction()
         for i in range(in_count):
@@ -132,23 +130,19 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             adjust = len(bytes_to_hex_str(flags)) + 1 # plus one for one OP_HOP
 
             while True:
-                scriptSig = CScript([bytes(bytearray([OP_NOP]) * ((in_size // in_count) - adjust)) + flags])
+                scriptSig = CScript([bytes(bytearray([OP_NOP]) * (spam - adjust)) + flags])
                 tx.vin[-1].scriptSig = scriptSig
 
-                if i == in_count - 1:
+                if len(scriptSig) > spam:
+                    adjust = adjust + 1
+                    continue
+                elif len(scriptSig) < spam:
+                    adjust = adjust - 1
+                    continue
 
-                    if check_size + len(scriptSig) > in_size:
-                        adjust = adjust + 1
-                        continue
-                    elif check_size + len(scriptSig) < in_size:
-                        adjust = adjust - 1
-                        continue
-
-                check_size = check_size + len(scriptSig)
                 break
 
         assert (len(tx.vin) == in_count)
-        assert (check_size == in_size)
 
         x = out_size // out_count
         x_rest = out_size % out_count
@@ -172,47 +166,87 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         tx.rehash()
         return ToHex(tx)
 
-
-
     # send 2 p2pkh transactions that must fail
     # and one that must succeed
     def run_test(self):
 
-
-        output_counts = [1,4,5]
+        output_counts = [1, 5]
         single_output_script_sizes = [25,50]
         for node in self.nodes:
-            node.generate(300)
+            node.generate(200)
             for output_count in output_counts:
                 for single_output_script_size in single_output_script_sizes:
-                    self.consolidation_factor = int(node.getnetworkinfo()['mintxconsolidationfactor'])
-                    print ("consolidation factor", self.consolidation_factor)
-                    print ("single_output_script_size", single_output_script_size)
-                    print ("output_count", output_count)
+                    self.consolidation_factor = int(node.getnetworkinfo()['minconsolidationfactor'])
+                    self.scriptSigSpam = int(node.getnetworkinfo()['maxconsolidationinputscriptsize'])
+                    self.minConfirmations = int(node.getnetworkinfo()['minconsolidationinputmaturity'])
+                    self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
+                    self.log.info ("single_output_script_size: {}".format( single_output_script_size))
+                    self.log.info ("output_count: {}".format( output_count))
+                    self.log.info("minimum input confirmations: {}".format( self.minConfirmations))
+                    self.log.info ("scriptSig spam limit: {}".format( self.scriptSigSpam))
 
-                    enough_inputs = output_count + 1
+                    enough_inputs = output_count * self.consolidation_factor
+                    not_spam = self.scriptSigSpam
                     cumulated_outputsize = single_output_script_size * output_count
-                    enough_cumulated_inputsize = cumulated_outputsize * self.consolidation_factor + 1
-                    enough_confirmations = 1
+                    enough_cumulated_inputsize = cumulated_outputsize * self.consolidation_factor
+                    enough_confirmations = self.minConfirmations
 
-                    output_count = 1
-                    enough_inputs = output_count + 1
-                    cumulated_outputsize = single_output_script_size * output_count
-                    enough_cumulated_inputsize = cumulated_outputsize * self.consolidation_factor + 1
-                    enough_confirmations = 1
+                    # if the consolidation factor is 0 consolidation transactions are disabled and this
+                    # should fail. Our minimum/maximum calculations above fail for this factor
+                    # hence we need to build the parameters differently. e.g. instead of
+                    # insize becomes enough cumulated inputsize
+                    # we do
+                    # insize becomes cumulated outputsize times two
+                    if self.consolidation_factor == 0:
+                        tx_hex = self.create_and_sign_tx(node,
+                                                         in_count = output_count * 2,
+                                                         out_count = output_count,
+                                                         in_size=cumulated_outputsize * 2,
+                                                         out_size = cumulated_outputsize,
+                                                         min_confirmations = enough_confirmations,
+                                                         spam = not_spam
+                                                         )
 
-                    # FAILING CONDITION: input_sizes <= consolidation_factor * output_size
-                    # We assume scriptSig ~ 4 * scriptPubKey
+                        assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
+                        self.log.info ("test 1 - failing cnonsolidation transaction not disabled: PASS")
+                        break
+
+
                     tx_hex = self.create_and_sign_tx(node,
                                                      in_count = enough_inputs - 1,
                                                      out_count = output_count,
                                                      in_size=enough_cumulated_inputsize,
                                                      out_size = cumulated_outputsize,
-                                                     min_confirmations = enough_confirmations
+                                                     min_confirmations = enough_confirmations,
+                                                     spam = not_spam
                                                      )
 
                     assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    print ("test 1: PASS")
+                    self.log.info ("test 1 - failing input_sizes > consolidation_factor * output_size: PASS")
+
+                    tx_hex = self.create_and_sign_tx(node,
+                                                     in_count=enough_inputs,
+                                                     out_count=output_count,
+                                                     in_size=enough_cumulated_inputsize,
+                                                     out_size = cumulated_outputsize,
+                                                     min_confirmations=enough_confirmations - 1,
+                                                     spam = not_spam
+                                                     )
+
+                    assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
+                    self.log.info("test 2 - failing all inputs maturities > minimum maturity: PASS")
+
+                    tx_hex = self.create_and_sign_tx(node,
+                                                     in_count=enough_inputs,
+                                                     out_count=output_count,
+                                                     in_size=enough_cumulated_inputsize - 1,
+                                                     out_size = cumulated_outputsize,
+                                                     min_confirmations=enough_confirmations,
+                                                     spam = not_spam
+                                                     )
+
+                    assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
+                    self.log.info("test 3 - faling cumulated input sizes > consolidation factor times output sizes: PASS")
 
                     # FAILING CONDITION: no confirmed inputs
                     tx_hex = self.create_and_sign_tx(node,
@@ -220,23 +254,12 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      out_count=output_count,
                                                      in_size=enough_cumulated_inputsize,
                                                      out_size = cumulated_outputsize,
-                                                     min_confirmations=enough_confirmations - 1
+                                                     min_confirmations=enough_confirmations,
+                                                     spam = not_spam + 1
                                                      )
 
                     assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    print("test 2: PASS")
-
-                    # FAILING CONDITION: no confirmed inputs
-                    tx_hex = self.create_and_sign_tx(node,
-                                                     in_count=enough_inputs,
-                                                     out_count=output_count,
-                                                     in_size=enough_cumulated_inputsize - 1,
-                                                     out_size = cumulated_outputsize,
-                                                     min_confirmations=enough_confirmations
-                                                     )
-
-                    assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    print("test 3: PASS")
+                    self.log.info("test 4 - failed scriptSig's of transaction < spam limit: PASS")
 
                     # ALL CONDITIONS MET: must succeed
                     tx_hex = self.create_and_sign_tx(node,
@@ -244,14 +267,15 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      out_count=output_count,
                                                      in_size=enough_cumulated_inputsize,
                                                      out_size = cumulated_outputsize,
-                                                     min_confirmations=enough_confirmations
+                                                     min_confirmations=enough_confirmations,
+                                                     spam = not_spam
                                                      )
                     txid = node.sendrawtransaction(tx_hex)
                     node.generate(1)
                     tx = node.getrawtransaction(txid, 1)
                     confirmations = tx.get('confirmations', 0)
                     assert_equal (confirmations, 1)
-                    print ("test 4: PASS")
+                    self.log.info("test 5 - all consolidation conditions met:PASS")
 
 if __name__ == '__main__':
     ConsolidationP2PKHTest().main()

@@ -965,9 +965,19 @@ std::string HelpMessage(HelpMessageMode mode) {
                 DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS/ONE_MEGABYTE, MAX_TX_SIZE_POLICY_BEFORE_GENESIS));
 
     strUsage +=
-            HelpMessageOpt("-mintxconsolidationfactor=<n>",
-                           strprintf(_("Set minimum ratio between sum of input input script sizes to fum of output script sizes (default: %u)"),
-                                     DEFAULT_MIN_TX_CONSOLIDATION_FACTOR));
+            HelpMessageOpt("-minconsolidationfactor=<n>",
+                           strprintf(_("Set minimum ratio between sum of input input script sizes to sum of output script sizes (default: %u). "
+				       "A value of 0 disables free consolidation transactions"),
+                                     DEFAULT_MIN_CONSOLIDATION_FACTOR));
+    strUsage +=
+            HelpMessageOpt("-maxconsolidationinputscriptsize=<n>",
+                           strprintf(_("This number is the maximum length for a scriptSig input in a consolidation txn (default: %u). "),
+                                     DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE));
+
+    strUsage +=
+            HelpMessageOpt("-minConsolidationInputMaturity=<n>",
+                           strprintf(_("Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
+                                     DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY));
 
     strUsage += HelpMessageOpt(
         "-maxscriptsizepolicy",
@@ -1881,10 +1891,28 @@ bool AppInitParameterInteraction(Config &config) {
     }
 
     // configure min ratio between tx input to tx output size to be considered free consolidation tx.
-    if (gArgs.IsArgSet("-mintxconsolidationfactor"))
+    if (gArgs.IsArgSet("-minconsolidationfactor"))
     {
-        uint64_t minTxConsolidationFactor = gArgs.GetArg("-mintxconsolidationfactor", DEFAULT_MIN_TX_CONSOLIDATION_FACTOR);
-        if (std::string err; !config.SetMinTxConsolidationFactor(minTxConsolidationFactor, &err)) {
+        uint64_t minConsolidationFactor = gArgs.GetArg("-minconsolidationfactor", DEFAULT_MIN_CONSOLIDATION_FACTOR);
+        if (std::string err; !config.SetMinConsolidationFactor(minConsolidationFactor, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // configure maxiumum scriptSig input size not considered spam in a consolidation transaction
+    if (gArgs.IsArgSet("-maxconsolidationinputscriptsize"))
+    {
+        uint64_t maxConsolidationInputScriptSize = gArgs.GetArg("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
+        if (std::string err; !config.SetMaxConsolidationInputScriptSize(maxConsolidationInputScriptSize, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // configure minimum number of confirmations needed by transactions spent in a consolidatin transaction
+    if (gArgs.IsArgSet("-minconsolidationinputmaturity"))
+    {
+        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY);
+        if (std::string err; !config.SetMinConsolidationInputMaturity(param, &err)) {
             return InitError(err);
         }
     }
