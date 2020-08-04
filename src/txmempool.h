@@ -97,7 +97,7 @@ private:
     std::vector<TxId> mTxnsToPrioritise {};
 
 public:
-    CTxPrioritizer(CTxMemPool& mempool, TxId txnToPrioritise);
+    CTxPrioritizer(CTxMemPool& mempool, const TxId& txnToPrioritise = TxId());
     CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrioritise);
     ~CTxPrioritizer();
     // Forbid copying/assignment
