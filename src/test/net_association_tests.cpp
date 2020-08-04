@@ -65,6 +65,7 @@ BOOST_AUTO_TEST_CASE(TestBasicStream)
     BOOST_CHECK_EQUAL(abw.second, 0);
 
     // Update avg bandwidth calcs
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     stream.AvgBandwithCalc();
     abw = stream.GetAverageBandwidth();
     BOOST_CHECK_EQUAL(abw.first, 0);
@@ -124,6 +125,7 @@ BOOST_AUTO_TEST_CASE(TestBasicAssociation)
     BOOST_CHECK_EQUAL(abw.second, 0);
 
     // Update avg bandwidth calcs
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     association.AvgBandwithCalc();
     BOOST_CHECK_EQUAL(association.GetAverageBandwidth(), 0);
     abw = association.GetAverageBandwidth(StreamType::GENERAL);
