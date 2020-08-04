@@ -4567,7 +4567,7 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
     }
     // Mempool Journal ChangeSet
     CJournalChangeSetPtr changeSet {
-        mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
+        mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
     };
     // Forward transaction to the validator and wait for results.
     // To support backward compatibility (of this interface) we need

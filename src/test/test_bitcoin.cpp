@@ -106,7 +106,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
         // dummyState is used to report errors, not block related invalidity - ignore it
         // (see description of ActivateBestChain)
         CValidationState dummyState;
-        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
         if (!ActivateBestChain(source->GetToken(), testConfig, dummyState, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");

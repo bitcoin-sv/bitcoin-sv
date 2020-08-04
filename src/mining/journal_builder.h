@@ -27,8 +27,8 @@ class CJournalBuilder final
   public:
 
     // Construction/destruction
-    CJournalBuilder() = default;
-    ~CJournalBuilder() = default;
+    CJournalBuilder();
+    ~CJournalBuilder();
     CJournalBuilder(const CJournalBuilder&) = delete;
     CJournalBuilder(CJournalBuilder&&) = delete;
     CJournalBuilder& operator=(const CJournalBuilder&) = delete;
@@ -55,7 +55,7 @@ class CJournalBuilder final
     mutable std::shared_mutex mMtx {};
 
     // The current active journal
-    CJournalPtr mJournal { std::make_shared<CJournal>() };
+    CJournalPtr mJournal;
 
 };
 

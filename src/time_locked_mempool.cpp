@@ -285,7 +285,7 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
             {
                 // Mempool Journal ChangeSet
                 CJournalChangeSetPtr changeSet {
-                    mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT)
+                    mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
                 };
                 std::string reason {};
                 bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActive.Tip()->nHeight + 1, reason) };

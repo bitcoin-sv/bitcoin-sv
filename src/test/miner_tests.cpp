@@ -43,6 +43,7 @@ namespace
     {
         config.Reset();
         config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+        config.SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType::LEGACY);
         config.SetGenesisActivationHeight(config.GetChainParams().GetConsensus().genesisHeight);
         configJournal.Reset();
         configJournal.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());

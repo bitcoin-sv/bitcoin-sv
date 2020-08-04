@@ -48,7 +48,7 @@ class CMiningFactory
 const enumTableT<CMiningFactory::BlockAssemblerType>& enumTable(CMiningFactory::BlockAssemblerType);
 
 // Default block assembler type to use
-constexpr CMiningFactory::BlockAssemblerType DEFAULT_BLOCK_ASSEMBLER_TYPE { CMiningFactory::BlockAssemblerType::LEGACY };
+constexpr CMiningFactory::BlockAssemblerType DEFAULT_BLOCK_ASSEMBLER_TYPE { CMiningFactory::BlockAssemblerType::JOURNALING };
 
 // A global unique mining factory
 inline std::unique_ptr<CMiningFactory> g_miningFactory {nullptr};

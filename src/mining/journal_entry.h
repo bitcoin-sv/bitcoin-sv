@@ -33,6 +33,7 @@ class CJournalEntry
     const AncestorDescendantCountsPtr& getAncestorCount() const { return mAncestorCount; }
     const Amount& getFee() const { return mFee; }
     int64_t getSigOpsCount() const { return mSigOpsCount; }
+    const TxId GetTxId() const {return mTxn->GetId(); }
 
   private:
 

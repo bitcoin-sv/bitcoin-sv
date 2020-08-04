@@ -995,7 +995,8 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage += HelpMessageOpt(
         "-blockprioritypercentage=<n>",
         strprintf(_("Set maximum percentage of a block reserved to "
-                    "high-priority/low-fee transactions (default: %d)"),
+                    "high-priority/low-fee transactions (default: %d). NOTE: This is supported only by the legacy block assembler which"
+                    " is not default block assembler any more and will be removed in the upcoming release."),
                   DEFAULT_BLOCK_PRIORITY_PERCENTAGE));
     strUsage += HelpMessageOpt(
         "-blockmintxfee=<amt>",
@@ -1340,7 +1341,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         // dummyState is used to report errors, not block related invalidity
         // (see description of ActivateBestChain)
         CValidationState dummyState;
-        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
         if (!ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), shutdownToken), config, dummyState, changeSet)) {
             LogPrintf("Failed to connect best block");
@@ -2000,9 +2001,13 @@ bool AppInitParameterInteraction(Config &config) {
     // happens.
     if (gArgs.IsArgSet("-blockmintxfee")) {
         Amount n(0);
-        if (!ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n))
+        if (!ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n)) {
             return InitError(AmountErrMsg("blockmintxfee",
                                           gArgs.GetArg("-blockmintxfee", "")));
+        }
+        mempool.SetBlockMinTxFee(CFeeRate(n));
+    } else {
+        mempool.SetBlockMinTxFee(CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE));
     }
 
     // Feerate used to define dust.  Shouldn't be changed lightly as old
