@@ -54,7 +54,7 @@ class P2PConnections(BitcoinTestFramework):
                     self.disconnections[node1].append(node2)
                     self.disconnections[node2].append(node1)
                     self.log.info("Disconnecting node {} and {}".format(node1, node2))
-                    disconnect_nodes(self.nodes[node1], node2)
+                    disconnect_nodes_bi(self.nodes, node1, node2)
                     break
 
     def do_reconnection(self):

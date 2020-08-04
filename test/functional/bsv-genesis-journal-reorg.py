@@ -110,7 +110,7 @@ class JournalReorg(BitcoinTestFramework):
             self.sync_all()
 
         # Disconnect nodes so they can build their own competing chains
-        disconnect_nodes(self.nodes[0], 1)
+        disconnect_nodes_bi(self.nodes, 0, 1)
 
         # Make chain on node0 invalid for node1
         self.send_genesis_txn(self.nodes[0])

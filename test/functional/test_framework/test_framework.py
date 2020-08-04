@@ -28,7 +28,7 @@ from .util import (
     assert_equal,
     check_json_precision,
     connect_nodes_bi,
-    disconnect_nodes,
+    disconnect_nodes_bi,
     initialize_datadir,
     log_filename,
     p2p_port,
@@ -335,7 +335,6 @@ class BitcoinTestFramework():
         del connections
         # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
         thr.join()
-        disconnect_nodes(self.nodes[node_index],1)
         self.stop_node(node_index)
         logger.debug("finished %s", title)
 
@@ -387,8 +386,7 @@ class BitcoinTestFramework():
         """
         Split the network of four nodes into nodes 0/1 and 2/3.
         """
-        disconnect_nodes(self.nodes[1], 2)
-        disconnect_nodes(self.nodes[2], 1)
+        disconnect_nodes_bi(self.nodes, 1, 2)
         self.sync_all([self.nodes[:2], self.nodes[2:]])
 
     def join_network(self):
