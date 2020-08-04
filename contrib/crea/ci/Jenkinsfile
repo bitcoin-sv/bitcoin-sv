@@ -120,6 +120,12 @@ try {
             
             echo "Functional tests done"
         }
+        
+        stage('Benchmark') {
+            catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                sh 'src/bench/bench_bitcoin'
+            }
+        }
 
         echo "Build result is: $currentBuild.result"
         
