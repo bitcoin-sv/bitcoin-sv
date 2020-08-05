@@ -15,8 +15,8 @@ class CTxMemPoolEntry;
  */
 struct TxMempoolInfo
 {
-    TxMempoolInfo() = default;
-    TxMempoolInfo(const CTxMemPoolEntry& entry);
+    explicit TxMempoolInfo() = default;
+    explicit TxMempoolInfo(const CTxMemPoolEntry& entry);
     TxMempoolInfo(const CTransactionRef& ptx) : tx{ptx} {}
 
     /** The transaction itself */
@@ -30,5 +30,8 @@ struct TxMempoolInfo
 
     /** The fee delta. */
     Amount nFeeDelta {};
+
+    /** size of the serialized transaction */
+    size_t nTxSize {};
 };
 

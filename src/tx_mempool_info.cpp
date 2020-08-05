@@ -9,6 +9,7 @@ TxMempoolInfo::TxMempoolInfo(const CTxMemPoolEntry& entry)
 : tx { entry.GetSharedTx() },
   nTime { entry.GetTime() },
   feeRate { entry.GetFee(), entry.GetTxSize() },
-  nFeeDelta { entry.GetModifiedFee() - entry.GetFee() }
+  nFeeDelta { entry.GetModifiedFee() - entry.GetFee() },
+  nTxSize { entry.GetTxSize() }
 {
 }
