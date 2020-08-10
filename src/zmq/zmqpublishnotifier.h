@@ -39,6 +39,19 @@ public:
     bool NotifyTransaction(const CTransaction &transaction) override;
 };
 
+class CZMQPublishRemovedFromMempoolNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyRemovedFromMempool(const uint256& txid, const MemPoolRemovalReason reason,
+                                  const CTransaction* conflictedWith) override;
+};
+
+class CZMQPublishRemovedFromMempoolBlockNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyRemovedFromMempoolBlock(const uint256& txid, const MemPoolRemovalReason reason) override;
+};
+
 class CZMQPublishRawBlockNotifier : public CZMQAbstractPublishNotifier {
 public:
     bool NotifyBlock(const CBlockIndex *pindex) override;

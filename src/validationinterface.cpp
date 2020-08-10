@@ -14,6 +14,8 @@ CMainSignals &GetMainSignals() {
 void RegisterValidationInterface(CValidationInterface *pwalletIn) {
     g_signals.UpdatedBlockTip.connect(boost::bind( &CValidationInterface::UpdatedBlockTip, pwalletIn, _1, _2, _3));
     g_signals.TransactionAddedToMempool.connect(boost::bind( &CValidationInterface::TransactionAddedToMempool, pwalletIn, _1));
+    g_signals.TransactionRemovedFromMempool.connect(boost::bind(&CValidationInterface::TransactionRemovedFromMempool, pwalletIn, _1, _2, _3));
+    g_signals.TransactionRemovedFromMempoolBlock.connect(boost::bind(&CValidationInterface::TransactionRemovedFromMempoolBlock, pwalletIn, _1, _2));
     g_signals.BlockConnected.connect(boost::bind( &CValidationInterface::BlockConnected, pwalletIn, _1, _2, _3));
     g_signals.BlockDisconnected.connect( boost::bind(&CValidationInterface::BlockDisconnected, pwalletIn, _1));
     g_signals.SetBestChain.connect( boost::bind(&CValidationInterface::SetBestChain, pwalletIn, _1));
@@ -32,6 +34,8 @@ void UnregisterValidationInterface(CValidationInterface *pwalletIn) {
     g_signals.Inventory.disconnect( boost::bind(&CValidationInterface::Inventory, pwalletIn, _1));
     g_signals.SetBestChain.disconnect( boost::bind(&CValidationInterface::SetBestChain, pwalletIn, _1));
     g_signals.TransactionAddedToMempool.disconnect(boost::bind( &CValidationInterface::TransactionAddedToMempool, pwalletIn, _1));
+    g_signals.TransactionRemovedFromMempool.disconnect(boost::bind(&CValidationInterface::TransactionRemovedFromMempool, pwalletIn, _1, _2, _3));
+    g_signals.TransactionRemovedFromMempoolBlock.disconnect(boost::bind(&CValidationInterface::TransactionRemovedFromMempoolBlock, pwalletIn, _1, _2));
     g_signals.BlockConnected.disconnect(boost::bind( &CValidationInterface::BlockConnected, pwalletIn, _1, _2, _3));
     g_signals.BlockDisconnected.disconnect( boost::bind(&CValidationInterface::BlockDisconnected, pwalletIn, _1));
     g_signals.UpdatedBlockTip.disconnect(boost::bind( &CValidationInterface::UpdatedBlockTip, pwalletIn, _1, _2, _3));
@@ -45,6 +49,8 @@ void UnregisterAllValidationInterfaces() {
     g_signals.Inventory.disconnect_all_slots();
     g_signals.SetBestChain.disconnect_all_slots();
     g_signals.TransactionAddedToMempool.disconnect_all_slots();
+    g_signals.TransactionRemovedFromMempool.disconnect_all_slots();
+    g_signals.TransactionRemovedFromMempoolBlock.disconnect_all_slots();
     g_signals.BlockConnected.disconnect_all_slots();
     g_signals.ScriptForMining.disconnect_all_slots();
     g_signals.BlockDisconnected.disconnect_all_slots();
