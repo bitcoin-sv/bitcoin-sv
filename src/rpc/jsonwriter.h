@@ -83,6 +83,7 @@ public:
     CTextWriter& getWriter();
 
     void pushK(const std::string& key);
+    void pushKNoComma(const std::string& key);
     void pushV(const ScalarValue& val);
     void pushV(const std::vector<std::string>& val);
     // Outputs the key and then string value is written without quotes as is.

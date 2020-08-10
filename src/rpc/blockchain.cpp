@@ -410,11 +410,12 @@ void getrawmempool(const Config &config, const JSONRPCRequest &request, HTTPRequ
         CHttpTextWriter httpWriter(httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
-        httpWriter.Write("{\"result\": ");
+        jWriter.writeBeginObject();
+        jWriter.pushKNoComma("result");
         writeMempoolToJson(jWriter, fVerbose);
         jWriter.pushKV("error", nullptr);
         jWriter.pushKV("id", request.id.write());
-        httpWriter.Write("}");
+        jWriter.writeEndObject();
         jWriter.flush();
     }
 
@@ -454,7 +455,8 @@ void getrawnonfinalmempool(const Config &config,
         CHttpTextWriter httpWriter(httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
-        httpWriter.Write("{\"result\": ");
+        jWriter.writeBeginObject();
+        jWriter.pushKNoComma("result");
 
         jWriter.writeBeginArray();
         for (const uint256 &txid : mempool.getNonFinalPool().getTxnIDs())
@@ -466,7 +468,7 @@ void getrawnonfinalmempool(const Config &config,
 
         jWriter.pushKV("error", nullptr);
         jWriter.pushKV("id", request.id.write());
-        httpWriter.Write("}");
+        jWriter.writeEndObject();
         jWriter.flush();
     }
 
@@ -536,7 +538,8 @@ void getmempoolancestors(const Config &config,
         CHttpTextWriter httpWriter(httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
-        httpWriter.Write("{\"result\": ");
+        jWriter.writeBeginObject();
+        jWriter.pushKNoComma("result");
 
         if (!fVerbose) {
             jWriter.writeBeginArray();
@@ -556,7 +559,7 @@ void getmempoolancestors(const Config &config,
 
         jWriter.pushKV("error", nullptr);
         jWriter.pushKV("id", request.id.write());
-        httpWriter.Write("}");
+        jWriter.writeEndObject();
         jWriter.flush();
     }
 
@@ -625,7 +628,8 @@ void getmempooldescendants(const Config &config,
         CHttpTextWriter httpWriter(httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
-        httpWriter.Write("{\"result\": ");
+        jWriter.writeBeginObject();
+        jWriter.pushKNoComma("result");
 
         if (!fVerbose) {
             jWriter.writeBeginArray();
@@ -645,7 +649,7 @@ void getmempooldescendants(const Config &config,
 
         jWriter.pushKV("error", nullptr);
         jWriter.pushKV("id", request.id.write());
-        httpWriter.Write("}");
+        jWriter.writeEndObject();
         jWriter.flush();
     }
 
@@ -695,13 +699,14 @@ void getmempoolentry(const Config &config,
         CHttpTextWriter httpWriter(httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
-        httpWriter.Write("{\"result\": ");
+        jWriter.writeBeginObject();
+        jWriter.pushKNoComma("result");
 
         writeMempoolEntryToJsonNL(e, jWriter, false);
 
         jWriter.pushKV("error", nullptr);
         jWriter.pushKV("id", request.id.write());
-        httpWriter.Write("}");
+        jWriter.writeEndObject();
         jWriter.flush();
     }
 

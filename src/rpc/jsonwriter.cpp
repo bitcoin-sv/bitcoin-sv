@@ -65,6 +65,12 @@ void CJSONWriter::pushK(const std::string& key)
     jWriter.Write("\": ");
 }
 
+void CJSONWriter::pushKNoComma(const std::string& key)
+{
+    pushK(key);
+    _doNotAddComma = true;
+}
+
 void CJSONWriter::pushKVJSONFormatted(const std::string& key, const std::string& val)
 {
     pushK(key);
