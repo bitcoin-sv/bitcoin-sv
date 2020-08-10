@@ -5,6 +5,7 @@
 """
 The aim of this test is to group an additional RPC test cases dependant on the PTV's interface configuration
 - test a set of duplicates submitted through sendrawtransaction (a single txn submit via rpc)
+- test if a newly generated block is a valid block
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.key import CECKey
@@ -87,6 +88,43 @@ class PTVRPCTests(ComparisonTestFramework):
         # No transactions should be in the mempool.
         assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
 
+        return txchains
+
+    # An extension to the scenario1.
+    # - submit txns through p2p interface
+    # - resubmit transactions (via rpc interface) which are already known
+    # - create a new block
+    # - use invalidateblock to re-org back
+    # - create a new block
+    # - check if txns are present in the new block
+    def run_scenario2(self, conn, num_of_chains, chain_length, spend, allowhighfees=False, dontcheckfee=False, timeout=60):
+        # Create tx chains.
+        txchains = self.run_scenario1(conn, num_of_chains, chain_length, spend, allowhighfees, dontcheckfee, timeout)
+        # Check if txchains txns are in the mempool.
+        self.check_mempool(conn.rpc, set(txchains), timeout=60)
+        # Check if there is only num_of_chains * chain_length txns in the mempool.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], len(txchains))
+        # At this stage PTV asynch queues should be empty.
+        wait_until(lambda: conn.rpc.getblockchainactivity()["transactions"] == 0, timeout=timeout)
+        # Generate a single block.
+        mined_block1 = conn.rpc.generate(1)
+        # Mempool should be empty, all txns in the block.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
+        # Use invalidateblock to re-org back; all transactions should
+        # end up unconfirmed and back in the mempool.
+        conn.rpc.invalidateblock(mined_block1[0])
+        # There should be exactly num_of_chains * chain_length txns in the mempool.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], len(txchains))
+        self.check_mempool(conn.rpc, set(txchains))
+        # Generate another block, they should all get mined.
+        mined_block2 = conn.rpc.generate(1)
+        # Mempool should be empty, all txns confirmed.
+        assert_equal(conn.rpc.getmempoolinfo()['size'], 0)
+        # Check if txchains txns are included in the block.
+        mined_block2_details = conn.rpc.getblock(mined_block2[0])
+        assert_equal(mined_block2_details['num_tx'], len(txchains) + 1) # +1 for coinbase txn.
+        assert_equal(len(set(mined_block2_details['tx']).intersection(t.hash for t in txchains)), len(txchains))
+
     def get_tests(self):
         rejected_txs = []
         def on_reject(conn, msg):
@@ -138,6 +176,25 @@ class PTVRPCTests(ComparisonTestFramework):
                 0, args + self.default_args, number_of_connections=1) as (conn,):
             # Run test case.
             self.run_scenario1(conn, num_of_chains, chain_length, out)
+
+        # Scenario 2 (TS2).
+        # It's an extension to TS1. Resubmit duplicates, then create a new block and check if it is a valid block.
+        # - 100 txs used
+        # - allowhighfees=False (default)
+        # - dontcheckfee=False (default)
+        #
+        # Test case config
+        num_of_chains = 10
+        chain_length = 10
+        # Node's config
+        args = ['-txnvalidationasynchrunfreq=2000',
+                '-blockcandidatevaliditytest=1', # on regtest it's enabled by default but for clarity let's add it explicitly.
+                '-checkmempool=0',
+                '-persistmempool=0']
+        with self.run_node_with_connections('TS2: {} chains of length {}. Test duplicates and generate a new block.'.format(num_of_chains, chain_length),
+                0, args + self.default_args, number_of_connections=1) as (conn,):
+            # Run test case.
+            self.run_scenario2(conn, num_of_chains, chain_length, out)
 
 if __name__ == '__main__':
     PTVRPCTests().main()
