@@ -186,8 +186,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
     : tx{_tx, mempoolIn.GetMempoolTxDB()},
       nFee{_nFee}, nTime{_nTime}, entryPriority{_entryPriority},
       inChainInputValue{_inChainInputValue},
-      lockPoints{lp}, entryHeight{_entryHeight}, spendsCoinbase{_spendsCoinbase},
-      group{nullptr}, groupingData{std::nullopt}
+      lockPoints{lp}, entryHeight{_entryHeight}, spendsCoinbase{_spendsCoinbase}
 {
     nTxSize = _tx->GetTotalSize();
     nModSize = _tx->CalculateModifiedSize(GetTxSize());

@@ -53,4 +53,19 @@ public:
 
 using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>;
 
+namespace {
+    struct UnitTestAccessTag;
+}
+
+template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
+{
+    CTxMemPoolEntry& entry;
+    UnitTestAccess(CTxMemPoolEntry& _entry) : entry(_entry) {}
+    
+    decltype(CTxMemPoolEntry::group)& group() {return entry.group;};
+    decltype(CTxMemPoolEntry::groupingData)& groupingData() {return entry.groupingData;};
+};
+
+using CTestTxMemPoolEntry = CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>;
+
 #endif // BITCOIN_TEST_MEMPOOL_TEST_ACCESS_H

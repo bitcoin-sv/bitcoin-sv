@@ -72,6 +72,27 @@ struct LockPoints {
 };
 
 class CTxMemPool;
+struct CPFPGroup;
+
+/**
+ * Statistics for the secondary mempool and CPFP groups.
+ *
+ * In the secondary mempool, the stats accumulated from parents are approximate
+ * because they don't account for possible duplicates.
+ *
+ * In the primary mempool CPFP group, duplicates are eliminated and the
+ * accumulated data are precise, except for @c ancestorsCount, which is not used.
+ */
+struct SecondaryMempoolEntryData
+{
+    // Accumulated data from parents or for the whole group.
+    Amount fee {0};
+    Amount feeDelta {0};
+    size_t size {0};
+
+    // We only count ancestors in the secondary mempool.
+    size_t ancestorsCount {0};
+};
 
 class CTxMemPoolBase {
 public:
@@ -120,16 +141,6 @@ public:
     CTxPrioritizer& operator=(CTxPrioritizer&&) = delete;
 };
 
-/**
- * Current totals of not enough paying ancestors including self
- */
-struct CPFPGroupEvaluationData
-{
-    Amount fee {0};
-    Amount feeDelta {0};
-    size_t size {0};
-};
-
 struct CPFPGroup;
 
 
@@ -162,6 +173,7 @@ public:
 
     void MoveTxToDisk() const;
     void UpdateMoveTxToDisk() const;
+
     bool IsInMemory() const;
 };
 
@@ -179,7 +191,6 @@ public:
  * limit the amount of work we're willing to do to avoid consuming too much
  * CPU.)
  */
-
 class CTxMemPoolEntry {
 private:
     CTransactionRefWrapper tx;
@@ -202,6 +213,10 @@ private:
     Amount feeDelta;
     //!< Track the height and time at which tx was final
     LockPoints lockPoints;
+
+    // Grouping data for long chains/CPFP evaluation.
+    std::shared_ptr<CPFPGroup> group {nullptr};
+    std::optional<SecondaryMempoolEntryData> groupingData {std::nullopt};
 
     //!< Chain height when entering the mempool
     int32_t entryHeight;
@@ -244,15 +259,15 @@ public:
 
     bool GetSpendsCoinbase() const { return spendsCoinbase; }
 
-    std::shared_ptr<CPFPGroup> group {};
-    std::optional<CPFPGroupEvaluationData> groupingData {};
-
-    bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     bool IsCPFPGroupMember() const { return group != nullptr; }
+    bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
+    std::shared_ptr<const CPFPGroup> GetCPFPGroup() const { return group; }
 
     void MoveTxToDisk() const;
     void UpdateMoveTxToDisk() const;
     bool IsInMemory() const;
+
+    template<typename X> struct UnitTestAccess;
 };
 
 struct update_fee_delta {
@@ -457,6 +472,8 @@ private:
     CTimeLockedMempool mTimeLockedPool {};
 
     friend class CEvictionCandidateTracker;
+
+    // The group definition needs access to the mempool index iterator type.
     friend struct CPFPGroup;
 
     // Mempool transaction database
@@ -1103,6 +1120,20 @@ public:
     bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
 };
 
+// Group definition in the secondary mempool.
+struct CPFPGroup
+{
+    SecondaryMempoolEntryData evaluationParams {};
+
+    // Transactions are topologically sorted.
+    std::vector<CTxMemPool::txiter> transactions {};
+
+    CTxMemPool::txiter PayingTransaction() const
+    {
+        return transactions.back();
+    }
+};
+
 
 /**
  * ICoinsView that brings transactions from a memorypool into view.
@@ -1251,13 +1282,5 @@ public:
         queuedTx.clear();
     }
 };
-
-struct CPFPGroup
-{
-    CPFPGroupEvaluationData evaluationParams {};
-    std::vector<CTxMemPool::txiter> transactions; // topologicaly sorted
-    CTxMemPool::txiter PayingTransaction() { return transactions.back(); }
-};
-
 
 #endif // BITCOIN_TXMEMPOOL_H
