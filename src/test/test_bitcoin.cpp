@@ -79,8 +79,6 @@ BasicTestingSetup::~BasicTestingSetup() {
         g_connman->Stop();
         g_connman.reset();
     }
-
-    mining::g_miningFactory.reset();
 }
 
 TestingSetup::TestingSetup(const std::string &chainName)
@@ -125,6 +123,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
 }
 
 TestingSetup::~TestingSetup() {
+    mining::g_miningFactory.reset();
     UnregisterNodeSignals(GetNodeSignals());
     threadGroup.interrupt_all();
     threadGroup.join_all();
