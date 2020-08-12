@@ -33,6 +33,7 @@ void GlobalConfig::Reset()
     minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
     maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
+    acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
@@ -302,6 +303,17 @@ bool GlobalConfig::SetMinConsolidationInputMaturity(uint64_t minconsolidationinp
 uint64_t GlobalConfig::GetMinConsolidationInputMaturity() const
 {
     return minConsolidationInputMaturity;
+}
+
+bool GlobalConfig::SetAcceptNonStdConsolidationInput(uint64_t acceptNonStdConsolidationInputIn, std::string* err)
+{
+    acceptNonStdConsolidationInput = acceptNonStdConsolidationInputIn;
+    return true;
+}
+
+bool GlobalConfig::GetAcceptNonStdConsolidationInput() const
+{
+    return acceptNonStdConsolidationInput;
 }
 
 void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {

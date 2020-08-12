@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (c) 2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
-#
 
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
@@ -24,23 +23,41 @@ class TestNode(NodeConnCB):
         super().__init__()
         self.txinvs = []
 
+    def on_inv(self, conn, message):
+        for i in message.inv:
+            if (i.type == 1):
+                self.txinvs.append(hashToHex(i.hash))
+
+    def clear_invs(self):
+        with mininode_lock:
+            self.txinvs = []
+
 class FeeFilterTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
-        self.COIN = 100000000
+        #self.setup_clean_chain = True
         self.utxo_test_sats = 10000
-        self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / self.COIN)
+        self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / COIN)
         self.blockmintxfee_sats = 500
-        self.mintxrelayfee_sats = 250
+        self.minrelaytxfee_sats = 250
         self.extra_args = [[
-            "-mintxrelayfee={}".format(self.mintxrelayfee_sats),
-            "-minblocktxfee={}".format(self.blockmintxfee_sats),
-            "-minconsolidationfactor=10",
-            ],[
+            "-whitelist=127.0.0.1",
             "-whitelistforcerelay=1"
-            "-mintxrelayfee={}".format(self.mintxrelayfee_sats),
-            "-minblocktxfee={}".format(self.blockmintxfee_sats),
+            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
+            "-acceptnonstdtxn=1",
+            "-relaypriority=1"
+            "-txindex=1"
+            ],[
+            "-whitelist=127.0.0.1",
+            "-whitelistforcerelay=1"
+            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
+            "-minconsolidationfactor=10",
+            "-acceptnonstdtxn=1",
+            "-relaypriority=1"
+            "-txindex=1"
         ]]
 
 
@@ -84,15 +101,17 @@ class FeeFilterTest(BitcoinTestFramework):
 
     def run_test(self):
         node1 = self.nodes[1]
+        node0 = self.nodes[0]
 
         # Get out of IBD
         node1.generate(300)
         sync_blocks(self.nodes)
 
+        ## BEGIN setup consolidation transactions
         self.consolidation_factor = int(node1.getnetworkinfo()['minconsolidationfactor'])
         self.minConfirmations = int(node1.getnetworkinfo()['minconsolidationinputmaturity'])
         # test ratio between size of input script and size of output script
-        tx_hex = self.create_and_sign_tx(node1, 1, min_confirmations=1)
+        tx_hex = self.create_and_sign_tx(node1, 1, min_confirmations=self.minConfirmations)
         tx = FromHex(CTransaction(), tx_hex)
         tx.rehash()
         sin = len(getInputScriptPubKey(node1, tx.vin[0], 0))
@@ -104,15 +123,57 @@ class FeeFilterTest(BitcoinTestFramework):
         # END setup consolidation transactions
         sync_blocks(self.nodes)
 
+        # Setup the p2p connections and start up the network thread.
+        test_node = TestNode()
+        connection = NodeConn(
+            '127.0.0.1', p2p_port(0), node0, test_node)
+        test_node.add_connection(connection)
+
+        NetworkThread().start()
+        test_node.wait_for_verack()
+
         tx_hex = self.create_and_sign_tx(node1, in_count=enough_inputs, min_confirmations=enough_confirmations)
+        tx_hex3 = self.create_and_sign_tx(node1, in_count=enough_inputs, min_confirmations=enough_confirmations)
+
         sync_blocks(self.nodes)
         sync_mempools(self.nodes)
 
+        tx1 = FromHex(CTransaction(), tx_hex)
+        tx1.rehash()
+
+        tx3 = FromHex(CTransaction(), tx_hex3)
+        tx3.rehash()
+        test_node.clear_invs()
+
+        # Set test_node's fee filter to blockmintxfee-1 (-1 because of rounding in feefilter check)
+        # TODO: if the check in CORE-914 is modified change to blockmintxfee
+        # Consolidation transaction will be relayed,
+        # as the modified fees are set to blockmintxfee >= feefilter
+        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats-1))
+
+        # Send consolidation and regular tx - both should be accepted and relayed
         txid1 = node1.sendrawtransaction(tx_hex)
         txid2 = node1.sendtoaddress(node1.getnewaddress(), 1)
 
-        wait_until(lambda: txid1 in self.nodes[0].getrawmempool(), timeout=5)
-        wait_until(lambda: txid2 in self.nodes[0].getrawmempool(), timeout=5)
+        wait_until(lambda: txid1 in node0.getrawmempool(), timeout=5)
+        wait_until(lambda: txid2 in node0.getrawmempool(), timeout=5)
+
+        # Check that tx1 and tx2 were relayed to test_node
+        wait_until(lambda: sorted([txid1, txid2]) == sorted(test_node.txinvs), timeout=60)
+
+        # Now the feefilter is set to blockmintxfee+1;
+        # tx3 is not relayed as modified fees < feefilter
+        # tx4 is relayed, as node1's txfee is set high enough - control tx
+        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats+1))
+
+        txid3 = node1.sendrawtransaction(tx_hex3)
+        txid4 = node1.sendtoaddress(node1.getnewaddress(), 1)
+
+        wait_until(lambda: txid3 in node0.getrawmempool(), timeout=5)
+        wait_until(lambda: txid4 in node0.getrawmempool(), timeout=5)
+
+        # Check that tx3 was not relayed to test_node but tx4 was
+        wait_until(lambda: sorted([txid1, txid2, txid4]) == sorted(test_node.txinvs), timeout=60)
 
 if __name__ == '__main__':
     FeeFilterTest().main()

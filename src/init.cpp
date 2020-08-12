@@ -966,7 +966,8 @@ std::string HelpMessage(HelpMessageMode mode) {
 
     strUsage +=
             HelpMessageOpt("-minconsolidationfactor=<n>",
-                           strprintf(_("Set minimum ratio between sum of input input script sizes to sum of output script sizes (default: %u). "
+                           strprintf(_("Set minimum ratio between sum of utxo scriptPubKey sizes spent in a consolidation transaction, to the corresponding sum of output scriptPubKey sizes. "
+					   "The ratio between number of consolidation transaction inputs to the number of outputs also needs to be greater or equal to the minimum consolidation factor (default: %u). "
 				       "A value of 0 disables free consolidation transactions"),
                                      DEFAULT_MIN_CONSOLIDATION_FACTOR));
     strUsage +=
@@ -975,9 +976,14 @@ std::string HelpMessage(HelpMessageMode mode) {
                                      DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE));
 
     strUsage +=
-            HelpMessageOpt("-minConsolidationInputMaturity=<n>",
+            HelpMessageOpt("-minconsolidationinputnaturity=<n>",
                            strprintf(_("Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
                                      DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY));
+
+    strUsage +=
+            HelpMessageOpt("-acceptnonstdconsolidationinput=<n>",
+                           strprintf(_("Accept consolidation transactions spending non standard inputs (default: %u). "),
+                                     DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT));
 
     strUsage += HelpMessageOpt(
         "-maxscriptsizepolicy",
@@ -1913,6 +1919,15 @@ bool AppInitParameterInteraction(Config &config) {
     {
         uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY);
         if (std::string err; !config.SetMinConsolidationInputMaturity(param, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // configure if non standard inputs for consolidation transactions are allowed
+    if (gArgs.IsArgSet("-acceptnonstdconsolidationinput"))
+    {
+        uint64_t param = gArgs.GetArg("-acceptnonstdconsolidationinput", DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetAcceptNonStdConsolidationInput(param, &err)) {
             return InitError(err);
         }
     }

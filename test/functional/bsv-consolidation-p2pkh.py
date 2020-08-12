@@ -12,7 +12,8 @@ allows applying this test to standard p2pkh transactions.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, hashToHex
-from test_framework.mininode import FromHex, CTransaction
+from test_framework.mininode import FromHex, CTransaction, COIN
+from decimal import Decimal
 
 def getInputScriptPubKey(node, input, index):
     txid = hashToHex(input.prevout.hash)
@@ -26,25 +27,22 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.COIN = 100000000
         self.utxo_test_sats = 10000
-        self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / self.COIN)
+        self.utxo_test_bsvs = satoshi_round(self.utxo_test_sats / COIN)
         self.blockmintxfee_sats = 500
-        self.mintxrelayfee_sats = 250
+        self.minrelaytxfee_sats = 250
         self.extra_args = [[
             "-whitelist=127.0.0.1",
-            "-mintxrelayfee={}".format(self.mintxrelayfee_sats),
-            "-minblocktxfee={}".format(self.blockmintxfee_sats),
+            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=2",
             "-acceptnonstdtxn=1",
-            "-relaypriority=1"
             ],[
             "-whitelist=127.0.0.1",
-            "-mintxrelayfee={}".format(self.mintxrelayfee_sats),
-            "-minblocktxfee={}".format(self.blockmintxfee_sats),
+            "-minrelaytxfee={}".format(Decimal(self.minrelaytxfee_sats)/COIN),
+            "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             #"-minconsolidationfactor=10", # test default consolidation factor
             "-acceptnonstdtxn=1",
-            "-relaypriority=1"
         ]]
 
     def create_utxos_value10000(self, node, utxo_count, min_confirmations):

@@ -57,20 +57,22 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPu
 // an extent that is rewarding enough for the miner to mine the transaction for free.
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int tipHeight)
 {
-    const uint64_t c = config.GetMinConsolidationFactor();
-    const uint64_t m = config.GetMinConsolidationInputMaturity();
-    const uint64_t s = config.GetMaxConsolidationInputScriptSize();
+    const uint64_t factor = config.GetMinConsolidationFactor();
+    const uint64_t minMaturity = config.GetMinConsolidationInputMaturity();
+    const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
+    const bool stdInputOnly = !config.GetAcceptNonStdConsolidationInput();
+
 
     // Allow disabling free consolidation txns via configuring
     // the consolidation factor to zero
-    if (c == 0)
+    if (factor == 0)
         return false;
 
     if (tx.IsCoinBase())
         return false;
 
     // The consolidation transaction needs to reduce the count of UTXOS
-    if (tx.vin.size() < c * tx.vout.size())
+    if (tx.vin.size() < factor * tx.vout.size())
         return false;
 
     // Check all UTXOs are confirmed and prevent spam via big
@@ -85,15 +87,21 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
         if (coinHeight == MEMPOOL_HEIGHT)
             return false;
 
-        if (tipHeight + 1 - coinHeight < m && coinHeight != 0) // older versions did not store height
+        if (coinHeight && (tipHeight - coinHeight < minMaturity)) // older versions did not store height
+            return false;
+
+        // spam detection
+        if (u.scriptSig.size() > maxSize)
+            return false;
+
+        // if not acceptnonstdconsolidationinput then check if inputs are standard
+        // and fail otherwise
+        txnouttype dummyType;
+        if (stdInputOnly  && !IsStandard(config, coin.GetTxOut().scriptPubKey, coinHeight, dummyType))
             return false;
 
         // sum up some script sizes
         sumScriptPubKeySizeOfTxInputs += coin.GetTxOut().scriptPubKey.size();
-
-        // spam detection
-        if (u.scriptSig.size() > s)
-            return false;
     }
 
     // check ratio between sum of tx-scriptPubKeys to sum of parent-scriptPubKeys
@@ -103,7 +111,7 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
     }
 
     // prevent consolidation transactions that are not advantageous enough for miners
-    if(sumScriptPubKeySizeOfTxInputs < c * sumScriptPubKeySizeOfTxOutputs)
+    if(sumScriptPubKeySizeOfTxInputs < factor * sumScriptPubKeySizeOfTxOutputs)
         return false;
 
     return true;

@@ -60,6 +60,9 @@ public:
     virtual bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMinConsolidationInputMaturity() const = 0;
 
+    virtual bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) = 0;
+    virtual bool GetAcceptNonStdConsolidationInput() const = 0;
+
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
 
@@ -207,6 +210,9 @@ public:
     bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) override;
     uint64_t GetMinConsolidationInputMaturity() const  override;
 
+    bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) override;
+    bool GetAcceptNonStdConsolidationInput() const  override;
+
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
 
@@ -352,7 +358,7 @@ private:
     uint64_t minConsolidationFactor;
     uint64_t maxConsolidationInputScriptSize;
     uint64_t minConsolidationInputMaturity;
-
+    uint64_t acceptNonStdConsolidationInput;
     uint64_t dataCarrierSize;
     uint64_t limitDescendantCount;
     uint64_t limitAncestorCount;
@@ -470,6 +476,14 @@ public:
         return false;
     }
     uint64_t GetMinConsolidationInputMaturity() const override { return minConsolidationInputMaturity; }
+
+    bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+        acceptNonStdConsolidationInput = value;
+        return false;
+    }
+    bool GetAcceptNonStdConsolidationInput() const override { return acceptNonStdConsolidationInput; }
 
     void SetChainParams(std::string net);
     const CChainParams &GetChainParams() const override { return *chainParams; }
@@ -713,6 +727,7 @@ private:
     uint64_t minConsolidationFactor{ DEFAULT_MIN_CONSOLIDATION_FACTOR };
     uint64_t maxConsolidationInputScriptSize{DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE };
     uint64_t minConsolidationInputMaturity { DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY };
+    uint64_t acceptNonStdConsolidationInput { DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;

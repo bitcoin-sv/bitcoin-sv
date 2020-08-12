@@ -1344,16 +1344,16 @@ CTxnValResult TxnValidation(
     // Note that consolidation transactions paying a voluntary fee will
     // be treated with higher priority. The higher the fee the higher
     // the priority
-    bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height());
-    double nPriorityDummy = 0;
+    bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height() + 1);
     if (skipFeeTest) {
+        double priority = 0;
         const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
-        pool.PrioritiseTransaction(tx.GetId(), tx.GetId().ToString(), nPriorityDummy, consolidationDelta);
+        pool.PrioritiseTransaction(txid, txid.ToString(), priority, consolidationDelta);
         LogPrint(BCLog::TXNVAL,"free consolidation transaction detected, txid:=%s\n", tx.GetId().ToString());
     }
 
-    nPriorityDummy = 0;
+    double nPriorityDummy = 0;
     pool.ApplyDeltas(txid, nPriorityDummy, nModifiedFees);
 
     Amount inChainInputValue;
