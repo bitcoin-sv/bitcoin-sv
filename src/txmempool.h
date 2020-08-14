@@ -217,6 +217,8 @@ private:
     // Grouping data for long chains/CPFP evaluation.
     std::shared_ptr<CPFPGroup> group {nullptr};
     std::optional<SecondaryMempoolEntryData> groupingData {std::nullopt};
+    // The mempool needs access to the group statistics.
+    friend class CTxMemPool;
 
     //!< Chain height when entering the mempool
     int32_t entryHeight;
@@ -456,6 +458,10 @@ private:
 
     //!< sum of all mempool tx's virtual sizes.
     uint64_t totalTxSize;
+
+    // Primary and secondary mempool sizes are tracked separately.
+    unsigned long secondaryMempoolSize;
+
     //!< sum of dynamic memory usage of all the map elements (NOT the maps
     //! themselves)
     uint64_t cachedInnerUsage;
@@ -814,6 +820,13 @@ private:
     void GetDescendantsNL(
         txiter it,
         setEntries &setDescendants) const;
+
+    // Non-locking, returns the size of the primary mempool.
+    unsigned long PrimaryMempoolSizeNL() const;
+
+    // Non-locking, returns the minimum fee rate for entering a transaction into
+    // the primary mempool.
+    CFeeRate GetPrimaryMempoolMinFeeNL() const;
 
 public:
     /** \class CTxMemPool::Snapshot
