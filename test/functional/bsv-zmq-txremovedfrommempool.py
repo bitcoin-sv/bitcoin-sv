@@ -41,13 +41,12 @@ Test case 4:
     - receive conflict in block tx notification
 """
 
-import configparser
-import os
 import json
 
 from test_framework.script import CTransaction, CScript, OP_TRUE, CTxOut
 from test_framework.test_framework import BitcoinTestFramework, SkipTest, ToHex, FromHex
-from test_framework.util import assert_equal, disconnect_nodes_bi, connect_nodes_bi, sync_blocks
+from test_framework.util import (assert_equal, check_zmq_test_requirements, 
+                                 disconnect_nodes_bi, connect_nodes_bi, sync_blocks)
 from test_framework.mininode import CTxIn, COutPoint
 
 
@@ -58,21 +57,11 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
 
     def setup_nodes(self):
 
-        # Check that bitcoin has been built with ZMQ enabled
-        config = configparser.ConfigParser()
-        if not self.options.configfile:
-            self.options.configfile = os.path.dirname(
-                __file__) + "/../config.ini"
-        config.read_file(open(self.options.configfile))
-
-        if not config["components"].getboolean("ENABLE_ZMQ"):
-            raise SkipTest("bitcoind has not been built with zmq enabled.")
-
-        # if we built bitcoind with ZMQ enabled, then we need zmq package to test its functionality
-        try:
-            import zmq
-        except ImportError:
-            raise Exception("python3-zmq module not available.")
+        # Check that bitcoin has been built with ZMQ enabled and we have python zmq package installed.
+        check_zmq_test_requirements(self.options.configfile,
+                                    SkipTest("bitcoind has not been built with zmq enabled."))
+        # import zmq when we know we have the requirements for test with zmq.
+        import zmq
 
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)

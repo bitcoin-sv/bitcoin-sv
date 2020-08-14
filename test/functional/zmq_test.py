@@ -3,14 +3,13 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the ZMQ API."""
-import configparser
-import os
+
 import struct
 
 from test_framework.test_framework import BitcoinTestFramework, SkipTest
 from test_framework.util import (assert_equal,
                                  bytes_to_hex_str,
-                                 hash256,
+                                 hash256, check_zmq_test_requirements
                                  )
 
 
@@ -20,21 +19,11 @@ class ZMQTest (BitcoinTestFramework):
 
     def setup_nodes(self):
 
-        # Check that bitcoin has been built with ZMQ enabled
-        config = configparser.ConfigParser()
-        if not self.options.configfile:
-            self.options.configfile = os.path.dirname(
-                __file__) + "/../config.ini"
-        config.read_file(open(self.options.configfile))
-
-        if not config["components"].getboolean("ENABLE_ZMQ"):
-            raise SkipTest("bitcoind has not been built with zmq enabled.")
-
-        # if we built bitcoind with ZMQ enabled, then we need zmq package to test its functionality
-        try:
-            import zmq
-        except ImportError:
-            raise Exception("python3-zmq module not available.")
+        # Check that bitcoin has been built with ZMQ enabled and we have python zmq package installed.
+        check_zmq_test_requirements(self.options.configfile,
+                                    SkipTest("bitcoind has not been built with zmq enabled."))
+        # import zmq when we know we have the requirements for test with zmq.
+        import zmq
 
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
