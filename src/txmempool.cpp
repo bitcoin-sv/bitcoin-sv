@@ -509,7 +509,8 @@ void CTxMemPool::AddUncheckedNL(
     updateAncestorsOfNL(true, newit);
 
     // Calculate CPFP statistics.
-    SecondaryMempoolEntryData groupingData({entry.nFee, entry.feeDelta, entry.nTxSize, 0});
+    SecondaryMempoolEntryData groupingData{
+        newit->GetFee(), newit->GetFeeDelta(), newit->GetTxSize(), 0};
     for (const auto& input : tx->vin) {
         auto parent = mapTx.find(input.prevout.GetTxId());
         if (parent != mapTx.end() && !parent->IsInPrimaryMempool()) {

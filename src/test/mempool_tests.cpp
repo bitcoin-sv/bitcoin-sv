@@ -575,26 +575,26 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
 
     BOOST_CHECK_EQUAL(pool.Size(), 0UL);
 
-    CTestTxMemPoolEntry poolTx1(const_cast<CTxMemPoolEntry&>(*tx1it));
+    CTestTxMemPoolEntry testTx1(const_cast<CTxMemPoolEntry&>(*tx1it));
     BOOST_CHECK(!tx1it->IsInPrimaryMempool());
-    BOOST_CHECK_EQUAL(poolTx1.groupingData()->fee, poolTx1.nFee());
-    BOOST_CHECK_EQUAL(poolTx1.groupingData()->feeDelta, poolTx1.feeDelta());
-    BOOST_CHECK_EQUAL(poolTx1.groupingData()->size, poolTx1.nTxSize());
-    BOOST_CHECK_EQUAL(poolTx1.groupingData()->ancestorsCount, 0);
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->fee, tx1it->GetFee());
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->feeDelta, tx1it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->size, tx1it->GetTxSize());
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->ancestorsCount, 0);
 
-    CTestTxMemPoolEntry poolTx2(const_cast<CTxMemPoolEntry&>(*tx2it));
+    CTestTxMemPoolEntry testTx2(const_cast<CTxMemPoolEntry&>(*tx2it));
     BOOST_CHECK(!tx2it->IsInPrimaryMempool());
-    BOOST_CHECK_EQUAL(poolTx2.groupingData()->fee, poolTx2.nFee());
-    BOOST_CHECK_EQUAL(poolTx2.groupingData()->feeDelta, poolTx2.feeDelta());
-    BOOST_CHECK_EQUAL(poolTx2.groupingData()->size, poolTx2.nTxSize());
-    BOOST_CHECK_EQUAL(poolTx2.groupingData()->ancestorsCount, 0);
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->fee, tx2it->GetFee());
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->feeDelta, tx2it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->size, tx2it->GetTxSize());
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->ancestorsCount, 0);
 
-    CTestTxMemPoolEntry poolTx3(const_cast<CTxMemPoolEntry&>(*tx3it));
+    CTestTxMemPoolEntry testTx3(const_cast<CTxMemPoolEntry&>(*tx3it));
     BOOST_CHECK(!tx3it->IsInPrimaryMempool());
-    BOOST_CHECK_EQUAL(poolTx3.groupingData()->fee, poolTx3.nFee() + poolTx2.nFee() + poolTx1.nFee());
-    BOOST_CHECK_EQUAL(poolTx3.groupingData()->feeDelta, poolTx3.feeDelta() + poolTx2.feeDelta() + poolTx1.feeDelta());
-    BOOST_CHECK_EQUAL(poolTx3.groupingData()->size, poolTx3.nTxSize() + poolTx2.nTxSize() + poolTx1.nTxSize());
-    BOOST_CHECK_EQUAL(poolTx3.groupingData()->ancestorsCount, 2);
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->fee, tx1it->GetFee() + tx2it->GetFee() + tx3it->GetFee());
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->feeDelta, tx1it->GetFeeDelta() + tx2it->GetFeeDelta() + tx3it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->size, tx1it->GetTxSize() + tx2it->GetTxSize() + tx3it->GetTxSize());
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->ancestorsCount, 2);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -245,7 +245,8 @@ public:
      * priority. Only inputs that were originally in-chain will age.
      */
     double GetPriority(int32_t currentHeight) const;
-    const Amount GetFee() const { return nFee; }
+    Amount GetFee() const { return nFee; }
+    Amount GetFeeDelta() const { return feeDelta; }
     size_t GetTxSize() const { return nTxSize; }
     int64_t GetTime() const { return nTime; }
     int32_t GetHeight() const { return entryHeight; }
