@@ -33,6 +33,7 @@ public:
     auto& mapTx() { return mempool.mapTx; }
     auto& mapNextTx() { return mempool.mapNextTx; }
     auto& mapDeltas() { return mempool.mapDeltas; }
+    auto& rollingMinimumFeeRate() { return mempool.rollingMinimumFeeRate; }
 
     using txiter = CTxMemPool::txiter;
     using TxLinks = CTxMemPool::TxLinks;
@@ -62,8 +63,11 @@ template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
     CTxMemPoolEntry& entry;
     UnitTestAccess(CTxMemPoolEntry& _entry) : entry(_entry) {}
     
-    decltype(CTxMemPoolEntry::group)& group() {return entry.group;};
-    decltype(CTxMemPoolEntry::groupingData)& groupingData() {return entry.groupingData;};
+    auto& nFee() {return entry.nFee;};
+    auto& feeDelta() {return entry.feeDelta;};
+    auto& nTxSize() {return entry.nTxSize;};
+    auto& group() {return entry.group;};
+    auto& groupingData() {return entry.groupingData;};
 };
 
 using CTestTxMemPoolEntry = CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>;
