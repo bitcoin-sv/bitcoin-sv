@@ -101,22 +101,6 @@ public:
     virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() = 0;
 };
 
-
-/**
- * Shared ancestor/descendant count information.
- */
-struct AncestorCounts
-{
-    AncestorCounts(uint64_t ancestors)
-        : nCountWithAncestors{ancestors}
-    {}
-
-    // These don't actually need to be atomic currently, but there's no cost
-    // if they are and we might want to access them across threads in the future.
-    std::atomic_uint64_t nCountWithAncestors   {0};
-};
-using AncestorCountsPtr = std::shared_ptr<AncestorCounts>;
-
 /** \class CTxPrioritizer
  *
  * The aim of this class is to support txn prioritisation and cleanup
