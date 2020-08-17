@@ -16,6 +16,7 @@ GlobalConfig::GlobalConfig() {
 void GlobalConfig::Reset()
 {
     feePerKB = CFeeRate {};
+    blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
     blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
@@ -29,6 +30,10 @@ void GlobalConfig::Reset()
     maxGeneratedBlockSizeAfter = 0;
     maxGeneratedBlockSizeOverridden =  false;
     maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
+    minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
+    maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
+    minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
+    acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
@@ -257,6 +262,58 @@ uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) con
         return MAX_TX_SIZE_CONSENSUS_AFTER_GENESIS;
     }
     return maxTxSizePolicy;
+}
+
+bool GlobalConfig::SetMinConsolidationFactor(uint64_t minConsolidationFactorIn, std::string* err)
+{
+    minConsolidationFactor = minConsolidationFactorIn;
+    return true;
+}
+
+uint64_t GlobalConfig::GetMinConsolidationFactor() const
+{
+    return minConsolidationFactor;
+}
+
+bool GlobalConfig::SetMaxConsolidationInputScriptSize(uint64_t maxConsolidationInputScriptSizeIn, std::string* err)
+{
+    if (maxConsolidationInputScriptSizeIn == 0) {
+        maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
+    } else {
+        maxConsolidationInputScriptSize = maxConsolidationInputScriptSizeIn;
+    }
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxConsolidationInputScriptSize() const
+{
+    return maxConsolidationInputScriptSize;
+}
+
+bool GlobalConfig::SetMinConsolidationInputMaturity(uint64_t minconsolidationinputmaturityIn, std::string* err)
+{
+    if (minconsolidationinputmaturityIn == 0) {
+        minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
+    } else {
+        minConsolidationInputMaturity = minconsolidationinputmaturityIn;
+    }
+    return true;
+}
+
+uint64_t GlobalConfig::GetMinConsolidationInputMaturity() const
+{
+    return minConsolidationInputMaturity;
+}
+
+bool GlobalConfig::SetAcceptNonStdConsolidationInput(uint64_t acceptNonStdConsolidationInputIn, std::string* err)
+{
+    acceptNonStdConsolidationInput = acceptNonStdConsolidationInputIn;
+    return true;
+}
+
+bool GlobalConfig::GetAcceptNonStdConsolidationInput() const
+{
+    return acceptNonStdConsolidationInput;
 }
 
 void GlobalConfig::SetDataCarrierSize(uint64_t dataCarrierSizeIn) {
@@ -834,6 +891,15 @@ void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {
 CFeeRate GlobalConfig::GetMinFeePerKB() const {
     return feePerKB;
 }
+
+void GlobalConfig::SetBlockMinFeePerKB(CFeeRate fee) {
+    blockMinFeePerKB = fee;
+}
+
+CFeeRate GlobalConfig::GetBlockMinFeePerKB() const {
+    return blockMinFeePerKB;
+}
+
 bool GlobalConfig::SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err)
 {
     if (LessThanZero(maxTxSigOpsCountIn, err, "Policy value for maximum allowed number of signature operations per transaction cannot be less than 0"))

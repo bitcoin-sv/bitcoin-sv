@@ -3,6 +3,7 @@
 ## List of Changes since 1.0.4
 * Make Journaling block assembler the default. The legacy block assembler is scheduled for removal in a future release.
 * Journaling block assembler now respects -blockmintxfee
+* New consolidation transaction policy. Consolidation transactions are now processed for free.
 * New RPC function sendrawtransactions - support submitting multiple transactions in a single call.
 * PTV: optimise txn lookup
 * Allow size values in bitcoin.conf to be set with human readable values

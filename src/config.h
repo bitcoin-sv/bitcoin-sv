@@ -51,8 +51,23 @@ public:
     virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
 
+    virtual bool SetMinConsolidationFactor(uint64_t value, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMinConsolidationFactor() const = 0;
+
+    virtual bool SetMaxConsolidationInputScriptSize(uint64_t value, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxConsolidationInputScriptSize() const = 0;
+
+    virtual bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMinConsolidationInputMaturity() const = 0;
+
+    virtual bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) = 0;
+    virtual bool GetAcceptNonStdConsolidationInput() const = 0;
+
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
+
+    virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
+    virtual CFeeRate GetBlockMinFeePerKB() const = 0;
 
     virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual uint64_t GetPreferredBlockFileSize() const = 0;
@@ -186,8 +201,23 @@ public:
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const  override;
 
+    bool SetMinConsolidationFactor(uint64_t value, std::string* err = nullptr) override;
+    uint64_t GetMinConsolidationFactor() const  override;
+
+    bool SetMaxConsolidationInputScriptSize(uint64_t value, std::string* err = nullptr) override;
+    uint64_t GetMaxConsolidationInputScriptSize() const  override;
+
+    bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) override;
+    uint64_t GetMinConsolidationInputMaturity() const  override;
+
+    bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) override;
+    bool GetAcceptNonStdConsolidationInput() const  override;
+
     void SetMinFeePerKB(CFeeRate amt) override;
     CFeeRate GetMinFeePerKB() const override;
+
+    void SetBlockMinFeePerKB(CFeeRate amt) override;
+    CFeeRate GetBlockMinFeePerKB() const override;
 
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override;
     uint64_t GetPreferredBlockFileSize() const override;
@@ -305,6 +335,7 @@ public:
 private:
     // All fileds are initialized in Reset()    
     CFeeRate feePerKB;
+    CFeeRate blockMinFeePerKB;
     uint64_t blockPriorityPercentage;
     uint64_t preferredBlockFileSize;
     uint64_t factorMaxSendQueuesBytes;
@@ -324,7 +355,10 @@ private:
     bool maxGeneratedBlockSizeOverridden;
 
     uint64_t maxTxSizePolicy;
-
+    uint64_t minConsolidationFactor;
+    uint64_t maxConsolidationInputScriptSize;
+    uint64_t minConsolidationInputMaturity;
+    uint64_t acceptNonStdConsolidationInput;
     uint64_t dataCarrierSize;
     uint64_t limitDescendantCount;
     uint64_t limitAncestorCount;
@@ -419,11 +453,46 @@ public:
     }
     uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const override { return maxTxSizePolicy; }
 
+    bool SetMinConsolidationFactor(uint64_t value, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+        minConsolidationFactor = value;
+        return false;
+    }
+    uint64_t GetMinConsolidationFactor() const override { return minConsolidationFactor; }
+
+    bool SetMaxConsolidationInputScriptSize(uint64_t value, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+        maxConsolidationInputScriptSize = value;
+        return false;
+    }
+    uint64_t GetMaxConsolidationInputScriptSize() const override { return maxConsolidationInputScriptSize; }
+
+    bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+        minConsolidationInputMaturity = value;
+        return false;
+    }
+    uint64_t GetMinConsolidationInputMaturity() const override { return minConsolidationInputMaturity; }
+
+    bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) override
+    {
+        SetErrorMsg(err);
+        acceptNonStdConsolidationInput = value;
+        return false;
+    }
+    bool GetAcceptNonStdConsolidationInput() const override { return acceptNonStdConsolidationInput; }
+
     void SetChainParams(std::string net);
     const CChainParams &GetChainParams() const override { return *chainParams; }
 
     void SetMinFeePerKB(CFeeRate amt) override{};
     CFeeRate GetMinFeePerKB() const override { return CFeeRate(Amount(0)); }
+
+    void SetBlockMinFeePerKB(CFeeRate amt) override{};
+    CFeeRate GetBlockMinFeePerKB() const override { return CFeeRate(Amount(0)); }
 
     void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) override {}
     uint64_t GetPreferredBlockFileSize() const override { return 0; }
@@ -655,6 +724,10 @@ private:
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
     uint64_t genesisActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
+    uint64_t minConsolidationFactor{ DEFAULT_MIN_CONSOLIDATION_FACTOR };
+    uint64_t maxConsolidationInputScriptSize{DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE };
+    uint64_t minConsolidationInputMaturity { DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY };
+    uint64_t acceptNonStdConsolidationInput { DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;

@@ -69,6 +69,15 @@ static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500);
 static const uint64_t MAX_TX_SIZE_POLICY_BEFORE_GENESIS = 100000 - 1; // -1 because pre genesis policy validation was >=
 /** The default size for transactions we're willing to relay/mine */
 static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = 10 * ONE_MEGABYTE;
+/** The default size for the minimum txout size to txin size ratio to identify consolidation transactions */
+static const uint64_t DEFAULT_MIN_CONSOLIDATION_FACTOR = 20;
+/** The default size for the maximum scriptSig input in a consolidation transactions */
+static const uint64_t DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE = 150;
+/** consolidation transaction need inputs with a minimum number of confirmations */
+static const uint64_t DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY = 6;
+/** consolidation transaction with non standard inputs */
+static const uint64_t DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = 0;
+
 /** Maximum number of signature check operations in an IsStandard() P2SH script
  */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
@@ -162,6 +171,9 @@ inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
     }
     return flags;
 }
+
+/** Consolidation transactions are free */
+bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int tipHeight);
 
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType);
 

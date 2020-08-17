@@ -964,6 +964,27 @@ std::string HelpMessage(HelpMessageMode mode) {
                         "The value may be given in bytes or with unit (B, kB, MB, GB)."),
                 DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS/ONE_MEGABYTE, MAX_TX_SIZE_POLICY_BEFORE_GENESIS));
 
+    strUsage +=
+            HelpMessageOpt("-minconsolidationfactor=<n>",
+                           strprintf(_("Set minimum ratio between sum of utxo scriptPubKey sizes spent in a consolidation transaction, to the corresponding sum of output scriptPubKey sizes. "
+					   "The ratio between number of consolidation transaction inputs to the number of outputs also needs to be greater or equal to the minimum consolidation factor (default: %u). "
+				       "A value of 0 disables free consolidation transactions"),
+                                     DEFAULT_MIN_CONSOLIDATION_FACTOR));
+    strUsage +=
+            HelpMessageOpt("-maxconsolidationinputscriptsize=<n>",
+                           strprintf(_("This number is the maximum length for a scriptSig input in a consolidation txn (default: %u). "),
+                                     DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE));
+
+    strUsage +=
+            HelpMessageOpt("-minconsolidationinputnaturity=<n>",
+                           strprintf(_("Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
+                                     DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY));
+
+    strUsage +=
+            HelpMessageOpt("-acceptnonstdconsolidationinput=<n>",
+                           strprintf(_("Accept consolidation transactions spending non standard inputs (default: %u). "),
+                                     DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT));
+
     strUsage += HelpMessageOpt(
         "-maxscriptsizepolicy",
         strprintf("Set maximum script size in bytes we're willing to relay/mine per script after Genesis is activated. "
@@ -1871,6 +1892,42 @@ bool AppInitParameterInteraction(Config &config) {
     {
         int64_t maxTxSizePolicy = gArgs.GetArgAsBytes("-maxtxsizepolicy", DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS);
         if (std::string err; !config.SetMaxTxSizePolicy(maxTxSizePolicy, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // configure min ratio between tx input to tx output size to be considered free consolidation tx.
+    if (gArgs.IsArgSet("-minconsolidationfactor"))
+    {
+        uint64_t minConsolidationFactor = gArgs.GetArg("-minconsolidationfactor", DEFAULT_MIN_CONSOLIDATION_FACTOR);
+        if (std::string err; !config.SetMinConsolidationFactor(minConsolidationFactor, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // configure maxiumum scriptSig input size not considered spam in a consolidation transaction
+    if (gArgs.IsArgSet("-maxconsolidationinputscriptsize"))
+    {
+        uint64_t maxConsolidationInputScriptSize = gArgs.GetArg("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
+        if (std::string err; !config.SetMaxConsolidationInputScriptSize(maxConsolidationInputScriptSize, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // configure minimum number of confirmations needed by transactions spent in a consolidatin transaction
+    if (gArgs.IsArgSet("-minconsolidationinputmaturity"))
+    {
+        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY);
+        if (std::string err; !config.SetMinConsolidationInputMaturity(param, &err)) {
+            return InitError(err);
+        }
+    }
+
+    // configure if non standard inputs for consolidation transactions are allowed
+    if (gArgs.IsArgSet("-acceptnonstdconsolidationinput"))
+    {
+        uint64_t param = gArgs.GetArg("-acceptnonstdconsolidationinput", DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetAcceptNonStdConsolidationInput(param, &err)) {
             return InitError(err);
         }
     }
