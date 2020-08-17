@@ -134,6 +134,13 @@ UniValue generateBlocks(const Config &config,
     unsigned int nExtraNonce = 0;
     UniValue blockHashes(UniValue::VARR);
     CBlockIndex* pindexPrev {nullptr};
+    /* Generating blocks in this loop on a busy node can call more than one CreateNewBlock on the same
+     * active chain height, causing to overwrite block(s). generateBlocks will thus not create exactly
+     * nGenerate blocks.
+     * This can happen if there is another asynchronous ActivateBestChain running while the one running
+     * in this thread (ProcessNewBlock) returns before chain is updated (for example when
+     * CBlockValidationStatus::isAncestorInValidation)
+     */
     while (nHeight < nHeightEnd) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(
             mining::g_miningFactory->GetAssembler()->CreateNewBlock(coinbaseScript->reserveScript, pindexPrev));
