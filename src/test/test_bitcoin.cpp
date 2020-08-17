@@ -79,13 +79,12 @@ BasicTestingSetup::~BasicTestingSetup() {
         g_connman->Stop();
         g_connman.reset();
     }
-
-    mining::g_miningFactory.reset();
 }
 
-TestingSetup::TestingSetup(const std::string &chainName)
+TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory::BlockAssemblerType assemblerType)
     : BasicTestingSetup(chainName) {
-
+    
+    testConfig.SetMiningCandidateBuilder(assemblerType);
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
     RegisterAllRPCCommands(tableRPC);
@@ -125,6 +124,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
 }
 
 TestingSetup::~TestingSetup() {
+    mining::g_miningFactory.reset();
     UnregisterNodeSignals(GetNodeSignals());
     threadGroup.interrupt_all();
     threadGroup.join_all();
@@ -156,9 +156,8 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey) {
     const Config &config = GlobalConfig::GetConfig();
     CBlockIndex* pindexPrev {nullptr};
-    mining::CMiningFactory miningFactory {config};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-            miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
+            mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
     CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock &block = *blockRef;
 
