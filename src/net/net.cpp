@@ -798,7 +798,10 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
         for(const CTxnSendingDetails& txn : txns)
         {
             // Don't bother if below peer's fee rate
-            if(filterrate != Amount{0} && txn.getInfo().feeRate.GetFeePerK() < filterrate)
+            auto const & info = txn.getInfo();
+            const Amount fee = info.feeRate.GetFee(info.nTxSize);
+            const Amount totalFilterFee = CFeeRate{filterrate}.GetFee(info.nTxSize);
+            if(filterrate != Amount{0} && fee + info.nFeeDelta < totalFilterFee)
                 continue;
 
             // Check and update bloom filters

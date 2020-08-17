@@ -1282,7 +1282,7 @@ TxMempoolInfo CTxMemPool::Info(const uint256 &txid) const {
         return TxMempoolInfo();
     }
 
-    return { *i };
+    return TxMempoolInfo{*i};
 }
 
 CFeeRate CTxMemPool::estimateFee() const {
