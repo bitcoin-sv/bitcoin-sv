@@ -1947,7 +1947,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             {
                 jWriter.pushKV("error", "missing");
             }
-            else if(const CTransaction* tx = mempool.IsSpentBy(outPoints[arrayIndex]))
+            else if(const auto tx = mempool.IsSpentBy(outPoints[arrayIndex]))
             {
                 jWriter.pushKV("error", "spent");
                 jWriter.writeBeginObject("collidedWith");

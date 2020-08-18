@@ -8,8 +8,8 @@
 
 #include "amount.h"
 #include "coins.h"
-#include "indirectmap.h"
 #include "mining/journal_builder.h"
+#include "primitives/transaction.h"
 #include "random.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
@@ -523,7 +523,7 @@ private:
     void updateChildNL(txiter entry, txiter child, bool add);
 
     std::vector<txiter> getSortedDepthAndScoreNL() const;
-    indirectmap<COutPoint, const CTransaction *> mapNextTx;
+    std::map<COutPoint, TxId> mapNextTx;
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
 public:
@@ -572,9 +572,7 @@ public:
 
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
-    // Returns const pointer to transaction that spends outpoint.
-    // Pointer is valid and transaction will not change as long as mempool smtx lock is held
-    const CTransaction* IsSpentBy(const COutPoint &outpoint) const;
+    CTransactionRef IsSpentBy(const COutPoint &outpoint) const;
 
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
@@ -1096,7 +1094,7 @@ private:
 
     // A non-locking version of RemoveRecursive
     void removeRecursiveNL(
-            const CTransaction &tx,
+            const TxId &txid,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedWith = nullptr);
