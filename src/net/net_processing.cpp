@@ -91,6 +91,14 @@ std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
 
 namespace {
 
+bool IsBlockDownloadStallingFromPeer(const CNodePtr& node, uint64_t& avgbw)
+{
+    avgbw = node->GetAssociation().GetAverageBandwidth();
+    int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
+    minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
+    return (avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000);
+}
+
 void UpdatePreferredDownload(const CNodePtr& pnode) {
     // Try to obtain an access to the node's state data.
     const CNodeStateRef stateRef { GetState(pnode->GetId()) };
@@ -311,7 +319,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                               std::vector<const CBlockIndex*>& vBlocks,
                               NodeId &nodeStaller,
                               const Consensus::Params& consensusParams,
-                              const CNodeStatePtr& state) {
+                              const CNodeStatePtr& state,
+                              CConnman& connman) {
     if (count == 0) {
         return;
     }
@@ -406,7 +415,40 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
             }
             else if (waitingfor == -1) {
                 // This is the first already-in-flight block.
-                waitingfor = blockDownloadTracker.GetPeerForBlock(pindex->GetBlockHash());
+                const uint256& hash { pindex->GetBlockHash() };
+                waitingfor = blockDownloadTracker.GetPeerForBlock(hash);
+
+                size_t stallerCount {0};
+                const std::vector<BlockDownloadTracker::InFlightBlock> allInFlightDetails { blockDownloadTracker.GetBlockDetails(hash) };
+                bool stalling { ! allInFlightDetails.empty() };
+                for(const auto& inFlightDetails : blockDownloadTracker.GetBlockDetails(hash)) {
+                    // In flight for a while?
+                    int64_t inFlightSecs { (GetTimeMicros() - inFlightDetails.inFlightSince) / MICROS_PER_SECOND };
+                    if(inFlightSecs >= 30) {
+                        // Are we getting (any) data from this peer?
+                        const CNodePtr& nodePtr { connman.FindNodeById(inFlightDetails.block.GetNode()) };
+                        if(nodePtr) {
+                            uint64_t avgbw {0};
+                            if(IsBlockDownloadStallingFromPeer(nodePtr, avgbw)) {
+                                // This peer is stalling
+                                ++stallerCount;
+                            }
+                            else {
+                                // This peer seems active currently
+                                stalling = false;
+                                break;
+                            }
+                        }
+                    }
+                    else {
+                        // Give this peer more time
+                        stalling = false;
+                        break;
+                    }
+                }
+
+                if(stalling) {
+                }
             }
         }
     }
@@ -4167,10 +4209,8 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
         // Also, don't abandon this attempt to download all the while we are making
         // sufficient progress, as measured by the current download speed to this
         // peer.
-        uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth() };
-        int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
-        minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
-        if(avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000) {
+        uint64_t avgbw {0};
+        if(IsBlockDownloadStallingFromPeer(pto, avgbw)) {
             LogPrintf("Peer=%d is stalling block download (current speed %d), disconnecting\n", pto->id, avgbw);
             pto->fDisconnect = true;
             return true;
@@ -4224,7 +4264,7 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
         NodeId staller = -1;
         FindNextBlocksToDownload(pto->GetId(),
                                  MAX_BLOCKS_IN_TRANSIT_PER_PEER - state->nBlocksInFlight,
-                                 vToDownload, staller, consensusParams, state);
+                                 vToDownload, staller, consensusParams, state, connman);
         for (const CBlockIndex *pindex : vToDownload) {
             vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
             blockDownloadTracker.MarkBlockAsInFlight(config, {pindex->GetBlockHash(), pto->id}, state, *pindex);
