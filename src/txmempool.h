@@ -17,8 +17,8 @@
 #include "policy/policy.h"
 
 #include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index/random_access_index.hpp>
 #include <boost/multi_index_container.hpp>
 
 #include <boost/signals2/signal.hpp>
@@ -209,6 +209,9 @@ private:
     //!< keep track of transactions that spend a coinbase
     bool spendsCoinbase;
 
+    // index of insertion to mempool, entry with smaller index is inserted before the one with larger
+    uint64_t insertionIndex;
+    
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime, double _entryPriority,
@@ -255,6 +258,9 @@ public:
     bool IsInMemory() const;
 
     template<typename X> struct UnitTestAccess;
+
+    void SetInsertionIndex(uint64_t ndx) { insertionIndex = ndx; }
+    uint64_t GetInsertionIndex() const { return insertionIndex; }
 };
 
 struct update_fee_delta {
@@ -287,7 +293,6 @@ struct mempoolentry_txid {
     }
 };
 
-
 /** \class CompareTxMemPoolEntryByScore
  *
  *  Sort by score of entry ((fee+delta)/size) in descending order
@@ -312,6 +317,7 @@ public:
 };
 
 // Multi_index tag names
+struct transaction_id {};
 struct entry_time {};
 struct insertion_order {};
 
@@ -479,6 +485,7 @@ public:
         CTxMemPoolEntry, boost::multi_index::indexed_by<
                              // sorted by txid
                              boost::multi_index::hashed_unique<
+                                 boost::multi_index::tag<transaction_id>,
                                  mempoolentry_txid, SaltedTxidHasher>,
                              // sorted by entry time
                              boost::multi_index::ordered_non_unique<
@@ -498,7 +505,7 @@ public:
 private:
     static constexpr int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
 
-    using  txiter = indexed_transaction_set::nth_index<0>::type::const_iterator;
+    using txiter = indexed_transaction_set::index<transaction_id>::type::const_iterator;
 
     struct CompareIteratorByHash {
         bool operator()(const txiter &a, const txiter &b) const {
@@ -520,6 +527,18 @@ private:
     };
 
     using setEntries = std::unordered_set<txiter, SaltedTxiterHasher>;
+     
+    class InsrtionOrderComparator
+    {
+    public:
+        bool operator() (const txiter& lhs, const txiter& rhs) const
+        { 
+            return lhs->GetInsertionIndex() < rhs->GetInsertionIndex(); 
+        }
+    };
+    // when inserting transaction to mempool, all of its mempool parents must be already inserted and none of its children should be inserted.
+    // transaction which is inserted later has larger insertion index. thus if we sort a sequence by insertion index it will be topo sorted
+    using setEntriesTopoSorted = std::set<txiter, InsrtionOrderComparator>;
 
     const setEntries &GetMemPoolParentsNL(txiter entry) const;
     const setEntries &GetMemPoolChildrenNL(txiter entry) const;
@@ -538,6 +557,16 @@ private:
     std::vector<txiter> getSortedDepthAndScoreNL() const;
     std::map<COutPoint, const CTransactionRefWrapper*> mapNextTx;
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
+
+    class InsertionIndex
+    {
+        uint64_t nextIndex = 1;
+    public:
+        uint64_t GetNext()
+        {
+            return nextIndex++;
+        }
+    } insertionIndex;
 
 public:
     /** Create a new CTxMemPool. */
@@ -571,6 +600,20 @@ public:
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
+
+    // walks through ancestors and collect all that are still in the secondary mempool
+    // payingTx will be includes in this set also
+    setEntriesTopoSorted GetSecondaryMempoolAncestorsNL(CTxMemPool::txiter payingTx) const;
+
+    // it will calculate grouping data for the actual group, used when a group is accepted
+    SecondaryMempoolEntryData FillGroupingDataNL(const CTxMemPool::setEntriesTopoSorted& groupMembers) const;
+
+    // forms a group out of groupMembers, modifys mempool entry (remove grouping data and create group object) and adds
+    // changes to the changeSet
+    void AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& groupMembers, mining::CJournalChangeSet& changeSet);
+
+    // forms a group using AcceptSingleGroupNL 
+    void AcceptGroupNL(CTxMemPool::txiter payingTx, mining::CJournalChangeSet& changeSet);
 
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
@@ -819,10 +862,6 @@ private:
 
     // Non-locking, returns the size of the primary mempool.
     unsigned long PrimaryMempoolSizeNL() const;
-
-    // Non-locking, returns the minimum fee rate for entering a transaction into
-    // the primary mempool.
-    CFeeRate GetPrimaryMempoolMinFeeNL() const;
 
 public:
     /** \class CTxMemPool::Snapshot

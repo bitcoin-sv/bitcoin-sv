@@ -230,6 +230,22 @@ bool CTxMemPoolEntry::IsInMemory() const {
     return tx.IsInMemory();
 }
 
+namespace {
+// Takes given change set if not empty, creates new otherwise
+class CEnsureNonNullChangeSet
+{
+    CJournalChangeSetPtr replacement;
+    const CJournalChangeSetPtr& cs;
+public:
+    CEnsureNonNullChangeSet(CTxMemPool& theMempool,  const CJournalChangeSetPtr& changeSet)
+        : replacement(changeSet ? nullptr : theMempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN))
+        , cs(changeSet ? changeSet : replacement) 
+    {}
+
+    CJournalChangeSet& Get() { return *cs; }
+};
+}
+
 bool CTxMemPool::CheckAncestorLimits(
     const CTxMemPoolEntry& entry,
     uint64_t limitAncestorCount,
@@ -461,6 +477,71 @@ void CTxMemPool::AddUnchecked(
     NotifyEntryAdded(entry.GetSharedTx());
 }
 
+CTxMemPool::setEntriesTopoSorted CTxMemPool::GetSecondaryMempoolAncestorsNL(CTxMemPool::txiter payingTx) const
+{
+    setEntriesTopoSorted ancestors;
+    setEntries toVisit{payingTx};
+
+    // recursivly visit ancestors and collect all which are in the secondary mempool
+    while(!toVisit.empty())
+    {
+        txiter entry = *toVisit.begin();
+        toVisit.erase(toVisit.begin());
+        ancestors.insert(entry);
+        for(txiter parent: GetMemPoolParentsNL(entry))
+        {
+            if (!parent->IsInPrimaryMempool())
+            {
+                toVisit.insert(parent);
+            }
+        }
+    }
+    return ancestors;
+}
+
+SecondaryMempoolEntryData CTxMemPool::FillGroupingDataNL(const CTxMemPool::setEntriesTopoSorted& groupMembers) const
+{
+    SecondaryMempoolEntryData data{Amount(0),Amount(0),0,0};
+    data.ancestorsCount = groupMembers.size();
+
+    // precisely calculate groups data
+    for(auto entry: groupMembers)
+    {
+        data.size += entry->GetTxSize();
+        data.fee += entry->GetFee();
+        data.feeDelta += entry->GetFeeDelta();
+    }
+
+    return data;
+}
+
+void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& groupMembers, mining::CJournalChangeSet& changeSet)
+{
+    auto groupingData = FillGroupingDataNL(groupMembers);
+    auto group = std::make_shared<CPFPGroup>();
+    group->evaluationParams = groupingData;
+
+    for(auto entry: groupMembers)
+    {
+        // put txs in the group object and in the journal
+        group->transactions.push_back(entry);
+        changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry});
+        secondaryMempoolSize--; // moving from secondary mempool to the primary
+        mapTx.modify(entry, [&group](CTxMemPoolEntry& entry) {
+                                entry.group = group;
+                                entry.groupingData = std::nullopt;
+                            });
+    }
+
+}
+
+void CTxMemPool::AcceptGroupNL(CTxMemPool::txiter payingTx, mining::CJournalChangeSet& changeSet)
+{
+    // find all ancestors of this tx which are in secondary mempool, this will be group members
+    auto groupMembers = GetSecondaryMempoolAncestorsNL(payingTx);
+    AcceptSingleGroupNL(groupMembers, changeSet);
+}
+
 void CTxMemPool::AddUncheckedNL(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
@@ -470,6 +551,10 @@ void CTxMemPool::AddUncheckedNL(
 
     indexed_transaction_set::iterator newit = mapTx.insert(entry).first;
     mapLinks.insert(make_pair(newit, TxLinks()));
+
+    mapTx.modify(newit, [this](CTxMemPoolEntry& entry) {
+        entry.SetInsertionIndex(insertionIndex.GetNext());
+    });
 
     // Update transaction for any feeDelta created by PrioritiseTransaction
     // TODO: refactor so that the fee delta is calculated before inserting into
@@ -520,17 +605,14 @@ void CTxMemPool::AddUncheckedNL(
         }
     }
 
-    if (groupingData.fee + groupingData.feeDelta
-        >= GetPrimaryMempoolMinFeeNL().GetFee(groupingData.size)) {
-        // This transaction will go directly into the primary mempool.
-        if (groupingData.ancestorsCount > 0) {
-            // TODO: Construct the CPFP group and move it from the secondary to
-            // the priomary mempool. Currently this should never happen given
-            // how GetPrimaryMempoolMinFeeNL() is implemented.
-            assert(!"Construct CPFP group");
-        }
-    }
-    else {
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
+
+    bool paysEnoughFee = groupingData.fee + groupingData.feeDelta
+                            >= blockMinTxfee.GetFee(groupingData.size);
+
+
+    if (groupingData.ancestorsCount > 0 || !paysEnoughFee) {
+
         // This transaction is not paying enough, it goes into the secondary mempool.
         // NOTE: We use modify() here because it returns a mutable reference to
         //       the entry in the index, whereas dereferencing the iterator
@@ -541,6 +623,18 @@ void CTxMemPool::AddUncheckedNL(
                                 entry.groupingData.emplace(groupingData);
                             });
         ++secondaryMempoolSize;
+        
+        if(paysEnoughFee)
+        {
+            AcceptGroupNL(newit, nonNullChangeSet.Get());
+        }
+
+    }
+    else
+    {
+        // Pays enough fee.
+        // This transaction will go directly into the primary mempool.
+        nonNullChangeSet.Get().addOperation(CJournalChangeSet::Operation::ADD, {*newit});
     }
 
     nTransactionsUpdated++;
@@ -552,17 +646,6 @@ void CTxMemPool::AddUncheckedNL(
     }
     if (pnDynamicMemoryUsage) {
         *pnDynamicMemoryUsage = DynamicMemoryUsageNL();
-    }
-
-    // Apply to the current journal, either via the passed in change set or directly ourselves
-    if(changeSet)
-    {
-        changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
-    }
-    else
-    {
-        CJournalChangeSetPtr tmpChangeSet { getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
     }
 }
 
@@ -580,14 +663,21 @@ void CTxMemPool::removeUncheckedNL(
     }
 
     // Apply to the current journal, either via the passed in change set or directly ourselves
-    if(changeSet)
+    if(it->IsInPrimaryMempool())
     {
-        changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
+        if(changeSet)
+        {
+            changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
+        }
+        else
+        {
+            CJournalChangeSetPtr tmpChangeSet { getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
+            tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
+        }
     }
     else
     {
-        CJournalChangeSetPtr tmpChangeSet { getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-        tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
+        secondaryMempoolSize--;
     }
 
     totalTxSize -= it->GetTxSize();
@@ -777,9 +867,6 @@ void CTxMemPool::removeConflictsNL(
     }
 }
 
-/**
- * Called when a block is connected. Removes from mempool.
- */
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     int32_t nBlockHeight,
@@ -811,6 +898,7 @@ void CTxMemPool::RemoveForBlock(
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = true;
 }
+
 
 void CTxMemPool::clearNL() {
     mapLinks.clear();
@@ -1548,7 +1636,7 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
         mapTx.get<entry_time>().begin();
     setEntries toremove;
     while (it != mapTx.get<entry_time>().end() && it->GetTime() < time) {
-        toremove.insert(mapTx.project<0>(it));
+        toremove.insert(mapTx.project<transaction_id>(it));
         it++;
     }
 
@@ -1802,33 +1890,6 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
     return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
 }
 
-// FIXME: Currently this implementation is just a non-locking copy of GetMinFee().
-// TODO: CORE-130
-CFeeRate CTxMemPool::GetPrimaryMempoolMinFeeNL() const {
-    if (!blockSinceLastRollingFeeBump || rollingMinimumFeeRate == 0) {
-        return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
-    }
-
-    int64_t time = GetTime();
-    if (time > lastRollingFeeUpdate + 10) {
-        // FIXME: Size limit is calculated as per estimateFee().
-        const auto sizelimit =
-            gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
-        double halflife = ROLLING_FEE_HALFLIFE;
-        if (DynamicMemoryUsageNL() < sizelimit / 4) {
-            halflife /= 4;
-        } else if (DynamicMemoryUsageNL() < sizelimit / 2) {
-            halflife /= 2;
-        }
-
-        rollingMinimumFeeRate =
-            rollingMinimumFeeRate /
-            pow(2.0, (time - lastRollingFeeUpdate) / halflife);
-        lastRollingFeeUpdate = time;
-    }
-    return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
-}
-
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     const mining::CJournalChangeSetPtr& changeSet,
@@ -1859,7 +1920,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     //     maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
     //     setEntries stage;
-    //     GetDescendantsNL(mapTx.project<0>(it), stage);
+    //     GetDescendantsNL(mapTx.project<transaction_id>(it), stage);
     //     nTxnRemoved += stage.size();
 
     //     std::vector<CTransaction> txn;
@@ -1905,7 +1966,7 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
 
 unsigned long CTxMemPool::Size() {
     std::shared_lock lock(smtx);
-    return PrimaryMempoolSizeNL();
+    return mapTx.size();
 }
 
 unsigned long CTxMemPool::PrimaryMempoolSizeNL() const {

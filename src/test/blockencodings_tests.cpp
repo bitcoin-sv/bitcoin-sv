@@ -70,7 +70,7 @@ static CBlock BuildBlockTestCase() {
 BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
     CTxMemPool pool;
     CTxMemPoolTestAccess testPoolAccess(pool);
-    TestMemPoolEntryHelper entry;
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
     pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), nullChangeSet);
@@ -190,7 +190,7 @@ public:
 BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
     CTxMemPool pool;
     CTxMemPoolTestAccess testPoolAccess(pool);
-    TestMemPoolEntryHelper entry;
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
     pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), nullChangeSet);
@@ -282,7 +282,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
 BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
     CTxMemPool pool;
     CTxMemPoolTestAccess testPoolAccess(pool);
-    TestMemPoolEntryHelper entry;
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
     pool.AddUnchecked(block.vtx[1]->GetId(), entry.FromTx(*block.vtx[1]), nullChangeSet);

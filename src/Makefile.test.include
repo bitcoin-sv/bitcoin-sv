@@ -54,6 +54,7 @@ BITCOIN_TESTS =\
   test/compress_tests.cpp \
   test/config_tests.cpp \
   test/core_io_tests.cpp \
+  test/cpfp_tests.cpp \
   test/crypto_tests.cpp \
   test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
