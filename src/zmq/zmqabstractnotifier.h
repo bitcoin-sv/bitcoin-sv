@@ -6,6 +6,7 @@
 #define BITCOIN_ZMQ_ZMQABSTRACTNOTIFIER_H
 
 #include "zmqconfig.h"
+#include "zmq_publisher.h"
 
 class CBlockIndex;
 class CZMQAbstractNotifier;
@@ -26,7 +27,7 @@ public:
     std::string GetAddress() const { return address; }
     void SetAddress(const std::string &a) { address = a; }
 
-    virtual bool Initialize(void *pcontext) = 0;
+    virtual bool Initialize(void *pcontext, std::shared_ptr<CZMQPublisher>) = 0;
     virtual void Shutdown() = 0;
 
     virtual bool NotifyBlock(const CBlockIndex *pindex);

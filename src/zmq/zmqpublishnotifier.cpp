@@ -8,8 +8,10 @@
 #include "streams.h"
 #include "util.h"
 #include "validation.h"
+#include "zmq_publisher.h"
 
 #include <cstdarg>
+
 
 static std::multimap<std::string, CZMQAbstractPublishNotifier *>
     mapPublishNotifiers;
@@ -19,45 +21,10 @@ static const char *MSG_HASHTX = "hashtx";
 static const char *MSG_RAWBLOCK = "rawblock";
 static const char *MSG_RAWTX = "rawtx";
 
-// Internal function to send multipart message
-static int zmq_send_multipart(void *sock, const void *data, size_t size, ...) {
-    va_list args;
-    auto closeVaList = [](va_list* args) {va_end(*args);};
-    va_start(args, size);
-    std::unique_ptr<va_list, decltype(closeVaList)> guard{&args, closeVaList};
 
-    while (1) {
-        zmq_msg_t msg;
-
-        int rc = zmq_msg_init_size(&msg, size);
-        if (rc != 0) {
-            zmqError("Unable to initialize ZMQ msg");
-            return -1;
-        }
-
-        void *buf = zmq_msg_data(&msg);
-        memcpy(buf, data, size);
-
-        data = va_arg(args, const void *);
-
-        rc = zmq_msg_send(&msg, sock, data ? ZMQ_SNDMORE : 0);
-        if (rc == -1) {
-            zmqError("Unable to send ZMQ msg");
-            zmq_msg_close(&msg);
-            return -1;
-        }
-
-        zmq_msg_close(&msg);
-
-        if (!data) break;
-
-        size = va_arg(args, size_t);
-    }
-    return 0;
-}
-
-bool CZMQAbstractPublishNotifier::Initialize(void *pcontext) {
+bool CZMQAbstractPublishNotifier::Initialize(void *pcontext, std::shared_ptr<CZMQPublisher> tspublisher) {
     assert(!psocket);
+    zmqPublisher = tspublisher;
 
     // check if address is being used by other publish notifier
     std::multimap<std::string, CZMQAbstractPublishNotifier *>::iterator i =
@@ -109,6 +76,9 @@ void CZMQAbstractPublishNotifier::Shutdown() {
         }
     }
 
+    // release reference to threadSafePublisher
+    zmqPublisher = nullptr;
+
     if (count == 1) {
         LogPrint(BCLog::ZMQ, "Close socket at address %s\n", address);
         int linger = 0;
@@ -122,13 +92,10 @@ void CZMQAbstractPublishNotifier::Shutdown() {
 bool CZMQAbstractPublishNotifier::SendZMQMessage(const char *command,
                                               const void *data, size_t size) {
     assert(psocket);
+    assert(zmqPublisher);
 
-    /* send three parts, command & data & a LE 4byte sequence number */
-    uint8_t msgseq[sizeof(uint32_t)];
-    WriteLE32(&msgseq[0], nSequence);
-    int rc = zmq_send_multipart(psocket, command, strlen(command), data, size,
-                                msgseq, (size_t)sizeof(uint32_t), (void *)0);
-    if (rc == -1) return false;
+    bool rc = zmqPublisher->SendZMQMessage(psocket, command, data, size, nSequence);
+    if (rc == false) return false;
 
     /* increment memory only sequence number after sending */
     nSequence++;

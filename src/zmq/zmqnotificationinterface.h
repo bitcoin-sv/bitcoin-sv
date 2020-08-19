@@ -6,6 +6,7 @@
 #define BITCOIN_ZMQ_ZMQNOTIFICATIONINTERFACE_H
 
 #include "validationinterface.h"
+#include "zmq_publisher.h"
 
 #include <list>
 #include <map>
@@ -40,6 +41,7 @@ private:
 
     void *pcontext;
     std::list<CZMQAbstractNotifier *> notifiers;
+    std::shared_ptr<CZMQPublisher> zmqPublisher;
 };
 
 #endif // BITCOIN_ZMQ_ZMQNOTIFICATIONINTERFACE_H
