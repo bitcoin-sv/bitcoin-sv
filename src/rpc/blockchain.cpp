@@ -1076,6 +1076,9 @@ void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
     LOCK(cs_main);
 
     int nHeight = jsonRPCReq.params[0].get_int();
+    if (nHeight == -1) {
+        nHeight = chainActive.Height();
+    }
     if (nHeight < 0 || nHeight > chainActive.Height()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
     }
