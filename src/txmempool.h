@@ -523,7 +523,7 @@ private:
     void updateChildNL(txiter entry, txiter child, bool add);
 
     std::vector<txiter> getSortedDepthAndScoreNL() const;
-    std::map<COutPoint, TxId> mapNextTx;
+    std::map<COutPoint, const CTransactionRefWrapper*> mapNextTx;
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
 public:
