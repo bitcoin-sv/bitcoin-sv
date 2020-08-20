@@ -535,11 +535,186 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
 
 }
 
-void CTxMemPool::AcceptGroupNL(CTxMemPool::txiter payingTx, mining::CJournalChangeSet& changeSet)
+bool CTxMemPool::IsPayingEnough(const SecondaryMempoolEntryData& groupingData) const
 {
-    // find all ancestors of this tx which are in secondary mempool, this will be group members
-    auto groupMembers = GetSecondaryMempoolAncestorsNL(payingTx);
-    AcceptSingleGroupNL(groupMembers, changeSet);
+    return groupingData.fee + groupingData.feeDelta >= blockMinTxfee.GetFee(groupingData.size);
+}
+
+SecondaryMempoolEntryData CTxMemPool::CalculateSecondaryMempoolData(txiter entryIt) const
+{
+    SecondaryMempoolEntryData groupingData({
+            entryIt->GetFee(), entryIt->GetFeeDelta(), entryIt->GetTxSize(), 0});
+    
+    for (txiter parent : GetMemPoolParentsNL(entryIt)) {
+        if (!parent->IsInPrimaryMempool()) {
+            groupingData.fee += parent->groupingData->fee;
+            groupingData.feeDelta += parent->groupingData->feeDelta;
+            groupingData.size += parent->groupingData->size;
+            groupingData.ancestorsCount += parent->groupingData->ancestorsCount + 1;
+        }
+    }
+
+    return groupingData;
+}
+
+void CTxMemPool::SetGroupingData(CTxMemPool::txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData)
+{
+    // NOTE: We use modify() here because it returns a mutable reference to
+    //       the entry in the index, whereas dereferencing the iterator
+    //       returns an immutable reference, which would require a
+    //       const_cast<> and also would not update the index. Not that we
+    //       expect any of the index keys to change here.
+    mapTx.modify(entryIt, [&groupingData](CTxMemPoolEntry& entry) {
+        entry.groupingData = groupingData;});
+
+}
+
+
+CTxMemPool::ResultOfUpdateEntryGroupingDataNL CTxMemPool::UpdateEntryGroupingDataNL(CTxMemPool::txiter entryIt)
+{
+    SecondaryMempoolEntryData groupingData = CalculateSecondaryMempoolData(entryIt);
+
+    assert(!entryIt->IsInPrimaryMempool());
+
+    if(!IsPayingEnough(groupingData))
+    {
+        if(entryIt->groupingData.value() == groupingData)
+        {
+            return ResultOfUpdateEntryGroupingDataNL::NOTHING;
+        }
+
+        SetGroupingData(entryIt, groupingData);
+        return ResultOfUpdateEntryGroupingDataNL::GROUPING_DATA_MODIFIED;
+    }
+    else
+    {
+        if(groupingData.ancestorsCount == 0)
+        {
+            SetGroupingData(entryIt, std::nullopt);
+            return ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_STANDALONE;
+        }
+
+        SetGroupingData(entryIt, groupingData);
+        return ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_GROUP_PAYING_TX;
+    }
+}
+
+void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet)
+{
+    // we want to limit the number of txs that could be updated at once to mitigate potential attack where
+    // creating of one group results in accepting arbitrary number of txs to the mempool.
+    // 
+    // for example:  payFor0  payFor1  payFor2  payFor3  payFor4  payFor5  payFor6  
+    //                      \   |    \   |    \   |    \   |    \   |    \   |    \ ....      
+    //                        tx0      tx1      tx2      tx3      tx4      tx5     
+    //
+    //  if the payFor0 is submitted last, it will trigger acceptance of all transaction
+    int countOfVisitedTxs = 0;
+
+    while(!toUpdate.empty() && countOfVisitedTxs < MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO)
+    {
+        // take first item from the topo-sorted set, this transactions does not
+        // depend on any other tx in the set
+        txiter entry = *toUpdate.begin();
+        toUpdate.erase(toUpdate.begin());
+
+        assert(!entry->IsInPrimaryMempool());
+
+        // update grouping data of this entry and see what happend
+        ResultOfUpdateEntryGroupingDataNL whatHappend = UpdateEntryGroupingDataNL(entry);
+            
+        switch (whatHappend)
+        {
+            case ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_GROUP_PAYING_TX:
+            {
+                // this is paying tx of the group, we should create CPFP group
+                // find groups members
+                auto groupMembers = GetSecondaryMempoolAncestorsNL(entry);
+                // put it to primary mempool (in the journal also)
+                AcceptSingleGroupNL(groupMembers, changeSet);
+
+                // let see if any of the group member has children outside of the group
+                // if it has, put them in the toUpdate set, their grouping data should be updated
+                // because its parent is accepted to the group. it may result in accepting it to the 
+                // primary mempool because it got rid of its parents debt
+                for(auto member: groupMembers)
+                {
+                    for(auto child: GetMemPoolChildrenNL(mapTx.project<transaction_id>(member)))
+                    {
+                        if(groupMembers.find(child) == groupMembers.end())
+                        {
+                            toUpdate.insert(child);
+                        }
+                    }
+                }
+                countOfVisitedTxs += groupMembers.size();
+                break;
+            }
+            case ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_STANDALONE:
+            {
+                // accept it to primary mempool
+                changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry} );
+                secondaryMempoolSize--;
+                // enqueue children to update
+                for(auto child: GetMemPoolChildrenNL(entry))
+                {
+                    toUpdate.insert(child);
+                }
+                countOfVisitedTxs += 1;
+                break;
+            }
+            case ResultOfUpdateEntryGroupingDataNL::GROUPING_DATA_MODIFIED:
+            {
+                // enqueue children to update
+                for(auto child: GetMemPoolChildrenNL(entry))
+                {
+                    toUpdate.insert(child);
+                }
+                countOfVisitedTxs += 1;
+                break;
+            }
+            case ResultOfUpdateEntryGroupingDataNL::NOTHING:  
+            { 
+                countOfVisitedTxs += 1; 
+                break;
+            }
+            default:
+            {
+	            assert(false);
+            }
+        }
+    }
+}
+
+void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry, mining::CJournalChangeSet& changeSet)
+{
+    if(nCheckFrequency)
+    {
+        assert(GetMemPoolChildrenNL(entry).empty());
+    }
+
+    SecondaryMempoolEntryData data = CalculateSecondaryMempoolData(entry);
+    if(IsPayingEnough(data))
+    {
+        if(data.ancestorsCount == 0)
+        {
+            // accept it to primary mempool as standalone tx
+            SetGroupingData(entry, std::nullopt);
+            changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry} );
+            secondaryMempoolSize--;
+        }
+        else
+        {
+            // accept it to primary mempool as group paying tx
+            setEntriesTopoSorted toUpdate;
+            toUpdate.insert(entry);
+            TryAcceptToPrimaryMempoolNL(std::move(toUpdate), changeSet);
+        }
+    }
+    else
+    {
+        SetGroupingData(entry, data);
+    }
 }
 
 void CTxMemPool::AddUncheckedNL(
@@ -592,50 +767,14 @@ void CTxMemPool::AddUncheckedNL(
     }
     updateAncestorsOfNL(true, newit);
 
-    // Calculate CPFP statistics.
-    SecondaryMempoolEntryData groupingData{
-        newit->GetFee(), newit->GetFeeDelta(), newit->GetTxSize(), 0};
-    for (const auto& input : tx->vin) {
-        auto parent = mapTx.find(input.prevout.GetTxId());
-        if (parent != mapTx.end() && !parent->IsInPrimaryMempool()) {
-            groupingData.fee += parent->groupingData->fee;
-            groupingData.feeDelta += parent->groupingData->feeDelta;
-            groupingData.size += parent->groupingData->size;
-            groupingData.ancestorsCount += parent->groupingData->ancestorsCount + 1;
-        }
-    }
-
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
-    bool paysEnoughFee = groupingData.fee + groupingData.feeDelta
-                            >= blockMinTxfee.GetFee(groupingData.size);
-
-
-    if (groupingData.ancestorsCount > 0 || !paysEnoughFee) {
-
-        // This transaction is not paying enough, it goes into the secondary mempool.
-        // NOTE: We use modify() here because it returns a mutable reference to
-        //       the entry in the index, whereas dereferencing the iterator
-        //       returns an immutable reference, which would require a
-        //       const_cast<> and also would not update the index. Not that we
-        //       expect any of the index keys to change here.
-        mapTx.modify(newit, [&groupingData](CTxMemPoolEntry& entry) {
-                                entry.groupingData.emplace(groupingData);
-                            });
-        ++secondaryMempoolSize;
-        
-        if(paysEnoughFee)
-        {
-            AcceptGroupNL(newit, nonNullChangeSet.Get());
-        }
-
-    }
-    else
-    {
-        // Pays enough fee.
-        // This transaction will go directly into the primary mempool.
-        nonNullChangeSet.Get().addOperation(CJournalChangeSet::Operation::ADD, {*newit});
-    }
+    // set dummy data that it looks like it is in the secondary mempool
+    SetGroupingData(newit, SecondaryMempoolEntryData());
+    secondaryMempoolSize++;
+    // now see if it can be accepted to primary mempool
+    // this will set correct groupin data if it stays in the secondary mempool
+    TryAcceptChildlessTxToPrimaryMempoolNL(newit, nonNullChangeSet.Get());
 
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();

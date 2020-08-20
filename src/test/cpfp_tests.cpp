@@ -94,25 +94,38 @@ CTxMemPoolTestAccess::txiter AddToMempool(CTxMemPoolEntry& entry)
 
 BOOST_FIXTURE_TEST_SUITE(cpfp_tests, TestingSetup)
 
-BOOST_AUTO_TEST_CASE(simple_group) 
+BOOST_AUTO_TEST_CASE(group_forming) 
 {
-    //          entryNotPaying
-    //                 |
-    //         entryPayForItself
-    //          |            |   
-    //   entryPayForGroup   entryNotPaying2
+    //          |                    |
+    //          |              entryNotPaying
+    //          |                    |
+    // entryNotPaying3   +---- entryPayForItself ----+
+    //          |        |           |               |
+    //     entryNotPaying4     entryPayForGroup   entryNotPaying2
+    //          |                    
+    //     entryPayingFor3And4
+    //
+    //  
     //
     //
-    //
-    //  entries in group (entering primary mempool): entryNotPaying, entryPayForItself and entryPayForGroup
+    //  entries in group1 (entering primary mempool): entryNotPaying, entryPayForItself and entryPayForGroup
+    //  entries in group2 (entering primary mempool): entryNotPaying3, entryNotPaying4 and entryPayingFor3And4
     //  entry still in secondary: entryNotPaying2
 
     auto entryNotPaying = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
     
-    auto entryPayForItself = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying.GetSharedTx(), 0)}, 2);
+    auto entryPayForItself = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying.GetSharedTx(), 0)}, 3);
 
     auto entryNotPaying2 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 1)}, 1);
     
+    auto entryNotPaying3 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
+
+    auto entryNotPaying4 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 2), std::make_tuple(entryNotPaying3.GetSharedTx(), 0)}, 1);
+    
+    auto sizeOfNotPaying3and4 = entryNotPaying3.GetSharedTx()->GetTotalSize() + entryNotPaying4.GetSharedTx()->GetTotalSize();
+    auto feeOfNotPaying3and4 = entryNotPaying3.GetModifiedFee() + entryNotPaying4.GetModifiedFee();
+    auto entryPayingFor3And4 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying4.GetSharedTx(), 0)}, 1, sizeOfNotPaying3and4, feeOfNotPaying3and4);
+
     auto sizeSoFar = entryNotPaying.GetSharedTx()->GetTotalSize() + entryPayForItself.GetSharedTx()->GetTotalSize();
     auto feeSoFar = entryNotPaying.GetModifiedFee() + entryPayForItself.GetModifiedFee();
     auto entryPayForGroup = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 0)}, 1, sizeSoFar, feeSoFar);
@@ -120,7 +133,6 @@ BOOST_AUTO_TEST_CASE(simple_group)
     
     CTxMemPoolTestAccess testAccess(mempool);
     auto journal = testAccess.getJournalBuilder().getCurrentJournal();
-    auto& mapTx = testAccess.mapTx();
 
     auto notPayingIt = AddToMempool(entryNotPaying);
     BOOST_ASSERT(!notPayingIt->IsInPrimaryMempool());
@@ -128,27 +140,63 @@ BOOST_AUTO_TEST_CASE(simple_group)
     auto payForItselfIt = AddToMempool(entryPayForItself);
     BOOST_ASSERT(!payForItselfIt->IsInPrimaryMempool());
 
-    auto notPayingIt2 = AddToMempool(entryNotPaying2);
-    BOOST_ASSERT(!notPayingIt2->IsInPrimaryMempool());
+    auto notPaying2It = AddToMempool(entryNotPaying2);
+    BOOST_ASSERT(!notPaying2It->IsInPrimaryMempool());
     
+    auto notPaying3It = AddToMempool(entryNotPaying3);
+    BOOST_ASSERT(!notPaying3It->IsInPrimaryMempool());
+
+    auto notPaying4It = AddToMempool(entryNotPaying4);
+    BOOST_ASSERT(!notPaying4It->IsInPrimaryMempool());
+
+    // entryPayingFor3And4 pays for entryNotPaying4 and entryNotPaying3 
+    // but not enough for entryPayForItself and entryNotPaying
+    // so it will not be able to form a group yet
+    auto payFor3And4It = AddToMempool(entryPayingFor3And4); 
+    BOOST_ASSERT(!payFor3And4It->IsInPrimaryMempool());
+
+    // still nothing is accepted to primary mempool
     BOOST_ASSERT(mining::CJournalTester(journal).journalSize() == 0);
 
+    // now we will add payForGroupIt which pays enough for entryPayForItself and entryNotPaying
+    // this will cause forming a group
     auto payForGroupIt = AddToMempool(entryPayForGroup);
     BOOST_ASSERT(payForGroupIt->IsInPrimaryMempool() && payForGroupIt->IsCPFPGroupMember());
     BOOST_ASSERT(payForItselfIt->IsInPrimaryMempool() && payForItselfIt->IsCPFPGroupMember());
     BOOST_ASSERT(notPayingIt->IsInPrimaryMempool() && notPayingIt->IsCPFPGroupMember());
+    
     BOOST_ASSERT(payForGroupIt->GetCPFPGroup() == payForItselfIt->GetCPFPGroup());
     BOOST_ASSERT(payForGroupIt->GetCPFPGroup() == notPayingIt->GetCPFPGroup());
 
-    BOOST_ASSERT(!notPayingIt2->IsInPrimaryMempool());
+    // as the entryNotPaying4 (and consequently entryPayingFor3And4) is no longer obliged to pay
+    // for entryPayForItself and entryNotPaying, a new group can be formed
+    // (entryPayingFor3And4 pays for entryNotPaying4 and entryNotPaying3)
+    BOOST_ASSERT(payFor3And4It->IsInPrimaryMempool() && payFor3And4It->IsCPFPGroupMember());
+    BOOST_ASSERT(notPaying4It->IsInPrimaryMempool() && notPaying4It->IsCPFPGroupMember());
+    BOOST_ASSERT(notPaying3It->IsInPrimaryMempool() && notPaying3It->IsCPFPGroupMember());
 
+    BOOST_ASSERT(payFor3And4It->GetCPFPGroup() == notPaying4It->GetCPFPGroup());
+    BOOST_ASSERT(payFor3And4It->GetCPFPGroup() == notPaying3It->GetCPFPGroup());
+
+    // check that they are not part of the same group
+    BOOST_ASSERT(payForGroupIt->GetCPFPGroup() != payFor3And4It->GetCPFPGroup());
+
+    // nobody payed for notPaying2It, still in secondary mempool
+    BOOST_ASSERT(!notPaying2It->IsInPrimaryMempool());
+
+    // journal is no longer empty
     BOOST_ASSERT(mining::CJournalTester(journal).journalSize() != 0);
 
+    // check content of the journal
     BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*notPayingIt}));
     BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*payForItselfIt}));
     BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*payForGroupIt}));
 
-    BOOST_ASSERT(! mining::CJournalTester(journal).checkTxnExists({*notPayingIt2}));
+    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*payFor3And4It}));
+    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*notPaying4It}));
+    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*notPaying3It}));
+
+    BOOST_ASSERT(! mining::CJournalTester(journal).checkTxnExists({*notPaying2It}));
 
 };
 

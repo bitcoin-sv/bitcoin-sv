@@ -92,6 +92,14 @@ struct SecondaryMempoolEntryData
 
     // We only count ancestors in the secondary mempool.
     size_t ancestorsCount {0};
+
+    bool operator == (const SecondaryMempoolEntryData& other) const
+    {
+        return (fee == other.fee) && 
+               (feeDelta == other.feeDelta) &&
+               (size == other.size) &&
+               (ancestorsCount == other.ancestorsCount);
+    }
 };
 
 class CTxMemPoolBase {
@@ -438,6 +446,8 @@ struct DisconnectedBlockTransactions;
  */
 class CTxMemPool : public CTxMemPoolBase {
 private:
+    static constexpr int MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO = 1000;
+
     //!< Value n means that n times in 2^32 we check.
     // Sanity checks off by default for performance, because otherwise accepting
     // transactions becomes O(N^2) where N is the number of transactions in the
@@ -601,6 +611,7 @@ public:
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
+private:
     // walks through ancestors and collect all that are still in the secondary mempool
     // payingTx will be includes in this set also
     setEntriesTopoSorted GetSecondaryMempoolAncestorsNL(CTxMemPool::txiter payingTx) const;
@@ -608,13 +619,40 @@ public:
     // it will calculate grouping data for the actual group, used when a group is accepted
     SecondaryMempoolEntryData FillGroupingDataNL(const CTxMemPool::setEntriesTopoSorted& groupMembers) const;
 
+    // checks groupingData if ti pays enough to enter the primary mempool
+    bool IsPayingEnough(const SecondaryMempoolEntryData& groupingData) const;
+
+    // calculate grouping data for the given entry based on it's direct parents, does not modify entry
+    SecondaryMempoolEntryData CalculateSecondaryMempoolData(txiter entryIt) const;
+
+    // modifies entry by adding grouping data
+    void SetGroupingData(txiter entryIt, std::optional<SecondaryMempoolEntryData> groupingData);
+
     // forms a group out of groupMembers, modifys mempool entry (remove grouping data and create group object) and adds
     // changes to the changeSet
-    void AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& groupMembers, mining::CJournalChangeSet& changeSet);
+    void AcceptSingleGroupNL(const setEntriesTopoSorted& groupMembers, mining::CJournalChangeSet& changeSet);
+    
+    // result of the UpdateEntryGroupingDataNL
+    // designates what kind of change took place
+    enum class ResultOfUpdateEntryGroupingDataNL
+    {
+        NOTHING,                         // entry is not modified
+        GROUPING_DATA_MODIFIED,          // grouping data is modified, children needs to be updated
+        ADD_TO_PRIMARY_STANDALONE,       // grouping data is deleted as the entry should be accepted to the primary mempool
+        ADD_TO_PRIMARY_GROUP_PAYING_TX   // grouping data is modified, entry is detected as paying transaction for the group
+    };
 
-    // forms a group using AcceptSingleGroupNL 
-    void AcceptGroupNL(CTxMemPool::txiter payingTx, mining::CJournalChangeSet& changeSet);
+    // recalculates grouping data for the given entry, entry must not be in the primary mempool
+    ResultOfUpdateEntryGroupingDataNL UpdateEntryGroupingDataNL(CTxMemPool::txiter iter);
 
+    // tries to accept transactions to primary mempool. it recalculates grouping data, forms groups or accepts transactions as standalone
+    // this may result that some other transaction, which are not in the toUpdate, to be updated and accepted to primary mempool
+    void TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toUpdate, mining::CJournalChangeSet& changeSet);
+
+    // tries to accept entry to the primary mempool, may result in accepting other transactions (i.e. if the entry is groups paying tx)
+    void TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry, mining::CJournalChangeSet& changeSet);
+
+public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             int32_t nBlockHeight,
