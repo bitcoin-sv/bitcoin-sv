@@ -1336,13 +1336,13 @@ static UniValue sendrawtransactions(const Config &config,
             "{\n"
             "  \"known\" : [                  (json array) "
             "Already known transactions detected during processing (if there are any)\n"
-            "      \"txid\" : \"hash\",           (string) "
+            "      \"txid\",           (string) "
             "The transaction id\n"
             "      ,...\n"
             "  ],\n"
             "  \"evicted\" : [                (json array) "
             "Transactions accepted by the mempool and then evicted due to insufficient fee (if there are any)\n"
-            "      \"txid\" : \"hash\",           (string) "
+            "      \"txid\",           (string) "
             "The transaction id\n"
             "      ,...\n"
             "  ],\n"
@@ -1353,27 +1353,26 @@ static UniValue sendrawtransactions(const Config &config,
             "The transaction id\n"
             "      \"reject_code\" : n,        (numeric) "
             "The reject code set during validation\n"
-            "      \"reject_reason\" : \"text\",  (string) "
+            "      \"reject_reason\" : \"text\"  (string) "
             "The reject reason set during validation\n"
-            "      \"error\" : \"text\"           (string) "
-            "The error message related to the transaction\n"
             "    }\n"
             "    ,...\n"
             "  ]\n"
             "}\n"
 
-            "\nExamples:\n"
-            "\nCreate a transaction\n" +
-            HelpExampleCli("createrawtransaction",
-                           "\"[{\\\"txid\\\" : "
-                           "\\\"mytxid\\\",\\\"vout\\\":0}]\" "
-                           "\"{\\\"myaddress\\\":0.01}\"") +
-            "Sign the transaction, and get back the hex\n" +
-            HelpExampleCli("signrawtransaction", "\"myhex\"") +
-            "\nSend the transaction (signed hex)\n" +
-            HelpExampleCli("sendrawtransaction", "\"signedhex\"") +
-            "\nAs a json rpc call\n" +
-            HelpExampleRpc("sendrawtransaction", "\"signedhex\""));
+            "\nExamples:\n" +
+            HelpExampleCli("sendrawtransactions",
+                           "\"[{\\\"hex\\\":\\\"hexstring\\\"}]\"") +
+            HelpExampleCli("sendrawtransactions",
+                           "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true}]\"") +
+            HelpExampleCli("sendrawtransactions",
+                           "\"[{\\\"hex\\\":\\\"hexstring\\\", \\\"allowhighfees\\\":true, \\\"dontcheckfee\\\":true}]\"") +
+            HelpExampleRpc("sendrawtransactions",
+                           "[{\"hex\":\"hexstring\"}]") +
+            HelpExampleRpc("sendrawtransactions",
+                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true}]") +
+            HelpExampleRpc("sendrawtransactions",
+                           "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]"));
     }
 
     RPCTypeCheck(request.params, {UniValue::VARR});
