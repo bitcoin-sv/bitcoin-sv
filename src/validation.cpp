@@ -1806,7 +1806,9 @@ void ProcessValidatedTxn(
             PostValidationStepsForFinalisedTxn(txStatus, pool, handlers);
         }
         // Logging txn commit status
-        LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
+        if (!state.IsResubmittedTx()) {
+            LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
+        }
     }
     // If txn validation or commit has failed then:
     // - uncache coins
