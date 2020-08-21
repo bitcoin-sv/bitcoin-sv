@@ -74,9 +74,6 @@
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
 
-#if ENABLE_ZMQ
-#include "zmq/zmqnotificationinterface.h"
-#endif
 
 static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
@@ -87,7 +84,8 @@ std::unique_ptr<CConnman> g_connman;
 std::unique_ptr<PeerLogicValidation> peerLogic;
 
 #if ENABLE_ZMQ
-static CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
+CCriticalSection cs_zmqNotificationInterface;
+CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
 #endif
 
 #ifdef WIN32
@@ -250,10 +248,13 @@ void Shutdown() {
 #endif
 
 #if ENABLE_ZMQ
-    if (pzmqNotificationInterface) {
-        UnregisterValidationInterface(pzmqNotificationInterface);
-        delete pzmqNotificationInterface;
-        pzmqNotificationInterface = nullptr;
+    {
+        LOCK(cs_zmqNotificationInterface);
+        if (pzmqNotificationInterface) {
+            UnregisterValidationInterface(pzmqNotificationInterface);
+            delete pzmqNotificationInterface;
+            pzmqNotificationInterface = nullptr;
+        }
     }
 #endif
 
@@ -2550,10 +2551,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 
 #if ENABLE_ZMQ
-    pzmqNotificationInterface = CZMQNotificationInterface::Create();
-
-    if (pzmqNotificationInterface) {
-        RegisterValidationInterface(pzmqNotificationInterface);
+    {
+        LOCK(cs_zmqNotificationInterface);
+        pzmqNotificationInterface = CZMQNotificationInterface::Create();
+        if (pzmqNotificationInterface) {
+            RegisterValidationInterface(pzmqNotificationInterface);
+        }
     }
 #endif
     // unlimited unless -maxuploadtarget is set

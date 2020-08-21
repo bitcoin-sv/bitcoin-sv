@@ -670,12 +670,52 @@ static UniValue echo(const Config &config, const JSONRPCRequest &request) {
     return request.params;
 }
 
+static UniValue activezmqnotifications(const Config &config, const JSONRPCRequest &request)
+{
+    if (request.fHelp || request.params.size() != 0)
+    {
+        throw std::runtime_error(
+            "activezmqnotifications\n"
+            "Get the active zmq notifications and their addresses\n"
+            "\nResult:\n"
+            "[ (array) active zmq notifications\n"
+            "    {\n"
+            "       \"notification\": \"xxxx\", (string) name of zmq notification\n"
+            "       \"address\": \"xxxx\"       (string) address of zmq notification\n"
+            "    }, ...\n"
+            "]\n"
+            "\nExamples:\n" +
+            HelpExampleCli("activezmqnotifications", "") +
+            HelpExampleRpc("activezmqnotifications", ""));
+    }
+
+    UniValue obj(UniValue::VARR);
+#if ENABLE_ZMQ
+    LOCK(cs_zmqNotificationInterface);
+    if (pzmqNotificationInterface)
+    {
+        std::vector<ActiveZMQNotifier> arrNotifiers = pzmqNotificationInterface->ActiveZMQNotifiers();
+        for (auto& n : arrNotifiers)
+        {
+            UniValue notifierData(UniValue::VOBJ);
+            notifierData.push_back(Pair("notification", n.notifierName));
+            notifierData.push_back(Pair("address", n.notifierAddress));
+            obj.push_back(notifierData);
+
+        }
+    }
+#endif
+    return obj;
+
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
     //  ------------------- ------------------------  ----------------------  ----------
     { "control",            "getinfo",                getinfo,                true,  {} }, /* uses wallet if enabled */
     { "control",            "getmemoryinfo",          getmemoryinfo,          true,  {} },
+    { "control",            "activezmqnotifications", activezmqnotifications, true,  {} },
     { "util",               "validateaddress",        validateaddress,        true,  {"address"} }, /* uses wallet if enabled */
     { "util",               "createmultisig",         createmultisig,         true,  {"nrequired","keys"} },
     { "util",               "verifymessage",          verifymessage,          true,  {"address","signature","message"} },

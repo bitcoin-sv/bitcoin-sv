@@ -10,6 +10,7 @@
 #include "validation.h"
 #include "version.h"
 
+
 void zmqError(const char *str) {
     LogPrint(BCLog::ZMQ, "zmq: Error: %s, errno=%s\n", str,
              zmq_strerror(errno));
@@ -118,6 +119,18 @@ void CZMQNotificationInterface::Shutdown() {
 
         pcontext = 0;
     }
+}
+
+std::vector<ActiveZMQNotifier> CZMQNotificationInterface::ActiveZMQNotifiers()
+{
+    std::vector<ActiveZMQNotifier> arrNotifiers;
+
+    for (auto& n : notifiers)
+    {
+        arrNotifiers.push_back({n->GetType(), n->GetAddress()});
+    }
+
+    return arrNotifiers;
 }
 
 void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,
