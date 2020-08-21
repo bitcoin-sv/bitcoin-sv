@@ -145,11 +145,9 @@ class FeeFilterTest(BitcoinTestFramework):
         tx3.rehash()
         test_node.clear_invs()
 
-        # Set test_node's fee filter to blockmintxfee-1 (-1 because of rounding in feefilter check)
-        # TODO: if the check in CORE-914 is modified change to blockmintxfee
         # Consolidation transaction will be relayed,
         # as the modified fees are set to blockmintxfee >= feefilter
-        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats-1))
+        test_node.send_and_ping(msg_feefilter(self.blockmintxfee_sats))
 
         # Send consolidation and regular tx - both should be accepted and relayed
         txid1 = node1.sendrawtransaction(tx_hex)

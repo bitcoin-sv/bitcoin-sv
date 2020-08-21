@@ -566,6 +566,11 @@ static UniValue getnetworkinfo(const Config &config,
             "relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
+			    "  \"minconsolidationfactor\": xxxxx        (numeric) minimum ratio between scriptPubKey inputs and outputs, "
+			    "0 disables consolidation transactions\n"
+			    "  \"maxconsolidationinputscriptsize\": xxxxx  (numeric) max input scriptSig size\n"
+			    "  \"minconsolidationinputmaturity\": xxxxx    (numeric) minimum number of confirmations for inputs spent\n"
+			    "  \"acceptnonstdconsolidationinput\": xxxxx   (numeric) 1 allow 0 dissallow std transactions to be spent\n"
                             "  \"localaddresses\": [                    "
                             "(array) list of local addresses\n"
                             "  {\n"
@@ -602,14 +607,14 @@ static UniValue getnetworkinfo(const Config &config,
         obj.push_back(Pair("connections", (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
         obj.push_back(Pair("addresscount", static_cast<uint64_t>(g_connman->GetAddressCount())));
     }
-    obj.push_back(Pair("minconsolidationfactor",  config.GetMinConsolidationFactor()));
-    obj.push_back(Pair("maxconsolidationinputscriptsize",  config.GetMaxConsolidationInputScriptSize()));
-    obj.push_back(Pair("minconsolidationinputmaturity",  config.GetMinConsolidationInputMaturity()));
-    obj.push_back(Pair("acceptnonstdconsolidationinput",  config.GetAcceptNonStdConsolidationInput()));
 
     obj.push_back(Pair("networks", GetNetworksInfo()));
     obj.push_back(Pair("relayfee",
                        ValueFromAmount(config.GetMinFeePerKB().GetFeePerK())));
+    obj.push_back(Pair("minconsolidationfactor",  config.GetMinConsolidationFactor()));
+    obj.push_back(Pair("maxconsolidationinputscriptsize",  config.GetMaxConsolidationInputScriptSize()));
+    obj.push_back(Pair("minconsolidationinputmaturity",  config.GetMinConsolidationInputMaturity()));
+    obj.push_back(Pair("acceptnonstdconsolidationinput",  config.GetAcceptNonStdConsolidationInput()));
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
