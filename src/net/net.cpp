@@ -821,16 +821,18 @@ void CNode::AddTxnsToInventory(const std::vector<CTxnSendingDetails>& txns)
 * Assumes the caller has taken care of locking access to the mempool,
 * and so can be called in parallel.
 */
-void CNode::RemoveTxnsFromInventory(const std::vector<CTxnSendingDetails>& txns)
+void CNode::RemoveTxnsFromInventory(const std::set<CInv>& toRemove)
 {
     // Remove them
     LOCK(cs_mInvList);
-    for (const auto& el : txns)
-    {
-         mInvList.erase(std::remove_if(mInvList.begin(), mInvList.end(), [&el](const CTxnSendingDetails& i) {
-             return i.getInv() == el.getInv(); }),
-                mInvList.end());
-      }
+
+    mInvList.erase(
+        std::remove_if(
+            mInvList.begin(), mInvList.end(), 
+            [&toRemove](const CTxnSendingDetails& i) {
+                return toRemove.find(i.getInv()) != toRemove.end(); 
+            }), 
+        mInvList.end());    
 }
 
 /** Fetch the next N items from our inventory */
