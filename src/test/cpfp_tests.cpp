@@ -256,4 +256,69 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     }
 };
 
+BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
+{
+    //  
+    //  entryNotPaying1            entryNotPaying3            RemoveForBlock
+    //        |                           |
+    // ----------------------------------------------------------
+    //        |                           |
+    //  entryNotPaying2            entryPaysForItself
+    //        |                           |
+    //   entryPaysFor2               entryPaysFor3
+    // 
+
+
+    // before: 1. entryPaysFor2 can not form a group
+    //         2. entryPaysFor3 forms a group
+    //
+    // after: 1. entryPaysFor2 forms a group (got rid of the entryNotPaying1 debt)
+    //        2  entryPaysFor3 group is disbanded, and entryPaysForItself and entryPaysFor3 are accepted as standalone
+
+    auto entryNotPaying1 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
+    auto entryNotPaying2 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryNotPaying1.GetSharedTx(), 0)}, 1);
+    auto entryPaysFor2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying2.GetSharedTx(), 0)}, 1, entryNotPaying2.GetSharedTx()->GetTotalSize());
+    auto entryNotPaying3 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
+    auto entryPayForItself = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying3.GetSharedTx(), 0)}, 3);
+    auto entryPaysFor3 = MakeEntry(mempool, CFeeRate(Amount(10000)), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 0)}, 3);
+
+    auto notPaying1   = AddToMempool(entryNotPaying1);
+    auto notPaying2   = AddToMempool(entryNotPaying2);
+    auto paysFor2     = AddToMempool(entryPaysFor2);
+    auto notPaying3   = AddToMempool(entryNotPaying3);
+    auto payForItself = AddToMempool(entryPayForItself);
+    auto paysFor3     = AddToMempool(entryPaysFor3);
+
+    CTxMemPoolTestAccess testAccess(mempool);
+    auto journal = testAccess.getJournalBuilder().getCurrentJournal();
+
+    for(auto entryIt: {notPaying1, notPaying2, paysFor2})
+    {
+        BOOST_ASSERT(!entryIt->IsInPrimaryMempool());
+        BOOST_ASSERT(!mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+    }
+
+    for(auto entryIt: {notPaying3, payForItself, paysFor3})
+    {
+        BOOST_ASSERT(entryIt->IsCPFPGroupMember());
+        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+    }
+
+    mempool.RemoveForBlock({entryNotPaying1.GetSharedTx(), entryNotPaying3.GetSharedTx()}, 0, {});
+
+    for(auto entryIt: {notPaying2, paysFor2})
+    {
+        BOOST_ASSERT(entryIt->IsInPrimaryMempool());
+        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+    }
+
+    for(auto entryIt: {payForItself, paysFor3})
+    {
+        BOOST_ASSERT(!entryIt->IsCPFPGroupMember());
+        BOOST_ASSERT(entryIt->IsInPrimaryMempool());
+        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+    }
+
+};
+
 BOOST_AUTO_TEST_SUITE_END()

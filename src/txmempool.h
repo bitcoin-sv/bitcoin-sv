@@ -653,9 +653,11 @@ private:
     void TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry, mining::CJournalChangeSet& changeSet);
 
     // removes transactions from the primary mempool, together with all descedants. if we happen to remove a group then the group is disbanded
-    // and all its members are removed, together with all their children. If the entries are expected to be revisited later one can set putDummyGroupingData
-    // to false to avoid recalculation of the grouping data
-    setEntriesTopoSorted RemoveFromPrimaryMempoolNL(setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, bool putDummyGroupingData = false);
+    // and all its members are removed, together with all their children. 
+    //   -if the entries are expected to be revisited later one can set putDummyGroupingData to false to avoid recalculation of the grouping data
+    //   -one can set which entries can be ignored when disbanding groups by setting variable "entriesToIgnore"
+    setEntriesTopoSorted RemoveFromPrimaryMempoolNL(setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, 
+        bool putDummyGroupingData = false, const setEntries* entriesToIgnore = nullptr);
 
 public:
     void RemoveForBlock(
@@ -1142,10 +1144,6 @@ private:
             mining::CJournalChangeSet& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedWith = nullptr);
-
-    void removeConflictsNL(
-            const CTransaction &tx,
-            const mining::CJournalChangeSetPtr& changeSet);
 
     void clearNL();
 

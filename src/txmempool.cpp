@@ -678,7 +678,8 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
     }
 }
 
-CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, bool putDummyGroupingData)
+CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, 
+    bool putDummyGroupingData, const setEntries* entriesToIgnore)
 {
     setEntriesTopoSorted removed;
 
@@ -705,10 +706,15 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
             auto group = entry->group;
             for(txiter groupMember: group->transactions)
             {
-                mapTx.modify(groupMember, 
-                    [](CTxMemPoolEntry& entry) {entry.group.reset();});
-                // we have removed group object so it will look like it is accepted as standalone in next round
-                toRemove.insert(groupMember);
+                // if the entry is in the entriesToIgnore skip it
+                if(entriesToIgnore == nullptr || entriesToIgnore->find(groupMember) == entriesToIgnore->end())
+                {
+                    mapTx.modify(groupMember, 
+                        [](CTxMemPoolEntry& entry) {entry.group.reset();});
+                    // we have removed group object so it will look like it is accepted as standalone in next round
+                    toRemove.insert(groupMember);
+                }
+                
             }
         }
         else
@@ -758,8 +764,7 @@ void CTxMemPool::AddUncheckedNL(
     // Update transaction for any feeDelta created by PrioritiseTransaction
     // TODO: refactor so that the fee delta is calculated before inserting into
     // mapTx.
-    std::map<uint256, std::pair<double, Amount>>::const_iterator pos =
-        mapDeltas.find(hash);
+    auto pos = mapDeltas.find(hash);
     if (pos != mapDeltas.end()) {
         const std::pair<double, Amount> &deltas = pos->second;
         if (deltas.second != Amount(0)) {
@@ -1007,51 +1012,101 @@ void CTxMemPool::RemoveForReorg(
     removeStagedNL(setAllRemoves, nonNullChangeSet.Get(), MemPoolRemovalReason::REORG);
 }
 
-void CTxMemPool::removeConflictsNL(
-    const CTransaction &tx,
-    const CJournalChangeSetPtr& changeSet) {
-
-    // Remove transactions which depend on inputs of tx, recursively
-    for (const CTxIn &txin : tx.vin) {
-        auto it = mapNextTx.find(txin.prevout);
-        if (it != mapNextTx.end()) {
-            const auto& conflictTxId = it->second->GetId();
-            if (conflictTxId != tx.GetId()) {
-                clearPrioritisationNL(conflictTxId);
-                removeRecursiveNL(conflictTxId, changeSet, MemPoolRemovalReason::CONFLICT, &tx);
-            }
-        }
-    }
-}
-
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     int32_t nBlockHeight,
     const CJournalChangeSetPtr& changeSet) {
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
+
     std::unique_lock lock(smtx);
-    std::vector<const CTxMemPoolEntry *> entries;
-    for (const auto &tx : vtx) {
-        uint256 txid = tx->GetId();
 
-        indexed_transaction_set::iterator i = mapTx.find(txid);
-        if (i != mapTx.end()) {
-            entries.push_back(&*i);
+    setEntries toRemove; // entries which should be removed
+    setEntriesTopoSorted childrenOfToRemoveGroupMembers; // immediate children of entries we will remove that are members of the cpfp group, need to be updated after removal
+    setEntriesTopoSorted childrenOfToRemoveSecondaryMempool; // immediate children of entries we will remove that are in the secondary mempool, need to be updated after removal
+
+    std::unordered_set<TxId, SaltedTxidHasher> txidFromBlock; // spent outputs by tx from block
+
+    for(auto vtxIter = vtx.rbegin();  vtxIter != vtx.rend();  vtxIter++)
+    {
+        auto& tx = *vtxIter;
+        
+        auto found = mapTx.find(tx->GetId()); // see if we have this transaction from block
+
+        if(found != mapTx.end()) 
+        {
+            toRemove.insert(found);
+            for(auto child: GetMemPoolChildrenNL(found))
+            {
+                // we are iterating block transactions backwards (we will always first visit child than its parent) 
+                // all children that are scheduled for removal are in txToRemove set already
+                if(toRemove.find(child) == toRemove.end())
+                {
+                    // we will not remove this child
+                    // let's see if it need to be updated later on
+                    // it needs to be updated in two cases: 
+                    //     1. parent and child are part of the same group (group needs to be disbanded)
+                    //     2. child is in secondary mempool, as well as it's parent (grouping data needs to be updated)
+                    if(found->IsCPFPGroupMember() && child->IsCPFPGroupMember() && (found->GetCPFPGroup() == child->GetCPFPGroup()))
+                    {
+                        childrenOfToRemoveGroupMembers.insert(child);
+                    }
+                    else if(!found->IsInPrimaryMempool() && !child->IsInPrimaryMempool())
+                    {
+                        childrenOfToRemoveSecondaryMempool.insert(child);
+                    }
+
+                    // cutting connection from child tx to soon to be removed parent
+                    updateParentNL(child, found, false);
+                }
+            }
+        }
+        else
+        {
+            // walk through all inputs by spent tx
+            for (const CTxIn &txin : tx->vin) 
+            {
+                // and see if we already spending them
+                auto it = mapNextTx.find(txin.prevout);
+                if (it != mapNextTx.end()) 
+                {
+                    // found double-spend
+
+                    // collect all descendants of the tx which made double-spend
+                    setEntries conflictedWithDescendants;
+                    GetDescendantsNL(mapTx.find(it->second->GetId()), conflictedWithDescendants);
+
+                    for(txiter inConflict: conflictedWithDescendants)
+                    {
+                        // inConflict will be erased so remove it from the sets of txs that needs to be updated
+                        childrenOfToRemoveGroupMembers.erase(inConflict);
+                        childrenOfToRemoveSecondaryMempool.erase(inConflict);
+                    }
+
+                    // remove conflicted tx from mempool (together with all descendants)
+                    removeStagedNL(conflictedWithDescendants, nonNullChangeSet.Get(), MemPoolRemovalReason::CONFLICT, tx.get());
+                }
+            }
         }
     }
 
-    // Before the txs in the new block have been removed from the mempool,
-    for (const auto &tx : vtx) {
-        txiter it = mapTx.find(tx->GetId());
-        if (it != mapTx.end()) {
-            setEntries stage;
-            stage.insert(it);
-            removeStagedNL(stage, nonNullChangeSet.Get(), MemPoolRemovalReason::BLOCK); // TODO: this will not work any more
-        }
-        removeConflictsNL(*tx, changeSet);
-        clearPrioritisationNL(tx->GetId());
+    // remove affected groups from primary mempool
+    // we are ignoring members of "toRemove" (we will remove them in the removeUncheckedNL), so that "removedFromPrimary" can not contain transactions that will be removed
+    auto removedFromPrimary = RemoveFromPrimaryMempoolNL(std::move(childrenOfToRemoveGroupMembers), nonNullChangeSet.Get(), true, &toRemove);
+
+    // now remove transactions from mempool
+    for(txiter entry: toRemove)
+    {
+        removeUncheckedNL(entry, nonNullChangeSet.Get(), MemPoolRemovalReason::BLOCK);
     }
+
+    setEntriesTopoSorted toRecheck;
+    // we will recheck all disbanded groups members and secondary mempool children together
+    std::set_union(removedFromPrimary.begin(), removedFromPrimary.end(), 
+                   childrenOfToRemoveSecondaryMempool.begin(), childrenOfToRemoveSecondaryMempool.end(),
+                   std::inserter(toRecheck, toRecheck.begin()), InsrtionOrderComparator());
+
+    TryAcceptToPrimaryMempoolNL(std::move(toRecheck), nonNullChangeSet.Get());
 
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = true;
@@ -1914,7 +1969,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
 
     disconnectpool.queuedTx.clear();
 
-    // we will reset the journal soon, we should clear the changeSet also
+    // we are about to delete journal, changes in the changeSet make no sense now
     if(changeSet)
     {
         changeSet->clear();
