@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2019 Bitcoin Association
+# Copyright (c) 2019-2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 """
 Test p2p behavior for non-final txns.
@@ -11,6 +11,10 @@ Both nodes agree on contents of their mempools.
 
 Send finalising txn to node0. It should be forwarded over P2P to node1.
 Both nodes agree on contents of their mempools.
+
+---
+To submit transactions p2p and rpc interfaces are used
+(in separate test cases).
 
 """
 
@@ -29,12 +33,70 @@ class NonFinalP2PTest(BitcoinTestFramework):
         self.extra_args = [['-debug', '-genesisactivationheight=%d' % 100,
                             '-txnpropagationfreq=1', '-txnvalidationasynchrunfreq=1']] * self.num_nodes
 
-    def create_locked_transaction(self, prevtx, n, sig, value, scriptPubKey, lockTime, sequence):
-        tx = self.create_transaction(prevtx, n, sig, value, scriptPubKey)
-        tx.nLockTime = lockTime
-        tx.vin[0].nSequence = sequence
+    def send_txn(self, rpcsend, conn, tx):
+        if conn is not None:
+            conn.send_message(msg_tx(tx))
+        elif rpcsend is not None:
+            self.rpc_send_txn(rpcsend, tx)
+        else:
+            raise Exception("Unspecified interface!")
+
+    def rpc_send_txn(self, rpcsend, tx):
+        if "sendrawtransaction" == rpcsend._service_name:
+            rpcsend(ToHex(tx))
+        elif "sendrawtransactions" == rpcsend._service_name:
+            rpcsend([{'hex': ToHex(tx)}])
+        else:
+            raise Exception("Unsupported rpc method!")
+
+    def test_case(self, rpcsend=None, conn=None):
+        # First create funding transaction that pays to output that does not require signatures.
+        out_value = 10000
+        ftx = CTransaction()
+        ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
+        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
+        ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
+        ftx = FromHex(CTransaction(), ftxHex)
+        ftx.rehash()
+
+        # Allow coinbase to mature
+        self.nodes[0].generate(101)
+
+        # Feed in funding txn and wait for both nodes to see it
+        self.send_txn(rpcsend, conn, ftx)
+
+        wait_until(lambda: ftx.hash in self.nodes[0].getrawmempool(), timeout=5)
+        wait_until(lambda: ftx.hash in self.nodes[1].getrawmempool(), timeout=5)
+
+        # Create non-final txn.
+        parent_txid = ftx.sha256
+        send_value = out_value - 500;
+        tx = CTransaction()
+        tx.vin.append(CTxIn(COutPoint(parent_txid, 0), b'', 0x01))
+        tx.vout.append(CTxOut(int(send_value), CScript([OP_TRUE])))
+        tx.nLockTime = int(time.time()) + 300
         tx.rehash()
-        return tx
+
+        # Send non-final txn to node0. It should be forwarded over P2P to node1.
+        self.send_txn(rpcsend, conn, tx)
+
+        wait_until(lambda: tx.hash in self.nodes[0].getrawnonfinalmempool(), timeout=5)
+        wait_until(lambda: tx.hash in self.nodes[1].getrawnonfinalmempool(), timeout=5)
+        assert(tx.hash not in self.nodes[0].getrawmempool())
+        assert(tx.hash not in self.nodes[1].getrawmempool())
+
+        # Create finalising txn.
+        finaltx = copy.deepcopy(tx)
+        finaltx.vin[0].nSequence = 0xFFFFFFFF;
+        finaltx.rehash()
+
+        # Send finalising txn to node0. It should be forwarded over P2P to node1.
+        self.send_txn(rpcsend, conn, finaltx)
+
+        wait_until(lambda: finaltx.hash in self.nodes[0].getrawmempool(), timeout=5)
+        wait_until(lambda: finaltx.hash in self.nodes[1].getrawmempool(), timeout=5)
+        assert(tx.hash not in self.nodes[0].getrawnonfinalmempool())
+        assert(tx.hash not in self.nodes[1].getrawnonfinalmempool())
 
     def run_test(self):
         # Create a P2P connection to the first node
@@ -52,50 +114,16 @@ class NonFinalP2PTest(BitcoinTestFramework):
         # Out of IBD
         self.nodes[0].generate(1)
 
-        # First create funding transaction that pays to output that does not require signatures.
-        out_value = 10000
-        ftx = CTransaction()
-        ftx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
-        ftxHex = self.nodes[0].fundrawtransaction(ToHex(ftx),{ 'changePosition' : len(ftx.vout)})['hex']
-        ftxHex = self.nodes[0].signrawtransaction(ftxHex)['hex']
-        ftx = FromHex(CTransaction(), ftxHex)
-        ftx.rehash()
+        # Create shortcuts.
+        conn = connections[0]
+        rpc = conn.rpc
 
-        # Allow coinbase to mature
-        self.nodes[0].generate(101)
-
-        # Feed in funding txn and wait for both nodes to see it
-        connections[0].send_message(msg_tx(ftx))
-        wait_until(lambda: ftx.hash in self.nodes[0].getrawmempool(), timeout=5)
-        wait_until(lambda: ftx.hash in self.nodes[1].getrawmempool(), timeout=5)
-
-        # Create non-final txn.
-        parent_txid = ftx.sha256
-        send_value = out_value - 500;
-        tx = CTransaction()
-        tx.vin.append(CTxIn(COutPoint(parent_txid, 0), b'', 0x01))
-        tx.vout.append(CTxOut(int(send_value), CScript([OP_TRUE])))
-        tx.nLockTime = int(time.time()) + 300
-        tx.rehash()
-
-        # Send non-final txn to node0. It should be forwarded over P2P to node1.
-        connections[0].send_message(msg_tx(tx))
-        wait_until(lambda: tx.hash in self.nodes[0].getrawnonfinalmempool(), timeout=5)
-        wait_until(lambda: tx.hash in self.nodes[1].getrawnonfinalmempool(), timeout=5)
-        assert(tx.hash not in self.nodes[0].getrawmempool())
-        assert(tx.hash not in self.nodes[1].getrawmempool())
-
-        # Create finalising txn.
-        finaltx = copy.deepcopy(tx)
-        finaltx.vin[0].nSequence = 0xFFFFFFFF;
-        finaltx.rehash()
-
-        # Send finalising txn to node0. It should be forwarded over P2P to node1.
-        connections[0].send_message(msg_tx(finaltx))
-        wait_until(lambda: finaltx.hash in self.nodes[0].getrawmempool(), timeout=5)
-        wait_until(lambda: finaltx.hash in self.nodes[1].getrawmempool(), timeout=5)
-        assert(tx.hash not in self.nodes[0].getrawnonfinalmempool())
-        assert(tx.hash not in self.nodes[1].getrawnonfinalmempool())
+        # Use p2p interface.
+        self.test_case(rpcsend=None, conn=conn)
+        # Use sendrawtransaction rpc interface.
+        self.test_case(rpc.sendrawtransaction)
+        # Use sendrawtransactions rpc interface.
+        self.test_case(rpc.sendrawtransactions)
 
 if __name__ == '__main__':
     NonFinalP2PTest().main()
