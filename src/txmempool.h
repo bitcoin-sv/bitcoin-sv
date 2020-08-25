@@ -37,6 +37,7 @@
 
 class CAutoFile;
 class CBlockIndex;
+class CEvictionCandidateTracker;
 class Config;
 class CoinsDB;
 class CoinsDBView;
@@ -480,8 +481,6 @@ private:
     // Sub-pool for time locked txns
     CTimeLockedMempool mTimeLockedPool {};
 
-    friend class CEvictionCandidateTracker;
-
     // The group definition needs access to the mempool index iterator type.
     friend struct CPFPGroup;
 
@@ -572,6 +571,18 @@ private:
             return nextIndex++;
         }
     } insertionIndex;
+
+    // The eviction tracker must be declared after mapLinks because it refers to
+    // it and must be destroyed first.
+    friend class CEvictionCandidateTracker;
+    std::shared_ptr<CEvictionCandidateTracker> evictionTracker;
+    static int64_t evaluateEvictionCandidateNL(txiter entry);
+
+    // Shortcuts for eviction tracking. Must be called with the mempool locked.
+    void TrackEntryAdded(CTxMemPool::txiter entry);
+    void TrackEntryRemoved(const TxId& txId, const setEntries& immediateParents);
+    void TrackEntryModified(CTxMemPool::txiter entry);
+
 
 public:
     /** Create a new CTxMemPool. */

@@ -4,6 +4,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "txmempool.h"
+#include "txmempoolevictioncandidates.h"
 #include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
@@ -502,6 +503,7 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
                                 entry.groupingData = std::nullopt;
                             });
         secondaryMempoolSize--; // moving from secondary mempool to the primary
+        TrackEntryModified(entry);
     }
 
     // submit the group
@@ -624,6 +626,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
                     }
                 }
                 countOfVisitedTxs += groupMembers.size();
+                TrackEntryModified(entry);
                 break;
             }
             case ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_STANDALONE:
@@ -637,6 +640,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
                     toUpdate.insert(child);
                 }
                 countOfVisitedTxs += 1;
+                TrackEntryModified(entry);
                 break;
             }
             case ResultOfUpdateEntryGroupingDataNL::GROUPING_DATA_MODIFIED:
@@ -647,6 +651,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
                     toUpdate.insert(child);
                 }
                 countOfVisitedTxs += 1;
+                TrackEntryModified(entry);
                 break;
             }
             case ResultOfUpdateEntryGroupingDataNL::NOTHING:  
@@ -757,6 +762,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
                 SecondaryMempoolEntryData groupingData = CalculateSecondaryMempoolData(entry);
                 SetGroupingData(entry, groupingData);
             }
+            TrackEntryModified(entry);
         }
     }
     return removed;
@@ -830,6 +836,9 @@ void CTxMemPool::AddUncheckedNL(
     if (pnDynamicMemoryUsage) {
         *pnDynamicMemoryUsage = DynamicMemoryUsageNL();
     }
+
+    // Update the eviction candidate tracker.
+    TrackEntryAdded(newit);
 }
 
 void CTxMemPool::removeUncheckedNL(
@@ -860,6 +869,13 @@ void CTxMemPool::removeUncheckedNL(
     // FIXME: we are not implemented IncrementalDynamicMemoryUsage for unordered set. see: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
     //    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
     //                        memusage::DynamicUsage(mapLinks[it].children);
+
+    setEntries parents;
+    TxId txid;
+    if (evictionTracker) {
+        txid = it->GetTxId();
+        parents = std::move(mapLinks.at(it).parents);
+    }
     mapLinks.erase(it);
     mapTx.erase(it);
 
@@ -873,6 +889,8 @@ void CTxMemPool::removeUncheckedNL(
     }
 
     nTransactionsUpdated++;
+    
+    TrackEntryRemoved(txid, parents);
 }
 
 // Calculates descendants of entry that are not already in setDescendants, and
@@ -1036,6 +1054,8 @@ void CTxMemPool::RemoveForBlock(
 
     std::unique_lock lock(smtx);
 
+    evictionTracker.reset();
+
     setEntries toRemove; // entries which should be removed
     setEntriesTopoSorted childrenOfToRemoveGroupMembers; // immediate children of entries we will remove that are members of the cpfp group, need to be updated after removal
     setEntriesTopoSorted childrenOfToRemoveSecondaryMempool; // immediate children of entries we will remove that are in the secondary mempool, need to be updated after removal
@@ -1129,6 +1149,7 @@ void CTxMemPool::RemoveForBlock(
 
 
 void CTxMemPool::clearNL() {
+    evictionTracker.reset();
     mapLinks.clear();
     mapTx.clear();
     mapNextTx.clear();
@@ -2175,6 +2196,48 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
         lastRollingFeeUpdate = time;
     }
     return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
+}
+
+int64_t CTxMemPool::evaluateEvictionCandidateNL(txiter entry)
+{
+    if(entry->IsCPFPGroupMember())
+    {
+        const auto& evalParams = entry->GetCPFPGroup()->evaluationParams;
+        return (evalParams.fee + evalParams.feeDelta).GetSatoshis() * 1000 / entry->GetTxSize();
+    }
+    
+    int64_t score = entry->GetFee().GetSatoshis() * 1000 / entry->GetTxSize();
+    if(!entry->IsInPrimaryMempool())
+    {
+        // tx is secondary mempool, decremet its score
+        score += std::numeric_limits<int64_t>::min();
+    }
+    return score;
+
+}
+
+void CTxMemPool::TrackEntryAdded(CTxMemPool::txiter entry)
+{
+    if (evictionTracker)
+    {
+        evictionTracker->EntryAdded(entry);
+    }
+}
+
+void CTxMemPool::TrackEntryRemoved(const TxId& txId, const setEntries& immediateParents)
+{
+    if (evictionTracker)
+    {
+        evictionTracker->EntryRemoved(txId, immediateParents);
+    }
+}
+
+void CTxMemPool::TrackEntryModified(CTxMemPool::txiter entry)
+{
+    if (evictionTracker)
+    {
+        evictionTracker->EntryModified(entry);
+    }
 }
 
 std::vector<TxId> CTxMemPool::TrimToSize(
