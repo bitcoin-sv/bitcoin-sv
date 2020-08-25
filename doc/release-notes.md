@@ -69,6 +69,7 @@
 * Remove support for upgrading database from old format.
 * Handle exception in ActivateBestChainStep
 * Instruction iterator fix for OP_INVALIDOPCODE traversal.
+* Optimise relaying of transactions.
 
 ## Scaling Test Network (STN) Reset
 N/A
