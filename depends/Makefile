@@ -5,7 +5,7 @@ BASE_CACHE ?= $(BASEDIR)/built
 SDK_PATH ?= $(BASEDIR)/SDKs
 NO_WALLET ?=
 NO_UPNP ?=
-FALLBACK_DOWNLOAD_PATH ?= https://bitcoinsv.io/depends-sources
+FALLBACK_DOWNLOAD_PATH ?= https://download.bitcoinsv.io/depends-sources
 
 BUILD = $(shell ./config.guess)
 HOST ?= $(BUILD)
