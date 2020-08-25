@@ -389,26 +389,26 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
 
     std::vector<CTransactionRef> vtx;
     SetMockTime(42);
-    SetMockTime(42 + CTestTxMemPool::ROLLING_FEE_HALFLIFE);
+    SetMockTime(42 + CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       maxFeeRateRemoved.GetFeePerK() + feeIncrement);
     // ... we should keep the same min fee until we get a block
     pool.RemoveForBlock(vtx, 1, nullChangeSet);
-    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE);
+    SetMockTime(42 + 2 * CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 2);
     // ... then feerate should drop 1/2 each halflife
 
-    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE +
-                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 2);
+    SetMockTime(42 + 2 * CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE +
+                CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE / 2);
     BOOST_CHECK_EQUAL(
         pool.GetMinFee(pool.DynamicMemoryUsage() * 5 / 2).GetFeePerK(),
         (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 4);
     // ... with a 1/2 halflife when mempool is < 1/2 its target size
 
-    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE +
-                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 2 +
-                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 4);
+    SetMockTime(42 + 2 * CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE +
+                CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE / 2 +
+                CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE / 4);
     BOOST_CHECK_EQUAL(
         pool.GetMinFee(pool.DynamicMemoryUsage() * 9 / 2).GetFeePerK(),
         (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 8);
