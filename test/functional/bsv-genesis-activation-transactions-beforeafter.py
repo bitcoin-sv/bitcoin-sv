@@ -15,12 +15,10 @@ Genesis height is 102.
 5. Generate new block with tx1 and tx2. It is on height 103 so it is not rejected.
 """
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.script import CScript, OP_RETURN, OP_TRUE, OP_ADD
+from test_framework.script import CScript, OP_RETURN, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, p2p_port
-from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.mininode import msg_tx
-from time import sleep
+from test_framework.util import assert_equal
+from test_framework.mininode import msg_tx, wait_until
 
 class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
 
@@ -51,7 +49,7 @@ class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
         tx1 = create_transaction(out[0].tx, out[0].n, b'', 100000, CScript([OP_RETURN]))
         self.test.connections[0].send_message(msg_tx(tx1))
         # wait for transaction processing
-        sleep(1)
+        wait_until(lambda: tx1.hash in node.getrawmempool(), timeout=5)
 
         # generate an empty block, height is 102
         block(1, spend=out[1])
@@ -60,7 +58,7 @@ class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
         tx2 = create_transaction(tx1, 0, b'\x51', 1, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(tx2))
         # wait for transaction processing
-        sleep(1)
+        wait_until(lambda: tx2.hash in node.getrawmempool(), timeout=5)
 
         # Mine block (height 103) with new transactions.
         self.nodes[0].generate(1)
