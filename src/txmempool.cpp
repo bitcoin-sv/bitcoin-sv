@@ -1054,24 +1054,32 @@ std::string CTxMemPool::checkJournalNL() const
     {
         // Check this mempool txn also appears in the journal
         const CJournalEntry tx { *it };
-        if(!tester.checkTxnExists(tx))
+        if(it->IsInPrimaryMempool() && !tester.checkTxnExists(tx))
         {
-            res << "Txn " << tx.getTxn()->GetId().ToString() << " is in the mempool but not the journal" << std::endl;
+            res << "Txn " << tx.getTxn()->GetId().ToString() << " is in the primary mempool but not the journal" << std::endl;
         }
 
-        for(const CTxIn& txin : tx.getTxn()->vin)
+        if(!it->IsInPrimaryMempool() && tester.checkTxnExists(tx))
         {
-            auto prevoutit { mapTx.find(txin.prevout.GetTxId()) };
-            if(prevoutit != mapTx.end())
+            res << "Txn " << tx.getTxn()->GetId().ToString() << " is not in the primary mempool but it is in the journal" << std::endl;
+        }
+
+        if(it->IsInPrimaryMempool())
+        {
+            for(const CTxIn& txin : tx.getTxn()->vin)
             {
-                // Check this in mempool ancestor appears before its descendent in the journal
-                const CJournalEntry prevout { *prevoutit };
-                CJournalTester::TxnOrder order { tester.checkTxnOrdering(prevout, tx) };
-                if(order != CJournalTester::TxnOrder::BEFORE)
+                auto prevoutit { mapTx.find(txin.prevout.GetTxId()) };
+                if(prevoutit != mapTx.end())
                 {
-                    res << "Ancestor " << prevout.getTxn()->GetId().ToString() << " of "
-                        << tx.getTxn()->GetId().ToString() << " appears "
-                        << enum_cast<std::string>(order) << " in the journal" << std::endl;
+                    // Check this in mempool ancestor appears before its descendent in the journal
+                    const CJournalEntry prevout { *prevoutit };
+                    CJournalTester::TxnOrder order { tester.checkTxnOrdering(prevout, tx) };
+                    if(order != CJournalTester::TxnOrder::BEFORE)
+                    {
+                        res << "Ancestor " << prevout.getTxn()->GetId().ToString() << " of "
+                            << tx.getTxn()->GetId().ToString() << " appears "
+                            << enum_cast<std::string>(order) << " in the journal" << std::endl;
+                    }
                 }
             }
         }
