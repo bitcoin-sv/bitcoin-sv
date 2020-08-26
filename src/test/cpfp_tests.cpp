@@ -254,6 +254,14 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     {
         BOOST_ASSERT(!entryIt.IsInPrimaryMempool());
     }
+
+    // now raise modified fee for the entryPayingFor3And4 so that it can pay for all ancestors (entryNotPaying4, entryNotPaying3, entryPaysForItself, entryNotPaying)
+    mempool.PrioritiseTransaction(entryPayingFor3And4.GetTxId(), entryPayingFor3And4.GetTxId().GetHex(), 0, Amount(10000));
+    for(const auto& entryIt: {notPayingIt, notPaying3It, notPaying4It, payForItselfIt, payFor3And4It})
+    {
+        BOOST_ASSERT(entryIt->IsInPrimaryMempool());
+        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+    }
 };
 
 BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)

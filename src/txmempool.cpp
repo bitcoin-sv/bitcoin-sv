@@ -1691,13 +1691,18 @@ void CTxMemPool::prioritiseTransactionNL(
     txiter it = mapTx.find(hash);
     if (it != mapTx.end()) {
         mapTx.modify(it, update_fee_delta(deltas.second));
+        auto changeSet = mJournalBuilder.getNewChangeSet(JournalUpdateReason::UNKNOWN); // TODO: add new update reason (PRIORITY?)
 
-        // Now update all descendants' modified fees with ancestors
-        setEntries setDescendants;
-        GetDescendantsNL(it, setDescendants);
-        setDescendants.erase(it);
+        setEntriesTopoSorted entries;
+        entries.insert(it);
+
+        if(it->IsInPrimaryMempool())
+        {
+            entries = RemoveFromPrimaryMempoolNL(entries, *changeSet, false);
+        }
+
+        TryAcceptToPrimaryMempoolNL(std::move(entries), *changeSet);
     }
-    
 }
 
 void CTxMemPool::clearPrioritisationNL(const uint256& hash) {
