@@ -23,7 +23,7 @@ UniValue RPCConvertNamedValues(const std::string &strMethod,
  */
 UniValue ParseNonRFCJSONValue(const std::string &strVal);
 
-int AppInitRPC(int argc, char *argv[], const std::string& usage, std::function<std::string(void)> help); 
+int AppInitRPC(int argc, char *argv[], const std::string& usage, const std::function<std::string(void)>& help); 
 
 // Exit codes are EXIT_SUCCESS, EXIT_FAILURE, CONTINUE_EXECUTION 
 static const int CONTINUE_EXECUTION = -1;  

@@ -3,7 +3,7 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "rpc/client.h"
+#include "rpc/client_utils.h"
 #include "rpc/protocol.h"
 #include "util.h"
 #include "support/events.h"
@@ -139,16 +139,16 @@ static const CRPCConvertParam vRPCConvertParams[] = {
 
 class CRPCConvertTable {
 private:
-    std::set<std::pair<std::string, int>> members;
+    std::set<std::pair<std::string, unsigned int>> members;
     std::set<std::pair<std::string, std::string>> membersByName;
 
 public:
     CRPCConvertTable();
 
-    bool convert(const std::string &method, int idx) {
+    bool contains(const std::string &method, unsigned int idx) {
         return (members.count(std::make_pair(method, idx)) > 0);
     }
-    bool convert(const std::string &method, const std::string &name) {
+    bool contains(const std::string &method, const std::string &name) {
         return (membersByName.count(std::make_pair(method, name)) > 0);
     }
 };
@@ -186,7 +186,7 @@ UniValue RPCConvertValues(const std::string &strMethod,
     for (unsigned int idx = 0; idx < strParams.size(); idx++) {
         const std::string &strVal = strParams[idx];
 
-        if (!rpcCvtTable.convert(strMethod, idx)) {
+        if (!rpcCvtTable.contains(strMethod, idx)) {
             // insert string value directly
             params.push_back(strVal);
         } else {
@@ -203,7 +203,7 @@ UniValue RPCConvertNamedValues(const std::string &strMethod,
     UniValue params(UniValue::VOBJ);
 
     for (const std::string &s : strParams) {
-        size_t pos = s.find("=");
+        size_t pos = s.find('=');
         if (pos == std::string::npos) {
             throw(std::runtime_error("No '=' in named argument '" + s +
                                      "', this needs to be present for every "
@@ -213,7 +213,7 @@ UniValue RPCConvertNamedValues(const std::string &strMethod,
         std::string name = s.substr(0, pos);
         std::string value = s.substr(pos + 1);
 
-        if (!rpcCvtTable.convert(strMethod, name)) {
+        if (!rpcCvtTable.contains(strMethod, name)) {
             // insert string value directly
             params.pushKV(name, value);
         } else {
@@ -410,7 +410,7 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
 // This function returns either one of EXIT_ codes when it's expected to stop
 // the process or CONTINUE_EXECUTION when it's expected to continue further.
 //
-int AppInitRPC(int argc, char *argv[], const std::string& usage_format, std::function<std::string(void)> help_message)
+int AppInitRPC(int argc, char *argv[], const std::string& usage_format, const std::function<std::string(void)>& help_message)
 {
     try
     {

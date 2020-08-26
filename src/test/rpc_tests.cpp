@@ -2,7 +2,7 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "rpc/client.h"
+#include "rpc/client_utils.h"
 #include "rpc/server.h"
 
 #include "base58.h"
