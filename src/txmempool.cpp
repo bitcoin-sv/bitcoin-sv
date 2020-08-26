@@ -380,45 +380,6 @@ void CTxMemPool::updateAncestorsOfNL(bool add, txiter it) {
     }
 }
 
-void CTxMemPool::updateChildrenForRemovalNL(txiter it) {
-    const setEntries &setMemPoolChildren = GetMemPoolChildrenNL(it); // MARK: also used by legacy
-    for (txiter updateIt : setMemPoolChildren) {
-         updateParentNL(updateIt, it, false);
-    }
-}
-
-void CTxMemPool::updateForRemoveFromMempoolNL(const setEntries &entriesToRemove,
-                                            bool updateDescendants) {
-    // For each entry, walk back all ancestors and decrement size associated
-    // with this transaction.
-    if (updateDescendants) {
-        // updateDescendants should be true whenever we're not recursively
-        // removing a tx and all its descendants, eg when a transaction is
-        // confirmed in a block. Here we only update statistics and not data in
-        // mapLinks (which we need to preserve until we're finished with all
-        // operations that need to traverse the mempool).
-        for (txiter removeIt : entriesToRemove) {
-            setEntries setDescendants;
-            GetDescendantsNL(removeIt, setDescendants);
-            setDescendants.erase(removeIt); // don't update state for self
-            int64_t modifySize = -((int64_t)removeIt->GetTxSize());
-            Amount modifyFee = -1 * removeIt->GetModifiedFee();
-        }
-    }
-
-    for (txiter removeIt : entriesToRemove) {
-        // Note that updateAncestorsOfNL severs the child links that point to
-        // removeIt in the entries for the parents of removeIt.
-        updateAncestorsOfNL(false, removeIt);
-    }
-    // After updating all the ancestor sizes, we can now sever the link between
-    // each transaction being removed and any mempool children (ie, update
-    // setMemPoolParents for each direct child of a transaction being removed).
-    for (txiter removeIt : entriesToRemove) {
-        updateChildrenForRemovalNL(removeIt);
-    }
-}
-
 CTxMemPool::CTxMemPool()
 {
     // lock free clear
@@ -802,6 +763,7 @@ void CTxMemPool::removeUncheckedNL(
     }
 
     // Apply to the current journal, either via the passed in change set or directly ourselves
+    // but only if it is in the journal already
     if(it->IsInPrimaryMempool())
     {
         if(changeSet)
@@ -818,6 +780,7 @@ void CTxMemPool::removeUncheckedNL(
     {
         secondaryMempoolSize--;
     }
+
 
     totalTxSize -= it->GetTxSize();
     cachedInnerUsage -= it->DynamicMemoryUsage();
@@ -911,7 +874,7 @@ void CTxMemPool::removeRecursiveNL(
         GetDescendantsNL(it, setAllRemoves);
     }
 
-    removeStagedNL(setAllRemoves, false, changeSet, reason, conflictedWith);
+    removeStagedNL(setAllRemoves, changeSet, reason, conflictedWith);
 }
 
 void CTxMemPool::RemoveForReorg(
@@ -986,7 +949,7 @@ void CTxMemPool::RemoveForReorg(
     for (txiter it : txToRemove) {
         GetDescendantsNL(it, setAllRemoves);
     }
-    removeStagedNL(setAllRemoves, false, changeSet, MemPoolRemovalReason::REORG);
+    removeStagedNL(setAllRemoves, changeSet, MemPoolRemovalReason::REORG);
 }
 
 void CTxMemPool::removeConflictsNL(
@@ -1028,7 +991,7 @@ void CTxMemPool::RemoveForBlock(
         if (it != mapTx.end()) {
             setEntries stage;
             stage.insert(it);
-            removeStagedNL(stage, true, changeSet, MemPoolRemovalReason::BLOCK);
+            removeStagedNL(stage, changeSet, MemPoolRemovalReason::BLOCK); // TODO: this will not work any more
         }
         removeConflictsNL(*tx, changeSet);
         clearPrioritisationNL(tx->GetId());
@@ -1756,16 +1719,39 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
 }
 
 void CTxMemPool::removeStagedNL(
-    setEntries &stage,
-    bool updateDescendants,
+    setEntries& stage,
     const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason,
-    const CTransaction* conflictedWith) {
+    const CTransaction* conflictedWith)
+{
+    // TODO: Disband groups first
 
-    updateForRemoveFromMempoolNL(stage, updateDescendants);
-    for (const txiter &it : stage) {
+    for(auto it: stage)
+    {
+        for(auto parent: GetMemPoolParentsNL(it))
+        {
+            if(stage.find(parent) == stage.end())
+            {
+                // remove "it" from "parents" children list
+                updateChildNL(parent, it, false);
+            }
+        }
+        if(nCheckFrequency)
+        {
+            // check that every child is staged for removal
+            for(auto child: GetMemPoolChildrenNL(it))
+            {
+                assert(stage.find(child) != stage.end());
+            }
+        }
+    }
+
+    for(auto it: stage)
+    {
         removeUncheckedNL(it, changeSet, reason, conflictedWith);
     }
+
+    // TODO: try to form groups again
 }
 
 int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)
@@ -1784,7 +1770,7 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
         GetDescendantsNL(removeit, stage);
     }
 
-    removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::EXPIRY);
+    removeStagedNL(stage, changeSet, MemPoolRemovalReason::EXPIRY);
     return stage.size();
 }
 

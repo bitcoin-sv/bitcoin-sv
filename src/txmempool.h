@@ -1125,21 +1125,6 @@ private:
             txiter hash);
 
     /**
-     * For each transaction being removed, update ancestors and any direct
-     * children. If updateDescendants is true, then also update in-mempool
-     * descendants' ancestor state.
-     */
-
-    void updateForRemoveFromMempoolNL(
-            const setEntries &entriesToRemove,
-            bool updateDescendants);
-
-    /**
-     * Sever link between specified transaction and direct children.
-     */
-    void updateChildrenForRemovalNL(txiter entry);
-
-    /**
      * Before calling removeUnchecked for a given transaction,
      * updateForRemoveFromMempoolNL must be called on the entire (dependent) set
      * of transactions being removed at the same time. We use each
@@ -1163,14 +1148,10 @@ private:
 
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
-     * this set, then all in-mempool descendants must also be in the set, unless
-     * this transaction is being removed for being in a block. Set
-     * updateDescendants to true when removing a tx that was in a block, so that
-     * any in-mempool descendants have their ancestor state updated.
+     * this set, then all in-mempool descendants must also be in the set. 
      */
     void removeStagedNL(
-            setEntries &stage,
-            bool updateDescendants,
+            setEntries& stage,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedwith = nullptr);
