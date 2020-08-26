@@ -886,11 +886,17 @@ void CTxMemPool::CheckMempoolImplNL(
              "Checking mempool with %u transactions and %u inputs\n",
              (unsigned int)PrimaryMempoolSizeNL(), (unsigned int)mapNextTx.size());
 
+    size_t primaryMempoolSize = 0;
+
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;
 
     std::list<const CTxMemPoolEntry *> waitingOnDependants;
     for (txiter it = mapTx.begin(); it != mapTx.end(); it++) {
+        if(it->IsInPrimaryMempool())
+        {
+            primaryMempoolSize++;
+        }
         unsigned int i = 0;
         checkTotal += it->GetTxSize();
         innerUsage += it->DynamicMemoryUsage();
@@ -975,6 +981,8 @@ void CTxMemPool::CheckMempoolImplNL(
         // Check we haven't let any non-final txns in
         assert(IsFinalTx(*tx, nSpendHeight, medianTimePast));
     }
+
+    assert(primaryMempoolSize == PrimaryMempoolSizeNL());
 
     unsigned int stepsSinceLastRemove = 0;
     while (!waitingOnDependants.empty()) {
@@ -1636,6 +1644,14 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         auto& tempMapTxSequenced = tempMapTx.get<insertion_order>();
         for (auto itTemp = tempMapTxSequenced.begin(); itTemp != tempMapTxSequenced.end();) 
         {
+            tempMapTxSequenced.modify(
+                itTemp,
+                [](CTxMemPoolEntry& entry)
+                {
+                    entry.groupingData = std::nullopt;
+                    entry.group.reset();
+                }   
+            );
             AddUncheckedNL(itTemp->GetTxId(), *itTemp, changeSet);
             tempMapTxSequenced.erase(itTemp++);
         }
