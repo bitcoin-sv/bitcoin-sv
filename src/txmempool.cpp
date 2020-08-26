@@ -678,6 +678,69 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
     }
 }
 
+CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, bool putDummyGroupingData)
+{
+    setEntriesTopoSorted removed;
+
+    while(!toRemove.empty())
+    {
+        // take first item from the topo-sorted set, this transactions is not
+        // descedant of any other tx in the set
+        txiter entry = *toRemove.begin();
+        toRemove.erase(toRemove.begin());
+
+        // already in secondary, skip it
+        if(!entry->IsInPrimaryMempool())
+        {
+            continue;
+        }
+
+        if(entry->IsCPFPGroupMember())
+        {
+            // if the entry is a member of the group, we will disband whole group but not here
+            // we will just remove grouping data from every group member so they will look like 
+            // they are accepted to primary as standalone txs, and re-schedule them for removal
+
+            // keep one reference while iterating to prevent deletion
+            auto group = entry->group;
+            for(txiter groupMember: group->transactions)
+            {
+                mapTx.modify(groupMember, 
+                    [](CTxMemPoolEntry& entry) {entry.group.reset();});
+                // we have removed group object so it will look like it is accepted as standalone in next round
+                toRemove.insert(groupMember);
+            }
+        }
+        else
+        {
+            // add to change set, removin them from journal
+            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, {*entry});
+            secondaryMempoolSize++; // removing from primary to secondary mempool
+
+            // add to set of removed
+            removed.insert(entry);
+
+            // add children to the set of removed
+            for(txiter child: GetMemPoolChildrenNL(entry))
+            {
+                toRemove.insert(child);
+            }
+
+            // update grouping data, this marks them as secondary mempool tx
+            if(putDummyGroupingData)
+            {
+                SetGroupingData(entry, SecondaryMempoolEntryData());
+            }
+            else
+            {
+                SecondaryMempoolEntryData groupingData = CalculateSecondaryMempoolData(entry);
+                SetGroupingData(entry, groupingData);
+            }
+        }
+    }
+    return removed;
+}
+
 void CTxMemPool::AddUncheckedNL(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
@@ -751,10 +814,9 @@ void CTxMemPool::AddUncheckedNL(
 
 void CTxMemPool::removeUncheckedNL(
     txiter it,
-    const CJournalChangeSetPtr& changeSet,
+    CJournalChangeSet& changeSet,
     MemPoolRemovalReason reason,
     const CTransaction* conflictedWith) {
-
 
     CTransactionRef txn { it->GetSharedTx() };
     NotifyEntryRemoved(txn, reason);
@@ -762,19 +824,10 @@ void CTxMemPool::removeUncheckedNL(
         mapNextTx.erase(txin.prevout);
     }
 
-    // Apply to the current journal, either via the passed in change set or directly ourselves
-    // but only if it is in the journal already
+    // Apply to the current journal, but only if it is in the journal (primary mempool) already
     if(it->IsInPrimaryMempool())
     {
-        if(changeSet)
-        {
-            changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
-        }
-        else
-        {
-            CJournalChangeSetPtr tmpChangeSet { getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
-            tmpChangeSet->addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
-        }
+        changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
     }
     else
     {
@@ -1724,10 +1777,27 @@ void CTxMemPool::removeStagedNL(
     MemPoolRemovalReason reason,
     const CTransaction* conflictedWith)
 {
-    // TODO: Disband groups first
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
+    // first remove groups from primary mempool because when we remove groups we might need 
+    // to remove transactions which are not in the staged for deletion
+    setEntriesTopoSorted toRemoveFromPrimaryMempool;
     for(auto it: stage)
     {
+        if(it->IsCPFPGroupMember())
+        {
+            toRemoveFromPrimaryMempool.insert(it);
+        }
+        
+    }
+    
+    // collect transactions which are removed from the primary mempool as consequence of removing groups
+    // we will revisit these transactions when we remove all staged transactions
+    setEntriesTopoSorted toUpdateAfterDeletion = RemoveFromPrimaryMempoolNL(toRemoveFromPrimaryMempool, nonNullChangeSet.Get(), true);
+    
+    for(auto it: stage)
+    {
+        // cut connections to the transactions which remain in the mempool
         for(auto parent: GetMemPoolParentsNL(it))
         {
             if(stage.find(parent) == stage.end())
@@ -1736,6 +1806,13 @@ void CTxMemPool::removeStagedNL(
                 updateChildNL(parent, it, false);
             }
         }
+
+        // we don't want to update transactions which will not be in the mempool any more
+        if(!toUpdateAfterDeletion.empty())
+        {
+            toUpdateAfterDeletion.erase(it);
+        }
+        
         if(nCheckFrequency)
         {
             // check that every child is staged for removal
@@ -1746,12 +1823,14 @@ void CTxMemPool::removeStagedNL(
         }
     }
 
+    // now actually remove transactions
     for(auto it: stage)
     {
-        removeUncheckedNL(it, changeSet, reason, conflictedWith);
+        removeUncheckedNL(it, nonNullChangeSet.Get(), reason, conflictedWith);
     }
 
-    // TODO: try to form groups again
+    // check if removed transactions can be re-accepted to the primary mempool
+    TryAcceptToPrimaryMempoolNL(std::move(toUpdateAfterDeletion), nonNullChangeSet.Get());
 }
 
 int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)

@@ -652,6 +652,11 @@ private:
     // tries to accept entry to the primary mempool, may result in accepting other transactions (i.e. if the entry is groups paying tx)
     void TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry, mining::CJournalChangeSet& changeSet);
 
+    // removes transactions from the primary mempool, together with all descedants. if we happen to remove a group then the group is disbanded
+    // and all its members are removed, together with all their children. If the entries are expected to be revisited later one can set putDummyGroupingData
+    // to false to avoid recalculation of the grouping data
+    setEntriesTopoSorted RemoveFromPrimaryMempoolNL(setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, bool putDummyGroupingData = false);
+
 public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
@@ -1134,9 +1139,9 @@ private:
      */
     void removeUncheckedNL(
             txiter entry,
-            const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason,
-            const CTransaction* conflictedWith);
+            mining::CJournalChangeSet& changeSet,
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
+            const CTransaction* conflictedWith = nullptr);
 
     void removeConflictsNL(
             const CTransaction &tx,
