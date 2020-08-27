@@ -21,6 +21,7 @@
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
+#include "invalid_txn_publisher.h"
 #include "key.h"
 #include "mining/journal_builder.h"
 #include "mining/journaling_block_assembler.h"
@@ -194,6 +195,8 @@ void Shutdown() {
     /// part of the way, for example if the data directory was found to be
     /// locked. Be sure that anything that writes files or flushes caches only
     /// does this if the respective module was initialized.
+    CInvalidTxnPublisher::Get().Stop();
+
     RenameThread("bitcoin-shutoff");
     mempool.AddTransactionsUpdated(1);
 
@@ -2406,6 +2409,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 #ifndef WIN32
     CreatePidFile(GetPidFile(), getpid());
 #endif
+
+    CInvalidTxnPublisher::Get().Initialize(config);
 
     BCLog::Logger &logger = GetLogger();
 

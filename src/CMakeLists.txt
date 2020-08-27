@@ -234,6 +234,7 @@ add_library(server
 	httprpc.cpp
 	httpserver.cpp
 	init.cpp
+	invalid_txn_publisher.cpp
 	dbwrapper.cpp
 	merkleblock.cpp
 	mining/assembler.cpp
