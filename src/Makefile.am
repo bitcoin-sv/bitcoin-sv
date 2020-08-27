@@ -120,6 +120,7 @@ BITCOIN_CORE_H = \
   httpserver.h \
   indirectmap.h \
   init.h \
+  invalid_txn_publisher.h \
   key.h \
   keystore.h \
   dbwrapper.h \

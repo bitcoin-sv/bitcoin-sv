@@ -318,7 +318,7 @@ void OnRPCPreCommand(const CRPCCommand &cmd) {
                            std::string("Safe mode: ") + strWarning);
 }
 
-std::string HelpMessage(HelpMessageMode mode) {
+std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     const auto defaultBaseParams =
         CreateBaseChainParams(CBaseChainParams::MAIN);
     const auto testnetBaseParams =
@@ -707,6 +707,9 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage +=
         HelpMessageOpt("-zmqpubrawtx=<address>",
                        _("Enable publish raw transaction in <address>"));
+    strUsage +=
+        HelpMessageOpt("-zmqpubinvalidtx=<address>",
+                       _("Enable publish invalid transaction in <address>. -invalidtxsink=ZMQ should be specified."));
 #endif
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
@@ -901,7 +904,7 @@ std::string HelpMessage(HelpMessageMode mode) {
             strprintf(
                 "Relay and mine transactions that create or consume non standard"
                 " outputs after Genesis is activated. (default: %u)",
-                GlobalConfig::GetConfig().GetAcceptNonStandardOutput(true)));
+                config.GetAcceptNonStandardOutput(true)));
         strUsage += HelpMessageOpt(
             "-dustrelayfee=<amt>",
             strprintf("Fee rate (in %s/kB) used to defined dust, the value of "
@@ -1206,6 +1209,35 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "Seting 0 will disable Genesis graceful period. Genesis graceful period range :"
                     "(GENESIS_ACTIVATION_HEIGHT - n |...| GENESIS_ACTIVATION_HEIGHT |...| GENESIS_ACTIVATION_HEIGHT + n)"),
             DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
+
+    strUsage += HelpMessageGroup(_("Invalid transactions sink options:"));
+    std::string availableSinks = StringJoin(", ", config.GetAvailableInvalidTxSinks());
+    strUsage += HelpMessageOpt(
+        "-invalidtxsink=<sink>",
+        strprintf(_("Set destination for dumping invalid transactions. Specify separately for every sink you want to include. Available sinks:%s, (no sink by default)"),
+            availableSinks));
+
+    strUsage += HelpMessageOpt(
+        "-invalidtxfilemaxdiskusage=<n>",
+        strprintf(_("Set maximal disk usage for dumping invalid transactions when using FILE for the sink."
+            " In megabytes. (default: %dMB)"
+            " The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE / ONE_MEGABYTE));
+
+    // The message below assumes that default policy is IGNORE_NEW
+    static_assert(CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY == InvalidTxEvictionPolicy::IGNORE_NEW);
+    strUsage += HelpMessageOpt(
+        "-invalidtxfileevictionpolicy=<policy>",
+        strprintf(_("Set policy which is applied when disk usage limits are reached when using FILE for the sink. IGNORE_NEW or DELETE_OLD (default: IGNORE_NEW)")));
+
+#if ENABLE_ZMQ
+    strUsage += HelpMessageOpt(
+        "-invalidtxzmqmaxmessagesize=<n>",
+        strprintf(_("Set maximal message size for publishing invalid transactions using ZMQ, in megabytes. (default: %dMB)"
+            " The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE / ONE_MEGABYTE));
+#endif
+
 
     return strUsage;
 }
@@ -1965,6 +1997,69 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
+    
+    if (gArgs.IsArgSet("-invalidtxsink"))
+    {
+        for (const std::string &sink : gArgs.GetArgs("-invalidtxsink"))
+        {
+            if (std::string err; !config.AddInvalidTxSink(sink, &err))
+            {
+                return InitError(err);
+            }
+        }
+    }
+
+#if ENABLE_ZMQ
+    bool zmqSinkSpecified = (config.GetInvalidTxSinks().count("ZMQ") != 0);
+    bool zmqIpDefined = gArgs.IsArgSet("-zmqpubinvalidtx");
+
+    if (zmqSinkSpecified && !zmqIpDefined)
+    {
+        InitError("The 'zmqpubinvalidtx' parameter should be specified when 'invalidtxsink' is set to ZMQ.");
+    }
+    if (!zmqSinkSpecified && zmqIpDefined)
+    {
+        InitError("The 'invalidtxsink' parameter should be set to ZMQ when 'zmqpubinvalidtx' is defined.");
+    }
+#endif
+
+    if (gArgs.IsArgSet("-invalidtxfilemaxdiskusage"))
+    {
+        auto maxInvalidTxDumpFileSize =
+            gArgs.GetArgAsBytes(
+                "-invalidtxfilemaxdiskusage",
+                CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE,
+                ONE_MEGABYTE);
+        if (std::string err; !config.SetInvalidTxFileSinkMaxDiskUsage(maxInvalidTxDumpFileSize, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+    if (gArgs.IsArgSet("-invalidtxfileevictionpolicy"))
+    {
+        assert(CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY == InvalidTxEvictionPolicy::IGNORE_NEW);
+        auto evictionPolicy = gArgs.GetArg("-invalidtxfileevictionpolicy", "IGNORE_NEW");
+        if (std::string err; !config.SetInvalidTxFileSinkEvictionPolicy(evictionPolicy, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+#if ENABLE_ZMQ
+    if (gArgs.IsArgSet("-invalidtxzmqmaxmessagesize"))
+    {
+        auto zmqMessageSize =
+            gArgs.GetArgAsBytes(
+                "-invalidtxzmqmaxmessagesize",
+                CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE,
+                ONE_MEGABYTE);
+        if (std::string err; !config.SetInvalidTxZMQMaxMessageSize(zmqMessageSize, &err))
+        {
+            return InitError(err);
+        }
+    }
+#endif
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &
     // undo files

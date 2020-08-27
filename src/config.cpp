@@ -77,6 +77,11 @@ void GlobalConfig::Reset()
     mPromiscuousMempoolFlags = 0;
     mIsSetPromiscuousMempoolFlags = false;
 
+    invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
+    invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
+#if ENABLE_ZMQ
+    invalidTxZMQMaxMessageSize = CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE;
+#endif
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -853,6 +858,98 @@ bool GlobalConfig::IsClientUABanned(const std::string uaClient) const
     }
     return false;
 }
+
+bool GlobalConfig::AddInvalidTxSink(const std::string& sink, std::string* err)
+{
+    auto availableSinks = GetAvailableInvalidTxSinks();
+    if (availableSinks.find(sink) == availableSinks.end())
+    {
+        if (err)
+        {
+            *err =sink + " is not valid transaction sink. Valid transactions sinks are: ";
+            *err += StringJoin(", ", availableSinks.begin(), availableSinks.end());
+        }
+        return false;
+    }
+
+    invalidTxSinks.insert(sink);
+    return true;
+}
+
+std::set<std::string> GlobalConfig::GetInvalidTxSinks() const
+{
+    return invalidTxSinks;
+}
+
+std::set<std::string> GlobalConfig::GetAvailableInvalidTxSinks() const
+{
+#if ENABLE_ZMQ
+    return {"FILE", "ZMQ"};
+#else
+    return {"FILE"};
+#endif
+}
+
+bool GlobalConfig::SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err)
+{
+    if (LessThanZero(max, err, "Invalid transaction file usage can not be negative."))
+    {
+        return false;
+    }
+
+    invalidTxFileSinkSize = (max == 0 ? std::numeric_limits<int64_t>::max() : max);
+    return true;
+}
+
+int64_t GlobalConfig::GetInvalidTxFileSinkMaxDiskUsage() const
+{
+    return invalidTxFileSinkSize;
+}
+
+bool GlobalConfig::SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err)
+{
+    if(policy == "IGNORE_NEW")
+    {
+        invalidTxFileSinkEvictionPolicy = InvalidTxEvictionPolicy::IGNORE_NEW;
+        return true;
+    }
+    else if (policy == "DELETE_OLD")
+    {
+        invalidTxFileSinkEvictionPolicy = InvalidTxEvictionPolicy::DELETE_OLD;
+        return true;
+    }
+
+    if (err)
+    {
+        *err = "Invalid value for invalid transactions eviction policy. Available policies are IGNORE_NEW and DELETE_OLD. Got " + policy;
+    }
+
+    return false;
+}
+
+InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
+{
+    return invalidTxFileSinkEvictionPolicy;
+}
+
+#if ENABLE_ZMQ
+bool GlobalConfig::SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err)
+{
+    if (LessThanZero(max, err, "Invalid transaction ZMQ max message size can not be negative."))
+    {
+        return false;
+    }
+
+    invalidTxZMQMaxMessageSize = (max == 0 ? std::numeric_limits<int64_t>::max() : max);
+    return true;
+}
+
+int64_t GlobalConfig::GetInvalidTxZMQMaxMessageSize() const
+{
+    return invalidTxZMQMaxMessageSize;
+}
+#endif
+
 
 DummyConfig::DummyConfig()
     : chainParams(CreateChainParams(CBaseChainParams::REGTEST)) {}
