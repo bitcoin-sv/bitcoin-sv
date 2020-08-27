@@ -5,6 +5,7 @@
 #include "rpc/client.h"
 #include "rpc/client_config.h"
 #include "rpc/client_utils.h"
+#include "rpc/http_request.h"
 #include "rpc/http_response.h"
 #include "rpc/server.h"
 
@@ -592,6 +593,8 @@ BOOST_AUTO_TEST_CASE(getminingcandidate_low_height)
 // Create client configs for DS Authority
 BOOST_AUTO_TEST_CASE(client_config_dsa)
 {
+    using namespace rpc::client;
+
     {
         // All good
         gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/DsAuthority/proof/");
@@ -696,6 +699,8 @@ BOOST_AUTO_TEST_CASE(client_config_bitcoind)
     gArgs.ForceSetArg("-rpcclienttimeout", "100");
     gArgs.ForceSetArg("-rpcwallet", "wallet");
 
+    using namespace rpc::client;
+
     BOOST_CHECK_NO_THROW(
         RPCClientConfig config { RPCClientConfig::CreateForBitcoind() };
         BOOST_CHECK_EQUAL(config.GetServerIP(), "localhost");
@@ -717,20 +722,19 @@ BOOST_AUTO_TEST_CASE(http_requests)
     UniValue params(UniValue::VARR);
     params = RPCConvertNamedValues(method, args);
 
-    using namespace rpcclient;
+    using namespace rpc::client;
 
     {
         // REST requests to the DS authority
-        gArgs.ForceSetArg("-dsauthorityurl", "http://127.0.0.1:8080/DsAuthority/proof");
-        RPCClientConfig config { RPCClientConfig::ServerType::DOUBLE_SPEND_AUTHORITY };
+        RPCClientConfig config { RPCClientConfig::CreateForDSA("http://127.0.0.1:8080/DsAuthority/proof") };
 
-        RESTPostRequest postRequest { config, params};
+        auto postRequest { rpc::client::HTTPRequest::CreateRESTPostRequest(config, params) };
         BOOST_CHECK_EQUAL(postRequest.GetContents(), "{\"tx1\":\"1\",\"tx2\":\"2\"}\n");
         BOOST_CHECK_EQUAL(postRequest.GetEndpoint(), "/DsAuthority/proof/submit");
 
-        RESTGetRequest getRequest { config, "5_a56fd" };
-        BOOST_CHECK_EQUAL(getRequest.GetContents(), "\n");
-        BOOST_CHECK_EQUAL(getRequest.GetEndpoint(), "/DsAuthority/proof/5_a56fd");
+        auto getRequest { rpc::client::HTTPRequest::CreateRESTGetRequest(config, "a56fd", 5) };
+        BOOST_CHECK_EQUAL(getRequest.GetContents(), "");
+        BOOST_CHECK_EQUAL(getRequest.GetEndpoint(), "/DsAuthority/proof/a56fd/5");
     }
 
     {
@@ -739,9 +743,9 @@ BOOST_AUTO_TEST_CASE(http_requests)
         gArgs.ForceSetArg("-rpcuser", "user");
         gArgs.ForceSetArg("-rpcpassword", "passwd");
         gArgs.ForceSetArg("-rpcwallet", "walletname");
-        RPCClientConfig config { RPCClientConfig::ServerType::BITCOIND };
+        RPCClientConfig config { RPCClientConfig::CreateForBitcoind() };
 
-        rpcclient::JSONRPCRequest rpcRequest { config, method, params };
+        auto rpcRequest { rpc::client::HTTPRequest::CreateJSONRPCRequest(config, method, params) };
         BOOST_CHECK_EQUAL(rpcRequest.GetContents(), "{\"method\":\"somemethod\",\"params\":{\"tx1\":\"1\",\"tx2\":\"2\"},\"id\":1}\n");
         BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), "/wallet/walletname");
     }

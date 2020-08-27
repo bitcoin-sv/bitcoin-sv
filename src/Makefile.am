@@ -157,8 +157,11 @@ BITCOIN_CORE_H = \
   random.h \
   reverselock.h \
   rpc/blockchain.h \
+  rpc/client.h \
   rpc/client_config.h \
   rpc/client_utils.h \
+  rpc/http_request.h \
+  rpc/http_response.h \
   rpc/jsonwriter.h \
   rpc/mining.h \
   rpc/misc.h \
@@ -459,8 +462,11 @@ endif
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
+  rpc/client.cpp \
   rpc/client_config.cpp \
   rpc/client_utils.cpp \
+  rpc/http_request.cpp \
+  rpc/http_response.cpp \
   $(BITCOIN_CORE_H)
 
 # seeder library

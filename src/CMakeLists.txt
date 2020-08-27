@@ -329,8 +329,11 @@ endif()
 
 # RPC client support
 add_library(rpcclient
+    rpc/client.cpp
     rpc/client_config.cpp
     rpc/client_utils.cpp
+    rpc/http_request.cpp
+    rpc/http_response.cpp
 )
 target_link_libraries(rpcclient univalue util)
 
