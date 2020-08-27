@@ -157,6 +157,7 @@ BITCOIN_CORE_H = \
   random.h \
   reverselock.h \
   rpc/blockchain.h \
+  rpc/client_config.h \
   rpc/client_utils.h \
   rpc/jsonwriter.h \
   rpc/mining.h \
@@ -458,6 +459,7 @@ endif
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
+  rpc/client_config.cpp \
   rpc/client_utils.cpp \
   $(BITCOIN_CORE_H)
 

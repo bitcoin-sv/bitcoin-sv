@@ -328,7 +328,10 @@ if(BUILD_BITCOIN_ZMQ)
 endif()
 
 # RPC client support
-add_library(rpcclient rpc/client_utils.cpp)
+add_library(rpcclient
+    rpc/client_config.cpp
+    rpc/client_utils.cpp
+)
 target_link_libraries(rpcclient univalue util)
 
 # bitcoin-seeder
