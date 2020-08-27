@@ -1983,7 +1983,7 @@ bool AppInitParameterInteraction(Config &config) {
     // configure if non standard inputs for consolidation transactions are allowed
     if (gArgs.IsArgSet("-acceptnonstdconsolidationinput"))
     {
-        uint64_t param = gArgs.GetArg("-acceptnonstdconsolidationinput", DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT);
+        bool param = gArgs.GetBoolArg("-acceptnonstdconsolidationinput", DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT);
         if (std::string err; !config.SetAcceptNonStdConsolidationInput(param, &err)) {
             return InitError(err);
         }

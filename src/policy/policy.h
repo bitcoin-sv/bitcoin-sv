@@ -76,7 +76,7 @@ static const uint64_t DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE = 150;
 /** The default minimum number of blocks that need to be mined on top of the block containing previous output, for it to be eligible as an input in consolidation transaction */
 static const uint64_t DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY = 6;
 /** consolidation transaction with non standard inputs */
-static const uint64_t DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = 0;
+static const bool DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = false;
 
 /** Maximum number of signature check operations in an IsStandard() P2SH script
  */

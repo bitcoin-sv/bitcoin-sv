@@ -566,11 +566,11 @@ static UniValue getnetworkinfo(const Config &config,
             "relay fee for non-free transactions in " +
             CURRENCY_UNIT +
             "/kB\n"
-			    "  \"minconsolidationfactor\": xxxxx        (numeric) minimum ratio between scriptPubKey inputs and outputs, "
+			    "  \"minconsolidationfactor\": xxxxx               (numeric) minimum ratio between scriptPubKey inputs and outputs, "
 			    "0 disables consolidation transactions\n"
-			    "  \"maxconsolidationinputscriptsize\": xxxxx  (numeric) max input scriptSig size\n"
-			    "  \"minconsolidationinputmaturity\": xxxxx    (numeric) minimum number of confirmations for inputs spent\n"
-			    "  \"acceptnonstdconsolidationinput\": xxxxx   (numeric) 1 allow 0 dissallow std transactions to be spent\n"
+			    "  \"maxconsolidationinputscriptsize\": xxxxx      (numeric) maximum input scriptSig size\n"
+			    "  \"minconsolidationinputmaturity\": xxxxx        (numeric) minimum number of confirmations for inputs spent\n"
+			    "  \"acceptnonstdconsolidationinput\": true|false  (boolean) true if non std inputs can be spent\n"
                             "  \"localaddresses\": [                    "
                             "(array) list of local addresses\n"
                             "  {\n"
