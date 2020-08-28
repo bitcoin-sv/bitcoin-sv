@@ -91,17 +91,19 @@ struct SecondaryMempoolEntryData
     Amount feeDelta {0};
     size_t size {0};
 
-    // We only count ancestors in the secondary mempool.
+    // We only count ancestors and chain length in the secondary mempool.
     size_t ancestorsCount {0};
-
-    bool operator == (const SecondaryMempoolEntryData& other) const
-    {
-        return (fee == other.fee) && 
-               (feeDelta == other.feeDelta) &&
-               (size == other.size) &&
-               (ancestorsCount == other.ancestorsCount);
-    }
 };
+
+inline bool operator==(const SecondaryMempoolEntryData& a,
+                       const SecondaryMempoolEntryData& b)
+{
+    return ((&a == &b) || ((a.fee == b.fee) &&
+                           (a.feeDelta == b.feeDelta) &&
+                           (a.size == b.size) &&
+                           (a.ancestorsCount == b.ancestorsCount)));
+}
+
 
 class CTxMemPoolBase {
 public:

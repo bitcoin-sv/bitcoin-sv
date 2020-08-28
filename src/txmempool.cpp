@@ -474,7 +474,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::GetSecondaryMempoolAncestorsNL(CTxM
 
 SecondaryMempoolEntryData CTxMemPool::FillGroupingDataNL(const CTxMemPool::setEntriesTopoSorted& groupMembers) const
 {
-    SecondaryMempoolEntryData data{Amount(0),Amount(0),0,0};
+    SecondaryMempoolEntryData data;
     data.ancestorsCount = groupMembers.size();
 
     // precisely calculate groups data
@@ -521,8 +521,8 @@ bool CTxMemPool::IsPayingEnough(const SecondaryMempoolEntryData& groupingData) c
 SecondaryMempoolEntryData CTxMemPool::CalculateSecondaryMempoolData(txiter entryIt) const
 {
     SecondaryMempoolEntryData groupingData({
-            entryIt->GetFee(), entryIt->GetFeeDelta(), entryIt->GetTxSize(), 0});
-    
+            entryIt->GetFee(), entryIt->GetFeeDelta(), entryIt->GetTxSize()});
+
     for (txiter parent : GetMemPoolParentsNL(entryIt)) {
         if (!parent->IsInPrimaryMempool()) {
             groupingData.fee += parent->groupingData->fee;
