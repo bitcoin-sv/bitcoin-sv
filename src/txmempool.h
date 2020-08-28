@@ -505,12 +505,24 @@ private:
             return a->GetTxId() < b->GetTxId();
         }
     };
-    typedef std::set<txiter, CompareIteratorByHash> setEntries;
+
+    class SaltedTxiterHasher {
+    private:
+        /** Salt */
+        const uint64_t k0, k1;
+
+    public:
+        SaltedTxiterHasher();
+
+        size_t operator()(const txiter& entry) const {
+            return SipHashUint256(k0, k1, entry->GetTxId());
+        }
+    };
+
+    using setEntries = std::unordered_set<txiter, SaltedTxiterHasher>;
 
     const setEntries &GetMemPoolParentsNL(txiter entry) const;
     const setEntries &GetMemPoolChildrenNL(txiter entry) const;
-
-    typedef std::map<txiter, setEntries, CompareIteratorByHash> cacheMap;
 
     struct TxLinks {
         setEntries parents;

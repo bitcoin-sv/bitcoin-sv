@@ -592,8 +592,9 @@ void CTxMemPool::removeUncheckedNL(
 
     totalTxSize -= it->GetTxSize();
     cachedInnerUsage -= it->DynamicMemoryUsage();
-    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
-                        memusage::DynamicUsage(mapLinks[it].children);
+    // FIXME: we are not implemented IncrementalDynamicMemoryUsage for unordered set. see: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
+    //    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
+    //                        memusage::DynamicUsage(mapLinks[it].children);
     mapLinks.erase(it);
     mapTx.erase(it);
 
@@ -904,8 +905,9 @@ void CTxMemPool::CheckMempoolImplNL(
         txlinksMap::const_iterator linksiter = mapLinks.find(it);
         assert(linksiter != mapLinks.end());
         const TxLinks &links = linksiter->second;
-        innerUsage += memusage::DynamicUsage(links.parents) +
-                      memusage::DynamicUsage(links.children);
+        // FIXME: we are not implemented IncrementalDynamicMemoryUsage for unordered set. see: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
+        //innerUsage += memusage::DynamicUsage(links.parents) +
+        //              memusage::DynamicUsage(links.children);
         bool fDependsWait = false;
         setEntries setParentCheck;
         int64_t parentSizes = 0;
@@ -1740,20 +1742,24 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
 
 
 void CTxMemPool::updateChildNL(txiter entry, txiter child, bool add) {
-    setEntries s;
+    // FIXME: Implement IncrementalDynamicUsage for std::unordered_set
+    // before it was: static size_t memUsage = memusage::IncrementalDynamicUsage(setEntries());
+    static size_t memUsage = 0;
     if (add && mapLinks[entry].children.insert(child).second) {
-        cachedInnerUsage += memusage::IncrementalDynamicUsage(s);
+        cachedInnerUsage += memUsage;
     } else if (!add && mapLinks[entry].children.erase(child)) {
-        cachedInnerUsage -= memusage::IncrementalDynamicUsage(s);
+        cachedInnerUsage -= memUsage;
     }
 }
 
 void CTxMemPool::updateParentNL(txiter entry, txiter parent, bool add) {
-    setEntries s;
+    // FIXME: Implement IncrementalDynamicUsage for std::unordered_set
+    // before it was: static size_t memUsage = memusage::IncrementalDynamicUsage(setEntries());
+    static size_t memUsage = 0;
     if (add && mapLinks[entry].parents.insert(parent).second) {
-        cachedInnerUsage += memusage::IncrementalDynamicUsage(s);
+        cachedInnerUsage += memUsage;
     } else if (!add && mapLinks[entry].parents.erase(parent)) {
-        cachedInnerUsage -= memusage::IncrementalDynamicUsage(s);
+        cachedInnerUsage -= memUsage;
     }
 }
 
@@ -1934,6 +1940,9 @@ SaltedTxidHasher::SaltedTxidHasher()
     : k0(GetRand(std::numeric_limits<uint64_t>::max())),
       k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
 
+CTxMemPool::SaltedTxiterHasher::SaltedTxiterHasher()
+    : k0(GetRand(std::numeric_limits<uint64_t>::max())),
+      k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
 
 CTxMemPool::Snapshot::Snapshot(Contents&& contents,
                                CachedTxIdsRef&& relevantTxIds)
@@ -2219,6 +2228,4 @@ void CTxMemPool::DumpMempool(void) {
     // Dump non-final pool
     getNonFinalPool().dumpMempool();
 }
-
-
 
