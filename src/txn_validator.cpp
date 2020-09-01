@@ -157,14 +157,24 @@ CValidationState CTxnValidator::processValidation(
     try
     {
         // Execute txn validation (timed cancellation is not set).
-        result = TxnValidation(
+        result =
+            executeTxnValidationNL(
+                pTxInputData,
+                handlers,
+                fLimitMempoolSize,
+                false);
+        // Check if txn is resubmitted for revalidation
+        // - currently only finalised txn can be re-submitted
+        if (result.mState.IsResubmittedTx()) {
+            LogPrint(BCLog::TXNVAL,
+                    "Txnval-synch: Reprocess txn= %s\n", tx.GetId().ToString());
+            result =
+                executeTxnValidationNL(
                     pTxInputData,
-                    mConfig,
-                    mMempool,
-                    mpTxnDoubleSpendDetector,
+                    handlers,
+                    fLimitMempoolSize,
                     false);
-        // Process validated results for the given txn
-        ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
+        }
     } catch (const std::exception& e) {
         return HandleTxnProcessingException("An exception thrown in txn processing: " + std::string(e.what()),
                     pTxInputData,
@@ -233,7 +243,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
         // - detected low priority txns
         // - cancelled txns
         // - txns that need to be re-submitted
-        // There will be no detected non-standard, cancelled and re-submitted txns as:
+        // There will be no detected non-standard and cancelled txns as:
         // - timed cancellation is not set
         // - maxasynctasksrunduration is not set to non-zero value
         CIntermediateResult imdResult {
@@ -248,12 +258,34 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
             std::make_move_iterator(imdResult.mAcceptedTxns.end()));
         // Move invalid txns into the result hash table (if any exists)
         mInvalidTxns.insert(imdResult.mInvalidTxns.begin(), imdResult.mInvalidTxns.end());
+        // Get resubmitted transactions (if any exists)
+        size_t numResubmittedTxns = imdResult.mResubmittedTxns.size();
+        if (numResubmittedTxns) {
+            vTxInputData = std::move_if_noexcept(imdResult.mResubmittedTxns);
+        }
         // Get dependent orphans (if any exists)
-        vTxInputData = handlers.mpOrphanTxns->collectDependentTxnsForRetry();
+        TxInputDataSPtrVec vOrphanTxns = handlers.mpOrphanTxns->collectDependentTxnsForRetry();
+        size_t numOrphanTxns = vOrphanTxns.size();
+        if (numOrphanTxns) {
+            if (numResubmittedTxns) {
+                vTxInputData.insert(vTxInputData.end(),
+                    std::make_move_iterator(vOrphanTxns.begin()),
+                    std::make_move_iterator(vOrphanTxns.end()));
+            } else {
+                vTxInputData = std::move_if_noexcept(vOrphanTxns);
+            }
+        } else if (!numResubmittedTxns) {
+            // There are no resubmitted or orphan transactions, so clear the vector.
+            vTxInputData.clear();
+        }
+        // Add data logging.
         vTxInputDataSize = vTxInputData.size();
         if (vTxInputDataSize) {
             LogPrint(BCLog::TXNVAL,
-                    "Txnval-synch-batch: Reprocess a set of %d orphan txns\n", vTxInputDataSize);
+                    "Txnval-synch-batch: Reprocess a set of %ld txns (resubmitted: %ld, orphans: %ld)\n",
+                    vTxInputDataSize,
+                    numResubmittedTxns,
+                    numOrphanTxns);
         }
     } while (vTxInputDataSize);
     // Limit mempool size if required
@@ -482,6 +514,28 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
     } catch (...) {
         LogPrint(BCLog::TXNVAL, "Unexpected exception in new txn thread\n");
     }
+}
+
+/**
+ * Execute txn validation for a single transaction.
+ */
+CTxnValResult CTxnValidator::executeTxnValidationNL(
+    const TxInputDataSPtr& pTxInputData,
+    CTxnHandlers& handlers,
+    bool fLimitMempoolSize,
+    bool fUseLimits) {
+
+    // Execute txn validation.
+    CTxnValResult result =
+        TxnValidation(
+            pTxInputData,
+            mConfig,
+            mMempool,
+            mpTxnDoubleSpendDetector,
+            fUseLimits);
+    // Process validated results for the given txn
+    ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
+    return result;
 }
 
 /**

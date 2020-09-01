@@ -62,30 +62,27 @@ void CTxnPropagator::removeTransactions(const std::vector<CTransactionRef>& txns
 {
     LogPrint(BCLog::TXNPROP, "Purging %d transactions\n", txns.size());
 
-    // Create list of CTxnSendingDetails as required to remove them from
-    // a nodes list.
-    std::vector<CTxnSendingDetails> txnDetails {};
-    txnDetails.reserve(txns.size());
+    // Create set of objects to use it as lookup when deleting 
+    std::set<CInv> toRemove {};
     for(const CTransactionRef& txn : txns)
     {   
-        CInv inv { MSG_TX, txn->GetId() };
-        txnDetails.emplace_back(inv, txn);
+        toRemove.emplace(MSG_TX, txn->GetId());
     }
    
     // Filter list of new transactions
     {
         std::unique_lock<std::mutex> lock { mNewTxnsMtx };
 
-        for (const auto& el : txnDetails)
-        {
-            mNewTxns.erase(std::remove_if(mNewTxns.begin(), mNewTxns.end(), [&el](const CTxnSendingDetails& i) {
-              return i.getInv() == el.getInv(); }), mNewTxns.end());
-        }
-
+        mNewTxns.erase(
+            std::remove_if(mNewTxns.begin(), mNewTxns.end(), 
+                [&toRemove](const CTxnSendingDetails& i) {
+                    return toRemove.find(i.getInv()) != toRemove.end(); 
+                }), 
+            mNewTxns.end());
     }
 
     // Update lists of pending transactions for each node
-    auto results { g_connman->ParallelForEachNode([&txnDetails](const CNodePtr& node) { node->RemoveTxnsFromInventory(txnDetails); }) };
+    auto results { g_connman->ParallelForEachNode([&toRemove](const CNodePtr& node) { node->RemoveTxnsFromInventory(toRemove); }) };
 
     // Wait for all nodes to finish since they depend on local variable txnDetails
     for(auto& result : results)

@@ -976,7 +976,7 @@ std::string HelpMessage(HelpMessageMode mode) {
                                      DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE));
 
     strUsage +=
-            HelpMessageOpt("-minconsolidationinputnaturity=<n>",
+            HelpMessageOpt("-minconsolidationinputmaturity=<n>",
                            strprintf(_("Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
                                      DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY));
 

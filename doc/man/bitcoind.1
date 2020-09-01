@@ -554,6 +554,30 @@ Set maximum transaction size in bytes we relay and mine (default: 10 MB,
 min: 99999 B, 0 = unlimited) after Genesis is activated. The
 value may be given in bytes or with unit (B, kB, MB, GB).
 .HP
+\fB\-minconsolidationfactor=\fR<n>
+.IP
+Set minimum ratio between sum of utxo scriptPubKey sizes spent in a
+consolidation transaction, to the corresponding sum of output
+scriptPubKey sizes. The ratio between number of consolidation
+transaction inputs to the number of outputs also needs to be
+greater or equal to the minimum consolidation factor (default:
+20). A value of 0 disables free consolidation transactions
+.HP
+\fB\-maxconsolidationinputscriptsize=\fR<n>
+.IP
+This number is the maximum length for a scriptSig input in a
+consolidation txn (default: 150).
+.HP
+\fB\-minconsolidationinputmaturity=\fR<n>
+.IP
+Minimum number of confirmations of inputs spent by consolidation
+transactions (default: 6).
+.HP
+\fB\-acceptnonstdconsolidationinput=\fR<n>
+.IP
+Accept consolidation transactions spending non standard inputs (default:
+0).
+.HP
 \fB\-maxscriptsizepolicy\fR
 .IP
 Set maximum script size in bytes we're willing to relay/mine per script
