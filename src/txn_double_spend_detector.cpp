@@ -13,7 +13,7 @@ bool CTxnDoubleSpendDetector::insertTxnInputs(
     CValidationState& state,
     bool isFinal) {
 
-    const CTransactionRef& ptx = pTxInputData->mpTx;
+    const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
 
     if (tx.vin.empty()) {

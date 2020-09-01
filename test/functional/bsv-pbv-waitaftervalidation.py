@@ -19,6 +19,7 @@ win the validation race and be set on tip
 
 We are artificially extending validation time by calling waitaftervalidatingblock
 """
+from test_framework.blocktools import prepare_init_chain
 from test_framework.mininode import (
     NetworkThread,
     NodeConn,
@@ -63,20 +64,8 @@ class PBVWaitAfterValidation(BitcoinTestFramework):
         node2.wait_for_verack()
 
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
-        block = self.chain.next_block(block_count)
-        block_count += 1
-        self.chain.save_spendable_output()
-        node0.send_message(msg_block(block))
 
-        for i in range(100):
-            block = self.chain.next_block(block_count)
-            block_count += 1
-            self.chain.save_spendable_output()
-            node0.send_message(msg_block(block))
-
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
+        _, out, block_count = prepare_init_chain(self.chain, 101, 100, block_0=False, start_block=0, node=node0)
 
         self.log.info("waiting for block height 101 via rpc")
         self.nodes[0].waitforblockheight(101)

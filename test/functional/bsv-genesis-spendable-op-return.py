@@ -57,9 +57,6 @@ class SpendingOpReturnTx(BitcoinTestFramework):
         self.num_nodes = 1
 
     def setup_network(self):
-        self.setup_nodes()
-
-    def setup_nodes(self):
         self.add_nodes(self.num_nodes)
 
     def run_test(self):

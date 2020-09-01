@@ -13,13 +13,7 @@ import time
 FeeFilterTest -- test processing of feefilter messages
 '''
 
-
-def hashToHex(hash):
-    return format(hash, '064x')
-
 # Wait up to 60 secs to see if the testnode has received all the expected invs
-
-
 def allInvsMatch(invsExpected, testnode):
     for x in range(60):
         with mininode_lock:

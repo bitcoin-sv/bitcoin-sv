@@ -100,6 +100,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	mempool_tests.cpp
 	merkle_tests.cpp
 	miner_tests.cpp
+    net_association_tests.cpp
 	object_stream_deserialization_tests.cpp
 	opcode_tests.cpp
 	multisig_tests.cpp
@@ -134,6 +135,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	test_double_spend_detector.cpp
 	test_orphantxns.cpp
 	test_recent_rejects.cpp
+	test_txid_tracker.cpp
 	test_txnvalidation_utils.cpp
 	test_txnvalidator.cpp
 	testutil.cpp

@@ -17,18 +17,18 @@ import time
 import traceback
 import contextlib
 from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.mininode import NetworkThread
+from test_framework.mininode import NetworkThread, StopNetworkThread
 
 from .authproxy import JSONRPCException
 from . import coverage
-from .test_node import TestNode
+from .test_node import TestNode, TestNode_process_list, BITCOIND_PROC_WAIT_TIMEOUT
 from .util import (
     MAX_NODES,
     PortSeed,
     assert_equal,
     check_json_precision,
     connect_nodes_bi,
-    disconnect_nodes,
+    disconnect_nodes_bi,
     initialize_datadir,
     log_filename,
     p2p_port,
@@ -72,6 +72,7 @@ class BitcoinTestFramework():
         self.nodes = []
         self.mocktime = 0
         self.runNodesWithRequiredParams = True
+        self.bitcoind_proc_wait_timeout = BITCOIND_PROC_WAIT_TIMEOUT
         self.set_test_params()
 
         assert hasattr(
@@ -149,6 +150,9 @@ class BitcoinTestFramework():
             print("Testcase failed. Attaching python debugger. Enter ? for help")
             pdb.set_trace()
 
+        # Make the NetworkThread stop if it is still running so that it does not prevent test script from exiting.
+        StopNetworkThread()
+
         if not self.options.noshutdown:
             self.log.info("Stopping nodes")
             if self.nodes:
@@ -156,6 +160,15 @@ class BitcoinTestFramework():
         else:
             self.log.info(
                 "Note: bitcoinds were not stopped and may still be running")
+            # Remove all node processes from list of running external processes
+            # so that they will not be killed when Python exists.
+            TestNode_process_list.clear()
+
+        if len(TestNode_process_list)>0:
+            self.log.warning("%i process(es) started by test are still running and will be killed." % len(TestNode_process_list))
+            if success != TestStatus.FAILED:
+                self.log.error("Because not all started processes were properly stopped, test is considered to have failed!")
+                success = TestStatus.FAILED
 
         if not self.options.nocleanup and not self.options.noshutdown and success != TestStatus.FAILED:
             self.log.info("Cleaning up {} on exit".format(self.options.tmpdir))
@@ -325,14 +338,13 @@ class BitcoinTestFramework():
         del connections
         # once all connection.close() are complete, NetworkThread run loop completes and thr.join() returns success
         thr.join()
-        disconnect_nodes(self.nodes[node_index],1)
         self.stop_node(node_index)
         logger.debug("finished %s", title)
 
     def stop_node(self, i):
         """Stop a bitcoind test node"""
         self.nodes[i].stop_node()
-        self.nodes[i].wait_until_stopped()
+        self.nodes[i].wait_until_stopped(timeout=self.bitcoind_proc_wait_timeout)
 
     def stop_nodes(self):
         """Stop multiple bitcoind test nodes"""
@@ -342,7 +354,7 @@ class BitcoinTestFramework():
 
         for node in self.nodes:
             # Wait for nodes to stop
-            node.wait_until_stopped()
+            node.wait_until_stopped(timeout=self.bitcoind_proc_wait_timeout)
 
     def restart_node(self, i, extra_args=None):
         """Stop and start a test node"""
@@ -355,9 +367,8 @@ class BitcoinTestFramework():
                 self.start_node(i, extra_args, stderr=log_stderr)
                 self.stop_node(i)
             except Exception as e:
+                self.wait_for_node_exit(i,1) # wait until process properly terminates and resources are cleaned up
                 assert 'bitcoind exited' in str(e)  # node must have shutdown
-                self.nodes[i].running = False
-                self.nodes[i].process = None
                 if expected_msg is not None:
                     log_stderr.seek(0)
                     stderr = log_stderr.read().decode('utf-8')
@@ -372,14 +383,13 @@ class BitcoinTestFramework():
                 raise AssertionError(assert_msg)
 
     def wait_for_node_exit(self, i, timeout):
-        self.nodes[i].process.wait(timeout)
+        self.nodes[i].wait_for_exit(timeout)
 
     def split_network(self):
         """
         Split the network of four nodes into nodes 0/1 and 2/3.
         """
-        disconnect_nodes(self.nodes[1], 2)
-        disconnect_nodes(self.nodes[2], 1)
+        disconnect_nodes_bi(self.nodes, 1, 2)
         self.sync_all([self.nodes[:2], self.nodes[2:]])
 
     def join_network(self):
@@ -593,8 +603,8 @@ class ComparisonTestFramework(BitcoinTestFramework):
         else:
             return TestInstance([[self.chain.tip, reject]])
 
-    def check_mempool(self, rpc, should_be_in_mempool):
-        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=20)
+    def check_mempool(self, rpc, should_be_in_mempool, timeout=20):
+        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=timeout)
 
 
 

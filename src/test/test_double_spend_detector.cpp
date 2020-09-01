@@ -32,9 +32,10 @@ namespace {
             GetScriptForDestination(key.GetPubKey().GetID());
         // Return a shared object with txn's input data
         return std::make_shared<CTxInputData>(
-                                    source,                   // tx source
-                                    TxValidationPriority::normal,          // tx validation priority
-                                    MakeTransactionRef(tx));  // a pointer to the tx
+                   g_connman->GetTxIdTracker(), // a pointer to the TxIdTracker
+                   MakeTransactionRef(tx),  // a pointer to the tx
+                   source,                   // tx source
+                   TxValidationPriority::normal);          // tx validation priority
     }
 }
 
@@ -55,11 +56,11 @@ BOOST_AUTO_TEST_CASE(test_detector_insert_txn_inputs) {
     };
 
     auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx1 = *txnInputData1->mpTx;
+    const CTransaction &tx1 = *txnInputData1->GetTxnPtr();
     auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx2 = *txnInputData2->mpTx;
+    const CTransaction &tx2 = *txnInputData2->GetTxnPtr();
     auto txnInputData3 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx3 = *txnInputData3->mpTx;
+    const CTransaction &tx3 = *txnInputData3->GetTxnPtr();
 
     CValidationState state;
     // tx1 checks
@@ -83,9 +84,9 @@ BOOST_AUTO_TEST_CASE(test_detector_conflicts) {
     };
 
     auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx1 = *txnInputData1->mpTx;
+    const CTransaction &tx1 = *txnInputData1->GetTxnPtr();
     auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx2 = *txnInputData2->mpTx;
+    const CTransaction &tx2 = *txnInputData2->GetTxnPtr();
 
     CValidationState state;
     BOOST_REQUIRE(dsDetector->insertTxnInputs(txnInputData1, mempool, state, true));
@@ -120,9 +121,9 @@ BOOST_AUTO_TEST_CASE(test_detector_remove_txn_inputs) {
     };
 
     auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10000);
-    const CTransaction &tx1 = *txnInputData1->mpTx;
+    const CTransaction &tx1 = *txnInputData1->GetTxnPtr();
     auto txnInputData2 = CreateTxnWithNInputs(TxSource::p2p, 10);
-    const CTransaction &tx2 = *txnInputData2->mpTx;
+    const CTransaction &tx2 = *txnInputData2->GetTxnPtr();
 
     CValidationState state;
     // Insert tx1
@@ -146,7 +147,7 @@ BOOST_AUTO_TEST_CASE(test_detector_clear_txn_inputs) {
     };
 
     auto txnInputData1 = CreateTxnWithNInputs(TxSource::p2p, 10000);
-    const CTransaction &tx1 = *txnInputData1->mpTx;
+    const CTransaction &tx1 = *txnInputData1->GetTxnPtr();
 
     CValidationState state;
     // Insert tx1

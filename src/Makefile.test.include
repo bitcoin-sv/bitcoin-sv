@@ -79,6 +79,7 @@ BITCOIN_TESTS =\
   test/mempool_tests.cpp \
   test/merkle_tests.cpp \
   test/miner_tests.cpp \
+  test/net_association_tests.cpp \
   test/object_stream_deserialization_tests.cpp \
   test/opcode_tests.cpp \
   test/multisig_tests.cpp \
@@ -98,6 +99,7 @@ BITCOIN_TESTS =\
   test/script_tests.cpp \
   test/scriptflags.cpp \
   test/scriptflags.h \
+  test/script_macros.h \
   test/scriptnum_tests.cpp \
   test/serialize_tests.cpp \
   test/sighash_tests.cpp \
@@ -117,6 +119,7 @@ BITCOIN_TESTS =\
   test/test_double_spend_detector.cpp \
   test/test_orphantxns.cpp \
   test/test_recent_rejects.cpp \
+  test/test_txid_tracker.cpp \
   test/test_txnvalidation_utils.cpp \
   test/test_txnvalidator.cpp \
   test/testutil.cpp \

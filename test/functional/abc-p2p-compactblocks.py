@@ -85,26 +85,13 @@ class FullBlockTest(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(99):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out, _ = prepare_init_chain(self.chain, 99, 100)
 
-        # Send it all to the node at once.
         yield test
-
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
-
+        
         # Check that compact block also work for big blocks
         node = self.nodes[0]
         peer = TestNode()

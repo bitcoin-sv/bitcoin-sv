@@ -13,8 +13,6 @@ from test_framework.script import OP_CHECKSIG, OP_FALSE, OP_RETURN, CScript, OP_
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import bytes_to_hex_str
 
-def hashToHex(hash):
-    return format(hash, '064x')
 
 class TestNode(NodeConnCB):
     def __init__(self):
@@ -24,7 +22,7 @@ class TestNode(NodeConnCB):
     def on_inv(self, conn, message):
         for i in message.inv:
             if (i.type == 1):
-                self.txinvs.append(format(i.hash, '064x'))
+                self.txinvs.append(hashToHex(i.hash))
 
     def clear_invs(self):
         with mininode_lock:
@@ -37,14 +35,10 @@ class SigopPolicyTest(BitcoinTestFramework):
         self.genesisactivationheight = 205
         self.maxblocksigops = 30000
         self.setup_clean_chain = True
+        self.extra_args = [['-genesisactivationheight=%d' % self.genesisactivationheight], ['-genesisactivationheight=%d' % self.genesisactivationheight, '-maxtxsigopscountspolicy=10000']]
 
     def setup_network(self):
-        # Add & start nodes
-        self.add_nodes(self.num_nodes)
-        # Create nodes
-        self.start_node(0, ['-genesisactivationheight=%d' % self.genesisactivationheight])
-        self.start_node(1, ['-genesisactivationheight=%d' % self.genesisactivationheight, '-maxtxsigopscountspolicy=10000'])
-
+        self.setup_nodes()
         sync_blocks(self.nodes)
 
     def run_test_node(self, node_index=0, dstaddr='127.0.0.1', dstportno=0, num_of_connections=1):

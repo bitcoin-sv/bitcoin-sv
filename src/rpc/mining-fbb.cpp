@@ -16,7 +16,7 @@
 #include "hash.h"
 #include "mining/candidates.h"
 #include "mining/factory.h"
-#include "net.h"
+#include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/server.h"
@@ -249,7 +249,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
     if (request.fHelp || request.params.size() != 1)
     {
         throw std::runtime_error(
-                "submitminingsolution \"<json string>\" \n"
+                "submitminingsolution \"<json string>\"\n"
                 "\nAttempts to submit a new block to the network.\n"
                 "\nJson Object should comprise of the following and must be escaped\n"
                 "    {\n"

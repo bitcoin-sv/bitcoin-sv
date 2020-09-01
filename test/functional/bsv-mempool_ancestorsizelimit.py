@@ -126,7 +126,7 @@ class MempoolSizeLimitTest(BitcoinTestFramework):
             # Here, the size is the problem (count is less then limitdescendantscount, which is 25 by default).
             if (descendantsSize + txSize > self.limitdescendantsize):
                 utxo = utxos.pop(0)
-                connection.message_count.clear()
+                connection.clear_messages()
                 # Check if there is an expected number of transactions in the mempool.
                 wait_until(lambda: len(self.nodes[0].getrawmempool()) == i, timeout=1)
                 (tx, sent_value, txSize) = self.chain_transaction(self.nodes[0], utxo['txid'], utxo['vout'], utxo['amount'], 1, connection)

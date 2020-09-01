@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_TXMEMPOOL_H
@@ -9,10 +9,12 @@
 #include "amount.h"
 #include "coins.h"
 #include "indirectmap.h"
+#include "mining/journal_builder.h"
 #include "random.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
 #include "tx_mempool_info.h"
+#include "policy/policy.h"
 
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -33,14 +35,6 @@
 class CAutoFile;
 class CBlockIndex;
 class Config;
-
-namespace mining
-{
-    class CJournalBuilder;
-    class CJournalChangeSet;
-    using CJournalBuilderPtr = std::unique_ptr<CJournalBuilder>;
-    using CJournalChangeSetPtr = std::unique_ptr<CJournalChangeSet>;
-}
 
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
@@ -88,6 +82,30 @@ struct AncestorDescendantCounts
     std::atomic_uint64_t nCountWithDescendants {0};
 };
 using AncestorDescendantCountsPtr = std::shared_ptr<AncestorDescendantCounts>;
+
+/** \class CTxPrioritizer
+ *
+ * The aim of this class is to support txn prioritisation and cleanup
+ * for the given set of transactions (in RAII style).
+ * If txn, that was prioritised, did not go to the mempool, then it's
+ * prioritisation entry needs to be cleared during destruction of the object.
+ */
+class CTxPrioritizer final
+{
+private:
+    CTxMemPool& mMempool;
+    std::vector<TxId> mTxnsToPrioritise {};
+
+public:
+    CTxPrioritizer(CTxMemPool& mempool, TxId txnToPrioritise);
+    CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrioritise);
+    ~CTxPrioritizer();
+    // Forbid copying/assignment
+    CTxPrioritizer(const CTxPrioritizer&) = delete;
+    CTxPrioritizer(CTxPrioritizer&&) = delete;
+    CTxPrioritizer& operator=(const CTxPrioritizer&) = delete;
+    CTxPrioritizer& operator=(CTxPrioritizer&&) = delete;
+};
 
 /** \class CTxMemPoolEntry
  *
@@ -492,6 +510,8 @@ private:
     std::atomic_uint32_t nCheckFrequency;
     std::atomic_uint nTransactionsUpdated;
 
+    CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
+
     //!< sum of all mempool tx's virtual sizes.
     uint64_t totalTxSize;
     //!< sum of dynamic memory usage of all the map elements (NOT the maps
@@ -504,7 +524,7 @@ private:
     mutable double rollingMinimumFeeRate;
 
     // Our journal builder
-    mining::CJournalBuilderPtr mJournalBuilder;
+    mutable mining::CJournalBuilder mJournalBuilder;
 
     // Sub-pool for time locked txns
     CTimeLockedMempool mTimeLockedPool {};
@@ -603,6 +623,8 @@ public:
 
     void SetSanityCheck(double dFrequency = 1.0);
 
+    void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
+
     /** Rebuild the journal contents so they match the mempool */
     void RebuildJournal() const;
 
@@ -674,6 +696,10 @@ public:
             const std::string& strHash,
             double dPriorityDelta,
             const Amount nFeeDelta);
+    void PrioritiseTransaction(
+            const std::vector<TxId>& vTxToPrioritise,
+            double dPriorityDelta,
+            const Amount nFeeDelta);
 
     void ApplyDeltas(
             const uint256& hash,
@@ -687,7 +713,7 @@ public:
             Amount &nFeeDelta) const;
 
     // Get a reference to the journal builder
-    const mining::CJournalBuilderPtr& getJournalBuilder() const { return mJournalBuilder; }
+    mining::CJournalBuilder& getJournalBuilder() { return mJournalBuilder; }
 
     // Get a reference to the time-locked (non-final txn) mempool
     CTimeLockedMempool& getNonFinalPool() { return mTimeLockedPool; }
@@ -714,11 +740,19 @@ public:
      * UpdateTransactionsFromBlock() will find child transactions and update the
      * descendant state for each transaction in hashesToUpdate (excluding any
      * child transactions present in hashesToUpdate, which are already accounted
-     * for).  Note: hashesToUpdate should be the set of transactions from the
-     * disconnected block that have been accepted back into the mempool.
+     * for).  
+     * Note: hashesToUpdate should be the set of transactions from the
+     *       disconnected block that have been accepted back into the mempool.
+     * Note: if the transaction from the disconnected block does not enter the journal
+     *       but their descendants are already in the journal we have to remove 
+     *       them using the changeSet. this can happen when low paying tx is mined
+     *       and we have its descendant in the mempool and journal, and when the block 
+     *       is disconnected low paying tx will end up in the mempool but will not be in the
+     *       journal while its descendants are already in
      */
     void UpdateTransactionsFromBlock(
-            const std::vector<uint256> &hashesToUpdate);
+            const std::vector<uint256> &hashesToUpdate,
+            const mining::CJournalChangeSetPtr &changeSet);
 
     /**
      * Try to calculate all in-mempool ancestors of entry.
@@ -768,10 +802,7 @@ public:
 
     /**
      * The minimum fee to get into the mempool, which may itself not be enough
-     * for larger-sized transactions. The incrementalRelayFee policy variable is
-     * used to bound the time it takes the fee rate to go back down all the way
-     * to 0. When the feerate would otherwise be half of this, it is set to 0
-     * instead.
+     * for larger-sized transactions.
      */
     CFeeRate GetMinFee(size_t sizelimit) const;
 
@@ -837,7 +868,8 @@ public:
     boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
         NotifyEntryRemoved;
 
-    void clearPrioritisation(const uint256 &hash);
+    void ClearPrioritisation(const uint256 &hash);
+    void ClearPrioritisation(const std::vector<TxId>& vTxIds);
 
 private:
     /**
@@ -931,7 +963,13 @@ private:
             setEntries &stage,
             bool updateDescendants,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
+            bool updateJournal = true);
+
+    void prioritiseTransactionNL(
+            const uint256& hash,
+            double dPriorityDelta,
+            const Amount nFeeDelta);
 
     void clearPrioritisationNL(const uint256& hash);
 
@@ -946,6 +984,25 @@ private:
 
     // A non-locking version of DynamicMemoryUsage.
     size_t DynamicMemoryUsageNL() const;
+
+    // returns a set of entries which are connected to any of items in the given set, but not elements of the given set. transactions are considered "connected"  
+    // if one transaction can reach another trough one or more child or parent relations
+    // - only transactions for which filter returns true are considered
+    // - every transaction from the set will have all its in-mempool ancestors included in the set (if they pass filter)
+    // - if the limit is not std::nullopt, not all children/siblings will be added. adding new transactions to the set is stopped when the size of the 
+    //   entries set is reached, but we have to ensure that all parents of all transactions in the set, so
+    //   we have to add parents of the last added entry too, this can extend the size of the entries set by up to {-limitdescendantcount - 1} transactions
+    setEntries getConnectedNL(const setEntries& entries, std::function<bool(txiter)> filter, std::optional<size_t> limit= std::nullopt) const;
+    
+    // returns a set of entries which are connected to any of items in the given set, but not elements of the given set.
+    setEntries getConnectedNL(const setEntries& entries) const;
+
+    // checks if affected transactions have met conditions to be mined, 
+    // - if they could be mined but they are not in the journal they are added to the changeSet as ADD
+    // - if they could not be mined but they are in the journal they are added to the changeSet as REMOVE
+    // - "Child pays for parent" (cpfp) is taken into account here
+    // - parents which are not in the affectedTransactions set are considered to be already mined or accepted to the journal
+    void checkJournalAcceptanceNL(const setEntries& affectedTransactions, mining::CJournalChangeSet& changeSet) const;
 };
 
 /**

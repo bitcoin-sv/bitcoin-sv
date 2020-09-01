@@ -348,6 +348,11 @@ void ECC_Start() {
     secp256k1_context_sign = ctx;
 }
 
+bool ECC_IsStarted()
+{
+    return secp256k1_context_sign !=nullptr; 
+}
+
 void ECC_Stop() {
     secp256k1_context *ctx = secp256k1_context_sign;
     secp256k1_context_sign = nullptr;
@@ -356,3 +361,6 @@ void ECC_Stop() {
         secp256k1_context_destroy(ctx);
     }
 }
+
+
+

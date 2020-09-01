@@ -81,13 +81,23 @@ class CJournalChangeSet final
     // Clear the changeset without applying it
     void clear();
 
+    // Checks if the transaction is already added
+    bool checkTxnAdded(const TxId& txid) const;
+
+    // Checks if the transaction is already removed
+    bool checkTxnRemoved(const TxId& txid) const;
+
+
   private:
 
     // Common post operation addition steps
-    void addOperationCommon(Operation op);
+    void addOperationCommonNL(Operation op, const TxId& txid);
 
     // Apply our changes (caller holds mutex)
     void applyNL();
+
+    // Clear the changeset without applying it (caller holds mutex)
+    void clearNL();
 
     mutable std::mutex mMtx {};
 
@@ -103,6 +113,10 @@ class CJournalChangeSet final
     // Is this change set a simple one that just appends to the end, or is a more
     // complicated one that removes as well or does something else complicated?
     std::atomic_bool mTailAppendOnly {true};
+
+    std::set<TxId> mAddedTransactions;
+    std::set<TxId> mRemovedTransactions;
+
 
 };
 

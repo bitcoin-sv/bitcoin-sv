@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2019 Bitcoin Association
+// Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #ifndef BITCOIN_POLICY_POLICY_H
@@ -69,6 +69,15 @@ static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500);
 static const uint64_t MAX_TX_SIZE_POLICY_BEFORE_GENESIS = 100000 - 1; // -1 because pre genesis policy validation was >=
 /** The default size for transactions we're willing to relay/mine */
 static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = 10 * ONE_MEGABYTE;
+/** The default minimum input (previous output) ScriptPubKey size to output ScriptPubKey size ratio to qualify for consolidation transaction */
+static const uint64_t DEFAULT_MIN_CONSOLIDATION_FACTOR = 20;
+/** The default maximum size for input scriptSig in a consolidation transaction */
+static const uint64_t DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE = 150;
+/** The default minimum number of blocks that need to be mined on top of the block containing previous output, for it to be eligible as an input in consolidation transaction */
+static const uint64_t DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY = 6;
+/** consolidation transaction with non standard inputs */
+static const uint64_t DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = 0;
+
 /** Maximum number of signature check operations in an IsStandard() P2SH script
  */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
@@ -82,8 +91,7 @@ static const unsigned int DEFAULT_TX_SIGOPS_COUNT_POLICY_AFTER_GENESIS = MAX_TX_
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 1000;
 /** Default for -maxnonfinalmempool, maximum megabytes of non-final mempool memory usage */
 static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
-/** Default for -incrementalrelayfee, which sets the minimum feerate increase
- * for mempool limiting or BIP 125 replacement **/
+/** Minimum feerate increase for mempool limiting **/
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
 /** Default for -maxscriptsizepolicy **/
 static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
@@ -93,8 +101,10 @@ static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
  * standard and should be done with care and ideally rarely. It makes sense to
  * only increase the dust limit after prior releases were already not creating
  * outputs below the new threshold.
+ * We will statically assert this to be the same value as DEFAULT_MIN_RELAY_TX_FEE
+ * because of CORE-647
  */
-static const Amount DUST_RELAY_TX_FEE(1000);
+static constexpr Amount DUST_RELAY_TX_FEE(250);
 
 /*
 * Number of blocks around GENESIS activation (72 blocks before and 72 blocks after) when
@@ -112,7 +122,7 @@ static const int DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 72;
 static const int MAX_GENESIS_GRACEFULL_ACTIVATION_PERIOD = 7200;
 
 // Default policy value for maximum number of non-push operations per script
-static const int DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = UINT32_MAX;
+static const uint64_t DEFAULT_OPS_PER_SCRIPT_POLICY_AFTER_GENESIS = UINT32_MAX;
 
 // Default policy value for maximum number of public keys per multisig after GENESIS
 static const uint64_t DEFAULT_PUBKEYS_PER_MULTISIG_POLICY_AFTER_GENESIS = UINT32_MAX;
@@ -162,6 +172,9 @@ inline unsigned int StandardNonFinalVerifyFlags(bool genesisEnabled)
     return flags;
 }
 
+/** Consolidation transactions are free */
+bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int tipHeight);
+
 bool IsStandard(const Config &config, const CScript &scriptPubKey, int nScriptPubKeyHeight, txnouttype &whichType);
 
 /**
@@ -186,7 +199,6 @@ std::optional<bool> AreInputsStandard(
     const CCoinsViewCache &mapInputs,
     const int mempoolHeight);
 
-extern CFeeRate incrementalRelayFee;
 extern CFeeRate dustRelayFee;
 
 #endif // BITCOIN_POLICY_POLICY_H

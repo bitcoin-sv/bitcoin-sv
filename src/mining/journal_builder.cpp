@@ -12,6 +12,11 @@ using mining::CJournalPtr;
 using mining::JournalUpdateReason;
 using mining::CJournalChangeSet;
 
+CJournalBuilder::CJournalBuilder()
+    : mJournal{ std::make_shared<CJournal>() }
+{}
+CJournalBuilder::~CJournalBuilder() = default;
+
 // Fetch a new empty change set
 CJournalChangeSetPtr CJournalBuilder::getNewChangeSet(JournalUpdateReason updateReason)
 {

@@ -16,7 +16,7 @@ import time
 from test_framework.script import *
 from test_framework.cdefs import (ONE_MEGABYTE)
 
-class BSV128MBlocks(ComparisonTestFramework):
+class BSV2MBlocks(ComparisonTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 1
@@ -39,32 +39,16 @@ class BSV128MBlocks(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(99):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 99, 100)
 
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         # Sending maximal size blocks will not cause disconnection neither banning (still be able to reconnect)
         block(1, spend=out[0], block_size=self.excessive_block_size)
         yield self.accepted()
-        assert(not self.test.test_nodes[0].closed)
-        self.test.clear_all_connections()
-        self.test.add_all_connections(self.nodes)
-        NetworkThread().start()
-        self.test.wait_for_verack(5)
 
         # Sending oversized blocks will cause disconnection and banning (not able to reconnect within 10 seconds of bantime)
         assert(not self.test.test_nodes[0].closed)
@@ -90,9 +74,7 @@ class BSV128MBlocks(ComparisonTestFramework):
         assert_equal(len(self.nodes[0].listbanned()),0)# Make sure the banned register has been cleared
         # Rewind bad block and reconnect to node
         self.chain.set_tip(1)
-        self.test.clear_all_connections()
-        self.test.add_all_connections(self.nodes)
-        NetworkThread().start()
+        self.restart_network()
         self.test.wait_for_verack(5)
 
         # Check we can still mine a good size block
@@ -100,4 +82,4 @@ class BSV128MBlocks(ComparisonTestFramework):
         yield self.accepted()
 
 if __name__ == '__main__':
-    BSV128MBlocks().main()
+    BSV2MBlocks().main()

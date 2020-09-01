@@ -16,7 +16,7 @@ Genesis height is 102.
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_RETURN, OP_TRUE, OP_ADD
-from test_framework.blocktools import create_transaction
+from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, p2p_port
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import msg_tx
@@ -39,26 +39,13 @@ class BSVGenesisActivationTransactionsBeforeAfter(ComparisonTestFramework):
         block = self.chain.next_block
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
-        
-        # Create a new block
+
         block(0)
-
-        self.chain.save_spendable_output()
-
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(100):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 100, 100)
 
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         # Create transaction with OP_RETURN in the locking script.
         tx1 = create_transaction(out[0].tx, out[0].n, b'', 100000, CScript([OP_RETURN]))

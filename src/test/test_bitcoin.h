@@ -12,6 +12,7 @@
 #include "random.h"
 #include "txdb.h"
 #include "txmempool.h"
+#include "mining/factory.h"
 
 #include <boost/thread.hpp>
 
@@ -69,7 +70,8 @@ struct TestingSetup : public BasicTestingSetup {
     boost::thread_group threadGroup;
     CConnman *connman;
 
-    TestingSetup(const std::string &chainName = CBaseChainParams::MAIN);
+    TestingSetup(const std::string &chainName = CBaseChainParams::MAIN, 
+                 mining::CMiningFactory::BlockAssemblerType assemblerType = mining::CMiningFactory::BlockAssemblerType::JOURNALING);
     ~TestingSetup();
 };
 

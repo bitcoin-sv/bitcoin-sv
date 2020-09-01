@@ -85,7 +85,7 @@ public:
     /** Send a string to the log output */
     int LogPrintStr(const std::string &str);
 
-    void OpenDebugLog();
+    bool OpenDebugLog();
     void ShrinkDebugFile();
 
     void EnableCategory(LogFlags category);

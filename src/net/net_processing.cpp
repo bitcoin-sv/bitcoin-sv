@@ -6,7 +6,7 @@
 #include <chrono>
 #include <optional>
 #include <shared_mutex>
-#include "net_processing.h"
+#include "net/net_processing.h"
 
 #include "addrman.h"
 #include "arith_uint256.h"
@@ -21,8 +21,8 @@
 #include "locked_ref.h"
 #include "merkleblock.h"
 #include "mining/journal_builder.h"
-#include "net.h"
-#include "netbase.h"
+#include "net/net.h"
+#include "net/netbase.h"
 #include "netmessagemaker.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
@@ -248,7 +248,7 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
     uint64_t nonce = pnode->GetLocalNonce();
     int nNodeStartingHeight = pnode->GetMyStartingHeight();
     NodeId nodeid = pnode->GetId();
-    CAddress addr = pnode->addr;
+    CAddress addr = pnode->GetAssociation().GetPeerAddr();
 
     CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr)
                             ? addr
@@ -284,7 +284,7 @@ void PushProtoconf(const CNodePtr& pnode, CConnman &connman) {
 
 
 void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
-    CAddress addr = pnode->addr;
+    CAddress addr = pnode->GetAssociation().GetPeerAddr();
     std::string addrName = pnode->GetAddrName();
     NodeId nodeid = pnode->GetId();
     {
@@ -300,48 +300,50 @@ void InitializeNode(const CNodePtr& pnode, CConnman &connman) {
     }
 }
 
-void FinalizeNode(NodeId nodeid, bool &fUpdateConnectionTime) {
+void FinalizeNode(NodeId nodeid, bool &fUpdateConnectionTime)
+{
+    // For mapBlocksInFlight and mapBlockSource
+    AssertLockHeld(cs_main);
 
     fUpdateConnectionTime = false;
-    LOCK(cs_main);
-    {
-        // Try to obtain an access to the node's state data.
-        const CNodeStateRef stateRef { GetState(nodeid) };
-        const CNodeStatePtr& state { stateRef.get() };
-        assert(state);
 
-        if (state->fSyncStarted) {
-            nSyncStarted--;
-        }
+    // Try to obtain an access to the node's state data.
+    const CNodeStateRef stateRef { GetState(nodeid) };
+    const CNodeStatePtr& state { stateRef.get() };
+    assert(state);
 
-        if (state->nMisbehavior == 0 && state->fCurrentlyConnected) {
-            fUpdateConnectionTime = true;
-        }
-
-        for (const QueuedBlock &entry : state->vBlocksInFlight) {
-            mapBlocksInFlight.erase(entry.hash);
-        }
-        // Get rid of stale mapBlockSource entries for this peer as they may leak
-        // if we don't clean them up (I saw on the order of ~100 stale entries on
-        // a full resynch in my testing -- these entries stay forever).
-        // Performance note: most of the time mapBlockSource has 0 or 1 entries.
-        // During synch of blockchain it may end up with as many as 1000 entries,
-        // which still only takes ~1ms to iterate through on even old hardware.
-        // So this memleak cleanup is not expensive and worth doing since even
-        // small leaks are bad. :)
-        for (auto it = mapBlockSource.begin(); it != mapBlockSource.end(); /*NA*/) {
-            if (it->second.first == nodeid) {
-                mapBlockSource.erase(it++);
-            } else {
-                ++it;
-            }
-        }
-        // Erase orphan txns received from the given nodeId
-        g_connman->EraseOrphanTxnsFromPeer(nodeid);
-        nPreferredDownload -= state->fPreferredDownload;
-        nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
-        assert(nPeersWithValidatedDownloads >= 0);
+    if (state->fSyncStarted) {
+        nSyncStarted--;
     }
+
+    if (state->nMisbehavior == 0 && state->fCurrentlyConnected) {
+        fUpdateConnectionTime = true;
+    }
+
+    for (const QueuedBlock &entry : state->vBlocksInFlight) {
+        mapBlocksInFlight.erase(entry.hash);
+    }
+    // Get rid of stale mapBlockSource entries for this peer as they may leak
+    // if we don't clean them up (I saw on the order of ~100 stale entries on
+    // a full resynch in my testing -- these entries stay forever).
+    // Performance note: most of the time mapBlockSource has 0 or 1 entries.
+    // During synch of blockchain it may end up with as many as 1000 entries,
+    // which still only takes ~1ms to iterate through on even old hardware.
+    // So this memleak cleanup is not expensive and worth doing since even
+    // small leaks are bad. :)
+    for (auto it = mapBlockSource.begin(); it != mapBlockSource.end(); /*NA*/) {
+        if (it->second.first == nodeid) {
+            mapBlockSource.erase(it++);
+        } else {
+            ++it;
+        }
+    }
+    // Erase orphan txns received from the given nodeId
+    g_connman->EraseOrphanTxnsFromPeer(nodeid);
+    nPreferredDownload -= state->fPreferredDownload;
+    nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
+    assert(nPeersWithValidatedDownloads >= 0);
+
     // Modify mapNodeState in an exclusive mode.
     {
         std::unique_lock<std::shared_mutex> lock { mapNodeStateMtx };
@@ -1067,7 +1069,7 @@ bool AlreadyHave(const CInv &inv) {
 bool IsTxnKnown(const CInv &inv) {
     if (MSG_TX == inv.type) {
         const uint256& activeTipBlockHash {
-            chainActiveSharedData.GetChainActiveTipBlockHash()
+            chainActive.Tip()->GetBlockHash()
         };
         if (activeTipBlockHash != hashRecentRejectsChainTip) {
             // If the chain tip has changed previously rejected transactions
@@ -1086,8 +1088,11 @@ bool IsTxnKnown(const CInv &inv) {
                mempool.Exists(inv.hash) ||
                mempool.getNonFinalPool().exists(inv.hash) ||
                mempool.getNonFinalPool().recentlyRemoved(inv.hash) ||
-               g_connman->CheckOrphanTxnExists(inv.hash) ||
-               g_connman->CheckTxnExistsInValidatorsQueue(inv.hash) ||
+               // A call to the TxIdTracker is sufficient to verify, if currently:
+               // - txn is already received from the network and then moved into ptv queues
+               // - txn is already detected as an orphan and it is still being kept
+               //   (until evicted or accepted)
+               g_connman->GetTxIdTracker()->Contains(TxId(inv.hash)) ||
                // It is safe to refer to pcoinsTip (without holding cs_main) as:
                // - pcoinsTip is initialized before CConnman object is created
                // - HaveCoinInCache is protected by an internal mtx
@@ -1658,7 +1663,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
     nServices = ServiceFlags(nServiceInt);
     if(!pfrom->fInbound) {
-        connman.SetServices(pfrom->addr, nServices);
+        connman.SetServices(pfrom->GetAssociation().GetPeerAddr(), nServices);
     }
     if(pfrom->nServicesExpected & ~nServices) {
         LogPrint(BCLog::NET, "peer=%d does not offer the expected services "
@@ -1711,7 +1716,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     // Disconnect if we connected to ourself
     if(pfrom->fInbound && !connman.CheckIncomingNonce(nNonce)) {
         LogPrintf("connected to self at %s, disconnecting\n",
-                  pfrom->addr.ToString());
+                  pfrom->GetAssociation().GetPeerAddr().ToString());
         pfrom->fDisconnect = true;
         return true;
     }
@@ -1731,7 +1736,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     PushProtoconf(pfrom, connman);
 
     pfrom->nServices = nServices;
-    pfrom->SetAddrLocal(addrMe);
+    pfrom->GetAssociation().SetPeerAddrLocal(addrMe);
     {
         LOCK(pfrom->cs_SubVer);
         pfrom->strSubVer = strSubVer;
@@ -1752,11 +1757,13 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     // Potentially mark this peer as a preferred download peer.
     UpdatePreferredDownload(pfrom);
 
+    CAddress peerAddr { pfrom->GetAssociation().GetPeerAddr() };
+
     if(!pfrom->fInbound) {
         // Advertise our address
         if(fListen && !IsInitialBlockDownload()) {
             CAddress addr =
-                GetLocalAddress(&pfrom->addr, pfrom->GetLocalServices());
+                GetLocalAddress(&peerAddr, pfrom->GetLocalServices());
             FastRandomContext insecure_rand;
             if(addr.IsRoutable()) {
                 LogPrint(BCLog::NET,
@@ -1778,23 +1785,23 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
             pfrom->fGetAddr = true;
             connman.PushMessage(pfrom, CNetMsgMaker(nSendVersion).Make(NetMsgType::GETADDR));
         }
-        connman.MarkAddressGood(pfrom->addr);
+        connman.MarkAddressGood(peerAddr);
     }
 
     std::string remoteAddr;
     if(fLogIPs) {
-        remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
+        remoteAddr = ", peeraddr=" + peerAddr.ToString();
     }
 
     LogPrint(BCLog::NET, "receive version message: [%s] %s: version %d, blocks=%d, "
               "us=%s, peer=%d%s\n",
-              pfrom->addr.ToString().c_str(), cleanSubVer, pfrom->nVersion,
+              peerAddr.ToString().c_str(), cleanSubVer, pfrom->nVersion,
               pfrom->nStartingHeight, addrMe.ToString(), pfrom->id,
               remoteAddr);
 
     int64_t nTimeOffset = nTime - GetTime();
     pfrom->nTimeOffset = nTimeOffset;
-    AddTimeData(pfrom->addr, nTimeOffset);
+    AddTimeData(peerAddr, nTimeOffset);
 
     // If the peer is old enough to have the old alert system, send it the
     // final alert.
@@ -1829,6 +1836,7 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
 {
     pfrom->SetRecvVersion(std::min(pfrom->nVersion.load(), PROTOCOL_VERSION));
 
+    const CAddress& peerAddr { pfrom->GetAssociation().GetPeerAddr() };
     if(!pfrom->fInbound) {
         // Try to obtain an access to the node's state data.
         const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
@@ -1838,12 +1846,12 @@ static void ProcessVerAckMessage(const CNodePtr& pfrom, const CNetMsgMaker& msgM
         state->fCurrentlyConnected = true;
         LogPrintf("New outbound peer connected: version: %d, blocks=%d, peer=%d%s\n",
                   pfrom->nVersion.load(), pfrom->nStartingHeight, pfrom->GetId(),
-                  (fLogIPs ? strprintf(", peeraddr=%s", pfrom->addr.ToString()) : ""));
+                  (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
     }
     else {
         LogPrintf("New inbound peer connected: version: %d, subver: %s, blocks=%d, peer=%d%s\n",
                   pfrom->nVersion.load(), pfrom->cleanSubVer, pfrom->nStartingHeight, pfrom->GetId(),
-                  (fLogIPs ? strprintf(", peeraddr=%s", pfrom->addr.ToString()) : ""));
+                  (fLogIPs ? strprintf(", peeraddr=%s", peerAddr.ToString()) : ""));
     }
 
     if(pfrom->nVersion >= SENDHEADERS_VERSION) {
@@ -1892,6 +1900,8 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
     // also get whether I asked for an addr.
     bool requestedAddr { pfrom->fGetAddr.exchange(false) };
 
+    const CAddress& peerAddr { pfrom->GetAssociation().GetPeerAddr() };
+
     // FIXME: For now we make rejecting unsolicited addr messages configurable (on by default).
     // Once we are happy this doesn't have any adverse effects on address propagation we can
     // remove the config option and make it the only behaviour.
@@ -1913,7 +1923,7 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
             for (const CAddress& addr : vAddr)
             {
                 // Server listen port will be different. We want to compare IPs and then use provided port
-                if (static_cast<CNetAddr>(addr) == static_cast<CNetAddr>(pfrom->addr))
+                if (static_cast<CNetAddr>(addr) == static_cast<CNetAddr>(peerAddr))
                 {
                     ownAddr = addr;
                     reportedOwnAddr = true;
@@ -1967,7 +1977,7 @@ static bool ProcessAddrMessage(const CNodePtr& pfrom, const std::atomic<bool>& i
             vAddrOk.push_back(addr);
         }
     }
-    connman.AddNewAddresses(vAddrOk, pfrom->addr, 2 * 60 * 60);
+    connman.AddNewAddresses(vAddrOk, peerAddr, 2 * 60 * 60);
     if (pfrom->fOneShot) {
         pfrom->fDisconnect = true;
     }
@@ -2375,14 +2385,15 @@ static void ProcessTxMessage(const Config& config,
         // By default, treat a received txn as a 'high' priority txn.
         // If the validation timeout occurs the txn is moved to the 'low' priority queue.
         connman.EnqueueTxnForValidator(
-					std::make_shared<CTxInputData>(
-                                        TxSource::p2p,  // tx source
-                                        TxValidationPriority::high,  // tx validation priority
-                                        std::move(ptx), // a pointer to the tx
-                                        GetTime(),      // nAcceptTime
-                                        true,           // fLimitFree
-                                        Amount(0),      // nAbsurdFee
-                                        pfrom));        // pNode
+            std::make_shared<CTxInputData>(
+                connman.GetTxIdTracker(),
+                std::move(ptx), // a pointer to the tx
+                TxSource::p2p,  // tx source
+                TxValidationPriority::high,  // tx validation priority
+                GetTime(),      // nAcceptTime
+                true,           // fLimitFree
+                Amount(0),      // nAbsurdFee
+                pfrom));        // pNode
     } else {
         // Always relay transactions received from whitelisted peers,
         // even if they were already in the mempool or rejected from it
@@ -3247,7 +3258,6 @@ static void ProcessFilterLoadMessage(const CNodePtr& pfrom, CDataStream& vRecv)
     else {
         LOCK(pfrom->cs_filter);
         pfrom->mFilter = std::move(filter);
-        pfrom->mFilter.UpdateEmptyFull();
         pfrom->fRelayTxes = true;
     }
 }
@@ -3529,19 +3539,20 @@ static bool SendRejectsAndCheckIfBanned(const CNodePtr& pnode, CConnman &connman
 
     if (state->fShouldBan) {
         state->fShouldBan = false;
+        const CAddress& peerAddr { pnode->GetAssociation().GetPeerAddr() };
         if (pnode->fWhitelisted) {
             LogPrintf("Warning: not punishing whitelisted peer %s!\n",
-                      pnode->addr.ToString());
+                      peerAddr.ToString());
         } else if (pnode->fAddnode) {
             LogPrintf("Warning: not punishing addnoded peer %s!\n",
-                      pnode->addr.ToString());
+                      peerAddr.ToString());
         } else {
             pnode->fDisconnect = true;
-            if (pnode->addr.IsLocal()) {
+            if (peerAddr.IsLocal()) {
                 LogPrintf("Warning: not banning local peer %s!\n",
-                          pnode->addr.ToString());
+                          peerAddr.ToString());
             } else {
-                connman.Ban(pnode->addr, BanReasonNodeMisbehaving);
+                connman.Ban(peerAddr, BanReasonNodeMisbehaving);
             }
         }
         return true;
@@ -3619,7 +3630,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
                   SanitizeString(msg.hdr.GetCommand()), pfrom->id);
 
         // Make sure we ban where that come from for some time.
-        connman.Ban(pfrom->addr, BanReasonNodeMisbehaving);
+        connman.Ban(pfrom->GetAssociation().GetPeerAddr(), BanReasonNodeMisbehaving);
 
         pfrom->fDisconnect = true;
         return false;
@@ -4144,7 +4155,7 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
         // Also, don't abandon this attempt to download all the while we are making
         // sufficient progress, as measured by the current download speed to this
         // peer.
-        uint64_t avgbw { pto->GetAverageBandwidth() };
+        uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth(StreamType::BLOCK).first };
         int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
         minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
         if(avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000) {
@@ -4222,7 +4233,7 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
             assert(stallerState);
             if (stallerState->nStallingSince == 0) {
                 stallerState->nStallingSince = GetTimeMicros();
-                uint64_t avgbw { pto->GetAverageBandwidth() };
+                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth(StreamType::BLOCK).first };
                 LogPrint(BCLog::NET, "Stall started (current speed %d) peer=%d\n", avgbw, staller);
             }
         }
@@ -4296,12 +4307,7 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         !(pto->fWhitelisted &&
           gArgs.GetBoolArg("-whitelistforcerelay",
                            DEFAULT_WHITELISTFORCERELAY))) {
-        Amount currentFilter =
-            mempool
-                .GetMinFee(
-                    gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) *
-                    1000000)
-                .GetFeePerK();
+        Amount currentFilter = mempool.GetMinFee(config.GetMaxMempool()).GetFeePerK();
         int64_t timeNow = GetTimeMicros();
         if (timeNow > pto->nextSendTimeFeeFilter) {
             static CFeeRate default_feerate =
@@ -4310,7 +4316,7 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
             Amount filterToSend = filterRounder.round(currentFilter);
             // If we don't allow free transactions, then we always have a fee
             // filter of at least minRelayTxFee
-            if (gArgs.GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) <= 0) {
+            if (config.GetLimitFreeRelay() <= 0) {
                 filterToSend = std::max(filterToSend,
                                         config.GetMinFeePerKB().GetFeePerK());
             }

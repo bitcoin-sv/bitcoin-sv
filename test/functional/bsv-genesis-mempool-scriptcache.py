@@ -22,10 +22,10 @@
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import *
-from test_framework.blocktools import create_transaction, create_block, create_coinbase
-from test_framework.util import assert_equal
+from test_framework.blocktools import create_transaction, create_block, create_coinbase, prepare_init_chain
+from test_framework.util import assert_equal, hashToHex, wait_until
 from test_framework.comptool import TestInstance
-from test_framework.mininode import msg_tx, msg_block
+from test_framework.mininode import msg_tx, msg_block, mininode_lock
 from time import sleep
 
 def add_tx_to_block(block, txs):
@@ -50,24 +50,13 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         block = self.chain.next_block
         node = self.nodes[0]
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
-        
-        # Create a new block
+
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(101):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 101, 100)
 
-        # collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(100):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         ########## SCENARIO 1
 
@@ -79,10 +68,8 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 
         self.test.connections[0].send_message(msg_tx(tx1))
         self.test.connections[0].send_message(msg_tx(tx2))
-        # wait for transaction processing
-        sleep(1)
-       
-        # Both transactions are accepted.
+        # wait for transactions to be accepted.
+        wait_until(lambda: len(node.getrawmempool()) == 2, timeout=5)
         assert_equal(True, tx1.hash in node.getrawmempool())
         assert_equal(True, tx2.hash in node.getrawmempool())
 
@@ -97,10 +84,8 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         self.test.connections[0].send_message(msg_tx(tx1))
         self.test.connections[0].send_message(msg_tx(tx2))
         # wait for transaction processing
-        sleep(1)
-
         # Tx2 should not be valid anymore.
-        assert_equal(len(node.getrawmempool()), 1)
+        wait_until(lambda: len(node.getrawmempool()) == 1, timeout=5)
         assert_equal(True, tx1.hash in node.getrawmempool())
         assert_equal(False, tx2.hash in node.getrawmempool())
 
@@ -109,15 +94,19 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         add_tx_to_block(block, [tx1,tx2])
         
         rejected_blocks = []
+        rejected_txs = []
         def on_reject(conn, msg):
             if (msg.message == b'block'):
                 rejected_blocks.append(msg)
                 assert_equal(msg.reason, b'blk-bad-inputs')
 
+            if msg.message == b'tx':
+                rejected_txs.append(msg)
+
         self.test.connections[0].cb.on_reject = on_reject
         self.test.connections[0].send_message(msg_block(block))
-        sleep(1)
 
+        wait_until(lambda: len(rejected_blocks) > 0, timeout=5, lock=mininode_lock)
         assert_equal(rejected_blocks[0].data, block.sha256)
         assert_equal(False, block.hash == node.getbestblockhash())
 
@@ -131,15 +120,12 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 
         self.test.connections[0].send_message(msg_tx(tx3))
         self.test.connections[0].send_message(msg_tx(tx4))
-        # wait for transaction processing
-        sleep(1)
-
-        # Both transactions are accepted.
-        assert_equal(True, tx3.hash in node.getrawmempool())
-        assert_equal(True, tx4.hash in node.getrawmempool())
+        # wait for transaction in mempool
+        wait_until(lambda: tx3.hash in node.getrawmempool(), timeout=5)
+        wait_until(lambda: tx4.hash in node.getrawmempool(), timeout=5)
 
         # Invalidate block -->  we are then at state before Genesis. Mempool is cleared.
-        node.invalidateblock(format(block103.sha256, 'x'))
+        node.invalidateblock(hashToHex(block103.sha256))
         assert_equal(False, tx3.hash in node.getrawmempool())
         assert_equal(False, tx4.hash in node.getrawmempool())
 
@@ -147,8 +133,8 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 
         # Send tx3 again, this time in pre-genesis rules. It is accepted to mempool.
         self.test.connections[0].send_message(msg_tx(tx3))
-        sleep(1)
-        assert_equal(True, tx3.hash in node.getrawmempool())
+
+        wait_until(lambda: tx3.hash in node.getrawmempool(), timeout=5)
 
         # Generate a block (height 103) with tx3 in it.
         node.generate(1)
@@ -157,7 +143,8 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
 
         # Send tx4 again, again with Genesis rules. It should not be accepted to mempool.
         self.test.connections[0].send_message(msg_tx(tx4))
-        sleep(1)
+
+        wait_until(lambda: tx4.sha256 in [msg.data for msg in rejected_txs], timeout=5, lock=mininode_lock)
         assert_equal(len(node.getrawmempool()), 0)
 
         # Send tx4 again, this time in block. Block should be rejected.
@@ -165,12 +152,11 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         add_tx_to_block(block, [tx4])
        
         self.test.connections[0].send_message(msg_block(block))
-        sleep(1)
 
-        assert_equal(rejected_blocks[1].data, block.sha256)
+        # Wait for hash in rejected blocks
+        wait_until(lambda: block.sha256 in [msg.data for msg in rejected_blocks], timeout=5, lock=mininode_lock)
         assert_equal(False, block.hash == node.getbestblockhash())
-
-
+        
         ########## SCENARIO 3
 
         assert_equal(node.getblock(node.getbestblockhash())['height'], self.genesisactivationheight - 1)
@@ -181,13 +167,13 @@ class BSVGenesisMempoolScriptCache(ComparisonTestFramework):
         blockGenesis = create_block(int("0x" + node.getbestblockhash(), 16), create_coinbase(height=1, outputValue=25))
         add_tx_to_block(blockGenesis, [tx5, tx6])
         self.test.connections[0].send_message(msg_block(blockGenesis))
-        sleep(1)
 
+        wait_until(lambda: blockGenesis.hash == node.getbestblockhash(), timeout=5)
         assert_equal(True, tx5.hash in node.getblock(node.getbestblockhash())['tx'])
         assert_equal(True, tx6.hash in node.getblock(node.getbestblockhash())['tx'])
 
         # Invalidate block 104. tx5 and tx6 are in now in mempool.
-        node.invalidateblock(format(blockGenesis.sha256, 'x'))
+        node.invalidateblock(hashToHex(blockGenesis.sha256))
         assert_equal(True, tx5.hash in node.getrawmempool())
         assert_equal(True, tx6.hash in node.getrawmempool())
 

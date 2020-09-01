@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <time_locked_mempool.h>
+#include <txn_validation_data.h>
 #include <validation.h>
 
 #include <test/test_bitcoin.h>
@@ -134,7 +135,7 @@ BOOST_AUTO_TEST_CASE(MempoolAddTest)
         CTransactionRef txnRef { MakeTransactionRef(txn) };
         CValidationState state { NonFinalState() };
         size_t startingMem { tester.getMemUsed() };
-        tlMempool.addOrUpdateTransaction({txnRef}, state);
+        tlMempool.addOrUpdateTransaction({txnRef}, TxInputDataSPtr{}, state);
         BOOST_CHECK(state.IsValid());
         BOOST_CHECK(tester.isInMempool(txnRef));
         BOOST_CHECK(!tester.isRecentlyRemoved(txnRef));
@@ -161,14 +162,14 @@ BOOST_AUTO_TEST_CASE(MempoolAddTest)
     CValidationState state { NonFinalState() };
     CMutableTransaction large { CreateRandomTransaction(5000) };
     CTransactionRef largeRef { MakeTransactionRef(large) };
-    tlMempool.addOrUpdateTransaction({largeRef}, state);
+    tlMempool.addOrUpdateTransaction({largeRef}, TxInputDataSPtr{}, state);
     BOOST_CHECK(state.IsValid());
     BOOST_CHECK(tester.isInMempool(largeRef));
     BOOST_CHECK(!tester.isRecentlyRemoved(largeRef));
     CTransactionRef oldLargeRef { largeRef };
     large = CreateRandomTransaction(5000);
     largeRef = MakeTransactionRef(large);
-    tlMempool.addOrUpdateTransaction({largeRef}, state);
+    tlMempool.addOrUpdateTransaction({largeRef}, TxInputDataSPtr{}, state);
     BOOST_CHECK(!state.IsValid());
     BOOST_CHECK(state.GetRejectCode() == REJECT_MEMPOOL_FULL);
     BOOST_CHECK(!tester.isInMempool(largeRef));
@@ -189,7 +190,7 @@ BOOST_AUTO_TEST_CASE(DoubleSpendTest)
     {
         CTransactionRef txnRef { MakeTransactionRef(txn) };
         CValidationState state { NonFinalState() };
-        tlMempool.addOrUpdateTransaction({txnRef}, state);
+        tlMempool.addOrUpdateTransaction({txnRef}, TxInputDataSPtr{}, state);
     }
 
     // Check for double spend of UTXO locked by one of our non-final txns
@@ -220,9 +221,19 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
     original.vin[0].nSequence = 1;
     original.vout.resize(1);
 
+    const TxIdTrackerSPtr& pTxIdTracker = std::make_shared<CTxIdTracker>();
     CTransactionRef txnRef { MakeTransactionRef(original) };
+    TxInputDataSPtr pTxInputData {
+        std::make_shared<CTxInputData>(
+            pTxIdTracker,
+            txnRef,
+            TxSource::unknown,
+            TxValidationPriority::high,
+            GetTime()
+        )
+    };
     CValidationState state { NonFinalState() };
-    tlMempool.addOrUpdateTransaction({txnRef}, state);
+    tlMempool.addOrUpdateTransaction({txnRef}, pTxInputData, state);
 
     CTransactionRef lastUpdate {nullptr};
 
@@ -236,9 +247,10 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
         BOOST_CHECK(!tlMempool.finalisesExistingTransaction(updateRef));
         CValidationState state { NonFinalState() };
         size_t startingMem { tester.getMemUsed() };
-        tlMempool.addOrUpdateTransaction({updateRef}, state);
+        tlMempool.addOrUpdateTransaction({updateRef}, pTxInputData, state);
         BOOST_CHECK_EQUAL(startingMem, tester.getMemUsed());
         BOOST_CHECK(!state.IsValid());
+        BOOST_CHECK(!state.IsResubmittedTx());
         BOOST_CHECK(!tester.isInMempool(updateRef));
         BOOST_CHECK(tester.isInMempool(originalRef));
         BOOST_CHECK(!tester.isRecentlyRemoved(updateRef));
@@ -255,9 +267,10 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
         BOOST_CHECK(!tlMempool.finalisesExistingTransaction(updateRef));
         CValidationState state { NonFinalState() };
         size_t startingMem { tester.getMemUsed() };
-        tlMempool.addOrUpdateTransaction({updateRef}, state);
+        tlMempool.addOrUpdateTransaction({updateRef}, pTxInputData, state);
         BOOST_CHECK_EQUAL(startingMem, tester.getMemUsed());
         BOOST_CHECK(!state.IsValid());
+        BOOST_CHECK(!state.IsResubmittedTx());
         BOOST_CHECK(tester.isInMempool(originalRef));
         BOOST_CHECK(!tester.isRecentlyRemoved(originalRef));
         BOOST_CHECK(!tester.isRecentlyRemoved(updateRef));
@@ -274,9 +287,10 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
         BOOST_CHECK(!tlMempool.finalisesExistingTransaction(updateRef));
         CValidationState state { NonFinalState() };
         size_t startingMem { tester.getMemUsed() };
-        tlMempool.addOrUpdateTransaction({updateRef}, state);
+        tlMempool.addOrUpdateTransaction({updateRef}, pTxInputData, state);
         BOOST_CHECK_EQUAL(startingMem, tester.getMemUsed());
         BOOST_CHECK(state.IsValid());
+        BOOST_CHECK(!state.IsResubmittedTx());
         BOOST_CHECK(tester.isInMempool(updateRef));
         BOOST_CHECK(!tester.isInMempool(originalRef));
         BOOST_CHECK(tester.isRecentlyRemoved(originalRef));
@@ -294,9 +308,10 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
         BOOST_CHECK(tlMempool.finalisesExistingTransaction(updateRef));
         CValidationState state {};
         size_t startingMem { tester.getMemUsed() };
-        tlMempool.addOrUpdateTransaction({updateRef}, state);
+        tlMempool.addOrUpdateTransaction({updateRef}, pTxInputData, state);
         BOOST_CHECK(tester.getMemUsed() < startingMem);
         BOOST_CHECK(state.IsValid());
+        BOOST_CHECK(state.IsResubmittedTx());
         BOOST_CHECK(!tester.isInMempool(updateRef));
         BOOST_CHECK(!tester.isInMempool(originalRef));
         BOOST_CHECK(tester.isRecentlyRemoved(originalRef));

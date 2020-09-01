@@ -10,7 +10,7 @@
 #ifndef BITCOIN_PROTOCOL_H
 #define BITCOIN_PROTOCOL_H
 
-#include "netaddress.h"
+#include "net/netaddress.h"
 #include "serialize.h"
 #include "uint256.h"
 #include "version.h"
@@ -278,6 +278,12 @@ extern const char *PROTOCONF;
  * may need to be processed differently.
  */
 bool IsBlockLike(const std::string &strCommand);
+
+/**
+ * Return the maximum message size for the given message type.
+ */
+uint64_t GetMaxMessageLength(const std::string& command, const Config& config);
+
 }; // namespace NetMsgType
 
 /* Get a vector of all valid message types (see above) */

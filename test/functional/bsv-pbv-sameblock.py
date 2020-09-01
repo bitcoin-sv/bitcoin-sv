@@ -5,7 +5,6 @@
 Send two same blocks via different p2p connection, one of the blocks will
 be processed and the other ignored
 """
-import glob
 
 from test_framework.mininode import (
     NetworkThread,
@@ -17,8 +16,8 @@ from test_framework.test_framework import BitcoinTestFramework, ChainManager
 from test_framework.util import (
     assert_equal,
     p2p_port,
-    wait_until
-)
+    wait_until,
+    check_for_log_msg)
 from bsv_pbv_common import (
     wait_for_waiting_blocks,
     wait_for_validating_blocks
@@ -73,16 +72,8 @@ class PBVSameBlock(BitcoinTestFramework):
         # One is validating the other is ignored.
         wait_for_validating_blocks({block.hash}, self.nodes[0], self.log)
 
-        def wait_for_log():
-            line_text = block.hash + " will not be considered by the current"
-            for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
-                if line_text in line:
-                    self.log.info("Found line: %s", line)
-                    return True
-            return False
-
         # wait for the log of the ignored block.
-        wait_until(wait_for_log)
+        wait_until(lambda: check_for_log_msg(self, block.hash + " will not be considered by the current", "/node0"))
 
         # remove block validating status to finish validation
         self.nodes[0].waitaftervalidatingblock(block.hash, "remove")

@@ -70,18 +70,11 @@ class BSVGetBlock(ComparisonTestFramework):
 
         # shorthand for functions
         block = self.chain.next_block
-
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(99):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, _, _ = prepare_init_chain(self.chain, 99, 0)
+
         yield test
 
         block_size = 100000

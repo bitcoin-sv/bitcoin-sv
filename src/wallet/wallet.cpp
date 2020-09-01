@@ -16,7 +16,7 @@
 #include "key.h"
 #include "keystore.h"
 #include "mining/journal_builder.h"
-#include "net.h"
+#include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
@@ -83,7 +83,7 @@ struct CompareValueOnly {
 };
 
 bool CWallet::ExtractDestination(const CScript &scriptPubKey, CTxDestination &addressRet) {
-    bool isGenesisEnabled = scriptPubKey.IsPayToScriptHash() ? false : true;
+    const bool isGenesisEnabled = !IsP2SH(scriptPubKey);
     return ::ExtractDestination(scriptPubKey, isGenesisEnabled, addressRet);
 }
 
@@ -107,7 +107,7 @@ public:
         std::vector<CTxDestination> vDest;
         int nRequired;
         // We will treat all scripts as after genesis except P2SH.
-        bool isGenesisEnabled = script.IsPayToScriptHash() ? false : true;
+        const bool isGenesisEnabled = !IsP2SH(script);
         if (ExtractDestinations(script, isGenesisEnabled, type, vDest, nRequired)) {
             for (const CTxDestination &dest : vDest) {
                 boost::apply_visitor(*this, dest);
@@ -2326,7 +2326,9 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
             if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
                 !IsLockedCoin((*it).first, i) &&
                 (pcoin->tx->vout[i].nValue > Amount(0) || fIncludeZeroValue) &&
-                !(pcoin->tx->vout[i].scriptPubKey.IsPayToScriptHash() && pcoin->IsGenesisEnabled()) && // we don't want to select p2sh utxos created after genesis
+                !(IsP2SH(pcoin->tx->vout[i].scriptPubKey) &&
+                  pcoin->IsGenesisEnabled()) && // we don't want to select p2sh
+                                                // utxos created after genesis
                 (!coinControl || !coinControl->HasSelected() ||
                  coinControl->fAllowOtherInputs ||
                  coinControl->IsSelected(COutPoint((*it).first, i)))) {
@@ -4061,7 +4063,8 @@ std::string CWallet::GetWalletHelpString(bool showDebug) {
         strUsage += HelpMessageOpt(
             "-dblogsize=<n>",
             strprintf("Flush wallet database activity from memory to disk log "
-                      "every <n> megabytes (default: %u)",
+                      "every <n> megabytes (default: %u). "
+                      "The value may be given in megabytes or with unit (B, KiB, MiB, GiB).",
                       DEFAULT_WALLET_DBLOGSIZE));
         strUsage += HelpMessageOpt(
             "-flushwallet",
@@ -4564,21 +4567,22 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
     }
     // Mempool Journal ChangeSet
     CJournalChangeSetPtr changeSet {
-        mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::NEW_TXN)
+        mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
     };
     // Forward transaction to the validator and wait for results.
     // To support backward compatibility (of this interface) we need
     // to wait until the transaction is processed.
     const auto& txValidator = g_connman->getTxnValidator();
     state = txValidator->processValidation(
-                            std::make_shared<CTxInputData>(
-                                                TxSource::wallet, // tx source
-                                                TxValidationPriority::normal, // tx validation priority
-                                                tx,           // a pointer to the tx
-                                                GetTime(),    // nAcceptTime
-                                                true,         // fLimitFree
-                                                nAbsurdFee),  // nAbsurdFee
-                            changeSet, // an instance of the mempool journal
-                            true); // fLimitMempoolSize
+        std::make_shared<CTxInputData>(
+            g_connman->GetTxIdTracker(),
+            tx,           // a pointer to the tx
+            TxSource::wallet, // tx source
+            TxValidationPriority::normal, // tx validation priority
+            GetTime(),    // nAcceptTime
+            true,         // fLimitFree
+            nAbsurdFee),  // nAbsurdFee
+        changeSet, // an instance of the mempool journal
+        true); // fLimitMempoolSize
     return state.IsValid();
 }

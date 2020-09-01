@@ -13,32 +13,7 @@ from test_framework.blocktools import *
 from test_framework.key import CECKey
 from test_framework.script import *
 
-# a little handier version of create_transaction
 from test_framework.util import assert_raises_message
-
-
-def create_tx(spend_tx, n, value, script=CScript([OP_TRUE])):
-    tx = create_transaction(spend_tx, n, b"", value, script)
-    return tx
-
-# sign a transaction, using the key we know about
-# this signs input 0 in tx, which is assumed to be spending output n in
-# spend_tx
-def sign_tx(tx, spend_tx, n, coinbase_key):
-    scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-    if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
-        tx.vin[0].scriptSig = CScript()
-        return
-    sighash = SignatureHashForkId(
-        spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
-    tx.vin[0].scriptSig = CScript(
-        [coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
-
-def create_and_sign_transaction(spend_tx, n, value, coinbase_key, script=CScript([OP_TRUE])):
-    tx = create_tx(spend_tx, n, value, script)
-    sign_tx(tx, spend_tx, n, coinbase_key)
-    tx.rehash()
-    return tx
 
 
 # In this test we are checking behavior of the Wallet when trying to spend pre and post genesis P2SH script
@@ -58,12 +33,8 @@ class P2SH(ComparisonTestFramework):
         self.coinbase_key.set_secretbytes(b"horsebattery")
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.genesisactivationheight = 150
-
-    def setup_network(self):
-        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-banscore=1000000', f'-genesisactivationheight={self.genesisactivationheight}']]*3
-        self.add_nodes(self.num_nodes, self.extra_args)
-        self.start_nodes()
-        self.init_network()
+        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-banscore=1000000',
+                            f'-genesisactivationheight={self.genesisactivationheight}']] * 3
 
     def run_test(self):
         self.test.run()
@@ -110,7 +81,7 @@ class P2SH(ComparisonTestFramework):
             p2sh_script = CScript([OP_HASH160, redeem_script_hash, OP_EQUAL])
             return create_and_sign_transaction(spend_tx=output.tx, n=output.n,
                                                value=output.tx.vout[0].nValue-100,
-                                               coinbase_key=self.coinbase_key,
+                                               private_key=self.coinbase_key,
                                                script=p2sh_script)
 
         # Add the transactions to the block

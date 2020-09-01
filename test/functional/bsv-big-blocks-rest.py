@@ -9,6 +9,7 @@ Test that rest call for /rest/block/BLOCKHASH works for bigger blocks.
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.comptool import TestInstance
 from test_framework.util import assert_equal, assert_greater_than, json
+from test_framework.blocktools import prepare_init_chain
 from test_framework.cdefs import ONE_MEGABYTE
 import http.client
 import urllib.parse
@@ -50,17 +51,11 @@ class BSVBigBlockRestCall(ComparisonTestFramework):
         # shorthand for functions
         block = self.chain.next_block
 
-        # Create a new block
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(99):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out, _ = prepare_init_chain(self.chain, 99, 0)
+
         yield test
 
         blockSize = 200 * ONE_MEGABYTE

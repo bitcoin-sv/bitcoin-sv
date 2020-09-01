@@ -79,7 +79,7 @@ static const bool DEFAULT_WHITELISTFORCERELAY = true;
 /** Default for DEFAULT_REJECTMEMPOOLREQUEST. */
 static const bool DEFAULT_REJECTMEMPOOLREQUEST = false;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
-static const Amount DEFAULT_MIN_RELAY_TX_FEE(250);
+static constexpr Amount DEFAULT_MIN_RELAY_TX_FEE(250);
 //! -maxtxfee default
 static const Amount DEFAULT_TRANSACTION_MAXFEE(COIN / 10);
 //! Discourage users to set fees higher than this amount (in satoshis) per kB
@@ -694,7 +694,7 @@ std::vector<TxId> LimitMempoolSize(
  * @param pnDynamicMemoryUsage If not null store dynamic memory usage after txn is commited
  */
 void CommitTxToMempool(
-    const CTransactionRef &ptx,
+    const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& entry,
     bool fTxValidForFeeEstimation,
     CTxMemPool::setEntries& setAncestors,
@@ -1059,7 +1059,6 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex);
 
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
-extern CChainActiveSharedData chainActiveSharedData;
 
 /** Global variable that points to the active CCoinsView (protected by cs_main)
  */

@@ -26,7 +26,7 @@
 #include <unistd.h>
 #endif
 
-typedef u_int SOCKET;
+typedef int SOCKET;
 #ifdef __APPLE__
 #define MSG_NOSIGNAL 0
 #endif
@@ -45,7 +45,7 @@ typedef int socklen_t;
 #define WSAEINPROGRESS EINPROGRESS
 #define WSAEADDRINUSE EADDRINUSE
 #define WSAENOTSOCK EBADF
-#define INVALID_SOCKET (SOCKET)(~0)
+#define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #endif
 

@@ -22,8 +22,8 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
         return;
     }
     // Mark txn as orphan
-    pTxInputData->mfOrphan = true;
-    const CTransactionRef& ptx = pTxInputData->mpTx;
+    pTxInputData->SetOrphanTxn();
+    const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const uint256 &txid = tx.GetId();
     // Emplace a new txn in the buffer
@@ -40,7 +40,7 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
         // Since we support big transactions we do not limit number of orphan transactions
         // but combined size of those transactions. limitTxnsSize is called after adding.
         unsigned int sz = tx.GetTotalSize();
-        if (TxSource::p2p == pTxInputData->mTxSource) {
+        if (TxSource::p2p == pTxInputData->GetTxSource()) {
             if (sz > mMaxStandardTxSize /*mMaxStandardTxSize is always set to after genesis value. If non default value is used for policy tx size then orphan tx before genesis might not get accepted by mempool */) {
                 LogPrint(BCLog::MEMPOOL,
                          "ignoring large orphan tx (size: %u, hash: %s)\n", sz,
@@ -101,9 +101,9 @@ void COrphanTxns::eraseTxnsFromPeer(NodeId peer) {
         while (iter != mOrphanTxns.end()) {
             // Increment to avoid iterator becoming invalid.
             OrphanTxnsIter maybeErase = iter++;
-            auto pNode = maybeErase->second.pTxInputData->mpNode.lock();
+            auto pNode = maybeErase->second.pTxInputData->GetNodePtr().lock();
             if (pNode && pNode->GetId() == peer) {
-                nErased += eraseTxnNL(maybeErase->second.pTxInputData->mpTx->GetId());
+                nErased += eraseTxnNL(maybeErase->second.pTxInputData->GetTxnPtr()->GetId());
             }
         }
     }
@@ -139,7 +139,7 @@ std::vector<uint256> COrphanTxns::getTxnsHash(const COutPoint& prevout) const {
         return vOrphanErase;
     }
     for (auto mi = itByPrev->second.begin(); mi != itByPrev->second.end(); ++mi) {
-        const CTransactionRef& ptx = (*mi)->second.pTxInputData->mpTx;
+        const CTransactionRef& ptx = (*mi)->second.pTxInputData->GetTxnPtr();
         const CTransaction &orphanTx = *ptx;
         const uint256 &orphanHash = orphanTx.GetHash();
         vOrphanErase.emplace_back(orphanHash);
@@ -168,7 +168,7 @@ unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
         while (iter != mOrphanTxns.end()) {
             OrphanTxnsIter maybeErase = iter++;
             unsigned int txSize =  maybeErase->second.size;
-            const CTransactionRef& ptx = maybeErase->second.pTxInputData->mpTx;
+            const CTransactionRef& ptx = maybeErase->second.pTxInputData->GetTxnPtr();
             if (mNextSweep <= nNow) {
                 if (maybeErase->second.nTimeExpire <= nNow) {
                     nErasedTimeLimit += eraseTxnNL(ptx->GetId());
@@ -197,7 +197,7 @@ unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
                 it = mOrphanTxns.begin();
             }
             
-            const CTransactionRef& ptx = it->second.pTxInputData->mpTx;
+            const CTransactionRef& ptx = it->second.pTxInputData->GetTxnPtr();
             const CTransaction& tx = *ptx;
             // Make sure we never go below 0 (causing overflow in uint)
             unsigned int txTotalSize = tx.GetTotalSize();
@@ -223,7 +223,7 @@ unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
     return nEvicted;
 }
 
-std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
+std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry(const TxIdTrackerWPtr& pTxIdTracker) {
     std::vector<TxInputDataSPtr> vRetryTxns {};
     std::set<TxInputDataSPtr, CTxnIdComparator> setRetryTxns {};
     {
@@ -277,14 +277,15 @@ std::vector<TxInputDataSPtr> COrphanTxns::collectDependentTxnsForRetry() {
                 setRetryTxns.
                     insert(
                         std::make_shared<CTxInputData>(
-                                           pTxInputData->mTxSource,   // tx source
-                                           pTxInputData->mTxValidationPriority,     // tx validation priority
-                                           pTxInputData->mpTx,        // a pointer to the tx
-                                           GetTime(),                 // nAcceptTime
-                                           pTxInputData->mfLimitFree, // fLimitFree
-                                           pTxInputData->mnAbsurdFee, // nAbsurdFee
-                                           pTxInputData->mpNode,      // pNode
-                                           pTxInputData->mfOrphan));  // fOrphan
+                            pTxIdTracker,
+                            pTxInputData->GetTxnPtr(),        // a pointer to the tx
+                            pTxInputData->GetTxSource(),   // tx source
+                            pTxInputData->GetTxValidationPriority(),     // tx validation priority
+                            GetTime(),                 // nAcceptTime
+                            pTxInputData->IsLimitFree(), // fLimitFree
+                            pTxInputData->GetAbsurdFee(), // nAbsurdFee
+                            pTxInputData->GetNodePtr(),      // pNode
+                            pTxInputData->IsOrphanTxn()));  // fOrphan
             }
             // We cannot simply return all dependent orphan txns to the given tx.vout of the parent tx.
             // The limit for descendant size & counter would not be properly calculated/updated.
@@ -372,6 +373,20 @@ void COrphanTxns::eraseCollectedOutpointsFromTxns(const std::vector<TxId>& vRemo
     }
 }
 
+/** Get TxIds of known orphan transactions */
+std::vector<TxId> COrphanTxns::getTxIds() const {
+    std::shared_lock lock {mOrphanTxnsMtx};
+    if (mOrphanTxns.empty()) {
+        return {};
+    }
+    std::vector<TxId> vTxIds;
+    vTxIds.reserve(mOrphanTxns.size());
+    for (const auto& elem: mOrphanTxns) {
+        vTxIds.emplace_back(elem.first);
+    }
+    return vTxIds;
+}
+
 size_t COrphanTxns::getTxnsNumber() {
     std::shared_lock lock {mOrphanTxnsMtx};
     return mOrphanTxns.size();
@@ -415,7 +430,7 @@ int COrphanTxns::eraseTxnNL(const uint256& hash) {
     if (it == mOrphanTxns.end()) {
         return 0;
     }
-    for (const CTxIn &txin : it->second.pTxInputData->mpTx->vin) {
+    for (const CTxIn &txin : it->second.pTxInputData->GetTxnPtr()->vin) {
         auto itPrev = mOrphanTxnsByPrev.find(txin.prevout);
         if (itPrev == mOrphanTxnsByPrev.end()) {
             continue;

@@ -19,6 +19,7 @@ import time
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
+import glob
 
 logger = logging.getLogger("TestFramework.utils")
 
@@ -249,7 +250,7 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
         time.sleep(check_interval)
 
     # Print the cause of the timeout
-    assert attempts >= attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
+    assert attempts > attempt, f"{label} : max attempts exceeeded (attempts={attempt})"
     assert timeout >= time.time(), f"{label} : timeout exceeded {timeout}"
     raise RuntimeError('Unreachable')
 
@@ -350,11 +351,13 @@ def get_auth_cookie(datadir):
                     assert password is None  # Ensure that there is only one rpcpassword line
                     password = line.split("=")[1].strip("\n")
     if os.path.isfile(os.path.join(datadir, "regtest", ".cookie")):
-        with open(os.path.join(datadir, "regtest", ".cookie"), 'r') as f:
-            userpass = f.read()
-            split_userpass = userpass.split(':')
-            user = split_userpass[0]
-            password = split_userpass[1]
+        try:
+            with open(os.path.join(datadir, "regtest", ".cookie"), 'r') as f:
+                userpass = f.read()
+                split_userpass = userpass.split(':')
+                user = split_userpass[0]
+                password = split_userpass[1]
+        except: pass # any failures while reading the cookie file are treated as if the file was not there
     if user is None or password is None:
         raise ValueError("No RPC credentials")
     return user, password
@@ -368,18 +371,25 @@ def set_node_times(nodes, t):
     for node in nodes:
         node.setmocktime(t)
 
-
+# Disconnects only the outbound connection "from_connection -> node_num"
+# If nodes were connected with connect_nodes_bi (default setup_network) use disconnect_nodes_bi to completely split the nodes if needed
 def disconnect_nodes(from_connection, node_num):
-    for peer_id in [peer['id'] for peer in from_connection.getpeerinfo() if "testnode%d" % node_num in peer['subver']]:
+    subver = "testnode%d" % node_num
+    for peer_id in [peer['id'] for peer in from_connection.getpeerinfo() if subver in peer['subver'] and not peer['inbound']]:
         from_connection.disconnectnode(nodeid=peer_id)
 
     for _ in range(50):
-        if [peer['id'] for peer in from_connection.getpeerinfo() if "testnode%d" % node_num in peer['subver']] == []:
+        if [peer['id'] for peer in from_connection.getpeerinfo() if subver in peer['subver'] and not peer['inbound']] == []:
             break
         time.sleep(0.1)
     else:
         raise AssertionError("timed out waiting for disconnect")
 
+# Disconnects both outbound and inbound connections between nodes[node_a_index] and nodes[node_b_index]
+# Inbound connection on one node is implicitly closed as a result of closing the outbound connection on the other node
+def disconnect_nodes_bi(nodes, node_a_index, node_b_index):
+    disconnect_nodes(nodes[node_a_index], node_b_index)
+    disconnect_nodes(nodes[node_b_index], node_a_index)
 
 def connect_nodes(from_connection, node_num):
     ip_port = "127.0.0.1:" + str(p2p_port(node_num))
@@ -461,6 +471,29 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
         time.sleep(wait)
         timeout -= wait
     raise AssertionError("Mempool sync failed")
+
+def check_mempool_equals(rpc, should_be_in_mempool, timeout=20):
+    wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool}, timeout=timeout)
+
+# The function checks if transaction/block was rejected
+# The actual reject reason is checked if specified
+def wait_for_reject_message(conn, reject_reason=None, timeout=5):
+    wait_until(lambda: ('reject' in list(conn.cb.last_message.keys()) and (
+                reject_reason == None or conn.cb.last_message['reject'].reason == reject_reason)), timeout=timeout)
+    if conn.cb.last_message['reject'].message == b'tx':
+        conn.rpc.log.info('Transaction rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
+    else:
+        conn.rpc.log.info('Block rejected with ' + (conn.cb.last_message['reject'].reason).decode('utf8') + ' -- OK')
+
+    conn.cb.last_message.pop('reject', None)
+
+# The function checks that transaction/block was not rejected
+def ensure_no_rejection(conn):
+    # wait 2 seconds for transaction/block before checking for reject message
+    time.sleep(2)
+    wait_until(lambda: not ('reject' in list(conn.cb.last_message.keys())) or conn.cb.last_message[
+        'reject'].reason == None, timeout=5)
+    conn.rpc.log.info('Not rejected -- OK')
 
 # Transaction/Block functions
 #############################
@@ -737,10 +770,12 @@ def loghash(inhash=None):
     else:
         return inhash
 
-
-def check_for_log_msg(log_msg, node_dir):
-    for line in open(glob.glob(node_dir + "/regtest/bitcoind.log")[0]):
+def check_for_log_msg(rpc, log_msg, node_dir):
+    for line in open(glob.glob(rpc.options.tmpdir + node_dir + "/regtest/bitcoind.log")[0]):
         if log_msg in line:
+            rpc.log.info("Found line: %s", line)
             return True
     return False
 
+def hashToHex(hash):
+    return format(hash, '064x')

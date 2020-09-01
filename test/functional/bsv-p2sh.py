@@ -13,30 +13,6 @@ from test_framework.blocktools import *
 from test_framework.key import CECKey
 from test_framework.script import *
 
-# a little handier version of create_transaction
-def create_tx(spend_tx, n, value, script=CScript([OP_TRUE])):
-    tx = create_transaction(spend_tx, n, b"", value, script)
-    return tx
-
-# sign a transaction, using the key we know about
-# this signs input 0 in tx, which is assumed to be spending output n in
-# spend_tx
-def sign_tx(tx, spend_tx, n, coinbase_key):
-    scriptPubKey = bytearray(spend_tx.vout[n].scriptPubKey)
-    if (scriptPubKey[0] == OP_TRUE):  # an anyone-can-spend
-        tx.vin[0].scriptSig = CScript()
-        return
-    sighash = SignatureHashForkId(
-        spend_tx.vout[n].scriptPubKey, tx, 0, SIGHASH_ALL | SIGHASH_FORKID, spend_tx.vout[n].nValue)
-    tx.vin[0].scriptSig = CScript(
-        [coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))])
-
-def create_and_sign_transaction(spend_tx, n, value, coinbase_key, script=CScript([OP_TRUE])):
-    tx = create_tx(spend_tx, n, value, script)
-    sign_tx(tx, spend_tx, n, coinbase_key)
-    tx.rehash()
-    return tx
-
 SPEND_OUTPUT = CScript([OP_FALSE,OP_RETURN]) # Output script used by spend transactions. Could be anything that is standard, but OP_FALSE OP_RETURN is the easiest to create.
 
 class P2SH(ComparisonTestFramework):
@@ -51,14 +27,8 @@ class P2SH(ComparisonTestFramework):
          # Build the redeem script, hash it, use hash to create the p2sh script
         self.redeem_script = CScript([self.coinbase_pubkey, OP_2DUP, OP_CHECKSIGVERIFY, OP_CHECKSIG])
         self.p2sh_script = CScript([OP_HASH160, hash160(self.redeem_script), OP_EQUAL])
-
-
-    def setup_network(self):
         self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0', '-banscore=1000000',
                             f'-genesisactivationheight={self.genesisactivationheight}', '-maxgenesisgracefulperiod=1']]
-        self.add_nodes(self.num_nodes, self.extra_args)
-        self.start_nodes()
-        self.init_network()
 
     def run_test(self):
         self.test.run()
@@ -102,7 +72,7 @@ class P2SH(ComparisonTestFramework):
             output = coinbase_utxos.pop(0)
             return create_and_sign_transaction(spend_tx=output.tx, n=output.n,
                                                value=output.tx.vout[0].nValue-100,
-                                               coinbase_key=self.coinbase_key,
+                                               private_key=self.coinbase_key,
                                                script=self.p2sh_script)
 
         # Add the transactions to the block

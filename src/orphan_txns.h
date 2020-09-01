@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "net.h"
+#include "net/net.h"
 #include "txn_validation_data.h"
 
 #include <shared_mutex>
@@ -25,7 +25,7 @@ struct IterComparator {
 
 struct CTxnIdComparator {
     bool operator ()(const TxInputDataSPtr& lhs, const TxInputDataSPtr& rhs) const {
-        return lhs->mpTx->GetId() < rhs->mpTx->GetId();
+        return lhs->GetTxnPtr()->GetId() < rhs->GetTxnPtr()->GetId();
     }
 };
 
@@ -84,7 +84,7 @@ class COrphanTxns {
     /** Limit a number of orphan transactions size */
     unsigned int limitTxnsSize(uint64_t nMaxOrphanTxnsSize, bool fSkipRndEviction=false);
     /** Collect dependent transactions which might be processed later */
-    std::vector<TxInputDataSPtr> collectDependentTxnsForRetry();
+    std::vector<TxInputDataSPtr> collectDependentTxnsForRetry(const TxIdTrackerWPtr& pTxIdTracker = TxIdTrackerWPtr{});
     /** Collect txn's outpoints which will be used to find any dependant orphan txn */
     void collectTxnOutpoints(const CTransaction& tx);
     /** Erase collected outpoints */
@@ -93,6 +93,8 @@ class COrphanTxns {
     void eraseCollectedOutpointsFromTxns(const std::vector<TxId>& vRemovedTxIds);
     /** Get a number of orphan transactions queued */
     size_t getTxnsNumber();
+    /** Get TxIds of known orphan transactions */
+    std::vector<TxId> getTxIds() const;
     /** Get collected outpoints */
     std::vector<COutPoint> getCollectedOutpoints();
     /** Get a random orphan txn by a lower bound (needed for UTs) */

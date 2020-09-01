@@ -78,6 +78,21 @@ mininode_socket_map = dict()
 # access to any data shared with the NodeConnCB or NodeConn.
 mininode_lock = RLock()
 
+# Lock used to synchronize access to data required by loop running in NetworkThread.
+# It must be locked, for example, when adding new NodeConn object, otherwise loop in
+# NetworkThread may try to access partially constructed object.
+network_thread_loop_lock = RLock()
+
+# Network thread acquires network_thread_loop_lock at start of each iteration and releases
+# it at the end. Since the next iteration is run immediately after that, lock is acquired
+# almost all of the time making it difficult for other threads to also acquire this lock.
+# To work around this problem, NetworkThread first acquires network_thread_loop_intent_lock 
+# and immediately releases it before acquiring network_thread_loop_lock.
+# Other threads (e.g. the ones calling NodeConn constructor) acquire both locks before
+# proceeding. The end result is that other threads wait at most one iteration of loop in
+# NetworkThread.
+network_thread_loop_intent_lock = RLock()
+
 # ports used by chain type
 NETWORK_PORTS = {
     "mainnet" : 8333,
@@ -1543,6 +1558,10 @@ class NodeConnCB():
 
     # Message receiving helper methods
 
+    def clear_messages(self):
+        with mininode_lock:
+            self.message_count.clear()
+
     def wait_for_block(self, blockhash, timeout=60):
         def test_function(): return self.last_message.get(
             "block") and self.last_message["block"].block.rehash() == blockhash
@@ -1660,43 +1679,47 @@ class NodeConn(asyncore.dispatcher):
     }
 
     def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=NODE_NETWORK, send_version=True, strSubVer=None):
-        asyncore.dispatcher.__init__(self, map=mininode_socket_map)
-        self.dstaddr = dstaddr
-        self.dstport = dstport
-        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sendbuf = bytearray()
-        self.recvbuf = b""
-        self.ver_send = 209
-        self.ver_recv = 209
-        self.last_sent = 0
-        self.state = "connecting"
-        self.network = net
-        self.cb = callback
-        self.disconnect = False
-        self.nServices = 0
-        self.maxInvElements = CInv.estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
-        self.strSubVer = strSubVer
+        # Lock must be acquired when new object is added to prevent NetworkThread from trying
+        # to access partially constructed object or trying to call callbacks before the connection
+        # is established.
+        with network_thread_loop_intent_lock, network_thread_loop_lock:
+            asyncore.dispatcher.__init__(self, map=mininode_socket_map)
+            self.dstaddr = dstaddr
+            self.dstport = dstport
+            self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sendbuf = bytearray()
+            self.recvbuf = b""
+            self.ver_send = 209
+            self.ver_recv = 209
+            self.last_sent = 0
+            self.state = "connecting"
+            self.network = net
+            self.cb = callback
+            self.disconnect = False
+            self.nServices = 0
+            self.maxInvElements = CInv.estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
+            self.strSubVer = strSubVer
 
-        if send_version:
-            # stuff version msg into sendbuf
-            vt = msg_version()
-            vt.nServices = services
-            vt.addrTo.ip = self.dstaddr
-            vt.addrTo.port = self.dstport
-            vt.addrFrom.ip = "0.0.0.0"
-            vt.addrFrom.port = 0
-            if(strSubVer):
-                vt.strSubVer = strSubVer
-            self.send_message(vt, True)
+            if send_version:
+                # stuff version msg into sendbuf
+                vt = msg_version()
+                vt.nServices = services
+                vt.addrTo.ip = self.dstaddr
+                vt.addrTo.port = self.dstport
+                vt.addrFrom.ip = "0.0.0.0"
+                vt.addrFrom.port = 0
+                if(strSubVer):
+                    vt.strSubVer = strSubVer
+                self.send_message(vt, True)
 
-        logger.info('Connecting to Bitcoin Node: %s:%d' %
-                    (self.dstaddr, self.dstport))
+            logger.info('Connecting to Bitcoin Node: %s:%d' %
+                        (self.dstaddr, self.dstport))
 
-        try:
-            self.connect((dstaddr, dstport))
-        except:
-            self.handle_close()
-        self.rpc = rpc
+            try:
+                self.connect((dstaddr, dstport))
+            except:
+                self.handle_close()
+            self.rpc = rpc
 
     def handle_connect(self):
         if self.state != "connected":
@@ -1844,19 +1867,39 @@ class NodeConn(asyncore.dispatcher):
         self.disconnect = True
 
 
+NetworkThread_should_stop = False
+def StopNetworkThread():
+    global NetworkThread_should_stop
+    NetworkThread_should_stop = True
+
 class NetworkThread(Thread):
 
     def run(self):
-        while mininode_socket_map:
-            # We check for whether to disconnect outside of the asyncore
-            # loop to workaround the behavior of asyncore when using
-            # select
-            disconnected = []
-            for fd, obj in mininode_socket_map.items():
-                if obj.disconnect:
-                    disconnected.append(obj)
-            [obj.handle_close() for obj in disconnected]
-            asyncore.loop(0.1, use_poll=True, map=mininode_socket_map, count=1)
+        while mininode_socket_map and not NetworkThread_should_stop:
+            with network_thread_loop_intent_lock:
+                # Acquire and immediately release lock.
+                # This allows other threads to more easily acquire network_thread_loop_lock by
+                # acquiring (and holding) network_thread_loop_intent_lock first since NetworkThread
+                # will block on trying to acquire network_thread_loop_intent_lock in the line above.
+                # If this was not done, other threads would need to wait for a long time (>10s) for
+                # network_thread_loop_lock since it is released only briefly between two loop iterations.
+                pass
+            with network_thread_loop_lock:
+                # We check for whether to disconnect outside of the asyncore
+                # loop to workaround the behavior of asyncore when using
+                # select
+                disconnected = []
+                for fd, obj in mininode_socket_map.items():
+                    if obj.disconnect:
+                        disconnected.append(obj)
+                [obj.handle_close() for obj in disconnected]
+                try:
+                    asyncore.loop(0.1, use_poll=True, map=mininode_socket_map, count=1)
+                except Exception as e:
+                    # All exceptions are caught to prevent them from taking down the network thread.
+                    # Since the error cannot be easily reported, it is just logged assuming that if
+                    # the error is relevant, the test will detect it in some other way.
+                    logger.warning("mininode NetworkThread: asyncore.loop() failed! " + str(e))
         logger.debug("Network thread closing")
 
 

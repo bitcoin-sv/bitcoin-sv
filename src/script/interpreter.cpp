@@ -35,6 +35,8 @@ inline bool set_error(ScriptError *ret, const ScriptError serror) {
     return false;
 }
 
+constexpr auto bits_per_byte{8};
+
 } // namespace
 
 inline uint8_t make_rshift_mask(size_t n) {
@@ -369,6 +371,10 @@ std::optional<bool> EvalScript(
     const CScript& script,
     uint32_t flags,
     const BaseSignatureChecker& checker,
+    LimitedStack& altstack,
+    long& ipc,
+    std::vector<bool>& vfExec,
+    std::vector<bool>& vfElse,
     ScriptError* serror)
 {
     static const CScriptNum bnZero(0);
@@ -381,11 +387,7 @@ std::optional<bool> EvalScript(
     CScript::const_iterator pbegincodehash = script.begin();
     opcodetype opcode;
     valtype vchPushValue;
-    std::vector<bool> vfExec;
-    std::vector<bool> vfElse;
 
-    // altstack shares memory with stack
-    LimitedStack altstack {stack.makeChildStack()};
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
 
     const bool utxo_after_genesis{(flags & SCRIPT_UTXO_AFTER_GENESIS) != 0};
@@ -415,6 +417,7 @@ std::optional<bool> EvalScript(
             if (!script.GetOp(pc, opcode, vchPushValue)) {
                 return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
             }
+            ipc = pc - script.begin();
 
             if (!utxo_after_genesis && (vchPushValue.size() > MAX_SCRIPT_ELEMENT_SIZE_BEFORE_GENESIS))
             {
@@ -973,14 +976,21 @@ std::optional<bool> EvalScript(
                         stack.pop_back();
                         stack.pop_back();
                         auto values{vch1.GetElement()};
-                        do
-                        {
-                            values = LShift(values, n.getint());
-                            n -= utxo_after_genesis
-                                     ? CScriptNum{bsv::bint{INT32_MAX}}
-                                     : CScriptNum{INT32_MAX};
-                        } while(n > 0);
 
+                        if(n >= values.size() * bits_per_byte)
+                            fill(begin(values), end(values), 0);
+                        else
+                        {
+                            do
+                            {
+                                values = LShift(values, n.getint());
+                                if(token.IsCanceled())
+                                    return {};
+                                n -= utxo_after_genesis
+                                         ? CScriptNum{bsv::bint{INT32_MAX}}
+                                         : CScriptNum{INT32_MAX};
+                            } while(n > 0);
+                        }
                         stack.push_back(values);
                     }
                     break;
@@ -1007,14 +1017,21 @@ std::optional<bool> EvalScript(
                         stack.pop_back();
                         stack.pop_back();
                         auto values{vch1.GetElement()};
-                        do
-                        {
-                            values = RShift(values, n.getint());
-                            n -= utxo_after_genesis
-                                     ? CScriptNum{bsv::bint{INT32_MAX}}
-                                     : CScriptNum{INT32_MAX};
-                        } while(n > 0);
 
+                        if(n >= values.size() * bits_per_byte)
+                            fill(begin(values), end(values), 0);
+                        else
+                        {
+                            do
+                            {
+                                values = RShift(values, n.getint());
+                                if(token.IsCanceled())
+                                    return {};
+                                n -= utxo_after_genesis
+                                         ? CScriptNum{bsv::bint{INT32_MAX}}
+                                         : CScriptNum{INT32_MAX};
+                            } while(n > 0);
+                        }
                         stack.push_back(values);
                     }
                     break;
@@ -1669,6 +1686,22 @@ std::optional<bool> EvalScript(
     return set_success(serror);
 }
 
+std::optional<bool> EvalScript(
+    const CScriptConfig& config,
+    bool consensus,
+    const task::CCancellationToken& token,
+    LimitedStack& stack,
+    const CScript& script,
+    uint32_t flags,
+    const BaseSignatureChecker& checker,
+    ScriptError* serror)
+{
+    LimitedStack altstack {stack.makeChildStack()};
+    long ipc{0};
+    std::vector<bool> vfExec, vfElse;
+    return EvalScript(config, consensus, token, stack, script, flags, checker, altstack, ipc, vfExec, vfElse, serror);
+}
+
 namespace {
 
 /**
@@ -2061,7 +2094,7 @@ std::optional<bool> VerifyScript(
     // But only if if the utxo is before genesis
     if(  (flags & SCRIPT_VERIFY_P2SH) &&
         !(flags & SCRIPT_UTXO_AFTER_GENESIS) &&
-        scriptPubKey.IsPayToScriptHash())
+        IsP2SH(scriptPubKey))
     {
         // scriptSig must be literals-only or validation fails
         if (!scriptSig.IsPushOnly()) {

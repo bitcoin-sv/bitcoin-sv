@@ -14,7 +14,7 @@
 #include "logging.h"
 #include "mining/factory.h"
 #include "mining/journal_builder.h"
-#include "net_processing.h"
+#include "net/net_processing.h"
 #include "pubkey.h"
 #include "random.h"
 #include "rpc/register.h"
@@ -79,13 +79,12 @@ BasicTestingSetup::~BasicTestingSetup() {
         g_connman->Stop();
         g_connman.reset();
     }
-
-    mining::g_miningFactory.reset();
 }
 
-TestingSetup::TestingSetup(const std::string &chainName)
+TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory::BlockAssemblerType assemblerType)
     : BasicTestingSetup(chainName) {
-
+    
+    testConfig.SetMiningCandidateBuilder(assemblerType);
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
     RegisterAllRPCCommands(tableRPC);
@@ -106,7 +105,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
         // dummyState is used to report errors, not block related invalidity - ignore it
         // (see description of ActivateBestChain)
         CValidationState dummyState;
-        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder()->getNewChangeSet(mining::JournalUpdateReason::INIT) };
+        mining::CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::INIT) };
         auto source = task::CCancellationSource::Make();
         if (!ActivateBestChain(source->GetToken(), testConfig, dummyState, changeSet)) {
             throw std::runtime_error("ActivateBestChain failed.");
@@ -125,6 +124,7 @@ TestingSetup::TestingSetup(const std::string &chainName)
 }
 
 TestingSetup::~TestingSetup() {
+    mining::g_miningFactory.reset();
     UnregisterNodeSignals(GetNodeSignals());
     threadGroup.interrupt_all();
     threadGroup.join_all();
@@ -156,9 +156,8 @@ CBlock TestChain100Setup::CreateAndProcessBlock(
     const std::vector<CMutableTransaction> &txns, const CScript &scriptPubKey) {
     const Config &config = GlobalConfig::GetConfig();
     CBlockIndex* pindexPrev {nullptr};
-    mining::CMiningFactory miningFactory {config};
     std::unique_ptr<CBlockTemplate> pblocktemplate =
-            miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
+            mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
     CBlockRef blockRef = pblocktemplate->GetBlockRef();
     CBlock &block = *blockRef;
 

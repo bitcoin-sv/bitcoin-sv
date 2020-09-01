@@ -1,7 +1,7 @@
-// Copyright (c) 2010 Satoshi Nakamoto
+// Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2019-2020 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "amount.h"
 #include "chain.h"
@@ -11,7 +11,7 @@
 #include "core_io.h"
 #include "dstencode.h"
 #include "init.h"
-#include "net.h"
+#include "net/net.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
 #include "rpc/mining.h"
@@ -2216,11 +2216,6 @@ static UniValue gettransaction(const Config &config,
             "seconds since epoch (1 Jan 1970 GMT)\n"
             "  \"timereceived\" : ttt,    (numeric) The time received in "
             "seconds since epoch (1 Jan 1970 GMT)\n"
-            "  \"bip125-replaceable\": \"yes|no|unknown\",  (string) Whether "
-            "this transaction could be replaced due to BIP125 "
-            "(replace-by-fee);\n"
-            "                                                   may be unknown "
-            "for unconfirmed transactions not in the mempool\n"
             "  \"details\" : [\n"
             "    {\n"
             "      \"account\" : \"accountname\",      (string) DEPRECATED. "
@@ -2467,45 +2462,51 @@ static UniValue walletpassphrase(const Config &config,
             HelpExampleRpc("walletpassphrase", "\"my pass phrase\", 60"));
     }
 
-    LOCK2(cs_main, pwallet->cs_wallet);
+    int64_t nSleepTime = 0;
+    {
+        LOCK2(cs_main, pwallet->cs_wallet);
 
-    if (request.fHelp) {
-        return true;
-    }
-
-    if (!pwallet->IsCrypted()) {
-        throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE,
-                           "Error: running with an unencrypted wallet, but "
-                           "walletpassphrase was called.");
-    }
-
-    // Note that the walletpassphrase is stored in request.params[0] which is
-    // not mlock()ed
-    SecureString strWalletPass;
-    strWalletPass.reserve(100);
-    // TODO: get rid of this .c_str() by implementing
-    // SecureString::operator=(std::string)
-    // Alternately, find a way to make request.params[0] mlock()'d to begin
-    // with.
-    strWalletPass = request.params[0].get_str().c_str();
-
-    if (strWalletPass.length() > 0) {
-        if (!pwallet->Unlock(strWalletPass)) {
-            throw JSONRPCError(
-                RPC_WALLET_PASSPHRASE_INCORRECT,
-                "Error: The wallet passphrase entered was incorrect.");
+        if (request.fHelp) {
+            return true;
         }
-    } else {
-        throw std::runtime_error(
-            "walletpassphrase <passphrase> <timeout>\n"
-            "Stores the wallet decryption key in memory for "
-            "<timeout> seconds.");
+
+        if (!pwallet->IsCrypted()) {
+            throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE,
+                "Error: running with an unencrypted wallet, but "
+                "walletpassphrase was called.");
+        }
+
+        // Note that the walletpassphrase is stored in request.params[0] which is
+        // not mlock()ed
+        SecureString strWalletPass;
+        strWalletPass.reserve(100);
+        // TODO: get rid of this .c_str() by implementing
+        // SecureString::operator=(std::string)
+        // Alternately, find a way to make request.params[0] mlock()'d to begin
+        // with.
+        strWalletPass = request.params[0].get_str().c_str();
+
+        if (strWalletPass.length() > 0) {
+            if (!pwallet->Unlock(strWalletPass)) {
+                throw JSONRPCError(
+                    RPC_WALLET_PASSPHRASE_INCORRECT,
+                    "Error: The wallet passphrase entered was incorrect.");
+            }
+        }
+        else {
+            throw std::runtime_error(
+                "walletpassphrase <passphrase> <timeout>\n"
+                "Stores the wallet decryption key in memory for "
+                "<timeout> seconds.");
+        }
+
+        pwallet->TopUpKeyPool();
+        nSleepTime = request.params[1].get_int64();
+        pwallet->nRelockTime = GetTime() + nSleepTime;
     }
 
-    pwallet->TopUpKeyPool();
-
-    int64_t nSleepTime = request.params[1].get_int64();
-    pwallet->nRelockTime = GetTime() + nSleepTime;
+    // We need to call RPCRunLater without lock for cs_wallet
+    // to prevent deadlock.
     RPCRunLater(strprintf("lockwallet(%s)", pwallet->GetName()),
                 boost::bind(LockWallet, pwallet), nSleepTime);
 
@@ -3213,7 +3214,7 @@ static UniValue listunspent(const Config &config,
                     Pair("account", pwallet->mapAddressBook[address].name));
             }
 
-            if (scriptPubKey.IsPayToScriptHash()) {
+            if (IsP2SH(scriptPubKey)) {
                 const CScriptID &hash = boost::get<CScriptID>(address);
                 CScript redeemScript;
                 if (pwallet->GetCScript(hash, redeemScript)) {

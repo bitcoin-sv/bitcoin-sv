@@ -9,8 +9,8 @@
 #include "config.h"
 #include "dstencode.h"
 #include "init.h"
-#include "net.h"
-#include "netbase.h"
+#include "net/net.h"
+#include "net/netbase.h"
 #include "policy/policy.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
@@ -185,7 +185,7 @@ public:
             int nRequired;
             // DescribeAddressVisitor is used by RPC call validateaddress, which only takes address as input. 
             // We have no block height available - treat all transactions as post-Genesis except P2SH to be able to spend them.
-            bool isGenesisEnabled = subscript.IsPayToScriptHash() ? false : true; 
+            const bool isGenesisEnabled = !IsP2SH(subscript);
             ExtractDestinations(subscript, isGenesisEnabled, whichType, addresses, nRequired);
             obj.push_back(Pair("script", GetTxnOutputType(whichType)));
             obj.push_back(

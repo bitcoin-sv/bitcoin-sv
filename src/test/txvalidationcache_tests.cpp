@@ -33,11 +33,12 @@ namespace {
             // Mock rpc txn
             auto pTxInputData {
                 std::make_shared<CTxInputData>(
-                                    TxSource::rpc,            // tx source
-                                    TxValidationPriority::normal,   // tx validation priority
-                                    MakeTransactionRef(tx),   // a pointer to the tx
-                                    GetTime(),                // nAcceptTime
-                                    false)                    // fLimitFree
+                    pTxIdTracker,             // a pointer to the TxIdTracker
+                    MakeTransactionRef(tx),   // a pointer to the tx
+                    TxSource::rpc,            // tx source
+                    TxValidationPriority::normal,   // tx validation priority
+                    GetTime(),                // nAcceptTime
+                    false)                    // fLimitFree
             };
             // Mempool Journal ChangeSet
             mining::CJournalChangeSetPtr changeSet {nullptr};
@@ -47,6 +48,8 @@ namespace {
             };
             return status.IsValid();
         }
+        // Get a pointer to the TxIdTracker.
+        TxIdTrackerSPtr pTxIdTracker = connman->GetTxIdTracker();
         // A default double spend detector
         TxnDoubleSpendDetectorSPtr dsDetector {
             std::make_shared<CTxnDoubleSpendDetector>()
@@ -56,7 +59,8 @@ namespace {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
                     mempool,
-                    dsDetector)
+                    dsDetector,
+                    pTxIdTracker)
         };
     };
 

@@ -7,7 +7,8 @@ from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.cdefs import (ONE_MEGABYTE)
 from test_framework.util import *
-from test_framework.blocktools import ChainManager
+from test_framework.blocktools import ChainManager, prepare_init_chain
+
 
 # This test checks input parameter factormaxsendqueuesbytes, which is setting maxSendQueuesBytes.
 # Scenario:
@@ -72,19 +73,7 @@ class MaxSendQueuesBytesTest(BitcoinTestFramework):
 
         # Generate some old blocks
         self.chain.set_genesis_hash(int(self.nodes[0].getbestblockhash(), 16))
-
-        # Create the first block with a coinbase output to our key
-        block = self.chain.next_block(self.next_block)
-        self.next_block += 1
-        self.chain.save_spendable_output()
-        node.send_message(msg_block(block))
-
-        # Bury the block 100 deep so the coinbase output is spendable
-        for i in range(1, 100):
-            block = self.chain.next_block(self.next_block)
-            self.next_block += 1
-            self.chain.save_spendable_output()
-            node.send_message(msg_block(block))
+        _, _, self.next_block = prepare_init_chain(self.chain, 100, 0, start_block=0, block_0=False, node=node)
 
         return node
 

@@ -16,7 +16,7 @@ Scenario:
 """
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.script import CScript, OP_RETURN, OP_TRUE, OP_NOP, OP_FALSE
-from test_framework.blocktools import create_transaction
+from test_framework.blocktools import create_transaction, prepare_init_chain
 from test_framework.util import assert_equal, p2p_port
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import msg_tx, CTransaction, FromHex
@@ -37,7 +37,7 @@ class BlockFileStore(ComparisonTestFramework):
             '-whitelist=127.0.0.1',
             '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
             '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
-            '-maxmempool=%d' % ONE_GIGABYTE * 10,
+            '-maxmempool=%d' % (ONE_GIGABYTE * 10),
             '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
             '-maxscriptsizepolicy=0',
             '-maxstdtxvalidationduration=55000',
@@ -49,9 +49,6 @@ class BlockFileStore(ComparisonTestFramework):
             ]
         ]
 
-    def check_mempool(self, rpc, should_be_in_mempool):
-        wait_until(lambda: {t.hash for t in should_be_in_mempool}.issubset(set(rpc.getrawmempool())), timeout=6000)
-
     def run_test(self):
         self.test.run()
 
@@ -62,40 +59,29 @@ class BlockFileStore(ComparisonTestFramework):
         node = get_rpc_proxy(self.nodes[0].url, 1, timeout=6000, coveragedir=self.nodes[0].coverage_dir)
 
         self.chain.set_genesis_hash( int(node.getbestblockhash(), 16) )
-        # Create a new block
-        block(0)
 
-        self.chain.save_spendable_output()
+        block(0)
         yield self.accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(200):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
-        yield test
+        test, out, _ = prepare_init_chain(self.chain, 200, 200)
 
-        # Collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(200):
-            out.append(self.chain.get_spendable_output())
+        yield test
 
         txHashes = []
         for i in range(18):
             txLarge = create_transaction(out[i].tx, out[i].n, b"", ONE_MEGABYTE * 256, CScript([OP_FALSE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 256))]))
             self.test.connections[0].send_message(msg_tx(txLarge))
-            self.check_mempool(node, [txLarge])
+            self.check_mempool(node, [txLarge], timeout=6000)
             txHashes.append([txLarge.hash, txLarge.sha256])
 
         txOverflow = create_transaction(out[18].tx, out[18].n, b"", ONE_MEGABYTE * 305, CScript([OP_FALSE, OP_RETURN, bytearray([42] * (ONE_MEGABYTE * 305))]))
         self.test.connections[0].send_message(msg_tx(txOverflow))
-        self.check_mempool(node, [txOverflow])
+        self.check_mempool(node, [txOverflow], timeout=6000)
         txHashes.append([txOverflow.hash, txOverflow.sha256])
 
         txOverflow = create_transaction(out[19].tx, out[19].n, b"", ONE_MEGABYTE, CScript([OP_FALSE, OP_RETURN, bytearray([42] * ONE_MEGABYTE)]))
         self.test.connections[0].send_message(msg_tx(txOverflow))
-        self.check_mempool(node, [txOverflow])
+        self.check_mempool(node, [txOverflow], timeout=6000)
         txHashes.append([txOverflow.hash, txOverflow.sha256])
 
         # Mine block with new transactions.

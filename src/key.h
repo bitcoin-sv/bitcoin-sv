@@ -181,6 +181,8 @@ struct CExtKey {
  * calling ECC_Stop first. */
 void ECC_Start(void);
 
+bool ECC_IsStarted();
+
 /** Deinitialize the elliptic curve support. No-op if ECC_Start wasn't called
  * first. */
 void ECC_Stop(void);

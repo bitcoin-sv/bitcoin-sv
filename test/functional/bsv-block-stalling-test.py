@@ -4,6 +4,7 @@
 """
 Test stalling isn't triggered just for large blocks.
 """
+from test_framework.blocktools import prepare_init_chain
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import assert_equal, p2p_port, connect_nodes
 from test_framework.comptool import TestInstance
@@ -13,6 +14,7 @@ from test_framework.util import get_rpc_proxy, wait_until, check_for_log_msg
 class StallingTest(ComparisonTestFramework):
 
     def set_test_params(self):
+        self.bitcoind_proc_wait_timeout = 120
         self.num_nodes = 2
         self.setup_clean_chain = True
         self.genesisactivationheight = 101
@@ -22,8 +24,8 @@ class StallingTest(ComparisonTestFramework):
             '-whitelist=127.0.0.1',
             '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
             '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
-            '-maxmempool=%d' % ONE_GIGABYTE * 10,
-            '-maxtxsizepolicy=%d' % ONE_GIGABYTE * 2,
+            '-maxmempool=%d' % (ONE_GIGABYTE * 10),
+            '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
             '-maxscriptsizepolicy=0',
             '-rpcservertimeout=1000',
             '-genesisactivationheight=%d' % self.genesisactivationheight,
@@ -41,24 +43,12 @@ class StallingTest(ComparisonTestFramework):
         block = self.chain.next_block
         node = get_rpc_proxy(self.nodes[0].url, 1, timeout=6000, coveragedir=self.nodes[0].coverage_dir)
 
-        # Create a new block
+        # Create a new block & setup initial chain with spendable outputs
         self.chain.set_genesis_hash(int(node.getbestblockhash(), 16))
         block(0)
-        self.chain.save_spendable_output()
         yield self.accepted()
-
-        # Now we need that block to mature so we can spend the coinbase.
-        test = TestInstance(sync_every_block=False)
-        for i in range(self.num_blocks):
-            block(5000 + i)
-            test.blocks_and_transactions.append([self.chain.tip, True])
-            self.chain.save_spendable_output()
+        test, out, _ = prepare_init_chain(self.chain, self.num_blocks, self.num_blocks+1)
         yield test
-
-        # Collect spendable outputs now to avoid cluttering the code later on
-        out = []
-        for i in range(self.num_blocks + 1):
-            out.append(self.chain.get_spendable_output())
 
         # Create 1GB block
         block(1, spend=out[0], block_size=1*ONE_GIGABYTE)
@@ -77,7 +67,7 @@ class StallingTest(ComparisonTestFramework):
                                     '-whitelist=127.0.0.1',
                                     '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
                                     '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
-                                    '-maxtxsizepolicy=%d' % ONE_GIGABYTE * 2,
+                                    '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
                                     '-maxscriptsizepolicy=0',
                                     '-rpcservertimeout=1000',
                                     '-genesisactivationheight=%d' % self.genesisactivationheight,
@@ -96,7 +86,7 @@ class StallingTest(ComparisonTestFramework):
         self.sync_all(timeout=120)
 
         # Check we didn't hit a stall for node2
-        assert(not check_for_log_msg("stalling block download", self.options.tmpdir + "/node2"))
+        assert(not check_for_log_msg(self, "stalling block download", "/node2"))
 
 if __name__ == '__main__':
     StallingTest().main()

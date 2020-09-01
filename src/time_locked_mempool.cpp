@@ -7,7 +7,7 @@
 #include <logging.h>
 #include <memusage.h>
 #include <mining/journal_change_set.h>
-#include <net.h>
+#include <net/net.h>
 #include <policy/policy.h>
 #include <scheduler.h>
 #include <time_locked_mempool.h>
@@ -18,14 +18,16 @@ using namespace mining;
 CTimeLockedMempool::CTimeLockedMempool()
 {
     // Set some sane default values for config
-    mMaxMemory = DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE * 1024 * 1024;
+    mMaxMemory = DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE * ONE_MEBIBYTE;
     mPeriodRunFreq = DEFAULT_NONFINAL_CHECKS_FREQ;
-    mPurgeAge = DEFAULT_NONFINAL_MEMPOOL_EXPIRY * 60 * 60;
+    mPurgeAge = DEFAULT_NONFINAL_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
 }
 
 // Add or update a time-locked transaction
-void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
-                                                CValidationState& state)
+void CTimeLockedMempool::addOrUpdateTransaction(
+    const TxMempoolInfo& info,
+    const TxInputDataSPtr& pTxInputData,
+    CValidationState& state)
 {
     const CTransactionRef& txn { info.tx };
 
@@ -60,18 +62,10 @@ void CTimeLockedMempool::addOrUpdateTransaction(const TxMempoolInfo& info,
             if(finalised)
             {
                 LogPrint(BCLog::MEMPOOL, "Finalising non-final tx: %s\n", txn->GetId().ToString());
-
                 // For full belt-and-braces safety, resubmit newly final transaction for revalidation
-                std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainActiveSharedData.GetChainActiveHeight() + 1, reason) };
-                g_connman->ResubmitTxnForValidator(
-                    std::make_shared<CTxInputData>(
-                        TxSource::finalised,
-                        standard ? TxValidationPriority::high : TxValidationPriority::low,
-                        txn,
-                        GetTime()
-                    )
-                );
+                pTxInputData->SetTxSource(TxSource::finalised);
+                pTxInputData->SetAcceptTime(GetTime());
+                state.SetResubmitTx();
             }
             else
             {
@@ -278,6 +272,8 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
 
         // Take a reference to the validator.
         const auto& txValidator { g_connman->getTxnValidator() };
+        // A pointer to the TxIdTracker.
+        const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
         while(numTxns--)
         {
             CTransactionRef tx {};
@@ -289,21 +285,22 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
             {
                 // Mempool Journal ChangeSet
                 CJournalChangeSetPtr changeSet {
-                    mempool.getJournalBuilder()->getNewChangeSet(JournalUpdateReason::INIT)
+                    mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
                 };
                 std::string reason {};
-                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActiveSharedData.GetChainActiveHeight() + 1, reason) };
+                bool standard { IsStandardTx(GlobalConfig::GetConfig(), *tx, chainActive.Tip()->nHeight + 1, reason) };
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
-                                        std::make_shared<CTxInputData>(
-                                                            TxSource::file, // tx source
-                                                            standard ? TxValidationPriority::high : TxValidationPriority::low,
-                                                            tx,    // a pointer to the tx
-                                                            nTime, // nAcceptTime
-                                                            true),  // fLimitFree
-                                        changeSet, // an instance of the mempool journal
-                                        true) // fLimitMempoolSize
+                        std::make_shared<CTxInputData>(
+                            pTxIdTracker, // a pointer to the TxIdTracker
+                            tx,    // a pointer to the tx
+                            TxSource::file, // tx source
+                            standard ? TxValidationPriority::high : TxValidationPriority::low,
+                            nTime, // nAcceptTime
+                            true),  // fLimitFree
+                        changeSet, // an instance of the mempool journal
+                        true) // fLimitMempoolSize
                 };
 
                 // Check results
@@ -360,11 +357,11 @@ void CTimeLockedMempool::loadConfig()
     std::unique_lock lock { mMtx };
 
     // Get max memory size in bytes
-    mMaxMemory = gArgs.GetArg("-maxmempoolnonfinal", DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE) * 1024 * 1024;
+    mMaxMemory = gArgs.GetArgAsBytes("-maxmempoolnonfinal", DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE, ONE_MEBIBYTE);
     // Get periodic checks run frequency
     mPeriodRunFreq = gArgs.GetArg("-checknonfinalfreq", DEFAULT_NONFINAL_CHECKS_FREQ);
     // Get configured purge age (convert hours to seconds)
-    mPurgeAge = gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * 60 * 60;
+    mPurgeAge = gArgs.GetArg("-mempoolexpirynonfinal", DEFAULT_NONFINAL_MEMPOOL_EXPIRY) * SECONDS_IN_ONE_HOUR;
 }
 
 // Fetch all transactions updated by the given new transaction.
@@ -537,18 +534,12 @@ void CTimeLockedMempool::periodicChecks()
 {
     // Get current time
     int64_t now { GetTime() };
-
-    // Get next block height and MTP
-    int nextBlockHeight {};
-    int medianTimePast {};
-    {
-        LOCK(cs_main);
-        nextBlockHeight = chainActive.Height() + 1;
-        medianTimePast = chainActive.Tip()->GetMedianTimePast();
-    }
+    const CBlockIndex* chainTip = chainActive.Tip();
 
     std::unique_lock lock { mMtx };
 
+    // A pointer to the TxIdTracker.
+    const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
     // Iterate over transactions in unlocking time order
     auto& index { mTransactionMap.get<TagUnlockingTime>() };
     auto it { index.begin() };
@@ -562,24 +553,23 @@ void CTimeLockedMempool::periodicChecks()
         ++it;
 
         // Lock time passed?
-        if(IsFinalTx(*txn, nextBlockHeight, medianTimePast))
+        if(IsFinalTx(*txn, chainTip->nHeight + 1, chainTip->GetMedianTimePast()))
         {
             LogPrint(BCLog::MEMPOOL, "Finalising non-final transaction %s at block height %d, mtp %d\n",
-                txn->GetId().ToString(), nextBlockHeight, medianTimePast);
+                txn->GetId().ToString(), chainTip->nHeight + 1, chainTip->GetMedianTimePast());
 
             removeNL(txn);
 
             // For full belt-and-braces safety, resubmit newly final transaction for revalidation
             std::string reason {};
-            bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, nextBlockHeight, reason) };
-            g_connman->ResubmitTxnForValidator(
+            bool standard { IsStandardTx(GlobalConfig::GetConfig(), *txn, chainTip->nHeight + 1, reason) };
+            g_connman->EnqueueTxnForValidator(
                 std::make_shared<CTxInputData>(
+                    pTxIdTracker,
+                    txn,
                     TxSource::finalised,
                     standard ? TxValidationPriority::high : TxValidationPriority::low,
-                    txn,
-                    GetTime()
-                )
-            );
+                    GetTime()));
         }
         // Purge age passed?
         else if(timeInPool >= mPurgeAge)

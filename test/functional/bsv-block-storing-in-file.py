@@ -8,7 +8,7 @@ This test checks whether block files are created as expected in different cases.
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.comptool import TestInstance
 from test_framework.cdefs import (ONE_MEGABYTE)
-from test_framework.blocktools import ChainManager
+from test_framework.blocktools import ChainManager, prepare_init_chain
 from test_framework.mininode import (NetworkThread, NodeConn, NodeConnCB, msg_block)
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (p2p_port, assert_equal)
@@ -47,18 +47,7 @@ class RunnerNode(NodeConnCB):
         self.block_time = self.remote_node.getblock(
             self.remote_node.getbestblockhash())['time'] + 1
 
-        # Create the first block with a coinbase output to our key
-        block = self.chain.next_block(self.next_block)
-        self.next_block += 1
-        self.chain.save_spendable_output()
-        self.send_message(msg_block(block))
-
-        # Bury the block 100 deep so the coinbase output is spendable
-        for i in range(1, 100):
-            block = self.chain.next_block(self.next_block)
-            self.next_block += 1
-            self.chain.save_spendable_output()
-            self.send_message(msg_block(block))
+        _, _, self.next_block = prepare_init_chain(self.chain, 100, 0, block_0=False, start_block=0, node=self)
 
         self.sync_with_ping()
 
