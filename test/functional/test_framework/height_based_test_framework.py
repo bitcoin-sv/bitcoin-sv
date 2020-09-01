@@ -53,7 +53,7 @@ class HeightBasedTestsCase:
     COINBASE_KEY = None
     ADDITIONAL_CONNECTIONS = []
     ARGS = []
-    P2P_ACCEPT_TIMEOUT = 10
+    P2P_ACCEPT_TIMEOUT = 20
 
     _UTXO_KEY = None
     _NUMBER_OF_UTXOS_PER_HEIGHT = 24
