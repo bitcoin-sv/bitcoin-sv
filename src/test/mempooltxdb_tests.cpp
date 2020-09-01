@@ -49,16 +49,8 @@ BOOST_AUTO_TEST_CASE(save_on_full_mempool)
     unsigned int poolSize = mempool.Size();
     mempool.SaveTxsToDiskBatch(10000);
     BOOST_CHECK_EQUAL(mempool.Size(), poolSize);
-    uint64_t diskUsage;
-    uint64_t sizeTXsAdded = 0;
-    if (!mempool.GetMempoolTxDB()->GetDiskUsage(diskUsage)) 
-    {
-        diskUsage = 0;
-    }
-    else
-    {
-        sizeTXsAdded = diskUsage;
-    }
+    uint64_t diskUsage = mempool.GetMempoolTxDB()->GetDiskUsage();
+    uint64_t sizeTXsAdded = diskUsage;
 
     // Add transactions:
     mempool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
@@ -76,7 +68,7 @@ BOOST_AUTO_TEST_CASE(save_on_full_mempool)
         sizeTXsAdded += mi->GetTxSize();
         mi++;
     }
-    mempool.GetMempoolTxDB()->GetDiskUsage(diskUsage);
+    diskUsage = mempool.GetMempoolTxDB()->GetDiskUsage();
     BOOST_CHECK_EQUAL(diskUsage, sizeTXsAdded);
 }
 BOOST_AUTO_TEST_SUITE_END()

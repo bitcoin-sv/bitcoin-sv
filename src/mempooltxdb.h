@@ -19,6 +19,7 @@ private:
 
     CDBWrapper mempoolTxDB;
 
+    uint64_t diskUsage {0};
 
 public:
     /**
@@ -50,10 +51,9 @@ public:
     bool RemoveTransactions(const std::vector<uint256> &transactionsToRemove, uint64_t diskUsageRemoved);
 
     /**
-     * Read disk usage value stored in the database to diskUsageOut.
-     * Returns false in case record could not be read from the database.
+     * Return the total size of transactions moved to disk.
      */
-    bool GetDiskUsage(uint64_t &diskUsageOut);
+    uint64_t GetDiskUsage();
 };
 
 #endif // BITCOIN_MEMPOOLDB_H

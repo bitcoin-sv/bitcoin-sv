@@ -109,21 +109,23 @@ CTxPrioritizer::~CTxPrioritizer()
 /**
  * class CTransactionRefWrapper
  */
+CTransactionRefWrapper::CTransactionRefWrapper() {
+}
+
 CTransactionRefWrapper::CTransactionRefWrapper(const CTransactionRef &_tx, const std::shared_ptr<CMempoolTxDB>& txDB)
-: tx{_tx}
-, txid{_tx->GetId()}
-, mempoolTxDB{txDB}
+    : tx{_tx}
+    , txid{_tx->GetId()}
+    , mempoolTxDB{txDB}
 {
 }
 
 CTransactionRef CTransactionRefWrapper::GetTxFromDB() const {
-    if (mempoolTxDB != nullptr)
-    {
-        CTransactionRef txRef;
-	    mempoolTxDB->GetTransaction(txid, txRef);
-        return txRef;
+    CTransactionRef tmp;
+    if (mempoolTxDB != nullptr) {
+        mempoolTxDB->GetTransaction(txid, tmp);
+        std::atomic_store(&tx, tmp);
     }
-    return tx;
+    return tmp;
 }
 
 
@@ -132,20 +134,23 @@ const TxId& CTransactionRefWrapper::GetId() const {
 }
 
 CTransactionRef CTransactionRefWrapper::GetTx() const {
-    if (tx != nullptr)
-    {
-        return tx;
+    CTransactionRef tmp = std::atomic_load(&tx);
+    if (tmp != nullptr) {
+        return tmp;
     }
     return GetTxFromDB();
 }
 
 void CTransactionRefWrapper::MoveTxToDisk() const {
-    if (tx)
+    CTransactionRef tmp = std::atomic_load(&tx);
+    if (tmp) 
     {
         if (mempoolTxDB)
         {
-            mempoolTxDB->AddTransaction(txid, tx);
-            tx = nullptr;
+            if (mempoolTxDB->AddTransaction(txid, tmp)) {
+                tmp = nullptr;
+                std::atomic_store(&tx, tmp);
+            }
         }
         else
         {
@@ -159,12 +164,12 @@ void CTransactionRefWrapper::MoveTxToDisk() const {
 }
 
 void CTransactionRefWrapper::UpdateMoveTxToDisk() const {
-    tx = nullptr;
+    std::atomic_store(&tx, CTransactionRef(nullptr));
 }
 
 bool CTransactionRefWrapper::IsInMemory() const
 {
-    return tx != nullptr;
+    return std::atomic_load(&tx) != nullptr;
 }
 
 /**
@@ -400,16 +405,10 @@ void CTxMemPool::updateForRemoveFromMempoolNL(const setEntries &entriesToRemove,
     }
 }
 
-CTxMemPool::CTxMemPool() : nTransactionsUpdated(0) {
+CTxMemPool::CTxMemPool()
+{
     // lock free clear
     clearNL();
-
-    // Sanity checks off by default for performance, because otherwise accepting
-    // transactions becomes O(N^2) where N is the number of transactions in the
-    // pool
-    nCheckFrequency = 0;
-
-    mempoolTxDB = nullptr;
 }
 
 CTxMemPool::~CTxMemPool() {
@@ -1140,26 +1139,21 @@ CTxMemPool::getSortedDepthAndScoreNL() const {
 
 
 void CTxMemPool::InitMempoolTxDB() {
-    mempoolTxDB =
-        std::make_shared<CMempoolTxDB>(1 << 20); /*TODO: remove constant*/
+    static constexpr auto cacheSize = 1 << 20; /*TODO: remove constant*/
+    std::call_once(db_initialized,
+                   [this] {
+                       mempoolTxDB = std::make_shared<CMempoolTxDB>(cacheSize);
+                   });
 }
 
 std::shared_ptr<CMempoolTxDB> CTxMemPool::GetMempoolTxDB() {
-    if (!this)
-    {
-        return nullptr;
-    }
-    if (mempoolTxDB == nullptr)
-    {
-        InitMempoolTxDB();
-    }
+    InitMempoolTxDB();
     return mempoolTxDB;
 };
 
 uint64_t CTxMemPool::GetDiskUsage() {
-    uint64_t usage;
-    mempoolTxDB->GetDiskUsage(usage);
-    return usage;
+    InitMempoolTxDB();
+    return mempoolTxDB->GetDiskUsage();
 };
 
 void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize)
@@ -1167,10 +1161,7 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize)
     /* Decide which transactions we want to store first */
     auto mi = mapTx.get<entry_time>().begin();
     uint64_t movedToDiskSize = 0;
-    if (!mempoolTxDB)
-    {
-        InitMempoolTxDB();
-    }
+    InitMempoolTxDB();
     while (movedToDiskSize < requiredSize && !mapTx.empty() && mi != mapTx.get<entry_time>().end())
     {
         if (mi->IsInMemory())
@@ -1196,9 +1187,7 @@ void CTxMemPool::SaveTxsToDiskBatch(uint64_t requiredSize) {
     uint64_t movedToDiskSize = 0;
     std::vector<CTransactionRef> toBeMoved;
     std::vector<const CTxMemPoolEntry*> toBeUpdated;
-    if (!mempoolTxDB) {
-        InitMempoolTxDB();
-    }
+    InitMempoolTxDB();
     while (movedToDiskSize < requiredSize && !mapTx.empty() &&
            mi != mapTx.get<entry_time>().end()) {
         if (mi->IsInMemory()) {

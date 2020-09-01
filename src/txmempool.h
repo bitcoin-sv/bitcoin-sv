@@ -154,7 +154,7 @@ private:
     CTransactionRef GetTxFromDB() const;
 
 public:
-    CTransactionRefWrapper() {}
+    CTransactionRefWrapper();
     CTransactionRefWrapper(const CTransactionRef &tx, const std::shared_ptr<CMempoolTxDB>& txDB);
 
     CTransactionRef GetTx() const;
@@ -431,8 +431,11 @@ struct DisconnectedBlockTransactions;
 class CTxMemPool : public CTxMemPoolBase {
 private:
     //!< Value n means that n times in 2^32 we check.
-    std::atomic_uint32_t nCheckFrequency;
-    std::atomic_uint nTransactionsUpdated;
+    // Sanity checks off by default for performance, because otherwise accepting
+    // transactions becomes O(N^2) where N is the number of transactions in the
+    // pool
+    std::atomic_uint32_t nCheckFrequency {0};
+    std::atomic_uint nTransactionsUpdated {0};
 
     CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
 
@@ -457,7 +460,9 @@ private:
     friend struct CPFPGroup;
 
     // Mempool transaction database
-    std::shared_ptr<CMempoolTxDB> mempoolTxDB;
+    std::shared_ptr<CMempoolTxDB> mempoolTxDB {nullptr};
+
+    std::once_flag db_initialized {};
 
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
