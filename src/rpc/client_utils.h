@@ -40,15 +40,6 @@ public:
         : std::runtime_error(msg) {}
 };
 
-struct HTTPReply 
-{
-    HTTPReply() : status(0), error(-1) {}
-
-    int status;
-    int error;
-    std::string body;
-};
-
 static const char DEFAULT_RPCCONNECT[] = "127.0.0.1";
 static const int DEFAULT_HTTP_CLIENT_TIMEOUT = 900;
 static const bool DEFAULT_NAMED = false;
