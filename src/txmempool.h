@@ -1157,7 +1157,7 @@ private:
      */
     void removeStagedNL(
             setEntries& stage,
-            const mining::CJournalChangeSetPtr& changeSet,
+            mining::CJournalChangeSet& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedwith = nullptr);
 

@@ -905,6 +905,7 @@ void CTxMemPool::removeRecursiveNL(
     MemPoolRemovalReason reason,
     const CTransaction* conflictedWith) {
 
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
     setEntries txToRemove;
     txiter origit = mapTx.find(origTxId);
     if (origit != mapTx.end()) {
@@ -927,7 +928,7 @@ void CTxMemPool::removeRecursiveNL(
         GetDescendantsNL(it, setAllRemoves);
     }
 
-    removeStagedNL(setAllRemoves, changeSet, reason, conflictedWith);
+    removeStagedNL(setAllRemoves, nonNullChangeSet.Get(), reason, conflictedWith);
 }
 
 void CTxMemPool::RemoveForReorg(
@@ -1002,7 +1003,8 @@ void CTxMemPool::RemoveForReorg(
     for (txiter it : txToRemove) {
         GetDescendantsNL(it, setAllRemoves);
     }
-    removeStagedNL(setAllRemoves, changeSet, MemPoolRemovalReason::REORG);
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
+    removeStagedNL(setAllRemoves, nonNullChangeSet.Get(), MemPoolRemovalReason::REORG);
 }
 
 void CTxMemPool::removeConflictsNL(
@@ -1027,6 +1029,7 @@ void CTxMemPool::RemoveForBlock(
     int32_t nBlockHeight,
     const CJournalChangeSetPtr& changeSet) {
 
+    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
     std::unique_lock lock(smtx);
     std::vector<const CTxMemPoolEntry *> entries;
     for (const auto &tx : vtx) {
@@ -1044,7 +1047,7 @@ void CTxMemPool::RemoveForBlock(
         if (it != mapTx.end()) {
             setEntries stage;
             stage.insert(it);
-            removeStagedNL(stage, changeSet, MemPoolRemovalReason::BLOCK); // TODO: this will not work any more
+            removeStagedNL(stage, nonNullChangeSet.Get(), MemPoolRemovalReason::BLOCK); // TODO: this will not work any more
         }
         removeConflictsNL(*tx, changeSet);
         clearPrioritisationNL(tx->GetId());
@@ -1773,12 +1776,10 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
 
 void CTxMemPool::removeStagedNL(
     setEntries& stage,
-    const CJournalChangeSetPtr& changeSet,
+    mining::CJournalChangeSet& changeSet,
     MemPoolRemovalReason reason,
     const CTransaction* conflictedWith)
 {
-    CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
-
     // first remove groups from primary mempool because when we remove groups we might need 
     // to remove transactions which are not in the staged for deletion
     setEntriesTopoSorted toRemoveFromPrimaryMempool;
@@ -1793,7 +1794,7 @@ void CTxMemPool::removeStagedNL(
     
     // collect transactions which are removed from the primary mempool as consequence of removing groups
     // we will revisit these transactions when we remove all staged transactions
-    setEntriesTopoSorted toUpdateAfterDeletion = RemoveFromPrimaryMempoolNL(toRemoveFromPrimaryMempool, nonNullChangeSet.Get(), true);
+    setEntriesTopoSorted toUpdateAfterDeletion = RemoveFromPrimaryMempoolNL(toRemoveFromPrimaryMempool, changeSet, true);
     
     for(auto it: stage)
     {
@@ -1826,11 +1827,11 @@ void CTxMemPool::removeStagedNL(
     // now actually remove transactions
     for(auto it: stage)
     {
-        removeUncheckedNL(it, nonNullChangeSet.Get(), reason, conflictedWith);
+        removeUncheckedNL(it, changeSet, reason, conflictedWith);
     }
 
     // check if removed transactions can be re-accepted to the primary mempool
-    TryAcceptToPrimaryMempoolNL(std::move(toUpdateAfterDeletion), nonNullChangeSet.Get());
+    TryAcceptToPrimaryMempoolNL(std::move(toUpdateAfterDeletion), changeSet);
 }
 
 int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)
@@ -1849,7 +1850,8 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
         GetDescendantsNL(removeit, stage);
     }
 
-    removeStagedNL(stage, changeSet, MemPoolRemovalReason::EXPIRY);
+    CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+    removeStagedNL(stage, nonNullChangeSet.Get(), MemPoolRemovalReason::EXPIRY);
     return stage.size();
 }
 

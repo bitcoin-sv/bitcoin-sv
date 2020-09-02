@@ -55,7 +55,7 @@ public:
         mempool.RemoveRecursive(tx, changeSet, reason);
     }
   
-    const mining::CJournalBuilder& getJournalBuilder()
+    mining::CJournalBuilder& getJournalBuilder()
     {
         return mempool.getJournalBuilder();
     }
@@ -64,6 +64,11 @@ public:
     {
         return mempool.PrimaryMempoolSizeNL();
     }
+    
+    void removeStagedNL(setEntries& stage, mining::CJournalChangeSet& changeSet, MemPoolRemovalReason reason)
+    {
+        return mempool.removeStagedNL(stage, changeSet, reason);
+    }    
 };
 
 using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>;

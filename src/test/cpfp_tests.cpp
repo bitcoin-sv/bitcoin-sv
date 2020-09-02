@@ -94,7 +94,7 @@ CTxMemPoolTestAccess::txiter AddToMempool(CTxMemPoolEntry& entry)
 
 BOOST_FIXTURE_TEST_SUITE(cpfp_tests, TestingSetup)
 
-BOOST_AUTO_TEST_CASE(group_forming) 
+BOOST_AUTO_TEST_CASE(group_forming_and_disbanding) 
 {
     //          |                    |
     //          |              entryNotPaying
@@ -198,6 +198,62 @@ BOOST_AUTO_TEST_CASE(group_forming)
 
     BOOST_ASSERT(! mining::CJournalTester(journal).checkTxnExists({*notPaying2It}));
 
+    
+    // remove payFor3And4It, notPaying4It from mempool
+    CTxMemPoolTestAccess::setEntries entriesToRemove = {payFor3And4It, notPaying4It};
+    auto changeSet = testAccess.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::UNKNOWN);
+    testAccess.removeStagedNL(entriesToRemove, *changeSet, MemPoolRemovalReason::UNKNOWN);
+    
+    changeSet->apply();
+    changeSet->clear();
+
+    // entries which we have removed, they should removed from mempool and also from the journal
+    for(auto entry: {entryNotPaying4, entryPayingFor3And4})
+    {
+        BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) == testAccess.mapTx().end());
+        BOOST_ASSERT(!mining::CJournalTester(journal).checkTxnExists({entry}));
+    }
+
+    // unaffected entries, they should stay in the mempool and journal
+    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup})
+    {
+        BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
+        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({entry}));
+    }
+
+    // notPaying3It is still in the mempool
+    BOOST_ASSERT(testAccess.mapTx().find(entryNotPaying3.GetTxId()) != testAccess.mapTx().end());
+    // but not in the journal
+    BOOST_ASSERT(!mining::CJournalTester(journal).checkTxnExists({entryNotPaying3}));
+
+    
+    // return removed transactions back to mempool
+    
+    notPaying4It = AddToMempool(entryNotPaying4);
+    payFor3And4It = AddToMempool(entryPayingFor3And4); 
+    BOOST_ASSERT(notPaying4It->IsInPrimaryMempool());
+    BOOST_ASSERT(payFor3And4It->IsInPrimaryMempool());
+
+    // things should be as before removal
+    for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup, entryNotPaying3, entryNotPaying4, entryPayingFor3And4})
+    {
+        BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
+        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({entry}));
+    }
+
+    // now remove entryPayForGroup
+    entriesToRemove.clear();
+    entriesToRemove.insert(payForGroupIt);
+    testAccess.removeStagedNL(entriesToRemove, *changeSet, MemPoolRemovalReason::UNKNOWN);
+
+    // everything should be removed from journal
+    BOOST_ASSERT(mining::CJournalTester(journal).journalSize() == 0);
+
+    // and nothing should stay in the primary mempool
+    for(const auto& entryIt: testAccess.mapTx())
+    {
+        BOOST_ASSERT(!entryIt.IsInPrimaryMempool());
+    }
 };
 
 BOOST_AUTO_TEST_SUITE_END()
