@@ -676,7 +676,8 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     BOOST_CHECK(tx4it != testPoolAccess.mapTx().end());
     BOOST_CHECK(!tx4it->IsInPrimaryMempool());
 
-    BOOST_CHECK_EQUAL(pool.Size(), 0UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 0UL);
+    BOOST_CHECK_EQUAL(pool.Size(), 4UL);
 
     CTestTxMemPoolEntry entry4access(const_cast<CTxMemPoolEntry&>(*tx4it));
     const auto& group4data = entry4access.groupingData();
@@ -693,6 +694,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     tx5.vout[0].nValue = 4 * COIN;
     pool.AddUnchecked(tx5.GetId(), entry.Fee(Amount(100000)).FromTx(tx5), nullChangeSet);
 
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 5UL);
     BOOST_CHECK_EQUAL(pool.Size(), 5UL);
     BOOST_CHECK(tx1it->IsInPrimaryMempool());
     BOOST_CHECK(tx2it->IsInPrimaryMempool());
