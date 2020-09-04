@@ -241,7 +241,6 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 7UL);
 }
 
-#if 0   // FIXME: Disabled for CORE-130
 BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     CTxMemPool pool;
     TestMemPoolEntryHelper entry;
@@ -299,9 +298,8 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     BOOST_CHECK(!pool.Exists(tx2.GetId()));
     BOOST_CHECK(!pool.Exists(tx3.GetId()));
 
-    CFeeRate maxFeeRateRemoved(Amount(25000),
-                               CTransaction(tx3).GetTotalSize() +
-                                   CTransaction(tx2).GetTotalSize());
+    CFeeRate maxFeeRateRemoved(Amount(20000),
+                               CTransaction(tx3).GetTotalSize());
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       maxFeeRateRemoved.GetFeePerK() + feeIncrement);
 
@@ -416,7 +414,6 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
 
     SetMockTime(0);
 }
-#endif  // FIXME: Disabled for CORE-130
 
 BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
     // Create a transaction

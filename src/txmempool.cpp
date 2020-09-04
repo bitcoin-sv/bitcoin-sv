@@ -2244,12 +2244,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     const mining::CJournalChangeSetPtr& changeSet,
     std::vector<COutPoint>* pvNoSpendsRemaining) {
-#if 1
-    return std::vector<TxId>();
-#else
 
-    // FIXME: Disabled because CPFP groups aren't implemented yet.
-    // TODO: CORE-130
     std::unique_lock lock(smtx);
 
     unsigned nTxnRemoved = 0;
@@ -2264,6 +2259,8 @@ std::vector<TxId> CTxMemPool::TrimToSize(
                 return evaluateEvictionCandidateNL(entry);
             });
     }
+
+    CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
     while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
         const auto it = evictionTracker->GetMostWorthles();
 
@@ -2273,7 +2270,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
         // mempool with feerate equal to txn which were removed with no block in
         // between.
 
-        // TODO: Account for CPFP groups.
+        // TODO: CORE-130: Account for CPFP groups?
         CFeeRate removed(it->GetModifiedFee(), it->GetTxSize());
         removed += MEMPOOL_FULL_FEE_INCREMENT;
 
@@ -2293,7 +2290,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
                 vRemovedTxIds.emplace_back(txref->GetId());
             }
         }
-        removeStagedNL(stage, changeSet, MemPoolRemovalReason::SIZELIMIT);
+        removeStagedNL(stage, nonNullChangeSet.Get(), MemPoolRemovalReason::SIZELIMIT);
         if (pvNoSpendsRemaining) {
             for (const auto& txref : txn) {
                 for (const auto& txin : txref->vin) {
@@ -2314,7 +2311,6 @@ std::vector<TxId> CTxMemPool::TrimToSize(
                  nTxnRemoved, maxFeeRateRemoved.ToString());
     }
     return vRemovedTxIds;
-#endif
 }
 
 bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
