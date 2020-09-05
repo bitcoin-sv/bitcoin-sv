@@ -2288,10 +2288,6 @@ SaltedTxidHasher::SaltedTxidHasher()
     : k0(GetRand(std::numeric_limits<uint64_t>::max())),
       k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
 
-CTxMemPool::SaltedTxiterHasher::SaltedTxiterHasher()
-    : k0(GetRand(std::numeric_limits<uint64_t>::max())),
-      k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
-
 CTxMemPool::Snapshot::Snapshot(Contents&& contents,
                                CachedTxIdsRef&& relevantTxIds)
     : mValid(true),

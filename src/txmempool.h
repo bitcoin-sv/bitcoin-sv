@@ -353,7 +353,8 @@ enum class MemPoolRemovalReason {
 
 class SaltedTxidHasher {
 private:
-    /** Salt */
+    // The salt does not change during the lifetime of the hasher object,
+    // but it's not const so that copy construction and assignment work.
     uint64_t k0, k1;
 
 public:
@@ -523,16 +524,10 @@ private:
         }
     };
 
-    class SaltedTxiterHasher {
-    private:
-        /** Salt */
-        const uint64_t k0, k1;
-
+    class SaltedTxiterHasher : private SaltedTxidHasher {
     public:
-        SaltedTxiterHasher();
-
         size_t operator()(const txiter& entry) const {
-            return SipHashUint256(k0, k1, entry->GetTxId());
+            return SaltedTxidHasher::operator()(entry->GetTxId());
         }
     };
 
