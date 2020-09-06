@@ -14,6 +14,7 @@
 
 #include <limits>
 
+using mining::CJournal;
 using mining::CBlockTemplate;
 using mining::JournalingBlockAssembler;
 
