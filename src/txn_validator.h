@@ -149,6 +149,13 @@ class CTxnValidator final
     /** Thread entry point for new transaction queue handling */
     void threadNewTxnHandler() noexcept;
 
+    /** Execute txn validation for a single transaction */
+    CTxnValResult executeTxnValidationNL(
+        const TxInputDataSPtr& pTxInputData,
+        CTxnHandlers& handlers,
+        bool fLimitMempoolSize,
+        bool fUseLimits);
+
     /** Process all newly arrived transactions. */
     CTxnValidator::CIntermediateResult processNewTransactionsNL(
         std::vector<TxInputDataSPtr>& txns,

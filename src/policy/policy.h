@@ -69,11 +69,11 @@ static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500);
 static const uint64_t MAX_TX_SIZE_POLICY_BEFORE_GENESIS = 100000 - 1; // -1 because pre genesis policy validation was >=
 /** The default size for transactions we're willing to relay/mine */
 static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = 10 * ONE_MEGABYTE;
-/** The default size for the minimum txout size to txin size ratio to identify consolidation transactions */
+/** The default minimum input (previous output) ScriptPubKey size to output ScriptPubKey size ratio to qualify for consolidation transaction */
 static const uint64_t DEFAULT_MIN_CONSOLIDATION_FACTOR = 20;
-/** The default size for the maximum scriptSig input in a consolidation transactions */
+/** The default maximum size for input scriptSig in a consolidation transaction */
 static const uint64_t DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE = 150;
-/** consolidation transaction need inputs with a minimum number of confirmations */
+/** The default minimum number of blocks that need to be mined on top of the block containing previous output, for it to be eligible as an input in consolidation transaction */
 static const uint64_t DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY = 6;
 /** consolidation transaction with non standard inputs */
 static const uint64_t DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = 0;
