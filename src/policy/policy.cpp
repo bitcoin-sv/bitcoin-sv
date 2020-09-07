@@ -54,7 +54,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
     const uint64_t factor = config.GetMinConsolidationFactor();
-    const int32_t minMaturity = static_cast<int32_t>(config.GetMinConsolidationInputMaturity());
+    const uint64_t minConf = config.GetMinConfConsolidationInput();
     const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
     const bool stdInputOnly = !config.GetAcceptNonStdConsolidationInput();
 
@@ -84,7 +84,7 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
         if (coinHeight == MEMPOOL_HEIGHT)
             return false;
 
-        if (coinHeight && (tipHeight - coinHeight < minMaturity)) // older versions did not store height
+        if (coinHeight && (tipHeight + 1 - coinHeight < minConf)) // older versions did not store height
             return false;
 
         // spam detection

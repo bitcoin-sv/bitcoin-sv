@@ -110,7 +110,7 @@ class FeeFilterTest(BitcoinTestFramework):
 
         ## BEGIN setup consolidation transactions
         self.consolidation_factor = int(node1.getnetworkinfo()['minconsolidationfactor'])
-        self.minConfirmations = int(node1.getnetworkinfo()['minconsolidationinputmaturity'])
+        self.minConfirmations = int(node1.getnetworkinfo()['minconfconsolidationinput'])
         # test ratio between size of input script and size of output script
         tx_hex = self.create_and_sign_tx(node1, 1, min_confirmations=self.minConfirmations)
         tx = FromHex(CTransaction(), tx_hex)

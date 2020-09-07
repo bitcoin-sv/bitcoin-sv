@@ -73,8 +73,8 @@ static const uint64_t DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS = 10 * ONE_MEGABY
 static const uint64_t DEFAULT_MIN_CONSOLIDATION_FACTOR = 20;
 /** The default maximum size for input scriptSig in a consolidation transaction */
 static const uint64_t DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE = 150;
-/** The default minimum number of blocks that need to be mined on top of the block containing previous output, for it to be eligible as an input in consolidation transaction */
-static const uint64_t DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY = 6;
+/** The default minimum number of confirmations to be eligible as an input in consolidation transaction */
+static const uint64_t DEFAULT_MIN_CONF_CONSOLIDATION_INPUT = 6;
 /** consolidation transaction with non standard inputs */
 static const bool DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT = false;
 

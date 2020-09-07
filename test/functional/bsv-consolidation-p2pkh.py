@@ -86,7 +86,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
     def run_test(self):
         for node in self.nodes:
             self.consolidation_factor = int(node.getnetworkinfo()['minconsolidationfactor'])
-            self.minConfirmations = int(node.getnetworkinfo()['minconsolidationinputmaturity'])
+            self.minConfirmations = int(node.getnetworkinfo()['minconfconsolidationinput'])
             self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
             self.log.info ("minimum input confirmations: {}".format(self.minConfirmations))
 
