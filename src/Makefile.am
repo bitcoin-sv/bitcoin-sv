@@ -531,6 +531,7 @@ endif
 
 bitcoind_LDADD = \
   $(LIBBITCOIN_SERVER) \
+  $(LIBBITCOIN_CLI) \
   $(LIBBITCOIN_COMMON) \
   $(LIBUNIVALUE) \
   $(LIBBITCOIN_UTIL) \

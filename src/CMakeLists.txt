@@ -593,6 +593,7 @@ add_executable(bitcoind bitcoind.cpp
 target_link_libraries(
 	bitcoind
 	server
+    rpcclient
 	$<$<PLATFORM_ID:Linux>:rt>) # use librt.so for aio on Linux
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 	target_sources(bitcoind PRIVATE bitcoind-res.rc)

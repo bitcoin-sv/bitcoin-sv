@@ -30,6 +30,7 @@ add_executable(bench_bitcoin
 
 target_link_libraries(bench_bitcoin
         server
+        rpcclient
         common
         util
         bitcoinconsensus
