@@ -88,7 +88,7 @@ public:
 
     std::string GetCommand() const;
     bool IsValid(const Config &config) const;
-    bool IsOversized(const Config &config) const;
+    bool IsOversized(const Config &config, uint64_t maxBlockSize) const;
 
     ADD_SERIALIZE_METHODS
 
@@ -310,7 +310,7 @@ bool IsBlockLike(const std::string &strCommand);
 /**
  * Return the maximum message size for the given message type.
  */
-uint64_t GetMaxMessageLength(const std::string& command, const Config& config);
+uint64_t GetMaxMessageLength(const std::string& command, const Config& config, uint64_t maxBlockSize);
 
 } // namespace NetMsgType
 

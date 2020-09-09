@@ -193,13 +193,21 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         // as we allow this go or we reach the end of the journal.
         CJournal::Index journalEnd {journalLock.end()};
         bool finished { mState.mJournalPos == journalEnd };
-
+        // ComputeMaxGeneratedBlockSize depends on two values (GetMaxGeneratedBlockSize and GetMaxBlockSize) 
+        // each of which can be updated independently (two RPC functions). 
+        // To properly solve this, we should replace two RPC functions 
+        // with one that updates both values under the lock and change getters/setters in Config class so that 
+        // both values are returned or changed. But we cannot remove a RPC function and 
+        // this is also unlikely to be a problem in practice.
+        // maxBlockSizeComputed is stored here to keep the same value throughout
+        // the whole execution and to avoid locking/unlocking mutex too many times.
+        uint64_t maxBlockSizeComputed = ComputeMaxGeneratedBlockSize(pindex);
         while(!finished)
         {
             // Try to add another txn or a whole group of txns to the block
             // mMaxTransactions is an internal limit used to reduce lock contention
             // When we're adding a group we may add more transactions and that's OK
-            size_t nAdded = addTransactionOrGroup(pindex, journalEnd);
+            size_t nAdded = addTransactionOrGroup(pindex, journalEnd, maxBlockSizeComputed);
             if(nAdded)
             {
                 txnNum += nAdded;
@@ -261,19 +269,19 @@ void JournalingBlockAssembler::newBlock()
     mRecentlyUpdated = true;
 }
 
-size_t JournalingBlockAssembler::addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd)
+size_t JournalingBlockAssembler::addTransactionOrGroup(const CBlockIndex* pindex, const CJournal::Index& journalEnd, uint64_t maxBlockSizeComputed)
 {
     auto& groupId { mState.mJournalPos.at().getGroupId() };
     if (!groupId)
     {
-        return addTransaction(pindex);
+        return addTransaction(pindex, maxBlockSizeComputed);
     }
     else
     {
         GroupCheckpoint checkpoint {*this};
         size_t nAddedTotal {0};
         while (mState.mJournalPos != journalEnd && groupId == mState.mJournalPos.at().getGroupId()) {
-            size_t nAdded = addTransaction(pindex);
+            size_t nAdded = addTransaction(pindex, maxBlockSizeComputed);
             if (!nAdded) {
                 checkpoint.rollback();
                 return 0;
@@ -306,15 +314,14 @@ void JournalingBlockAssembler::GroupCheckpoint::rollback()
 
 // Test whether we can add another transaction to the next block, and if
 // so do it - Caller holds mutex
-size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
+size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex, uint64_t maxBlockSizeComputed)
 {
     const CJournalEntry& entry { mState.mJournalPos.at() };
 
     // Check for block being full
-    uint64_t maxBlockSize { ComputeMaxGeneratedBlockSize(pindex) };
     uint64_t txnSize { entry.getTxnSize() };
     uint64_t blockSizeWithTx { mState.mBlockSize + txnSize };
-    if(blockSizeWithTx >= maxBlockSize)
+    if(blockSizeWithTx >= maxBlockSizeComputed)
     {
         return 0;
     }

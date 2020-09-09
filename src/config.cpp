@@ -160,6 +160,7 @@ void GlobalConfig::CheckSetDefaultCalled() const
 }
 
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
+    std::scoped_lock<std::shared_mutex> lock{configMtx};
     // Do not allow maxBlockSize to be set below historic 1MB limit
     // It cannot be equal either because of the "must be big" UAHF rule.
     if (maxSize && maxSize <= LEGACY_MAX_BLOCK_SIZE) {
@@ -175,6 +176,7 @@ bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
 }
 
 uint64_t GlobalConfig::GetMaxBlockSize() const {
+    std::shared_lock<std::shared_mutex> lock{configMtx};
     CheckSetDefaultCalled();
     return maxBlockSize;
 }
@@ -200,6 +202,7 @@ uint64_t GlobalConfig::GetMaxSendQueuesBytes() const {
 }
 
 bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) {
+    std::scoped_lock<std::shared_mutex> lock{configMtx};
     maxGeneratedBlockSizeAfter = maxSize;
     maxGeneratedBlockSizeOverridden = true;
 
@@ -207,11 +210,13 @@ bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) 
 }
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize() const {
+    std::shared_lock<std::shared_mutex> lock{configMtx};
     CheckSetDefaultCalled();
     return maxGeneratedBlockSizeAfter;
 }
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
+    std::shared_lock<std::shared_mutex> lock{configMtx};
     CheckSetDefaultCalled();
     uint64_t maxSize;
     if (!maxGeneratedBlockSizeOverridden) {

@@ -25,6 +25,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include <memory>
 #include <string>
 #include <orphan_txns.h>
+#include <shared_mutex>
 
 class CChainParams;
 struct DefaultBlockSizeParams;
@@ -498,6 +499,10 @@ private:
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
 #endif
+
+    // Only for values that can change in runtime
+    mutable std::shared_mutex configMtx{};
+
 };
 
 // Dummy for subclassing in unittests

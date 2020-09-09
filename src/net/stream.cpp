@@ -4,6 +4,7 @@
 #include <net/net.h>
 #include <net/netbase.h>
 #include <net/stream.h>
+#include "config.h"
 
 // Enable enum_cast for StreamType, so we can log informatively
 const enumTableT<StreamType>& enumTable(StreamType)
@@ -22,7 +23,7 @@ const enumTableT<StreamType>& enumTable(StreamType)
 
 namespace
 {
-    bool IsOversizedMessage(const Config& config, const CNetMessage& msg)
+    bool IsOversizedMessage(const Config& config, const CNetMessage& msg, uint64_t maxBlockSize)
     {   
         if(!msg.in_data)
         {   
@@ -30,7 +31,7 @@ namespace
             return false;
         }
 
-        return msg.hdr.IsOversized(config);
+        return msg.hdr.IsOversized(config, maxBlockSize);
     }
 
     const std::string NET_MESSAGE_COMMAND_OTHER { "*other*" };
@@ -378,6 +379,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
     mLastRecvTime = nTimeMicros / MICROS_PER_SECOND;
     mTotalBytesRecv += nBytes;
     mBytesRecvThisSpot += nBytes;
+    uint64_t maxBlockSize = config.GetMaxBlockSize();
 
     while (nBytes > 0)
     {   
@@ -393,7 +395,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
         int handled;
         if (!msg.in_data)
         {   
-            handled = msg.readHeader(config, pch, nBytes);
+            handled = msg.readHeader(config, pch, nBytes, maxBlockSize);
             if (handled < 0)
             {   
                 return RECV_BAD_LENGTH;//Notify bad message as soon as seen in the header
@@ -409,7 +411,7 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
             return RECV_FAIL;
         }
 
-        if (IsOversizedMessage(config, msg))
+        if (IsOversizedMessage(config, msg, maxBlockSize))
         {   
             LogPrint(BCLog::NETCONN, "Oversized message from peer=%i, disconnecting\n", mNode->GetId());
             return RECV_BAD_LENGTH;

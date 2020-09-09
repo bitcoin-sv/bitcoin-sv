@@ -8,7 +8,7 @@
 #include <logging.h>
 
 int CNetMessage::readHeader(const Config &config, const char *pch,
-                            uint32_t nBytes) {
+                            uint32_t nBytes, uint64_t maxBlockSize) {
     // copy data to temporary parsing buffer
     uint32_t nRemaining = 24 - nHdrPos;
     uint32_t nCopy = std::min(nRemaining, nBytes);
@@ -30,7 +30,7 @@ int CNetMessage::readHeader(const Config &config, const char *pch,
     }
 
     // Reject oversized messages
-    if (hdr.IsOversized(config)) {
+    if (hdr.IsOversized(config, maxBlockSize)) {
         LogPrint(BCLog::NETMSG, "Oversized header detected\n");
         return -1;
     }

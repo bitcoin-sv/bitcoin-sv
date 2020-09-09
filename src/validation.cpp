@@ -5120,17 +5120,26 @@ bool CheckBlock(const Config &config, const CBlock &block,
 
     // Size limits.
     auto nMaxBlockSize = config.GetMaxBlockSize();
+    // This validation option shouldCheckMaxBlockSize() is set in generateBlocks() RPC.
+    // If block size was checked during CreateNewBlock(), another check is not needed.
+    // With setexcessiveblock() RPC method value maxBlockSize may change to lower value
+    // during block validation. Thus, block could be rejected because it would exceed
+    // the max block size, even though it was accepted when block was created.
+    if (validationOptions.shouldCheckMaxBlockSize()) {
+        // Bail early if there is no way this block is of reasonable size.  
+        if ( MIN_TRANSACTION_SIZE > 0 && block.vtx.size () > (nMaxBlockSize/MIN_TRANSACTION_SIZE)){
+            return state.DoS(100, false, REJECT_INVALID, "bad-blk-length", "size limits failed");
+        }
 
-    // Bail early if there is no way this block is of reasonable size.  
-    if ( MIN_TRANSACTION_SIZE > 0 && block.vtx.size () > (nMaxBlockSize/MIN_TRANSACTION_SIZE)){
-        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length", "size limits failed");
     }
 
-    auto currentBlockSize =
+    auto currentBlockSize = 
         ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-    if (currentBlockSize > nMaxBlockSize) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
-                         "size limits failed");
+    if (validationOptions.shouldCheckMaxBlockSize()) {
+        if (currentBlockSize > nMaxBlockSize) {
+            return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
+                             "size limits failed");
+        }
     }
 
     bool isGenesisEnabled = IsGenesisEnabled(config, blockHeight);
@@ -5730,7 +5739,8 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
     const Config& config,
     const std::shared_ptr<const CBlock>& pblock,
     bool fForceProcessing,
-    bool* fNewBlock)
+    bool* fNewBlock,
+    const BlockValidationOptions& validationOptions)
 {
     auto guard = CBlockProcessing::GetCountGuard();
 
@@ -5753,7 +5763,7 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
 
         // Ensure that CheckBlock() passes before calling AcceptBlock, as
         // belt-and-suspenders.
-        bool ret = CheckBlock(config, *pblock, state, pindexPrev->GetHeight() + 1);
+        bool ret = CheckBlock(config, *pblock, state, pindexPrev->GetHeight() + 1, validationOptions);
 
         LOCK(cs_main);
 
@@ -5800,12 +5810,13 @@ std::function<bool()> ProcessNewBlockWithAsyncBestChainActivation(
 
 bool ProcessNewBlock(const Config &config,
                      const std::shared_ptr<const CBlock>& pblock,
-                     bool fForceProcessing, bool *fNewBlock)
+                     bool fForceProcessing, bool *fNewBlock,
+                     const BlockValidationOptions& validationOptions)
 {
     auto source = task::CCancellationSource::Make();
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
-            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, fForceProcessing, fNewBlock);
+            task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, fForceProcessing, fNewBlock, validationOptions);
 
     if(!bestChainActivation)
     {

@@ -195,7 +195,14 @@ UniValue generateBlocks(const Config &config,
             throw JSONRPCError(RPC_TRANSACTION_REJECTED, "bad-txns-vout-p2sh");
         }
 
-        if (!ProcessNewBlock(config, shared_pblock, true, nullptr)) {
+        // If block size was checked in CheckBlock() during CreateNewBlock() (it depends on chain params testBlockCandidateValidity), 
+        // another check during ProcessNewBlock() is not needed. 
+        // With setexcessiveblock() RPC method value maxBlockSize may change to lower value
+        // during block validation. Thus, block could be rejected because it would exceed the max block size,
+        // even though it was accepted when block was created.
+        const BlockValidationOptions validationOptions = BlockValidationOptions()
+            .withCheckMaxBlockSize(!config.GetTestBlockCandidateValidity());
+        if (!ProcessNewBlock(config, shared_pblock, true, nullptr, validationOptions)) {
             throw JSONRPCError(RPC_INTERNAL_ERROR,
                                "ProcessNewBlock, block not accepted");
         }

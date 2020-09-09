@@ -49,7 +49,7 @@ bool IsBlockLike(const std::string &strCommand) {
            strCommand == NetMsgType::BLOCKTXN;
 }
 
-uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
+uint64_t GetMaxMessageLength(const std::string& command, const Config& config, uint64_t maxBlockSize)
 {
     if (command == NetMsgType::PROTOCONF)
     {
@@ -71,7 +71,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
 
         // If the message is GETBLOCKTXN, it is limited to an estimate of the maximum number of
         // short TXIDs the message could contain.
-        return (config.GetMaxBlockSize() / MIN_TX_SIZE * SHORT_TXID_SIZE) + CMessageHeader::HEADER_SIZE;
+        return (maxBlockSize / MIN_TX_SIZE * SHORT_TXID_SIZE) + CMessageHeader::HEADER_SIZE;
     }
     else if (!NetMsgType::IsBlockLike(command))
     {
@@ -82,7 +82,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
     else
     {
         // Maximum accepted block type message size
-        return config.GetMaxBlockSize();
+        return maxBlockSize;
     }
 }
 
@@ -176,7 +176,8 @@ bool CMessageHeader::IsValid(const Config &config) const {
     }
 
     // Message size
-    if (IsOversized(config)) {
+    uint64_t maxBlockSize = config.GetMaxBlockSize();
+    if (IsOversized(config, maxBlockSize)) {
         LogPrintf("CMessageHeader::IsValid(): (%s, %u bytes) is oversized\n",
                   GetCommand(), nPayloadLength);
         return false;
@@ -185,9 +186,9 @@ bool CMessageHeader::IsValid(const Config &config) const {
     return true;
 }
 
-bool CMessageHeader::IsOversized(const Config &config) const 
+bool CMessageHeader::IsOversized(const Config &config, uint64_t maxBlockSize) const
 {
-    return nPayloadLength > NetMsgType::GetMaxMessageLength(GetCommand(), config);
+    return nPayloadLength > NetMsgType::GetMaxMessageLength(GetCommand(), config, maxBlockSize);
 }
 
 CAddress::CAddress(CService ipIn, ServiceFlags nServicesIn) : CService{ipIn}, nServices{nServicesIn} {
