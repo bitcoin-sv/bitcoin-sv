@@ -39,8 +39,6 @@ public:
     using txlinksMap = CTxMemPool::txlinksMap;
     using setEntries = CTxMemPool::setEntries;
 
-    template<typename... Args>
-    bool CalculateMemPoolAncestorsNL(Args... args) { return mempool.CalculateMemPoolAncestorsNL(args...); };
 
     void SetBlockMinTxFee(const CFeeRate& feeRate)
     {

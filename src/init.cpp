@@ -779,23 +779,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf("Do not accept transactions if number of in-mempool "
                       "ancestors is <n> or more (default: %u)",
                       DEFAULT_ANCESTOR_LIMIT));
-        strUsage +=
-            HelpMessageOpt("-limitancestorsize=<n>",
-                           strprintf("Do not accept transactions whose size "
-                                     "with all in-mempool ancestors exceeds "
-                                     "<n> kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                                     DEFAULT_ANCESTOR_SIZE_LIMIT));
-        strUsage += HelpMessageOpt(
-            "-limitdescendantcount=<n>",
-            strprintf("Do not accept transactions if any ancestor would have "
-                      "<n> or more in-mempool descendants (default: %u)",
-                      DEFAULT_DESCENDANT_LIMIT));
-        strUsage += HelpMessageOpt(
-            "-limitdescendantsize=<n>",
-            strprintf("Do not accept transactions if any ancestor would have "
-                      "more than <n> kilobytes of in-mempool descendants "
-                      "(default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                      DEFAULT_DESCENDANT_SIZE_LIMIT));
     }
     strUsage += HelpMessageOpt(
         "-debug=<category>",
@@ -1933,11 +1916,6 @@ bool AppInitParameterInteraction(Config &config) {
         config.SetDataCarrierSize(gArgs.GetArgAsBytes("-datacarriersize", DEFAULT_DATA_CARRIER_SIZE));
     }
 
-    // Configure descendant limit count.
-    if(gArgs.IsArgSet("-limitdescendantcount")) {
-        config.SetLimitDescendantCount(gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
-    }
-
     // Configure ancestor limit count.
     if(gArgs.IsArgSet("-limitancestorcount")) {
         config.SetLimitAncestorCount(gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT));
@@ -1987,17 +1965,6 @@ bool AppInitParameterInteraction(Config &config) {
             return InitError(err);
         }
     }
-
-    // Configure descendant limit size.
-    if(gArgs.IsArgSet("-limitdescendantsize")) {
-        config.SetLimitDescendantSize(gArgs.GetArgAsBytes("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT, ONE_KILOBYTE));
-    }
-
-    // Configure ancestor limit size.
-    if(gArgs.IsArgSet("-limitancestorsize")) {
-        config.SetLimitAncestorSize(gArgs.GetArgAsBytes("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT, ONE_KILOBYTE));
-    }
-
     // Configure genesis activation height.
     int32_t genesisActivationHeight = static_cast<int32_t>(gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight));
     if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {

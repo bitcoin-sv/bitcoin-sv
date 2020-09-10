@@ -2562,9 +2562,7 @@ bool CWallet::SelectCoins(
         }
     }
 
-    size_t nMaxChainLength = std::min(
-        gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT),
-        gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
+    size_t nMaxChainLength = gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
     bool fRejectLongChains = gArgs.GetBoolArg(
         "-walletrejectlongchains", DEFAULT_WALLET_REJECT_LONG_CHAINS);
 
@@ -3043,13 +3041,9 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         CTxMemPoolEntry entry {wtxNew.tx, Amount(0), 0, 0, 0, Amount(0), false,
             lp, mempool};
         size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-        size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
 
-        size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
-        size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
         if (!mempool.CheckAncestorLimits(
-                entry, nLimitAncestors, nLimitAncestorSize,
-                nLimitDescendants, nLimitDescendantSize, std::nullopt)) {
+                entry, nLimitAncestors, std::nullopt)) {
             strFailReason = _("Transaction has too long of a mempool chain");
             return false;
         }

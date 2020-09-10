@@ -223,22 +223,26 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx7.vout[0].nValue = 10 * COIN;
     tx7.vout[1].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx7.vout[1].nValue = 1 * COIN;
-
-    CTxMemPoolTestAccess::setEntries setAncestorsCalculated;
+    
     {
-        std::unique_lock lock(pool.smtx);
+        std::string error;
+        
         BOOST_CHECK_EQUAL(
-            testPoolAccess.CalculateMemPoolAncestorsNL(entry.Fee(Amount(2000000LL)).FromTx(tx7),
-                                             std::ref(setAncestorsCalculated),
-                                             100, 1000000, 1000, 1000000,
-                                             std::nullopt),
+            pool.CheckAncestorLimits( entry.FromTx(tx7), 2, error),
             true);
+        BOOST_CHECK_EQUAL(error, "");
+
+        BOOST_CHECK_EQUAL(
+            pool.CheckAncestorLimits( entry.FromTx(tx7), 1, error),
+            false);
+        BOOST_CHECK_EQUAL(error, "too many unconfirmed parents [limit: 1]");
+
     }
-    BOOST_CHECK(setAncestorsCalculated == setAncestors);
 
     /* will pull tx6 into the primary pool with tx7, whose fee was set above */
-    pool.AddUnchecked(tx7.GetId(), entry.FromTx(tx7), nullChangeSet);
+    pool.AddUnchecked(tx7.GetId(), entry.Fee(Amount{2000000LL}).FromTx(tx7), nullChangeSet);
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 7UL);
+    BOOST_CHECK_EQUAL(pool.Size(), 7UL);
 }
 
 BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {

@@ -169,7 +169,6 @@ class PTVRPCTests(ComparisonTestFramework):
         # Node's config
         args = ['-txnvalidationasynchrunfreq=10000',
                 '-limitancestorcount=100',
-                '-limitdescendantcount=100',
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS1: {} chains of length {}. Test duplicates resubmitted via rpc.'.format(num_of_chains, chain_length),

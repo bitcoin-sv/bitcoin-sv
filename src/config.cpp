@@ -37,11 +37,8 @@ void GlobalConfig::Reset()
     acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
-    limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
     limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
-    limitDescendantSize = DEFAULT_DESCENDANT_SIZE_LIMIT;
-    limitAncestorSize = DEFAULT_ANCESTOR_SIZE_LIMIT;
-
+    
     testBlockCandidateValidity = false;
     blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
 
@@ -340,36 +337,12 @@ uint64_t GlobalConfig::GetDataCarrierSize() const {
     return dataCarrierSize;
 }
 
-void GlobalConfig::SetLimitAncestorSize(uint64_t limitAncestorSizeIn) {
-    limitAncestorSize = limitAncestorSizeIn;
-}
-
-uint64_t GlobalConfig::GetLimitAncestorSize() const {
-    return limitAncestorSize;
-}
-
-void GlobalConfig::SetLimitDescendantSize(uint64_t limitDescendantSizeIn) {
-    limitDescendantSize = limitDescendantSizeIn;
-}
-
-uint64_t GlobalConfig::GetLimitDescendantSize() const {
-    return limitDescendantSize;
-}
-
 void GlobalConfig::SetLimitAncestorCount(uint64_t limitAncestorCountIn) {
     limitAncestorCount = limitAncestorCountIn;
 }
 
 uint64_t GlobalConfig::GetLimitAncestorCount() const {
     return limitAncestorCount;
-}
-
-void GlobalConfig::SetLimitDescendantCount(uint64_t limitDescendantCountIn) {
-    limitDescendantCount = limitDescendantCountIn;
-}
-
-uint64_t GlobalConfig::GetLimitDescendantCount() const {
-    return limitDescendantCount;
 }
 
 const CChainParams &GlobalConfig::GetChainParams() const {

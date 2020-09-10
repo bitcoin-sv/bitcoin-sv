@@ -895,14 +895,8 @@ static bool CheckAncestorLimits(const CTxMemPool& pool,
                                 const CTxMemPoolEntry& entry,
                                 std::string& errString) {
     const auto limitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-    const auto limitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
-    const auto limitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
-    const auto limitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
     return pool.CheckAncestorLimits(entry,
                                     limitAncestors,
-                                    limitAncestorSize,
-                                    limitDescendants,
-                                    limitDescendantSize,
                                     std::ref(errString));
 }
 
