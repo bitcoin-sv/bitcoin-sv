@@ -66,6 +66,7 @@ BITCOIN_TESTS =\
   test/instruction_iterator_tests.cpp \
   test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
+  test/invalid_txn_publisher_tests.cpp \
   test/journal_tests.cpp \
   test/jsonutil.cpp \
   test/json_tests.cpp \

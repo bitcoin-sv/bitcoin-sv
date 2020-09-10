@@ -88,6 +88,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	inv_tests.cpp
     int_serialization_tests.cpp
     instruction_iterator_tests.cpp
+    invalid_txn_publisher_tests.cpp
 	journal_tests.cpp
 	json_tests.cpp
 	jsonutil.cpp
