@@ -659,7 +659,7 @@ void decoderawtransaction(const Config& config,
     CTransaction tx(std::move(mtx));
     //treat as after genesis if no output is P2SH
     const bool genesisEnabled =
-        std::none_of(mtx.vout.begin(), mtx.vout.end(), [](const CTxOut& out) {
+        std::none_of(tx.vout.begin(), tx.vout.end(), [](const CTxOut& out) {
             return IsP2SH(out.scriptPubKey);
         });
     CJSONWriter jWriter(textWriter, false);
