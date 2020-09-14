@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(save_on_full_mempool)
 
     // Nothing in pool, remove should do nothing:
     unsigned int poolSize = mempool.Size();
-    mempool.SaveTxsToDiskBatch(10000);
+    mempool.SaveTxsToDisk(10000);
     BOOST_CHECK_EQUAL(mempool.Size(), poolSize);
     uint64_t diskUsage = mempool.GetMempoolTxDB()->GetDiskUsage();
     uint64_t sizeTXsAdded = diskUsage;
@@ -59,7 +59,7 @@ BOOST_AUTO_TEST_CASE(save_on_full_mempool)
         mempool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), nullChangeSet);
     }
 
-    mempool.SaveTxsToDiskBatch(10000);
+    mempool.SaveTxsToDisk(10000);
 
     auto mi = mempool.mapTx.get<entry_time>().begin();
     while (mi != mempool.mapTx.get<entry_time>().end())

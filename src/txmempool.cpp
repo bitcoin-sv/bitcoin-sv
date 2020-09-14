@@ -1551,50 +1551,28 @@ uint64_t CTxMemPool::GetDiskUsage() {
     return mempoolTxDB->GetDiskUsage();
 };
 
-void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize)
-{
-    /* Decide which transactions we want to store first */
-    auto mi = mapTx.get<entry_time>().begin();
-    uint64_t movedToDiskSize = 0;
-    InitMempoolTxDB();
-    while (movedToDiskSize < requiredSize && !mapTx.empty() && mi != mapTx.get<entry_time>().end())
-    {
-        if (mi->IsInMemory())
-        {
-            mi->MoveTxToDisk();
-            movedToDiskSize += mi->GetTxSize();
-            mi++;
-        }
-
-    }
-}
-
-void CTxMemPool::UpdateMoveTxsToDisk(std::vector<const CTxMemPoolEntry*> toBeUpdated) {
-    for (const CTxMemPoolEntry* entry : toBeUpdated)
-    {
-        entry->UpdateMoveTxToDisk();
-    }
-}
-
-void CTxMemPool::SaveTxsToDiskBatch(uint64_t requiredSize) {
-    /* Decide which transactions we want to store first */
-    auto mi = mapTx.get<entry_time>().begin();
+void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
     uint64_t movedToDiskSize = 0;
     std::vector<CTransactionRef> toBeMoved;
     std::vector<const CTxMemPoolEntry*> toBeUpdated;
-    InitMempoolTxDB();
-    while (movedToDiskSize < requiredSize && !mapTx.empty() &&
-           mi != mapTx.get<entry_time>().end()) {
+
+    for (auto mi = mapTx.get<entry_time>().begin();
+         mi != mapTx.get<entry_time>().end() && movedToDiskSize < requiredSize;
+         ++mi) {
         if (mi->IsInMemory()) {
             toBeMoved.push_back(mi->GetSharedTx());
             toBeUpdated.push_back(&*mi);
             movedToDiskSize += mi->GetTxSize();
-            mi++;
         }
     }
+
+    InitMempoolTxDB();
     if (mempoolTxDB->AddTransactions(toBeMoved))
     {
-        UpdateMoveTxsToDisk(toBeUpdated);
+        for (const CTxMemPoolEntry* entry : toBeUpdated)
+        {
+            entry->UpdateMoveTxToDisk();
+        }
     }
     else
     {

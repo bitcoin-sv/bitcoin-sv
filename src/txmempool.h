@@ -733,14 +733,9 @@ public:
         const std::function<void(const CoinWithScript&, size_t)>& callback) const;
 
     void InitMempoolTxDB();
-    // Get MempoolTxDB
-    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() override;
-
     uint64_t GetDiskUsage();
-
-    void SaveTxsToDisk(uint64_t required_size);
-    void UpdateMoveTxsToDisk(std::vector<const CTxMemPoolEntry*> toBeUpdated);
-    void SaveTxsToDiskBatch(uint64_t requiredSize);
+    void SaveTxsToDisk(uint64_t requiredSize);
+    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() override;
 
 public:
     /**

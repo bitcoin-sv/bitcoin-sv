@@ -976,7 +976,7 @@ std::vector<TxId> LimitMempoolSize(
     size_t usageMemory = usageTotal - usageDisk;
     if (usageMemory > limitMemory) {
         size_t toWriteOut = usageMemory - limitMemory;
-        pool.SaveTxsToDiskBatch(toWriteOut);
+        pool.SaveTxsToDisk(toWriteOut);
     }
     pcoinsTip->Uncache(vNoSpendsRemaining);
     return vRemovedTxIds;
