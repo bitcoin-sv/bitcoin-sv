@@ -2406,7 +2406,11 @@ CConnman::CConnman(
 #endif
 
                 return sinks;
-            }()}
+            }(),
+            [this](const InvalidTxnPublisher::InvalidTxnInfoWithTxn& txnInfo)
+            {
+                mDSHandler.HandleDoubleSpend(txnInfo);
+            }}
 {
     fNetworkActive = true;
     setBannedIsDirty = false;
