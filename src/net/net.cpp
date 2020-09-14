@@ -27,6 +27,9 @@
 #include "utilstrencodings.h"
 #include "invalid_txn_publisher.h"
 
+#include "invalid_txn_sinks/file_sink.h"
+#include "invalid_txn_sinks/zmq_sink.h"
+
 #ifdef WIN32
 #include <string.h>
 #else
@@ -2302,7 +2305,30 @@ CConnman::CConnman(
          static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
     , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
     , mAsyncTaskPool{configIn}
-    , mInvalidTxnPublisher{ configIn }
+    , mInvalidTxnPublisher{
+            [&configIn]
+            {
+                std::vector<std::unique_ptr<InvalidTxnPublisher::CInvalidTxnSink>> sinks;
+                auto sinkNames = configIn.GetInvalidTxSinks();
+
+                if (sinkNames.find( "FILE" ) != sinkNames.end())
+                {
+                    sinks.push_back(
+                        std::make_unique<InvalidTxnPublisher::CInvalidTxnFileSink>(
+                            configIn.GetInvalidTxFileSinkMaxDiskUsage(),
+                            configIn.GetInvalidTxFileSinkEvictionPolicy()));
+                }
+#if ENABLE_ZMQ
+                if (sinkNames.find( "ZMQ" ) != sinkNames.end())
+                {
+                    sinks.push_back(
+                        std::make_unique<InvalidTxnPublisher::CInvalidTxnZmqSink>(
+                            configIn.GetInvalidTxZMQMaxMessageSize()));
+                }
+#endif
+
+                return sinks;
+            }()}
 {
     fNetworkActive = true;
     setBannedIsDirty = false;

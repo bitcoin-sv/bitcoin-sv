@@ -235,6 +235,8 @@ add_library(server
 	httpserver.cpp
 	init.cpp
 	invalid_txn_publisher.cpp
+    invalid_txn_sinks/file_sink.cpp
+    invalid_txn_sinks/zmq_sink.cpp
 	dbwrapper.cpp
 	merkleblock.cpp
 	mining/assembler.cpp

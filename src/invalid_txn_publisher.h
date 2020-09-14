@@ -214,7 +214,29 @@ private:
     void PutRejectionTime(CJSONWriter& writer) const;
 };
 
-class CInvalidTxnSink;
+namespace InvalidTxnPublisher
+{
+    class CInvalidTxnSink
+    {
+    protected:
+
+        static int64_t EstimateMessageSize(const InvalidTxnInfo& invalidTxnInfo, bool writeTxHex)
+        {
+            constexpr int64_t APPROXIMATE_SIZE_NO_HEX = 500; // roughly size of the json file without transaction hex
+            if (writeTxHex)
+            {
+                return invalidTxnInfo.GetTotalTransactionSize() * 2 + APPROXIMATE_SIZE_NO_HEX;
+            }
+            return APPROXIMATE_SIZE_NO_HEX;
+        }
+
+    public:
+
+        virtual ~CInvalidTxnSink() = default;
+        virtual void Publish(const InvalidTxnInfo& invalidTxnInfo) = 0;
+        virtual int64_t ClearStored() { return 0;};
+    };
+}
 
 // Class used for asynchronous publishing invalid transactions to different sinks, 
 // thread safe
@@ -233,19 +255,16 @@ private:
     CThreadSafeQueue<InvalidTxnInfo> txInfoQueue;
 
     // invalid transaction sinks (can be file or zmq)
-    std::vector<std::shared_ptr<CInvalidTxnSink>> sinks;
-
-    void AddFileSink(int64_t maxSize, InvalidTxEvictionPolicy evictionPolicy);
-#if ENABLE_ZMQ
-    void AddZMQSink(int64_t maxMessageSize);
-#endif
+    std::vector<std::unique_ptr<InvalidTxnPublisher::CInvalidTxnSink>> mSinks;
 
     // worker thread which takes a transaction from the queue and sends it to all sinks
     std::thread dumpingThread;
 
 public:
     // starts the dumpingThread
-    CInvalidTxnPublisher(const Config& config);
+    CInvalidTxnPublisher(
+        std::vector<std::unique_ptr<InvalidTxnPublisher::CInvalidTxnSink>>&& sinks,
+        std::size_t maxQueueSize = ONE_GIGABYTE);
 
     ~CInvalidTxnPublisher();
 
