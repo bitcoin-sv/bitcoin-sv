@@ -13,6 +13,23 @@
 
 #include "validationinterface.h"
 
+InvalidTxnInfo::InvalidTxnInfo(
+    const CTransactionRef& tx,
+    const uint256& hash,
+    int64_t height,
+    int64_t time,
+    const CValidationState& state)
+    : InvalidTxnInfo{
+        tx,
+        InvalidTxnInfo::BlockDetails{
+            CScopedBlockOriginRegistry::GetOrigins(hash),
+            hash,
+            height,
+            time},
+        std::time(nullptr),
+        state}
+{}
+
 size_t InvalidTxnInfo::DynamicMemoryUsage() const
 {
     size_t totalSize = sizeof(InvalidTxnInfo);

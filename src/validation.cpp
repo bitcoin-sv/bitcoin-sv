@@ -5136,6 +5136,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
 
     if (state.IsValid()) {
+        CScopedBlockOriginRegistry reg(pindex->GetBlockHash(), "invalidateblock");
         auto source = task::CCancellationSource::Make();
         // state is used to report errors, not block related invalidity
         // (see description of ActivateBestChain)

@@ -31,6 +31,7 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "init.h"
+#include "invalid_txn_publisher.h"
 
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
 #include <boost/thread/thread.hpp>              // boost::thread::interrupt
@@ -1938,6 +1939,9 @@ UniValue reconsiderblock(const Config &config, const JSONRPCRequest &request) {
     mining::CJournalChangeSetPtr changeSet{
         mempool.getJournalBuilder().getNewChangeSet(
             mining::JournalUpdateReason::REORG)};
+    
+    CScopedBlockOriginRegistry reg(hash, "reconsiderblock");
+    
     auto source = task::CCancellationSource::Make();
     ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
 

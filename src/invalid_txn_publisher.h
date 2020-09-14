@@ -71,13 +71,7 @@ public:
         const uint256& hash,
         int64_t height,
         int64_t time,
-        const CValidationState& state)
-        : InvalidTxnInfo{
-            tx,
-            InvalidTxnInfo::BlockDetails{ {}, hash, height, time},
-            std::time(nullptr),
-            state}
-    {}
+        const CValidationState& state);
 
     InvalidTxnInfo(
         const CTransactionRef& tx,
