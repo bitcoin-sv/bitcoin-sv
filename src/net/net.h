@@ -55,6 +55,7 @@ class CScheduler;
 class CTxIdTracker;
 class CTxnPropagator;
 class CTxnValidator;
+class CInvalidTxnPublisher;
 
 using CNodePtr = std::shared_ptr<CNode>;
 
@@ -386,6 +387,8 @@ public:
     const TxIdTrackerSPtr& GetTxIdTracker();
     /** Get a handle to our transaction validator */
     std::shared_ptr<CTxnValidator> getTxnValidator();
+    /** Get a handle to invalid tx publisher*/
+    std::shared_ptr<CInvalidTxnPublisher> getInvalidTxnPublisher();
     /** Enqueue a new transaction for validation */
     void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
     /* Support for a vector */
@@ -689,6 +692,9 @@ private:
 
     CAsyncTaskPool mAsyncTaskPool;
     uint8_t mNodeAsyncTaskLimit;
+
+    /** Invalid transaction publisher*/
+    std::shared_ptr<CInvalidTxnPublisher> mInvalidTxnPublisher;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);

@@ -1741,7 +1741,12 @@ static void LogTxnCommitStatus(
 
 void PublishInvalidTransaction(CTxnValResult& txStatus)
 {
-    const bool processingCompleted =
+    if (!g_connman)
+    {
+        return;
+    }
+
+    const bool processingCompleted = 
             (TxValidationPriority::low == txStatus.mTxInputData->GetTxValidationPriority() ||
             !txStatus.mState.IsValidationTimeoutExceeded());
 
@@ -1756,7 +1761,7 @@ void PublishInvalidTransaction(CTxnValResult& txStatus)
         txStatus.mTxInputData->GetTxSource(),
         pNode ? pNode->GetId() : -1,
         pNode ? pNode->GetAddrName() : ""};
-    CInvalidTxnPublisher::Get().Publish(
+    g_connman->getInvalidTxnPublisher()->Publish(
         {txStatus.mTxInputData->GetTxnPtr(), details, std::time(nullptr), txStatus.mState} );
 }
 
@@ -3669,9 +3674,12 @@ static bool ConnectBlock(
                         100,
                         error("ConnectBlock(): tried to overwrite transaction"),
                         REJECT_INVALID, "bad-txns-BIP30");
-                    if(!state.IsValid())
+                    if(!state.IsValid() && g_connman)
                     {
-                        CInvalidTxnPublisher::Get().Publish( { tx, pindex, state } );
+                        if(auto pub = g_connman->getInvalidTxnPublisher())
+                        {
+                            pub->Publish( { tx, pindex, state } );
+                        }
                     }
                     return result;
                 }
@@ -3728,7 +3736,9 @@ static bool ConnectBlock(
         auto& txRef = block.vtx[i];
         const CTransaction &tx = *txRef;
 
-        CScopedInvalidTxSenderBlock dumper(CInvalidTxnPublisher::Get(), txRef, pindex, state);
+        CScopedInvalidTxSenderBlock dumper(
+            g_connman ? (g_connman->getInvalidTxnPublisher()) : nullptr, 
+            txRef, pindex, state);
 
         nInputs += tx.vin.size();
 
@@ -3844,11 +3854,15 @@ static bool ConnectBlock(
                                            "(actual=%d vs limit=%d)",
                                            block.vtx[0]->GetValueOut(), blockReward),
                                 REJECT_INVALID, "bad-cb-amount");
-        if(!state.IsValid())
+        if(!state.IsValid() && g_connman)
         {
-            CInvalidTxnPublisher::Get().Publish( { block.vtx[0], pindex, state } );
+            if(auto pub = g_connman->getInvalidTxnPublisher())
+            {
+                pub->Publish( { block.vtx[0], pindex, state } );
+            }
         }
         return result;
+
     }
 
     const CBlockIndex* tipBeforeMainLockReleased = chainActive.Tip();
@@ -3907,8 +3921,13 @@ static bool ConnectBlock(
                                REJECT_INVALID,
                                strprintf("blk-bad-inputs (%s)",
                                          ScriptErrorString(check.GetScriptError())));
-
-                CInvalidTxnPublisher::Get().Publish( { *it, pindex, state } );
+                if(g_connman)
+                {
+                    if(auto pub = g_connman->getInvalidTxnPublisher())
+                    {
+                        pub->Publish( { *it, pindex, state } );
+                    }
+                }
             }
 
             return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
@@ -5159,7 +5178,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     InvalidChainFound(pindex);
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
 
-    if (state.IsValid()) {
+    if (state.IsValid() && g_connman) {
         CScopedBlockOriginRegistry reg(pindex->GetBlockHash(), "invalidateblock");
         auto source = task::CCancellationSource::Make();
         // state is used to report errors, not block related invalidity
@@ -5520,12 +5539,16 @@ bool CheckBlock(const Config &config, const CBlock &block,
                                     strprintf("Coinbase check failed (txid %s) %s",
                                               block.vtx[0]->GetId().ToString(),
                                               state.GetDebugMessage()));
-        if(!state.IsValid())
+        if(!state.IsValid() && g_connman)
         {
-            CInvalidTxnPublisher::Get().Publish(
-                { block.vtx[0], block.GetHash(), blockHeight, block.GetBlockTime(), state });
+            if(auto pub = g_connman->getInvalidTxnPublisher())
+            {
+                pub->Publish(
+                    { block.vtx[0], block.GetHash(), blockHeight, block.GetBlockTime(), state });
+            }
         }
         return result;
+
     }
 
     // Keep track of the sigops count.
@@ -5548,13 +5571,16 @@ bool CheckBlock(const Config &config, const CBlock &block,
             if (sigOpCountError || nSigOps > nMaxSigOpsCountConsensusBeforeGenesis) {
                 auto result = state.DoS(100, false, REJECT_INVALID, "bad-blk-sigops",
                                         false, "out-of-bounds SigOpCount");
-                if(!state.IsValid())
+                if(!state.IsValid() && g_connman)
                 {
-                    CInvalidTxnPublisher::Get().Publish(
-                        { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state });
+                    if(auto pub = g_connman->getInvalidTxnPublisher())
+                    {
+
+                        pub->Publish(
+                            { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state });
+                    }
                 }
                 return result;
-
             }
         }
         // Go to the next transaction.
@@ -5571,13 +5597,17 @@ bool CheckBlock(const Config &config, const CBlock &block,
         tx = block.vtx[i].get();
         if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
             auto result = state.Invalid(
+
                 false, state.GetRejectCode(), state.GetRejectReason(),
                 strprintf("Transaction check failed (txid %s) %s",
                           tx->GetId().ToString(), state.GetDebugMessage()));
-            if(!state.IsValid())
+            if(!state.IsValid() && g_connman)
             {
-                CInvalidTxnPublisher::Get().Publish(
-                    { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state });
+                if(auto pub = g_connman->getInvalidTxnPublisher())
+                {
+                    pub->Publish(
+                        { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state });
+                }
             }
             return result;
         }
@@ -5764,9 +5794,14 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     for (const auto &tx : block.vtx) {
         if (!ContextualCheckTransaction(config, *tx, state, nHeight,
                                         nLockTimeCutoff, true)) {
-            CInvalidTxnPublisher::Get().Publish(
-                { tx, block.GetHash(), nHeight, block.GetBlockTime(), state });
-
+            if(g_connman)
+            {
+                if(auto pub = g_connman->getInvalidTxnPublisher())
+                {
+                    pub->Publish(
+                        { tx, block.GetHash(), nHeight, block.GetBlockTime(), state });
+                }
+            }
             // state set by ContextualCheckTransaction.
             return false;
         }
@@ -5781,10 +5816,13 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
 
             auto result = state.DoS(100, false, REJECT_INVALID, "bad-cb-height", false,
                                     "block height mismatch in coinbase");
-            if(!state.IsValid())
+            if(!state.IsValid() && g_connman)
             {
-                CInvalidTxnPublisher::Get().Publish(
-                    { block.vtx[0], block.GetHash(), nHeight, block.GetBlockTime(), state });
+                if(auto pub = g_connman->getInvalidTxnPublisher())
+                {
+                    pub->Publish(
+                        { block.vtx[0], block.GetHash(), nHeight, block.GetBlockTime(), state });
+                }
             }
             return result;
         }

@@ -3030,7 +3030,8 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
 /**
 * Process block message.
 */
-static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDataStream& vRecv)
+static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDataStream& vRecv,
+    CConnman& connman)
 {
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     vRecv >> *pblock;
@@ -3484,7 +3485,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) {
-        ProcessBlockMessage(config, pfrom, vRecv);
+        ProcessBlockMessage(config, pfrom, vRecv, connman);
     }
 
     else if (strCommand == NetMsgType::GETADDR) {

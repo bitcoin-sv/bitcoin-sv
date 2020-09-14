@@ -25,6 +25,7 @@
 #include "txn_validator.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
+#include "invalid_txn_publisher.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -2301,6 +2302,7 @@ CConnman::CConnman(
          static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
     , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
     , mAsyncTaskPool{configIn}
+    , mInvalidTxnPublisher{ std::make_shared<CInvalidTxnPublisher>(configIn) }
 {
     fNetworkActive = true;
     setBannedIsDirty = false;
@@ -2464,7 +2466,6 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
     scheduler.scheduleEvery(std::bind(&CConnman::PeerAvgBandwithCalc, this),
                             PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS * 1000);
 
-
     return true;
 }
 
@@ -2557,6 +2558,7 @@ void CConnman::Stop() {
     vhListenSocket.clear();
     semOutbound = nullptr;
     semAddnode = nullptr;
+    mInvalidTxnPublisher = nullptr;
 }
 
 void CConnman::DeleteNode(const CNodePtr& pnode) {
@@ -2924,6 +2926,11 @@ const TxIdTrackerSPtr& CConnman::GetTxIdTracker() {
 
 std::shared_ptr<CTxnValidator> CConnman::getTxnValidator() {
 	return mTxnValidator;
+}
+
+std::shared_ptr<CInvalidTxnPublisher> CConnman::getInvalidTxnPublisher()
+{
+    return mInvalidTxnPublisher;
 }
 
 /** Enqueue a new transaction for validation */

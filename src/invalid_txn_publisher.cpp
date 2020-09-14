@@ -410,15 +410,13 @@ public:
 };
 #endif
 
-CInvalidTxnPublisher::CInvalidTxnPublisher()
+CInvalidTxnPublisher::CInvalidTxnPublisher(const Config& config)
     :txInfoQueue(ONE_GIGABYTE, [](const InvalidTxnInfo& txInfo) { return txInfo.DynamicMemoryUsage(); })
-{}
-
-void CInvalidTxnPublisher::Initialize(const Config& config)
 {
     auto sinkNames = config.GetInvalidTxSinks();
     if (sinkNames.empty())
     {
+        txInfoQueue.Close();
         return;
     }
 
@@ -446,7 +444,6 @@ void CInvalidTxnPublisher::Initialize(const Config& config)
             std::string txid = txInfo->GetTxnIdHex();
             LogPrintf("Dumping invalid transaction %s\n", txid);
 
-            std::lock_guard lock(sinksGuard);
             for (auto& sink: sinks)
             {
                 sink->Publish(*txInfo);
@@ -459,13 +456,8 @@ void CInvalidTxnPublisher::Initialize(const Config& config)
             [taskFunction](){TraceThread("invalidtxnpublisher", taskFunction);});
 }
 
-CInvalidTxnPublisher& CInvalidTxnPublisher::Get()
-{
-    static CInvalidTxnPublisher thePublisher;
-    return thePublisher;
-}
 
-void CInvalidTxnPublisher::Stop()
+CInvalidTxnPublisher::~CInvalidTxnPublisher()
 {
     if(!txInfoQueue.IsClosed())
     {
@@ -477,13 +469,7 @@ void CInvalidTxnPublisher::Stop()
         dumpingThread.join();
     }
 
-    std::lock_guard lock(sinksGuard);
     sinks.clear();
-}
-
-CInvalidTxnPublisher::~CInvalidTxnPublisher()
-{
-    Stop();
 }
 
 void CInvalidTxnPublisher::Publish(InvalidTxnInfo&& invalidTxnInfo)
@@ -506,13 +492,11 @@ void CInvalidTxnPublisher::Publish(InvalidTxnInfo&& invalidTxnInfo)
 
 void CInvalidTxnPublisher::AddFileSink(int64_t maxSize, InvalidTxEvictionPolicy evictionPolicy)
 {
-    std::lock_guard lock(sinksGuard);
     sinks.emplace_back(new CInvalidTxnFileSink(maxSize, evictionPolicy));
 }
 
 int64_t CInvalidTxnPublisher::ClearStored()
 {
-    std::lock_guard lock(sinksGuard);
     int64_t clearedSize = 0;
     for(auto& sink: sinks)
     {
@@ -524,7 +508,6 @@ int64_t CInvalidTxnPublisher::ClearStored()
 #if ENABLE_ZMQ
 void CInvalidTxnPublisher::AddZMQSink(int64_t maxMessageSize)
 {
-    std::lock_guard lock(sinksGuard);
     sinks.emplace_back(new CInvalidTxnZmqSink(maxMessageSize));
 }
 #endif

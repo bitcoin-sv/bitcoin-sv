@@ -569,7 +569,7 @@ static UniValue clearinvalidtransactions(const Config &config,
             "Deletes stored invalid transactions.\n"
             "Result: number of bytes freed.");
     }
-    return CInvalidTxnPublisher::Get().ClearStored();;
+    return g_connman->getInvalidTxnPublisher()->ClearStored();
 }
 
 static UniValue setmocktime(const Config &config,

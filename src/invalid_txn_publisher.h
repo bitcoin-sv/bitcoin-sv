@@ -139,7 +139,7 @@ private:
 class CInvalidTxnSink;
 
 // Class used for asynchronous publishing invalid transactions to different sinks, 
-// implemented as singleton, thread safe
+// thread safe
 class CInvalidTxnPublisher
 {
 public:
@@ -148,6 +148,7 @@ public:
 #if ENABLE_ZMQ
     static constexpr int64_t DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE = 500 * ONE_MEGABYTE;
 #endif
+
 private:
     // Queue for transactions which should be written to the sinks,
     // maximal size of transactions in the queue at any time is one gigabyte
@@ -155,7 +156,6 @@ private:
 
     // invalid transaction sinks (can be file or zmq)
     std::vector<std::shared_ptr<CInvalidTxnSink>> sinks;
-    std::mutex sinksGuard;
 
     void AddFileSink(int64_t maxSize, InvalidTxEvictionPolicy evictionPolicy);
 #if ENABLE_ZMQ
@@ -165,21 +165,16 @@ private:
     // worker thread which takes a transaction from the queue and sends it to all sinks
     std::thread dumpingThread;
 
-    // starts the dumpingThread
-    CInvalidTxnPublisher();
 public:
-    static CInvalidTxnPublisher& Get();
+    // starts the dumpingThread
+    CInvalidTxnPublisher(const Config& config);
+
     ~CInvalidTxnPublisher();
 
     CInvalidTxnPublisher(CInvalidTxnPublisher&&) = delete;
     CInvalidTxnPublisher(const CInvalidTxnPublisher&&) = delete;
     CInvalidTxnPublisher& operator=(CInvalidTxnPublisher&&) = delete;
     CInvalidTxnPublisher& operator=(const CInvalidTxnPublisher&) = delete;
-
-    // Creates sinks
-    void Initialize(const Config& config);
-    // Stops closes queue and stops dumpingThread
-    void Stop();
 
     // Puts invalid transaction on the queue
     void Publish(InvalidTxnInfo&& InvalidTxnInfo);
@@ -222,18 +217,17 @@ public:
 // it from the destructor. Useful in function with multiple exits
 class CScopedInvalidTxSenderBlock
 {
-
-    CInvalidTxnPublisher& publisher;
+    std::shared_ptr<CInvalidTxnPublisher> publisher;
     InvalidTxnInfo::BlockDetails blockDetails;
     const CTransactionRef transaction;
     CValidationState& validationState;
 
 public:
-    CScopedInvalidTxSenderBlock(CInvalidTxnPublisher& dump,
-                         CTransactionRef tx,
-                         const CBlockIndex* blockIndex,
-                         CValidationState& state)
-        :publisher(dump)
+    CScopedInvalidTxSenderBlock(std::shared_ptr<CInvalidTxnPublisher> dump,
+                                CTransactionRef tx,
+                                const CBlockIndex* blockIndex,
+                                CValidationState& state)
+        :publisher( std::move(dump) )
         ,blockDetails(
             blockIndex ? InvalidTxnInfo::BlockDetails{{},
                                                       blockIndex->GetBlockHash(),
@@ -246,13 +240,13 @@ public:
 
     ~CScopedInvalidTxSenderBlock()
     {
-        if (validationState.IsValid())
+        if (validationState.IsValid() || !publisher)
         {
             return;
         }
 
         blockDetails.origins = CScopedBlockOriginRegistry::GetOrigins(blockDetails.hash);
-        publisher.Publish( {transaction, blockDetails, std::time(nullptr), validationState} );
+        publisher->Publish( {transaction, blockDetails, std::time(nullptr), validationState} );
     }
 
     CScopedInvalidTxSenderBlock(CScopedInvalidTxSenderBlock&&) = delete;
