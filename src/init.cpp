@@ -982,7 +982,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                      DEFAULT_MIN_CONSOLIDATION_FACTOR));
     strUsage +=
             HelpMessageOpt("-maxconsolidationinputscriptsize=<n>",
-                           strprintf(_("This number is the maximum length for a scriptSig input in a consolidation txn (default: %u). "),
+                           strprintf(_("This number is the maximum length for a scriptSig input in a consolidation txn (default: %u). The value may be given in bytes or with unit (B, kB, MB, GB)."),
                                      DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE));
 
     strUsage +=
@@ -1955,7 +1955,7 @@ bool AppInitParameterInteraction(Config &config) {
     // configure maxiumum scriptSig input size not considered spam in a consolidation transaction
     if (gArgs.IsArgSet("-maxconsolidationinputscriptsize"))
     {
-        uint64_t maxConsolidationInputScriptSize = gArgs.GetArg("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
+        uint64_t maxConsolidationInputScriptSize = gArgs.GetArgAsBytes("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
         if (std::string err; !config.SetMaxConsolidationInputScriptSize(maxConsolidationInputScriptSize, &err)) {
             return InitError(err);
         }
