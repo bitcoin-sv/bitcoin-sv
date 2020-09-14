@@ -2302,7 +2302,7 @@ CConnman::CConnman(
          static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
     , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
     , mAsyncTaskPool{configIn}
-    , mInvalidTxnPublisher{ std::make_shared<CInvalidTxnPublisher>(configIn) }
+    , mInvalidTxnPublisher{ configIn }
 {
     fNetworkActive = true;
     setBannedIsDirty = false;
@@ -2558,7 +2558,6 @@ void CConnman::Stop() {
     vhListenSocket.clear();
     semOutbound = nullptr;
     semAddnode = nullptr;
-    mInvalidTxnPublisher = nullptr;
 }
 
 void CConnman::DeleteNode(const CNodePtr& pnode) {
@@ -2928,7 +2927,7 @@ std::shared_ptr<CTxnValidator> CConnman::getTxnValidator() {
 	return mTxnValidator;
 }
 
-std::shared_ptr<CInvalidTxnPublisher> CConnman::getInvalidTxnPublisher()
+CInvalidTxnPublisher& CConnman::getInvalidTxnPublisher()
 {
     return mInvalidTxnPublisher;
 }

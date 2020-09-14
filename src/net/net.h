@@ -15,6 +15,7 @@
 #include "compat.h"
 #include "fs.h"
 #include "hash.h"
+#include "invalid_txn_publisher.h"
 #include "limitedmap.h"
 #include "net/association.h"
 #include "net/net_message.h"
@@ -55,7 +56,6 @@ class CScheduler;
 class CTxIdTracker;
 class CTxnPropagator;
 class CTxnValidator;
-class CInvalidTxnPublisher;
 
 using CNodePtr = std::shared_ptr<CNode>;
 
@@ -388,7 +388,7 @@ public:
     /** Get a handle to our transaction validator */
     std::shared_ptr<CTxnValidator> getTxnValidator();
     /** Get a handle to invalid tx publisher*/
-    std::shared_ptr<CInvalidTxnPublisher> getInvalidTxnPublisher();
+    CInvalidTxnPublisher& getInvalidTxnPublisher();
     /** Enqueue a new transaction for validation */
     void EnqueueTxnForValidator(TxInputDataSPtr pTxInputData);
     /* Support for a vector */
@@ -694,7 +694,7 @@ private:
     uint8_t mNodeAsyncTaskLimit;
 
     /** Invalid transaction publisher*/
-    std::shared_ptr<CInvalidTxnPublisher> mInvalidTxnPublisher;
+    CInvalidTxnPublisher mInvalidTxnPublisher;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group &threadGroup);

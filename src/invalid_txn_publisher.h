@@ -10,7 +10,7 @@
 #include "thread_safe_queue.h"
 #include "validation.h"
 #include "core_io.h"
-#include "net/net.h"
+#include "net/net_types.h"
 #include "prevector.h"
 
 #include <ctime>
@@ -295,17 +295,17 @@ public:
 // it from the destructor. Useful in function with multiple exits
 class CScopedInvalidTxSenderBlock
 {
-    std::shared_ptr<CInvalidTxnPublisher> publisher;
+    CInvalidTxnPublisher* publisher;
     InvalidTxnInfo::BlockDetails blockDetails;
     const CTransactionRef transaction;
     const CValidationState& validationState;
 
 public:
-    CScopedInvalidTxSenderBlock(std::shared_ptr<CInvalidTxnPublisher> dump,
+    CScopedInvalidTxSenderBlock(CInvalidTxnPublisher* dump,
                                 CTransactionRef tx,
                                 const CBlockIndex* blockIndex,
                                 const CValidationState& state)
-        :publisher( std::move(dump) )
+        :publisher( dump )
         ,blockDetails(
             blockIndex ? InvalidTxnInfo::BlockDetails{{},
                                                       blockIndex->GetBlockHash(),

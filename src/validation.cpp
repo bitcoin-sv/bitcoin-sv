@@ -1761,7 +1761,7 @@ void PublishInvalidTransaction(CTxnValResult& txStatus)
         txStatus.mTxInputData->GetTxSource(),
         pNode ? pNode->GetId() : -1,
         pNode ? pNode->GetAddrName() : ""};
-    g_connman->getInvalidTxnPublisher()->Publish(
+    g_connman->getInvalidTxnPublisher().Publish(
         {txStatus.mTxInputData->GetTxnPtr(), details, std::time(nullptr), txStatus.mState} );
 }
 
@@ -3676,10 +3676,7 @@ static bool ConnectBlock(
                         REJECT_INVALID, "bad-txns-BIP30");
                     if(!state.IsValid() && g_connman)
                     {
-                        if(auto pub = g_connman->getInvalidTxnPublisher())
-                        {
-                            pub->Publish( { tx, pindex, state } );
-                        }
+                        g_connman->getInvalidTxnPublisher().Publish( { tx, pindex, state } );
                     }
                     return result;
                 }
@@ -3737,7 +3734,7 @@ static bool ConnectBlock(
         const CTransaction &tx = *txRef;
 
         CScopedInvalidTxSenderBlock dumper(
-            g_connman ? (g_connman->getInvalidTxnPublisher()) : nullptr, 
+            g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr, 
             txRef, pindex, state);
 
         nInputs += tx.vin.size();
@@ -3856,10 +3853,7 @@ static bool ConnectBlock(
                                 REJECT_INVALID, "bad-cb-amount");
         if(!state.IsValid() && g_connman)
         {
-            if(auto pub = g_connman->getInvalidTxnPublisher())
-            {
-                pub->Publish( { block.vtx[0], pindex, state } );
-            }
+            g_connman->getInvalidTxnPublisher().Publish( { block.vtx[0], pindex, state } );
         }
         return result;
 
@@ -3923,10 +3917,7 @@ static bool ConnectBlock(
                                          ScriptErrorString(check.GetScriptError())));
                 if(g_connman)
                 {
-                    if(auto pub = g_connman->getInvalidTxnPublisher())
-                    {
-                        pub->Publish( { *it, pindex, state } );
-                    }
+                    g_connman->getInvalidTxnPublisher().Publish( { *it, pindex, state } );
                 }
             }
 
@@ -5541,11 +5532,8 @@ bool CheckBlock(const Config &config, const CBlock &block,
                                               state.GetDebugMessage()));
         if(!state.IsValid() && g_connman)
         {
-            if(auto pub = g_connman->getInvalidTxnPublisher())
-            {
-                pub->Publish(
-                    { block.vtx[0], block.GetHash(), blockHeight, block.GetBlockTime(), state });
-            }
+            g_connman->getInvalidTxnPublisher().Publish(
+                { block.vtx[0], block.GetHash(), blockHeight, block.GetBlockTime(), state } );
         }
         return result;
 
@@ -5573,12 +5561,8 @@ bool CheckBlock(const Config &config, const CBlock &block,
                                         false, "out-of-bounds SigOpCount");
                 if(!state.IsValid() && g_connman)
                 {
-                    if(auto pub = g_connman->getInvalidTxnPublisher())
-                    {
-
-                        pub->Publish(
-                            { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state });
-                    }
+                    g_connman->getInvalidTxnPublisher().Publish(
+                        { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state } );
                 }
                 return result;
             }
@@ -5603,11 +5587,8 @@ bool CheckBlock(const Config &config, const CBlock &block,
                           tx->GetId().ToString(), state.GetDebugMessage()));
             if(!state.IsValid() && g_connman)
             {
-                if(auto pub = g_connman->getInvalidTxnPublisher())
-                {
-                    pub->Publish(
-                        { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state });
-                }
+                g_connman->getInvalidTxnPublisher().Publish(
+                    { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state } );
             }
             return result;
         }
@@ -5796,11 +5777,8 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
                                         nLockTimeCutoff, true)) {
             if(g_connman)
             {
-                if(auto pub = g_connman->getInvalidTxnPublisher())
-                {
-                    pub->Publish(
-                        { tx, block.GetHash(), nHeight, block.GetBlockTime(), state });
-                }
+                g_connman->getInvalidTxnPublisher().Publish(
+                    { tx, block.GetHash(), nHeight, block.GetBlockTime(), state } );
             }
             // state set by ContextualCheckTransaction.
             return false;
@@ -5818,11 +5796,8 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
                                     "block height mismatch in coinbase");
             if(!state.IsValid() && g_connman)
             {
-                if(auto pub = g_connman->getInvalidTxnPublisher())
-                {
-                    pub->Publish(
-                        { block.vtx[0], block.GetHash(), nHeight, block.GetBlockTime(), state });
-                }
+                g_connman->getInvalidTxnPublisher().Publish(
+                    { block.vtx[0], block.GetHash(), nHeight, block.GetBlockTime(), state } );
             }
             return result;
         }
