@@ -466,3 +466,34 @@ void CInvalidTxnPublisher::AddZMQSink(int64_t maxMessageSize)
 }
 #endif
 
+
+CScopedBlockOriginRegistry::CScopedBlockOriginRegistry(
+    const uint256& hash,
+    const std::string& source,
+    const std::string& address,
+    NodeId nodeId)
+{
+    std::lock_guard lock(mRegistryGuard);
+    mRegistry.emplace_back(hash, InvalidTxnInfo::BlockOrigin{source, address, nodeId});
+    mThisItem = std::prev(mRegistry.cend());
+}
+
+CScopedBlockOriginRegistry::~CScopedBlockOriginRegistry()
+{
+    std::lock_guard lock(mRegistryGuard);
+    mRegistry.erase(mThisItem);
+}
+
+std::vector<InvalidTxnInfo::BlockOrigin> CScopedBlockOriginRegistry::GetOrigins(const uint256& blockHash)
+{
+    std::lock_guard lock(mRegistryGuard);
+    std::vector<InvalidTxnInfo::BlockOrigin> origins;
+    for(const auto& [hash, origin] : mRegistry)
+    {
+        if(blockHash == hash)
+        {
+            origins.push_back(origin);
+        }
+    }
+    return origins;
+}

@@ -14,6 +14,7 @@
 #include "prevector.h"
 
 #include <ctime>
+#include <list>
 #include <string>
 #include <variant>
 
@@ -53,6 +54,42 @@ public:
         NodeId nodeId;
         std::string address;
     };
+
+    InvalidTxnInfo(
+        const CTransactionRef& tx,
+        const std::variant<BlockDetails, TxDetails>& details,
+        int64_t rejectionTime,
+        const CValidationState& state)
+        : mTransaction{ tx }
+        , mTxValidationState{ state }
+        , mDetails{ details }
+        , mRejectionTime{ rejectionTime }
+    {}
+
+    InvalidTxnInfo(
+        const CTransactionRef& tx,
+        const uint256& hash,
+        int64_t height,
+        int64_t time,
+        const CValidationState& state)
+        : InvalidTxnInfo{
+            tx,
+            InvalidTxnInfo::BlockDetails{ {}, hash, height, time},
+            std::time(nullptr),
+            state}
+    {}
+
+    InvalidTxnInfo(
+        const CTransactionRef& tx,
+        const CBlockIndex* blockIndex,
+        const CValidationState& state)
+        : InvalidTxnInfo{
+            tx,
+            blockIndex->GetBlockHash(),
+            blockIndex->nHeight,
+            blockIndex->GetBlockTime(),
+            state}
+    {}
 
     std::string GetTxnIdHex() const
     {
@@ -153,4 +190,77 @@ public:
     // Puts invalid transaction on the queue
     void Publish(InvalidTxnInfo&& InvalidTxnInfo);
 
+};
+
+// Utility class that registers block origin in the constructor and unregisters in the destructor.
+// Usually, at places where we validate transactions we don't have information
+// how we got block which contains these transactions. So when we are starting to validate
+// block we are registering its origin and when we are finished with validation we are unregistering.
+class CScopedBlockOriginRegistry
+{
+    using BlockOriginRegistry =
+        std::list<std::tuple<uint256, InvalidTxnInfo::BlockOrigin>>;
+    BlockOriginRegistry::const_iterator mThisItem;
+
+    // registering origin of the block (from which peer, rpc)
+    inline static BlockOriginRegistry mRegistry;
+    inline static std::mutex mRegistryGuard;
+
+public:
+    CScopedBlockOriginRegistry(const uint256& hash,
+                               const std::string& source,
+                               const std::string& address = "",
+                               NodeId nodeId = 0);
+
+    ~CScopedBlockOriginRegistry();
+
+    CScopedBlockOriginRegistry(CScopedBlockOriginRegistry&&) = delete;
+    CScopedBlockOriginRegistry(const CScopedBlockOriginRegistry&) = delete;
+    CScopedBlockOriginRegistry& operator=(CScopedBlockOriginRegistry&&) = delete;
+    CScopedBlockOriginRegistry& operator=(const CScopedBlockOriginRegistry&) = delete;
+
+    static std::vector<InvalidTxnInfo::BlockOrigin> GetOrigins(const uint256& blockHash);
+};
+
+// Utility class that takes informations about transaction in the constructor and if evaluation failed publishes
+// it from the destructor. Useful in function with multiple exits
+class CScopedInvalidTxSenderBlock
+{
+
+    CInvalidTxnPublisher& publisher;
+    InvalidTxnInfo::BlockDetails blockDetails;
+    const CTransactionRef transaction;
+    CValidationState& validationState;
+
+public:
+    CScopedInvalidTxSenderBlock(CInvalidTxnPublisher& dump,
+                         CTransactionRef tx,
+                         const CBlockIndex* blockIndex,
+                         CValidationState& state)
+        :publisher(dump)
+        ,blockDetails(
+            blockIndex ? InvalidTxnInfo::BlockDetails{{},
+                                                      blockIndex->GetBlockHash(),
+                                                      blockIndex->nHeight,
+                                                      blockIndex->GetBlockTime()}
+                       : InvalidTxnInfo::BlockDetails{})
+        ,transaction( std::move(tx) )
+        ,validationState(state)
+    {}
+
+    ~CScopedInvalidTxSenderBlock()
+    {
+        if (validationState.IsValid())
+        {
+            return;
+        }
+
+        blockDetails.origins = CScopedBlockOriginRegistry::GetOrigins(blockDetails.hash);
+        publisher.Publish( {transaction, blockDetails, std::time(nullptr), validationState} );
+    }
+
+    CScopedInvalidTxSenderBlock(CScopedInvalidTxSenderBlock&&) = delete;
+    CScopedInvalidTxSenderBlock(const CScopedInvalidTxSenderBlock&) = delete;
+    CScopedInvalidTxSenderBlock& operator=(CScopedInvalidTxSenderBlock&&) = delete;
+    CScopedInvalidTxSenderBlock& operator=(const CScopedInvalidTxSenderBlock&) = delete;
 };

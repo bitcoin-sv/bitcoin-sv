@@ -944,6 +944,8 @@ public:
     std::optional<bool> operator()(const task::CCancellationToken& token);
 
     ScriptError GetScriptError() const { return error; }
+
+    const CTransaction* GetTransaction() const { return ptxTo; }
 };
 
 /** Functions for disk access for blocks */
