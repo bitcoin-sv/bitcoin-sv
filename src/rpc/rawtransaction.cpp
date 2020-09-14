@@ -1326,57 +1326,82 @@ static UniValue sendrawtransaction(const Config &config,
 }
 
 /**
- * Pushes a JSON object for invalid transactions to vInvalidRet.
+ * Pushes a JSON object for invalid transactions to JSON writer.
  */
-static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidTxns, UniValue &vInvalidRet) {
-    for (const auto& elem: invalidTxns) {
-        UniValue entry(UniValue::VOBJ);
-        entry.push_back(Pair("txid", elem.first.ToString()));
-        if (elem.second.IsMissingInputs()) {
-            entry.push_back(Pair("reject_code", REJECT_INVALID));
-            entry.push_back(Pair("reject_reason", "missing-inputs"));
-        } else {
-            entry.push_back(Pair("reject_code", uint64_t(elem.second.GetRejectCode())));
-            entry.push_back(Pair("reject_reason", elem.second.GetRejectReason()));
-        }
-        const std::set<CTransactionRef>& collidedWithTx = elem.second.GetCollidedWithTx();
-        if (!collidedWithTx.empty())
+static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidTxns, CJSONWriter& writer)
+{
+    if (!invalidTxns.empty())
+    {
+        writer.writeBeginArray("invalid");
+        for (const auto& elem: invalidTxns)
         {
-            UniValue uvCollidedWith(UniValue::VARR);
-            for (const CTransactionRef& tx : collidedWithTx)
+            writer.writeBeginObject();
+            writer.pushKV("txid", elem.first.ToString());
+            if (elem.second.IsMissingInputs())
             {
-                UniValue objTx(UniValue::VOBJ);
-                objTx.pushKV("txid", tx->GetId().GetHex());
-                objTx.pushKV("size", int64_t(tx->GetTotalSize()));
-                objTx.push_back(Pair("hex", EncodeHexTx(*tx)));
-                uvCollidedWith.push_back(objTx);
+                writer.pushKV("reject_code", REJECT_INVALID);
+                writer.pushKV("reject_reason", "missing-inputs");
+            } 
+            else
+            {
+                writer.pushKV("reject_code", uint64_t(elem.second.GetRejectCode()));
+                writer.pushKV("reject_reason", elem.second.GetRejectReason());
             }
-            entry.pushKV("collidedWith", uvCollidedWith);
+            const std::set<CTransactionRef>& collidedWithTx = elem.second.GetCollidedWithTx();
+            if (!collidedWithTx.empty())
+            {
+                writer.writeBeginArray("collidedWith");
+                for (const CTransactionRef& tx : collidedWithTx)
+                {
+                    writer.writeBeginObject();
+                    writer.pushKV("txid", tx->GetId().GetHex());
+                    writer.pushKV("size", int64_t(tx->GetTotalSize()));
+                    writer.pushK("hex");
+                    writer.pushQuote();
+                    EncodeHexTx(*tx, writer.getWriter(), 0);
+                    writer.pushQuote();
+                    writer.writeEndObject();
+                }
+                writer.writeEndArray();
+            }
+            writer.writeEndObject();
         }
-        vInvalidRet.push_back(entry);
+        writer.writeEndArray();
     }
 }
 
 /**
- * Pushes insufficient fee txns to vEvictedRet.
+ * Pushes insufficient fee txns to JSON writer.
  */
-static void EvictedTxnsToJSON(const CTxnValidator::RemovedTxns& evictedTxns, UniValue &vEvictedRet) {
-    for (const auto& elem: evictedTxns) {
-        vEvictedRet.push_back(elem.ToString());
+static void EvictedTxnsToJSON(const CTxnValidator::RemovedTxns& evictedTxns, CJSONWriter& writer)
+{
+    if (!evictedTxns.empty())
+    {
+        writer.writeBeginArray("evicted");
+        for (const auto& elem: evictedTxns) {
+            writer.pushV(elem.ToString());
+        }
+        writer.writeEndArray();
     }
 }
 
 /**
- * Pushes known txns to vKnownRet.
+ * Pushes known txns to JSON writer.
  */
-static void KnownTxnsToJSON(const std::vector<TxId>& evictedTxns, UniValue &vKnownRet) {
-    for (const auto& elem: evictedTxns) {
-        vKnownRet.push_back(elem.ToString());
+static void KnownTxnsToJSON(const std::vector<TxId>& knownTxns, CJSONWriter& writer)
+{
+    if (!knownTxns.empty())
+    {
+        writer.writeBeginArray("known");
+        for (const auto& elem: knownTxns) {
+            writer.pushV(elem.ToString());
+        }
+        writer.writeEndArray();
     }
 }
 
-static UniValue sendrawtransactions(const Config &config,
-                                   const JSONRPCRequest &request) {
+void sendrawtransactions(const Config &config, const JSONRPCRequest &request,
+                         HTTPRequest& httpReq, bool processedInBatch) {
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 1) {
         throw std::runtime_error(
@@ -1466,7 +1491,7 @@ static UniValue sendrawtransactions(const Config &config,
     vTxInputData.reserve(inputs.size());
     // A vector to store transactions that need to be prioritised.
     std::vector<TxId> vTxToPrioritise {};
-    // A vector to sotre already known transactions.
+    // A vector to store already known transactions.
     std::vector<TxId> vKnownTxns {};
 
     /**
@@ -1623,27 +1648,35 @@ static UniValue sendrawtransactions(const Config &config,
      * present in the mempool.
      */
     // A result json object.
-    UniValue result(UniValue::VOBJ);
-    // Known txns array.
-    UniValue uvKnownTxns(UniValue::VARR);
-    KnownTxnsToJSON(vKnownTxns, uvKnownTxns);
-    if (!uvKnownTxns.empty()) {
-        result.push_back(Pair("known", uvKnownTxns));
-    }
-    // Rejected txns array.
-    UniValue uvInvalidTxns(UniValue::VARR);
-    InvalidTxnsToJSON(rejectedTxns.first, uvInvalidTxns);
-    if (!uvInvalidTxns.empty()) {
-        result.push_back(Pair("invalid", uvInvalidTxns));
-    }
-    // Evicted txns array.
-    UniValue uvEvictedTxns(UniValue::VARR);
-    EvictedTxnsToJSON(rejectedTxns.second, uvEvictedTxns);
-    if (!uvEvictedTxns.empty()) {
-        result.push_back(Pair("evicted", uvEvictedTxns));
+    if (!processedInBatch)
+    {
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
     }
 
-    return result;
+    CHttpTextWriter httpWriter(httpReq);
+    CJSONWriter jWriter(httpWriter, false);
+
+    jWriter.writeBeginObject();
+    jWriter.pushKNoComma("result");
+    jWriter.writeBeginObject();
+    // Known txns array.
+    KnownTxnsToJSON(vKnownTxns, jWriter);
+    // Rejected txns array.
+    InvalidTxnsToJSON(rejectedTxns.first, jWriter);
+    // Evicted txns array.
+    EvictedTxnsToJSON(rejectedTxns.second, jWriter);
+    jWriter.writeEndObject();
+    jWriter.pushKV("error", nullptr);
+    jWriter.pushKVJSONFormatted("id", request.id.write());
+    jWriter.writeEndObject();
+    jWriter.flush();
+
+    if (!processedInBatch)
+    {
+        httpReq.StopWritingChunks();
+    }
+
 }
 
 static UniValue getmerkleproof(const Config& config,
