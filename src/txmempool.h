@@ -773,6 +773,7 @@ public:
      * Check if @a entry and its ancestors in the mempool conform to the
      * provided limits (these are all calculated including @a entry itself):
      * @param limitAncestorCount   max number of ancestors
+     * @param limitSecondaryMempoolAncestorCount    max size of ancestors which are in the secondary mempool
      *
      * Returns @c true if the set of ancestors is within the limits. Otherwise,
      * if @a errString is provided, it is populated with the failure reason.
@@ -780,6 +781,7 @@ public:
     bool CheckAncestorLimits(
         const CTxMemPoolEntry& entry,
         uint64_t limitAncestorCount,
+        uint64_t limitSecondaryMempoolAncestorCount,
         std::optional<std::reference_wrapper<std::string>> errString) const;
 
     /**
@@ -869,6 +871,7 @@ private:
     bool CheckAncestorLimitsNL(
         const CTxMemPoolEntry& entry,
         uint64_t limitAncestorCount,
+        uint64_t limitSecondaryMempoolAncestorCount,
         std::optional<std::reference_wrapper<std::string>> errString) const;
 
 

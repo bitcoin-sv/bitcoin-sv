@@ -79,6 +79,9 @@ public:
     virtual void SetLimitAncestorCount(uint64_t limitAncestorCount) = 0;
     virtual uint64_t GetLimitAncestorCount() const = 0;
 
+    virtual void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) = 0;
+    virtual uint64_t GetLimitSecondaryMempoolAncestorCount() const = 0;
+
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual bool GetTestBlockCandidateValidity() const = 0;
 
@@ -250,6 +253,9 @@ public:
 
     void SetLimitAncestorCount(uint64_t limitAncestorCount) override;
     uint64_t GetLimitAncestorCount() const override;
+
+    void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) override;
+    uint64_t GetLimitSecondaryMempoolAncestorCount() const override;
     
     void SetTestBlockCandidateValidity(bool test) override;
     bool GetTestBlockCandidateValidity() const override;
@@ -560,6 +566,9 @@ public:
 
     void SetLimitAncestorCount(uint64_t limitAncestorCount) override {}
     uint64_t GetLimitAncestorCount() const override { return 0; }
+
+    void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) override {}
+    uint64_t GetLimitSecondaryMempoolAncestorCount() const override { return 0; }
 
     void SetTestBlockCandidateValidity(bool skip) override {}
     bool GetTestBlockCandidateValidity() const override { return false; }

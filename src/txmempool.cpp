@@ -261,17 +261,20 @@ public:
 bool CTxMemPool::CheckAncestorLimits(
     const CTxMemPoolEntry& entry,
     uint64_t limitAncestorCount,
+    uint64_t limitSecondaryMempoolAncestorCount,
     std::optional<std::reference_wrapper<std::string>> errString) const
 {
     std::shared_lock lock(smtx);
     return CheckAncestorLimitsNL(entry,
                                  limitAncestorCount,
+                                 limitSecondaryMempoolAncestorCount,
                                  errString);
 }
 
 bool CTxMemPool::CheckAncestorLimitsNL(
     const CTxMemPoolEntry& entry,
     uint64_t limitAncestorCount,
+    uint64_t limitSecondaryMempoolAncestorCount,
     std::optional<std::reference_wrapper<std::string>> errString) const
 {
     // Get parents of this transaction that are in the mempool
@@ -295,6 +298,12 @@ bool CTxMemPool::CheckAncestorLimitsNL(
             ancestorsCount += 1;
             ancestorsCount += (*it)->ancestorsCount;
 
+            if(!(*it)->IsInPrimaryMempool())
+            {
+                secondaryMempoolAncestorsCount += 1;
+                secondaryMempoolAncestorsCount += (*it)->groupingData.value().ancestorsCount;
+            }
+            
             if(ancestorsCount >= limitAncestorCount)
             {
                 if(errString.has_value())
@@ -303,6 +312,16 @@ bool CTxMemPool::CheckAncestorLimitsNL(
                 }
                 return false;
             }
+            
+            if(secondaryMempoolAncestorsCount >= limitSecondaryMempoolAncestorCount)
+            {
+                if(errString.has_value())
+                {
+                    errString.value().get() = strprintf("too many unconfirmed parents which we are not willing to mine [limit: %u]", limitSecondaryMempoolAncestorCount);
+                }
+                return false;
+            }
+
         }
     }
     return true;
@@ -1246,6 +1265,11 @@ void CTxMemPool::CheckMempoolImplNL(
                 if (setParentCheck.insert(it2).second) {
                     ancestorsCount += 1;
                     ancestorsCount += it2->ancestorsCount;
+                    if(!it2->IsInPrimaryMempool())
+                    {
+                        secondaryMempoolAncestorsCount += 1;
+                        secondaryMempoolAncestorsCount += it2->groupingData.value().ancestorsCount;
+                    }
                 }
             } else {
                 assert(view.GetCoin(txin.prevout).has_value());
@@ -1257,7 +1281,20 @@ void CTxMemPool::CheckMempoolImplNL(
             assert(it3->second->GetId() == tx->GetId());
             i++;
         }
-        assert(setParentCheck == GetMemPoolParentsNL(it));
+        assert(setParentCheck == GetMemPoolParentsNL(it)); // MARK: also used by legacy         
+        assert(ancestorsCount == it->ancestorsCount);
+        if(secondaryMempoolAncestorsCount)
+        {
+            assert(!it->IsInPrimaryMempool());
+            assert(secondaryMempoolAncestorsCount == it->groupingData.value().ancestorsCount);
+        }
+        else
+        {
+            if(!it->IsInPrimaryMempool())
+            {
+                assert(secondaryMempoolAncestorsCount == 0);
+            }
+        }
 
         //TODO: check fee and other stuff aftrer groups are implemented
 

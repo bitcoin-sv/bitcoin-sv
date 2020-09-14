@@ -779,6 +779,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf("Do not accept transactions if number of in-mempool "
                       "ancestors is <n> or more (default: %u)",
                       DEFAULT_ANCESTOR_LIMIT));
+        strUsage += HelpMessageOpt(
+            "-limitcpfpgroupmemberscount=<n>",
+            strprintf("Do not accept transactions if number of in-mempool transactions"
+                      "which we are not willing to mine due to a low fee is <n> or more (default: %u)",
+                      DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
     strUsage += HelpMessageOpt(
         "-debug=<category>",
@@ -1919,6 +1924,11 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure ancestor limit count.
     if(gArgs.IsArgSet("-limitancestorcount")) {
         config.SetLimitAncestorCount(gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT));
+    }
+    
+    // Configure ancestor limit count.
+    if(gArgs.IsArgSet("-limitcpfpgroupmemberscount")) {
+        config.SetLimitSecondaryMempoolAncestorCount(gArgs.GetArg("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
 
     // configure max transaction size policy

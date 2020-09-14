@@ -38,6 +38,7 @@ void GlobalConfig::Reset()
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
     limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
+    limitSecondaryMempoolAncestorCount = DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT;
     
     testBlockCandidateValidity = false;
     blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
@@ -343,6 +344,14 @@ void GlobalConfig::SetLimitAncestorCount(uint64_t limitAncestorCountIn) {
 
 uint64_t GlobalConfig::GetLimitAncestorCount() const {
     return limitAncestorCount;
+}
+
+void GlobalConfig::SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) {
+    limitSecondaryMempoolAncestorCount = limitSecondaryMempoolAncestorCountIn;
+}
+
+uint64_t GlobalConfig::GetLimitSecondaryMempoolAncestorCount()const {
+    return limitSecondaryMempoolAncestorCount;
 }
 
 const CChainParams &GlobalConfig::GetChainParams() const {

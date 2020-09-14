@@ -45,10 +45,12 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
     def run_test(self):
 
         limitancestorcount = 20
+        limitcpfpgroupmemberscount = 10
 
         with self.run_node_with_connections("Tests for ancestors count limit, for primary and secondary mempool", 0,
                                             ["-blockmintxfee=0.00001",
                                              f"-limitancestorcount={limitancestorcount}",
+                                             f"-limitcpfpgroupmemberscount={limitcpfpgroupmemberscount}",
                                              "-checkmempool=1",],
                                             number_of_connections=1) as (conn,):
 
@@ -85,26 +87,40 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
                 primary_mempool_chain.append(tx)
                 last_outpoint = (tx, 0)
 
+            # create oversized secondary mempool chain, the last tx in the chain will be over the limit
+            last_outpoint = (funding_tx, 1)
+            secondary_mempool_chain = []
+            for _ in range(limitcpfpgroupmemberscount + 1):
+                tx = self.create_tx([last_outpoint], 1, relayfee)
+                secondary_mempool_chain.append(tx)
+                last_outpoint = (tx, 0)
+
             # send transactions to the node
             for tx in primary_mempool_chain[:-1]:
                 conn.send_message(msg_tx(tx))
 
+            for tx in secondary_mempool_chain[:-1]:
+                conn.send_message(msg_tx(tx))
+
+
             # all transactions that are sent should en up in the mempool, chains are at the limit
-            check_mempool_equals(conn.rpc, primary_mempool_chain[:-1])
+            check_mempool_equals(conn.rpc, primary_mempool_chain[:-1] + secondary_mempool_chain[:-1])
 
 
-            # now send transaction that try to extend chain over the limit, should be rejected
-            conn.send_message(msg_tx(primary_mempool_chain[-1]))
-            wait_until(lambda: len(rejected_txs) == 1)
-            assert_equal(rejected_txs[0].data, primary_mempool_chain[-1].sha256)
-            assert_equal(rejected_txs[0].reason, b'too-long-mempool-chain')
-            rejected_txs.clear()
+            # now send transactions that try to extend chain over the limit, should be rejected
+            for tx_to_reject in [primary_mempool_chain[-1], secondary_mempool_chain[-1]]:
+                conn.send_message(msg_tx(tx_to_reject))
+                wait_until(lambda: len(rejected_txs) == 1)
+                assert_equal(rejected_txs[0].data, tx_to_reject.sha256)
+                assert_equal(rejected_txs[0].reason, b'too-long-mempool-chain')
+                rejected_txs.clear()
 
 
-            # lets mine transaction from beggining of the chain, this will shorten the chain
+            # lets mine transactions from beggining of the chain, this will shorten the chains
             last_block_info = conn.rpc.getblock(conn.rpc.getbestblockhash())
             block = create_block(int(last_block_info["hash"], 16), coinbase=create_coinbase(height=last_block_info["height"] + 1), nTime=last_block_info["time"] + 1)
             block.vtx.append(primary_mempool_chain[0])
+            block.vtx.append(secondary_mempool_chain[0])
             block.hashMerkleRoot = block.calc_merkle_root()
             block.calc_sha256()
             block.solve()
@@ -113,13 +129,14 @@ class MemepoolAncestorsLimits(BitcoinTestFramework):
             wait_until(lambda: conn.rpc.getbestblockhash() == block.hash, check_interval=0.3)
 
             # try to send transactions again, now chains are shorter and transactions will be accepted
-            conn.send_message(msg_tx(primary_mempool_chain[-1]))
-            check_mempool_equals(conn.rpc, primary_mempool_chain[1:])
+            for tx_to_reject in [primary_mempool_chain[-1], secondary_mempool_chain[-1]]:
+                conn.send_message(msg_tx(tx_to_reject))
+            check_mempool_equals(conn.rpc, primary_mempool_chain[1:] + secondary_mempool_chain[1:])
 
             # invalidate the block, this will force mined transactions back to mempool
             # as we do not check chain lenght after reorg we will end up wit long chains in the mempool
             conn.rpc.invalidateblock(block.hash)
-            check_mempool_equals(conn.rpc, primary_mempool_chain)
+            check_mempool_equals(conn.rpc, primary_mempool_chain + secondary_mempool_chain)
 
 if __name__ == '__main__':
     MemepoolAncestorsLimits().main()

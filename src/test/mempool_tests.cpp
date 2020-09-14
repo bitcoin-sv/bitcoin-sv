@@ -228,15 +228,19 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
         std::string error;
         
         BOOST_CHECK_EQUAL(
-            pool.CheckAncestorLimits( entry.FromTx(tx7), 2, error),
+            pool.CheckAncestorLimits( entry.FromTx(tx7), 2, 2, error),
             true);
         BOOST_CHECK_EQUAL(error, "");
 
         BOOST_CHECK_EQUAL(
-            pool.CheckAncestorLimits( entry.FromTx(tx7), 1, error),
+            pool.CheckAncestorLimits( entry.FromTx(tx7), 1, 2, error),
             false);
         BOOST_CHECK_EQUAL(error, "too many unconfirmed parents [limit: 1]");
 
+        BOOST_CHECK_EQUAL(
+            pool.CheckAncestorLimits( entry.FromTx(tx7), 2, 1, error),
+            false);
+        BOOST_CHECK_EQUAL(error, "too many unconfirmed parents which we are not willing to mine [limit: 1]");
     }
 
     /* will pull tx6 into the primary pool with tx7, whose fee was set above */
