@@ -809,27 +809,6 @@ static bool CheckTxOutputs(
     return true;
 }
 
-static bool CheckTxInputExists(
-    const CTransaction &tx,
-    const CCoinsViewCache* pcoinsTip,
-    const CCoinsViewCache& view,
-    CValidationState &state,
-    std::vector<COutPoint> &vCoinsToUncache) {
-    // Do all inputs exist?
-    for (const CTxIn& txin : tx.vin) {
-        // Check if txin.prevout available as a UTXO tx.
-        if (!pcoinsTip->HaveCoinInCache(txin.prevout)) {
-            vCoinsToUncache.push_back(txin.prevout);
-        }
-        // Check if txin.prevout is not present in the mempool
-        if (!view.HaveCoin(txin.prevout)) {
-            state.SetMissingInputs();
-            return state.Invalid();
-        }
-    }
-    return true;
-}
-
 static bool IsAbsurdlyHighFeeSetForTxn(
     const Amount& nFees,
     const Amount& nAbsurdFee) {
@@ -1242,10 +1221,14 @@ CTxnValResult TxnValidation(
                         "txn-already-known");
            return Result{state, pTxInputData, vCoinsToUncache};
         }
-        // Do all inputs exist?
-        if(!CheckTxInputExists(tx, pcoinsTip, view, state,
-                               vCoinsToUncache)) {
-           return Result{state, pTxInputData, vCoinsToUncache};
+        // Prepare coins to uncache list for inputs
+        for (const CTxIn& txin : tx.vin)
+        {
+            // Check if txin.prevout available as a UTXO tx.
+            if (!pcoinsTip->HaveCoinInCache(txin.prevout))
+            {
+                vCoinsToUncache.push_back(txin.prevout);
+            }
         }
         // Are the actual inputs available?
         if (auto have = view.HaveInputsLimited(tx, fUseLimits ? config.GetMaxCoinsViewCacheSize() : 0);
@@ -1257,8 +1240,8 @@ CTxnValResult TxnValidation(
         }
         else if (!have.value())
         {
-            state.Invalid(false, REJECT_DUPLICATE,
-                         "bad-txns-inputs-spent");
+            state.SetMissingInputs();
+            state.Invalid();
             return Result{state, pTxInputData, vCoinsToUncache};
         }
         // Bring the best block into scope.
