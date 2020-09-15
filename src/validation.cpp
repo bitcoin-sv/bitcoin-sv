@@ -1349,8 +1349,7 @@ CTxnValResult TxnValidation(
             uiChainActiveHeight,
             inChainInputValue,
             fSpendsCoinbase,
-            lp,
-            pool) };
+            lp) };
     if (!skipFeeTest) {
         // Check tx's priority based on relaypriority flag and relay fee.
         const CFeeRate minRelayTxFee = config.GetMinFeePerKB();

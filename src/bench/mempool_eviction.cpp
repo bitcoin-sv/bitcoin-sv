@@ -22,7 +22,7 @@ static void AddTx(const CTransaction &tx, const Amount &nFee,
     pool.AddUnchecked(tx.GetId(),
                       CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime,
                                       dPriority, nHeight, tx.GetValueOut(),
-                                      spendsCoinbase, lp, pool),
+                                      spendsCoinbase, lp),
                       nullChangeSet);
 }
 

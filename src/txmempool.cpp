@@ -183,11 +183,15 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  int32_t _entryHeight,
                                  Amount _inChainInputValue,
                                  bool _spendsCoinbase,
-                                 LockPoints lp, CTxMemPoolBase &mempoolIn)
-    : tx{_tx, mempoolIn.GetMempoolTxDB()},
-      nFee{_nFee}, nTime{_nTime}, entryPriority{_entryPriority},
+                                 LockPoints lp)
+    : tx{_tx, nullptr},
+      nFee{_nFee},
+      nTime{_nTime},
+      entryPriority{_entryPriority},
       inChainInputValue{_inChainInputValue},
-      lockPoints{lp}, entryHeight{_entryHeight}, spendsCoinbase{_spendsCoinbase}
+      lockPoints{lp},
+      entryHeight{_entryHeight},
+      spendsCoinbase{_spendsCoinbase}
 {
     nTxSize = _tx->GetTotalSize();
     nModSize = _tx->CalculateModifiedSize(GetTxSize());
@@ -762,16 +766,26 @@ void CTxMemPool::UpdateAncestorsCountNL(CTxMemPool::setEntriesTopoSorted entries
 
 void CTxMemPool::AddUncheckedNL(
     const uint256 &hash,
-    const CTxMemPoolEntry &entry,
+    const CTxMemPoolEntry &originalEntry,
     const CJournalChangeSetPtr& changeSet,
     size_t* pnMempoolSize,
-    size_t* pnDynamicMemoryUsage) {
+    size_t* pnDynamicMemoryUsage)
+{
+    auto newit = mapTx.insert(originalEntry).first;
+    assert(newit->IsInMemory());
+    const auto sharedTx = newit->GetSharedTx();
 
-    indexed_transaction_set::iterator newit = mapTx.insert(entry).first;
+    // Make sure the transaction database is initialized so that we have
+    // a valid mempoolTxDB in the mapTx.modify() callback below.
+    InitMempoolTxDB();
+
     mapLinks.insert(make_pair(newit, TxLinks()));
-
-    mapTx.modify(newit, [this](CTxMemPoolEntry& entry) {
+    mapTx.modify(newit, [this, &sharedTx](CTxMemPoolEntry& entry) {
+        // Update insertion order indes for this entry.
         entry.SetInsertionIndex(insertionIndex.GetNext());
+        // Update transaction database for this entry.
+        // This should not affect the mapTx index.
+        entry.tx = CTransactionRefWrapper(sharedTx, mempoolTxDB);
     });
 
     // Update transaction for any feeDelta created by PrioritiseTransaction
@@ -788,11 +802,10 @@ void CTxMemPool::AddUncheckedNL(
     // Update cachedInnerUsage to include contained transaction's usage.
     // (When we update the entry for in-mempool parents, memory usage will be
     // further updated.)
-    cachedInnerUsage += entry.DynamicMemoryUsage();
+    cachedInnerUsage += newit->DynamicMemoryUsage();
 
-    const auto tx = newit->GetSharedTx();
     std::set<uint256> setParentTransactions;
-    for (const CTxIn &in : tx->vin) {
+    for (const CTxIn &in : sharedTx->vin) {
         mapNextTx.insert(std::make_pair(in.prevout, &newit->tx));
         setParentTransactions.insert(in.prevout.GetTxId());
     }
@@ -827,7 +840,7 @@ void CTxMemPool::AddUncheckedNL(
     TryAcceptChildlessTxToPrimaryMempoolNL(newit, nonNullChangeSet.Get());
 
     nTransactionsUpdated++;
-    totalTxSize += entry.GetTxSize();
+    totalTxSize += newit->GetTxSize();
 
     // If it is required calculate mempool size & dynamic memory usage.
     if (pnMempoolSize) {
@@ -1540,11 +1553,6 @@ void CTxMemPool::InitMempoolTxDB() {
                        mempoolTxDB = std::make_shared<CMempoolTxDB>(cacheSize);
                    });
 }
-
-std::shared_ptr<CMempoolTxDB> CTxMemPool::GetMempoolTxDB() {
-    InitMempoolTxDB();
-    return mempoolTxDB;
-};
 
 uint64_t CTxMemPool::GetDiskUsage() {
     InitMempoolTxDB();

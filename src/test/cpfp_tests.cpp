@@ -18,11 +18,10 @@
 namespace{
 
 CTxMemPoolEntry MakeEntry(
-    CTxMemPoolBase &pool,
     CFeeRate feerate, 
     std::vector<std::tuple<TxId, int, Amount>> inChainInputs, 
     std::vector<std::tuple<CTransactionRef, int>> inMempoolInputs,
-    size_t nOutputs, size_t additionalSize=0, Amount feeAlreadyPaid=Amount(0),
+    size_t nOutputs, size_t additionalSize=0, Amount feeAlreadyPaid=Amount{1},
     size_t opReturnSize=0)
 {
     CMutableTransaction tx;
@@ -47,7 +46,7 @@ CTxMemPoolEntry MakeEntry(
     {
         CScript script;
         script << OP_TRUE;
-        tx.vout.push_back(CTxOut(Amount(), script));
+        tx.vout.push_back(CTxOut(Amount{1}, script));
     }
     
     if(opReturnSize != 0)
@@ -71,7 +70,7 @@ CTxMemPoolEntry MakeEntry(
     }
 
     auto txRef = MakeTransactionRef(tx);
-    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, 0, totalInChainInput, false, LockPoints(), pool);
+    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, 0, totalInChainInput, false, LockPoints());
     return entry;
 }
 
@@ -191,23 +190,23 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
 
     mempool.SetSanityCheck(0);
 
-    auto entryNotPaying = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
-    
-    auto entryPayForItself = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying.GetSharedTx(), 0)}, 3);
+    auto entryNotPaying = MakeEntry(CFeeRate{}, MakeConfirmedInputs(1, Amount{1000000}), {}, 1);
 
-    auto entryNotPaying2 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 1)}, 1);
-    
-    auto entryNotPaying3 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
+    auto entryPayForItself = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying.GetSharedTx(), 0)}, 3);
 
-    auto entryNotPaying4 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 2), std::make_tuple(entryNotPaying3.GetSharedTx(), 0)}, 1);
+    auto entryNotPaying2 = MakeEntry(CFeeRate{}, {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 1)}, 1);
+    
+    auto entryNotPaying3 = MakeEntry(CFeeRate{}, MakeConfirmedInputs(1, Amount{1000000}), {}, 1);
+
+    auto entryNotPaying4 = MakeEntry(CFeeRate{}, {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 2), std::make_tuple(entryNotPaying3.GetSharedTx(), 0)}, 1);
     
     auto sizeOfNotPaying3and4 = entryNotPaying3.GetSharedTx()->GetTotalSize() + entryNotPaying4.GetSharedTx()->GetTotalSize();
     auto feeOfNotPaying3and4 = entryNotPaying3.GetModifiedFee() + entryNotPaying4.GetModifiedFee();
-    auto entryPayingFor3And4 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying4.GetSharedTx(), 0)}, 1, sizeOfNotPaying3and4, feeOfNotPaying3and4);
+    auto entryPayingFor3And4 = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying4.GetSharedTx(), 0)}, 1, sizeOfNotPaying3and4, feeOfNotPaying3and4);
 
     auto sizeSoFar = entryNotPaying.GetSharedTx()->GetTotalSize() + entryPayForItself.GetSharedTx()->GetTotalSize();
     auto feeSoFar = entryNotPaying.GetModifiedFee() + entryPayForItself.GetModifiedFee();
-    auto entryPayForGroup = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 0)}, 1, sizeSoFar, feeSoFar);
+    auto entryPayForGroup = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 0)}, 1, sizeSoFar, feeSoFar);
 
     CTxMemPoolTestAccess testAccess(mempool);
     auto journal = testAccess.getJournalBuilder().getCurrentJournal();
@@ -334,7 +333,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     }
 
     // now raise modified fee for the entryPayingFor3And4 so that it can pay for all ancestors (entryNotPaying4, entryNotPaying3, entryPaysForItself, entryNotPaying)
-    mempool.PrioritiseTransaction(entryPayingFor3And4.GetTxId(), entryPayingFor3And4.GetTxId().GetHex(), 0, Amount(10000));
+    mempool.PrioritiseTransaction(entryPayingFor3And4.GetTxId(), entryPayingFor3And4.GetTxId().GetHex(), 0, Amount{10000});
     for(const auto& entryIt: {notPayingIt, notPaying3It, notPaying4It, payForItselfIt, payFor3And4It})
     {
         BOOST_ASSERT(entryIt->IsInPrimaryMempool());
@@ -365,12 +364,12 @@ BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
 
     mempool.SetSanityCheck(0);
 
-    auto entryNotPaying1 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
-    auto entryNotPaying2 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryNotPaying1.GetSharedTx(), 0)}, 1);
-    auto entryPaysFor2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying2.GetSharedTx(), 0)}, 1, entryNotPaying2.GetSharedTx()->GetTotalSize());
-    auto entryNotPaying3 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
-    auto entryPayForItself = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying3.GetSharedTx(), 0)}, 3);
-    auto entryPaysFor3 = MakeEntry(mempool, CFeeRate(Amount(10000)), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 0)}, 3);
+    auto entryNotPaying1 = MakeEntry(CFeeRate{}, MakeConfirmedInputs(1, Amount{1000000}), {}, 1);
+    auto entryNotPaying2 = MakeEntry(CFeeRate{}, {}, {std::make_tuple(entryNotPaying1.GetSharedTx(), 0)}, 1);
+    auto entryPaysFor2 = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying2.GetSharedTx(), 0)}, 1, entryNotPaying2.GetSharedTx()->GetTotalSize());
+    auto entryNotPaying3 = MakeEntry(CFeeRate{}, MakeConfirmedInputs(1, Amount{1000000}), {}, 1);
+    auto entryPayForItself = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying3.GetSharedTx(), 0)}, 3);
+    auto entryPaysFor3 = MakeEntry(CFeeRate{Amount{10000}}, {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 0)}, 3);
 
     auto notPaying1   = AddToMempool(entryNotPaying1);
     auto notPaying2   = AddToMempool(entryNotPaying2);
@@ -425,14 +424,14 @@ BOOST_AUTO_TEST_CASE(mempool_rebuild)
 
     mempool.SetSanityCheck(0);
 
-    auto entry1 = MakeEntry(mempool, DefaultFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
-    auto entryGroup1Tx1 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 2);
-    auto entryGroup1Tx2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryGroup1Tx1.GetSharedTx(), 1)}, 2, entryGroup1Tx1.GetSharedTx()->GetTotalSize());
-    auto entryGroup2Tx1 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entry1.GetSharedTx(), 0), std::make_tuple(entryGroup1Tx1.GetSharedTx(), 0)}, 2);
-    auto entryGroup2Tx2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryGroup2Tx1.GetSharedTx(), 0)}, 5, entryGroup2Tx1.GetSharedTx()->GetTotalSize());
-    auto entryNonPaying1 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryGroup1Tx2.GetSharedTx(), 1)}, 1);
-    auto entryNonPaying2 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryNonPaying1.GetSharedTx(), 0)}, 1);
-    auto entry2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryGroup2Tx1.GetSharedTx(), 1), std::make_tuple(entryGroup1Tx2.GetSharedTx(), 0)}, 3);
+    auto entry1 = MakeEntry(DefaultFeeRate(), MakeConfirmedInputs(1, Amount{1000000}), {}, 1);
+    auto entryGroup1Tx1 = MakeEntry(CFeeRate{}, MakeConfirmedInputs(1, Amount{1000000}), {}, 2);
+    auto entryGroup1Tx2 = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryGroup1Tx1.GetSharedTx(), 1)}, 2, entryGroup1Tx1.GetSharedTx()->GetTotalSize());
+    auto entryGroup2Tx1 = MakeEntry(CFeeRate{}, {}, {std::make_tuple(entry1.GetSharedTx(), 0), std::make_tuple(entryGroup1Tx1.GetSharedTx(), 0)}, 2);
+    auto entryGroup2Tx2 = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryGroup2Tx1.GetSharedTx(), 0)}, 5, entryGroup2Tx1.GetSharedTx()->GetTotalSize());
+    auto entryNonPaying1 = MakeEntry(CFeeRate{}, {}, {std::make_tuple(entryGroup1Tx2.GetSharedTx(), 1)}, 1);
+    auto entryNonPaying2 = MakeEntry(CFeeRate{}, {}, {std::make_tuple(entryNonPaying1.GetSharedTx(), 0)}, 1);
+    auto entry2 = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryGroup2Tx1.GetSharedTx(), 1), std::make_tuple(entryGroup1Tx2.GetSharedTx(), 0)}, 3);
     
     auto tx1 = AddToMempool(entry1);
     auto tx2 = AddToMempool(entryGroup1Tx1);
@@ -485,9 +484,9 @@ BOOST_AUTO_TEST_CASE(journal_groups)
 
     auto journal = testAccess.getJournalBuilder().getCurrentJournal();
 
-    auto entry1 = MakeEntry(mempool, DefaultFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1, 0, Amount{0}, 100000);
-    auto entryGroup1Tx1 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 2, 0, Amount{0}, 100000);
-    auto entryGroup1Tx2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryGroup1Tx1.GetSharedTx(), 1)}, 2, entryGroup1Tx1.GetSharedTx()->GetTotalSize(), Amount{0}, 100000);
+    auto entry1 = MakeEntry(DefaultFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1, 0, Amount{0}, 100000);
+    auto entryGroup1Tx1 = MakeEntry(CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 2, 0, Amount{0}, 100000);
+    auto entryGroup1Tx2 = MakeEntry(DefaultFeeRate(), {}, {std::make_tuple(entryGroup1Tx1.GetSharedTx(), 1)}, 2, entryGroup1Tx1.GetSharedTx()->GetTotalSize(), Amount{0}, 100000);
     
     auto tx1 = AddToMempool(entry1);
     auto tx2 = AddToMempool(entryGroup1Tx1);

@@ -104,14 +104,6 @@ inline bool operator==(const SecondaryMempoolEntryData& a,
                            (a.ancestorsCount == b.ancestorsCount)));
 }
 
-
-class CTxMemPoolBase {
-public:
-    virtual ~CTxMemPoolBase() {}
-
-    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() = 0;
-};
-
 /** \class CTxPrioritizer
  *
  * The aim of this class is to support txn prioritisation and cleanup
@@ -135,9 +127,6 @@ public:
     CTxPrioritizer& operator=(const CTxPrioritizer&) = delete;
     CTxPrioritizer& operator=(CTxPrioritizer&&) = delete;
 };
-
-struct CPFPGroup;
-
 
 /**
  * \class GroupID
@@ -228,8 +217,7 @@ public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime, double _entryPriority,
                     int32_t _entryHeight, Amount _inChainInputValue,
-                    bool spendsCoinbase, LockPoints lp,
-                    CTxMemPoolBase &mempoolIn);
+                    bool spendsCoinbase, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
@@ -449,7 +437,7 @@ struct DisconnectedBlockTransactions;
  * entry as "dirty", and set the feerate for sorting purposes to be equal the
  * feerate of the transaction without any descendants.
  */
-class CTxMemPool : public CTxMemPoolBase {
+class CTxMemPool {
 private:
     static constexpr int MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO = 1000;
 
@@ -735,7 +723,6 @@ public:
     void InitMempoolTxDB();
     uint64_t GetDiskUsage();
     void SaveTxsToDisk(uint64_t requiredSize);
-    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() override;
 
 public:
     /**

@@ -65,7 +65,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
     mempool.getNonFinalPool().loadConfig();
-    mempool.GetMempoolTxDB();
+    mempool.InitMempoolTxDB();
 }
 
 BasicTestingSetup::~BasicTestingSetup() {
@@ -201,8 +201,7 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn,
     Amount inChainValue =
         pool && pool->HasNoInputsOf(txn) ? txn.GetValueOut() : Amount(0);
     return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, dPriority,
-                           nHeight, inChainValue, spendsCoinbase,
-                           lp, pool ? *pool : mempool);
+                           nHeight, inChainValue, spendsCoinbase, lp);
 }
 
 namespace {
