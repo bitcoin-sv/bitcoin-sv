@@ -512,7 +512,7 @@ private:
         setEntries children;
     };
 
-    typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
+    using txlinksMap = std::unordered_map<txiter, TxLinks, SaltedTxiterHasher>;
     txlinksMap mapLinks;
 
     void updateParentNL(txiter entry, txiter parent, bool add);
