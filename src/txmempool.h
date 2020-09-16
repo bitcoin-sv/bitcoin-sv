@@ -20,6 +20,7 @@
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index/random_access_index.hpp>
 #include <boost/multi_index_container.hpp>
+#include <boost/multi_index/member.hpp>
 
 #include <boost/signals2/signal.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -512,13 +513,43 @@ private:
         setEntries children;
     };
 
+
     using txlinksMap = std::unordered_map<txiter, TxLinks, SaltedTxiterHasher>;
     txlinksMap mapLinks;
 
     void updateParentNL(txiter entry, txiter parent, bool add);
     void updateChildNL(txiter entry, txiter child, bool add);
 
-    std::map<COutPoint, txiter> mapNextTx;
+    struct OutpointTxPair
+    {
+        COutPoint outpoint;
+        txiter spentBy;
+    };
+
+    using MapNextTx =
+    boost::multi_index_container<
+        OutpointTxPair,
+        boost::multi_index::indexed_by<
+            boost::multi_index::hashed_unique<
+                boost::multi_index::member<
+                    OutpointTxPair,
+                    COutPoint,
+                    &OutpointTxPair::outpoint
+                >,
+                SaltedOutpointHasher
+            >,
+            boost::multi_index::hashed_non_unique<
+                boost::multi_index::member<
+                    OutpointTxPair,
+                    txiter,
+                    &OutpointTxPair::spentBy
+                >,
+                SaltedTxiterHasher
+            >
+        >
+    >;
+
+    MapNextTx mapNextTx;
 
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 

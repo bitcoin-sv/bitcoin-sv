@@ -313,7 +313,7 @@ CTransactionWrapperRef CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
     {
         return nullptr;
     }
-    return it->second->tx;
+    return it->spentBy->tx;
 }
 
 unsigned int CTxMemPool::GetTransactionsUpdated() const {
@@ -745,7 +745,7 @@ void CTxMemPool::AddUncheckedNL(
     std::set<uint256> setParentTransactions;
 
     for (const CTxIn &in : sharedTx->vin) {
-        mapNextTx.insert(std::make_pair(in.prevout, newit));
+        mapNextTx.insert(OutpointTxPair{in.prevout, newit});
         setParentTransactions.insert(in.prevout.GetTxId());
     }
     // Don't bother worrying about child transactions of this one. Normal case
@@ -928,7 +928,7 @@ void CTxMemPool::removeRecursiveNL(
             auto nextit = mapNextTx.find(COutPoint{origTx.GetId(), ndx});
             if(nextit != mapNextTx.end())
             {
-                txToRemove.insert(nextit->second);
+                txToRemove.insert(nextit->spentBy);
             }
         }
     }
@@ -1083,7 +1083,7 @@ void CTxMemPool::RemoveForBlock(
 
                     // collect all descendants of the tx which made double-spend
                     setEntries conflictedWithDescendants;
-                    GetDescendantsNL(mapTx.find(it->second->GetTxId()), conflictedWithDescendants);
+                    GetDescendantsNL(mapTx.find(it->spentBy->GetTxId()), conflictedWithDescendants);
 
                     for(txiter inConflict: conflictedWithDescendants)
                     {
@@ -1253,8 +1253,8 @@ void CTxMemPool::CheckMempoolImplNL(
             // Check whether its inputs are marked in mapNextTx.
             auto it3 = mapNextTx.find(txin.prevout);
             assert(it3 != mapNextTx.end());
-            assert(it3->first == txin.prevout);
-            assert(it3->second->GetTxId() == tx->GetId());
+            assert(it3->outpoint == txin.prevout);
+            assert(it3->spentBy->GetTxId() == tx->GetId());
             i++;
         }
         assert(setParentCheck == GetMemPoolParentsNL(it));
@@ -1283,7 +1283,7 @@ void CTxMemPool::CheckMempoolImplNL(
             auto nextit = mapNextTx.find(COutPoint{tx->GetId(), ndx});
             if(nextit != mapNextTx.end())
             {
-                setChildrenCheck.insert(nextit->second);
+                setChildrenCheck.insert(nextit->spentBy);
             }
         }
         assert(setChildrenCheck == GetMemPoolChildrenNL(it));
@@ -1327,7 +1327,7 @@ void CTxMemPool::CheckMempoolImplNL(
     }
 
     for (const auto& item: mapNextTx) {
-        const auto& txid = item.second->GetTxId();
+        const auto& txid = item.spentBy->GetTxId();
         const auto it2 = mapTx.find(txid);
         assert(it2 != mapTx.end());
         assert(it2->GetTxId() == txid);
@@ -1808,7 +1808,8 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
     return mapTx.size() * memusage::MallocUsage(sizeof(CTxMemPoolEntry) +
                                                 sizeof(CTransactionWrapper) +
                                                 12 * sizeof(void *)) +
-           memusage::DynamicUsage(mapNextTx) +
+           mapNextTx.size() * memusage::MallocUsage(sizeof(OutpointTxPair) +
+                                                    12 * sizeof(void *)) +
            memusage::DynamicUsage(mapDeltas) +
            memusage::DynamicUsage(mapLinks) + cachedInnerUsage;
 }
@@ -1899,7 +1900,7 @@ std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx
     // Check our locked UTXOs
     for (const CTxIn &txin : tx->vin) {
         if (auto it = mapNextTx.find(txin.prevout); it != mapNextTx.end()) {
-            conflictsWith.insert(GetNL(it->second->GetTxId()));
+            conflictsWith.insert(GetNL(it->spentBy->GetTxId()));
         }
     }
 
