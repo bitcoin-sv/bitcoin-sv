@@ -1,10 +1,9 @@
 #include "mining/journal_change_set.h"
 #include "mempooltxdb.h"
+
+#include "mempool_test_access.h"
+
 #include "test/test_bitcoin.h"
-#include "key.h"
-#include "script/script_num.h"
-#include "validation.h"
-#include <boost/multi_index_container.hpp>
 
 #include <boost/test/unit_test.hpp>
 
@@ -12,10 +11,9 @@ namespace {
 mining::CJournalChangeSetPtr nullChangeSet{nullptr};
 }
 
-BOOST_FIXTURE_TEST_SUITE(mempooltxdb_tests, BasicTestingSetup)
-BOOST_AUTO_TEST_CASE(save_on_full_mempool)
+BOOST_FIXTURE_TEST_SUITE(mempooltxdb_tests, TestingSetup)
+BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
 {
-    mempool.Clear();
     TestMemPoolEntryHelper entry;
     // Parent transaction with three children, and three grand-children:
     CMutableTransaction txParent;
@@ -45,30 +43,38 @@ BOOST_AUTO_TEST_CASE(save_on_full_mempool)
         txGrandChild[i].vout[0].nValue = Amount(11000LL);
     }
 
+    CTxMemPool testPool;
+    CTxMemPoolTestAccess testPoolAccess(testPool);
+
     // Nothing in pool, remove should do nothing:
-    unsigned int poolSize = mempool.Size();
-    mempool.SaveTxsToDisk(10000);
-    BOOST_CHECK_EQUAL(mempool.Size(), poolSize);
-    uint64_t diskUsage = mempool.GetDiskUsage();
-    uint64_t sizeTXsAdded = diskUsage;
+    BOOST_CHECK_EQUAL(testPool.Size(), 0);
+    testPool.SaveTxsToDisk(10000);
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(testPool.Size(), 0);
 
     // Add transactions:
-    mempool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
+    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
     for (int i = 0; i < 3; i++) {
-        mempool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), nullChangeSet);
-        mempool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), nullChangeSet);
+        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), nullChangeSet);
+        testPool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), nullChangeSet);
     }
 
-    mempool.SaveTxsToDisk(10000);
+    // Saving transactions to disk doesn't change the mempool size:
+    const auto poolSize = testPool.Size();
+    testPool.SaveTxsToDisk(10000);
+    BOOST_CHECK_EQUAL(testPool.Size(), poolSize);
 
-    auto mi = mempool.mapTx.get<entry_time>().begin();
-    while (mi != mempool.mapTx.get<entry_time>().end())
+    // But it does store something to disk:
+    const auto diskUsage = testPool.GetDiskUsage();
+    BOOST_CHECK(diskUsage > 0);
+
+    // Check that all transactions have been saved to disk:
+    uint64_t sizeTXsAdded = 0;
+    for (const auto& entry : testPoolAccess.mapTx().get<entry_time>())
     {
-        BOOST_CHECK(!mi->IsInMemory());
-        sizeTXsAdded += mi->GetTxSize();
-        mi++;
+        BOOST_CHECK(!entry.IsInMemory());
+        sizeTXsAdded += entry.GetTxSize();
     }
-    diskUsage = mempool.GetDiskUsage();
     BOOST_CHECK_EQUAL(diskUsage, sizeTXsAdded);
 }
 BOOST_AUTO_TEST_SUITE_END()
