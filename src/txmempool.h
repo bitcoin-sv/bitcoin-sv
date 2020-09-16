@@ -518,7 +518,8 @@ private:
     void updateParentNL(txiter entry, txiter parent, bool add);
     void updateChildNL(txiter entry, txiter child, bool add);
 
-    std::map<COutPoint, const CTransactionWrapperRef> mapNextTx;
+    std::map<COutPoint, txiter> mapNextTx;
+
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
     class InsertionIndex
@@ -648,7 +649,7 @@ public:
 
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
-    CTransactionRef IsSpentBy(const COutPoint &outpoint) const;
+    CTransactionWrapperRef IsSpentBy(const COutPoint &outpoint) const;
 
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);

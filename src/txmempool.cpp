@@ -305,7 +305,7 @@ bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) const {
     return mapNextTx.count(outpoint);
 }
 
-CTransactionRef CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
+CTransactionWrapperRef CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
     std::shared_lock lock{ smtx };
 
     auto it = mapNextTx.find(outpoint);
@@ -313,7 +313,7 @@ CTransactionRef CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
     {
         return nullptr;
     }
-    return it->second->GetTx();
+    return it->second->tx;
 }
 
 unsigned int CTxMemPool::GetTransactionsUpdated() const {
@@ -743,8 +743,9 @@ void CTxMemPool::AddUncheckedNL(
 
     const auto sharedTx = newit->GetSharedTx();
     std::set<uint256> setParentTransactions;
+
     for (const CTxIn &in : sharedTx->vin) {
-        mapNextTx.insert(std::make_pair(in.prevout, newit->tx));
+        mapNextTx.insert(std::make_pair(in.prevout, newit));
         setParentTransactions.insert(in.prevout.GetTxId());
     }
     // Don't bother worrying about child transactions of this one. Normal case
@@ -924,7 +925,7 @@ void CTxMemPool::removeRecursiveNL(
         for (auto it = mapNextTx.lower_bound(COutPoint(origTxId, 0));
              it != mapNextTx.end() && it->first.GetTxId() == origTxId;
              ++it) {
-            txiter nextit = mapTx.find(it->second->GetId());
+            txiter nextit = mapTx.find(it->second->GetTxId());
             assert(nextit != mapTx.end());
             txToRemove.insert(nextit);
         }
@@ -1080,7 +1081,7 @@ void CTxMemPool::RemoveForBlock(
 
                     // collect all descendants of the tx which made double-spend
                     setEntries conflictedWithDescendants;
-                    GetDescendantsNL(mapTx.find(it->second->GetId()), conflictedWithDescendants);
+                    GetDescendantsNL(mapTx.find(it->second->GetTxId()), conflictedWithDescendants);
 
                     for(txiter inConflict: conflictedWithDescendants)
                     {
@@ -1251,7 +1252,7 @@ void CTxMemPool::CheckMempoolImplNL(
             auto it3 = mapNextTx.find(txin.prevout);
             assert(it3 != mapNextTx.end());
             assert(it3->first == txin.prevout);
-            assert(it3->second->GetId() == tx->GetId());
+            assert(it3->second->GetTxId() == tx->GetId());
             i++;
         }
         assert(setParentCheck == GetMemPoolParentsNL(it));
@@ -1279,7 +1280,7 @@ void CTxMemPool::CheckMempoolImplNL(
         for (; iter != mapNextTx.end() &&
                iter->first.GetTxId() == it->GetTxId();
              ++iter) {
-            txiter childit = mapTx.find(iter->second->GetId());
+            txiter childit = mapTx.find(iter->second->GetTxId());
             // mapNextTx points to in-mempool transactions
             assert(childit != mapTx.end());
             if (setChildrenCheck.insert(childit).second) {
@@ -1327,7 +1328,7 @@ void CTxMemPool::CheckMempoolImplNL(
     }
 
     for (const auto& item: mapNextTx) {
-        const auto& txid = item.second->GetId();
+        const auto& txid = item.second->GetTxId();
         const auto it2 = mapTx.find(txid);
         assert(it2 != mapTx.end());
         assert(it2->GetTxId() == txid);
@@ -1899,7 +1900,7 @@ std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx
     // Check our locked UTXOs
     for (const CTxIn &txin : tx->vin) {
         if (auto it = mapNextTx.find(txin.prevout); it != mapNextTx.end()) {
-            conflictsWith.insert(GetNL(it->second->GetId()));
+            conflictsWith.insert(GetNL(it->second->GetTxId()));
         }
     }
 

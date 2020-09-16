@@ -1947,8 +1947,10 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             {
                 jWriter.pushKV("error", "missing");
             }
-            else if(const auto tx = mempool.IsSpentBy(outPoints[arrayIndex]))
+            else if(const auto wrapper = mempool.IsSpentBy(outPoints[arrayIndex]))
             {
+                // FIXME: This could be reading the transaction from disk!
+                const auto tx = wrapper->GetTx();
                 jWriter.pushKV("error", "spent");
                 jWriter.writeBeginObject("collidedWith");
                 jWriter.pushKV("txid", tx->GetId().GetHex());
