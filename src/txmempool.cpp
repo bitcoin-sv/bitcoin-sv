@@ -900,34 +900,36 @@ void CTxMemPool::RemoveRecursive(
         std::unique_lock lock(smtx);
         // Remove transaction from memory pool.
         removeRecursiveNL(
-            origTx.GetId(),
+            origTx,
             changeSet,
             reason);
     }
 }
 
 void CTxMemPool::removeRecursiveNL(
-    const TxId &origTxId,
+    const CTransaction& origTx,
     const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason,
     const CTransaction* conflictedWith) {
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
     setEntries txToRemove;
-    txiter origit = mapTx.find(origTxId);
+    txiter origit = mapTx.find(origTx.GetId());
     if (origit != mapTx.end()) {
         txToRemove.insert(origit);
     } else {
-        // When recursively removing but origTxId isn't in the mempool be sure
+        // When recursively removing but origTx isn't in the mempool be sure
         // to remove any children that are in the pool. This can happen during
-        // chain re-orgs if origTxId isn't re-accepted into the mempool for any
+        // chain re-orgs if origTx isn't re-accepted into the mempool for any
         // reason.
-        for (auto it = mapNextTx.lower_bound(COutPoint(origTxId, 0));
-             it != mapNextTx.end() && it->first.GetTxId() == origTxId;
-             ++it) {
-            txiter nextit = mapTx.find(it->second->GetTxId());
-            assert(nextit != mapTx.end());
-            txToRemove.insert(nextit);
+        const uint32_t outputCount = origTx.vout.size();
+        for(uint32_t ndx = 0; ndx < outputCount; ndx++)
+        {
+            auto nextit = mapNextTx.find(COutPoint{origTx.GetId(), ndx});
+            if(nextit != mapNextTx.end())
+            {
+                txToRemove.insert(nextit->second);
+            }
         }
     }
     setEntries setAllRemoves;
@@ -1274,17 +1276,14 @@ void CTxMemPool::CheckMempoolImplNL(
 
         // Check children against mapNextTx
         setEntries setChildrenCheck;
-        auto iter = mapNextTx.lower_bound(COutPoint(it->GetTxId(), 0));
 
-        int64_t childSizes = 0;
-        for (; iter != mapNextTx.end() &&
-               iter->first.GetTxId() == it->GetTxId();
-             ++iter) {
-            txiter childit = mapTx.find(iter->second->GetTxId());
-            // mapNextTx points to in-mempool transactions
-            assert(childit != mapTx.end());
-            if (setChildrenCheck.insert(childit).second) {
-                childSizes += childit->GetTxSize();
+        const uint32_t outputCount = tx->vout.size();
+        for(uint32_t ndx = 0; ndx < outputCount; ndx++)
+        {
+            auto nextit = mapNextTx.find(COutPoint{tx->GetId(), ndx});
+            if(nextit != mapNextTx.end())
+            {
+                setChildrenCheck.insert(nextit->second);
             }
         }
         assert(setChildrenCheck == GetMemPoolChildrenNL(it));
@@ -1997,11 +1996,11 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
 
         // Disconnectpool related updates
         for (const auto& txInputData : vTxInputData) {
-            auto const txid = txInputData->GetTxnPtr()->GetId();
-            if (!ExistsNL(txid)) {
+            const auto& tx = txInputData->GetTxnPtr();
+            if (!ExistsNL(tx->GetId())) {
                 // If the transaction doesn't make it in to the mempool, remove any
                 // transactions that depend on it (which would now be orphans).
-                removeRecursiveNL(txid, changeSet, MemPoolRemovalReason::REORG);
+                removeRecursiveNL(*tx, changeSet, MemPoolRemovalReason::REORG);
             }
         }
     }

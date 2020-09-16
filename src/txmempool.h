@@ -1120,7 +1120,7 @@ private:
 
     // A non-locking version of RemoveRecursive
     void removeRecursiveNL(
-            const TxId &txid,
+            const CTransaction& origTx,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedWith = nullptr);
