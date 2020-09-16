@@ -855,55 +855,79 @@ void CTxMemPool::AddUncheckedNL(
 }
 
 void CTxMemPool::removeUncheckedNL(
-    txiter it,
+    const setEntries& entries,
     CJournalChangeSet& changeSet,
     MemPoolRemovalReason reason,
-    const CTransaction* conflictedWith) {
+    const CTransaction* conflictedWith)
+{
+    std::vector<uint256> transactionsToRemove;
+    std::uint64_t diskUsageRemoved = 0;
 
-    CTransactionRef txn { it->GetSharedTx() };
-    NotifyEntryRemoved(txn, reason);
-    for (const CTxIn &txin : txn->vin) {
-        mapNextTx.erase(txin.prevout);
-    }
-
-    // Apply to the current journal, but only if it is in the journal (primary mempool) already
-    if(it->IsInPrimaryMempool())
+    transactionsToRemove.reserve(entries.size());
+    for (auto entry : entries)
     {
-        changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, { *it });
+        if (!entry->IsInMemory())
+        {
+            transactionsToRemove.emplace_back(entry->GetTxId());
+            diskUsageRemoved += entry->GetTxSize();
+        }
+
+        const auto txn = entry->GetSharedTx();
+        NotifyEntryRemoved(txn, reason);
+        for (const auto& txin : txn->vin) {
+            mapNextTx.erase(txin.prevout);
+        }
+
+        // Apply to the current journal, but only if it is in the journal (primary mempool) already
+        if(entry->IsInPrimaryMempool())
+        {
+            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, { *entry });
+        }
+        else
+        {
+            secondaryMempoolSize--;
+        }
+
+
+        totalTxSize -= entry->GetTxSize();
+        cachedInnerUsage -= entry->DynamicMemoryUsage();
+        // FIXME: We are not implemented IncrementalDynamicMemoryUsage for unordered set.
+        //        See: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
+        //    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
+        //                        memusage::DynamicUsage(mapLinks[it].children);
+        setEntries parents;
+        TxId txid;
+        if (evictionTracker) {
+            txid = entry->GetTxId();
+            parents = std::move(mapLinks.at(entry).parents);
+        }
+
+        mapLinks.erase(entry);
+        mapTx.erase(entry);
+        nTransactionsUpdated++;
+
+        if (reason == MemPoolRemovalReason::BLOCK || reason == MemPoolRemovalReason::REORG)
+        {
+            GetMainSignals().TransactionRemovedFromMempoolBlock(txn->GetId(), reason);
+        }
+        else
+        {
+            GetMainSignals().TransactionRemovedFromMempool(txn->GetId(), reason, conflictedWith);
+        }
+
+        // Update the eviction candidate tracker.
+        TrackEntryRemoved(txid, parents);
     }
-    else
+
+    // TODO: CORE-130: Remove transactions asynchronously
+    if (transactionsToRemove.size() > 0)
     {
-        secondaryMempoolSize--;
+        InitMempoolTxDB();
+        if (!mempoolTxDB->RemoveTransactions(transactionsToRemove, diskUsageRemoved))
+        {
+            LogPrint(BCLog::MEMPOOL, "WriteBatch failed. Transactions were not removed from DB successfully.");
+        }
     }
-
-
-    totalTxSize -= it->GetTxSize();
-    cachedInnerUsage -= it->DynamicMemoryUsage();
-    // FIXME: we are not implemented IncrementalDynamicMemoryUsage for unordered set. see: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
-    //    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
-    //                        memusage::DynamicUsage(mapLinks[it].children);
-
-    setEntries parents;
-    TxId txid;
-    if (evictionTracker) {
-        txid = it->GetTxId();
-        parents = std::move(mapLinks.at(it).parents);
-    }
-    mapLinks.erase(it);
-    mapTx.erase(it);
-
-    if (reason == MemPoolRemovalReason::BLOCK || reason == MemPoolRemovalReason::REORG)
-    {
-        GetMainSignals().TransactionRemovedFromMempoolBlock(txn->GetId(), reason);
-    }
-    else
-    {   
-        GetMainSignals().TransactionRemovedFromMempool(txn->GetId(), reason, conflictedWith);
-    }
-
-    nTransactionsUpdated++;
-    
-    TrackEntryRemoved(txid, parents);
 }
 
 // Calculates descendants of entry that are not already in setDescendants, and
@@ -1146,10 +1170,7 @@ void CTxMemPool::RemoveForBlock(
     auto removedFromPrimary = RemoveFromPrimaryMempoolNL(std::move(childrenOfToRemoveGroupMembers), nonNullChangeSet.Get(), true, &toRemove);
 
     // now remove transactions from mempool
-    for(txiter entry: toRemove)
-    {
-        removeUncheckedNL(entry, nonNullChangeSet.Get(), MemPoolRemovalReason::BLOCK);
-    }
+    removeUncheckedNL(toRemove, nonNullChangeSet.Get(), MemPoolRemovalReason::BLOCK);
 
     UpdateAncestorsCountNL(std::move(childrenOfToRemove));
 
@@ -1574,6 +1595,7 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
         }
     }
 
+    // TODO: CORE-130: Save transactions asynchronously.
     InitMempoolTxDB();
     if (mempoolTxDB->AddTransactions(toBeMoved))
     {
@@ -1915,10 +1937,7 @@ void CTxMemPool::removeStagedNL(
     }
 
     // now actually remove transactions
-    for(auto it: stage)
-    {
-        removeUncheckedNL(it, changeSet, reason, conflictedWith);
-    }
+    removeUncheckedNL(stage, changeSet, reason, conflictedWith);
 
     // check if removed transactions can be re-accepted to the primary mempool
     TryAcceptToPrimaryMempoolNL(std::move(toUpdateAfterDeletion), changeSet);

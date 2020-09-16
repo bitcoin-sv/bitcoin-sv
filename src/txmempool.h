@@ -1113,7 +1113,7 @@ private:
      * in a chain before we've updated all the state for the removal.
      */
     void removeUncheckedNL(
-            txiter entry,
+            const setEntries& entries,
             mining::CJournalChangeSet& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedWith = nullptr);
