@@ -231,13 +231,6 @@ public:
 
     bool GetSpendsCoinbase() const { return spendsCoinbase; }
 
-    uint64_t GetCountWithAncestors() const { return ancestorCounts->nCountWithAncestors; }
-    uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
-    Amount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
-    int64_t GetSigOpCountWithAncestors() const {
-        return nSigOpCountWithAncestors;
-    }
-
     std::shared_ptr<CPFPGroup> group {};
     std::optional<CPFPGroupEvaluationData> groupingData {};
 

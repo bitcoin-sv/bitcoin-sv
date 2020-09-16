@@ -892,21 +892,8 @@ void CTxMemPool::CheckMempoolImplNL(
                                     nNoLimit,
                                     nNoLimit,
                                     std::nullopt);
-        uint64_t nCountCheck = setAncestors.size() + 1;
-        uint64_t nSizeCheck = it->GetTxSize();
-        Amount nFeesCheck = it->GetModifiedFee();
-        int64_t nSigOpCheck = it->GetSigOpCount();
 
-        for (txiter ancestorIt : setAncestors) {
-            nSizeCheck += ancestorIt->GetTxSize();
-            nFeesCheck += ancestorIt->GetModifiedFee();
-            nSigOpCheck += ancestorIt->GetSigOpCount();
-        }
-
-        assert(it->GetCountWithAncestors() == nCountCheck); // MARK: also used by legacy
-        assert(it->GetSizeWithAncestors() == nSizeCheck); // MARK: also used by legacy
-        assert(it->GetSigOpCountWithAncestors() == nSigOpCheck); // MARK: also used by legacy
-        assert(it->GetModFeesWithAncestors() == nFeesCheck); // MARK: also used by legacy
+        //TODO: check fee and other stuff aftrer groups are implemented
 
         // Check children against mapNextTx
         setEntries setChildrenCheck;
@@ -1082,6 +1069,7 @@ bool CTxMemPool::CompareDepthAndScore(const uint256 &hasha,
 }
 
 namespace {
+    //TODO: probably not needed any more
 class DepthAndScoreComparator {
 public:
     template<typename MempoolEntryIterator>
@@ -1746,7 +1734,8 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
                                              size_t chainLimit) const {
     std::shared_lock lock(smtx);
     auto it = mapTx.find(txid);
-    return it == mapTx.end() || (it->GetCountWithAncestors() < chainLimit);
+    // TODO: check lengtht of cahin in the secondary mempool
+    return true;
 }
 
 unsigned long CTxMemPool::Size() {

@@ -84,6 +84,8 @@ JOURNAL_BROKEN_TESTS = frozenset((
 
 # FIXME: (CORE-130) Tests broken by intermediate mempool changes
 MEMPOOL_BROKEN_TESTS = frozenset((
+    # caused by removal of ancestor statistics
+    "wallet.py",
     # Caused by removal of ancestor stats checks:
     "bsv-mempool_ancestorsizelimit.py",
     # Caused by removed descendant stats checks:
