@@ -1214,12 +1214,11 @@ void CTxMemPool::clearNL(bool skipTransactionDatabase/* = false*/) {
     ++nTransactionsUpdated;
     mJournalBuilder.clearJournal();
 
-    if (!skipTransactionDatabase)
+    if (!skipTransactionDatabase && mempoolTxDB)
     {
-        if (mempoolTxDB)
-        {
-            // FIXME: TODO: CORE-130: Clear the transaction database.
-        }
+        // FIXME: CORE-130: Clear the transaction database synchronously,
+        //        pre-empting asynchronouse writes and deletes.
+        mempoolTxDB->ClearDatabase();
     }
 }
 

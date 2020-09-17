@@ -3,15 +3,27 @@
 // LICENSE.
 
 #include "mempooltxdb.h"
-#include <core_read.cpp>
+
+#include <new>
 
 CMempoolTxDB::CMempoolTxDB(size_t nCacheSize, bool fMemory, bool fWipe)
-    : mempoolTxDB{GetDataDir() / "mempoolTxDB", nCacheSize, fMemory, fWipe}
+    : mempoolTxDB{GetDataDir() / "mempoolTxDB", nCacheSize, fMemory, fWipe},
+      saved_nCacheSize{nCacheSize},
+      saved_fMemory{fMemory}
 {
     if (!mempoolTxDB.Read(DB_DISK_USAGE, diskUsage))
     {
         diskUsage = 0;
     }
+}
+
+void CMempoolTxDB::ClearDatabase()
+{
+    const auto nCacheSize = saved_nCacheSize;
+    const auto fMemory = saved_fMemory;
+
+    this->~CMempoolTxDB();
+    new(this) CMempoolTxDB(nCacheSize, fMemory, true);
 }
 
 bool CMempoolTxDB::AddTransaction(
