@@ -362,7 +362,7 @@ void CTxMemPool::GetMemPoolAncestorsNL(
 
 
 void CTxMemPool::updateAncestorsOfNL(bool add, txiter it) {
-    setEntries parentIters = GetMemPoolParentsNL(it); // MARK: also used by legacy
+    setEntries parentIters = GetMemPoolParentsNL(it);
     // add or remove this tx as a child of each parent
     for (txiter piter : parentIters) {
         updateChildNL(piter, it, add);
@@ -964,7 +964,7 @@ void CTxMemPool::GetDescendantsNL(txiter entryit,
         setDescendants.insert(it);
         stage.erase(it);
 
-        const setEntries &setChildren = GetMemPoolChildrenNL(it); // MARK: also used by legacy
+        const setEntries &setChildren = GetMemPoolChildrenNL(it);
         for (const txiter &childiter : setChildren) {
             if (!setDescendants.count(childiter)) {
                 stage.insert(childiter);
@@ -1336,7 +1336,7 @@ void CTxMemPool::CheckMempoolImplNL(
             assert(it3->second->GetId() == tx->GetId());
             i++;
         }
-        assert(setParentCheck == GetMemPoolParentsNL(it)); // MARK: also used by legacy         
+        assert(setParentCheck == GetMemPoolParentsNL(it));
         assert(ancestorsCount == it->ancestorsCount);
         if(secondaryMempoolAncestorsCount)
         {
@@ -1368,7 +1368,7 @@ void CTxMemPool::CheckMempoolImplNL(
                 childSizes += childit->GetTxSize();
             }
         }
-        assert(setChildrenCheck == GetMemPoolChildrenNL(it)); // MARK: also used by legacy
+        assert(setChildrenCheck == GetMemPoolChildrenNL(it));
 
         if (fDependsWait) {
             waitingOnDependants.push_back(&(*it));
@@ -1735,10 +1735,10 @@ void CTxMemPool::PrioritiseTransaction(
 void CTxMemPool::ApplyDeltas(const uint256& hash, double &dPriorityDelta,
                              Amount &nFeeDelta) const {
     std::shared_lock lock(smtx);
-    ApplyDeltasNL(hash, dPriorityDelta, nFeeDelta); // MARK: also used by legacy
+    ApplyDeltasNL(hash, dPriorityDelta, nFeeDelta);
 }
 
-void CTxMemPool::ApplyDeltasNL(  // MARK: used by legacy
+void CTxMemPool::ApplyDeltasNL(
         const uint256& hash,
         double &dPriorityDelta,
         Amount &nFeeDelta) const {
