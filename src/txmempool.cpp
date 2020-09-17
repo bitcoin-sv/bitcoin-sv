@@ -113,7 +113,8 @@ CTxPrioritizer::~CTxPrioritizer()
 CTransactionRefWrapper::CTransactionRefWrapper() {
 }
 
-CTransactionRefWrapper::CTransactionRefWrapper(const CTransactionRef &_tx, const std::shared_ptr<CMempoolTxDB>& txDB)
+CTransactionRefWrapper::CTransactionRefWrapper(const CTransactionRef &_tx,
+                                               const std::shared_ptr<CMempoolTxDBReader>& txDB)
     : tx{_tx}
     , txid{_tx->GetId()}
     , mempoolTxDB{txDB}
@@ -142,29 +143,7 @@ CTransactionRef CTransactionRefWrapper::GetTx() const {
     return GetTxFromDB();
 }
 
-void CTransactionRefWrapper::MoveTxToDisk() const {
-    CTransactionRef tmp = std::atomic_load(&tx);
-    if (tmp) 
-    {
-        if (mempoolTxDB)
-        {
-            if (mempoolTxDB->AddTransaction(txid, tmp)) {
-                tmp = nullptr;
-                std::atomic_store(&tx, tmp);
-            }
-        }
-        else
-        {
-            LogPrint(BCLog::MEMPOOL, "Transaction %s has no DB configured\n", txid.ToString());
-        }
-    }
-    else
-    {
-        LogPrint(BCLog::MEMPOOL, "Transaction %s is already on disk\n", txid.ToString());
-    }
-}
-
-void CTransactionRefWrapper::UpdateMoveTxToDisk() const {
+void CTransactionRefWrapper::UpdateTxMovedToDisk() const {
     std::atomic_store(&tx, CTransactionRef(nullptr));
 }
 
@@ -239,12 +218,8 @@ void CTxMemPoolEntry::UpdateLockPoints(const LockPoints &lp) {
     lockPoints = lp;
 }
 
-void CTxMemPoolEntry::MoveTxToDisk() const {
-    tx.MoveTxToDisk();
-}
-
-void CTxMemPoolEntry::UpdateMoveTxToDisk() const {
-    tx.UpdateMoveTxToDisk();
+void CTxMemPoolEntry::UpdateTxMovedToDisk() const {
+    tx.UpdateTxMovedToDisk();
 }
 
 bool CTxMemPoolEntry::IsInMemory() const {
@@ -1622,7 +1597,7 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
     {
         for (const CTxMemPoolEntry* entry : toBeUpdated)
         {
-            entry->UpdateMoveTxToDisk();
+            entry->UpdateTxMovedToDisk();
         }
     }
     else

@@ -33,6 +33,7 @@
 #include <vector>
 #include <mutex>
 #include <shared_mutex>
+#include <thread>
 #include <unordered_map>
 
 class CAutoFile;
@@ -41,6 +42,7 @@ class CEvictionCandidateTracker;
 class Config;
 class CoinsDB;
 class CoinsDBView;
+class CMempoolTxDBReader;
 class CMempoolTxDB;
 
 inline double AllowFreeThreshold() {
@@ -140,24 +142,23 @@ using GroupID = std::optional<TxId>;
 
 class CTransactionRefWrapper {
 private:
-    mutable CTransactionRef tx {};
+    mutable CTransactionRef tx {nullptr};
     // Transaction Id
     TxId txid {};
     // Mempool Transaction database
-    std::shared_ptr<CMempoolTxDB> mempoolTxDB {};
+    std::shared_ptr<CMempoolTxDBReader> mempoolTxDB {nullptr};
 
     CTransactionRef GetTxFromDB() const;
 
 public:
     CTransactionRefWrapper();
-    CTransactionRefWrapper(const CTransactionRef &tx, const std::shared_ptr<CMempoolTxDB>& txDB);
+    CTransactionRefWrapper(const CTransactionRef &tx,
+                           const std::shared_ptr<CMempoolTxDBReader>& txDB);
 
     CTransactionRef GetTx() const;
     const TxId& GetId() const;
 
-    void MoveTxToDisk() const;
-    void UpdateMoveTxToDisk() const;
-
+    void UpdateTxMovedToDisk() const;
     bool IsInMemory() const;
 
     bool HasDatabase(const std::shared_ptr<CMempoolTxDB>& txDB) const noexcept;
@@ -255,8 +256,7 @@ public:
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     std::shared_ptr<const CPFPGroup> GetCPFPGroup() const { return group; }
 
-    void MoveTxToDisk() const;
-    void UpdateMoveTxToDisk() const;
+    void UpdateTxMovedToDisk() const;
     bool IsInMemory() const;
 
     template<typename X> struct UnitTestAccess;

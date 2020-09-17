@@ -8,8 +8,15 @@
 #include "dbwrapper.h"
 #include "primitives/transaction.h"
 
+/** Read-only access to transactions in the database. */
+class CMempoolTxDBReader {
+public:
+    virtual ~CMempoolTxDBReader() = default;
+    virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) = 0;
+};
+
 /** Access to the mempool transaction database (mempoolTxs/) */
-class CMempoolTxDB {
+class CMempoolTxDB : public CMempoolTxDBReader {
 private:
     // Prefix to store map of Transaction values with txid as a
     // key
@@ -54,7 +61,7 @@ public:
     /*
      * Used to retrieve transaction from the database.
      */
-    bool GetTransaction(const uint256 &txid, CTransactionRef &tx);
+    virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override;
 
     /*
      * Used to remove all transactions from the database.
@@ -67,4 +74,4 @@ public:
     uint64_t GetDiskUsage();
 };
 
-#endif // BITCOIN_MEMPOOLDB_H
+#endif // BITCOIN_MEMPOOLTXDB_H
