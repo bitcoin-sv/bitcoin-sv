@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2020 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #
 # Test merkleblock fetch/validation
@@ -84,7 +84,7 @@ class MerkleBlockTest(BitcoinTestFramework):
             self.nodes[2].gettxoutproof([txid_spent], blockhash)), [txid_spent])
         # We can't get the proof if we specify a non-existent block
         assert_raises_rpc_error(-5, "Block not found", self.nodes[2].gettxoutproof, [
-            txid_spent], "00000000000000000000000000000000")
+            txid_spent], "1234567890abcdef1234567890abcdef")
         # We can get the proof if the transaction is unspent
         assert_equal(self.nodes[2].verifytxoutproof(
             self.nodes[2].gettxoutproof([txid_unspent])), [txid_unspent])

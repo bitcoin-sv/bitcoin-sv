@@ -242,6 +242,105 @@ void getrawtransaction(const Config& config,
     textWriter.Write(", \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
 }
 
+/*
+ * Returns a block index of a block that contains one of the transactions in setTxIds or
+ * block index represented with "requestedBlockHash" parameter.
+ * Note that this function assumes all transactions in setTxIds are in the same block unless requestedBlockHash was provided.
+ * In this case exception is thrown if at least one transaction in setTxIds was not found in the related block.
+ */
+static CBlockIndex* GetBlockIndex(const Config& config,
+                                  const uint256& requestedBlockHash,
+                                  const std::set<TxId>& setTxIds)
+{
+    CBlockIndex* pblockindex = nullptr;
+
+    if (!requestedBlockHash.IsNull())
+    {
+        LOCK(cs_main);
+        // Find requested block
+        if (!mapBlockIndex.count(requestedBlockHash))
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+        }
+        pblockindex = mapBlockIndex[requestedBlockHash];
+
+        // Check if all provided transactions are in the block 
+        CBlock block;
+        bool allTxIdsFound = false;
+        if (ReadBlockFromDisk(block, pblockindex, config))
+        {
+            int numberOfTxIdsFound = 0;
+            for (const auto &tx : block.vtx)
+            {
+                if (setTxIds.find(tx->GetId()) != setTxIds.end())
+                {
+                    ++numberOfTxIdsFound;
+                }
+                if (numberOfTxIdsFound == setTxIds.size())
+                {
+                    // All txIds found, no need to check further
+                    allTxIdsFound = true;
+                    break;
+                }
+            }
+        }
+        if (!allTxIdsFound)
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
+        }
+    }
+    else
+    {
+        // Try to find a block containing at least one requested transaction with utxo
+        for (const TxId& txid : setTxIds)
+        {
+            const Coin& coin = AccessByTxid(*pcoinsTip, txid);
+            if (!coin.IsSpent())
+            {
+                LOCK(cs_main);
+                pblockindex = chainActive[coin.GetHeight()];
+                break;
+            }
+        }
+    }
+
+    //When hashBlock was not specified and none of requested transactions have unspent outputs
+    //try to find the block from txindex
+    if (pblockindex == nullptr)
+    {
+        CTransactionRef tx;
+        uint256 foundBlockHash;
+        bool isGenesisEnabledDummy; // not used
+        if (!GetTransaction(config, *setTxIds.cbegin(), tx, false, foundBlockHash, isGenesisEnabledDummy) ||
+            foundBlockHash.IsNull())
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+                               "Transaction not yet in block or -txindex is not enabled");
+        }
+
+        LOCK(cs_main);
+        if (!mapBlockIndex.count(foundBlockHash))
+        {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
+        }
+        pblockindex = mapBlockIndex[foundBlockHash];
+    }
+    return pblockindex;
+}
+
+/*
+ * Returns a block file stream reader for a given block index
+ */
+static std::unique_ptr<CBlockStreamReader<CFileReader>>  GetBlockStream(CBlockIndex& pblockindex)
+{
+    auto stream = GetDiskBlockStreamReader(pblockindex.GetBlockPos());
+    if (!stream)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+    }
+    return stream;
+}
+
 static UniValue gettxoutproof(const Config &config,
                               const JSONRPCRequest &request) {
     if (request.fHelp ||
@@ -272,7 +371,7 @@ static UniValue gettxoutproof(const Config &config,
     }
 
     std::set<TxId> setTxIds;
-    TxId oneTxId;
+
     UniValue txids = request.params[0].get_array();
     for (unsigned int idx = 0; idx < txids.size(); idx++) {
         const UniValue &utxid = txids[idx];
@@ -290,52 +389,14 @@ static UniValue gettxoutproof(const Config &config,
         }
 
         setTxIds.insert(txid);
-        oneTxId = txid;
     }
 
-    LOCK(cs_main);
-
-    CBlockIndex *pblockindex = nullptr;
-
-    uint256 hashBlock;
-    if (request.params.size() > 1) {
-        hashBlock = uint256S(request.params[1].get_str());
-        if (!mapBlockIndex.count(hashBlock))
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-        pblockindex = mapBlockIndex[hashBlock];
-    } else {
-        // Loop through txids and try to find which block they're in. Exit loop
-        // once a block is found.
-        for (const auto &txid : setTxIds) {
-            const Coin &coin = AccessByTxid(*pcoinsTip, txid);
-            if (!coin.IsSpent()) {
-                pblockindex = chainActive[coin.GetHeight()];
-                break;
-            }
-        }
+    uint256 requestedBlockHash;
+    if (request.params.size() > 1)
+    {
+        requestedBlockHash = uint256S(request.params[1].get_str());
     }
-
-    if (pblockindex == nullptr) {
-        CTransactionRef tx;
-        bool isGenesisEnabledDummy; // not used
-        if (!GetTransaction(config, oneTxId, tx, false, hashBlock, isGenesisEnabledDummy) ||
-            hashBlock.IsNull()) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
-                               "Transaction not yet in block");
-        }
-
-        if (!mapBlockIndex.count(hashBlock)) {
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Transaction index corrupt");
-        }
-
-        pblockindex = mapBlockIndex[hashBlock];
-    }
-
-    auto stream =
-        GetDiskBlockStreamReader(pblockindex->GetBlockPos());
-    if (!stream) {
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
-    }
+    auto stream = GetBlockStream(*GetBlockIndex(config, requestedBlockHash, setTxIds));
 
     CMerkleBlock mb;
 
