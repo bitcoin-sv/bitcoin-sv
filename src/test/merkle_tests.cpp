@@ -106,7 +106,7 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
             BOOST_CHECK(unmutatedMutated == false);
             uint256 newestUnmutatedRoot;
             {
-                CMerkleTree newestMerkleTree(block.vtx);
+                CMerkleTree newestMerkleTree(block.vtx, uint256(), 0);
                 newestUnmutatedRoot = newestMerkleTree.GetMerkleRoot();
             }
             // Optionally mutate by duplicating the last transactions, resulting
@@ -131,7 +131,7 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
             uint256 newRoot = BlockMerkleRoot(block, &newMutated);
             uint256 newestRoot;
             {
-                CMerkleTree newestMerkleTree(block.vtx);
+                CMerkleTree newestMerkleTree(block.vtx, uint256(), 0);
                 newestRoot = newestMerkleTree.GetMerkleRoot();
             }
             BOOST_CHECK(oldRoot == newRoot);
@@ -156,7 +156,7 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
                     std::vector<uint256> oldBranch =
                         BlockGetMerkleBranch(block, merkleTree, mtx);
 
-                    CMerkleTree newestMerkleTree(block.vtx);
+                    CMerkleTree newestMerkleTree(block.vtx, uint256(), 0);
                     CMerkleTree::MerkleProof newestBranch = newestMerkleTree.GetMerkleProof(block.vtx[mtx]->GetId(), false);
                     BOOST_CHECK(newestBranch.transactionIndex == mtx);
 
@@ -203,7 +203,7 @@ BOOST_AUTO_TEST_CASE(merkle_tree_test)
             block.vtx[txIndex] = MakeTransactionRef(std::move(mtx));
         }
         // Constructor will create merkle tree by splitting it into two subtrees, parallel calculation and merging them
-        CMerkleTree merkleTree(block.vtx, pMerkleTreeThreadPool.get());
+        CMerkleTree merkleTree(block.vtx, uint256(), 0, pMerkleTreeThreadPool.get());
         uint256 originalMerkleRoot = BlockMerkleRoot(block);
         uint256 newMerkleRoot = merkleTree.GetMerkleRoot();
         // root from CMerkleTree instance must be same as legacy merkle root

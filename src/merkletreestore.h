@@ -40,6 +40,35 @@ private:
     uint64_t diskUsage;
     // Absolute path to the folder containing Merkle Tree data files
     const fs::path merkleStorePath;
+    /**
+     * Defines if we can write index to the database.
+     * Value is set to false when:
+     * - index cannot be updated after data files were changed
+     * - index can be updated after data files were changed, but is still marked as out of sync
+     * - index cannot be rebuilt from data files
+     * When set to false, no changes are done on the database anymore. Merkle trees
+     * are still written to data files and index is kept in memory.
+     * Index in the database can be rebuilt when node is restarted.
+     * Value is set to true only on initialization when:
+     * - index was successfully loaded from database
+     * - index was successfully rebuilt from data files
+     */
+    bool writeIndexToDatabase;
+    /**
+     * Defines if index was successfully loaded from database or rebuilt from data files.
+     * Value is set to true when:
+     * - index cannot be rebuilt from data files
+     * Index is rebuilt from data files during initialization when it cannot be loaded
+     * from database or when it is marked as out of sync.
+     * When indexNotLoaded is set to true, merkle trees will not be stored to data files.
+     * Calling StoreMerkleTree will have no affect.
+     * Value is set to false only on initialization when:
+     * - index was successfully loaded from the database
+     * - index was successfully rebuilt from data files
+     */
+    bool indexNotLoaded;
+    // LevelDB cache size
+    size_t databaseCacheSize;
     // Merkle Tree data files information stored in the database
     std::unique_ptr<CMerkleTreeIndexDB> merkleTreeIndexDB;
 
@@ -83,6 +112,31 @@ private:
      */
     void ResetStateNL();
 
+    /**
+     * Helper function used after write or prune of data files. 
+     * Depending on databaseUpdateFailed it either:
+     * - marks index as NOT out of sync
+     *   - when databaseeUpdateFailed is false
+     * - sets writeIndexToDatabase to false to prevent future database changes
+     *   - when databaseeUpdateFailed is true
+     *   - when it cannot mark index as NOT out of sync
+     *   - index is already marked as out of sync and it will be rebuilt on next node start
+     * logPrefix is used as prefix for log entries.
+     */
+    void ResetIndexOutOfSyncNL(bool databaseUpdateFailed, const std::string& logPrefix);
+
+    /**
+     * Creates new index from existing Merkle Tree data files.
+     * Returns false if index could not be created.
+     */
+    bool ReindexMerkleTreeStoreNL();
+
+    /**
+     * Loads index data from the database.
+     * Returns false if index could not be read from the database.
+     */
+    bool LoadDBIndexNL();
+
 public:
     /**
      * Constructs a Merkle Tree store on specified path and with configured Merkle tree index database cache.
@@ -90,12 +144,12 @@ public:
     CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize);
 
     /**
-     * Stores given merkleTreeIn data to disk. 
-     * blockHash is hash and blockHeight is height of a block from which Merkle tree was calculated
+     * Stores given merkleTreeIn data to disk.
+     * merkleTreeIn must have proper blockHash and blockHeight set.
      * chainHeight should be set to the current chain height to prevent pruning of latest Merkle Trees
      * Returns false if Merkle Tree with given blockHash was already written or in case of errors.
      */
-    bool StoreMerkleTree(const Config& config, const uint256& blockHash, const int32_t blockHeight, const CMerkleTree& merkleTreeIn, const int32_t chainHeight);
+    bool StoreMerkleTree(const Config& config, const CMerkleTree& merkleTreeIn, const int32_t chainHeight);
 
     /**
      * Reads Merkle Tree data represented by blockHash.

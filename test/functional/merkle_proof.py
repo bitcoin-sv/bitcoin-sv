@@ -8,7 +8,7 @@
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import connect_nodes, assert_equal, Decimal, assert_raises_rpc_error, sync_blocks, random, assert_greater_than
-import os
+import os, shutil
 
 class MerkleProofTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -36,6 +36,12 @@ class MerkleProofTest(BitcoinTestFramework):
         # 32 bytes for each hash
         merkle_tree_size *= 32
         return merkle_tree_size
+
+    def verify_stored_data(self, verifyData, node):
+        for verifyBlockHash in verifyData:
+            verifyTransactions = verifyData[verifyBlockHash]
+            for verifyTxid in verifyTransactions:
+                self.verify_merkle_proof(verifyTxid, verifyBlockHash, node)
 
     def run_test(self):
         self.log.info("Mining 500 blocks...")
@@ -142,6 +148,7 @@ class MerkleProofTest(BitcoinTestFramework):
         self.log.info("Mining blocks with random transactions using all utxos...")
         utxos = self.nodes[0].listunspent()
         calculated_merkle_tree_disk_size = 0
+        verifyData = {}
         while len(utxos) > 0:
             # Choose random number of transactions
             send_transactions = random.randint(1, 400)
@@ -159,10 +166,10 @@ class MerkleProofTest(BitcoinTestFramework):
             # Verify proofs of some random transactions in each block
             hash_of_this_block = self.nodes[0].getblockhash(self.nodes[0].getblockcount())
             transactions_of_this_block = self.nodes[0].getblock(hash_of_this_block, True)["tx"]
-            for i in range(len(transactions_of_this_block)):
-                transactionIndex = random.randint(0, len(transactions_of_this_block) - 1)
-                self.verify_merkle_proof(transactions_of_this_block[transactionIndex], hash_of_this_block, 0)
             calculated_merkle_tree_disk_size += self.merkle_tree_size(len(transactions_of_this_block))
+            verifyData[hash_of_this_block] = transactions_of_this_block
+        # Verify merkle proofs of all transactions in all blocks
+        self.verify_stored_data(verifyData, 0)
         
         # Data files checks
         number_of_data_files = 0
@@ -180,6 +187,22 @@ class MerkleProofTest(BitcoinTestFramework):
         assert_greater_than(disk_size, calculated_merkle_tree_disk_size)
         # Number of data files should be at least calculated_merkle_tree_disk_size/preferred_file_size
         assert_greater_than(number_of_data_files, calculated_merkle_tree_disk_size/(30 * 1024))
+
+        # Delete index to test recreation of index when node is started again
+        self.log.info("Restarting nodes to remove Merkle Trees index...")
+        self.stop_nodes()
+        node0_index_dir = os.path.join(node0_data_dir, "index", "")
+        shutil.rmtree(node0_index_dir)
+        self.start_nodes(self.extra_args)
+        # Repeat merkle proof checks
+        self.verify_stored_data(verifyData, 0)
+        # Since index was recreated from data files, requesting existing merkle trees shouldn't create any new data
+        new_disk_size = 0
+        for data_file in os.listdir(node0_data_dir):
+            data_file_name = node0_data_dir + data_file
+            if os.path.isfile(data_file_name):
+                new_disk_size += os.path.getsize(data_file_name)
+        assert_equal(disk_size, new_disk_size)
 
 if __name__ == '__main__':
     MerkleProofTest().main()

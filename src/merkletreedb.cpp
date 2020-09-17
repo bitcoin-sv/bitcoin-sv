@@ -7,6 +7,11 @@ CMerkleTreeIndexDB::CMerkleTreeIndexDB(const fs::path& databasePath, size_t leve
     : merkleTreeIndexDB(databasePath, leveldbCacheSize, fMemory, fWipe)
 {
     // Write initial records if they do not yet exist
+    bool isIndexOutOfSync = true;
+    if (!merkleTreeIndexDB.Read(DB_MERKLE_TREES_INDEX_OUT_OF_SYNC, isIndexOutOfSync))
+    {
+        merkleTreeIndexDB.Write(DB_MERKLE_TREES_INDEX_OUT_OF_SYNC, isIndexOutOfSync);
+    }
     MerkleTreeDiskPosition nextDiskPosition;
     if (!merkleTreeIndexDB.Read(DB_NEXT_MERKLE_TREE_DISK_POSITION, nextDiskPosition))
     {
@@ -79,4 +84,14 @@ bool CMerkleTreeIndexDB::RemoveMerkleTreeData(const std::vector<int>& suffixesOf
     batch.Write(DB_MERKLE_TREES_DISK_USAGE, updatedDiskUsage);
 
     return merkleTreeIndexDB.WriteBatch(batch, true);
+}
+
+bool CMerkleTreeIndexDB::SetIndexOutOfSync(bool isIndexOutOfSyncIn)
+{
+    return merkleTreeIndexDB.Write(DB_MERKLE_TREES_INDEX_OUT_OF_SYNC, isIndexOutOfSyncIn);
+}
+
+bool CMerkleTreeIndexDB::GetIndexOutOfSync(bool& isIndexOutOfSyncOut)
+{
+    return merkleTreeIndexDB.Read(DB_MERKLE_TREES_INDEX_OUT_OF_SYNC, isIndexOutOfSyncOut);
 }

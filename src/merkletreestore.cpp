@@ -5,13 +5,15 @@
 #include "util.h"
 #include "config.h"
 #include "clientversion.h"
+#include <regex>
 
 /* Global state of Merkle Tree factory.
  * Merkle Trees are stored in memory cache and on disk when requested (RPC).
  */
 std::unique_ptr<CMerkleTreeFactory> pMerkleTreeFactory = nullptr;
 
-CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize) : diskUsage(0), merkleStorePath(storePath)
+CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize)
+    : diskUsage(0), merkleStorePath(storePath), writeIndexToDatabase(false), indexNotLoaded(true), databaseCacheSize(leveldbCacheSize)
 {
     merkleTreeIndexDB = std::make_unique<CMerkleTreeIndexDB>(merkleStorePath / "index", leveldbCacheSize);
 }
@@ -123,6 +125,13 @@ bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t ne
         return false;
     }
 
+    // Mark index as out of sync when we need to prune data files
+    if (writeIndexToDatabase && !merkleTreeIndexDB->SetIndexOutOfSync(true))
+    {
+        //Don't prune data files if we can't mark index as out of sync
+        return error("PruneDataFilesNL: Cannot mark index as out of sync. Merkle Tree data files will not be pruned.");
+    }
+
     /* Prune until usage is below the limit and there are still candidates to prune
      * For database synchronization, store block hashes of Merkle Trees removed and
      * suffixes of data files removed
@@ -156,7 +165,11 @@ bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t ne
     }
 
     // Sync with the database
-    merkleTreeIndexDB->RemoveMerkleTreeData(suffixesOfDataFilesRemoved, blockHashesOfMerkleTreesRemoved, nextDiskPosition, diskUsage);
+    if (writeIndexToDatabase)
+    {
+        bool databaseUpdateFailed = !merkleTreeIndexDB->RemoveMerkleTreeData(suffixesOfDataFilesRemoved, blockHashesOfMerkleTreesRemoved, nextDiskPosition, diskUsage);
+        ResetIndexOutOfSyncNL(databaseUpdateFailed, "PruneDataFilesNL");
+    }
 
     if ((diskUsage + newDataSizeInBytesToAdd) > maxDiskSpace)
     {
@@ -166,11 +179,11 @@ bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t ne
     return true;
 }
 
-bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const uint256& blockHash, const int32_t blockHeight, const CMerkleTree& merkleTreeIn, const int32_t chainHeight)
+bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const CMerkleTree& merkleTreeIn, const int32_t chainHeight)
 {
     LOCK(cs_merkleTreeStore);
-    // Continue only if it was not yet written
-    if (diskPositionMap.count(blockHash))
+    // Continue only if index was successfully loaded or rebuilt and merkle tree was not yet written
+    if (indexNotLoaded || diskPositionMap.count(merkleTreeIn.GetBlockHash()))
     {
         return false;
     }
@@ -181,6 +194,20 @@ bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const uint256& bloc
     if (!PruneDataFilesNL(config.GetMaxMerkleTreeDiskSpace(), merkleTreeSizeBytes, chainHeight))
     {
         return error("StoreMerkleTree: Merkle Tree of size %u will not be written to keep disk size hard limit", merkleTreeSizeBytes);
+    }
+
+    // Check disk space before write, there should be at least nMinDiskSpace available
+    uint64_t diskFreeBytesAvailable = fs::space(merkleStorePath).available;
+    if (diskFreeBytesAvailable < (nMinDiskSpace + merkleTreeSizeBytes))
+    {
+        return error("StoreMerkleTree: Disk space is low (%u bytes available), Merkle Trees will not be written.", diskFreeBytesAvailable);
+    }
+
+    // Mark index as out of sync when writing to data files
+    if (writeIndexToDatabase && !merkleTreeIndexDB->SetIndexOutOfSync(true))
+    {
+        //Don't store to disk if we can't mark index as out of sync
+        return error("StoreMerkleTree: Cannot mark index as out of sync. Merkle Tree will not be stored to disk.");
     }
 
     MerkleTreeDiskPosition writeAtPosition = nextDiskPosition;
@@ -209,11 +236,15 @@ bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const uint256& bloc
         return error("StoreMerkleTree: cannot store to data file: %s", e.what());
     }
 
-    AddNewDataNL(blockHash, blockHeight, writeAtPosition, merkleTreeSizeBytes);
+    AddNewDataNL(merkleTreeIn.GetBlockHash(), merkleTreeIn.GetBlockHeight(), writeAtPosition, merkleTreeSizeBytes);
 
     //Sync with the database
     MerkleTreeFileInfo updatedFileInfo = fileInfoMap[writeAtPosition.fileSuffix];
-    merkleTreeIndexDB->AddMerkleTreeData(blockHash, writeAtPosition, nextDiskPosition, updatedFileInfo, diskUsage);
+    if (writeIndexToDatabase)
+    {
+        bool databaseUpdateFailed = !merkleTreeIndexDB->AddMerkleTreeData(merkleTreeIn.GetBlockHash(), writeAtPosition, nextDiskPosition, updatedFileInfo, diskUsage);
+        ResetIndexOutOfSyncNL(databaseUpdateFailed, "StoreMerkleTree");
+    }
 
     return true;
 }
@@ -254,6 +285,24 @@ bool CMerkleTreeStore::LoadMerkleTreeIndexDB()
     // Clear current data
     ResetStateNL();
 
+    // Check if Merkle Trees index is out of sync
+    bool isIndexOutOfSync = true;
+    if (!merkleTreeIndexDB->GetIndexOutOfSync(isIndexOutOfSync))
+    {
+        LogPrintf("LoadMerkleTreeIndexDB() : cannot check if index is out of sync\n");
+    }
+    if (isIndexOutOfSync || (!isIndexOutOfSync && !LoadDBIndexNL()))
+    {
+        // Rebuild index if database is not in sync or it cannot be loaded
+        LogPrintf("LoadMerkleTreeIndexDB() : Index in the database is out of sync, rebuilding index from current data files\n");
+        return ReindexMerkleTreeStoreNL();
+    }
+    return true;
+}
+
+bool CMerkleTreeStore::LoadDBIndexNL()
+{
+    AssertLockHeld(cs_merkleTreeStore);
     // Measure duration of loading Merkle tree index database
     auto loadMerkleTreeIndexDBStartedAt = std::chrono::high_resolution_clock::now();
 
@@ -266,7 +315,7 @@ bool CMerkleTreeStore::LoadMerkleTreeIndexDB()
         if (!diskPositionsIterator.GetValue(diskPosition))
         {
             ResetStateNL();
-            return error("LoadMerkleTreeIndexDB() : failed to read disk position value");
+            return error("LoadDBIndexNL() : failed to read disk position value");
         }
         diskPositionMap[blockHash] = diskPosition;
         diskPositionsIterator.Next();
@@ -276,7 +325,7 @@ bool CMerkleTreeStore::LoadMerkleTreeIndexDB()
     if (!merkleTreeIndexDB->GetNextDiskPosition(nextDiskPosition))
     {
         ResetStateNL();
-        return error("LoadMerkleTreeIndexDB() : failed to read next disk position value");
+        return error("LoadDBIndexNL() : failed to read next disk position value");
     }
 
     // Load Merkle Tree file infos
@@ -288,7 +337,7 @@ bool CMerkleTreeStore::LoadMerkleTreeIndexDB()
         if (!fileInfosIterator.GetValue(fileInfo))
         {
             ResetStateNL();
-            return error("LoadMerkleTreeIndexDB() : failed to read file info value");
+            return error("LoadDBIndexNL() : failed to read file info value");
         }
         fileInfoMap[fileSuffix] = fileInfo;
         fileInfosIterator.Next();
@@ -298,14 +347,16 @@ bool CMerkleTreeStore::LoadMerkleTreeIndexDB()
     if (!merkleTreeIndexDB->GetDiskUsage(diskUsage))
     {
         ResetStateNL();
-        return error("LoadMerkleTreeIndexDB() : failed to read disk usage value");
+        return error("LoadDBIndexNL() : failed to read disk usage value");
     }
 
     auto loadMerkleTreeIndexDBStoppedAt = std::chrono::high_resolution_clock::now();
     auto loadMerkleTreeIndexDBDuration = std::chrono::duration_cast<std::chrono::milliseconds>(loadMerkleTreeIndexDBStoppedAt - loadMerkleTreeIndexDBStartedAt);
 
-    LogPrintf("LoadMerkleTreeIndexDB() : CMerkleTreeIndexDB loaded in " + std::to_string(loadMerkleTreeIndexDBDuration.count())  + "ms\n");
+    LogPrintf("LoadDBIndexNL() : CMerkleTreeIndexDB loaded in " + std::to_string(loadMerkleTreeIndexDBDuration.count())  + "ms\n");
 
+    writeIndexToDatabase = true;
+    indexNotLoaded = false;
     return true;
 }
 
@@ -317,6 +368,138 @@ void CMerkleTreeStore::ResetStateNL()
     nextDiskPosition.fileSuffix = 0;
     fileInfoMap.clear();
     diskUsage = 0;
+    writeIndexToDatabase = false;
+    indexNotLoaded = true;
+}
+
+void CMerkleTreeStore::ResetIndexOutOfSyncNL(bool databaseUpdateFailed, const std::string& logPrefix)
+{
+    AssertLockHeld(cs_merkleTreeStore);
+    if (databaseUpdateFailed)
+    {
+        // Index could not be updated on database
+        LogPrintf("%s: Could not update the index. Index will no longer be updated and will be rebuilt on next initialization.\n", logPrefix);
+        writeIndexToDatabase = false;
+    }
+    else
+    {
+        if (!merkleTreeIndexDB->SetIndexOutOfSync(false))
+        {
+            // Database was successfully updated but index could not be marked as in sync
+            LogPrintf("%s: Cannot mark index as in sync. Index will no longer be updated and will be rebuilt on next initialization.\n", logPrefix);
+            writeIndexToDatabase = false;
+        }
+    }
+}
+
+bool CMerkleTreeStore::ReindexMerkleTreeStoreNL()
+{
+    AssertLockHeld(cs_merkleTreeStore);
+    // Measure duration of index creation
+    auto reindexStartedAt = std::chrono::high_resolution_clock::now();
+    // Check all mrk<suffix>.dat files in merkleStorePath to get min and max suffixes first
+    // RegEx to check data file base name (name without the extension)
+    static const std::regex merkleDataFileBaseNameRegEx("^mrk([0-9]+)$");
+    int minSuffix = std::numeric_limits<int>::max();
+    int maxSuffix = 0;
+    for (fs::directory_iterator it(merkleStorePath); it != fs::directory_iterator(); ++it)
+    {
+        std::string merkleDataFileBaseName = fs::basename(it->path());
+        std::smatch merkleDataFileBaseNameMatch;
+        if (!fs::is_directory(*it) && fs::extension(*it) == ".dat" && std::regex_search(merkleDataFileBaseName, merkleDataFileBaseNameMatch, merkleDataFileBaseNameRegEx))
+        {
+            int currentFileSuffix = 0;
+            try
+            {
+                currentFileSuffix = std::stoi(merkleDataFileBaseNameMatch[1].str());
+            }
+            catch (std::exception& e)
+            {
+                LogPrintf("ReindexMerkleTreeStoreNL() : Cannot get suffix from %s data file, skipping\n", it->path().string());
+                continue;
+            }
+
+            if (currentFileSuffix < minSuffix)
+            {
+                minSuffix = currentFileSuffix;
+            }
+            if (currentFileSuffix > maxSuffix)
+            {
+                maxSuffix = currentFileSuffix;
+            }
+        }
+    }
+
+    // Clear current data and wipe the database
+    ResetStateNL();
+    merkleTreeIndexDB.reset();
+    merkleTreeIndexDB = std::make_unique<CMerkleTreeIndexDB>(merkleStorePath / "index", databaseCacheSize, false, true);
+
+    // Open current data files in order from minSuffix to maxSuffix
+    for (int currentSuffix = minSuffix; currentSuffix <= maxSuffix; ++currentSuffix)
+    {
+        MerkleTreeDiskPosition currentPosition{currentSuffix, 0};
+        fs::path currentFilePath = GetDataFilename(currentPosition.fileSuffix);
+        if (!fs::exists(currentFilePath))
+        {
+            // data file with this suffix does not exist, move to next candidate
+            continue;
+        }
+        uint64_t currentFileSize = fs::file_size(currentFilePath);
+        CAutoFile readFromFile{OpenMerkleTreeFile(currentPosition, true), SER_DISK, CLIENT_VERSION};
+        if (readFromFile.IsNull())
+        {
+            ResetStateNL();
+            return error("ReindexMerkleTreeStoreNL() : failed to open an existing data file");
+        }
+        while(readFromFile.Get())
+        {
+            CMerkleTree merkleTree;
+            try
+            {
+                readFromFile >> merkleTree;
+            }
+            catch (const std::runtime_error& e)
+            {
+                // Error reading merkle tree
+                ResetStateNL();
+                return error("ReindexMerkleTreeStoreNL() : failed to read merkle tree from file %s at position %u", currentFilePath.string(), currentPosition.fileOffset);
+            }
+
+            // Update index
+            uint64_t merkleTreeSizeBytes = ::GetSerializeSize(merkleTree, SER_DISK, CLIENT_VERSION);
+            AddNewDataNL(merkleTree.GetBlockHash(), merkleTree.GetBlockHeight(), currentPosition, merkleTreeSizeBytes);
+            MerkleTreeFileInfo updatedFileInfo = fileInfoMap[currentPosition.fileSuffix];
+            if (!merkleTreeIndexDB->AddMerkleTreeData(merkleTree.GetBlockHash(), currentPosition, nextDiskPosition, updatedFileInfo, diskUsage))
+            {
+                // Failed to update index in the database
+                ResetStateNL();
+                return error("ReindexMerkleTreeStoreNL() : failed to update index in the database");
+            }
+
+            // Move to the next position
+            currentPosition = nextDiskPosition;
+            // Check if we are at the end of a file
+            if (static_cast<uint64_t>(ftell(readFromFile.Get())) == currentFileSize)
+            {
+                //End of file, move to the next data file
+                readFromFile.fclose();
+            }
+        }
+    }
+
+    //Set index as in sync when all data files were read and index was updated
+    if (merkleTreeIndexDB->SetIndexOutOfSync(false))
+    {
+        writeIndexToDatabase = true;
+        indexNotLoaded = false;
+        auto reindexStoppedAt = std::chrono::high_resolution_clock::now();
+        auto reindexDuration = std::chrono::duration_cast<std::chrono::milliseconds>(reindexStoppedAt - reindexStartedAt);
+        LogPrintf("ReindexMerkleTreeStoreNL() : Merkle Trees index creation took " + std::to_string(reindexDuration.count()) + "ms\n");
+        return true;
+    }
+
+    return error("ReindexMerkleTreeStoreNL() : Cannot mark index as in sync.");
 }
 
 CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databaseCacheSize, size_t maxNumberOfThreadsForCalculations)
@@ -325,8 +508,11 @@ CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databas
 {
     LogPrintf("Using up to %u additional threads for Merkle tree computation\n", maxNumberOfThreadsForCalculations - 1);
 
-    // Load index data from the database
-    merkleTreeStore.LoadMerkleTreeIndexDB();
+    // Try to load index data from the database or rebuild index if needed
+    if (!merkleTreeStore.LoadMerkleTreeIndexDB())
+    {
+        LogPrintf("Merkle Trees will not be stored to disk until next successful initialization.");
+    }
 };
 
 CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockIndex& blockIndex, const int32_t currentChainHeight)
@@ -355,8 +541,8 @@ CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockInd
             return nullptr;
         }
 
-        merkleTreePtr = std::make_unique<CMerkleTree>(*stream, merkleTreeThreadPool.get());
-        merkleTreeStore.StoreMerkleTree(config, blockIndex.GetBlockHash(), static_cast<int32_t>(blockIndex.nHeight), *merkleTreePtr, currentChainHeight);
+        merkleTreePtr = std::make_unique<CMerkleTree>(*stream, blockIndex.GetBlockHash(), static_cast<int32_t>(blockIndex.nHeight), merkleTreeThreadPool.get());
+        merkleTreeStore.StoreMerkleTree(config, *merkleTreePtr, currentChainHeight);
     }
 
     // Put the requested Merkle Tree into the cache

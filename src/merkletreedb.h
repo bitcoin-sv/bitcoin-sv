@@ -132,6 +132,8 @@ private:
     static constexpr char DB_MERKLE_TREE_FILE_INFOS = 'i';
     // Prefix to store single uint64_t (Merkle Trees disk usage) value
     static constexpr char DB_MERKLE_TREES_DISK_USAGE = 'd';
+    // Prefix to store single bool (Merkle Trees index is out of sync) value
+    static constexpr char DB_MERKLE_TREES_INDEX_OUT_OF_SYNC = 's';
     // Database wrapper
     CDBWrapper merkleTreeIndexDB;
 
@@ -188,6 +190,21 @@ public:
      */
     bool RemoveMerkleTreeData(const std::vector<int>& suffixesOfDataFilesRemoved, const std::vector<uint256>& blockHashesOfMerkleTreesRemoved,
                               const MerkleTreeDiskPosition& updatedNextDiskPosition, const uint64_t updatedDiskUsage);
+
+    /**
+     * Sets whether index is (true) or is not (false) out of sync. Value is set in the database to provide
+     * proper synchronization with data written in the data files. Index is not out of sync only when it
+     * corresponds with the written data files.
+     * Returns false if value could not be set in the database.
+     */
+    bool SetIndexOutOfSync(bool isIndexOutOfSyncIn);
+
+    /**
+     * Sets isIndexOutOfSyncOut with boolean value that represents if index is (true) or in not (false) out of
+     * sync with written files.
+     * If index is out of sync it must be recreated from current data files during initialization.
+     */
+    bool GetIndexOutOfSync(bool& isIndexOutOfSyncOut);
 };
 
 #endif // BITCOIN_MERKLEDB_H

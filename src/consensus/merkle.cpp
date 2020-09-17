@@ -199,8 +199,8 @@ std::vector<uint256> BlockMerkleBranch(const CBlock &block, uint32_t position) {
     return ComputeMerkleBranch(leaves, position);
 }
 
-CMerkleTree::CMerkleTree(const std::vector<CTransactionRef>& transactions, CThreadPool<CQueueAdaptor>* pThreadPool)
-    : numberOfLeaves(transactions.size())
+CMerkleTree::CMerkleTree(const std::vector<CTransactionRef>& transactions, const uint256& blockHashIn, int32_t blockHeightIn, CThreadPool<CQueueAdaptor>* pThreadPool)
+    : numberOfLeaves(transactions.size()), blockHash(blockHashIn), blockHeight(blockHeightIn)
 {
     if (transactions.empty())
     {
@@ -210,7 +210,8 @@ CMerkleTree::CMerkleTree(const std::vector<CTransactionRef>& transactions, CThre
     CalculateMerkleTree<CTransactionRef>(transactions, pThreadPool);
 }
 
-CMerkleTree::CMerkleTree(CBlockStreamReader<CFileReader>& stream, CThreadPool<CQueueAdaptor>* pThreadPool)
+CMerkleTree::CMerkleTree(CBlockStreamReader<CFileReader>& stream, const uint256& blockHashIn, int32_t blockHeightIn, CThreadPool<CQueueAdaptor>* pThreadPool)
+    : blockHash(blockHashIn), blockHeight(blockHeightIn)
 {
     size_t numberOfRemainingTransactions = stream.GetRemainingTransactionsCount();
     if (!numberOfRemainingTransactions)

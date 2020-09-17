@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE(pmt_test1) {
         uint256 merkleRoot1 = BlockMerkleRoot(block);
         uint256 newMerkleRoot;
         {
-            CMerkleTree merkleTree(block.vtx);
+            CMerkleTree merkleTree(block.vtx, uint256(), 0);
             newMerkleRoot = merkleTree.GetMerkleRoot();
         }
         std::vector<uint256> vTxid(nTx, uint256());

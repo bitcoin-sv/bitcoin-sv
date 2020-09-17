@@ -90,6 +90,14 @@ class CMerkleTree
 private:
     size_t numberOfLeaves{ 0 };
     std::vector<std::vector<uint256>> merkleTreeLevelsWithNodeHashes;
+    /**
+     * Hash of a block from which this Merkle Tree was stored. Used in (de)serialization when merkle tree is written to or read from a data file.
+     */
+    uint256 blockHash{ uint256() };
+    /**
+     * Height of a block from which this Merkle Tree was stored. Used in (de)serialization when merkle tree is written to or read from a data file.
+     */
+    int32_t blockHeight{ 0 };
 
     /* Deleted copy constructor and assignment operator.
      * We want to avoid copy and assignment for performance reasons.
@@ -186,9 +194,12 @@ public:
 
     /**
      * Constructor used to calculate the Merkle Tree from given transaction references.
+     * When Merkle Tree is written and stored to disk, blockHashIn and blockHeightIn must be
+     * set to hash and height of a block from which this Merkle Tree was stored respectively.
+     * This is needed when rebuilding the index from data files.
      * Optionally use thread pool pThreadPool for parallel calculation.
      */
-    CMerkleTree(const std::vector<CTransactionRef>& transactions, CThreadPool<CQueueAdaptor>* pThreadPool = nullptr);
+    CMerkleTree(const std::vector<CTransactionRef>& transactions, const uint256& blockHashIn, int32_t blockHeightIn, CThreadPool<CQueueAdaptor>* pThreadPool = nullptr);
 
     // Default move constructor and move assignment operator
     CMerkleTree(CMerkleTree &&) = default;
@@ -196,9 +207,12 @@ public:
 
     /**
      * Constructor used to create the Merkle Tree from given file stream.
+     * When Merkle Tree is written and stored to disk, blockHashIn and blockHeightIn must be
+     * set to hash and height of a block from which this Merkle Tree was stored respectively.
+     * This is needed when rebuilding the index from data files.
      * Optionally use thread pool pThreadPool for parallel calculation.
      */
-    CMerkleTree(CBlockStreamReader<CFileReader>& stream, CThreadPool<CQueueAdaptor>* pThreadPool = nullptr);
+    CMerkleTree(CBlockStreamReader<CFileReader>& stream, const uint256& blockHashIn, int32_t blockHeightIn, CThreadPool<CQueueAdaptor>* pThreadPool = nullptr);
 
     /**
      * Returns Merkle root of this tree. If tree has no nodes it returns an empty hash. 
@@ -220,11 +234,16 @@ public:
      */
     uint64_t GetSizeInBytes() const;
 
+    uint256 GetBlockHash() const {return blockHash;};
+    int32_t GetBlockHeight() const {return blockHeight;};
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
+        READWRITE(blockHash);
+        READWRITE(blockHeight);
         READWRITE(merkleTreeLevelsWithNodeHashes);
     }
 };

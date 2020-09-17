@@ -109,14 +109,17 @@ BOOST_AUTO_TEST_CASE(write_read_test)
     testConfig.SetMaxMerkleTreeDiskSpace(500 * ONE_MEBIBYTE);
     CMerkleTreeStore merkleTreeStore(GetDataDir() / "merkle", 1 << 20);
 
+    // Load data from the database
+    BOOST_CHECK(merkleTreeStore.LoadMerkleTreeIndexDB());
+
     std::vector<WrittenData> writtenDataToCheck;
     // Create some random blocks and write their Merkle Trees to disk
     int32_t numberOfBlocks = static_cast<int32_t>(InsecureRandRange(100));
     for (int32_t i = 0; i < numberOfBlocks; ++i)
     {
         CBlock block = CreateRandomBlock(InsecureRandRange(20000));
-        CMerkleTree merkleTree(block.vtx);
-        BOOST_CHECK(merkleTreeStore.StoreMerkleTree(testConfig, block.GetHash(), i, merkleTree, i));
+        CMerkleTree merkleTree(block.vtx, block.GetHash(), i);
+        BOOST_CHECK(merkleTreeStore.StoreMerkleTree(testConfig, merkleTree, i));
 
         // For later checks, save block hash, merkle root, hash and index of one of the transactions
         StoreTestData(block, merkleTree.GetMerkleRoot(), writtenDataToCheck);
@@ -131,6 +134,9 @@ BOOST_AUTO_TEST_CASE(write_prune_load_test)
     testConfig.SetMaxMerkleTreeDiskSpace(200 * ONE_MEBIBYTE);
     CMerkleTreeStore merkleTreeStore(GetDataDir() / "merkle", 1 << 20);
 
+    // Load data from the database
+    BOOST_CHECK(merkleTreeStore.LoadMerkleTreeIndexDB());
+
     std::vector<WrittenData> writtenDataToCheck;
     // Create 1000 blocks, each with 4000 transactions and write their Merkle Trees to disk
     // One Merkle Tree takes around 250 kB. This will make around 130 Merkle Trees in each data file (32 MiB)
@@ -139,8 +145,8 @@ BOOST_AUTO_TEST_CASE(write_prune_load_test)
     for (int32_t i = 0; i < numberOfBlocks; ++i)
     {
         CBlock block = CreateRandomBlock(4000);
-        CMerkleTree merkleTree(block.vtx);
-        BOOST_CHECK(merkleTreeStore.StoreMerkleTree(testConfig, block.GetHash(), i, merkleTree, i));
+        CMerkleTree merkleTree(block.vtx, block.GetHash(), i);
+        BOOST_CHECK(merkleTreeStore.StoreMerkleTree(testConfig, merkleTree, i));
 
         uint256 merkleRoot = merkleTree.GetMerkleRoot();
         BOOST_CHECK(merkleRoot == BlockMerkleRoot(block));
@@ -152,7 +158,7 @@ BOOST_AUTO_TEST_CASE(write_prune_load_test)
         }
     }
 
-    // Load data from the database
+    // Load data from the database again
     BOOST_CHECK(merkleTreeStore.LoadMerkleTreeIndexDB());
     CheckTestData(writtenDataToCheck, merkleTreeStore);
 
