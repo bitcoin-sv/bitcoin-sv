@@ -159,6 +159,8 @@ public:
     void UpdateMoveTxToDisk() const;
 
     bool IsInMemory() const;
+
+    bool HasDatabase(const std::shared_ptr<CMempoolTxDB>& txDB) const noexcept;
 };
 
 /** \class CTxMemPoolEntry
@@ -1118,7 +1120,7 @@ private:
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedWith = nullptr);
 
-    void clearNL();
+    void clearNL(bool skipTransactionDatabase = false);
 
     void trackPackageRemovedNL(const CFeeRate &rate);
 

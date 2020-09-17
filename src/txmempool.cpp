@@ -173,6 +173,11 @@ bool CTransactionRefWrapper::IsInMemory() const
     return std::atomic_load(&tx) != nullptr;
 }
 
+bool CTransactionRefWrapper::HasDatabase(const std::shared_ptr<CMempoolTxDB>& txDB) const noexcept
+{
+    return mempoolTxDB == txDB;
+}
+
 /**
  * class CTxMemPoolEntry
  */
@@ -771,21 +776,30 @@ void CTxMemPool::AddUncheckedNL(
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage)
 {
-    auto newit = mapTx.insert(originalEntry).first;
-    assert(newit->IsInMemory());
-    const auto sharedTx = newit->GetSharedTx();
+    static const auto nullTxDB = std::shared_ptr<CMempoolTxDB>(nullptr);
 
     // Make sure the transaction database is initialized so that we have
-    // a valid mempoolTxDB in the mapTx.modify() callback below.
+    // a valid mempoolTxDB for the following checks.
     InitMempoolTxDB();
 
+    auto newit = mapTx.insert(originalEntry).first;
+    const auto sharedTx = newit->GetSharedTx();
+
+    // During reorg, we could be re-adding an entry whose transaction was
+    // previously moved to disk, in which case we must make sure that the entry
+    // belongs to the same mempool.
+    const auto mustUpdateDatabase = newit->tx.HasDatabase(nullTxDB);
+    assert((mustUpdateDatabase && newit->IsInMemory()) || newit->tx.HasDatabase(mempoolTxDB));
+
     mapLinks.insert(make_pair(newit, TxLinks()));
-    mapTx.modify(newit, [this, &sharedTx](CTxMemPoolEntry& entry) {
+    mapTx.modify(newit, [this, &sharedTx, &mustUpdateDatabase](CTxMemPoolEntry& entry) {
         // Update insertion order indes for this entry.
         entry.SetInsertionIndex(insertionIndex.GetNext());
-        // Update transaction database for this entry.
-        // This should not affect the mapTx index.
-        entry.tx = CTransactionRefWrapper(sharedTx, mempoolTxDB);
+        if (mustUpdateDatabase) {
+            // Update transaction database for this entry.
+            // This should not affect the mapTx index.
+            entry.tx = CTransactionRefWrapper(sharedTx, mempoolTxDB);
+        }
     });
 
     // Update transaction for any feeDelta created by PrioritiseTransaction
@@ -1186,7 +1200,7 @@ void CTxMemPool::RemoveForBlock(
     blockSinceLastRollingFeeBump = true;
 }
 
-void CTxMemPool::clearNL() {
+void CTxMemPool::clearNL(bool skipTransactionDatabase/* = false*/) {
     evictionTracker.reset();
     mapLinks.clear();
     mapTx.clear();
@@ -1199,6 +1213,14 @@ void CTxMemPool::clearNL() {
     rollingMinimumFeeRate = 0;
     ++nTransactionsUpdated;
     mJournalBuilder.clearJournal();
+
+    if (!skipTransactionDatabase)
+    {
+        if (mempoolTxDB)
+        {
+            // FIXME: TODO: CORE-130: Clear the transaction database.
+        }
+    }
 }
 
 void CTxMemPool::trackPackageRemovedNL(const CFeeRate &rate) {
@@ -2047,15 +2069,13 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         changeSet->clear();
     }
 
-    // rebuild mempool
+    // Clear the mempool, but save the current index, entries and the
+    // transaction database, since we'll re-add the entries later.
     indexed_transaction_set tempMapTx;
     {
-        std::unique_lock lock {smtx};
-
-        // save old mempool contents
-        tempMapTx = std::move(mapTx);
-
-        clearNL();
+        std::unique_lock lock(smtx);
+        std::swap(tempMapTx, mapTx);
+        clearNL(true);          // Do not clear the transaction database
     }
 
     // Validate the set of transactions from the disconnectpool and add them to the mempool
