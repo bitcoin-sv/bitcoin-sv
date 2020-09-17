@@ -302,6 +302,9 @@ struct transaction_id {};
 struct entry_time {};
 struct insertion_order {};
 
+struct by_prevout {};
+struct by_txiter {};
+
 
 /**
  * Reason why a transaction was removed from the mempool, this is passed to the
@@ -531,6 +534,7 @@ private:
         OutpointTxPair,
         boost::multi_index::indexed_by<
             boost::multi_index::hashed_unique<
+                boost::multi_index::tag<by_prevout>,
                 boost::multi_index::member<
                     OutpointTxPair,
                     COutPoint,
@@ -539,6 +543,7 @@ private:
                 SaltedOutpointHasher
             >,
             boost::multi_index::hashed_non_unique<
+                boost::multi_index::tag<by_txiter>,
                 boost::multi_index::member<
                     OutpointTxPair,
                     txiter,
@@ -573,6 +578,8 @@ private:
     void TrackEntryAdded(CTxMemPool::txiter entry);
     void TrackEntryRemoved(const TxId& txId, const setEntries& immediateParents);
     void TrackEntryModified(CTxMemPool::txiter entry);
+
+    std::vector<COutPoint> GetOutpointsSpentByNL(CTxMemPool::txiter entry);
 
 
 public:

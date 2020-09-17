@@ -810,9 +810,9 @@ void CTxMemPool::removeUncheckedNL(
 
         const auto txn = entry->GetSharedTx();
         NotifyEntryRemoved(txn, reason);
-        for (const auto& txin : txn->vin) {
-            mapNextTx.erase(txin.prevout);
-        }
+        
+        auto [itBegin, itEnd] = mapNextTx.get<by_txiter>().equal_range(entry);
+        mapNextTx.get<by_txiter>().erase(itBegin, itEnd);
 
         // Apply to the current journal, but only if it is in the journal (primary mempool) already
         if(entry->IsInPrimaryMempool())
@@ -982,13 +982,13 @@ void CTxMemPool::RemoveForReorg(
             // the LockPoints.
             txToRemove.insert(it);
         } else if (it->GetSpendsCoinbase()) {
-            for (const CTxIn &txin : tx->vin) {
-                txiter it2 = mapTx.find(txin.prevout.GetTxId());
+            for (const auto& prevout: GetOutpointsSpentByNL(it)) {
+                txiter it2 = mapTx.find(prevout.GetTxId());
                 if (it2 != mapTx.end()) {
                     continue;
                 }
 
-                auto coin = tipView.GetCoin(txin.prevout);
+                auto coin = tipView.GetCoin(prevout);
                 assert( coin.has_value() );
                 if (nCheckFrequency != 0) {
                     assert(coin.has_value() && !coin->IsSpent());
@@ -2181,6 +2181,16 @@ void CTxMemPool::TrackEntryModified(CTxMemPool::txiter entry)
     }
 }
 
+std::vector<COutPoint> CTxMemPool::GetOutpointsSpentByNL(CTxMemPool::txiter entry)
+{
+    std::vector<COutPoint> toReturn;
+    for(auto [it, itEnd] = mapNextTx.get<by_txiter>().equal_range(entry); it != itEnd; it++)
+    {
+        toReturn.push_back(it->outpoint);
+    }
+    return toReturn;
+}
+
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     const mining::CJournalChangeSetPtr& changeSet,
@@ -2226,28 +2236,28 @@ std::vector<TxId> CTxMemPool::TrimToSize(
         maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
         setEntries stage;
-        GetDescendantsNL(mapTx.project<0>(it), stage);
+        GetDescendantsNL(it, stage);
         nTxnRemoved += stage.size();
 
-        std::vector<CTransactionRef> txn;
+
+        std::vector<COutPoint> unspentOutpoints;
         if (pvNoSpendsRemaining) {
-            txn.reserve(stage.size());
             for (txiter iter : stage) {
-                auto txref = iter->GetSharedTx();
-                txn.push_back(txref);
-                vRemovedTxIds.emplace_back(txref->GetId());
+                vRemovedTxIds.emplace_back(iter->GetTxId());
+                // find and collect outpoints spent by "iter"
+                auto [itBegin, itEnd] = mapNextTx.get<by_txiter>().equal_range(iter);
+                std::transform(itBegin, itEnd, std::back_inserter(unspentOutpoints),
+                               [](const auto& value){return value.outpoint;});
             }
         }
         removeStagedNL(stage, nonNullChangeSet.Get(), MemPoolRemovalReason::SIZELIMIT);
         if (pvNoSpendsRemaining) {
-            for (const auto& txref : txn) {
-                for (const auto& txin : txref->vin) {
-                    if (ExistsNL(txin.prevout.GetTxId())) {
-                        continue;
-                    }
-                    if (!mapNextTx.count(txin.prevout)) {
-                        pvNoSpendsRemaining->push_back(txin.prevout);
-                    }
+            for (const auto& outpoint : unspentOutpoints) {
+                if (ExistsNL(outpoint.GetTxId())) {
+                    continue;
+                }
+                if (!mapNextTx.count(outpoint)) {
+                    pvNoSpendsRemaining->push_back(outpoint);
                 }
             }
         }
