@@ -29,6 +29,7 @@
 #include "net/net_processing.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
+#include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "scheduler.h"
@@ -1205,6 +1206,17 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "Seting 0 will disable Genesis graceful period. Genesis graceful period range :"
                     "(GENESIS_ACTIVATION_HEIGHT - n |...| GENESIS_ACTIVATION_HEIGHT |...| GENESIS_ACTIVATION_HEIGHT + n)"),
             DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
+
+    /** Double-spend detection/reporting */
+    strUsage += HelpMessageGroup(_("Double-Spend detection options:"));
+    strUsage += HelpMessageOpt(
+        "-dsauthorityurl=<url>",
+        "URL of double-spend authority to publish newly detected double-spends to. If not specified, they are not published. "
+        "Note: Only plain http (not https) is currently supported.");
+    strUsage += HelpMessageOpt(
+        "-dsauthoritytimeout=<n>",
+        strprintf(_("Timeout in seconds for communications with a double-spend authority (default: %u)"),
+            rpc::client::RPCClientConfig::DEFAULT_DS_AUTHORITY_TIMEOUT));
 
     return strUsage;
 }

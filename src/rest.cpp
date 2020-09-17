@@ -11,6 +11,8 @@
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "rpc/blockchain.h"
+#include "rpc/http_protocol.h"
+#include "rpc/jsonwriter.h"
 #include "rpc/server.h"
 #include "rpc/tojson.h"
 #include "streams.h"
@@ -19,7 +21,6 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "version.h"
-#include "rpc/jsonwriter.h"
 
 #include <boost/algorithm/string.hpp>
 #include <univalue.h>

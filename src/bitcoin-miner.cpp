@@ -13,7 +13,7 @@
 #include "fs.h"
 #include "hash.h"
 #include "primitives/block.h"
-#include "rpc/client.h"
+#include "rpc/client_utils.h"
 #include "rpc/protocol.h"
 #include "streams.h"
 #include "sync.h"

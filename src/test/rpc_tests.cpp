@@ -3,6 +3,10 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/client.h"
+#include "rpc/client_config.h"
+#include "rpc/client_utils.h"
+#include "rpc/http_request.h"
+#include "rpc/http_response.h"
 #include "rpc/server.h"
 
 #include "base58.h"
@@ -584,6 +588,167 @@ BOOST_AUTO_TEST_CASE(getminingcandidate_low_height)
     BOOST_CHECK_EQUAL(find_value(json.get_obj(), "height").get_int(), 1);
 
     nMaxTipAge = oldMaxAge;
+}
+
+// Create client configs for DS Authority
+BOOST_AUTO_TEST_CASE(client_config_dsa)
+{
+    using namespace rpc::client;
+
+    {
+        // All good
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/DsAuthority/proof/");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof/");
+
+            // Also just check other defaults
+            BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), RPCClientConfig::DEFAULT_DS_AUTHORITY_TIMEOUT);
+            BOOST_CHECK_EQUAL(config.GetCredentials(), "");
+            BOOST_CHECK(! config.UsesAuth());
+            BOOST_CHECK_EQUAL(config.GetWallet(), "");
+        );
+    }
+
+    {
+        // Mimimal endpoint (and override timeout)
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/D");
+        gArgs.ForceSetArg("-dsauthoritytimeout", "10");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/D");
+            BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), 10);
+        );
+    }
+
+    {
+        // Missing endpoint
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/");
+        );
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
+        );
+    }
+
+    {
+        // Without http://
+        gArgs.ForceSetArg("-dsauthorityurl", "hostname:8080");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
+        );
+    }
+
+    {
+        // Missing port
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:/DsAuthority/proof");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname:");
+            BOOST_CHECK_EQUAL(config.GetServerPort(), RPCClientConfig::DEFAULT_DS_AUTHORITY_PORT);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof");
+        );
+    }
+
+    {
+        // Unspecified port
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname/DsAuthority/proof");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
+            BOOST_CHECK_EQUAL(config.GetServerPort(), RPCClientConfig::DEFAULT_DS_AUTHORITY_PORT);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof");
+        );
+    }
+
+    {
+        // Missing server address
+        gArgs.ForceSetArg("-dsauthorityurl", "http://");
+        BOOST_CHECK_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+        , std::runtime_error);
+    }
+
+    {
+        // Unsupported protocol
+        gArgs.ForceSetArg("-dsauthorityurl", "https://hostname:8080/DsAuthority/proof");
+        BOOST_CHECK_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+        , std::runtime_error);
+    }
+}
+
+// Create client configs for bitcoind
+BOOST_AUTO_TEST_CASE(client_config_bitcoind)
+{
+    gArgs.ForceSetArg("-rpcconnect", "localhost:8080");
+    gArgs.ForceSetArg("-rpcuser", "user");
+    gArgs.ForceSetArg("-rpcpassword", "passwd");
+    gArgs.ForceSetArg("-rpcclienttimeout", "100");
+    gArgs.ForceSetArg("-rpcwallet", "wallet");
+
+    using namespace rpc::client;
+
+    BOOST_CHECK_NO_THROW(
+        RPCClientConfig config { RPCClientConfig::CreateForBitcoind() };
+        BOOST_CHECK_EQUAL(config.GetServerIP(), "localhost");
+        BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+        BOOST_CHECK(config.UsesAuth());
+        BOOST_CHECK_EQUAL(config.GetCredentials(), "user:passwd");
+        BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), 100);
+        BOOST_CHECK_EQUAL(config.GetWallet(), "wallet");
+        BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
+    );
+}
+
+// HTTP request creation
+BOOST_AUTO_TEST_CASE(http_requests)
+{
+    // Some parameters passed throughout
+    std::string method { "somemethod" };
+    std::vector<std::string> args { "tx1=1", "tx2=2" };
+    UniValue params(UniValue::VARR);
+    params = RPCConvertNamedValues(method, args);
+
+    using namespace rpc::client;
+
+    {
+        // REST requests to the DS authority
+        RPCClientConfig config { RPCClientConfig::CreateForDSA("http://127.0.0.1:8080/DsAuthority/proof") };
+
+        auto postRequest { rpc::client::HTTPRequest::CreateRESTPostRequest(config, params) };
+        BOOST_CHECK_EQUAL(postRequest.GetContents(), "{\"tx1\":\"1\",\"tx2\":\"2\"}\n");
+        BOOST_CHECK_EQUAL(postRequest.GetEndpoint(), "/DsAuthority/proof/submit");
+
+        auto getRequest { rpc::client::HTTPRequest::CreateRESTGetRequest(config, "a56fd", 5) };
+        BOOST_CHECK_EQUAL(getRequest.GetContents(), "");
+        BOOST_CHECK_EQUAL(getRequest.GetEndpoint(), "/DsAuthority/proof/a56fd/5");
+    }
+
+    {
+        // JSON RPC requests to bitcoind
+        gArgs.ForceSetArg("-rpcconnect", "localhost:8080");
+        gArgs.ForceSetArg("-rpcuser", "user");
+        gArgs.ForceSetArg("-rpcpassword", "passwd");
+        gArgs.ForceSetArg("-rpcwallet", "walletname");
+        RPCClientConfig config { RPCClientConfig::CreateForBitcoind() };
+
+        auto rpcRequest { rpc::client::HTTPRequest::CreateJSONRPCRequest(config, method, params) };
+        BOOST_CHECK_EQUAL(rpcRequest.GetContents(), "{\"method\":\"somemethod\",\"params\":{\"tx1\":\"1\",\"tx2\":\"2\"},\"id\":1}\n");
+        BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), "/wallet/walletname");
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

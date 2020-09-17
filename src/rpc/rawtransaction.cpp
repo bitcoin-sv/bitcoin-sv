@@ -17,6 +17,7 @@
 #include "net/net.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "rpc/http_protocol.h"
 #include "rpc/server.h"
 #include "rpc/tojson.h"
 #include "script/script_error.h"
