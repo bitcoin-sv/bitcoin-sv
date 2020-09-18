@@ -8,6 +8,7 @@
 #include "logging.h"
 #include <algorithm>
 #include "task_helpers.h"
+#include "blockstreams.h"
 
 /*     WARNING! If you're reading this because you're learning about crypto
        and/or designing a new system that will use merkle trees, keep in mind
@@ -165,7 +166,12 @@ uint256 ComputeMerkleRootFromBranch(const uint256 &leaf,
     uint256 hash = leaf;
     for (std::vector<uint256>::const_iterator it = vMerkleBranch.begin();
          it != vMerkleBranch.end(); ++it) {
-        if (nIndex & 1) {
+        if ((*it).IsNull())
+        {
+            // Duplicated node
+            hash = Hash(BEGIN(hash), END(hash), BEGIN(hash), END(hash));
+        }
+        else if (nIndex & 1) {
             hash = Hash(BEGIN(*it), END(*it), BEGIN(hash), END(hash));
         } else {
             hash = Hash(BEGIN(hash), END(hash), BEGIN(*it), END(*it));
@@ -202,6 +208,27 @@ CMerkleTree::CMerkleTree(const std::vector<CTransactionRef>& transactions, CThre
     }
 
     CalculateMerkleTree<CTransactionRef>(transactions, pThreadPool);
+}
+
+CMerkleTree::CMerkleTree(CBlockStreamReader<CFileReader>& stream, CThreadPool<CQueueAdaptor>* pThreadPool)
+{
+    size_t numberOfRemainingTransactions = stream.GetRemainingTransactionsCount();
+    if (!numberOfRemainingTransactions)
+    {
+        return;
+    }
+
+    std::vector<uint256> transactionIds;
+    transactionIds.reserve(numberOfRemainingTransactions);
+
+    do
+    {
+        transactionIds.push_back(stream.ReadTransaction().GetId());
+    }
+    while (!stream.EndOfStream());
+
+    numberOfLeaves = transactionIds.size();
+    CalculateMerkleTree<uint256>(transactionIds, pThreadPool);
 }
 
 template <typename elementType>
@@ -287,6 +314,11 @@ void CMerkleTree::CalculateMerkleTree(const std::vector<elementType>& vTransacti
 void CMerkleTree::AddTransactionId(const CTransactionRef& transactionRef)
 {
     AddNodeAtLevel(transactionRef->GetId(), 0);
+}
+
+void CMerkleTree::AddTransactionId(const uint256& transactionId)
+{
+    AddNodeAtLevel(transactionId, 0);
 }
 
 void CMerkleTree::AddNodeAtLevel(const uint256& hash, size_t level)
@@ -425,24 +457,22 @@ uint256 CMerkleTree::GetMerkleRoot() const
     return merkleTreeLevelsWithNodeHashes.back().back();
 }
 
-std::vector<uint256> CMerkleTree::GetMerkleProof(const TxId& transactionId) const
+CMerkleTree::MerkleProof CMerkleTree::GetMerkleProof(const TxId& transactionId, bool skipDuplicates) const
 {
     if (merkleTreeLevelsWithNodeHashes.empty())
     {
-        return {};
+        return MerkleProof(0);
     }
-
-    std::vector<uint256> merkleProof;
-    size_t currentIndex = 0;
 
     // Find transaction index
     auto foundTxId = std::find(merkleTreeLevelsWithNodeHashes[0].cbegin(), merkleTreeLevelsWithNodeHashes[0].cend(), transactionId);
-    currentIndex = std::distance(merkleTreeLevelsWithNodeHashes[0].cbegin(), foundTxId); 
+    size_t currentIndex = std::distance(merkleTreeLevelsWithNodeHashes[0].cbegin(), foundTxId);
     if (currentIndex == merkleTreeLevelsWithNodeHashes[0].size())
     {
         // Transaction id not found in this Merkle Tree
-        return {};
+        return MerkleProof(0);
     }
+    MerkleProof merkleProof(currentIndex);
     uint256 missingParentNode;
     for (size_t currentLevel = 0; currentLevel < merkleTreeLevelsWithNodeHashes.size(); ++currentLevel)
     {
@@ -452,17 +482,33 @@ std::vector<uint256> CMerkleTree::GetMerkleProof(const TxId& transactionId) cons
         if (siblingIndex < merkleTreeLevelsWithNodeHashes[currentLevel].size())
         {
             //Add a sibling as part of the proof
-            merkleProof.push_back(merkleTreeLevelsWithNodeHashes[currentLevel][siblingIndex]);
+            merkleProof.merkleTreeHashes.push_back(merkleTreeLevelsWithNodeHashes[currentLevel][siblingIndex]);
         }
         else if (!missingParentNode.IsNull())
         {
             //Add missing node
-            merkleProof.push_back(missingParentNode);
+            if (skipDuplicates && merkleProof.merkleTreeHashes.back().IsNull())
+            {
+                // In getmerkleproof RPC "empty" uint256 is represented as "*" to avoid duplicating values in the output
+                merkleProof.merkleTreeHashes.emplace_back();
+            }
+            else
+            {
+                merkleProof.merkleTreeHashes.push_back(missingParentNode);
+            }
         }
         else if (siblingIndex > 1)
         {
             //Add last node (duplicate) on level with odd numbers of nodes
-            merkleProof.push_back(merkleTreeLevelsWithNodeHashes[currentLevel].back());
+            if (skipDuplicates)
+            {
+                // Add "empty" uint256 to represent it as "*" in getmerkleproof RPC output
+                merkleProof.merkleTreeHashes.emplace_back();
+            }
+            else
+            {
+                merkleProof.merkleTreeHashes.push_back(merkleTreeLevelsWithNodeHashes[currentLevel].back());
+            }
         }
         else
         {

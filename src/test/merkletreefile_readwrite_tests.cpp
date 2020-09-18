@@ -75,11 +75,12 @@ namespace
             BOOST_CHECK(merkleTreeReadFromDisk != nullptr);
 
             // Calculate merkle proof and merkle root from read data using previously randomly chosen transaction id.
-            std::vector<uint256> checkProof = merkleTreeReadFromDisk->GetMerkleProof(TxId(dataToCheck.writtenRandomTxHash));
+            CMerkleTree::MerkleProof checkProof = merkleTreeReadFromDisk->GetMerkleProof(TxId(dataToCheck.writtenRandomTxHash), false);
+            BOOST_CHECK(checkProof.transactionIndex == dataToCheck.writtenRandomTxIndex);
             // Calculate the root from Merkle proof and compare it with the root we calculated before the write
             BOOST_CHECK(ComputeMerkleRootFromBranch(
                 dataToCheck.writtenRandomTxHash,
-                checkProof,
+                checkProof.merkleTreeHashes,
                 dataToCheck.writtenRandomTxIndex) == dataToCheck.writtenMerkleRoot);
         }
     }

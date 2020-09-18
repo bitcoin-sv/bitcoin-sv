@@ -155,19 +155,19 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
                         BlockMerkleBranch(block, mtx);
                     std::vector<uint256> oldBranch =
                         BlockGetMerkleBranch(block, merkleTree, mtx);
-                    std::vector<uint256> newestBranch;
-                    {
-                        CMerkleTree newestMerkleTree(block.vtx);
-                        newestBranch = newestMerkleTree.GetMerkleProof(block.vtx[mtx]->GetId());
-                    }
+
+                    CMerkleTree newestMerkleTree(block.vtx);
+                    CMerkleTree::MerkleProof newestBranch = newestMerkleTree.GetMerkleProof(block.vtx[mtx]->GetId(), false);
+                    BOOST_CHECK(newestBranch.transactionIndex == mtx);
+
                     BOOST_CHECK(oldBranch == newBranch);
-                    BOOST_CHECK(oldBranch == newestBranch);
+                    BOOST_CHECK(oldBranch == newestBranch.merkleTreeHashes);
                     BOOST_CHECK(
                         ComputeMerkleRootFromBranch(block.vtx[mtx]->GetId(),
                                                     newBranch, mtx) == oldRoot);
                     BOOST_CHECK(
                         ComputeMerkleRootFromBranch(block.vtx[mtx]->GetId(), 
-                                                    newestBranch, mtx) == oldRoot);
+                                                    newestBranch.merkleTreeHashes, mtx) == oldRoot);
                 }
             }
         }

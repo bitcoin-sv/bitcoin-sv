@@ -67,6 +67,9 @@ std::vector<uint256> BlockMerkleBranch(const CBlock &block, uint32_t position);
 class CQueueAdaptor;
 template<typename QueueAdapter>
 class CThreadPool;
+class CFileReader;
+template<typename Reader>
+class CBlockStreamReader;
 
  /** The default preferred size of a Merkle Tree datafile (mrk????????.dat) */
 static constexpr uint64_t DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE{32 * ONE_MEBIBYTE}; // 32 MiB
@@ -121,6 +124,7 @@ private:
      * in parallel manner. Function calls AddNodeAtLevel for level 0.
      */
     void AddTransactionId(const CTransactionRef& transactionRef);
+    void AddTransactionId(const uint256& transactionId);
 
     /**
      * Adds node at specific level into the Merkle Tree.
@@ -153,6 +157,20 @@ private:
     void CalculateMissingParentNode(const size_t currentLevel, uint256& additionalNodeInOut) const;
 
 public:
+
+    /* Structure MerkleProof contains a list of merkle tree hashes, one for each tree level and
+     * a transaction index of the transaction we want to prove.
+     * The structure is returned by the function GetMerkleProof and it is used to calculate the
+     * merkle root.
+     */
+    struct MerkleProof
+    {
+        MerkleProof(size_t index) : transactionIndex(index) {};
+
+        std::vector<uint256> merkleTreeHashes;
+        const size_t transactionIndex;
+    };
+
     CMerkleTree() {};
 
     /**
@@ -174,14 +192,24 @@ public:
     CMerkleTree & operator=(CMerkleTree &&) = default;
 
     /**
+     * Constructor used to create the Merkle Tree from given file stream.
+     * Optionally use thread pool pThreadPool for parallel calculation.
+     */
+    CMerkleTree(CBlockStreamReader<CFileReader>& stream, CThreadPool<CQueueAdaptor>* pThreadPool = nullptr);
+
+    /**
      * Returns Merkle root of this tree. If tree has no nodes it returns an empty hash. 
      */
     uint256 GetMerkleRoot() const;
 
     /**
      * Computes and returns the Merkle proof for a given transactionId.
+     * If skipDuplicates is set to true, uint256() (zero) is stored in the proof for duplicated nodes.
+     * This is used in getmerkleproof RPC where we want to mark a duplicate as "*" instead of the actual hash value.
+     * The returned Merkle proof contains a list of merkle tree hashes and a transaction's index in the tree/block.
+     * For example, transaction at index 0 is a coinbase transaction.
      */
-    std::vector<uint256> GetMerkleProof(const TxId& transactionId) const;
+    MerkleProof GetMerkleProof(const TxId& transactionId, bool skipDuplicates) const;
 
     ADD_SERIALIZE_METHODS;
 

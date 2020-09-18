@@ -87,6 +87,57 @@ const UniValue& find_value_in_result(const UniValue& obj, const std::string& nam
     return find_value(response, name);
 }
 
+bool FlagsNumericMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"flags\" must be a numeric value"));
+    return true;
+}
+bool FlagsValueMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("verifymerkleproof only supports \"flags\" with value 2"));
+    return true;
+}
+bool IndexNumericMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"index\" must be a numeric value"));
+    return true;
+}
+bool IndexValueMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"index\" must be a positive value"));
+    return true;
+}
+bool TxOrIdHashValueMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("txOrId must be hexadecimal string (not '') and length of it must be divisible by 2"));
+    return true;
+}
+bool TxOrIdHashValueMessage2(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("txOrId must be hexadecimal string (not 'wrong_hash') and length of it must be divisible by 2"));
+    return true;
+}
+bool TargetObjectMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"target\" must be a block header Json object"));
+    return true;
+}
+bool MerkleRootHashMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("merkleroot must be hexadecimal string (not '') and length of it must be divisible by 2"));
+    return true;
+}
+bool NodesArrayMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"nodes\" must be a Json array"));
+    return true;
+}
+bool NodeHashValueMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("node must be hexadecimal string (not '**') and length of it must be divisible by 2"));
+    return true;
+}
+
 BOOST_FIXTURE_TEST_SUITE(rpc_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(rpc_getinfo)
@@ -749,6 +800,89 @@ BOOST_AUTO_TEST_CASE(http_requests)
         BOOST_CHECK_EQUAL(rpcRequest.GetContents(), "{\"method\":\"somemethod\",\"params\":{\"tx1\":\"1\",\"tx2\":\"2\"},\"id\":1}\n");
         BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), "/wallet/walletname");
     }
+}
+
+BOOST_AUTO_TEST_CASE(rpc_verifymerkleproofparams)
+{
+    // Test verifymerkleproof API argument handling
+
+    BOOST_CHECK_THROW(CallRPC("verifymerkleproof"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("verifymerkleproof not_json"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("verifymerkleproof []"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("verifymerkleproof {} extra"), std::runtime_error);
+
+    // Exceptions thrown with wrong flags values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":\"my_flag\","
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, FlagsNumericMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":1,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, FlagsValueMessage);
+    // Exceptions thrown with wrong index values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":\"my_index\","
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, IndexNumericMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":-1,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, IndexValueMessage);
+    // Exceptions thrown with wrong txOrId values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":1,"
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, TxOrIdHashValueMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"wrong_hash\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, TxOrIdHashValueMessage2);
+    // Exceptions thrown with wrong target values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":1,"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, TargetObjectMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkelroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, MerkleRootHashMessage);
+    // Exceptions thrown with wrong nodes values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":\"my_nodes\"}"), std::runtime_error, NodesArrayMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"**\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, NodeHashValueMessage);
+    // Proper Json format should not throw any exception
+    BOOST_CHECK_NO_THROW(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

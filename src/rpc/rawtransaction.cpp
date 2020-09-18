@@ -29,6 +29,7 @@
 #include "uint256.h"
 #include "utilstrencodings.h"
 #include "validation.h"
+#include "merkletreestore.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -1653,6 +1654,172 @@ static UniValue sendrawtransactions(const Config &config,
     return result;
 }
 
+static UniValue getmerkleproof(const Config& config,
+    const JSONRPCRequest& request)
+{
+    if (request.fHelp ||
+        (request.params.size() != 1 && request.params.size() != 2))
+    {
+        throw std::runtime_error(
+            "getmerkleproof \"txid\" ( blockhash )\n"
+            "\nReturns a Merkle proof for a transaction represented by txid in a list of Merkle"
+            "\ntree hashes from which Merkle root can be calculated using the given txid. Calculated"
+            "\n Merkle root can be used to prove that the transaction was included in a block.\n"
+            "\nNOTE: This only works if transaction was already included in a block and the block"
+            "\nwas found. When not specifying \"blockhash\", function will be able to find the block"
+            "\nonly if there is an unspent output in the utxo for this transaction or transaction"
+            "\nindex is maintained (using the -txindex command line option).\n"
+
+            "\nArguments:\n"
+            "1. \"txid\"      (string, required) The transaction id\n"
+            "2. \"blockhash\" (string, optional) If specified, looks for txid in the block with "
+            "this hash\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"flags\" : 2,                     (numeric) Flags is always 2 => \"txOrId\" is transaction ID and \"target\" is a block header\n"
+            "  \"index\" : txIndex,               (numeric) Index of a transaction in a block/Merkle Tree (0 means coinbase)\n"
+            "  \"txOrId\" : \"txid\",             (string) ID of the Tx in question\n"
+            "  \"target\" : {blockheader},        (json) The block header, as returned by getBlockHeader(true) RPC (i.e. verbose = true)\n"
+            "  \"nodes\" :                        (json array) Merkle Proof for transaction txOrId as array of nodes\n"
+            "    [\"hash\", \"hash\", \"*\", ...] Each node is a hash in a Merkle Tree and \"*\" represents a copy of the calculated node\n"
+            "}\n"
+            "\nExamples:\n" +
+            HelpExampleCli("getmerkleproof", "\"mytxid\"") +
+            HelpExampleCli("getmerkleproof", "\"mytxid\" myblockhash") +
+            HelpExampleRpc("getmerkleproof", "\"mytxid\", myblockhash"));
+    }
+
+    TxId transactionId = TxId(ParseHashV(request.params[0], "hash"));
+    std::set<TxId> setTxIds;
+    setTxIds.insert(transactionId);
+
+    uint256 requestedBlockHash;
+    if (request.params.size() > 1)
+    {
+        requestedBlockHash = uint256S(request.params[1].get_str());
+    }
+    CBlockIndex* blockIndex = GetBlockIndex(config, requestedBlockHash, setTxIds);
+
+    if (blockIndex == nullptr)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Block for this transaction not found");
+    }
+
+    CMerkleTree merkleTree(*GetBlockStream(*blockIndex));
+
+    // Result in JSON format
+    UniValue merkleProofArray(UniValue::VARR);
+    CMerkleTree::MerkleProof proof = merkleTree.GetMerkleProof(transactionId, true);
+    for (const uint256& node : proof.merkleTreeHashes)
+    {
+        if (node.IsNull())
+        {
+            merkleProofArray.push_back("*");
+        }
+        else
+        {
+            merkleProofArray.push_back(node.GetHex());
+        }
+    }
+
+    // CallbackData
+    UniValue callbackDataObject(UniValue::VOBJ);
+    callbackDataObject.pushKV("flags", 2);
+    callbackDataObject.pushKV("index", static_cast<uint64_t>(proof.transactionIndex));
+    callbackDataObject.pushKV("txOrId", transactionId.GetHex());
+    callbackDataObject.pushKV("target", blockheaderToJSON(blockIndex));
+    callbackDataObject.pushKV("nodes", merkleProofArray);
+    return callbackDataObject;
+}
+
+static UniValue verifymerkleproof(const Config& config,
+    const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+    {
+        throw std::runtime_error(
+            "verifymerkleproof \"proof\"\n"
+            "\nVerifies a given Merkle proof in JSON format and returns true if\n"
+            "verification succeeded.\n"
+            "\nArguments:\n"
+            "1. \"proof\" (json, required) A json object containing Merkle proof for specified transaction. "
+            "Json object from \"getmerkleproof\" result can be used:\n"
+            "{\n"
+            "  \"flags\" : 2,                     (numeric) Flags should always be 2 => \"txOrId\" is transaction ID and \"target\" is a block header\n"
+            "  \"index\" : txIndex,               (numeric) Index of a transaction in a block/Merkle Tree (coinbase transaction for example is always at index 0)\n"
+            "  \"txOrId\" : \"txid\",             (string) ID of the Tx to be verified\n"
+            "  \"target\" : {blockheader},        (json) The block header, as returned by getblockheader RPC (verbose = true). Should at least contain \"merkleroot\" key and value\n"
+            "  \"nodes\" :                        (json array) Merkle Proof for transaction txOrId as array of nodes\n"
+            "    [\"hash\", \"hash\", \"*\", ...] Each node is a hash in a Merkle Tree or \"*\" to represent a duplicate of the calculated node\n"
+            "}\n"
+            "\nResult:\n"
+            "true|false                           (boolean) If true, proof for \"txOrId\" was successfully verified, false otherwise\n"
+            "\nExamples:\n" +
+            HelpExampleCli("verifymerkleproof", "'{\"flags\": 2, \"index\": 1, \"txOrId\": \"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\", "
+                "\"target\": {\"merkleroot\": \"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\"}, "
+                "\"nodes\": [\"*\", \"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\"]}'") +
+            HelpExampleRpc("verifymerkleproof", "{\"flags\": 2, \"index\": 1, \"txOrId\": \"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\", "
+                "\"target\": {\"merkleroot\": \"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\"}, "
+                "\"nodes\": [\"*\", \"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\"]}"));   
+    }
+
+    if (request.params[0].isNull())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, argument 1 must be non-null");
+    }
+    RPCTypeCheck(request.params, { UniValue::VOBJ }, true);
+
+    UniValue merkleProofObject = request.params[0].get_obj();
+    UniValue flags = find_value(merkleProofObject, "flags");
+    if (!flags.isNum())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "\"flags\" must be a numeric value");
+    }
+    else if (flags.get_int() != 2)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "verifymerkleproof only supports \"flags\" with value 2");
+    }
+    UniValue index = find_value(merkleProofObject, "index");
+    if (!index.isNum())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "\"index\" must be a numeric value");
+    }
+    else if (index.get_int() < 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "\"index\" must be a positive value");
+    }
+    TxId txid = TxId(ParseHashO(merkleProofObject, "txOrId"));
+    UniValue target = find_value(merkleProofObject, "target");
+    if (!target.isObject())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "\"target\" must be a block header Json object");
+    }
+    uint256 headerMerkleRoot = ParseHashO(target, "merkleroot");
+    UniValue proofNodes = find_value(merkleProofObject, "nodes");
+    if (!proofNodes.isArray())
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "\"nodes\" must be a Json array");
+    }
+    std::vector<uint256> merkleProof;
+    for (const UniValue& proofNode : proofNodes.getValues())
+    {
+        if (!proofNode.isStr())
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "\"node\" must be a \"hash\" or \"*\"");
+        }
+        uint256 node;
+        // "*" node is a zero unit256 which is considered as a duplicate in merkle root calculation
+        if (proofNode.getValStr() != "*")
+        {
+            node = ParseHashV(proofNode, "node");
+        }
+        merkleProof.push_back(node);
+    }
+
+    uint256 calculatedMerkleRoot = ComputeMerkleRootFromBranch(txid, merkleProof, index.get_int());
+    return(calculatedMerkleRoot == headerMerkleRoot);
+}
+
 // clang-format off
 static const CRPCCommand commands[] = {
     //  category            name                      actor (function)        okSafeMode
@@ -1667,6 +1834,8 @@ static const CRPCCommand commands[] = {
 
     { "blockchain",         "gettxoutproof",          gettxoutproof,          true,  {"txids", "blockhash"} },
     { "blockchain",         "verifytxoutproof",       verifytxoutproof,       true,  {"proof"} },
+    { "blockchain",         "getmerkleproof",         getmerkleproof,         true,  {"txid", "blockhash"} },
+    { "blockchain",         "verifymerkleproof",      verifymerkleproof,      true,  {"proof", "txid"} },
 };
 // clang-format on
 
