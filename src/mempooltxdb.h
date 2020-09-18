@@ -8,6 +8,17 @@
 #include "dbwrapper.h"
 #include "primitives/transaction.h"
 
+#include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <deque>
+#include <future>
+#include <initializer_list>
+#include <mutex>
+#include <thread>
+#include <variant>
+#include <vector>
+
 /** Read-only access to transactions in the database. */
 class CMempoolTxDBReader {
 public:
@@ -24,13 +35,14 @@ private:
     // Prefix to store disk usage
     static constexpr char DB_DISK_USAGE = 'D';
 
-    CDBWrapper mempoolTxDB;
+    // Saved database parameters
+    const fs::path dbPath;
+    const size_t nCacheSize;
+    const bool fMemory;
 
-    uint64_t diskUsage {0};
+    std::unique_ptr<CDBWrapper> mempoolTxDB;
 
-    // Saved constructor arguments
-    const size_t saved_nCacheSize;
-    const bool saved_fMemory;
+    std::atomic_uint64_t diskUsage {0};
 
 public:
     /**
@@ -48,15 +60,9 @@ public:
     void ClearDatabase();
 
     /*
-     * Used to add new transaction into the database to sync it with
-     * written data.
-     */
-    bool AddTransaction(const uint256 &txid, const CTransactionRef &tx);
-
-    /*
      * Used to add a batch of new transactions into the database
      */
-    bool AddTransactions(std::vector<CTransactionRef> &txs);
+    bool AddTransactions(const std::vector<CTransactionRef> &txs);
 
     /*
      * Used to retrieve transaction from the database.
@@ -64,14 +70,82 @@ public:
     virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override;
 
     /*
-     * Used to remove all transactions from the database.
+     * Used to remove a batch of transactions from the database.
      */
-    bool RemoveTransactions(const std::vector<uint256> &transactionsToRemove, uint64_t diskUsageRemoved);
+    bool RemoveTransactions(const std::vector<TxId> &transactionsToRemove, uint64_t diskUsageRemoved);
 
     /**
      * Return the total size of transactions moved to disk.
      */
     uint64_t GetDiskUsage();
+};
+
+class CTransactionWrapper;
+using CTransactionWrapperRef = std::shared_ptr<CTransactionWrapper>;
+
+/** Wrapper for CMempoolTxDB for asynchronous writes and deletes. */
+class CAsyncMempoolTxDB
+{
+public:
+    CAsyncMempoolTxDB(size_t nCacheSize);
+    ~CAsyncMempoolTxDB();
+
+    // Syncronize with the background thread after finishing pending tasks.
+    void Sync();
+
+    // Synchronously clear the database contents, skip all pending tasks.
+    // NOTE: Call this only from contexts where no reads or writes
+    //       to the database are possible.
+    void Clear();
+
+    // Asynchronously add transactions to the database.
+    void Add(std::vector<CTransactionWrapperRef>&& transactionsToAdd);
+
+    // Asynchronously remove transactions from the database.
+    void Remove(std::vector<TxId>&& transactionsToRemove,
+                std::uint64_t diskUsageRemoved);
+
+    // Get the size of the data in the database.
+    uint64_t GetDiskUsage()
+    {
+        return txdb->GetDiskUsage();
+    }
+
+    // Return a read-only database reference
+    std::shared_ptr<CMempoolTxDBReader> GetDatabase();
+
+private:
+    struct StopTask{};
+    struct SyncTask
+    {
+        std::promise<void>* sync;
+    };
+    struct ClearTask{};
+    struct AddTask
+    {
+        std::vector<CTransactionWrapperRef> transactions;
+    };
+    struct RemoveTask
+    {
+        std::vector<TxId> transactions;
+        std::uint64_t size;
+    };
+    using Task = std::variant<StopTask, SyncTask, ClearTask, AddTask, RemoveTask>;
+
+    // Task queue for the worker thread.
+    std::deque<Task> taskList;
+    std::mutex taskListGuard;
+    std::condition_variable taskListSignal;
+    void EnqueueNL(std::initializer_list<Task>&& tasks, bool clearList);
+    void Enqueue(std::initializer_list<Task>&& tasks, bool clearList = false);
+
+    // Thread synchronization point.
+    void Synchronize(std::initializer_list<Task>&& tasks, bool clearList = false);
+
+    // Initialize the database and worker thread after the queue and mutex.
+    std::shared_ptr<CMempoolTxDB> txdb;
+    std::thread worker;
+    void Work();
 };
 
 #endif // BITCOIN_MEMPOOLTXDB_H

@@ -108,20 +108,21 @@ CTxPrioritizer::~CTxPrioritizer()
 }
 
 /**
- * class CTransactionRefWrapper
+ * class CTransactionWrapper
  */
-CTransactionRefWrapper::CTransactionRefWrapper() {
-}
-
-CTransactionRefWrapper::CTransactionRefWrapper(const CTransactionRef &_tx,
-                                               const std::shared_ptr<CMempoolTxDBReader>& txDB)
-    : tx{_tx}
-    , txid{_tx->GetId()}
-    , mempoolTxDB{txDB}
+CTransactionWrapper::CTransactionWrapper()
 {
 }
 
-CTransactionRef CTransactionRefWrapper::GetTxFromDB() const {
+CTransactionWrapper::CTransactionWrapper(const CTransactionRef &_tx,
+                                         const std::shared_ptr<CMempoolTxDBReader>& txDB)
+    : tx{_tx},
+      txid{_tx->GetId()},
+      mempoolTxDB{txDB}
+{
+}
+
+CTransactionRef CTransactionWrapper::GetTxFromDB() const {
     CTransactionRef tmp;
     if (mempoolTxDB != nullptr) {
         mempoolTxDB->GetTransaction(txid, tmp);
@@ -131,11 +132,11 @@ CTransactionRef CTransactionRefWrapper::GetTxFromDB() const {
 }
 
 
-const TxId& CTransactionRefWrapper::GetId() const {
+const TxId& CTransactionWrapper::GetId() const {
     return txid;
 }
 
-CTransactionRef CTransactionRefWrapper::GetTx() const {
+CTransactionRef CTransactionWrapper::GetTx() const {
     CTransactionRef tmp = std::atomic_load(&tx);
     if (tmp != nullptr) {
         return tmp;
@@ -143,16 +144,16 @@ CTransactionRef CTransactionRefWrapper::GetTx() const {
     return GetTxFromDB();
 }
 
-void CTransactionRefWrapper::UpdateTxMovedToDisk() const {
+void CTransactionWrapper::UpdateTxMovedToDisk() const {
     std::atomic_store(&tx, CTransactionRef(nullptr));
 }
 
-bool CTransactionRefWrapper::IsInMemory() const
+bool CTransactionWrapper::IsInMemory() const
 {
     return std::atomic_load(&tx) != nullptr;
 }
 
-bool CTransactionRefWrapper::HasDatabase(const std::shared_ptr<CMempoolTxDB>& txDB) const noexcept
+bool CTransactionWrapper::HasDatabase(const std::shared_ptr<CMempoolTxDBReader>& txDB) const noexcept
 {
     return mempoolTxDB == txDB;
 }
@@ -168,7 +169,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  Amount _inChainInputValue,
                                  bool _spendsCoinbase,
                                  LockPoints lp)
-    : tx{_tx, nullptr},
+    : tx{std::make_shared<CTransactionWrapper>(_tx, nullptr)},
       nFee{_nFee},
       nTime{_nTime},
       entryPriority{_entryPriority},
@@ -218,12 +219,8 @@ void CTxMemPoolEntry::UpdateLockPoints(const LockPoints &lp) {
     lockPoints = lp;
 }
 
-void CTxMemPoolEntry::UpdateTxMovedToDisk() const {
-    tx.UpdateTxMovedToDisk();
-}
-
 bool CTxMemPoolEntry::IsInMemory() const {
-    return tx.IsInMemory();
+    return tx->IsInMemory();
 }
 
 namespace {
@@ -751,29 +748,29 @@ void CTxMemPool::AddUncheckedNL(
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage)
 {
-    static const auto nullTxDB = std::shared_ptr<CMempoolTxDB>(nullptr);
+    static const auto nullTxDB = std::shared_ptr<CMempoolTxDBReader>(nullptr);
 
     // Make sure the transaction database is initialized so that we have
     // a valid mempoolTxDB for the following checks.
     InitMempoolTxDB();
 
     auto newit = mapTx.insert(originalEntry).first;
-    const auto sharedTx = newit->GetSharedTx();
 
     // During reorg, we could be re-adding an entry whose transaction was
     // previously moved to disk, in which case we must make sure that the entry
     // belongs to the same mempool.
-    const auto mustUpdateDatabase = newit->tx.HasDatabase(nullTxDB);
-    assert((mustUpdateDatabase && newit->IsInMemory()) || newit->tx.HasDatabase(mempoolTxDB));
+    const auto mustUpdateDatabase = newit->tx->HasDatabase(nullTxDB);
+    const auto thisTxDB = mempoolTxDB->GetDatabase();
+    assert((mustUpdateDatabase && newit->IsInMemory()) || newit->tx->HasDatabase(thisTxDB));
 
     mapLinks.insert(make_pair(newit, TxLinks()));
-    mapTx.modify(newit, [this, &sharedTx, &mustUpdateDatabase](CTxMemPoolEntry& entry) {
+    mapTx.modify(newit, [this, &mustUpdateDatabase, &thisTxDB](CTxMemPoolEntry& entry) {
         // Update insertion order indes for this entry.
         entry.SetInsertionIndex(insertionIndex.GetNext());
         if (mustUpdateDatabase) {
             // Update transaction database for this entry.
             // This should not affect the mapTx index.
-            entry.tx = CTransactionRefWrapper(sharedTx, mempoolTxDB);
+            entry.tx = std::make_shared<CTransactionWrapper>(entry.GetSharedTx(), thisTxDB);
         }
     });
 
@@ -793,9 +790,10 @@ void CTxMemPool::AddUncheckedNL(
     // further updated.)
     cachedInnerUsage += newit->DynamicMemoryUsage();
 
+    const auto sharedTx = newit->GetSharedTx();
     std::set<uint256> setParentTransactions;
     for (const CTxIn &in : sharedTx->vin) {
-        mapNextTx.insert(std::make_pair(in.prevout, &newit->tx));
+        mapNextTx.insert(std::make_pair(in.prevout, newit->tx));
         setParentTransactions.insert(in.prevout.GetTxId());
     }
     // Don't bother worrying about child transactions of this one. Normal case
@@ -849,7 +847,7 @@ void CTxMemPool::removeUncheckedNL(
     MemPoolRemovalReason reason,
     const CTransaction* conflictedWith)
 {
-    std::vector<uint256> transactionsToRemove;
+    std::vector<TxId> transactionsToRemove;
     std::uint64_t diskUsageRemoved = 0;
 
     transactionsToRemove.reserve(entries.size());
@@ -908,14 +906,10 @@ void CTxMemPool::removeUncheckedNL(
         TrackEntryRemoved(txid, parents);
     }
 
-    // TODO: CORE-130: Remove transactions asynchronously
     if (transactionsToRemove.size() > 0)
     {
         InitMempoolTxDB();
-        if (!mempoolTxDB->RemoveTransactions(transactionsToRemove, diskUsageRemoved))
-        {
-            LogPrint(BCLog::MEMPOOL, "WriteBatch failed. Transactions were not removed from DB successfully.");
-        }
+        mempoolTxDB->Remove(std::move(transactionsToRemove), diskUsageRemoved);
     }
 }
 
@@ -1191,9 +1185,7 @@ void CTxMemPool::clearNL(bool skipTransactionDatabase/* = false*/) {
 
     if (!skipTransactionDatabase && mempoolTxDB)
     {
-        // FIXME: CORE-130: Clear the transaction database synchronously,
-        //        pre-empting asynchronouse writes and deletes.
-        mempoolTxDB->ClearDatabase();
+        mempoolTxDB->Clear();
     }
 }
 
@@ -1567,7 +1559,7 @@ void CTxMemPool::InitMempoolTxDB() {
     static constexpr auto cacheSize = 1 << 20; /*TODO: remove constant*/
     std::call_once(db_initialized,
                    [this] {
-                       mempoolTxDB = std::make_shared<CMempoolTxDB>(cacheSize);
+                       mempoolTxDB = std::make_shared<CAsyncMempoolTxDB>(cacheSize);
                    });
 }
 
@@ -1578,36 +1570,25 @@ uint64_t CTxMemPool::GetDiskUsage() {
 
 void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
     uint64_t movedToDiskSize = 0;
-    std::vector<CTransactionRef> toBeMoved;
-    std::vector<const CTxMemPoolEntry*> toBeUpdated;
+    std::vector<CTransactionWrapperRef> toBeMoved;
 
     for (auto mi = mapTx.get<entry_time>().begin();
          mi != mapTx.get<entry_time>().end() && movedToDiskSize < requiredSize;
          ++mi) {
         if (mi->IsInMemory()) {
-            toBeMoved.push_back(mi->GetSharedTx());
-            toBeUpdated.push_back(&*mi);
+            toBeMoved.push_back(mi->tx);
             movedToDiskSize += mi->GetTxSize();
         }
     }
 
-    // TODO: CORE-130: Save transactions asynchronously.
     InitMempoolTxDB();
-    if (mempoolTxDB->AddTransactions(toBeMoved))
-    {
-        for (const CTxMemPoolEntry* entry : toBeUpdated)
-        {
-            entry->UpdateTxMovedToDisk();
-        }
-    }
-    else
-    {
-        LogPrint(BCLog::MEMPOOL, "WriteBatch failed. Transactions were not moved to DB successfully.");
-    }
-    
+    mempoolTxDB->Add(std::move(toBeMoved));
+
     if (movedToDiskSize < requiredSize)
     {
-        LogPrint(BCLog::MEMPOOL, "Less than required amount of memory was freed. Required: %d,  freed: %d\n", requiredSize, movedToDiskSize);
+        LogPrint(BCLog::MEMPOOL,
+                 "Less than required amount of memory was freed. Required: %d,  freed: %d\n",
+                 requiredSize, movedToDiskSize);
     }
 }
 
@@ -1872,11 +1853,11 @@ size_t CTxMemPool::DynamicMemoryUsage() const {
 }
 
 size_t CTxMemPool::DynamicMemoryUsageNL() const {
-    // Estimate the overhead of mapTx to be 15 pointers + an allocation, as no
-    // exact formula for boost::multi_index_contained is implemented.
-    return memusage::MallocUsage(sizeof(CTxMemPoolEntry) +
-                                 12 * sizeof(void *)) *
-               mapTx.size() +
+    // Estimate the overhead of mapTx to be 12 pointers + two allocations, as
+    // no exact formula for boost::multi_index_container is implemented.
+    return mapTx.size() * memusage::MallocUsage(sizeof(CTxMemPoolEntry) +
+                                                sizeof(CTransactionWrapper) +
+                                                12 * sizeof(void *)) +
            memusage::DynamicUsage(mapNextTx) +
            memusage::DynamicUsage(mapDeltas) +
            memusage::DynamicUsage(mapLinks) + cachedInnerUsage;

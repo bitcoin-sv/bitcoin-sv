@@ -44,6 +44,7 @@ class CoinsDB;
 class CoinsDBView;
 class CMempoolTxDBReader;
 class CMempoolTxDB;
+class CAsyncMempoolTxDB;
 
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
@@ -140,7 +141,7 @@ public:
  */
 using GroupID = std::optional<TxId>;
 
-class CTransactionRefWrapper {
+class CTransactionWrapper {
 private:
     mutable CTransactionRef tx {nullptr};
     // Transaction Id
@@ -151,9 +152,9 @@ private:
     CTransactionRef GetTxFromDB() const;
 
 public:
-    CTransactionRefWrapper();
-    CTransactionRefWrapper(const CTransactionRef &tx,
-                           const std::shared_ptr<CMempoolTxDBReader>& txDB);
+    CTransactionWrapper();
+    CTransactionWrapper(const CTransactionRef &tx,
+                        const std::shared_ptr<CMempoolTxDBReader>& txDB);
 
     CTransactionRef GetTx() const;
     const TxId& GetId() const;
@@ -161,8 +162,10 @@ public:
     void UpdateTxMovedToDisk() const;
     bool IsInMemory() const;
 
-    bool HasDatabase(const std::shared_ptr<CMempoolTxDB>& txDB) const noexcept;
+    bool HasDatabase(const std::shared_ptr<CMempoolTxDBReader>& txDB) const noexcept;
 };
+
+using CTransactionWrapperRef = std::shared_ptr<CTransactionWrapper>;
 
 /** \class CTxMemPoolEntry
  *
@@ -180,7 +183,7 @@ public:
  */
 class CTxMemPoolEntry {
 private:
-    CTransactionRefWrapper tx;
+    CTransactionWrapperRef tx;
     //!< Cached to avoid expensive parent-transaction lookups
     Amount nFee;
     //!< ... and avoid recomputing tx size
@@ -227,8 +230,8 @@ public:
 
     // CPFP group, if any that this transaction belongs to.
     GroupID GetCPFPGroupId() const;
-    CTransactionRef GetSharedTx() const { return tx.GetTx(); }
-    const TxId& GetTxId() const { return tx.GetId(); }
+    CTransactionRef GetSharedTx() const { return tx->GetTx(); }
+    const TxId& GetTxId() const { return tx->GetId(); }
 
     /**
      * Fast calculation of lower bound of current priority as update from entry
@@ -256,7 +259,6 @@ public:
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     std::shared_ptr<const CPFPGroup> GetCPFPGroup() const { return group; }
 
-    void UpdateTxMovedToDisk() const;
     bool IsInMemory() const;
 
     template<typename X> struct UnitTestAccess;
@@ -478,9 +480,8 @@ private:
     friend struct CPFPGroup;
 
     // Mempool transaction database
-    std::shared_ptr<CMempoolTxDB> mempoolTxDB {nullptr};
-
     std::once_flag db_initialized {};
+    std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
 
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
@@ -552,7 +553,7 @@ private:
     void updateChildNL(txiter entry, txiter child, bool add);
 
     std::vector<txiter> getSortedDepthAndScoreNL() const;
-    std::map<COutPoint, const CTransactionRefWrapper*> mapNextTx;
+    std::map<COutPoint, const CTransactionWrapperRef> mapNextTx;
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
     class InsertionIndex

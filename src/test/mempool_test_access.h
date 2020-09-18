@@ -7,6 +7,7 @@
 #define BITCOIN_TEST_MEMPOOL_TEST_ACCESS_H
 
 #include "txmempool.h"
+#include "mempooltxdb.h"
 
 namespace
 {
@@ -66,7 +67,12 @@ public:
     void removeStagedNL(setEntries& stage, mining::CJournalChangeSet& changeSet, MemPoolRemovalReason reason)
     {
         return mempool.removeStagedNL(stage, changeSet, reason);
-    }    
+    }
+
+    void SyncWithMempoolTxDB()
+    {
+        mempool.mempoolTxDB->Sync();
+    }
 };
 
 using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>;
@@ -79,12 +85,14 @@ template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
 {
     CTxMemPoolEntry& entry;
     UnitTestAccess(CTxMemPoolEntry& _entry) : entry(_entry) {}
-    
+
     auto& nFee() {return entry.nFee;};
     auto& feeDelta() {return entry.feeDelta;};
     auto& nTxSize() {return entry.nTxSize;};
     auto& group() {return entry.group;};
     auto& groupingData() {return entry.groupingData;};
+
+    CTransactionWrapperRef Wrapper() { return entry.tx; }
 };
 
 using CTestTxMemPoolEntry = CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>;
