@@ -6,6 +6,12 @@
 #include "config.h"
 #include "clientversion.h"
 
+//TODO: proper database initialization will be done in one of the next commits
+CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath) : diskUsage(0), merkleStorePath(storePath)
+{
+    merkleTreeIndexDB = std::make_unique<CMerkleTreeIndexDB>(merkleStorePath / "index", 1 << 20);
+}
+
 fs::path CMerkleTreeStore::GetDataFilename(int merkleTreeFileSuffix) const
 {
     return (merkleStorePath / strprintf("%s%08u.dat", "mrk", merkleTreeFileSuffix));
@@ -37,7 +43,7 @@ FILE* CMerkleTreeStore::OpenMerkleTreeFile(const MerkleTreeDiskPosition& merkleT
     return file;
 }
 
-void CMerkleTreeStore::RemoveOldDataNL(const int suffixOfDataFileToRemove)
+void CMerkleTreeStore::RemoveOldDataNL(const int suffixOfDataFileToRemove, std::vector<uint256>& blockHashesOfMerkleTreesRemovedOut)
 {
     AssertLockHeld(cs_merkleTreeStore);
     // Remove file info and decrease datafile usage
@@ -54,6 +60,7 @@ void CMerkleTreeStore::RemoveOldDataNL(const int suffixOfDataFileToRemove)
     {
         if (diskPositionToRemove->second.fileSuffix == suffixOfDataFileToRemove)
         {
+            blockHashesOfMerkleTreesRemovedOut.push_back(diskPositionToRemove->first);
             diskPositionToRemove = diskPositionMap.erase(diskPositionToRemove);
         }
         else
@@ -112,7 +119,12 @@ bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t ne
         return false;
     }
 
-    // Prune until usage is below the limit and there are still candidates to prune
+    /* Prune until usage is below the limit and there are still candidates to prune
+     * For database synchronization, store block hashes of Merkle Trees removed and
+     * suffixes of data files removed
+     */
+    std::vector<uint256> blockHashesOfMerkleTreesRemoved;
+    std::vector<int> suffixesOfDataFilesRemoved;
     int32_t numberOfLatestBlocksToKeep = static_cast<int32_t>(MIN_BLOCKS_TO_KEEP);
     auto pruningCandidate = fileInfoMap.cbegin();
     while ((diskUsage + newDataSizeInBytesToAdd) > maxDiskSpace && pruningCandidate != fileInfoMap.cend())
@@ -132,11 +144,15 @@ bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t ne
             else
             {
                 LogPrintf("PruneDataFilesNL: deleted mrk file (%08u)\n", pruningCandidate->first);
-                RemoveOldDataNL(pruningCandidate->first);
+                RemoveOldDataNL(pruningCandidate->first, blockHashesOfMerkleTreesRemoved);
+                suffixesOfDataFilesRemoved.push_back(pruningCandidate->first);
             }
         }
         pruningCandidate = nextCandidate;
     }
+
+    // Sync with the database
+    merkleTreeIndexDB->RemoveMerkleTreeData(suffixesOfDataFilesRemoved, blockHashesOfMerkleTreesRemoved, nextDiskPosition, diskUsage);
 
     if ((diskUsage + newDataSizeInBytesToAdd) > maxDiskSpace)
     {
@@ -156,7 +172,7 @@ bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const uint256& bloc
     }
 
     uint64_t merkleTreeSizeBytes = ::GetSerializeSize(merkleTreeIn, SER_DISK, CLIENT_VERSION);
-
+    
     // Prune data files if needed, to stay below the disk usage limit
     if (!PruneDataFilesNL(config.GetMaxMerkleTreeDiskSpace(), merkleTreeSizeBytes, chainHeight))
     {
@@ -191,6 +207,10 @@ bool CMerkleTreeStore::StoreMerkleTree(const Config& config, const uint256& bloc
 
     AddNewDataNL(blockHash, blockHeight, writeAtPosition, merkleTreeSizeBytes);
 
+    //Sync with the database
+    MerkleTreeFileInfo updatedFileInfo = fileInfoMap[writeAtPosition.fileSuffix];
+    merkleTreeIndexDB->AddMerkleTreeData(blockHash, writeAtPosition, nextDiskPosition, updatedFileInfo, diskUsage);
+
     return true;
 }
 
@@ -223,3 +243,75 @@ std::unique_ptr<CMerkleTree> CMerkleTreeStore::GetMerkleTree(const uint256& bloc
 
     return nullptr;
 }
+
+bool CMerkleTreeStore::LoadMerkleTreeIndexDB()
+{
+    LOCK(cs_merkleTreeStore);
+    // Clear current data
+    ResetStateNL();
+
+    // Measure duration of loading Merkle tree index database
+    auto loadMerkleTreeIndexDBStartedAt = std::chrono::high_resolution_clock::now();
+
+    // Load Merkle Tree disk positions
+    CMerkleTreeIndexDBIterator<uint256> diskPositionsIterator = merkleTreeIndexDB->GetDiskPositionsIterator();
+    uint256 blockHash;
+    while (diskPositionsIterator.Valid(blockHash))
+    {
+        MerkleTreeDiskPosition diskPosition;
+        if (!diskPositionsIterator.GetValue(diskPosition))
+        {
+            ResetStateNL();
+            return error("LoadMerkleTreeIndexDB() : failed to read disk position value");
+        }
+        diskPositionMap[blockHash] = diskPosition;
+        diskPositionsIterator.Next();
+    }
+
+    // Load Merkle Tree disk position that marks position of next write
+    if (!merkleTreeIndexDB->GetNextDiskPosition(nextDiskPosition))
+    {
+        ResetStateNL();
+        return error("LoadMerkleTreeIndexDB() : failed to read next disk position value");
+    }
+
+    // Load Merkle Tree file infos
+    CMerkleTreeIndexDBIterator<int> fileInfosIterator = merkleTreeIndexDB->GetFileInfosIterator();
+    int fileSuffix = 0;
+    while (fileInfosIterator.Valid(fileSuffix))
+    {
+        MerkleTreeFileInfo fileInfo;
+        if (!fileInfosIterator.GetValue(fileInfo))
+        {
+            ResetStateNL();
+            return error("LoadMerkleTreeIndexDB() : failed to read file info value");
+        }
+        fileInfoMap[fileSuffix] = fileInfo;
+        fileInfosIterator.Next();
+    }
+
+    // Load Merkle Trees disk usage
+    if (!merkleTreeIndexDB->GetDiskUsage(diskUsage))
+    {
+        ResetStateNL();
+        return error("LoadMerkleTreeIndexDB() : failed to read disk usage value");
+    }
+
+    auto loadMerkleTreeIndexDBStoppedAt = std::chrono::high_resolution_clock::now();
+    auto loadMerkleTreeIndexDBDuration = std::chrono::duration_cast<std::chrono::milliseconds>(loadMerkleTreeIndexDBStoppedAt - loadMerkleTreeIndexDBStartedAt);
+
+    LogPrintf("LoadMerkleTreeIndexDB() : CMerkleTreeIndexDB loaded in " + std::to_string(loadMerkleTreeIndexDBDuration.count())  + "ms\n");
+
+    return true;
+}
+
+void CMerkleTreeStore::ResetStateNL()
+{
+    AssertLockHeld(cs_merkleTreeStore);
+    diskPositionMap.clear();
+    nextDiskPosition.fileOffset = 0;
+    nextDiskPosition.fileSuffix = 0;
+    fileInfoMap.clear();
+    diskUsage = 0;
+}
+

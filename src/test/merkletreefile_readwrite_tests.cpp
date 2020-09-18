@@ -151,6 +151,8 @@ BOOST_AUTO_TEST_CASE(write_prune_load_test)
         }
     }
 
+    // Load data from the database
+    BOOST_CHECK(merkleTreeStore.LoadMerkleTreeIndexDB());
     CheckTestData(writtenDataToCheck, merkleTreeStore);
 
     BOOST_CHECK(GetMerkleTreesDataSize() <= testConfig.GetMaxMerkleTreeDiskSpace());

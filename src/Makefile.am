@@ -131,6 +131,7 @@ BITCOIN_CORE_H = \
   logging.h \
   memusage.h \
   merkleblock.h \
+  merkletreedb.h \
   merkletreestore.h \
   mining/assembler.h \
   mining/candidates.h \
@@ -264,6 +265,7 @@ libbitcoin_server_a_SOURCES = \
   invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
+  merkletreedb.cpp \
   merkletreestore.cpp \
   mining/assembler.cpp \
   mining/candidates.cpp \

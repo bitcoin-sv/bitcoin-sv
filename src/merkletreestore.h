@@ -7,37 +7,14 @@
 #include "validation.h"
 #include "consensus/merkle.h"
 #include "fs.h"
-
-/**
-  * Struct that holds info about file location of one Merkle Tree
-  * Files are stored in 'merkle' folder
-  * fileSuffix points to an actual file in which MerkleTree was stored. Name of the file is:
-  * mrk<formatedFileSuffix>.dat
-  * 
-  */
-struct MerkleTreeDiskPosition
-{
-    int fileSuffix{0};
-    uint64_t fileOffset{0};
-};
-
-/* MerkleTreeFileInfo represents one of the data files used to store Merkle Trees.
- * Because one data file can store multiple Merkle Trees, greatestBlockHeight will
- * contain height of a block that is greatest among all Merkle Trees stored in this
- * data file. This is needed to prevent pruning of this data file because we want to
- * keep Merkle Trees from the latest MIN_BLOCKS_TO_KEEP blocks.
- */
-struct MerkleTreeFileInfo
-{
-    int32_t greatestBlockHeight{0};
-    uint64_t fileSize{0};
-};
+#include "merkletreedb.h"
 
 typedef std::unordered_map<uint256, MerkleTreeDiskPosition, BlockHasher> MerkleTreeDiskPositionMap;
 typedef std::map<int, MerkleTreeFileInfo> MerkleTreeFileInfoMap;
 
 /*
  * Class used to store Merkle Trees into data files and to keep information about their data files
+ * Data is synchronized with levedb on every update (write and prune).
  * Merkle Tree data (CMerkleTree) is serialized and stored to a merkle tree data file in "merkle" folder.
  * The maximum file size is limited and can be configured with -preferredmerkletreefilesize (by default 32 MiB).
  * For every Merkle Tree stored we keep its position (file suffix and offset) in a map with block has as a key.
@@ -45,7 +22,8 @@ typedef std::map<int, MerkleTreeFileInfo> MerkleTreeFileInfoMap;
  " The maximum total size of all files is limited and can be configured with -maxmerkletreediskspace.
  * Before we save Merkle Tree to a data file we need to prune older data files if we reach disk size limitation.
  * Data files that contain one of the latest 288 Merkle Trees (MIN_BLOCKS_TO_KEEP) are not pruned. That is why we
- * need to keep the biggest block height for each data file. 
+ * need to keep the biggest block height for each data file.
+ * Every time we need to prune and/or write data to disk, we synchronize MerkleTree data files state to leveldb.
  */
 class CMerkleTreeStore
 {
@@ -61,6 +39,8 @@ private:
     uint64_t diskUsage;
     // Absolute path to the folder containing Merkle Tree data files
     const fs::path merkleStorePath;
+    // Merkle Tree data files information stored in the database
+    std::unique_ptr<CMerkleTreeIndexDB> merkleTreeIndexDB;
 
     /*
      * Returns absolute path of Merkle Tree data file with specified suffix.
@@ -77,8 +57,9 @@ private:
 
     /*
      * Removes all data file's disk positions for specified suffixOfDataFileToRemove
+     * Block hashes of removed Merkle Trees will be put into blockHashesOfMerkleTreesRemovedOut
      */
-    void RemoveOldDataNL(const int suffixOfDataFileToRemove);
+    void RemoveOldDataNL(const int suffixOfDataFileToRemove, std::vector<uint256>& blockHashesOfMerkleTreesRemovedOut);
 
     /*
      * Adds new disk position
@@ -95,8 +76,14 @@ private:
      */
     bool PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t newDataSizeInBytesToAdd, const int32_t chainHeight);
 
+    /**
+     * Clears Merkle Trees index and sets it back to initial state.
+     * This is used before or when index data cannot be loaded from the database.
+     */
+    void ResetStateNL();
+
 public:
-    CMerkleTreeStore(const fs::path& storePath) : diskUsage(0), merkleStorePath(storePath) {};
+    CMerkleTreeStore(const fs::path& storePath);
 
     /**
      * Stores given merkleTreeIn data to disk. 
@@ -111,6 +98,12 @@ public:
      * Returns a unique pointer of the Merkle Tree read from the data file or nullptr in case of errors.
      */
     std::unique_ptr<CMerkleTree> GetMerkleTree(const uint256& blockHash);
+
+    /**
+     * Loads Merkle Tree data files information from the database.
+     * Returns false if loading data from the database was not successful.
+     */
+    bool LoadMerkleTreeIndexDB();
 };
 
 #endif // MERKLETREESTORE_H
