@@ -50,6 +50,7 @@
 #include "validation.h"
 #include "validationinterface.h"
 #include "vmtouch.h"
+#include "consensus/merkle.h"
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
@@ -514,7 +515,18 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-txindex", strprintf(_("Maintain a full transaction index, used by "
                                 "the getrawtransaction rpc call (default: %d)"),
-                              DEFAULT_TXINDEX));
+                              DEFAULT_TXINDEX)); 
+    strUsage += HelpMessageOpt(
+        "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
+        "can be taken by stored merkle trees. This size should not be less than default size "
+        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        MIN_DISK_SPACE_FOR_MERKLETREE_FILES));
+    strUsage += HelpMessageOpt(
+        "-preferredmerkletreefilesize", strprintf(_("Preferred size of a single datafile containing "
+        "merkle trees. When size is reached, new datafile is created. If preferred size is less than "
+        "size of a single merkle tree, it will still be stored, meaning datafile size can be larger than "
+        "preferred size. (default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE));
     strUsage += HelpMessageGroup(_("Connection options:"));
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
@@ -2272,6 +2284,26 @@ bool AppInitParameterInteraction(Config &config) {
             invalidUAClients.insert(invalidClient);
         }
         config.SetBanClientUA(invalidUAClients);
+    }
+
+    // Configure maximum disk space that can be taken by Merkle Tree data files.
+    {
+        int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", MIN_DISK_SPACE_FOR_MERKLETREE_FILES);
+        std::string err;
+        if (!config.SetMaxMerkleTreeDiskSpace(maxMerkleTreeDiskspaceArg, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+    // Configure preferred size of a single Merkle Tree data file.
+    {
+        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE);
+        std::string err;
+        if (!config.SetPreferredMerkleTreeFileSize(merkleTreeFileSizeArg, &err))
+        {
+            return InitError(err);
+        }
     }
 
     return true;

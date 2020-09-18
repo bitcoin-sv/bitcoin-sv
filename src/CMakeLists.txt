@@ -239,6 +239,7 @@ add_library(server
     invalid_txn_sinks/zmq_sink.cpp
 	dbwrapper.cpp
 	merkleblock.cpp
+	merkletreestore.cpp
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp

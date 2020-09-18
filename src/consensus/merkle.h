@@ -68,6 +68,17 @@ class CQueueAdaptor;
 template<typename QueueAdapter>
 class CThreadPool;
 
+ /** The default preferred size of a Merkle Tree datafile (mrk????????.dat) */
+static constexpr uint64_t DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE{32 * ONE_MEBIBYTE}; // 32 MiB
+
+/**
+ * The user should allocate at least 176 MiB for Merkle tree data files (mrk????????.dat)
+ * With average 0.5 MiB (8192 transactions) per block/tree, 288 blocks = 144 MiB.
+ * Pruning process will by default remove one of 32 MiB file (DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE)
+ * We need at least 176 MiB of free space for Merkle Tree files.
+ */
+static constexpr uint64_t MIN_DISK_SPACE_FOR_MERKLETREE_FILES{288 / 2 * ONE_MEBIBYTE + DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE};
+
 class CMerkleTree
 {
 private:
