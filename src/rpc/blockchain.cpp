@@ -1463,7 +1463,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
             return NullUniValue;
         }
     } else {
-        if (!pcoinsTip->GetCoin(out, coin)) {
+        if (!pcoinsTip->GetCoin(out, coin)  || coin.IsSpent()) {
             return NullUniValue;
         }
     }
@@ -1685,7 +1685,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
         }
         else
         {
-            if (!pcoinsTip->GetCoin(outPoints[arrayIndex], coin))
+            if (!pcoinsTip->GetCoin(outPoints[arrayIndex], coin) || coin.IsSpent())
             {
                 jWriter.pushKV("error", "missing", false);
                 jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
