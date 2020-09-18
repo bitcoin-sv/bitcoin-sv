@@ -334,6 +334,11 @@ public:
     size_t DynamicMemoryUsage() const;
 
     /**
+     * WARNING: Calling this function expects that we already have the coins in
+     *          cache and that we haven't spent them yet. This limitation will
+     *          be removed with internal locking mechanism guarantee in later
+     *          commit.
+     *
      * Amount of bitcoins coming in to a transaction
      * Note that lightweight clients may not know anything besides the hash of
      * previous transactions, so may not be able to calculate this.
@@ -363,12 +368,8 @@ public:
     Coin GetCoinByTxId(const TxId &txid) const;
 
 private:
-    // A non-locking version of AccessCoin
-    const Coin &AccessCoinNL(const COutPoint &output) const;
-    // A non-locking version of HaveCoin
-    bool HaveCoinNL(const COutPoint &outpoint) const;
     // A non-locking fetch coin
-    std::optional<std::reference_wrapper<const Coin>> FetchCoinNL(const COutPoint &outpoint) const;
+    std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint &outpoint) const;
 
     /**
      * By making the copy constructor private, we prevent accidentally using it
@@ -379,6 +380,14 @@ private:
 private:
     /* A mutex to support a thread safe access. */
     mutable std::mutex mCoinsViewCacheMtx {};
+
+    /**
+     * Contains outpoints that are currently being loaded from base view by
+     * FetchCoin(). This prevents simultaneous loads of the same coin by
+     * multiple threads and enables us not to hold the locks while loading from
+     * base view, which can be slow if it is backed by disk.
+     */
+    mutable std::set<COutPoint> mFetchingCoins;
 };
 
 //! Utility function to add all of a transaction's outputs to a cache.
