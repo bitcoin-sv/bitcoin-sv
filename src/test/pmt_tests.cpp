@@ -1,6 +1,6 @@
 // Copyright (c) 2012-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2020 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "arith_uint256.h"
 #include "consensus/merkle.h"
@@ -47,6 +47,11 @@ BOOST_AUTO_TEST_CASE(pmt_test1) {
 
         // calculate actual merkle root and height
         uint256 merkleRoot1 = BlockMerkleRoot(block);
+        uint256 newMerkleRoot;
+        {
+            CMerkleTree merkleTree(block.vtx);
+            newMerkleRoot = merkleTree.GetMerkleRoot();
+        }
         std::vector<uint256> vTxid(nTx, uint256());
         for (unsigned int j = 0; j < nTx; j++)
             vTxid[j] = block.vtx[j]->GetId();
@@ -92,6 +97,7 @@ BOOST_AUTO_TEST_CASE(pmt_test1) {
             // check that it has the same merkle root as the original, and a
             // valid one
             BOOST_CHECK(merkleRoot1 == merkleRoot2);
+            BOOST_CHECK(newMerkleRoot == merkleRoot2);
             BOOST_CHECK(!merkleRoot2.IsNull());
 
             // check that it contains the matched transactions (in the same
@@ -105,6 +111,7 @@ BOOST_AUTO_TEST_CASE(pmt_test1) {
                 std::vector<uint256> vMatchTxid3;
                 uint256 merkleRoot3 = pmt3.ExtractMatches(vMatchTxid3, vIndex);
                 BOOST_CHECK(merkleRoot3 != merkleRoot1);
+                BOOST_CHECK(merkleRoot3 != newMerkleRoot);
             }
         }
     }

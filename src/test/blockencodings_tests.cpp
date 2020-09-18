@@ -120,6 +120,10 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
         }
         bool mutated;
         BOOST_CHECK(block.hashMerkleRoot != BlockMerkleRoot(block2, &mutated));
+        {
+            CMerkleTree merkleTree(block2.vtx);
+            BOOST_CHECK(block.hashMerkleRoot != merkleTree.GetMerkleRoot());
+        }
 
         CBlock block3;
         BOOST_CHECK(partialBlock.FillBlock(block3, {block.vtx[1]}, 0) ==
@@ -129,6 +133,11 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block3, &mutated).ToString());
         BOOST_CHECK(!mutated);
+        {
+            CMerkleTree merkleTree(block3.vtx);
+            BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
+                              merkleTree.GetMerkleRoot().ToString());
+        }
     }
 }
 
@@ -234,6 +243,11 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
         }
         bool mutated;
         BOOST_CHECK(block.hashMerkleRoot != BlockMerkleRoot(block2, &mutated));
+        {
+            CMerkleTree merkleTree(block2.vtx);
+            BOOST_CHECK(block.hashMerkleRoot != merkleTree.GetMerkleRoot());
+
+        }
 
         CBlock block3;
         PartiallyDownloadedBlock partialBlockCopy = partialBlock;
@@ -244,6 +258,11 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block3, &mutated).ToString());
         BOOST_CHECK(!mutated);
+        {
+            CMerkleTree merkleTree(block3.vtx);
+            BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
+                              merkleTree.GetMerkleRoot().ToString());
+        }
 
         txhash = block.vtx[2]->GetId();
         block.vtx.clear();
@@ -307,6 +326,11 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block2, &mutated).ToString());
         BOOST_CHECK(!mutated);
+        {
+            CMerkleTree merkleTree(block2.vtx);
+            BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
+                              merkleTree.GetMerkleRoot().ToString());
+        }
 
         txhash = block.vtx[1]->GetId();
         block.vtx.clear();
@@ -368,6 +392,11 @@ BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
         BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
                           BlockMerkleRoot(block2, &mutated).ToString());
         BOOST_CHECK(!mutated);
+        {
+            CMerkleTree merkleTree(block2.vtx);
+            BOOST_CHECK_EQUAL(block.hashMerkleRoot.ToString(),
+                              merkleTree.GetMerkleRoot().ToString());
+        }
     }
 }
 

@@ -1,9 +1,10 @@
 // Copyright (c) 2015-2016 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// Copyright (c) 2020 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "consensus/merkle.h"
 #include "test/test_bitcoin.h"
+#include "task_helpers.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -103,6 +104,11 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
             bool unmutatedMutated = false;
             uint256 unmutatedRoot = BlockMerkleRoot(block, &unmutatedMutated);
             BOOST_CHECK(unmutatedMutated == false);
+            uint256 newestUnmutatedRoot;
+            {
+                CMerkleTree newestMerkleTree(block.vtx);
+                newestUnmutatedRoot = newestMerkleTree.GetMerkleRoot();
+            }
             // Optionally mutate by duplicating the last transactions, resulting
             // in the same merkle root.
             block.vtx.resize(ntx3);
@@ -123,11 +129,18 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
             // Compute the merkle root using the new mechanism.
             bool newMutated = false;
             uint256 newRoot = BlockMerkleRoot(block, &newMutated);
+            uint256 newestRoot;
+            {
+                CMerkleTree newestMerkleTree(block.vtx);
+                newestRoot = newestMerkleTree.GetMerkleRoot();
+            }
             BOOST_CHECK(oldRoot == newRoot);
             BOOST_CHECK(newRoot == unmutatedRoot);
             BOOST_CHECK((newRoot == uint256()) == (ntx == 0));
             BOOST_CHECK(oldMutated == newMutated);
             BOOST_CHECK(newMutated == !!mutate);
+            BOOST_CHECK(newestUnmutatedRoot == oldRoot);
+            BOOST_CHECK(newestRoot == oldRoot);
             // If no mutation was done (once for every ntx value), try up to 16
             // branches.
             if (mutate == 0) {
@@ -142,13 +155,59 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
                         BlockMerkleBranch(block, mtx);
                     std::vector<uint256> oldBranch =
                         BlockGetMerkleBranch(block, merkleTree, mtx);
+                    std::vector<uint256> newestBranch;
+                    {
+                        CMerkleTree newestMerkleTree(block.vtx);
+                        newestBranch = newestMerkleTree.GetMerkleProof(block.vtx[mtx]->GetId());
+                    }
                     BOOST_CHECK(oldBranch == newBranch);
+                    BOOST_CHECK(oldBranch == newestBranch);
                     BOOST_CHECK(
                         ComputeMerkleRootFromBranch(block.vtx[mtx]->GetId(),
                                                     newBranch, mtx) == oldRoot);
+                    BOOST_CHECK(
+                        ComputeMerkleRootFromBranch(block.vtx[mtx]->GetId(), 
+                                                    newestBranch, mtx) == oldRoot);
                 }
             }
         }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(merkle_tree_test)
+{
+    /* Test blocks with different number of transactions
+       Minimum CMerkleTree batch size is set to 4096 transaction ids. That means any merkle tree
+       with more than 4096 transaction ids (leaves) will be split into subtrees, each calculated
+       in parallel and merged together.
+       In this test we use up to 9192 leaves, causing three subtrees to be calculated and merged with
+       these 1000 combinations of leaves:
+       4096 + 4096 + 1
+       4096 + 4096 + 2
+       4096 + 4096 + 3
+       4096 + 4096 + 4
+       ...
+       4096 + 4096 + 1000
+     */
+    int minBatchSize = 4096;
+    // Initialize thread pool using 3 threads
+    std::unique_ptr<CThreadPool<CQueueAdaptor>> pMerkleTreeThreadPool = std::make_unique<CThreadPool<CQueueAdaptor>>("MerkleTreeThreadPoolTest", 3);
+    for (int numberOfTransactions = 2*minBatchSize + 1; numberOfTransactions <= (2*minBatchSize + 1000); ++numberOfTransactions)
+    {
+        CBlock block;
+        block.vtx.resize(numberOfTransactions);
+        for (int txIndex = 0; txIndex < numberOfTransactions; ++txIndex)
+        {
+            CMutableTransaction mtx;
+            mtx.nLockTime = txIndex;
+            block.vtx[txIndex] = MakeTransactionRef(std::move(mtx));
+        }
+        // Constructor will create merkle tree by splitting it into two subtrees, parallel calculation and merging them
+        CMerkleTree merkleTree(block.vtx, pMerkleTreeThreadPool.get());
+        uint256 originalMerkleRoot = BlockMerkleRoot(block);
+        uint256 newMerkleRoot = merkleTree.GetMerkleRoot();
+        // root from CMerkleTree instance must be same as legacy merkle root
+        BOOST_CHECK(originalMerkleRoot == newMerkleRoot);
     }
 }
 
