@@ -82,6 +82,9 @@ static constexpr uint64_t DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE{32 * ONE_MEBIBY
  */
 static constexpr uint64_t MIN_DISK_SPACE_FOR_MERKLETREE_FILES{288 / 2 * ONE_MEBIBYTE + DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE};
 
+/** The default maximum size of a Merkle Tree memory cache */
+static constexpr uint64_t DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE{32 * ONE_MEBIBYTE}; // 32 MiB
+
 class CMerkleTree
 {
 private:
@@ -210,6 +213,12 @@ public:
      * For example, transaction at index 0 is a coinbase transaction.
      */
     MerkleProof GetMerkleProof(const TxId& transactionId, bool skipDuplicates) const;
+
+    /*
+     * Returns size of Merkle Tree in bytes by calculating number of all hashes stored
+     * multiplied by 32 bytes (uint256).
+     */
+    uint64_t GetSizeInBytes() const;
 
     ADD_SERIALIZE_METHODS;
 

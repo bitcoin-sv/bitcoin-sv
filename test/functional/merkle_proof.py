@@ -7,15 +7,16 @@
 #
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import connect_nodes, assert_equal, Decimal, assert_raises_rpc_error
+from test_framework.util import connect_nodes, assert_equal, Decimal, assert_raises_rpc_error, sync_blocks, random, assert_greater_than
 import os
 
 class MerkleProofTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
+        # On first node set preferred data file size to 30 kB
         # On second node -txindex is set
-        self.extra_args = [[], ["-txindex"]]
+        self.extra_args = [["-preferredmerkletreefilesize=30720"], ["-txindex"]]
 
     def setup_network(self):
         self.setup_nodes()
@@ -25,6 +26,16 @@ class MerkleProofTest(BitcoinTestFramework):
     def verify_merkle_proof(self, txid, blockhash, node):
         assert self.nodes[node].verifymerkleproof(self.nodes[node].getmerkleproof(txid))
         assert self.nodes[node].verifymerkleproof(self.nodes[node].getmerkleproof(txid, blockhash))
+
+    # Calculate Merkle tree size in bytes
+    def merkle_tree_size(self, number_of_transactions):
+        merkle_tree_size = 0
+        while number_of_transactions > 0:
+            merkle_tree_size += number_of_transactions
+            number_of_transactions //= 2
+        # 32 bytes for each hash
+        merkle_tree_size *= 32
+        return merkle_tree_size
 
     def run_test(self):
         self.log.info("Mining 500 blocks...")
@@ -120,6 +131,55 @@ class MerkleProofTest(BitcoinTestFramework):
         self.verify_merkle_proof(txid_spent, hash_of_block_501, 1)
         hash_of_block_502 = self.nodes[0].getblockhash(height_of_block_501 + 1)
         self.verify_merkle_proof(txid3, hash_of_block_502, 0)
+
+        # Create more blocks to get utxos
+        self.log.info("Mining additional 1500 blocks...")
+        self.nodes[0].generate(1500)
+        sync_blocks(self.nodes[0:1])
+
+        # Use all utxos and create more Merkle Trees
+        # We create blocks with max 400 transactions (~25 kB for biggest Merkle Tree)
+        self.log.info("Mining blocks with random transactions using all utxos...")
+        utxos = self.nodes[0].listunspent()
+        calculated_merkle_tree_disk_size = 0
+        while len(utxos) > 0:
+            # Choose random number of transactions
+            send_transactions = random.randint(1, 400)
+            if len(utxos) < send_transactions:
+                send_transactions = len(utxos)
+            # Send transactions
+            for i in range(send_transactions):
+                tx_in = utxos.pop()
+                tx_out = tx_in["amount"] - Decimal("0.01")
+                tx = self.nodes[0].createrawtransaction([tx_in], {self.nodes[1].getnewaddress(): tx_out})
+                txid = self.nodes[0].sendrawtransaction(self.nodes[0].signrawtransaction(tx)["hex"])
+            # Mine a block
+            self.nodes[0].generate(1)
+            sync_blocks(self.nodes[0:1])
+            # Verify proofs of some random transactions in each block
+            hash_of_this_block = self.nodes[0].getblockhash(self.nodes[0].getblockcount())
+            transactions_of_this_block = self.nodes[0].getblock(hash_of_this_block, True)["tx"]
+            for i in range(len(transactions_of_this_block)):
+                transactionIndex = random.randint(0, len(transactions_of_this_block) - 1)
+                self.verify_merkle_proof(transactions_of_this_block[transactionIndex], hash_of_this_block, 0)
+            calculated_merkle_tree_disk_size += self.merkle_tree_size(len(transactions_of_this_block))
+        
+        # Data files checks
+        number_of_data_files = 0
+        disk_size = 0
+        node0_data_dir = os.path.join(self.options.tmpdir, "node0", "regtest", "merkle", "")
+        for data_file in os.listdir(node0_data_dir):
+            data_file_name = node0_data_dir + data_file
+            if os.path.isfile(data_file_name):
+                data_file_size = os.path.getsize(data_file_name)
+                # No file should be bigger than 30 kB since no Merkle Tree takes more than 25 kB
+                assert_greater_than(30 * 1024, data_file_size)
+                disk_size += data_file_size
+                number_of_data_files += 1
+        # Verify that Merkle Tree disk size is at least the size of Merkle Trees we just stored
+        assert_greater_than(disk_size, calculated_merkle_tree_disk_size)
+        # Number of data files should be at least calculated_merkle_tree_disk_size/preferred_file_size
+        assert_greater_than(number_of_data_files, calculated_merkle_tree_disk_size/(30 * 1024))
 
 if __name__ == '__main__':
     MerkleProofTest().main()

@@ -50,7 +50,7 @@
 #include "validation.h"
 #include "validationinterface.h"
 #include "vmtouch.h"
-#include "consensus/merkle.h"
+#include "merkletreestore.h"
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
@@ -527,6 +527,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         "size of a single merkle tree, it will still be stored, meaning datafile size can be larger than "
         "preferred size. (default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
         DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE));
+    strUsage += HelpMessageOpt(
+        "-maxmerkletreememcachesize", strprintf(_("Maximum merkle trees memory cache size in bytes. For "
+        "faster responses, requested merkle trees are stored into a memory cache. "
+        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE));
     strUsage += HelpMessageGroup(_("Connection options:"));
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
@@ -2306,6 +2311,16 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
+    // Configure size of Merkle Trees memory cache.
+    {
+        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE);
+        std::string err;
+        if (!config.SetMaxMerkleTreeMemoryCacheSize(maxMerkleTreeMemCacheSizeArg, &err))
+        {
+            return InitError(err);
+        }
+    }
+
     return true;
 }
 
@@ -2422,6 +2437,17 @@ void preloadChainState(boost::thread_group &threadGroup)
     {
         LogPrintf("Unknown value of -preload. No preloading will be done\n");
     }
+}
+
+static size_t GetMaxNumberOfMerkleTreeThreads()
+{
+    // Use 1/4 of all threads for Merkle tree calculations
+    size_t numberOfMerkleTreeCalculationThreads = static_cast<size_t>(std::thread::hardware_concurrency() * 0.25);
+    if (!numberOfMerkleTreeCalculationThreads)
+    {
+        numberOfMerkleTreeCalculationThreads = 1;
+    }
+    return numberOfMerkleTreeCalculationThreads;
 }
 
 bool AppInitMain(Config &config, boost::thread_group &threadGroup,
@@ -2722,12 +2748,17 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // cap total coins db cache
     nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20);
     nTotalCache -= nCoinDBCache;
+    // calculate cache for Merkle Tree database
+    int64_t nMerkleTreeIndexDBCache = nBlockTreeDBCache / 4;
+    nTotalCache -= nMerkleTreeIndexDBCache;
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
     int64_t nMempoolSizeMax = config.GetMaxMempool();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
+    LogPrintf("* Using %.1fMiB for Merkle Tree index database\n",
+              nMerkleTreeIndexDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for chain state database\n",
               nCoinDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
@@ -2756,7 +2787,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false,
                                                 fReindex || fReindexChainState);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
-
+                pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
+                
                 if (fReindex) {
                     pblocktree->WriteReindexing(true);
                     // If we're reindexing in prune mode, wipe away unusable

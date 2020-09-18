@@ -157,6 +157,8 @@ public:
     virtual uint64_t GetMaxMerkleTreeDiskSpace() const = 0;
     virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetPreferredMerkleTreeFileSize() const = 0;
+    virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxMerkleTreeMemoryCacheSize() const = 0;
 
     virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
     virtual uint64_t GetMaxMempool() const = 0;
@@ -331,6 +333,8 @@ public:
     uint64_t GetMaxMerkleTreeDiskSpace() const override;
     bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) override;
     uint64_t GetPreferredMerkleTreeFileSize() const override;
+    bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) override;
+    uint64_t GetMaxMerkleTreeMemoryCacheSize() const override;
 
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override;
     uint64_t GetMaxMempool() const override;
@@ -447,6 +451,7 @@ private:
     std::set<std::string> mBannedUAClients;
     uint64_t maxMerkleTreeDiskSpace;
     uint64_t preferredMerkleTreeFileSize;
+    uint64_t maxMerkleTreeMemoryCacheSize;
 
     bool LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage);
 
@@ -796,6 +801,16 @@ public:
     }
 
     uint64_t GetPreferredMerkleTreeFileSize() const override
+    {
+        return 0;
+    }
+
+    bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    uint64_t GetMaxMerkleTreeMemoryCacheSize() const override
     {
         return 0;
     }

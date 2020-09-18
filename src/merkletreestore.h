@@ -8,6 +8,7 @@
 #include "consensus/merkle.h"
 #include "fs.h"
 #include "merkletreedb.h"
+#include <queue>
 
 typedef std::unordered_map<uint256, MerkleTreeDiskPosition, BlockHasher> MerkleTreeDiskPositionMap;
 typedef std::map<int, MerkleTreeFileInfo> MerkleTreeFileInfoMap;
@@ -83,7 +84,10 @@ private:
     void ResetStateNL();
 
 public:
-    CMerkleTreeStore(const fs::path& storePath);
+    /**
+     * Constructs a Merkle Tree store on specified path and with configured Merkle tree index database cache.
+     */
+    CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize);
 
     /**
      * Stores given merkleTreeIn data to disk. 
@@ -105,5 +109,59 @@ public:
      */
     bool LoadMerkleTreeIndexDB();
 };
+
+/*
+ * CMerkleTreeFactory is used to handle cached Merkle Trees. Merkle Trees that were recently requested are 
+ * kept in a memory cache. This is a FIFO map with keys (block hashes) stored in a queue.
+ * Cache size is limited to 32 MiB by default and can be configured with -maxmerkletreememcachesize parameter.
+ * Oldest Merkle Trees are removed to keep cache size limitation.
+ * Additionally Merkle trees are stored in data files on disk and information on these data files is stored
+ * in the database.
+ */
+
+typedef std::shared_ptr<const CMerkleTree> CMerkleTreeRef;
+
+class CMerkleTreeFactory
+{
+private:
+    CCriticalSection cs_merkleTreeFactory;
+    std::unordered_map<uint256, CMerkleTreeRef, BlockHasher> merkleTreeMap;
+    std::queue<uint256> merkleTreeQueue;
+    uint64_t cacheSizeBytes;
+    CMerkleTreeStore merkleTreeStore;
+    std::unique_ptr<CThreadPool<CQueueAdaptor>> merkleTreeThreadPool;
+
+public:
+    /**
+     * Constructs a Merkle Tree factory instance used to manage creation and storage of Merkle Trees.
+     * storePath is an absolute path to the folder where merkle tree data files are stored.
+     * databaseCacheSize should be set to leveldb cache size for merkle trees index.
+     * maxNumberOfThreadsForCalculations should be set to maximum number of threads used in parallel
+     * Merkle Tree calculations.
+     */
+    CMerkleTreeFactory(const fs::path& storePath, size_t databaseCacheSize, size_t maxNumberOfThreadsForCalculations);
+    /**
+     * Returns CMerkleTreeRef from Merkle Tree cache. If it is not found in the memory cache,
+     * Merkle Tree is read from the disk. If it is not found on the disk, Merkle Tree is calculated
+     * first, stored to disk and in memory cache. Memory cache size is limited and can be configured
+     * with -maxmerkletreememcachesize parameter. Function takes config to retrieve configured limitations
+     * and blockIndex needed to read and/or create related Merkle Tree. Additionally, currentChainHeight
+     * must be set to height of an active chain. This is needed during purging of Merkle tree data files
+     * to prevent removal of last MIN_BLOCKS_TO_KEEP Merkle trees.
+     * Returns null if block could not be read from disk to create a Merkle Tree.
+     */
+    CMerkleTreeRef GetMerkleTree(const Config& config, CBlockIndex& blockIndex, const int32_t currentChainHeight);
+private:
+    /**
+     * Inserts merkleTree into a cached map with key blockHash.
+     * By default cache size is limited to 32 MiB and can be configured with
+     * -maxmerkletreememcachesize. If cache size limitation is reached,
+     * Merkle Trees that were added first are removed (FIFO).
+     */
+    void Insert(const uint256& blockHash, CMerkleTreeRef merkleTree, const Config& config);
+};
+
+/** Access to global Merkle Tree factory */
+extern std::unique_ptr<CMerkleTreeFactory> pMerkleTreeFactory;
 
 #endif // MERKLETREESTORE_H

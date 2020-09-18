@@ -86,6 +86,7 @@ void GlobalConfig::Reset()
 
     maxMerkleTreeDiskSpace = MIN_DISK_SPACE_FOR_MERKLETREE_FILES;
     preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
+    maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -994,6 +995,21 @@ int64_t GlobalConfig::GetInvalidTxZMQMaxMessageSize() const
 }
 #endif
 
+bool GlobalConfig::SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err)
+{
+    if (LessThanZero(maxMemoryCacheSize, err, "Maximum merkle tree memory cache size cannot be configured with a negative value."))
+    {
+        return false;
+    }
+
+    maxMerkleTreeMemoryCacheSize = static_cast<uint64_t>(maxMemoryCacheSize);
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxMerkleTreeMemoryCacheSize() const
+{
+    return maxMerkleTreeMemoryCacheSize;
+}
 
 DummyConfig::DummyConfig()
     : chainParams(CreateChainParams(CBaseChainParams::REGTEST)) {}

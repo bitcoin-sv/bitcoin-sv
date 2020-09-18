@@ -524,3 +524,13 @@ CMerkleTree::MerkleProof CMerkleTree::GetMerkleProof(const TxId& transactionId, 
     }
     return merkleProof;
 }
+
+uint64_t CMerkleTree::GetSizeInBytes() const
+{
+    uint64_t numberOfNodes = 0;
+    for (const auto& curentLevel : merkleTreeLevelsWithNodeHashes)
+    {
+        numberOfNodes += curentLevel.size();
+    }
+    return numberOfNodes * sizeof(uint256);
+}

@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE(write_read_test)
 {
     // Maximum size of disk space for Merkle Trees is 500 MiB 
     testConfig.SetMaxMerkleTreeDiskSpace(500 * ONE_MEBIBYTE);
-    CMerkleTreeStore merkleTreeStore(GetDataDir() / "merkle");
+    CMerkleTreeStore merkleTreeStore(GetDataDir() / "merkle", 1 << 20);
 
     std::vector<WrittenData> writtenDataToCheck;
     // Create some random blocks and write their Merkle Trees to disk
@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE(write_prune_load_test)
 {
     // Maximum size of disk space for Merkle Trees is 200 MiB 
     testConfig.SetMaxMerkleTreeDiskSpace(200 * ONE_MEBIBYTE);
-    CMerkleTreeStore merkleTreeStore(GetDataDir() / "merkle");
+    CMerkleTreeStore merkleTreeStore(GetDataDir() / "merkle", 1 << 20);
 
     std::vector<WrittenData> writtenDataToCheck;
     // Create 1000 blocks, each with 4000 transactions and write their Merkle Trees to disk

@@ -6,10 +6,14 @@
 #include "config.h"
 #include "clientversion.h"
 
-//TODO: proper database initialization will be done in one of the next commits
-CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath) : diskUsage(0), merkleStorePath(storePath)
+/* Global state of Merkle Tree factory.
+ * Merkle Trees are stored in memory cache and on disk when requested (RPC).
+ */
+std::unique_ptr<CMerkleTreeFactory> pMerkleTreeFactory = nullptr;
+
+CMerkleTreeStore::CMerkleTreeStore(const fs::path& storePath, size_t leveldbCacheSize) : diskUsage(0), merkleStorePath(storePath)
 {
-    merkleTreeIndexDB = std::make_unique<CMerkleTreeIndexDB>(merkleStorePath / "index", 1 << 20);
+    merkleTreeIndexDB = std::make_unique<CMerkleTreeIndexDB>(merkleStorePath / "index", leveldbCacheSize);
 }
 
 fs::path CMerkleTreeStore::GetDataFilename(int merkleTreeFileSuffix) const
@@ -315,3 +319,75 @@ void CMerkleTreeStore::ResetStateNL()
     diskUsage = 0;
 }
 
+CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databaseCacheSize, size_t maxNumberOfThreadsForCalculations)
+    :cacheSizeBytes(0), merkleTreeStore(CMerkleTreeStore(storePath, databaseCacheSize)),
+    merkleTreeThreadPool(std::make_unique<CThreadPool<CQueueAdaptor>>("MerkleTreeThreadPool", maxNumberOfThreadsForCalculations))
+{
+    LogPrintf("Using up to %u additional threads for Merkle tree computation\n", maxNumberOfThreadsForCalculations - 1);
+
+    // Load index data from the database
+    merkleTreeStore.LoadMerkleTreeIndexDB();
+};
+
+CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockIndex& blockIndex, const int32_t currentChainHeight)
+{
+    {
+        LOCK(cs_merkleTreeFactory);
+        // Try to get Merkle Tree from memory cache
+        auto merkleTreeMapIterator = merkleTreeMap.find(blockIndex.GetBlockHash());
+        if (merkleTreeMapIterator != merkleTreeMap.cend())
+        {
+            return merkleTreeMapIterator->second;
+        }
+    }
+
+    // Merkle Tree for this block not found in cache, read it from disk
+    auto merkleTreePtr = merkleTreeStore.GetMerkleTree(blockIndex.GetBlockHash());
+    if (!merkleTreePtr)
+    {
+        /* Merkle Tree of this block was not found or cannot be read from data files on disk.
+         * Calculate it from block stream and store it to the disk.
+         */
+        auto stream = GetDiskBlockStreamReader(blockIndex.GetBlockPos());
+        if (!stream)
+        {
+            // This should be handled by the caller - block cannot be read from the disk
+            return nullptr;
+        }
+
+        merkleTreePtr = std::make_unique<CMerkleTree>(*stream, merkleTreeThreadPool.get());
+        merkleTreeStore.StoreMerkleTree(config, blockIndex.GetBlockHash(), static_cast<int32_t>(blockIndex.nHeight), *merkleTreePtr, currentChainHeight);
+    }
+
+    // Put the requested Merkle Tree into the cache
+    CMerkleTreeRef merkleTreeRef = std::move(merkleTreePtr);
+    Insert(blockIndex.GetBlockHash(), merkleTreeRef, config);
+    return merkleTreeRef;
+}
+
+void CMerkleTreeFactory::Insert(const uint256& blockHash, CMerkleTreeRef merkleTree, const Config& config)
+{
+    LOCK(cs_merkleTreeFactory);
+    if (merkleTreeMap.count(blockHash))
+    {
+        // Skip if Merkle Tree is already in the cache
+        return;
+    }
+    // Get merkle tree size and add size of two block hashes (key in map and queue) 
+    uint64_t merkleTreeSizeInCache = merkleTree->GetSizeInBytes() + 2 * sizeof(uint256);
+    if (merkleTreeSizeInCache > config.GetMaxMerkleTreeMemoryCacheSize())
+    {
+        // Skip if Merkle Tree is too big
+        return;
+    }
+    while (cacheSizeBytes + merkleTreeSizeInCache > config.GetMaxMerkleTreeMemoryCacheSize())
+    {
+        // Remove first Merkle Tree in cache and subtract its size and size (+ two keys in map and queue)
+        cacheSizeBytes -= merkleTreeMap[merkleTreeQueue.front()]->GetSizeInBytes() + 2 * sizeof(uint256);
+        merkleTreeMap.erase(merkleTreeQueue.front());
+        merkleTreeQueue.pop();
+    }
+    merkleTreeMap.insert(std::make_pair(blockHash, merkleTree));
+    merkleTreeQueue.push(blockHash);
+    cacheSizeBytes += merkleTreeSizeInCache;
+}

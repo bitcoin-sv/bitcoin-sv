@@ -6,6 +6,20 @@
 CMerkleTreeIndexDB::CMerkleTreeIndexDB(const fs::path& databasePath, size_t leveldbCacheSize, bool fMemory, bool fWipe)
     : merkleTreeIndexDB(databasePath, leveldbCacheSize, fMemory, fWipe)
 {
+    // Write initial records if they do not yet exist
+    MerkleTreeDiskPosition nextDiskPosition;
+    if (!merkleTreeIndexDB.Read(DB_NEXT_MERKLE_TREE_DISK_POSITION, nextDiskPosition))
+    {
+        nextDiskPosition.fileOffset = 0;
+        nextDiskPosition.fileSuffix = 0;
+        merkleTreeIndexDB.Write(DB_NEXT_MERKLE_TREE_DISK_POSITION, nextDiskPosition);
+    }
+    uint64_t diskUsage = 0;
+    if (!merkleTreeIndexDB.Read(DB_MERKLE_TREES_DISK_USAGE, diskUsage))
+    {
+        diskUsage = 0;
+        merkleTreeIndexDB.Write(DB_MERKLE_TREES_DISK_USAGE, diskUsage);
+    }
 }
 
 CMerkleTreeIndexDBIterator<uint256> CMerkleTreeIndexDB::GetDiskPositionsIterator()

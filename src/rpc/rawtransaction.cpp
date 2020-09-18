@@ -1705,11 +1705,22 @@ static UniValue getmerkleproof(const Config& config,
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Block for this transaction not found");
     }
 
-    CMerkleTree merkleTree(*GetBlockStream(*blockIndex));
+    int32_t currentChainHeight = 0;
+    {
+        LOCK(cs_main);
+        currentChainHeight = static_cast<int32_t>(chainActive.Height());
+    }
+
+    CMerkleTreeRef merkleTree = pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, currentChainHeight);
+
+    if (merkleTree == nullptr)
+    {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
+    }
 
     // Result in JSON format
     UniValue merkleProofArray(UniValue::VARR);
-    CMerkleTree::MerkleProof proof = merkleTree.GetMerkleProof(transactionId, true);
+    CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(transactionId, true);
     for (const uint256& node : proof.merkleTreeHashes)
     {
         if (node.IsNull())
