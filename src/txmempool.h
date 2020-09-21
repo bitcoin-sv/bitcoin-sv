@@ -681,6 +681,9 @@ public:
     // A non-locking version of IsSpent
     // DEPRECATED - this will become private and ultimately changed or removed
     bool IsSpentNL(const COutPoint &outpoint);
+    // Returns const pointer to transaction that spends outpoint.
+    // Pointer is valid and transaction will not change as long as mempool smtx lock is held
+    const CTransaction* IsSpentByNL(const COutPoint &outpoint);
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
     /**

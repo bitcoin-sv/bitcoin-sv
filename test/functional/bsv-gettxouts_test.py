@@ -95,7 +95,8 @@ class GettxoutsTest(BitcoinTestFramework):
                      {"scriptPubKey", "scriptPubKeyLen", "value", "isStandard", "confirmations"})
 
         gettxouts_res = self.nodes[0].gettxouts([{"txid": spent_utxo_txid, "n": 0}], ["*"], True)
-        assert_equal(gettxouts_res["txouts"], [{'error': 'spent'}])
+        assert_equal(gettxouts_res["txouts"][0]["error"], "spent")
+        assert_equal(gettxouts_res["txouts"][0]["collidedWith"]["txid"], new_utxo_txid)
 
         # Check for multiple errors (missing, spent) and utxo that we can obtain
         gettxouts_res = self.nodes[0].gettxouts([{"txid": spent_utxo_txid, "n": 0}, {"txid": "abc", "n": 0},

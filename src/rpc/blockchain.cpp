@@ -1676,9 +1676,14 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
                 jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
                 continue;
             }
-            else if(mempool.IsSpentNL(outPoints[arrayIndex]))
+            else if(const CTransaction* tx = mempool.IsSpentByNL(outPoints[arrayIndex]))
             {
-                jWriter.pushKV("error", "spent", false);
+                jWriter.pushKV("error", "spent");
+                jWriter.writeBeginObject("collidedWith");
+                jWriter.pushKV("txid", tx->GetId().GetHex());
+                jWriter.pushKV("size", int64_t(tx->GetTotalSize()));
+                jWriter.pushKV("hex", EncodeHexTx(*tx), false);
+                jWriter.writeEndObject(false);
                 jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
                 continue;
             }
