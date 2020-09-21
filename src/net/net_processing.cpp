@@ -367,6 +367,28 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
     int32_t nWindowEnd = state->pindexLastCommonBlock->nHeight + nWindowSize;
     int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
+
+    // Lambda to record a block we should fetch
+    auto FetchBlock = [nodeid, count, nWindowEnd, &vBlocks, &nodeStaller, &waitingfor](const CBlockIndex* pindex)
+    {
+        // The block is not already downloaded, and not yet in flight.
+        if (pindex->nHeight > nWindowEnd) {
+            // We reached the end of the window.
+            if (vBlocks.size() == 0 && waitingfor != nodeid) {
+                // We aren't able to fetch anything, but we would be if
+                // the download window was one larger.
+                nodeStaller = waitingfor;
+            }
+            return false;
+        }
+        vBlocks.push_back(pindex);
+        if (vBlocks.size() == count) {
+            return false;
+        }
+
+        return true;
+    };
+
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed)
         // successors of pindexWalk (towards pindexBestKnownBlock) into
@@ -398,18 +420,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                 }
             }
             else if (! blockDownloadTracker.IsInFlight(pindex->GetBlockHash())) {
-                // The block is not already downloaded, and not yet in flight.
-                if (pindex->nHeight > nWindowEnd) {
-                    // We reached the end of the window.
-                    if (vBlocks.size() == 0 && waitingfor != nodeid) {
-                        // We aren't able to fetch anything, but we would be if
-                        // the download window was one larger.
-                        nodeStaller = waitingfor;
-                    }
-                    return;
-                }
-                vBlocks.push_back(pindex);
-                if (vBlocks.size() == count) {
+                if(! FetchBlock(pindex)) {
+                    // Can't fetch anymore
                     return;
                 }
             }
@@ -421,10 +433,10 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                 size_t stallerCount {0};
                 const std::vector<BlockDownloadTracker::InFlightBlock> allInFlightDetails { blockDownloadTracker.GetBlockDetails(hash) };
                 bool stalling { ! allInFlightDetails.empty() };
-                for(const auto& inFlightDetails : blockDownloadTracker.GetBlockDetails(hash)) {
+                for(const auto& inFlightDetails : allInFlightDetails) {
                     // In flight for a while?
                     int64_t inFlightSecs { (GetTimeMicros() - inFlightDetails.inFlightSince) / MICROS_PER_SECOND };
-                    if(inFlightSecs >= 30) {
+                    if(inFlightSecs >= gArgs.GetArg("-blockdownloadslowfetchtimeout", DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT)) {
                         // Are we getting (any) data from this peer?
                         const CNodePtr& nodePtr { connman.FindNodeById(inFlightDetails.block.GetNode()) };
                         if(nodePtr) {
@@ -448,6 +460,15 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                 }
 
                 if(stalling) {
+                    // Should we ask someone else for this block?
+                    size_t maxParallelFetch { static_cast<size_t>(gArgs.GetArg("-blockdownloadmaxparallelfetch", DEFAULT_MAX_BLOCK_PARALLEL_FETCH)) };
+                    if(stallerCount < maxParallelFetch && ! blockDownloadTracker.IsInFlight( {hash, nodeid} )) {
+                        LogPrint(BCLog::NET, "Triggering parallel block download for %s to peer=%d\n", hash.ToString(), nodeid);
+                        if(! FetchBlock(pindex)) {
+                            // Can't fetch anymore
+                            return;
+                        }
+                    }
                 }
             }
         }

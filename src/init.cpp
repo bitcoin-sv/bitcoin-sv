@@ -538,6 +538,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt("-blockdownloadwindow=<n>",
             strprintf(_("Size of block download window before considering we may be stalling "
                         "during IBD (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_WINDOW));
+        strUsage += HelpMessageOpt("-blockdownloadslowfetchtimeout=<n>",
+            strprintf(_("Number of seconds to wait for a block to be received before triggering "
+                        "a slow fetch timeout (default: %u)"), DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT));
+        strUsage += HelpMessageOpt("-blockdownloadmaxparallelfetch=<n>",
+            strprintf(_("Maximum number of parallel requests to different peers we will issue for "
+                        "a block that has exceeded the slow fetch detection timeout (default: %u)"),
+                        DEFAULT_MAX_BLOCK_PARALLEL_FETCH));
     }
     strUsage += HelpMessageOpt(
         "-broadcastdelay=<n>",
