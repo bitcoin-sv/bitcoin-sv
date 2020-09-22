@@ -3277,24 +3277,6 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
         fClean = false;
     }
 
-    if (undo.GetHeight() == 0) {
-        // Missing undo metadata (height and coinbase). Older versions included
-        // this information only in undo records for the last spend of a
-        // transactions' outputs. This implies that it must be present for some
-        // other output of the same tx.
-        Coin alternate = view.GetCoinByTxId(out.GetTxId());
-        if (alternate.IsSpent()) {
-            // Adding output for transaction without known metadata
-            return DISCONNECT_FAILED;
-        }
-
-        // This is somewhat ugly, but hopefully utility is limited. This is only
-        // useful when working from legacy on disck data. In any case, putting
-        // the correct information in there doesn't hurt.
-        const_cast<Coin &>(undo) = Coin(undo.GetTxOut(), alternate.GetHeight(),
-                                        alternate.IsCoinBase());
-    }
-
     // The potential_overwrite parameter to AddCoin is only allowed to be false
     // if we know for sure that the coin did not already exist in the cache. As
     // we have queried for that above using HaveCoin, we don't need to guess.
