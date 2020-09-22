@@ -56,6 +56,22 @@ size_t InvalidTxnInfo::DynamicMemoryUsage() const
         totalSize += origin->address.capacity();
     }
 
+    totalSize +=
+        std::accumulate(
+            mCollidedWithTransaction.begin(),
+            mCollidedWithTransaction.end(),
+            0,
+            [](int sum, const CollidedWith& item)
+            {
+                if(auto tx = std::get_if<CTransactionRef>(&item.mTransaction); tx)
+                {
+                    sum += memusage::DynamicUsage(*tx);
+                }
+
+                return sum;
+            }
+        );
+
     return totalSize;
 }
 
@@ -95,24 +111,31 @@ void InvalidTxnInfo::PutOrigin(CJSONWriter& writer) const
     }
 }
 
-void InvalidTxnInfo::PutTx(CJSONWriter& writer, bool writeHex) const
+void InvalidTxnInfo::PutTx(
+    CJSONWriter& writer,
+    const std::variant<CTransactionRef, TxData>& transaction,
+    bool writeHex,
+    bool addLastComma) const
 {
-    if(auto tx = std::get_if<CTransactionRef>(&mTransaction))
+    if(auto tx = std::get_if<CTransactionRef>(&transaction))
     {
-        writer.pushKV("txid", (*tx)->GetId().GetHex());
-        writer.pushKV("size", int64_t((*tx)->GetTotalSize()));
-        if(writeHex)
+        if(*tx)
         {
-            writer.pushK("hex");
-            writer.pushQuote(true, false);
-            EncodeHexTx(**tx, writer.getWriter(), 0);
-            writer.pushQuote(false);
+            writer.pushKV("txid", (*tx)->GetId().GetHex());
+            writer.pushKV("size", int64_t((*tx)->GetTotalSize()), !writeHex ? addLastComma : true);
+            if(writeHex)
+            {
+                writer.pushK("hex");
+                writer.pushQuote(true, false);
+                EncodeHexTx(**tx, writer.getWriter(), 0);
+                writer.pushQuote(false, addLastComma);
+            }
         }
     }
-    else if(auto tx = std::get_if<InvalidTxnInfo::TxData>(&mTransaction))
+    else if(auto tx = std::get_if<InvalidTxnInfo::TxData>(&transaction))
     {
         writer.pushKV("txid", tx->txid.GetHex());
-        writer.pushKV("size", tx->txSize);
+        writer.pushKV("size", tx->txSize, addLastComma);
     }
 }
 
@@ -145,8 +168,21 @@ void InvalidTxnInfo::ToJson(CJSONWriter& writer, bool writeHex) const
     writer.writeBeginObject();
 
     PutOrigin(writer);
-    PutTx(writer, writeHex);
+    PutTx(writer, mTransaction, writeHex, true);
     PutState(writer);
+
+    writer.writeBeginArray("collidedWith");
+    int idx=1;
+    for(auto& item : mCollidedWithTransaction)
+    {
+        writer.writeBeginObject();
+        PutTx(writer, item.mTransaction, writeHex, false);
+        bool placeComma = idx % mCollidedWithTransaction.size();
+        writer.writeEndObject(placeComma);
+        ++idx;
+    }
+    writer.writeEndArray();
+
     PutRejectionTime(writer);
 
     writer.writeEndObject(false);
@@ -481,11 +517,24 @@ void CInvalidTxnPublisher::Publish(InvalidTxnInfo&& invalidTxnInfo)
 
     if (!txInfoQueue.PushNoWait(invalidTxnInfo))
     {
-        if (!invalidTxnInfo.TruncateTransactionDetails())
+        for( auto& item : invalidTxnInfo.GetCollidedWithTruncationRange() )
         {
-            return; // we are already without transaction
+            if (!item.TruncateTransactionDetails())
+            {
+                continue;
+            }
+
+            if (txInfoQueue.PushNoWait(invalidTxnInfo))
+            {
+                return;
+            }
         }
 
+        // maybe we don't have space in the queue, try without actual transaction
+        if (!invalidTxnInfo.TruncateTransactionDetails())
+        {
+            return;
+        }
         txInfoQueue.PushNoWait(invalidTxnInfo);
     }
 }

@@ -132,7 +132,7 @@ class InvalidTx(BitcoinTestFramework):
             data = json.load(json_file)
             return self.check_message(data, *args, **kwargs)
 
-    def check_message(self, data, tx, block=None, has_hex=None, rejectionFlags=None, rejectionReason=None, source=None, **kwargs):
+    def check_message(self, data, tx, block=None, has_hex=None, rejectionFlags=None, rejectionReason=None, source=None, collidedTx=None, **kwargs):
         assert {"fromBlock", "txid", "isInvalid", "isValidationError", "isMissingInputs", "isDoubleSpendDetected",
                 "isMempoolConflictDetected", "isCorruptionPossible", "isNonFinal", "isValidationTimeoutExceeded",
                 "isStandardTx", "rejectionCode", "rejectionReason", "rejectionTime"}.issubset(set(data.keys()))
@@ -153,6 +153,15 @@ class InvalidTx(BitcoinTestFramework):
             if source is not None:
                 assert data["source"] == source
 
+        self.log.info(f"{data}")
+        assert "collidedWith" in data
+
+        if collidedTx is not None:
+            assert len(data["collidedWith"]) > 0
+            assert data["collidedWith"][0]["txid"] == collidedTx.hash
+            assert "size" in data["collidedWith"][0]
+        else:
+            assert len(data["collidedWith"]) == 0
 
         if has_hex is not None:
             if has_hex:
@@ -161,6 +170,13 @@ class InvalidTx(BitcoinTestFramework):
             else:
                 assert "hex" not in data
 
+            if collidedTx is not None:
+                if has_hex:
+                    assert "hex" in data["collidedWith"][0]
+                    collidedHex = data["collidedWith"][0]["hex"]
+                    assert collidedHex == bytes_to_hex_str(collidedTx.serialize()), f'{collidedHex} != {bytes_to_hex_str(collidedTx.serialize())}'
+                else:
+                    assert "hex" not in data["collidedWith"][0]
 
         if rejectionFlags is not None:
             for flag in ["isInvalid", "isValidationError", "isMissingInputs", "isDoubleSpendDetected", "isMempoolConflictDetected",
@@ -267,7 +283,8 @@ class InvalidTx(BitcoinTestFramework):
                                       rejectionFlags=["isInvalid", "isMissingInputs"], rejectionReason="")
             filenames_mempool_conflict = self.assert_number_of_files_with_substring_in_name(1, mempool_conflict_tx.hash)
             self.check_stored_tx_file(filename=filenames_mempool_conflict[0], tx=mempool_conflict_tx, block=None,
-                                      rejectionFlags=["isInvalid", "isMempoolConflictDetected"], rejectionReason="txn-mempool-conflict")
+                                      rejectionFlags=["isInvalid", "isMempoolConflictDetected"], rejectionReason="txn-mempool-conflict",
+                                      collidedTx=valid_tx_2, has_hex=True)
 
             conn.rpc.clearinvalidtransactions()
             self.assert_number_of_files(0)

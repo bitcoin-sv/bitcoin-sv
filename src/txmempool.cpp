@@ -1798,25 +1798,30 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
     return stage.size();
 }
 
-bool CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
- {
+std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
+{
     std::shared_lock lock(smtx);
+    std::set<CTransactionRef> conflictsWith;
 
     // Check our locked UTXOs
     for (const CTxIn &txin : tx->vin) {
-        if (mapNextTx.find(txin.prevout) != mapNextTx.end()) {
-            return true;
+        if (auto it = mapNextTx.find(txin.prevout); it != mapNextTx.end()) {
+            conflictsWith.insert(GetNL(it->second->GetId()));
         }
     }
 
     if(isFinal)
     {
         // Check non-final pool locked UTXOs
-        return mTimeLockedPool.checkForDoubleSpend(tx) &&
-            !mTimeLockedPool.finalisesExistingTransaction(tx);
+        auto tlConflictsWith = mTimeLockedPool.checkForDoubleSpend(tx);
+
+        if(!tlConflictsWith.empty() && !mTimeLockedPool.finalisesExistingTransaction(tx))
+        {
+            conflictsWith.merge( std::move(tlConflictsWith) );
+        }
     }
 
-    return false;
+    return conflictsWith;
 }
 
 void CTxMemPool::AddUnchecked(

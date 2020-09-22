@@ -15,6 +15,7 @@
 
 #include <ctime>
 #include <list>
+#include <set>
 #include <string>
 #include <variant>
 
@@ -55,6 +56,33 @@ public:
         std::string address;
     };
 
+    class CollidedWith
+    {
+    public:
+        CollidedWith(const CTransactionRef& transaction)
+            : mTransaction{ transaction }
+        {}
+
+        bool TruncateTransactionDetails()
+        {
+            // maybe we don't have space in the queue, try without actual transaction
+            if (!std::holds_alternative<CTransactionRef>(mTransaction))
+            {
+                return false; // we are already without transaction
+            }
+
+            const auto& tx = std::get<CTransactionRef>(mTransaction);
+            mTransaction = InvalidTxnInfo::TxData{tx->GetTotalSize(), tx->GetId()};
+
+            return true;
+        }
+
+    private:
+        std::variant<CTransactionRef, TxData> mTransaction;
+
+        friend class InvalidTxnInfo;
+    };
+
     InvalidTxnInfo(
         const CTransactionRef& tx,
         const std::variant<BlockDetails, TxDetails>& details,
@@ -62,9 +90,14 @@ public:
         const CValidationState& state)
         : mTransaction{ tx }
         , mTxValidationState{ state }
+        , mCollidedWithTransaction(
+            state.GetCollidedWithTx().begin(),
+            state.GetCollidedWithTx().end() )
         , mDetails{ details }
         , mRejectionTime{ rejectionTime }
-    {}
+    {
+        mTxValidationState.ClearCollidedWithTx();
+    }
 
     InvalidTxnInfo(
         const CTransactionRef& tx,
@@ -95,13 +128,23 @@ public:
 
     std::size_t GetTotalTransactionSize() const
     {
+        std::size_t totalSize = 0;
         auto tx = std::get_if<CTransactionRef>(&mTransaction);
         if (tx)
         {
-            return (*tx)->GetTotalSize();
+            totalSize = (*tx)->GetTotalSize();
         }
 
-        return 0;
+        for(const auto& item : mCollidedWithTransaction)
+        {
+            auto tx = std::get_if<CTransactionRef>(&item.mTransaction);
+            if (tx)
+            {
+                totalSize += (*tx)->GetTotalSize();
+            }
+        }
+
+        return totalSize;
     }
 
     bool TruncateTransactionDetails()
@@ -118,6 +161,34 @@ public:
         return true;
     }
 
+    class CollidedWithTruncationRange
+    {
+    public:
+        std::vector<CollidedWith>::reverse_iterator begin()
+        {
+            return mCollidedWithTransaction.rbegin();
+        }
+
+        std::vector<CollidedWith>::reverse_iterator end()
+        {
+            return mCollidedWithTransaction.rend();
+        }
+
+    private:
+        CollidedWithTruncationRange(std::vector<CollidedWith>& collidedWithTransaction)
+            : mCollidedWithTransaction{ collidedWithTransaction }
+        {}
+
+        std::vector<CollidedWith>& mCollidedWithTransaction;
+
+        friend class InvalidTxnInfo;
+    };
+
+    CollidedWithTruncationRange GetCollidedWithTruncationRange()
+    {
+        return { mCollidedWithTransaction };
+    }
+
     size_t DynamicMemoryUsage() const;
 
     void ToJson(CJSONWriter& writer, bool writeHex = true) const;
@@ -126,12 +197,19 @@ private:
     // transactions or informations about transaction (usually if the transaction itself is too big)
     std::variant<CTransactionRef, TxData> mTransaction;
     CValidationState mTxValidationState;
+    // NOTE: If a collision was not detected this variable will be set to an
+    //       empty (nullptr) CTransactionRef
+    std::vector<CollidedWith> mCollidedWithTransaction;
     // details about transaction origin
     std::variant<BlockDetails, TxDetails> mDetails;
     std::time_t mRejectionTime;
 
     void PutOrigin(CJSONWriter& writer) const;
-    void PutTx(CJSONWriter& writer, bool writeHex) const;
+    void PutTx(
+        CJSONWriter& writer,
+        const std::variant<CTransactionRef, TxData>& transaction,
+        bool writeHex,
+        bool addLastComma) const;
     void PutState(CJSONWriter& writer) const;
     void PutRejectionTime(CJSONWriter& writer) const;
 };
@@ -220,13 +298,13 @@ class CScopedInvalidTxSenderBlock
     std::shared_ptr<CInvalidTxnPublisher> publisher;
     InvalidTxnInfo::BlockDetails blockDetails;
     const CTransactionRef transaction;
-    CValidationState& validationState;
+    const CValidationState& validationState;
 
 public:
     CScopedInvalidTxSenderBlock(std::shared_ptr<CInvalidTxnPublisher> dump,
                                 CTransactionRef tx,
                                 const CBlockIndex* blockIndex,
-                                CValidationState& state)
+                                const CValidationState& state)
         :publisher( std::move(dump) )
         ,blockDetails(
             blockIndex ? InvalidTxnInfo::BlockDetails{{},

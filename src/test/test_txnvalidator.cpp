@@ -9,6 +9,7 @@
 #include "txmempool.h"
 #include "txn_validator.h"
 
+#include <algorithm>
 #include <boost/test/unit_test.hpp>
 
 namespace {
@@ -39,7 +40,7 @@ namespace {
         return scriptPubKey;
     }
     // Create a double spend txn
-    CMutableTransaction CreateDoubleSpendTxn(CTransaction& fundTxn,
+    CMutableTransaction CreateDoubleSpendTxn(const CTransaction& fundTxn,
                                        CKey& key,
                                        CScript& scriptPubKey) {
         static uint32_t dummyLockTime = 0;
@@ -109,7 +110,7 @@ namespace {
     }
     // Create a vector with input data for a given txn and source
     std::vector<TxInputDataSPtr> TxInputDataVec(TxSource source,
-                                                std::vector<CMutableTransaction>& spends,
+                                                const std::vector<CMutableTransaction>& spends,
                                                 std::shared_ptr<CNode> pNode = nullptr) {
         std::vector<TxInputDataSPtr> vTxInputData {};
         // Get a pointer to the TxIdTracker.
@@ -276,6 +277,195 @@ BOOST_AUTO_TEST_CASE(txn_validator_istxnknown) {
     // Wait for the Validator to process all queued txns.
     txnValidator->waitForEmptyQueue();
     BOOST_CHECK(!txnValidator->isTxnKnown(doubleSpend10Txns[0].GetId()));
+}
+
+BOOST_AUTO_TEST_CASE(double_spend_detector)
+{
+    CTxnDoubleSpendDetector detector;
+    std::vector<CMutableTransaction> txns{ MakeNLargeTxns(5, coinbaseTxns[0], scriptPubKey) };
+    std::size_t parentOfDoubleSpendIdx = 1;
+    // replace the transaction that spends txns[parentOfDoubleSpendIdx] so that we can crate a double spend later
+    txns[2] = CreateDoubleSpendTxn(CTransaction{txns[parentOfDoubleSpendIdx]}, coinbaseKey, scriptPubKey);
+    auto txnsData = TxInputDataVec(TxSource::p2p, txns);
+
+    for(const auto& data : txnsData)
+    {
+        CValidationState state;
+        BOOST_CHECK(detector.insertTxnInputs(data, mempool, state, true) == true);
+
+        BOOST_CHECK(state.IsDoubleSpendDetected() == false);
+        BOOST_CHECK(state.IsMempoolConflictDetected() == false);
+        BOOST_CHECK(state.GetCollidedWithTx().empty());
+    }
+
+    std::size_t doubleSpendIdx = 2;
+    auto doubleSpendTx =
+        std::make_shared<CTransaction>(
+            CreateDoubleSpendTxn(CTransaction{txns[parentOfDoubleSpendIdx]}, coinbaseKey, scriptPubKey) );
+    auto doubleSpendData =
+        std::make_shared<CTxInputData>(
+            g_connman->GetTxIdTracker(),
+            doubleSpendTx,
+            TxSource::p2p,
+            TxValidationPriority::normal,
+            GetTime(),// nAcceptTime
+            false,    // mfLimitFree
+            Amount(0), // nAbsurdFee
+            std::weak_ptr<CNode>{});
+    auto& primaryTx = *txnsData[doubleSpendIdx]->GetTxnPtr();
+
+    // Double spend should be detected
+    {
+        CValidationState state;
+        BOOST_CHECK(
+            detector.insertTxnInputs(txnsData[doubleSpendIdx], mempool, state, true)
+            == false);
+        BOOST_CHECK(state.IsDoubleSpendDetected() == true);
+        BOOST_CHECK(state.IsMempoolConflictDetected() == false);
+        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1);
+        BOOST_CHECK_EQUAL((*state.GetCollidedWithTx().begin())->GetId().ToString(), primaryTx.GetId().ToString());
+    }
+
+    // Trying to remove the tx with different address doesn't change anything
+    {
+        detector.removeTxnInputs( CTransaction{txns[doubleSpendIdx]} );
+        CValidationState state;
+        BOOST_CHECK(
+            detector.insertTxnInputs(doubleSpendData, mempool, state, true)
+            == false);
+        BOOST_CHECK(state.IsDoubleSpendDetected() == true);
+        BOOST_CHECK(state.IsMempoolConflictDetected() == false);
+        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1);
+        BOOST_CHECK_EQUAL((*state.GetCollidedWithTx().begin())->GetId().ToString(), primaryTx.GetId().ToString());
+    }
+
+    // Trying to remove the double spend tx doesn't change anything
+    {
+        detector.removeTxnInputs(*doubleSpendTx);
+        CValidationState state;
+        BOOST_CHECK(
+            detector.insertTxnInputs(doubleSpendData, mempool, state, true)
+            == false);
+        BOOST_CHECK(state.IsDoubleSpendDetected() == true);
+        BOOST_CHECK(state.IsMempoolConflictDetected() == false);
+        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1);
+        BOOST_CHECK_EQUAL((*state.GetCollidedWithTx().begin())->GetId().ToString(), primaryTx.GetId().ToString());
+    }
+
+    // Remove the first tx that caused double spend spend transaction so that we
+    // can add double spend tx without error
+    {
+        detector.removeTxnInputs(*txnsData[doubleSpendIdx]->GetTxnPtr());
+        CValidationState state;
+        BOOST_CHECK(detector.insertTxnInputs(doubleSpendData, mempool, state, true) == true);
+
+        BOOST_CHECK(state.IsDoubleSpendDetected() == false);
+        BOOST_CHECK(state.IsMempoolConflictDetected() == false);
+        BOOST_CHECK(state.GetCollidedWithTx().empty());
+    }
+
+    // Remove the double spend transaction, add initial tx to mempool and make
+    // sure that a mempool collision is detected when adding the double spend tx
+    // to the detector
+    {
+        detector.removeTxnInputs(*doubleSpendTx);
+
+        Amount fee{ 3 };
+        int64_t time = 0;
+        double priority = 10.0;
+        unsigned int height = 1;
+        bool spendsCoinbase = false;
+        unsigned int sigOpCost = 4;
+        LockPoints lp;
+        mining::CJournalChangeSetPtr nullChangeSet{nullptr};
+        auto& tx = *txnsData[doubleSpendIdx]->GetTxnPtr();
+        mempool.AddUnchecked(
+            tx.GetId(),
+            CTxMemPoolEntry{
+                txnsData[doubleSpendIdx]->GetTxnPtr(),
+                fee,
+                time,
+                priority,
+                height,
+                tx.GetValueOut(),
+                spendsCoinbase,
+                sigOpCost,
+                lp},
+            nullChangeSet);
+
+        CValidationState state;
+        BOOST_CHECK(
+            detector.insertTxnInputs(doubleSpendData, mempool, state, true)
+            == false);
+        BOOST_CHECK(state.IsDoubleSpendDetected() == false);
+        BOOST_CHECK(state.IsMempoolConflictDetected() == true);
+        BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 1);
+        BOOST_CHECK_EQUAL((*state.GetCollidedWithTx().begin())->GetId().ToString(), primaryTx.GetId().ToString());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(validation_state_collided_with_tx)
+{
+    std::vector<CMutableTransaction> txns{ MakeNLargeTxns(7, coinbaseTxns[0], scriptPubKey) };
+    CValidationState state;
+
+    auto all_present =
+        [](
+            const std::set<CTransactionRef>& transactions,
+            const std::vector<CTransactionRef>& expected)
+        {
+            BOOST_CHECK_EQUAL(transactions.size(), expected.size());
+            BOOST_CHECK(
+                std::all_of(
+                    expected.begin(),
+                    expected.end(),
+                    [&transactions](const CTransactionRef& item)
+                    {
+                        return transactions.find(item) != transactions.end();
+                    }));
+        };
+
+    BOOST_CHECK(state.IsDoubleSpendDetected() == false);
+    BOOST_CHECK(state.IsMempoolConflictDetected() == false);
+    BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 0);
+
+    std::vector<CTransactionRef> added;
+
+    // add two transactions as double spends
+    added.push_back(MakeTransactionRef(txns[0]));
+    added.push_back(MakeTransactionRef(txns[1]));
+    state.SetDoubleSpendDetected({added[0], added[1]});
+    BOOST_CHECK(state.IsDoubleSpendDetected() == true);
+    BOOST_CHECK(state.IsMempoolConflictDetected() == false);
+    all_present( state.GetCollidedWithTx(), added );
+
+    // we can call SetDoubleSpendDetected() multiple times but duplicates won't be added
+    added.push_back(MakeTransactionRef(txns[2]));
+    state.SetDoubleSpendDetected({added[1], added[2]});
+    BOOST_CHECK(state.IsDoubleSpendDetected() == true);
+    BOOST_CHECK(state.IsMempoolConflictDetected() == false);
+    all_present( state.GetCollidedWithTx(), added );
+
+    // add two transactions as mempool conflicts
+    added.push_back(MakeTransactionRef(txns[3]));
+    added.push_back(MakeTransactionRef(txns[4]));
+    state.SetMempoolConflictDetected({added[3], added[4]});
+    BOOST_CHECK(state.IsDoubleSpendDetected() == true);
+    BOOST_CHECK(state.IsMempoolConflictDetected() == true);
+    all_present( state.GetCollidedWithTx(), added );
+
+    // we can call SetMempoolConflictDetected() multiple times but duplicates won't be added
+    added.push_back(MakeTransactionRef(txns[5]));
+    state.SetMempoolConflictDetected({added[4], added[5]});
+    BOOST_CHECK(state.IsDoubleSpendDetected() == true);
+    BOOST_CHECK(state.IsMempoolConflictDetected() == true);
+    all_present( state.GetCollidedWithTx(), added );
+
+    // clear the collided with container
+    state.ClearCollidedWithTx();
+    BOOST_CHECK(state.IsDoubleSpendDetected() == true);
+    BOOST_CHECK(state.IsMempoolConflictDetected() == true);
+    BOOST_CHECK_EQUAL(state.GetCollidedWithTx().size(), 0);
 }
 
 /**

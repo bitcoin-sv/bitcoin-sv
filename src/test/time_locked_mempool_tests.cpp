@@ -199,13 +199,13 @@ BOOST_AUTO_TEST_CASE(DoubleSpendTest)
     doubleSpendTxn.vin.resize(1);
     doubleSpendTxn.vin[0] = txns[1].vin[1];
     CTransactionRef doubleSpendTxnRef { MakeTransactionRef(doubleSpendTxn) };
-    BOOST_CHECK(tlMempool.checkForDoubleSpend(doubleSpendTxnRef));
+    BOOST_CHECK(!tlMempool.checkForDoubleSpend(doubleSpendTxnRef).empty());
 
     // Check for false positive
     CMutableTransaction nonDoubleSpendTxn { CreateRandomTransaction(5) };
     nonDoubleSpendTxn.nLockTime = 0;
     CTransactionRef nonDoubleSpendTxnRef { MakeTransactionRef(nonDoubleSpendTxn) };
-    BOOST_CHECK(!tlMempool.checkForDoubleSpend(nonDoubleSpendTxnRef));
+    BOOST_CHECK(tlMempool.checkForDoubleSpend(nonDoubleSpendTxnRef).empty());
 }
 
 BOOST_AUTO_TEST_CASE(UpdateTest)

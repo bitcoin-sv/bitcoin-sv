@@ -1219,8 +1219,8 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
     // Check for conflicts with in-memory transactions
-    if (pool.CheckTxConflicts(ptx, isFinal)) {
-        state.SetMempoolConflictDetected();
+    if (auto conflictsWith = pool.CheckTxConflicts(ptx, isFinal); !conflictsWith.empty()) {
+        state.SetMempoolConflictDetected( std::move(conflictsWith) );
         // Disable replacement feature for good
         state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
         return Result{state, pTxInputData};
