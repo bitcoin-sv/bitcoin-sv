@@ -256,26 +256,6 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
     return true;
 }
 
-CCoinsViewCursor* CCoinsViewCache::Cursor() const {
-    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
-    return base->Cursor();
-}
-
-CCoinsViewCursor* CCoinsViewCache::Cursor(const TxId &txId) const {
-    std::unique_lock<std::mutex> lock{ mCoinsViewCacheMtx };
-    return base->Cursor(txId);
-}
-
-std::vector<uint256> CCoinsViewCache::GetHeadBlocks() const {
-    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
-    return base->GetHeadBlocks();
-}
-
-size_t CCoinsViewCache::EstimateSize() const {
-    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
-    return base->EstimateSize();
-}
-
 bool CCoinsViewCache::Flush() {
     std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     bool fOk = base->BatchWrite(cacheCoins, hashBlock);

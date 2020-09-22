@@ -234,11 +234,7 @@ public:
     bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const override;
     void SetBestBlock(const uint256 &hashBlock);
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;
-    CCoinsViewCursor *Cursor() const override;
-    CCoinsViewCursor *Cursor(const TxId &txId) const override;
-    std::vector<uint256> GetHeadBlocks() const override;
-    size_t EstimateSize() const override;
+    bool BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlock) override;
 
     /**
      * Check if we have the given utxo already loaded in this cache.
