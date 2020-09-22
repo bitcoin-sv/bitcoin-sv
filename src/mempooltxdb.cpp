@@ -91,6 +91,23 @@ uint64_t CMempoolTxDB::GetDiskUsage()
     return diskUsage.load();
 }
 
+CMempoolTxDB::TxIdSet CMempoolTxDB::GetKeys()
+{
+    static const auto initialKey = std::make_pair(DB_TRANSACTIONS, uint256());
+
+    std::unique_ptr<CDBIterator> iter {mempoolTxDB->NewIterator()};
+    iter->Seek(initialKey);
+
+    TxIdSet result;
+    for (; iter->Valid(); iter->Next())
+    {
+        auto key {decltype(initialKey){}};
+        iter->GetKey(key);
+        result.emplace(key.second);
+    }
+    return result;
+}
+
 
 void CAsyncMempoolTxDB::EnqueueNL(std::initializer_list<Task>&& tasks, bool clearList)
 {
@@ -158,6 +175,11 @@ void CAsyncMempoolTxDB::Remove(std::vector<TxId>&& transactionsToRemove,
 std::shared_ptr<CMempoolTxDBReader> CAsyncMempoolTxDB::GetDatabase()
 {
     return txdb;
+}
+
+CMempoolTxDB::TxIdSet CAsyncMempoolTxDB::GetTxKeys()
+{
+    return txdb->GetKeys();
 }
 
 // Overload dispatcher for std::visit.

@@ -7,6 +7,7 @@
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
 
 #include "amount.h"
+#include "hash.h"
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
@@ -37,6 +38,24 @@ struct TxId : public uint256 {
  */
 struct TxHash : public uint256 {
     explicit TxHash(const uint256 &b) : uint256(b) {}
+};
+
+/**
+ * A hasher object for std::unordered_set and similar hash-based containers.
+ */
+class SaltedTxidHasher {
+  private:
+    // The salt does not change during the lifetime of the hasher object, but
+    // it's not const so that container copy construction and assignment work.
+    uint64_t k0, k1;
+
+  public:
+    SaltedTxidHasher();
+
+    size_t operator()(const uint256& txid) const
+    {
+        return SipHashUint256(k0, k1, txid);
+    }
 };
 
 /**

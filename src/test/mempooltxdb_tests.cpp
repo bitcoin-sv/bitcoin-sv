@@ -46,7 +46,7 @@ BOOST_AUTO_TEST_CASE(WriteToTxDB)
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
 
-    // Check that all transactions are in the databas.
+    // Check that all transactions are in the database.
     for (const auto& e : entries)
     {
         CTransactionRef _;
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
 
-    // Check that all transactions are in the databas.
+    // Check that all transactions are in the database.
     for (const auto& e : entries)
     {
         CTransactionRef _;
@@ -184,6 +184,38 @@ BOOST_AUTO_TEST_CASE(ClearTxDB)
         CTransactionRef _;
         BOOST_CHECK(!txdb.GetTransaction(e.GetTxId(), _));
     }
+}
+
+BOOST_AUTO_TEST_CASE(GetContentsOfTxDB)
+{
+    const auto entries = GetABunchOfEntries(29);
+
+    CMempoolTxDB txdb(10000);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+
+    // Write the entries to the database.
+    uint64_t totalSize = 0;
+    for (const auto& e : entries)
+    {
+        totalSize += e.GetTxSize();
+        BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
+    }
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+
+    // Check that all transactions are in the database and only the ones we wrote.
+    auto keys = txdb.GetKeys();
+    BOOST_CHECK_EQUAL(keys.size(), 29);
+    for (const auto& e : entries)
+    {
+        auto iter = keys.find(e.GetTxId());
+        BOOST_WARN(iter != keys.end());
+        if (iter != keys.end())
+        {
+            keys.erase(iter);
+        }
+    }
+    // We should have removed all the keys in the loop.
+    BOOST_CHECK_EQUAL(keys.size(), 0);
 }
 
 BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)

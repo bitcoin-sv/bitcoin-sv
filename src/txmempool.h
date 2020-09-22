@@ -10,7 +10,6 @@
 #include "coins.h"
 #include "mining/journal_builder.h"
 #include "primitives/transaction.h"
-#include "random.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
 #include "tx_mempool_info.h"
@@ -345,20 +344,6 @@ enum class MemPoolRemovalReason {
     CONFLICT,
     //! Removed for replacement
     REPLACED
-};
-
-class SaltedTxidHasher {
-private:
-    // The salt does not change during the lifetime of the hasher object,
-    // but it's not const so that copy construction and assignment work.
-    uint64_t k0, k1;
-
-public:
-    SaltedTxidHasher();
-
-    size_t operator()(const uint256 &txid) const {
-        return SipHashUint256(k0, k1, txid);
-    }
 };
 
 struct DisconnectedBlockTransactions;

@@ -15,6 +15,7 @@
 #include <future>
 #include <initializer_list>
 #include <mutex>
+#include <unordered_set>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -78,6 +79,13 @@ public:
      * Return the total size of transactions moved to disk.
      */
     uint64_t GetDiskUsage();
+
+
+    using TxIdSet = std::unordered_set<uint256, SaltedTxidHasher>;
+    /*
+     * Get the set of keys from the database.
+     */
+    TxIdSet GetKeys();
 };
 
 class CTransactionWrapper;
@@ -113,6 +121,14 @@ public:
 
     // Return a read-only database reference
     std::shared_ptr<CMempoolTxDBReader> GetDatabase();
+
+
+    // Return the keys that are currently in the database. Keys will not be read
+    // in the background thread, so for best results, no background changes
+    // should be happening at the same time (e.g., use Sync() first to clear the
+    // task queue and make sure no new transactions arrive to the mempool in the
+    // meantime).
+    CMempoolTxDB::TxIdSet GetTxKeys();
 
 private:
     struct StopTask{};
