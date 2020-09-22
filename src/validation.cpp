@@ -2246,11 +2246,15 @@ bool GetTransaction(const Config &config, const TxId &txid,
     }
 
     if (pindexSlow) {
-        CBlock block;
-        if (ReadBlockFromDisk(block, pindexSlow, config)) {
-            for (const auto &tx : block.vtx) {
+        if (auto blockStreamReader=GetDiskBlockStreamReader(pindexSlow, config)) {
+            while (!blockStreamReader->EndOfStream()) {
+                const CTransaction* tx = blockStreamReader->ReadTransaction_NoThrow();
+                if(!tx)
+                {
+                    break;
+                }
                 if (tx->GetId() == txid) {
-                    txOut = tx;
+                    txOut = blockStreamReader->GetLastTransactionRef();
                     hashBlock = pindexSlow->GetBlockHash();
                     isGenesisEnabled = IsGenesisEnabled(config, pindexSlow->nHeight);
                     return true;
@@ -2395,6 +2399,8 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
 
     if (!file)
     {
+        error("GetDiskBlockStreamReader(CDiskBlockPos&): OpenBlockFile failed for %s", 
+            pos.ToString());
         return {}; // could not open a stream
     }
 
@@ -2402,7 +2408,40 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
         std::make_unique<CBlockStreamReader<CFileReader>>(
             std::move(file),
             CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
-            calculateDiskBlockMetadata);
+            calculateDiskBlockMetadata,
+            pos);
+}
+
+std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+    const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata)
+{
+    std::unique_ptr<CBlockStreamReader<CFileReader>> blockStreamReader;
+    try
+    {
+        blockStreamReader = GetDiskBlockStreamReader(pindex->GetBlockPos(), calculateDiskBlockMetadata);
+    }
+    catch(const std::exception& e)
+    {
+        error("GetDiskBlockStreamReader(CBlockIndex*): Deserialize or I/O error - %s at %s",
+            e.what(), pindex->GetBlockPos().ToString());
+        return {};
+    }
+
+    if (!CheckProofOfWork(blockStreamReader->GetBlockHeader().GetHash(), blockStreamReader->GetBlockHeader().nBits, config))
+    {
+        error("GetDiskBlockStreamReader(CBlockIndex*): Errors in block header at %s",
+            pindex->GetBlockPos().ToString());
+        return {};
+    }
+
+    if (blockStreamReader->GetBlockHeader().GetHash() != pindex->GetBlockHash())
+    {
+        error("GetDiskBlockStreamReader(CBlockIndex*): GetHash() doesn't match index for %s at %s",
+            pindex->ToString(), pindex->GetBlockPos().ToString());
+        return {};
+    }
+
+    return blockStreamReader;
 }
 
 static bool PopulateBlockIndexBlockDiskMetaData(
@@ -6686,13 +6725,19 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
 static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
                              const Config &config) {
     // TODO: merge with ConnectBlock
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pindex, config)) {
-        return error("ReplayBlock(): ReadBlockFromDisk failed at %d, hash=%s",
+    auto blockStreamReader = GetDiskBlockStreamReader(pindex, config);
+    if (!blockStreamReader) {
+        return error("ReplayBlock(): GetDiskBlockStreamReader(CBlockIndex) failed at %d, hash=%s",
                      pindex->nHeight, pindex->GetBlockHash().ToString());
     }
 
-    for (const CTransactionRef &tx : block.vtx) {
+    while (!blockStreamReader->EndOfStream()) {
+        const CTransaction* tx = blockStreamReader->ReadTransaction_NoThrow();
+        if(!tx)
+        {
+            return error("ReplayBlock(): ReadTransaction failed at %d, hash=%s",
+                pindex->nHeight, pindex->GetBlockHash().ToString());
+        }
         if (!tx->IsCoinBase()) {
             for (const CTxIn &txin : tx->vin) {
                 inputs.SpendCoin(txin.prevout);
