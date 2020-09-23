@@ -128,6 +128,18 @@ void CZMQNotificationInterface::Shutdown() {
     zmqPublisher = nullptr;
 }
 
+std::vector<ActiveZMQNotifier> CZMQNotificationInterface::ActiveZMQNotifiers()
+{
+    std::vector<ActiveZMQNotifier> arrNotifiers;
+
+    for (auto& n : notifiers)
+    {
+        arrNotifiers.push_back({n->GetType(), n->GetAddress()});
+    }
+
+    return arrNotifiers;
+}
+
 void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,
                                                 const CBlockIndex *pindexFork,
                                                 bool fInitialDownload) {

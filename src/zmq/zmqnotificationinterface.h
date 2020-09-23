@@ -14,11 +14,18 @@
 class CBlockIndex;
 class CZMQAbstractNotifier;
 
+struct ActiveZMQNotifier
+{
+    std::string notifierName;
+    std::string notifierAddress;
+};
+
 class CZMQNotificationInterface final : public CValidationInterface {
 public:
     virtual ~CZMQNotificationInterface();
 
     static CZMQNotificationInterface *Create();
+    std::vector<ActiveZMQNotifier> ActiveZMQNotifiers();
 
 protected:
     bool Initialize();

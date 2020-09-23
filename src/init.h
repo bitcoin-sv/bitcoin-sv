@@ -7,11 +7,25 @@
 #define BITCOIN_INIT_H
 
 #include <string>
+
+#include "sync.h"
 #include "taskcancellation.h"
+#if ENABLE_ZMQ
+#include "zmq/zmqnotificationinterface.h"
+#endif
 
 class Config;
 class CScheduler;
 class CWallet;
+
+#if ENABLE_ZMQ
+/**
+* cs_zmqNotificationInterface is used to protect pzmqNotificationInterface. One of the race conditions can occur
+* at shutdown when pzmqNotificationInterface gets deleted while RPC thread might still be using it.
+*/
+extern CCriticalSection cs_zmqNotificationInterface;
+extern CZMQNotificationInterface *pzmqNotificationInterface;
+#endif
 
 namespace boost {
 class thread_group;
