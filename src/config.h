@@ -153,6 +153,12 @@ public:
 
     virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
     virtual bool IsClientUABanned(const std::string uaClient) const = 0;
+    virtual bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxMerkleTreeDiskSpace() const = 0;
+    virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
+    virtual uint64_t GetPreferredMerkleTreeFileSize() const = 0;
+    virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxMerkleTreeMemoryCacheSize() const = 0;
 
     virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
     virtual uint64_t GetMaxMempool() const = 0;
@@ -323,6 +329,12 @@ public:
 
     void SetBanClientUA(const std::set<std::string> uaClients) override;
     bool IsClientUABanned(const std::string uaClient) const override;
+    bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) override;
+    uint64_t GetMaxMerkleTreeDiskSpace() const override;
+    bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) override;
+    uint64_t GetPreferredMerkleTreeFileSize() const override;
+    bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) override;
+    uint64_t GetMaxMerkleTreeMemoryCacheSize() const override;
 
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override;
     uint64_t GetMaxMempool() const override;
@@ -437,6 +449,9 @@ private:
 
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;
+    uint64_t maxMerkleTreeDiskSpace;
+    uint64_t preferredMerkleTreeFileSize;
+    uint64_t maxMerkleTreeMemoryCacheSize;
 
     bool LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage);
 
@@ -769,6 +784,36 @@ public:
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };
     int64_t GetInvalidTxZMQMaxMessageSize() const override { return 10 * ONE_MEGABYTE; };
 #endif
+
+    bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    uint64_t GetMaxMerkleTreeDiskSpace() const override
+    {
+        return 0;
+    }
+
+    bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    uint64_t GetPreferredMerkleTreeFileSize() const override
+    {
+        return 0;
+    }
+
+    bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    uint64_t GetMaxMerkleTreeMemoryCacheSize() const override
+    {
+        return 0;
+    }
 
 private:
     std::unique_ptr<CChainParams> chainParams;

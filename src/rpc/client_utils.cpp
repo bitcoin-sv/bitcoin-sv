@@ -128,6 +128,7 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"disconnectnode", 1, "nodeid"},
     {"getminingcandidate", 0, "coinbase"},
     {"getblockbyheight", 0, "height"},
+    {"verifymerkleproof", 0, "proof"},
     // Echo with conversion (For testing only)
     {"echojson", 0, "arg0"},
     {"echojson", 1, "arg1"},
