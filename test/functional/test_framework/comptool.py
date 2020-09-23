@@ -172,11 +172,12 @@ class TestNode(NodeConnCB):
 
 
 class TestInstance():
-    def __init__(self, objects=None, sync_every_block=True, sync_every_tx=False, sync_timeout=300):
+    def __init__(self, objects=None, sync_every_block=True, sync_every_tx=False, sync_timeout=300, timeout_to_requested_block=None):
         self.blocks_and_transactions = objects if objects else []
         self.sync_every_block = sync_every_block
         self.sync_every_tx = sync_every_tx
         self.sync_timeout = sync_timeout
+        self.timeout_to_requested_block = timeout_to_requested_block
 
 
 class TestManager():
@@ -226,7 +227,7 @@ class TestManager():
     # sync_blocks: Wait for all connections to request the blockhash given
     # then send get_headers to find out the tip of each node, and synchronize
     # the response by using a ping (and waiting for pong with same nonce).
-    def sync_blocks(self, blockhash, num_blocks, timeout=60):
+    def sync_blocks(self, blockhash, num_blocks, timeout=60, timeout_to_requested_block=None):
         def blocks_requested():
             return all(
                 blockhash in node.block_request_map and node.block_request_map[blockhash]
@@ -234,10 +235,15 @@ class TestManager():
             )
 
         # --> error if not requested
+        # Automatic (default) timeout is calculated as described below. In special cases,
+        # manual override is possible with parameter 'timeout_to_requested_block'.
         # Measured values for processing blocks range from 0.008 to 0.035 s/block (debug build)
         # Processing gets slower with the amount of blocks (0.008 s/block @ 200 blocks, 0.035 s/block @ 1000 blocks)
         # We use a slightly higher value of 0.05s + an extra 30s for good measure.
-        wait_until(blocks_requested, timeout=0.05*num_blocks+30, lock=mininode_lock)
+        if timeout_to_requested_block is None:
+            timeout_to_requested_block = 0.05*num_blocks+30
+
+        wait_until(blocks_requested, timeout=timeout_to_requested_block, lock=mininode_lock)
 
         # Wait for all the blocks to finish processing
         [c.cb.send_ping(self.ping_counter) for c in self.connections]
@@ -422,7 +428,7 @@ class TestManager():
                         # if we expect failure, just push the block and see what happens.
                         if outcome == True:
                             [c.cb.send_inv(block) for c in self.connections]
-                            self.sync_blocks(block.sha256, 1, timeout=test_instance.sync_timeout)
+                            self.sync_blocks(block.sha256, 1, timeout=test_instance.sync_timeout, timeout_to_requested_block=test_instance.timeout_to_requested_block)
                         else:
                             [c.send_message(msg_block(block))
                              for c in self.connections]
@@ -470,7 +476,7 @@ class TestManager():
                     [c.send_message(msg_inv(invqueue))
                      for c in self.connections]
                     invqueue = []
-                self.sync_blocks(block.sha256, len(test_instance.blocks_and_transactions), timeout=test_instance.sync_timeout)
+                self.sync_blocks(block.sha256, len(test_instance.blocks_and_transactions), timeout=test_instance.sync_timeout, timeout_to_requested_block=test_instance.timeout_to_requested_block)
                 if (not self.check_results(tip, block_outcome)):
                     raise AssertionError(
                         "Block test failed at test %d" % test_number)
