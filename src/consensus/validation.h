@@ -6,7 +6,9 @@
 #ifndef BITCOIN_CONSENSUS_VALIDATION_H
 #define BITCOIN_CONSENSUS_VALIDATION_H
 
+#include <set>
 #include <string>
+#include "primitives/transaction.h"
 
 /** "reject" message codes */
 static const uint8_t REJECT_MALFORMED = 0x01;
@@ -39,6 +41,10 @@ private:
     bool fValidationTimeoutExceeded {false};
     bool fStandardTx {false};
     bool fResubmitTx {false};
+
+    // Set of transactions with which the inputs collisions were detected either
+    // by fDoubleSpendDetected or fMempoolConflictDetected.
+    std::set<CTransactionRef> mCollidedWithTx;
 
 public:
     bool DoS(int level, bool ret = false, unsigned int chRejectCodeIn = 0,
@@ -94,8 +100,16 @@ public:
 
     void SetCorruptionPossible() { corruptionPossible = true; }
     void SetMissingInputs() { fMissingInputs = true; }
-    void SetDoubleSpendDetected() { fDoubleSpendDetected = true; }
-    void SetMempoolConflictDetected() { fMempoolConflictDetected = true; }
+    void SetDoubleSpendDetected(std::set<CTransactionRef>&& collidedWithTx)
+    {
+        mCollidedWithTx.merge( collidedWithTx );
+        fDoubleSpendDetected = true;
+    }
+    void SetMempoolConflictDetected(std::set<CTransactionRef>&& collidedWithTx)
+    {
+        mCollidedWithTx.merge( collidedWithTx );
+        fMempoolConflictDetected = true;
+    }
     void SetNonFinal(bool nf = true) { nonFinal = nf; }
     void SetValidationTimeoutExceeded() { fValidationTimeoutExceeded = true; };
     void SetStandardTx() { fStandardTx = true; };
@@ -105,6 +119,11 @@ public:
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
     std::string GetDebugMessage() const { return strDebugMessage; }
+    const std::set<CTransactionRef>& GetCollidedWithTx() const { return mCollidedWithTx; }
+
+    // Intended for use where we no longer wish to use up the memory required
+    // to hold the transaction info
+    void ClearCollidedWithTx() { mCollidedWithTx.clear(); }
 };
 
 #endif // BITCOIN_CONSENSUS_VALIDATION_H

@@ -43,6 +43,8 @@ CZMQNotificationInterface *CZMQNotificationInterface::Create() {
         CZMQAbstractNotifier::Create<CZMQPublishRawBlockNotifier>;
     factories["pubrawtx"] =
         CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
+    factories["pubinvalidtx"] =
+        CZMQAbstractNotifier::Create<CZMQPublishTextNotifier>;
 
     for (std::map<std::string, CZMQNotifierFactory>::const_iterator i =
              factories.begin();
@@ -138,6 +140,23 @@ void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,
         if (notifier->NotifyBlock(pindexNew)) {
             i++;
         } else {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
+void CZMQNotificationInterface::InvalidTxMessage(std::string_view message)
+{
+    for (auto i = notifiers.begin(); i != notifiers.end();) 
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyTextMessage("invalidtx", message)) 
+        {
+            i++;
+        } 
+        else 
+        {
             notifier->Shutdown();
             i = notifiers.erase(i);
         }

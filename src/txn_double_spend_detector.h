@@ -55,10 +55,27 @@ class CTxnDoubleSpendDetector {
 
   private:
     /** Check if any of txn's inputs is already known */
-    bool isAnyOfInputsKnownNL(const CTransaction &tx) const;
+    bool isAnyOfInputsKnownNL(const CTransaction &tx, CValidationState& state) const;
 
   private:
-    std::vector<COutPoint> mKnownSpends = {};
+    struct OutPointWithTx;
+
+    std::vector<OutPointWithTx> mKnownSpends = {};
     std::set<const CTransaction*> mKnownSpendsTx;
     mutable std::mutex mMainMtx {};
+};
+
+struct CTxnDoubleSpendDetector::OutPointWithTx
+{
+    COutPoint mOut;
+    CTransactionRef mTxRef;
+
+    OutPointWithTx(const COutPoint& out, const CTransactionRef& ref)
+        : mOut{ out }
+        , mTxRef{ ref }
+    {}
+
+    friend bool operator==(const OutPointWithTx &a, const COutPoint &b) {
+        return (a.mOut.GetTxId() == b.GetTxId() && a.mOut.GetN() == b.GetN());
+    }
 };

@@ -120,6 +120,9 @@ BITCOIN_CORE_H = \
   httpserver.h \
   indirectmap.h \
   init.h \
+  invalid_txn_publisher.h \
+  invalid_txn_sinks/file_sink.h \
+  invalid_txn_sinks/zmq_sink.h \
   key.h \
   keystore.h \
   dbwrapper.h \
@@ -255,6 +258,9 @@ libbitcoin_server_a_SOURCES = \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
+  invalid_txn_publisher.cpp \
+  invalid_txn_sinks/file_sink.cpp \
+  invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
   mining/assembler.cpp \

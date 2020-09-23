@@ -150,3 +150,9 @@ bool CZMQPublishRawTransactionNotifier::NotifyTransaction(
     ss << transaction;
     return SendZMQMessage(MSG_RAWTX, &(*ss.begin()), ss.size());
 }
+
+bool CZMQPublishTextNotifier::NotifyTextMessage(const std::string& topic, std::string_view message)
+{
+    LogPrint(BCLog::ZMQ, "zmq: Publish text with topic: %s\n", topic.c_str());
+    return SendZMQMessage(topic.c_str(), message.data(), message.size());
+}

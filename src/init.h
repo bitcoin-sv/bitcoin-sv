@@ -59,7 +59,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 enum HelpMessageMode { HMM_BITCOIND };
 
 /** Help for options shared between UI and daemon (for -help) */
-std::string HelpMessage(HelpMessageMode mode);
+std::string HelpMessage(HelpMessageMode mode, const Config& config);
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();
 

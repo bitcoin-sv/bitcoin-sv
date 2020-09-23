@@ -18,6 +18,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
+#include "invalid_txn_publisher.h"
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
@@ -560,6 +561,17 @@ static UniValue signmessagewithprivkey(const Config &config,
     return EncodeBase64(&vchSig[0], vchSig.size());
 }
 
+static UniValue clearinvalidtransactions(const Config &config,
+                                         const JSONRPCRequest &request) {
+    if (request.fHelp || request.params.size() != 0) {
+        throw std::runtime_error(
+            "clearinvalidtransactions\n\n"
+            "Deletes stored invalid transactions.\n"
+            "Result: number of bytes freed.");
+    }
+    return g_connman->getInvalidTxnPublisher().ClearStored();
+}
+
 static UniValue setmocktime(const Config &config,
                             const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() != 1) {
@@ -680,6 +692,8 @@ static const CRPCCommand commands[] = {
     { "util",               "createmultisig",         createmultisig,         true,  {"nrequired","keys"} },
     { "util",               "verifymessage",          verifymessage,          true,  {"address","signature","message"} },
     { "util",               "signmessagewithprivkey", signmessagewithprivkey, true,  {"privkey","message"} },
+
+    { "util",               "clearinvalidtransactions",clearinvalidtransactions, true,  {} },
 
     /* Not shown in help */
     { "hidden",             "setmocktime",            setmocktime,            true,  {"timestamp"}},

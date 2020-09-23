@@ -95,6 +95,9 @@ private:
     //! As the order of booleans doesn't matter, it is used as a LIFO (stack)
     std::vector<T> queue;
 
+    //! Checks that evaluated to false, all check that are failed execution are moved to this vector.
+    std::vector<T> failedChecks;
+
     //! The number of workers (including the master) that are idle.
     int nIdle = 0;
 
@@ -140,6 +143,7 @@ private:
         boost::condition_variable &cond = fMaster ? condMaster : condWorker;
         std::vector<T> vChecks;
         vChecks.reserve(nBatchSize);
+        std::vector<T> vTempFailedChecks;
         unsigned int nNow = 0;
         std::optional<bool> fOk = true;
         CTotalScopeGuard guard{mutex, nTotal};
@@ -153,6 +157,7 @@ private:
                     if(fAllOk.has_value() && fOk.has_value())
                     {
                         fAllOk.value() &= fOk.value();
+                        std::move(vTempFailedChecks.begin(), vTempFailedChecks.end(), std::back_inserter(failedChecks));
                     }
                     else
                     {
@@ -245,6 +250,10 @@ private:
                 }
 
                 fOk = check(*mSessionToken);
+                if (fOk.has_value() && (fOk.value() == false))
+                {
+                    vTempFailedChecks.emplace_back(std::move(check));
+                }
             }
             vChecks.clear();
         } while (true);
@@ -403,6 +412,12 @@ public:
         mSessionToken = token;
         fAllOk = true;
         mWaitCalled = false;
+    }
+
+    void TakeFailedChecks(std::vector<T>& toFill)
+    {
+        std::move(failedChecks.begin(), failedChecks.end(), std::back_inserter(toFill));
+        failedChecks.clear();
     }
 };
 

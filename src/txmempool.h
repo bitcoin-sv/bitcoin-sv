@@ -826,7 +826,7 @@ public:
      * @param tx A reference to the given txn
      * @param nonFinal A flag to indicate if tx is a non-final transaction
      */
-    bool CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const;
+    std::set<CTransactionRef> CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const;
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
