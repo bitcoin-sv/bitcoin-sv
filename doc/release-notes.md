@@ -1,6 +1,18 @@
-# Bitcoin SV version 1.0.6 Release Notes
+# Bitcoin SV version 1.0.6-beta Release Notes
 
 ## List of Changes since 1.0.5
+* New RPC to retrieve UTXOs.
+* sendrawtransactions returns any double spend transaction IDs.
+* Refactor code so HTTP client requests can be made from bitcoind.
+* New RPC to list ZMQ notifications and endpoints.
+* ZMQ notifications for transaction mempool removal.
+* Insecure function (sprintf) no longer used.
+* Make ZMQ interface thread safe.
+* RPC to provide Merkle proofs for transaction inclusion in blocks.
+* Invalid transactions stored in repository.
+* Ensure the fallback path for packages (bitcoinsv.io) in the Gitian build contains all required packages.
+* Fix to Gitian build.
+* Fix: Accessing memory after std::move.
 
 ## Scaling Test Network (STN) Reset
 N/A
