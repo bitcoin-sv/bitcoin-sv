@@ -45,6 +45,11 @@ CZMQNotificationInterface *CZMQNotificationInterface::Create() {
         CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
     factories["pubinvalidtx"] =
         CZMQAbstractNotifier::Create<CZMQPublishTextNotifier>;
+    factories["pubremovedfrommempool"] =
+        CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolNotifier>;
+    factories["pubremovedfrommempoolblock"] =
+        CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolBlockNotifier>;
+
 
     for (std::map<std::string, CZMQNotifierFactory>::const_iterator i =
              factories.begin();
@@ -187,6 +192,43 @@ void CZMQNotificationInterface::TransactionAddedToMempool(
         if (notifier->NotifyTransaction(tx)) {
             i++;
         } else {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
+
+void CZMQNotificationInterface::TransactionRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason, 
+                                                              const CTransaction* conflictedWith)
+{
+
+    for (auto i = notifiers.begin(); i != notifiers.end();)
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyRemovedFromMempool(txid, reason, conflictedWith))
+        {
+            ++i;
+        }
+        else
+        {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
+void CZMQNotificationInterface::TransactionRemovedFromMempoolBlock(const uint256& txid, MemPoolRemovalReason reason) {
+
+    for (auto i = notifiers.begin(); i != notifiers.end();)
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyRemovedFromMempoolBlock(txid, reason))
+        {
+            ++i;
+        }
+        else
+        {
             notifier->Shutdown();
             i = notifiers.erase(i);
         }

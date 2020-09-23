@@ -3,8 +3,12 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "zmqpublishnotifier.h"
+
 #include "config.h"
+#include "core_io.h"
 #include "rpc/server.h"
+#include "rpc/jsonwriter.h"
+#include "rpc/text_writer.h"
 #include "streams.h"
 #include "util.h"
 #include "validation.h"
@@ -20,6 +24,8 @@ static const char *MSG_HASHBLOCK = "hashblock";
 static const char *MSG_HASHTX = "hashtx";
 static const char *MSG_RAWBLOCK = "rawblock";
 static const char *MSG_RAWTX = "rawtx";
+static const char *MSG_REMOVEDFROMMEMPOOL = "removedfrommempool";
+static const char *MSG_REMOVEDFROMMEMPOOLBLOCK = "removedfrommempoolblock";
 
 
 bool CZMQAbstractPublishNotifier::Initialize(void *pcontext, std::shared_ptr<CZMQPublisher> tspublisher) {
@@ -120,6 +126,84 @@ bool CZMQPublishHashTransactionNotifier::NotifyTransaction(
     for (unsigned int i = 0; i < 32; i++)
         data[31 - i] = txid.begin()[i];
     return SendZMQMessage(MSG_HASHTX, data, 32);
+}
+
+bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint256& txid,
+                                                                     MemPoolRemovalReason reason,
+                                                                     const CTransaction* conflictedWith)
+{
+
+    CStringWriter tw;
+    CJSONWriter jw(tw, false);
+
+    jw.writeBeginObject();
+    jw.pushKV("txid", txid.GetHex(), true);
+
+    switch (reason)
+    {
+        case MemPoolRemovalReason::EXPIRY:
+            jw.pushKV("reason", "expired", false);
+            break;
+        case MemPoolRemovalReason::SIZELIMIT:
+            jw.pushKV("reason", "mempool-sizelimit-exceeded", false);
+            break;
+        case MemPoolRemovalReason::CONFLICT:
+            if (conflictedWith != nullptr)
+            {
+                jw.pushKV("reason", "collision-in-block-tx");
+                jw.writeBeginObject("collidedWith");
+                jw.pushKV("txid", conflictedWith->GetId().GetHex(), true);
+                jw.pushKV("size", int64_t(conflictedWith->GetTotalSize()), true);
+                jw.pushK("hex");
+                jw.pushQuote(true, false);
+                EncodeHexTx(*conflictedWith, jw.getWriter(), 0);
+                jw.pushQuote(true, false);
+                jw.writeEndObject(false);
+            }
+            else
+            {
+                jw.pushKV("reason", "collision-in-block-tx", false);
+            }
+            break;
+        default:
+            jw.pushKV("reason", "unknown-reason", false);
+    }
+
+    jw.writeEndObject(false);
+
+    std::string message = tw.MoveOutString();
+
+    return SendZMQMessage(MSG_REMOVEDFROMMEMPOOL, message.data(), message.size());
+}
+
+bool CZMQPublishRemovedFromMempoolBlockNotifier::NotifyRemovedFromMempoolBlock(const uint256& txid,
+                                                                               MemPoolRemovalReason reason)
+{
+
+    CStringWriter tw;
+    CJSONWriter jw(tw, false);
+
+    jw.writeBeginObject();
+
+    switch (reason)
+    {
+        case MemPoolRemovalReason::REORG:
+            jw.pushKV("reason", "reorg");
+            break;
+        case MemPoolRemovalReason::BLOCK:
+            jw.pushKV("reason", "included-in-block");
+            break;
+        default:
+            jw.pushKV("reason", "unknown-reason");
+    }
+    
+    jw.pushK("txid");
+    jw.pushV(txid.GetHex(), false);
+    jw.writeEndObject(false);
+
+    std::string message = tw.MoveOutString();
+
+    return SendZMQMessage(MSG_REMOVEDFROMMEMPOOLBLOCK, message.data(), message.size());
 }
 
 bool CZMQPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex) {

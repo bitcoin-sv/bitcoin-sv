@@ -945,7 +945,8 @@ private:
     void removeUncheckedNL(
             txiter entry,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+            MemPoolRemovalReason reason,
+            const CTransaction* conflictedWith);
 
     void removeConflictsNL(
             const CTransaction &tx,
@@ -967,7 +968,8 @@ private:
             bool updateDescendants,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            bool updateJournal = true);
+            bool updateJournal = true,
+            const CTransaction* conflictedwith = nullptr);
 
     void prioritiseTransactionNL(
             const uint256& hash,
@@ -980,7 +982,8 @@ private:
     void removeRecursiveNL(
             const CTransaction &tx,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
+            const CTransaction* conflictedWith = nullptr);
 
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;

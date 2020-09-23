@@ -17,6 +17,7 @@
 #include "utilmoneystr.h"
 #include "utiltime.h"
 #include "validation.h"
+#include "validationinterface.h"
 #include "version.h"
 #include <boost/range/adaptor/reversed.hpp>
 #include <config.h>
@@ -633,7 +634,9 @@ void CTxMemPool::AddUncheckedNL(
 void CTxMemPool::removeUncheckedNL(
     txiter it,
     const CJournalChangeSetPtr& changeSet,
-    MemPoolRemovalReason reason) {
+    MemPoolRemovalReason reason,
+    const CTransaction* conflictedWith) {
+
 
     CTransactionRef txn { it->GetSharedTx() };
     NotifyEntryRemoved(txn, reason);
@@ -662,6 +665,16 @@ void CTxMemPool::removeUncheckedNL(
                         memusage::DynamicUsage(mapLinks[it].children);
     mapLinks.erase(it);
     mapTx.erase(it);
+
+    if (reason == MemPoolRemovalReason::BLOCK || reason == MemPoolRemovalReason::REORG)
+    {
+        GetMainSignals().TransactionRemovedFromMempoolBlock(txn->GetId(), reason);
+    }
+    else
+    {   
+        GetMainSignals().TransactionRemovedFromMempool(txn->GetId(), reason, conflictedWith);
+    }
+
     nTransactionsUpdated++;
 }
 
@@ -718,7 +731,8 @@ void CTxMemPool::RemoveRecursive(
 void CTxMemPool::removeRecursiveNL(
     const CTransaction &origTx,
     const CJournalChangeSetPtr& changeSet,
-    MemPoolRemovalReason reason) {
+    MemPoolRemovalReason reason,
+    const CTransaction* conflictedWith) {
 
     setEntries txToRemove;
     txiter origit = mapTx.find(origTx.GetId());
@@ -746,7 +760,7 @@ void CTxMemPool::removeRecursiveNL(
         CalculateDescendantsNL(it, setAllRemoves);
     }
 
-    removeStagedNL(setAllRemoves, false, changeSet, reason);
+    removeStagedNL(setAllRemoves, false, changeSet, reason, true, conflictedWith);
 }
 
 void CTxMemPool::RemoveForReorg(
@@ -831,7 +845,7 @@ void CTxMemPool::removeConflictsNL(
             const CTransaction &txConflict = *it->second;
             if (txConflict != tx) {
                 clearPrioritisationNL(txConflict.GetId());
-                removeRecursiveNL(txConflict, changeSet, MemPoolRemovalReason::CONFLICT);
+                removeRecursiveNL(txConflict, changeSet, MemPoolRemovalReason::CONFLICT, &tx);
             }
         }
     }
@@ -1763,7 +1777,8 @@ void CTxMemPool::removeStagedNL(
     bool updateDescendants,
     const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason,
-    bool updateJournal) {
+    bool updateJournal,
+    const CTransaction* conflictedWith) {
 
     updateForRemoveFromMempoolNL(stage, updateDescendants);
 
@@ -1773,7 +1788,7 @@ void CTxMemPool::removeStagedNL(
         setEntries affectedStillInMempool = getConnectedNL(stage);
 
         for (const txiter &it : stage) {
-            removeUncheckedNL(it, changeSet, reason);
+            removeUncheckedNL(it, changeSet, reason, conflictedWith);
         }
     
         CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
@@ -1782,7 +1797,7 @@ void CTxMemPool::removeStagedNL(
     else
     {
         for (const txiter &it : stage) {
-            removeUncheckedNL(it, changeSet, reason);
+            removeUncheckedNL(it, changeSet, reason, conflictedWith);
         }
     }
 }

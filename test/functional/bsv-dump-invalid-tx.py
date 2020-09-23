@@ -6,14 +6,13 @@ import json
 from time import sleep
 import os
 import shutil
-import configparser
 
 from test_framework.blocktools import create_block, serialize_script_num, create_coinbase, create_transaction
 from test_framework.cdefs import ONE_MEGABYTE
 from test_framework.mininode import CTransaction, msg_tx, CTxIn, COutPoint, CTxOut, msg_block, ToHex, ser_string, COIN
 from test_framework.script import CScript, OP_FALSE, OP_DROP, OP_HASH160, hash160, OP_EQUAL
 from test_framework.test_framework import BitcoinTestFramework, SkipTest
-from test_framework.util import wait_until, assert_raises_rpc_error, bytes_to_hex_str
+from test_framework.util import wait_until, assert_raises_rpc_error, bytes_to_hex_str, check_zmq_test_requirements
 
 
 def create_invalid_coinbase(height, outputValue=50):
@@ -78,21 +77,12 @@ class InvalidTx(BitcoinTestFramework):
         self.setup_nodes()
 
     def setup_nodes(self):
-        # Try to import python3-zmq. Skip this test if the import fails.
-        try:
-            import zmq
-        except ImportError:
-            raise Exception("python3-zmq module not available.")
 
-        # Check that bitcoin has been built with ZMQ enabled
-        config = configparser.ConfigParser()
-        if not self.options.configfile:
-            self.options.configfile = os.path.dirname(
-                __file__) + "/../config.ini"
-        config.read_file(open(self.options.configfile))
-
-        if not config["components"].getboolean("ENABLE_ZMQ"):
-            raise SkipTest("bitcoind has not been built with zmq enabled.")
+        # Check that bitcoin has been built with ZMQ enabled and we have python zmq package installed.
+        check_zmq_test_requirements(self.options.configfile,
+                                    SkipTest("bitcoind has not been built with zmq enabled."))
+        # import zmq when we know we have the requirements for test with zmq.
+        import zmq
 
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)

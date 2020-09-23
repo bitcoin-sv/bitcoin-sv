@@ -730,6 +730,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage +=
         HelpMessageOpt("-zmqpubinvalidtx=<address>",
                        _("Enable publish invalid transaction in <address>. -invalidtxsink=ZMQ should be specified."));
+    strUsage += HelpMessageOpt("-zmqpubremovedfrommempool=<address>",
+                               _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
+    strUsage += HelpMessageOpt("-zmqpubremovedfrommempoolblock=<address>",
+                               _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
 #endif
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));

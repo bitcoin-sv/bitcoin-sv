@@ -8,6 +8,8 @@
 #include "zmqconfig.h"
 #include "zmq_publisher.h"
 
+#include "txmempool.h"
+
 class CBlockIndex;
 class CZMQAbstractNotifier;
 
@@ -33,6 +35,9 @@ public:
     virtual bool NotifyBlock(const CBlockIndex *pindex);
     virtual bool NotifyTransaction(const CTransaction &transaction);
     virtual bool NotifyTextMessage(const std::string& topic, std::string_view message);
+    virtual bool NotifyRemovedFromMempool(const uint256& txid, const MemPoolRemovalReason reason,
+                                          const CTransaction* conflictedWith);
+    virtual bool NotifyRemovedFromMempoolBlock(const uint256& txid, const MemPoolRemovalReason reason);
 
 protected:
     void *psocket;

@@ -7,6 +7,7 @@
 #define BITCOIN_VALIDATIONINTERFACE_H
 
 #include "primitives/transaction.h" // CTransaction(Ref)
+#include "txmempool.h"
 
 #include <boost/signals2/signal.hpp>
 
@@ -38,6 +39,10 @@ protected:
                                  const CBlockIndex *pindexFork,
                                  bool fInitialDownload) {}
     virtual void TransactionAddedToMempool(const CTransactionRef &ptxn) {}
+    virtual void TransactionRemovedFromMempool(const uint256& txid,
+                                               MemPoolRemovalReason reason,
+                                               const CTransaction* conflictedWith) {}
+    virtual void TransactionRemovedFromMempoolBlock(const uint256& txid, MemPoolRemovalReason reason) {}
     virtual void BlockConnected(const std::shared_ptr<const CBlock> &block,
                    const CBlockIndex *pindex,
                    const std::vector<CTransactionRef> &txnConflicted) {}
@@ -63,6 +68,16 @@ struct CMainSignals {
     /** Notifies listeners of a transaction having been added to mempool. */
     boost::signals2::signal<void(const CTransactionRef &)>
         TransactionAddedToMempool;
+    /** Notifies listeners of a transaction having been removed from mempool. */
+    boost::signals2::signal<void(const uint256 &, MemPoolRemovalReason reason, const CTransaction *)>
+        TransactionRemovedFromMempool;
+    /**
+     * Notifies listeners of a transaction having been removed from mempool.
+     * Some events for removing transactions from mempool are more frequent such as transaction
+     * being include in block hence the need for two different signals.
+     */
+    boost::signals2::signal<void(const uint256 &, MemPoolRemovalReason reason)>
+        TransactionRemovedFromMempoolBlock;
     /**
      * Notifies listeners of a block being connected.
      * Provides a vector of transactions evicted from the mempool as a result.
