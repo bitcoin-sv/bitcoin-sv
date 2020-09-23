@@ -165,6 +165,7 @@ BITCOIN_CORE_H = \
   rpc/client.h \
   rpc/client_config.h \
   rpc/client_utils.h \
+  rpc/http_protocol.h \
   rpc/http_request.h \
   rpc/http_response.h \
   rpc/jsonwriter.h \
