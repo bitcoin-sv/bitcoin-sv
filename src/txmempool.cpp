@@ -490,6 +490,15 @@ bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) {
     return mapNextTx.count(outpoint);
 }
 
+const CTransaction* CTxMemPool::IsSpentByNL(const COutPoint &outpoint) {
+    auto it = mapNextTx.find(outpoint);
+    if (it == mapNextTx.end())
+    {
+        return nullptr;
+    }
+    return it->second;
+}
+
 unsigned int CTxMemPool::GetTransactionsUpdated() const {
     return nTransactionsUpdated;
 }

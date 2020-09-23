@@ -1464,7 +1464,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
             return NullUniValue;
         }
     } else {
-        if (!pcoinsTip->GetCoin(out, coin)) {
+        if (!pcoinsTip->GetCoin(out, coin)  || coin.IsSpent()) {
             return NullUniValue;
         }
     }
@@ -1489,6 +1489,270 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     ret.push_back(Pair("coinbase", coin.IsCoinBase()));
 
     return ret;
+}
+
+void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
+{
+    if (request.fHelp || request.params.size() < 2 ||
+        request.params.size() > 3) {
+        throw std::runtime_error(
+            "gettxouts txidVoutList returnFields ( include_mempool )\n"
+            "\nReturns details about an unspent transaction output.\n"
+            "Function does not guarantee consistent view (if TXOs statuses change during RPC function execution)\n"
+            "\nArguments:\n"
+            "1. \"txidVoutList\"          \"[{\"txid\": txid1, \"n\" : n1}, {\"txid\": txid2, \"n\" : n2}]\" \n"
+            "(array, required) Array of elements consisting of transaction ids and vout numbers\n"
+            "2. \"returnFields\"                (array, required) Fields that we wish to return\n"
+            "Options are: scriptPubKey, scriptPubKeyLen, value, isStandard, confirmations, \n"
+            " * (meaning all return fields. It should not be used with other return fields.)\n"
+            "3. \"include_mempool\"  (boolean, optional) Whether to include "
+            "the mempool. Default: true.\n"
+            "Note that an unspent output that is spent in the mempool \n"
+            "will be displayed as spent.\n"
+            "\nResult:\n"
+            "{'txouts':\n"
+            "[\n"
+            "{\n"
+            "  \"scriptPubKey\" : \"scriptPubKey \",    (string) scriptPubKey in hexadecimal\n"
+            "  \"scriptPubKeyLen\" : n,       (numeric) Length of scriptPubKey\n"
+            "  \"value\" : x.xxx,           (numeric) The output value "
+            "in " +
+            CURRENCY_UNIT + "\n"
+            "  \"isStandard\" : true|false   (boolean) Standard output or not\n"
+            "  \"confirmations\" : n,       (numeric) Number of confirmations\n"
+            "}\n"
+            ", ...\n"
+            "]\n"
+            "}\n"
+            "In case where we cannot get coin we return element: {\"error\" : \"missing\"}\n"
+            "In case where coin is in mempool, but is spent we return element: {\"error\" : \"spent\", \n"
+            "\"collidedWith\" : {\"txid\" : txid, \"size\" : size, \"hex\" : hex }} \n"
+            "collidedWith contains a transaction id, size and hex of transaction that spends TXO. \n"
+
+            "\nExamples:\n"
+            "\nGet unspent transactions\n" +
+            HelpExampleCli("listunspent", "") + "\nView the details\n" +
+            HelpExampleCli("gettxouts", "\"[{\"txid\": txid, \"n\" : 0}, {\"txid\": txid2, \"n\" : 0}], [\"*\"]\" 1") +
+            "\nAs a json rpc call\n" +
+            HelpExampleRpc("gettxouts", "\"[{\"txid\": txid, \"n\" : 0}, {\"txid\": txid2, \"n\" : 0}], [\"*\"]\" 1"));
+    }
+    
+    UniValue txid_n_pairs = request.params[0].get_array();
+    UniValue returnFields = request.params[1].get_array();
+
+    bool fMempool = true;
+    if (request.params.size() > 2)
+    {
+        fMempool = request.params[2].get_bool();
+    }
+
+    // parse return fields and save them as flags in returnFieldsFlags variable
+    uint32_t returnFieldsFlags = 0;
+    const uint32_t scriptPubKeyFlag = 1<<0;
+    const uint32_t scriptPubKeyLenFlag = 1<<1;
+    const uint32_t valueFlag = 1<<2;
+    const uint32_t isStandardFlag = 1<<3;
+    const uint32_t confirmationsFlag = 1<<4;
+
+
+    for(size_t arrayIndex = 0; arrayIndex < returnFields.size(); arrayIndex++)
+    {
+        std::string returnField = returnFields[arrayIndex].get_str();
+        if(returnField == "*")
+        {
+            // set all flags to true
+            returnFieldsFlags = scriptPubKeyFlag | scriptPubKeyLenFlag | valueFlag
+                                | isStandardFlag | confirmationsFlag;
+            if(returnFields.size() > 1)
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMS, "\"*\" should not be used with other return fields");
+            }
+        }
+        else if (returnField == "scriptPubKey")
+        {
+            returnFieldsFlags |= scriptPubKeyFlag;
+        }
+        else if (returnField == "scriptPubKeyLen")  
+        {
+            returnFieldsFlags |= scriptPubKeyLenFlag;
+        }
+        else if (returnField == "value")
+        {
+            returnFieldsFlags |= valueFlag;
+        }
+        else if (returnField == "isStandard")
+        {
+            returnFieldsFlags |= isStandardFlag;
+        }
+        else if (returnField == "confirmations")
+        {
+            returnFieldsFlags |= confirmationsFlag;
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMS, strprintf("Wrong return field: %s", returnField));
+        }
+    }
+
+    // last field has value of the last field in an array (needed to form valid JSON)
+    uint32_t lastField;
+    for(int i = 0; i < 5; i++)
+    {
+        if (returnFieldsFlags & (1 << i))
+        {
+            lastField = (1 << i);
+        }
+    }
+
+    if(returnFieldsFlags == 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMS, "No return fields set");
+    }
+
+    // parse parameters and save them in an array of COutPoint
+    std::vector<COutPoint> outPoints; 
+    outPoints.reserve(txid_n_pairs.size());
+    for (size_t arrayIndex = 0; arrayIndex < txid_n_pairs.size(); arrayIndex++)
+    {
+        UniValue element = txid_n_pairs[arrayIndex].get_obj();
+
+        std::string txid;
+        int n;
+
+        std::vector<std::string> keys = element.getKeys();
+        if (keys.size() == 2 && element.exists("txid") && element.exists("n"))
+        {
+            if(element["txid"].isStr())
+            {
+                txid = element["txid"].getValStr();
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMS, "txid is in wrong format");
+            }
+            
+            if(element["n"].isNum())
+            {
+                n = element["n"].get_int();
+            }
+            else
+            {
+                throw JSONRPCError(RPC_INVALID_PARAMS, "vout is not an integer");
+            }
+        }
+        else
+        {
+            throw JSONRPCError(RPC_INVALID_PARAMS, "Wrong format. Exactly \"txid\" and \"n\" are required fields.");
+        }
+
+        uint256 hash(uint256S(txid));
+        outPoints.push_back(COutPoint(hash, n));
+    }
+
+    if (!processedInBatch)
+    {
+	    httpReq.WriteHeader("Content-Type", "application/json");
+	    httpReq.StartWritingChunks(HTTP_OK);
+    }
+   
+    CHttpTextWriter httpWriter(httpReq);
+    CJSONWriter jWriter(httpWriter, false);
+
+    httpWriter.Write("{\"result\": ");
+    jWriter.writeBeginObject();
+    jWriter.writeBeginArray("txouts");
+
+    for(size_t arrayIndex = 0; arrayIndex < outPoints.size(); arrayIndex++)
+    {
+        jWriter.writeBeginObject();
+
+        Coin coin;
+        if (fMempool)
+        {
+            std::shared_lock lock(mempool.smtx);
+            CCoinsViewMemPool view(pcoinsTip, mempool);
+            if (!view.GetCoin(outPoints[arrayIndex], coin))
+            {
+                jWriter.pushKV("error", "missing", false);
+                jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
+                continue;
+            }
+            else if(const CTransaction* tx = mempool.IsSpentByNL(outPoints[arrayIndex]))
+            {
+                jWriter.pushKV("error", "spent");
+                jWriter.writeBeginObject("collidedWith");
+                jWriter.pushKV("txid", tx->GetId().GetHex());
+                jWriter.pushKV("size", int64_t(tx->GetTotalSize()));
+                jWriter.pushKV("hex", EncodeHexTx(*tx), false);
+                jWriter.writeEndObject(false);
+                jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
+                continue;
+            }
+        }
+        else
+        {
+            if (!pcoinsTip->GetCoin(outPoints[arrayIndex], coin) || coin.IsSpent())
+            {
+                jWriter.pushKV("error", "missing", false);
+                jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
+                continue;
+            }
+        }
+
+        if(returnFieldsFlags & scriptPubKeyFlag)
+        {
+            jWriter.pushKV("scriptPubKey", HexStr(coin.GetTxOut().scriptPubKey), !(lastField==scriptPubKeyFlag));
+        }
+
+        if(returnFieldsFlags & scriptPubKeyLenFlag)
+        {
+            jWriter.pushKV("scriptPubKeyLen", static_cast<int64_t>(coin.GetTxOut().scriptPubKey.size()),
+              !(lastField==scriptPubKeyLenFlag));
+        }
+
+        if(returnFieldsFlags & valueFlag)
+        {
+            jWriter.pushKVMoney("value", ValueFromAmount(coin.GetTxOut().nValue).getValStr(), !(lastField==valueFlag));
+        }
+
+        if(returnFieldsFlags & isStandardFlag)
+        {
+            int height = (coin.GetHeight() == MEMPOOL_HEIGHT)
+                     ? (chainActive.Height() + 1)
+                     : coin.GetHeight();
+            txnouttype txOutType;
+            jWriter.pushKV("isStandard", IsStandard(config, coin.GetTxOut().scriptPubKey, height, txOutType), !(lastField==isStandardFlag));
+        }
+
+        if(returnFieldsFlags & confirmationsFlag)
+        {
+            int64_t confirmations;
+            if (coin.GetHeight() == MEMPOOL_HEIGHT)
+            {
+                confirmations = 0;
+            }
+            else
+            {
+                LOCK(cs_main);
+                BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
+                CBlockIndex *pindex = it->second;
+                confirmations = int64_t(pindex->nHeight - coin.GetHeight() + 1);
+            }
+            jWriter.pushKV("confirmations", confirmations, !(lastField==confirmationsFlag));
+        }
+
+        jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
+    }
+
+    jWriter.writeEndArray(false);
+    jWriter.writeEndObject();
+    httpWriter.Write(" \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
+    jWriter.flush();
+
+    if (!processedInBatch)
+    {
+	      httpReq.StopWritingChunks();
+    }
 }
 
 UniValue verifychain(const Config &config, const JSONRPCRequest &request) {
@@ -2683,6 +2947,7 @@ static const CRPCCommand commands[] = {
     { "blockchain",         "getrawmempool",          getrawmempool,          true,  {"verbose"} },
     { "blockchain",         "getrawnonfinalmempool",  getrawnonfinalmempool,  true,  {} },
     { "blockchain",         "gettxout",               gettxout,               true,  {"txid","n","include_mempool"} },
+    { "blockchain",         "gettxouts",              gettxouts,              true,  {"txids_vouts","return_fields","include_mempool"} },
     { "blockchain",         "gettxoutsetinfo",        gettxoutsetinfo,        true,  {} },
     { "blockchain",         "pruneblockchain",        pruneblockchain,        true,  {"height"} },
     { "blockchain",         "verifychain",            verifychain,            true,  {"checklevel","nblocks"} },
