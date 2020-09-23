@@ -4,18 +4,22 @@
 
 #include "zmqnotificationinterface.h"
 #include "zmqpublishnotifier.h"
-
+#include "zmq_publisher.h"
 #include "streams.h"
 #include "util.h"
 #include "validation.h"
 #include "version.h"
+
 
 void zmqError(const char *str) {
     LogPrint(BCLog::ZMQ, "zmq: Error: %s, errno=%s\n", str,
              zmq_strerror(errno));
 }
 
-CZMQNotificationInterface::CZMQNotificationInterface() : pcontext(nullptr) {}
+CZMQNotificationInterface::CZMQNotificationInterface() :
+    pcontext(nullptr),
+    zmqPublisher(std::make_shared<CZMQPublisher>())
+{}
 
 CZMQNotificationInterface::~CZMQNotificationInterface() {
     Shutdown();
@@ -86,7 +90,7 @@ bool CZMQNotificationInterface::Initialize() {
     std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin();
     for (; i != notifiers.end(); ++i) {
         CZMQAbstractNotifier *notifier = *i;
-        if (notifier->Initialize(pcontext)) {
+        if (notifier->Initialize(pcontext, zmqPublisher)) {
             LogPrint(BCLog::ZMQ, "  Notifier %s ready (address = %s)\n",
                      notifier->GetType(), notifier->GetAddress());
         } else {
@@ -118,6 +122,8 @@ void CZMQNotificationInterface::Shutdown() {
 
         pcontext = 0;
     }
+    // stop publisher thread
+    zmqPublisher = nullptr;
 }
 
 void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,

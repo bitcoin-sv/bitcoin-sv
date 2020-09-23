@@ -14,6 +14,8 @@ private:
     //!< upcounting per message sequence number
     uint32_t nSequence;
 
+    std::shared_ptr<CZMQPublisher> zmqPublisher;
+
 public:
     /* send zmq multipart message
        parts:
@@ -23,7 +25,7 @@ public:
     */
     bool SendZMQMessage(const char *command, const void *data, size_t size);
 
-    bool Initialize(void *pcontext) override;
+    bool Initialize(void *pcontext, std::shared_ptr<CZMQPublisher>) override;
     void Shutdown() override;
 };
 
