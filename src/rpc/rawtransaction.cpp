@@ -1285,6 +1285,20 @@ static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidT
             entry.push_back(Pair("reject_code", uint64_t(elem.second.GetRejectCode())));
             entry.push_back(Pair("reject_reason", elem.second.GetRejectReason()));
         }
+        const std::set<CTransactionRef>& collidedWithTx = elem.second.GetCollidedWithTx();
+        if (!collidedWithTx.empty())
+        {
+            UniValue uvCollidedWith(UniValue::VARR);
+            for (const CTransactionRef& tx : collidedWithTx)
+            {
+                UniValue objTx(UniValue::VOBJ);
+                objTx.pushKV("txid", tx->GetId().GetHex());
+                objTx.pushKV("size", int64_t(tx->GetTotalSize()));
+                objTx.push_back(Pair("hex", EncodeHexTx(*tx)));
+                uvCollidedWith.push_back(objTx);
+            }
+            entry.pushKV("collidedWith", uvCollidedWith);
+        }
         vInvalidRet.push_back(entry);
     }
 }
@@ -1335,27 +1349,36 @@ static UniValue sendrawtransactions(const Config &config,
 
             "\nResult:\n"
             "{\n"
-            "  \"known\" : [                  (json array) "
+            "  \"known\" : [                 (json array) "
             "Already known transactions detected during processing (if there are any)\n"
-            "      \"txid\",           (string) "
+            "      \"txid\" : xxxxxx,        (string) "
             "The transaction id\n"
             "      ,...\n"
             "  ],\n"
-            "  \"evicted\" : [                (json array) "
+            "  \"evicted\" : [               (json array) "
             "Transactions accepted by the mempool and then evicted due to insufficient fee (if there are any)\n"
-            "      \"txid\",           (string) "
+            "      \"txid\" : xxxxx,         (string) "
             "The transaction id\n"
             "      ,...\n"
             "  ],\n"
-            "  \"invalid\" : [                (json array of objects) "
+            "  \"invalid\" : [               (json array of objects) "
             "Invalid transactions detected during validation (if there are any)\n"
             "    {\n"
-            "      \"txid\" : \"hash\",           (string) "
+            "      \"txid\" : xxxxxxxx,      (string) "
             "The transaction id\n"
-            "      \"reject_code\" : n,        (numeric) "
+            "      \"reject_code\" : x,      (numeric) "
             "The reject code set during validation\n"
-            "      \"reject_reason\" : \"text\"  (string) "
+            "      \"reject_reason\" : xxxxx (string) "
             "The reject reason set during validation\n"
+            "      \"collidedWith\" : [      (json array of objects) This field is only present in case of "
+            "doublespend transaction and contains transactions we collided with\n"
+            "        {\n"
+            "          \"txid\" : xxxxxxxx,  (string) The transaction id\n"
+            "          \"size\" : xxxx,      (numeric) Transaction size in bytes\n"
+            "          \"hex\"  : xxxxxxxx,  (string) Whole transaction in hex\n"
+            "        }\n"
+            "        ,...\n"
+            "      ]\n"
             "    }\n"
             "    ,...\n"
             "  ]\n"
