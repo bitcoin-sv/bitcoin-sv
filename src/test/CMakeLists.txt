@@ -72,6 +72,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	checkpoints_tests.cpp
 	checkqueue_tests.cpp
 	coins_tests.cpp
+	write_preferring_upgradable_mutex_tests.cpp
 	compress_tests.cpp
 	config_tests.cpp
 	core_io_tests.cpp
