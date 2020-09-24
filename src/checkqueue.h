@@ -261,7 +261,11 @@ private:
 
 public:
     //! Create a new check queue
-    CCheckQueue(unsigned int nBatchSizeIn)
+    CCheckQueue(CCheckQueue&&) = delete;
+    CCheckQueue& operator=(CCheckQueue&&) = delete;
+    CCheckQueue(const CCheckQueue&) = delete;
+    CCheckQueue& operator=(const CCheckQueue&) = delete;
+    explicit CCheckQueue(unsigned int nBatchSizeIn)
         : nBatchSize(nBatchSizeIn) {}
 
     CCheckQueue(
