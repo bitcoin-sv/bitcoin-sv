@@ -174,3 +174,14 @@ uint64_t BlockPriorityStreamPolicy::PushMessage(StreamMap& streams, StreamType s
         std::move(msg), nPayloadLength, nTotalSize);
 }
 
+StreamType BlockPriorityStreamPolicy::GetStreamTypeForMessage(MessageType msgType) const
+{
+    if(msgType == MessageType::BLOCK || msgType == MessageType::PING)
+    {
+        // Block & ping messages are sent over DATA1
+        return StreamType::DATA1;
+    }
+
+    return StreamType::GENERAL;
+}
+

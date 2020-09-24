@@ -24,6 +24,11 @@ class StreamPolicy
 {
   public:
 
+    // Enumerate high level message categories.
+    // If you extend the number of high level categories, don't forget to also
+    // update the implementations of GetStreamType()
+    enum class MessageType { BLOCK, PING, OTHER };
+
     virtual ~StreamPolicy() = default;
 
     // Return the policy name
@@ -46,6 +51,8 @@ class StreamPolicy
                                  std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
                                  uint64_t nPayloadLength, uint64_t nTotalSize) = 0;
 
+    // Get the stream type the given message category is sent over
+    virtual StreamType GetStreamTypeForMessage(MessageType msgType) const = 0;
 };
 using StreamPolicyPtr = std::shared_ptr<StreamPolicy>;
 
@@ -104,6 +111,9 @@ class DefaultStreamPolicy : public BasicStreamPolicy
     uint64_t PushMessage(StreamMap& streams, StreamType streamType,
                          std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
                          uint64_t nPayloadLength, uint64_t nTotalSize) override;
+
+    // Get the stream type the given message category is sent over
+    StreamType GetStreamTypeForMessage(MessageType msgType) const override { return StreamType::GENERAL; }
 };
 
 
@@ -143,5 +153,8 @@ class BlockPriorityStreamPolicy : public BasicStreamPolicy
     uint64_t PushMessage(StreamMap& streams, StreamType streamType,
                          std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg,
                          uint64_t nPayloadLength, uint64_t nTotalSize) override;
+
+    // Get the stream type the given message category is sent over
+    StreamType GetStreamTypeForMessage(MessageType msgType) const override;
 };
 
