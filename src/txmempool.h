@@ -598,6 +598,10 @@ public:
             size_t* pnDynamicMemoryUsage = nullptr);
 
 private:
+    // Check the contents of the mempool transaction database against the mempool.
+    // hardErrors=true means the implementation will assert() on error.
+    bool CheckMempoolTxDBNL(bool hardErrors = true) const;
+
     // walks through ancestors and collect all that are still in the secondary mempool
     // payingTx will be includes in this set also
     setEntriesTopoSorted GetSecondaryMempoolAncestorsNL(CTxMemPool::txiter payingTx) const;

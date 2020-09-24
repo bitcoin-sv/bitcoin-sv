@@ -34,6 +34,7 @@ public:
     auto& mapTx() { return mempool.mapTx; }
     auto& mapNextTx() { return mempool.mapNextTx; }
     auto& mapDeltas() { return mempool.mapDeltas; }
+    auto& mempoolTxDB() { return mempool.mempoolTxDB; }
 
     using txiter = CTxMemPool::txiter;
     using TxLinks = CTxMemPool::TxLinks;
@@ -69,6 +70,12 @@ public:
         return mempool.removeStagedNL(stage, changeSet, reason);
     }
 
+    bool CheckMempoolTxDB()
+    {
+        std::shared_lock lock(mempool.smtx);
+        return mempool.CheckMempoolTxDBNL(false);
+    }
+
     void SyncWithMempoolTxDB()
     {
         mempool.mempoolTxDB->Sync();
@@ -92,7 +99,7 @@ template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
     auto& group() {return entry.group;};
     auto& groupingData() {return entry.groupingData;};
 
-    CTransactionWrapperRef Wrapper() { return entry.tx; }
+    CTransactionWrapperRef& Wrapper() { return entry.tx; }
 };
 
 using CTestTxMemPoolEntry = CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>;

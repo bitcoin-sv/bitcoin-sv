@@ -363,6 +363,7 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
     // But it does store something to disk:
     const auto diskUsage = testPool.GetDiskUsage();
     BOOST_CHECK_GT(diskUsage, 0);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 
     // Check that all transactions have been saved to disk:
     uint64_t sizeTXsAdded = 0;
@@ -372,6 +373,7 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
         sizeTXsAdded += entry.GetTxSize();
     }
     BOOST_CHECK_EQUAL(diskUsage, sizeTXsAdded);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 }
 
 BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrim)
@@ -395,11 +397,62 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrim)
 
     // But it does store something to disk:
     BOOST_CHECK_GT(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 
     // Trimming the mempool size should also remove transactions from disk:
     testPool.TrimToSize(0, nullChangeSet);
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), 0);
     BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
+}
+
+BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
+{
+    constexpr auto numberOfEntries = 6;
+    const auto entries = GetABunchOfEntries(numberOfEntries);
+
+    CTxMemPool testPool;
+    CTxMemPoolTestAccess testPoolAccess(testPool);
+    testPool.InitMempoolTxDB();
+
+    // Add transactions to the database that are not in the mempool.
+    std::vector<CTransactionWrapperRef> wrappers;
+    for (const auto& entry : entries)
+    {
+        // Create a copy of the transaction wrapper because Add() marks them as saved.
+        wrappers.emplace_back(std::make_shared<CTransactionWrapper>(*CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(entry)).Wrapper()));
+    }
+    testPoolAccess.mempoolTxDB()->Add(std::move(wrappers));
+    testPoolAccess.SyncWithMempoolTxDB();
+    BOOST_CHECK_EQUAL(testPool.Size(), 0);
+    BOOST_CHECK_GT(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK(!testPoolAccess.CheckMempoolTxDB());
+
+    // Clearing the database should put everything right again.
+    testPoolAccess.mempoolTxDB()->Clear();
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
+
+    // Add transactions to the mempool and mark them saved without writing to disk.
+    for (auto& entry : entries)
+    {
+        testPool.AddUnchecked(entry.GetTxId(), entry, nullChangeSet);
+        auto it = testPoolAccess.mapTx().find(entry.GetTxId());
+        BOOST_REQUIRE(it != testPoolAccess.mapTx().end());
+        CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()->UpdateTxMovedToDisk();
+        BOOST_CHECK(entry.IsInMemory());
+        BOOST_CHECK(!it->IsInMemory());
+    }
+    testPoolAccess.SyncWithMempoolTxDB();
+    BOOST_CHECK_EQUAL(testPool.Size(), numberOfEntries);
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK(!testPoolAccess.CheckMempoolTxDB());
+
+    // Clearing the mempool should put everything right again.
+    testPool.Clear();
+    BOOST_CHECK_EQUAL(testPool.Size(), 0);
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 }
 BOOST_AUTO_TEST_SUITE_END()

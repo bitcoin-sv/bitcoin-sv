@@ -1396,6 +1396,41 @@ void CTxMemPool::CheckMempoolImplNL(
         std::string journalResult { checkJournalNL() };
         assert(journalResult.empty());
     }
+
+    // Check the mempool transaction database.
+    assert(CheckMempoolTxDBNL());
+}
+
+bool CTxMemPool::CheckMempoolTxDBNL(bool hardErrors) const
+{
+#define ASSERT_OR_FAIL(condition)               \
+    do {                                        \
+        if (!(condition)) {                     \
+            if (hardErrors) {                   \
+                assert(condition);              \
+            }                                   \
+            return false;                       \
+        }                                       \
+    } while(0)
+
+    mempoolTxDB->Sync();
+    auto keys = mempoolTxDB->GetTxKeys();
+    for (auto& e : mapTx)
+    {
+        auto key = keys.find(e.GetTxId());
+        if (e.IsInMemory())
+        {
+            ASSERT_OR_FAIL(key == keys.end());
+        }
+        else
+        {
+            ASSERT_OR_FAIL(key != keys.end());
+            keys.erase(key);
+        }
+    }
+    ASSERT_OR_FAIL(keys.size() == 0);
+    return true;
+#undef ASSERT_OR_FAIL
 }
 
 std::string CTxMemPool::CheckJournal() const {
