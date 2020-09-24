@@ -593,8 +593,8 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
         LOCK(cs_main);
         std::shared_lock lock(mempool.smtx);
 
-        CCoinsView viewDummy;
-        CCoinsViewCache view(&viewDummy);
+        CCoinsViewEmpty dummy;
+        CCoinsViewCache view(&dummy);
 
         CCoinsViewCache &viewChain = *pcoinsTip;
         CCoinsViewMemPool viewMempool(&viewChain, mempool);

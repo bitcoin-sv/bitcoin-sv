@@ -197,15 +197,15 @@ std::optional<bool> AreInputsStandard(
     }
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
-        const CTxOut &prev = mapInputs.GetOutputFor(tx.vin[i]);
-        const Coin& coin = mapInputs.AccessCoin(tx.vin[i].prevout);
+        const Coin& prev = mapInputs.AccessCoin(tx.vin[i].prevout);
+        assert(!prev.IsSpent());
 
         std::vector<std::vector<uint8_t>> vSolutions;
         txnouttype whichType;
         // get the scriptPubKey corresponding to this input:
-        const CScript &prevScript = prev.scriptPubKey;
+        const CScript &prevScript = prev.GetTxOut().scriptPubKey;
         
-        if (!Solver(prevScript, IsGenesisEnabled(config, coin, mempoolHeight),
+        if (!Solver(prevScript, IsGenesisEnabled(config, prev, mempoolHeight),
                     whichType, vSolutions)) {
             return false;
         }

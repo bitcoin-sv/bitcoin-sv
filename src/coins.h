@@ -145,38 +145,53 @@ private:
 class CCoinsView {
 public:
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
-    virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
+    virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const = 0;
 
     //! Just check whether we have data for a given outpoint.
     //! This may (but cannot always) return true for spent outputs.
-    virtual bool HaveCoin(const COutPoint &outpoint) const;
+    virtual bool HaveCoin(const COutPoint &outpoint) const = 0;
 
     //! Retrieve the block hash whose state this CCoinsView currently represents
-    virtual uint256 GetBestBlock() const;
+    virtual uint256 GetBestBlock() const = 0;
 
     //! Retrieve the range of blocks that may have been only partially written.
     //! If the database is in a consistent state, the result is the empty
     //! vector.
     //! Otherwise, a two-element vector is returned consisting of the new and
     //! the old block hash, in that order.
-    virtual std::vector<uint256> GetHeadBlocks() const;
+    virtual std::vector<uint256> GetHeadBlocks() const = 0;
 
     //! Do a bulk modification (multiple Coin changes + BestBlock change).
     //! The passed mapCoins can be modified.
-    virtual bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
+    virtual bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) = 0;
 
     //! Get a cursor to iterate over the whole state
-    virtual CCoinsViewCursor *Cursor() const;
+    virtual CCoinsViewCursor *Cursor() const = 0;
 
     //! Get a cursor to iterate over coins by txId. Cursor is positioned at the first key in the source that is at or past target.
     //! If coin with txId is not found then cursor is at position at first record after txId - source is sorted by txId
-    virtual CCoinsViewCursor* Cursor(const TxId& txId) const;
+    virtual CCoinsViewCursor* Cursor(const TxId& txId) const = 0;
 
     //! As we use CCoinsViews polymorphically, have a virtual destructor
-    virtual ~CCoinsView() {}
+    virtual ~CCoinsView() = default;
 
     //! Estimate database size (0 if not implemented)
-    virtual size_t EstimateSize() const { return 0; }
+    virtual size_t EstimateSize() const = 0;
+};
+
+
+/** Coins provider that never contains coins - dummy. */
+class CCoinsViewEmpty : public CCoinsView
+{
+public:
+    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override { return false; }
+    bool HaveCoin(const COutPoint &outpoint) const override { return false; }
+    uint256 GetBestBlock() const override { return {}; }
+    std::vector<uint256> GetHeadBlocks() const override { return {}; }
+    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override { return false; }
+    CCoinsViewCursor *Cursor() const override { return nullptr; }
+    CCoinsViewCursor* Cursor(const TxId& txId) const override { return nullptr; }
+    size_t EstimateSize() const override { return 0; }
 };
 
 /** CCoinsView backed by another CCoinsView */
@@ -266,12 +281,6 @@ public:
     bool Flush();
 
     /**
-     * Removes the UTXO with the given outpoint from the cache, if it is not
-     * modified.
-     */
-    void Uncache(const COutPoint &outpoint);
-
-    /**
      * Removes UTXOs with the given outpoints from the cache.
      */
     void Uncache(const std::vector<COutPoint>& vOutpoints);
@@ -308,19 +317,16 @@ public:
     double GetPriority(const CTransaction &tx, int32_t nHeight,
                        Amount &inChainInputValue) const;
 
-    const CTxOut &GetOutputFor(const CTxIn &input) const;
+    //! Get any unspent output with a given txid.
+    Coin GetCoinByTxId(const TxId &txid) const;
 
 private:
     // A non-locking version of AccessCoin
     const Coin &AccessCoinNL(const COutPoint &output) const;
-    // A non-locking version of GetOutputFor
-    const CTxOut &GetOutputForNL(const CTxIn &input) const;
     // A non-locking version of HaveCoin
     bool HaveCoinNL(const COutPoint &outpoint) const;
     // A non-locking fetch coin
     CCoinsMap::iterator FetchCoinNL(const COutPoint &outpoint) const;
-    // A non-locking version of Uncache
-    void UncacheNL(const COutPoint &outpoint);
 
     /**
      * By making the copy constructor private, we prevent accidentally using it
@@ -342,8 +348,5 @@ private:
 // (pre-BIP34) cases.
 void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, int32_t genesisActivationHeight,
               bool check = false);
-
-//! Utility function to find any unspent output with a given txid.
-const Coin AccessByTxid(const CCoinsViewCache &cache, const TxId &txid);
 
 #endif // BITCOIN_COINS_H

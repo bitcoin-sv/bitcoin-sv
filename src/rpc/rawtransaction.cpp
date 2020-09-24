@@ -295,10 +295,8 @@ static CBlockIndex* GetBlockIndex(const Config& config,
         // Try to find a block containing at least one requested transaction with utxo
         for (const TxId& txid : setTxIds)
         {
-            const Coin& coin = AccessByTxid(*pcoinsTip, txid);
-            if (!coin.IsSpent())
-            {
-                LOCK(cs_main);
+            Coin coin = pcoinsTip->GetCoinByTxId(txid);
+            if (!coin.IsSpent()) {
                 pblockindex = chainActive[coin.GetHeight()];
                 break;
             }
@@ -932,8 +930,8 @@ static UniValue signrawtransaction(const Config &config,
     CMutableTransaction mergedTx(txVariants[0]);
 
     // Fetch previous transactions (inputs):
-    CCoinsView viewDummy;
-    CCoinsViewCache view(&viewDummy);
+    CCoinsViewEmpty dummy;
+    CCoinsViewCache view(&dummy);
     {
         std::shared_lock lock(mempool.smtx);
         CCoinsViewCache &viewChain = *pcoinsTip;
@@ -947,7 +945,7 @@ static UniValue signrawtransaction(const Config &config,
         }
 
         // Switch back to avoid locking mempool for too long.
-        view.SetBackend(viewDummy);
+        view.SetBackend(dummy);
     }
 
     bool fGivenKeys = false;

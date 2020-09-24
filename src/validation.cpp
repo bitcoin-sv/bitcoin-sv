@@ -1203,7 +1203,7 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
 
-    CCoinsView dummy;
+    CCoinsViewEmpty dummy;
     CCoinsViewCache view(&dummy);
     Amount nValueIn(0);
     LockPoints lp;
@@ -2248,7 +2248,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
 
     // use coin database to locate block that contains transaction, and scan it
     if (fAllowSlow) {
-        const Coin &coin = AccessByTxid(*pcoinsTip, txid);
+        Coin coin = pcoinsTip->GetCoinByTxId(txid);
         if (!coin.IsSpent()) {
             pindexSlow = chainActive[coin.GetHeight()];
         }
@@ -3303,7 +3303,7 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
         // this information only in undo records for the last spend of a
         // transactions' outputs. This implies that it must be present for some
         // other output of the same tx.
-        const Coin &alternate = AccessByTxid(view, out.GetTxId());
+        Coin alternate = view.GetCoinByTxId(out.GetTxId());
         if (alternate.IsSpent()) {
             // Adding output for transaction without known metadata
             return DISCONNECT_FAILED;

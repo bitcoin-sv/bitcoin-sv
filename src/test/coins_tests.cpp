@@ -104,6 +104,11 @@ public:
         CCoinsViewCursorEmpty* cc = new CCoinsViewCursorEmpty(GetBestBlock());
         return cc;
     }
+
+    // dummy functions
+    std::vector<uint256> GetHeadBlocks() const override { return {}; }
+    CCoinsViewCursor* Cursor() const override { return nullptr; }
+    size_t EstimateSize() const override { return 0; }
 };
 
 class CCoinsViewCacheTest : public CCoinsViewCache {
@@ -181,7 +186,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test) {
             Coin &coin = result[COutPoint(txid, 0)];
             const Coin &entry =
                 (InsecureRandRange(500) == 0)
-                    ? AccessByTxid(*stack.back(), txid)
+                    ? stack.back()->GetCoinByTxId(txid)
                     : stack.back()->AccessCoin(COutPoint(txid, 0));
             BOOST_CHECK(coin == entry);
 
@@ -216,7 +221,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test) {
         if (InsecureRandRange(10)) {
             COutPoint out(txids[insecure_rand() % txids.size()], 0);
             int cacheid = insecure_rand() % stack.size();
-            stack[cacheid]->Uncache(out);
+            stack[cacheid]->Uncache({out});
             uncached_an_entry |= !stack[cacheid]->HaveCoinInCache(out);
         }
 
@@ -480,15 +485,15 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test) {
         // One every 10 iterations, remove a random entry from the cache
         if (utxoset.size() > 1 && InsecureRandRange(30)) {
             stack[insecure_rand() % stack.size()]->Uncache(
-                FindRandomFrom(utxoset)->first);
+                {FindRandomFrom(utxoset)->first});
         }
         if (disconnected_coins.size() > 1 && InsecureRandRange(30)) {
             stack[insecure_rand() % stack.size()]->Uncache(
-                FindRandomFrom(disconnected_coins)->first);
+                {FindRandomFrom(disconnected_coins)->first});
         }
         if (duplicate_coins.size() > 1 && InsecureRandRange(30)) {
             stack[insecure_rand() % stack.size()]->Uncache(
-                FindRandomFrom(duplicate_coins)->first);
+                {FindRandomFrom(duplicate_coins)->first});
         }
 
         if (InsecureRandRange(100) == 0) {
@@ -657,7 +662,7 @@ public:
             InsertCoinMapEntry(cache.map(), cache_value, cache_flags);
     }
 
-    CCoinsView root;
+    CCoinsViewEmpty root;
     CCoinsViewCacheTest base{&root};
     CCoinsViewCacheTest cache{&base};
 };

@@ -11,28 +11,6 @@
 #include <cassert>
 #include <config.h>
 
-bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    return false;
-}
-bool CCoinsView::HaveCoin(const COutPoint &outpoint) const {
-    return false;
-}
-uint256 CCoinsView::GetBestBlock() const {
-    return uint256();
-}
-std::vector<uint256> CCoinsView::GetHeadBlocks() const {
-    return std::vector<uint256>();
-}
-bool CCoinsView::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
-    return false;
-}
-CCoinsViewCursor *CCoinsView::Cursor() const {
-    return nullptr;
-}
-CCoinsViewCursor* CCoinsView::Cursor(const TxId &txId) const {
-    return nullptr;
-}
-
 CCoinsViewBacked::CCoinsViewBacked(CCoinsView *viewIn) : base(viewIn) {}
 bool CCoinsViewBacked::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     return base->GetCoin(outpoint, coin);
@@ -314,40 +292,20 @@ bool CCoinsViewCache::Flush() {
     return fOk;
 }
 
-void CCoinsViewCache::Uncache(const COutPoint &outpoint) {
-    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
-    UncacheNL(outpoint);
-}
-
-void CCoinsViewCache::UncacheNL(const COutPoint &outpoint) {
-    CCoinsMap::iterator it = cacheCoins.find(outpoint);
-    if (it != cacheCoins.end() && it->second.flags == 0) {
-        cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
-        cacheCoins.erase(it);
-    }
-}
-
 void CCoinsViewCache::Uncache(const std::vector<COutPoint>& vOutpoints) {
     std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     for (const COutPoint &outpoint : vOutpoints) {
-         UncacheNL(outpoint);
+        CCoinsMap::iterator it = cacheCoins.find(outpoint);
+        if (it != cacheCoins.end() && it->second.flags == 0) {
+            cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
+            cacheCoins.erase(it);
+        }
     }
 }
 
 unsigned int CCoinsViewCache::GetCacheSize() const {
     std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     return cacheCoins.size();
-}
-
-const CTxOut &CCoinsViewCache::GetOutputFor(const CTxIn &input) const {
-    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
-    return GetOutputForNL(input);
-}
-
-const CTxOut &CCoinsViewCache::GetOutputForNL(const CTxIn &input) const {
-    const Coin &coin = AccessCoinNL(input.prevout);
-    assert(!coin.IsSpent());
-    return coin.GetTxOut();
 }
 
 Amount CCoinsViewCache::GetValueIn(const CTransaction &tx) const {
@@ -359,7 +317,9 @@ Amount CCoinsViewCache::GetValueIn(const CTransaction &tx) const {
     {
         std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
         for (const auto& input: tx.vin) {
-            nResult += GetOutputForNL(input).nValue;
+            const Coin& coin = AccessCoinNL( input.prevout );
+            assert(!coin.IsSpent());
+            nResult += coin.GetTxOut().nValue;
         }
     }
     return nResult;
@@ -429,13 +389,13 @@ double CCoinsViewCache::GetPriority(const CTransaction &tx, int32_t nHeight,
 
 static const int MAX_VIEW_ITERATIONS = 100;
 
-const Coin AccessByTxid(const CCoinsViewCache& view, const TxId& txid)
+Coin CCoinsViewCache::GetCoinByTxId(const TxId& txid) const
 {
     // wtih MAX_VIEW_ITERATIONS we are avoiding for loop to MAX_OUTPUTS_PER_TX (in millions after genesis)
     // performance testing indicates that after 100 look up by cursor becomes faster
 
     for (int n = 0; n < MAX_VIEW_ITERATIONS; n++) {
-        const Coin& alternate = view.AccessCoin(COutPoint(txid, n));
+        const Coin& alternate = AccessCoin(COutPoint(txid, n));
         if (!alternate.IsSpent()) {
             return alternate;
         }
@@ -446,7 +406,7 @@ const Coin AccessByTxid(const CCoinsViewCache& view, const TxId& txid)
     COutPoint key;
     Coin coin;
 
-    std::unique_ptr<CCoinsViewCursor> cursor{ view.Cursor(txid) };
+    std::unique_ptr<CCoinsViewCursor> cursor{ Cursor(txid) };
 
     if (cursor->Valid())
     {
