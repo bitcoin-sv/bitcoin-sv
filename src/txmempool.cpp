@@ -1267,7 +1267,6 @@ void CTxMemPool::CheckMempoolImplNL(
         const auto tx = it->GetSharedTx();
         txlinksMap::const_iterator linksiter = mapLinks.find(it);
         assert(linksiter != mapLinks.end());
-        const TxLinks &links = linksiter->second;
         // FIXME: we are not implemented IncrementalDynamicMemoryUsage for unordered set. see: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
         //innerUsage += memusage::DynamicUsage(links.parents) +
         //              memusage::DynamicUsage(links.children);
@@ -2511,7 +2510,6 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
             GetDescendantsNL(baseTx, related);
         }
         else {
-            static constexpr auto noLimit = std::numeric_limits<uint64_t>::max();
             GetMemPoolAncestorsNL(baseTx, related);
         }
         // Quirks mode: GetDescendantsNL() and CalculateMemPoolAncestors()

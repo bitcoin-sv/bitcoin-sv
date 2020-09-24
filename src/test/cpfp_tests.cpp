@@ -86,7 +86,7 @@ std::vector<std::tuple<TxId, int, Amount>> MakeConfirmedInputs(size_t count, Amo
 {
     static uint16_t nextTxid = 1;
     std::vector<std::tuple<TxId, int, Amount>> inputs;
-    for( int i = 0; i < static_cast<int>(count); i++)
+    for (size_t i = 0; i < count; i++)
     {
         inputs.push_back(std::make_tuple(MakeId(nextTxid++), i, value));
     }
@@ -172,17 +172,16 @@ mining::CJournalPtr CheckMempoolRebuild(CTxMemPoolTestAccess& testAccess)
 
 BOOST_AUTO_TEST_CASE(group_forming_and_disbanding) 
 {
-    //          |                    |
-    //          |              entryNotPaying
-    //          |                    |
-    // entryNotPaying3   +---- entryPayForItself ----+
-    //          |        |           |               |
-    //     entryNotPaying4     entryPayForGroup   entryNotPaying2
-    //          |                    
-    //     entryPayingFor3And4
-    //
-    //  
-    //
+    //           |                  |
+    //           |            entryNotPaying
+    //           |                  |
+    //   entryNotPaying3    entryPayForItself
+    //           |            |     |    |
+    //           +------------+     |    +-------------+
+    //           |                  |                  |
+    //    entryNotPaying4    entryPayForGroup   entryNotPaying2
+    //           |
+    //  entryPayingFor3And4
     //
     //  entries in group1 (entering primary mempool): entryNotPaying, entryPayForItself and entryPayForGroup
     //  entries in group2 (entering primary mempool): entryNotPaying3, entryNotPaying4 and entryPayingFor3And4

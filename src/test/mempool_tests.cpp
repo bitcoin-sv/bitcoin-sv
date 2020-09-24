@@ -447,8 +447,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         BOOST_CHECK(!testPoolAccess.mapDeltas().count(txid));
     };
     // A lambda-helper to check if an entry was added to the mapDeltas.
-    const auto check_entry_added_to_mapdeltas = [&testPoolAccess](
-        const TxId& txid) {
+    const auto check_entry_added_to_mapdeltas = [&testPoolAccess](const TxId& txid) {
         BOOST_CHECK(testPoolAccess.mapDeltas().count(txid));
         BOOST_CHECK_EQUAL(testPoolAccess.mapDeltas()[txid].first, 0UL);
         BOOST_CHECK_EQUAL(testPoolAccess.mapDeltas()[txid].second, MAX_MONEY);

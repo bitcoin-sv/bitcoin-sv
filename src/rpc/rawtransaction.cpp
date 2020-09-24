@@ -270,7 +270,7 @@ static CBlockIndex* GetBlockIndex(const Config& config,
         bool allTxIdsFound = false;
         if (ReadBlockFromDisk(block, pblockindex, config))
         {
-            int numberOfTxIdsFound = 0;
+            auto numberOfTxIdsFound = decltype(setTxIds.size())(0);
             for (const auto &tx : block.vtx)
             {
                 if (setTxIds.find(tx->GetId()) != setTxIds.end())

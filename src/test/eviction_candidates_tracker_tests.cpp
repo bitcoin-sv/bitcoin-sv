@@ -22,14 +22,14 @@ CTxMemPoolEntry MakeEntry(
     CMutableTransaction tx;
     Amount totalInput;
     Amount totalInChainInput;
-    for(const auto[id, ndx, amount]: inChainInputs)
+    for(const auto& [id, ndx, amount]: inChainInputs)
     {
         tx.vin.push_back(CTxIn(id, ndx, CScript()));
         totalInput += amount;
         totalInChainInput += amount;
     }
 
-    for(const auto[txInput, ndx]: inMempoolInputs)
+    for(const auto& [txInput, ndx]: inMempoolInputs)
     {
         tx.vin.push_back(CTxIn(txInput->GetId(), ndx, CScript()));
         totalInput += txInput->vout[ndx].nValue;

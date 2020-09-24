@@ -645,7 +645,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_sync_api) {
     auto spendtx_nValue_OutOfRange = doubleSpend2Txns[0];
     spendtx_nValue_OutOfRange.vout[0].nValue = MAX_MONEY + Amount(1);
     BOOST_CHECK_EXCEPTION(
-        !MoneyRange(CTransaction(spendtx_nValue_OutOfRange).GetValueOut()),
+        MoneyRange(CTransaction(spendtx_nValue_OutOfRange).GetValueOut()),
         std::runtime_error,
         GetValueOutException);
     CValidationState result {};
@@ -679,7 +679,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
         auto doubleSpends10Txns_nValue_OutOfRange = doubleSpend10Txns;
         for (auto& spend: doubleSpends10Txns_nValue_OutOfRange) {
             spend.vout[0].nValue = MAX_MONEY + Amount(1);
-            BOOST_CHECK_EXCEPTION(!MoneyRange(CTransaction(spend).GetValueOut()), std::runtime_error, GetValueOutException);
+            BOOST_CHECK_EXCEPTION(MoneyRange(CTransaction(spend).GetValueOut()), std::runtime_error, GetValueOutException);
         }
         // Schedule txns for processing.
         txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, doubleSpends10Txns_nValue_OutOfRange));
