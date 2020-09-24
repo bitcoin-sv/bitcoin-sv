@@ -93,7 +93,7 @@ namespace {
 
 bool IsBlockDownloadStallingFromPeer(const CNodePtr& node, uint64_t& avgbw)
 {
-    avgbw = node->GetAssociation().GetAverageBandwidth();
+    avgbw = node->GetAssociation().GetAverageBandwidth(StreamPolicy::MessageType::BLOCK).first;
     int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
     minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
     return (avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000);
@@ -4300,7 +4300,7 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
             assert(stallerState);
             if (stallerState->nStallingSince == 0) {
                 stallerState->nStallingSince = GetTimeMicros();
-                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth() };
+                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth(StreamPolicy::MessageType::BLOCK).first };
                 LogPrint(BCLog::NET, "Stall started (current speed %d) peer=%d\n", avgbw, staller);
             }
         }

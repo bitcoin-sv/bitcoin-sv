@@ -789,6 +789,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                        "height in the main chain (default: %u)",
                                        DEFAULT_STOPATHEIGHT));
         strUsage += HelpMessageOpt(
+            "-streamsendratelimit=<n>",
+            strprintf(_("Specify stream sending bandwidth upper rate limit in bytes/sec. "
+                "A negative value means no limit. (default: %d)"),
+                Stream::DEFAULT_SEND_RATE_LIMIT));
+        strUsage += HelpMessageOpt(
             "-limitancestorcount=<n>",
             strprintf("Do not accept transactions if number of in-mempool "
                       "ancestors is <n> or more (default: %u)",

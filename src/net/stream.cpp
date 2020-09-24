@@ -45,6 +45,9 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
         mRecvBytesPerMsgCmd[msg] = 0;
     }
     mRecvBytesPerMsgCmd[NET_MESSAGE_COMMAND_OTHER] = 0;
+
+    // Remember any sending rate limit that's been set
+    mSendRateLimit = gArgs.GetArg("-streamsendratelimit", DEFAULT_SEND_RATE_LIMIT);
 }
 
 Stream::~Stream()
@@ -456,16 +459,30 @@ void Stream::GetNewMsgs()
 Stream::CSendResult Stream::SendMessage(CForwardAsyncReadonlyStream& data, uint64_t maxChunkSize)
 {
     AssertLockHeld(cs_mNode);
+    AssertLockHeld(cs_mSendMsgQueue);
 
-    if (maxChunkSize == 0)
+    if (maxChunkSize == 0 || mSendRateLimit >= 0)
     {   
-        // if maxChunkSize is 0 assign some default chunk size value
+        // If maxChunkSize is 0 or we're applying rate limiting for testing,
+        // assign some small default chunk size value
         maxChunkSize = 1024;
     }
     uint64_t sentSize = 0;
 
     do
-    {   
+    {
+        // See if we need to apply a sending rate limit
+        if(mSendRateLimit >= 0)
+        {
+            double timeSending { static_cast<double>(GetTimeMicros() - mSendStartTime) };
+            double avgBytesSec { (mTotalBytesSent / timeSending) * MICROS_PER_SECOND };
+            if(avgBytesSec >= mSendRateLimit)
+            {
+                // Don't send any more for now
+                return {false, sentSize};
+            }
+        }
+
         ssize_t nBytes = 0;
         if (!mSendChunk)
         {   

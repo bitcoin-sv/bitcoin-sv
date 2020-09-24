@@ -89,6 +89,7 @@ class Association
     // Get estimated average bandwidth from peer
     uint64_t GetAverageBandwidth() const;
     AverageBandwidth GetAverageBandwidth(const StreamType streamType) const;
+    AverageBandwidth GetAverageBandwidth(const StreamPolicy::MessageType msgType) const;
 
     // Add new message to our list for sending
     uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType streamType);
