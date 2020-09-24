@@ -61,7 +61,21 @@ CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
     : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true) {}
 
 bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    return db.Read(CoinEntry(&outpoint), coin);
+    try
+    {
+        return db.Read(CoinEntry(&outpoint), coin);
+    } catch (const std::runtime_error &e) {
+        uiInterface.ThreadSafeMessageBox(
+            _("Error reading from database, shutting down."), "",
+            CClientUIInterface::MSG_ERROR);
+        LogPrintf("Error reading from database: %s\n", e.what());
+        // Starting the shutdown sequence and returning false to the caller
+        // would be interpreted as 'entry not found' (as opposed to unable
+        // to read data), and could lead to invalid interpretation. Just
+        // exit immediately, as we can't continue anyway, and all writes
+        // should be atomic.
+        abort();
+    }
 }
 
 bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const {

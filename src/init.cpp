@@ -142,36 +142,7 @@ task::CCancellationToken GetShutdownToken()
     return shutdownSource->GetToken();
 }
 
-/**
- * This is a minimally invasive approach to shutdown on LevelDB read errors from
- * the chainstate, while keeping user interface out of the common library, which
- * is shared between bitcoind and non-server tools.
- */
-class CCoinsViewErrorCatcher final : public CCoinsViewBacked {
-public:
-    CCoinsViewErrorCatcher(CCoinsView *view) : CCoinsViewBacked(view) {}
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override {
-        try {
-            return CCoinsViewBacked::GetCoin(outpoint, coin);
-        } catch (const std::runtime_error &e) {
-            uiInterface.ThreadSafeMessageBox(
-                _("Error reading from database, shutting down."), "",
-                CClientUIInterface::MSG_ERROR);
-            LogPrintf("Error reading from database: %s\n", e.what());
-            // Starting the shutdown sequence and returning false to the caller
-            // would be interpreted as 'entry not found' (as opposed to unable
-            // to read data), and could lead to invalid interpretation. Just
-            // exit immediately, as we can't continue anyway, and all writes
-            // should be atomic.
-            abort();
-        }
-    }
-    // Writes do not need similar protection, as failure to write is handled by
-    // the caller.
-};
-
 static CCoinsViewDB *pcoinsdbview = nullptr;
-static CCoinsViewErrorCatcher *pcoinscatcher = nullptr;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(boost::thread_group &threadGroup) {
@@ -240,8 +211,6 @@ void Shutdown() {
         }
         delete pcoinsTip;
         pcoinsTip = nullptr;
-        delete pcoinscatcher;
-        pcoinscatcher = nullptr;
         delete pcoinsdbview;
         pcoinsdbview = nullptr;
         delete pblocktree;
@@ -2804,16 +2773,14 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 UnloadBlockIndex();
                 delete pcoinsTip;
                 delete pcoinsdbview;
-                delete pcoinscatcher;
                 delete pblocktree;
 
                 pblocktree =
                     new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false,
                                                 fReindex || fReindexChainState);
-                pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
-                
+
                 if (fReindex) {
                     pblocktree->WriteReindexing(true);
                     // If we're reindexing in prune mode, wipe away unusable
@@ -2874,7 +2841,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     break;
                 }
 
-                pcoinsTip = new CCoinsViewCache(pcoinscatcher);
+                pcoinsTip = new CCoinsViewCache(pcoinsdbview);
                 {
                     LOCK(cs_main);
                     LoadChainTip(chainparams);
