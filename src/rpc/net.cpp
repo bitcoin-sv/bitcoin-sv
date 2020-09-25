@@ -577,6 +577,7 @@ static UniValue getnetworkinfo(const Config &config,
 			    "0 disables consolidation transactions\n"
 			    "  \"maxconsolidationinputscriptsize\": xxxxx      (numeric) maximum input scriptSig size\n"
 			    "  \"minconfconsolidationinput\": xxxxx        (numeric) minimum number of confirmations for inputs spent\n"
+			    "  \"minconsolidationinputmaturity\": xxxxx    (numeric) minimum number of confirmations for inputs spent (DEPRECATED: use minconfconsolidationinput instead) \n"
 			    "  \"acceptnonstdconsolidationinput\": true|false  (boolean) true if non std inputs can be spent\n"
                             "  \"localaddresses\": [                    "
                             "(array) list of local addresses\n"
@@ -621,6 +622,7 @@ static UniValue getnetworkinfo(const Config &config,
     obj.push_back(Pair("minconsolidationfactor",  config.GetMinConsolidationFactor()));
     obj.push_back(Pair("maxconsolidationinputscriptsize",  config.GetMaxConsolidationInputScriptSize()));
     obj.push_back(Pair("minconfconsolidationinput",  config.GetMinConfConsolidationInput()));
+    obj.push_back(Pair("minconsolidationinputmaturity",  config.GetMinConfConsolidationInput()));
     obj.push_back(Pair("acceptnonstdconsolidationinput",  config.GetAcceptNonStdConsolidationInput()));
     UniValue localAddresses(UniValue::VARR);
     {

@@ -988,6 +988,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                      DEFAULT_MIN_CONF_CONSOLIDATION_INPUT));
 
     strUsage +=
+            HelpMessageOpt("-minconsolidationinputmaturity=<n>",
+                           strprintf(_("(DEPRECATED: This option will be removed, use -minconfconsolidationinput instead) Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
+                                     DEFAULT_MIN_CONF_CONSOLIDATION_INPUT));
+
+    strUsage +=
             HelpMessageOpt("-acceptnonstdconsolidationinput=<n>",
                            strprintf(_("Accept consolidation transactions spending non standard inputs (default: %u). "),
                                      DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT));
@@ -1959,12 +1964,22 @@ bool AppInitParameterInteraction(Config &config) {
     }
 
     // configure minimum number of confirmations needed by transactions spent in a consolidatin transaction
-    if (gArgs.IsArgSet("-minconfconsolidationinput"))
-    {
+    if (gArgs.IsArgSet("-minconfconsolidationinput") && gArgs.IsArgSet("-minconsolidationinputmaturity")) {
+        return InitError(
+            _("Cannot use both -minconfconsolidationinput and -minconsolidationinputmaturity (deprecated) at the same time"));
+    }
+    if (gArgs.IsArgSet("-minconfconsolidationinput")) {
         uint64_t param = gArgs.GetArg("-minconfconsolidationinput", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
         if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
             return InitError(err);
         }
+    }
+    if (gArgs.IsArgSet("-minconsolidationinputmaturity")) {
+        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
+            return InitError(err);
+        }
+        LogPrintf("Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead.\n");
     }
 
     // configure if non standard inputs for consolidation transactions are allowed
