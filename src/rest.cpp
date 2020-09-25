@@ -597,22 +597,40 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
     outs.reserve(vOutPoints.size()); // reserve space for max possible amount of coins
     std::string bitmapStringRepresentation( vOutPoints.size(), '0' );
 
+    auto handleUnspentCoin =
+        [&outs, &bitmapStringRepresentation, &bitmap]
+        (const CoinWithScript& coin, size_t idx)
+        {
+            outs.emplace_back( coin.MakeOwning() );
+            // form a binary string representation (human-readable
+            // for json output)
+            bitmapStringRepresentation[ idx ] = '1';
+            bitmap[idx / 8] |= (1 << (idx % 8));
+        };
+
     if( fCheckMemPool )
     {
         mempool.OnUnspentCoinsWithScript(
             CoinsDBView{ *pcoinsTip },
             vOutPoints,
-            [&outs, &bitmapStringRepresentation, &bitmap]
-            (const CoinWithScript& coin, size_t idx)
-            {
-                outs.emplace_back( coin.MakeOwning() );
-                // form a binary string representation (human-readable
-                // for json output)
-                bitmapStringRepresentation[ idx ] = '1';
-                bitmap[idx / 8] |= (1 << (idx % 8));
-            });
+            handleUnspentCoin);
     }
-    // FIXME implement proper db only support
+    else
+    {
+        CoinsDBView view{ *pcoinsTip };
+        std::size_t idx = 0;
+
+        for(const auto& out : vOutPoints)
+        {
+            if (auto coin = view.GetCoinWithScript( out );
+                coin.has_value() && !coin->IsSpent())
+            {
+                handleUnspentCoin( std::move( coin.value() ), idx );
+            }
+
+            ++idx;
+        }
+    }
 
     switch (rf) {
         case RF_BINARY: {
