@@ -98,6 +98,7 @@ BITCOIN_CORE_H = \
   compat/byteswap.h \
   compat/endian.h \
   compat/sanity.h \
+  compiler_warnings.h \
   compressor.h \
   config.h \
   consensus/consensus.h \

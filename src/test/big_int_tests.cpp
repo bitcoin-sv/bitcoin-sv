@@ -7,6 +7,7 @@
 #include <array>
 
 #include <boost/test/unit_test.hpp>
+#include "compiler_warnings.h"
 
 using namespace std;
 using bsv::bint;
@@ -129,7 +130,10 @@ BOOST_AUTO_TEST_CASE(move_assign)
 BOOST_AUTO_TEST_CASE(copy_assign)
 {
     bint a{1};
+    CLANG_WARNINGS_PUSH;
+    CLANG_WARNINGS_IGNORE(-Wself-assign-overloaded);
     a = a;
+    CLANG_WARNINGS_POP;
     BOOST_CHECK_EQUAL(a, 1);
 
     bint b{2};
