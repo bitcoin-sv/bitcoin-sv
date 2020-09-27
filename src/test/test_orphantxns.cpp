@@ -72,6 +72,7 @@ namespace {
                    MakeTransactionRef(tx), // a pointer to the tx
                    source,   // tx source
                    TxValidationPriority::normal, // tx validation priority
+                   TxStorage::memory, // tx storage
                    0,        // nAcceptTime
                    false,    // mfLimitFree
                    Amount(0), // nAbsurdFee

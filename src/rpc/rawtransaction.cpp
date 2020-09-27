@@ -1245,6 +1245,7 @@ static UniValue sendrawtransaction(const Config &config,
             std::move(tx),                  // a pointer to the tx
             TxSource::rpc,                  // tx source
             TxValidationPriority::normal,   // tx validation priority
+            TxStorage::memory,              // tx storage
             GetTime(),                      // nAcceptTime
             false,                          // fLimitFree
             nMaxRawTxFee);                 // nAbsurdFee
@@ -1530,6 +1531,7 @@ static UniValue sendrawtransactions(const Config &config,
                 std::move(tx),                  // a pointer to the tx
                 TxSource::rpc,                  // tx source
                 TxValidationPriority::normal,   // tx validation priority
+                TxStorage::memory,              // tx storage
                 GetTime(),                      // nAcceptTime
                 false,                          // fLimitFree
                 nMaxRawTxFee);                 // nAbsurdFee

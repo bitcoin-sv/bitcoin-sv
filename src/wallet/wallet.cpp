@@ -4581,6 +4581,7 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
             tx,           // a pointer to the tx
             TxSource::wallet, // tx source
             TxValidationPriority::normal, // tx validation priority
+            TxStorage::memory, // tx storage
             GetTime(),    // nAcceptTime
             true,         // fLimitFree
             nAbsurdFee),  // nAbsurdFee

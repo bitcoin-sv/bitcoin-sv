@@ -2621,6 +2621,7 @@ static void ProcessTxMessage(const Config& config,
                 std::move(ptx), // a pointer to the tx
                 TxSource::p2p,  // tx source
                 TxValidationPriority::high,  // tx validation priority
+                TxStorage::memory, // tx storage
                 GetTime(),      // nAcceptTime
                 true,           // fLimitFree
                 Amount(0),      // nAbsurdFee

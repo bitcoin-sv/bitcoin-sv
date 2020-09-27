@@ -238,6 +238,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                 MakeTransactionRef(tx),  // a pointer to the tx
                 TxSource::p2p, // tx source
                 TxValidationPriority::normal, // tx validation priority
+                TxStorage::memory, // tx storage
                 GetTime(),     // nAcceptTime
                 false,      // mfLimitFree
                 Amount(0),     // nAbsurdFee
@@ -273,6 +274,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                 MakeTransactionRef(tx),  // a pointer to the tx
                 TxSource::p2p, // tx source
                 TxValidationPriority::normal, // tx validation priority
+                TxStorage::memory, // tx storage
                 GetTime(),     // nAcceptTime
                 false, // mfLimitFree
                 Amount(0),     // nAbsurdFee
@@ -313,6 +315,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                 MakeTransactionRef(tx),  // a pointer to the tx
                 TxSource::p2p, // tx source
                 TxValidationPriority::normal, // tx validation priority
+                TxStorage::memory, // tx storage
                 GetTime(),     // nAcceptTime
                 false,         // mfLimitFree
                 Amount(0),     // nAbsurdFee

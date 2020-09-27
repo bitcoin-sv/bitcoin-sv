@@ -298,6 +298,7 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
                             tx,    // a pointer to the tx
                             TxSource::file, // tx source
                             standard ? TxValidationPriority::high : TxValidationPriority::low,
+                            TxStorage::memory, // tx storage
                             nTime, // nAcceptTime
                             true),  // fLimitFree
                         changeSet, // an instance of the mempool journal
@@ -570,6 +571,7 @@ void CTimeLockedMempool::periodicChecks()
                     txn,
                     TxSource::finalised,
                     standard ? TxValidationPriority::high : TxValidationPriority::low,
+                    TxStorage::memory,
                     GetTime()));
         }
         // Purge age passed?

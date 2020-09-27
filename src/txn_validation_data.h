@@ -31,6 +31,13 @@ enum class TxValidationPriority : int
 // Enable enum_cast for TxValidationPriority, so we can log informatively
 const enumTableT<TxValidationPriority>& enumTable(TxValidationPriority);
 
+// Describes the storage location of the original transaction.
+enum class TxStorage : bool
+{
+    memory = 1,         // The transaction exists only in memory
+    txdb = 0            // The transaction is stored in the mempoolTxDB
+};
+
 class CNode;
 
 /**
@@ -45,6 +52,7 @@ public:
         CTransactionRef ptx,
         TxSource txSource,
         TxValidationPriority txValidationPriority,
+        TxStorage txStorage=TxStorage::memory,
         int64_t nAcceptTime=0,
         bool fLimitFree=false,
         Amount nAbsurdFee=Amount(0),
@@ -73,6 +81,13 @@ public:
     }
     const Amount& GetAbsurdFee() const {
         return mnAbsurdFee;
+    }
+    // GetTxStorage
+    TxStorage& GetTxStorage() {
+        return mTxStorage;
+    }
+    const TxStorage& GetTxStorage() const {
+        return mTxStorage;
     }
     // GetAcceptTime
     int64_t& GetAcceptTime() {
@@ -134,6 +149,7 @@ private:
     CTransactionRef mpTx {nullptr};
     std::weak_ptr<CNode> mpNode {};
     TxIdTrackerWPtr mpTxIdTracker {};
+    TxStorage mTxStorage {TxStorage::memory};
     Amount mnAbsurdFee {0};
     int64_t mnAcceptTime {0};
     TxSource mTxSource {TxSource::unknown};

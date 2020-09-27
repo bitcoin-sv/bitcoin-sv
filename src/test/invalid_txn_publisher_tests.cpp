@@ -100,6 +100,7 @@ namespace
                     MakeTransactionRef(txn),
                     TxSource::p2p,
                     TxValidationPriority::normal,
+                    TxStorage::memory,
                     GetTime(),// nAcceptTime
                     false,    // mfLimitFree
                     Amount(0), // nAbsurdFee

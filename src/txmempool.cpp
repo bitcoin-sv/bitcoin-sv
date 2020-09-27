@@ -2053,6 +2053,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
                     *it,              // a pointer to the tx
                     TxSource::reorg,  // tx source
                     TxValidationPriority::normal,  // tx validation priority
+                    TxStorage::memory, // tx storage
                     GetTime(),        // nAcceptTime
                     false));          // fLimitFree
         }
@@ -2611,6 +2612,7 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
                             tx,    // a pointer to the tx
                             TxSource::file, // tx source
                             TxValidationPriority::normal,  // tx validation priority
+                            TxStorage::memory, // tx storage
                             nTime, // nAcceptTime
                             true),  // fLimitFree
                         changeSet, // an instance of the mempool journal
