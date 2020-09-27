@@ -537,7 +537,6 @@ private:
     void updateParentNL(txiter entry, txiter parent, bool add);
     void updateChildNL(txiter entry, txiter child, bool add);
 
-    std::vector<txiter> getSortedDepthAndScoreNL() const;
     std::map<COutPoint, const CTransactionWrapperRef> mapNextTx;
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
@@ -662,10 +661,6 @@ public:
             const mining::CJournalChangeSetPtr& changeSet);
 
     void Clear();
-
-    bool CompareDepthAndScore(
-            const uint256 &hasha,
-            const uint256 &hashb);
 
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
@@ -1078,11 +1073,6 @@ private:
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
-
-    // A non-locking version of CompareDepthAndScore
-    bool CompareDepthAndScoreNL(
-        const uint256 &hasha,
-        const uint256 &hashb);
 
     // A non-locking version of ApplyDeltas
     void ApplyDeltasNL(

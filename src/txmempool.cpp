@@ -1531,68 +1531,6 @@ void CTxMemPool::SetSanityCheck(double dFrequency) {
     nCheckFrequency = dFrequency * 4294967295.0;
 }
 
-/**
-* Compare 2 transactions to determine their relative priority.
-*/
-bool CTxMemPool::CompareDepthAndScore(const uint256 &hasha,
-                                      const uint256 &hashb)
-{
-    std::shared_lock lock(smtx);
-    return CompareDepthAndScoreNL(hasha, hashb);
-}
-
-namespace {
-    //TODO: probably not needed any more
-class DepthAndScoreComparator {
-public:
-    template<typename MempoolEntryIterator>
-    bool operator()(const MempoolEntryIterator& a,
-                    const MempoolEntryIterator& b) const
-    {
-        return compare(*a, *b);
-    }
-
-private:
-    static bool compare(const CTxMemPoolEntry& a,
-                        const CTxMemPoolEntry& b)
-    {
-        return CompareTxMemPoolEntryByScore()(a, b);
-    }
-};
-} // namespace
-
-/**
-* Compare 2 transactions to determine their relative priority.
-* Does it wothout taking the mutex; it is up to the caller to
-* ensure this is thread safe.
-*/
-bool CTxMemPool::CompareDepthAndScoreNL(const uint256 &hasha,
-                                        const uint256 &hashb)
-{
-    const auto i = mapTx.find(hasha);
-    if (i == mapTx.end()) {
-        return false;
-    }
-    const auto j = mapTx.find(hashb);
-    if (j == mapTx.end()) {
-        return true;
-    }
-    return DepthAndScoreComparator()(i, j);
-}
-
-std::vector<CTxMemPool::txiter>
-CTxMemPool::getSortedDepthAndScoreNL() const {
-    std::vector<txiter> iters;
-    iters.reserve(mapTx.size());
-    for (txiter mi = mapTx.begin(); mi != mapTx.end(); ++mi) {
-        iters.push_back(mi);
-    }
-
-    std::sort(iters.begin(), iters.end(), DepthAndScoreComparator());
-    return iters;
-}
-
-
 void CTxMemPool::InitMempoolTxDB() {
     static constexpr auto cacheSize = 1 << 20; /*TODO: remove constant*/
     std::call_once(db_initialized,
@@ -1637,13 +1575,12 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
 
 void CTxMemPool::QueryHashes(std::vector<uint256> &vtxid) {
     std::shared_lock lock(smtx);
-    auto iters = getSortedDepthAndScoreNL();
 
     vtxid.clear();
     vtxid.reserve(mapTx.size());
 
-    for (auto it : iters) {
-        vtxid.push_back(it->GetTxId());
+    for (const auto& entry : mapTx.get<insertion_order>()) {
+        vtxid.emplace_back(entry.GetTxId());
     }
 }
 
@@ -1653,11 +1590,10 @@ std::vector<TxMempoolInfo> CTxMemPool::InfoAll() const {
 }
 
 std::vector<TxMempoolInfo> CTxMemPool::InfoAllNL() const {
-    auto iters = getSortedDepthAndScoreNL();
     std::vector<TxMempoolInfo> ret;
     ret.reserve(mapTx.size());
-    for (auto it : iters) {
-        ret.push_back(TxMempoolInfo{*it});
+    for (const auto& entry : mapTx.get<insertion_order>()) {
+        ret.emplace_back(TxMempoolInfo{entry});
     }
     return ret;
 }
@@ -1787,8 +1723,8 @@ void CTxMemPool::GetDeltasAndInfo(std::map<uint256, Amount>& deltas,
 {
     deltas.clear();
     std::shared_lock lock {smtx};
-    for (const auto &i : mapDeltas) {
-        deltas[i.first] = i.second.second;
+    for (const auto &it : mapDeltas) {
+        deltas.emplace(it.first, it.second.second);
     }
     info = InfoAllNL();
 }
