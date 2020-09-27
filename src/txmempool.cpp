@@ -25,7 +25,6 @@
 
 using namespace mining;
 
-
     /**
      * Special mempool coins provider for internal CTxMemPool use where smtx
      * mutex is expected to be locked.
@@ -105,57 +104,6 @@ CTxPrioritizer::~CTxPrioritizer()
     } catch (...) {
         LogPrint(BCLog::MEMPOOL, "~CTxPrioritizer: Unexpected exception during destruction.\n");
     }
-}
-
-/**
- * class CTransactionWrapper
- */
-CTransactionWrapper::CTransactionWrapper()
-{
-}
-
-CTransactionWrapper::CTransactionWrapper(const CTransactionRef &_tx,
-                                         const std::shared_ptr<CMempoolTxDBReader>& txDB)
-    : tx{_tx},
-      txid{_tx->GetId()},
-      mempoolTxDB{txDB}
-{
-}
-
-CTransactionRef CTransactionWrapper::GetTxFromDB() const {
-    CTransactionRef tmp;
-    if (mempoolTxDB != nullptr) {
-        mempoolTxDB->GetTransaction(txid, tmp);
-        std::atomic_store(&tx, tmp);
-    }
-    return tmp;
-}
-
-
-const TxId& CTransactionWrapper::GetId() const {
-    return txid;
-}
-
-CTransactionRef CTransactionWrapper::GetTx() const {
-    CTransactionRef tmp = std::atomic_load(&tx);
-    if (tmp != nullptr) {
-        return tmp;
-    }
-    return GetTxFromDB();
-}
-
-void CTransactionWrapper::UpdateTxMovedToDisk() const {
-    std::atomic_store(&tx, CTransactionRef(nullptr));
-}
-
-bool CTransactionWrapper::IsInMemory() const
-{
-    return std::atomic_load(&tx) != nullptr;
-}
-
-bool CTransactionWrapper::HasDatabase(const std::shared_ptr<CMempoolTxDBReader>& txDB) const noexcept
-{
-    return mempoolTxDB == txDB;
 }
 
 /**
@@ -2611,10 +2559,10 @@ void CTxMemPool::DumpMempool(void) {
 
         file << (uint64_t)vinfo.size();
         for (const auto &i : vinfo) {
-            file << *(i.tx);
+            file << *(i.GetTx());
             file << (int64_t)i.nTime;
             file << (int64_t)i.nFeeDelta.GetSatoshis();
-            mapDeltas.erase(i.tx->GetId());
+            mapDeltas.erase(i.GetTxId());
         }
 
         file << mapDeltas;

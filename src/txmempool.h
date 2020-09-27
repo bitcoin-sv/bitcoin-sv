@@ -32,7 +32,6 @@
 #include <vector>
 #include <mutex>
 #include <shared_mutex>
-#include <thread>
 #include <unordered_map>
 
 class CAutoFile;
@@ -41,8 +40,6 @@ class CEvictionCandidateTracker;
 class Config;
 class CoinsDB;
 class CoinsDBView;
-class CMempoolTxDBReader;
-class CMempoolTxDB;
 class CAsyncMempoolTxDB;
 
 inline double AllowFreeThreshold() {
@@ -140,32 +137,6 @@ public:
  */
 using GroupID = std::optional<TxId>;
 
-class CTransactionWrapper {
-private:
-    mutable CTransactionRef tx {nullptr};
-    // Transaction Id
-    TxId txid {};
-    // Mempool Transaction database
-    std::shared_ptr<CMempoolTxDBReader> mempoolTxDB {nullptr};
-
-    CTransactionRef GetTxFromDB() const;
-
-public:
-    CTransactionWrapper();
-    CTransactionWrapper(const CTransactionRef &tx,
-                        const std::shared_ptr<CMempoolTxDBReader>& txDB);
-
-    CTransactionRef GetTx() const;
-    const TxId& GetId() const;
-
-    void UpdateTxMovedToDisk() const;
-    bool IsInMemory() const;
-
-    bool HasDatabase(const std::shared_ptr<CMempoolTxDBReader>& txDB) const noexcept;
-};
-
-using CTransactionWrapperRef = std::shared_ptr<CTransactionWrapper>;
-
 /** \class CTxMemPoolEntry
  *
  * CTxMemPoolEntry stores data about the corresponding transaction.
@@ -183,6 +154,9 @@ using CTransactionWrapperRef = std::shared_ptr<CTransactionWrapper>;
 class CTxMemPoolEntry {
 private:
     CTransactionWrapperRef tx;
+    // The mempool info constructor needs access to the wrapper reference.
+    friend TxMempoolInfo::TxMempoolInfo(const CTxMemPoolEntry&);
+
     //!< Cached to avoid expensive parent-transaction lookups
     Amount nFee;
     //!< ... and avoid recomputing tx size

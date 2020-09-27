@@ -28,7 +28,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(
     const TxInputDataSPtr& pTxInputData,
     CValidationState& state)
 {
-    const CTransactionRef& txn { info.tx };
+    CTransactionRef txn { info.GetTx() };
 
     std::unique_lock lock { mMtx };
 
@@ -91,7 +91,7 @@ std::vector<TxId> CTimeLockedMempool::getTxnIDs() const
     std::shared_lock lock { mMtx };
     for(const auto& info : mTransactionMap.get<TagTxID>())
     {
-        res.emplace_back(info.tx->GetId());
+        res.emplace_back(info.GetTxId());
     }
 
     return res;
@@ -227,7 +227,7 @@ void CTimeLockedMempool::dumpMempool() const
 
         for(const auto& details : index)
         {
-            file << *(details.tx);
+            file << *(details.GetTx());
             file << details.nTime;
         }
 
@@ -387,7 +387,7 @@ std::set<CTransactionRef> CTimeLockedMempool::getTransactionsUpdatedByNL(const C
 // Insert a new transaction
 void CTimeLockedMempool::insertNL(const TxMempoolInfo& info, CValidationState& state)
 {
-    const CTransactionRef& txn { info.tx };
+    CTransactionRef txn { info.GetTx() };
 
     // Put new txn in the main index
     auto& index { mTransactionMap.get<TagTxID>() };
@@ -547,7 +547,7 @@ void CTimeLockedMempool::periodicChecks()
     auto it { index.begin() };
     while(it != index.end())
     {
-        CTransactionRef txn { it->tx };
+        CTransactionRef txn { it->GetTx() };
         int64_t insertionTime { it->nTime };
         int64_t timeInPool { now - insertionTime };
 

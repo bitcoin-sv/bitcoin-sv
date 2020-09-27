@@ -1316,7 +1316,7 @@ static UniValue sendrawtransaction(const Config &config,
     // - block was mined
     // - the Validator's asynch mode removed the txn (and triggered reject msg)
     // - this txn is final version of timelocked txn and is still being validated
-    if (txinfo.tx != nullptr){
+    if (!txinfo.IsNull()){
         g_connman->EnqueueTransaction({ inv, txinfo });
     }
 
@@ -1593,7 +1593,7 @@ static UniValue sendrawtransactions(const Config &config,
             // It is possible that txn was added and removed from the mempool, because:
             // - a block was mined
             // - PTV's asynch mode removed txn(s)
-            if (txinfo.tx != nullptr){
+            if (txinfo.GetTx() != nullptr){
                 g_connman->EnqueueTransaction({ inv, txinfo });
             }
             LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",

@@ -6,7 +6,7 @@
 #define BITCOIN_MEMPOOLTXDB_H
 
 #include "dbwrapper.h"
-#include "primitives/transaction.h"
+#include "tx_mempool_info.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -95,8 +95,6 @@ public:
     TxIdSet GetKeys();
 };
 
-class CTransactionWrapper;
-using CTransactionWrapperRef = std::shared_ptr<CTransactionWrapper>;
 
 /** Wrapper for CMempoolTxDB for asynchronous writes and deletes. */
 class CAsyncMempoolTxDB
