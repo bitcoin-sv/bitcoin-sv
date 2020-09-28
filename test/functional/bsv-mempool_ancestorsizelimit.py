@@ -93,6 +93,9 @@ class MempoolSizeLimitTest(BitcoinTestFramework):
         assert_equal(rejected_txs[0].data, tx.sha256)
         assert_equal(rejected_txs[0].reason, b'too-long-mempool-chain')
 
+        # mine transactions to clear the mempool for the next batch of transactions
+        self.nodes[0].generate(1)
+
         ######################################
         # 2. Test descendant chain size limit.
         send_value = 10000
@@ -106,6 +109,7 @@ class MempoolSizeLimitTest(BitcoinTestFramework):
         ftx.rehash()
         descendantsSize = len(ftxHex)/2
         connection.send_message(msg_tx(ftx))
+        sentTransactions = 1
 
         utxos = []
         for i in range(10):
@@ -119,6 +123,7 @@ class MempoolSizeLimitTest(BitcoinTestFramework):
         for i in range(MAX_DESCENDANTS):
             utxo = utxos.pop(0)
             (tx, sent_value, txSize) = self.chain_transaction(self.nodes[0], utxo['txid'], utxo['vout'], utxo['amount'], 1, connection)
+            sentTransactions += 1
             descendantsSize = descendantsSize + txSize
             chain_of_descendant_txns.append(tx.sha256)
             # Check if next sent transaction will cause too many descendants in a mempool.
@@ -128,7 +133,7 @@ class MempoolSizeLimitTest(BitcoinTestFramework):
                 utxo = utxos.pop(0)
                 connection.clear_messages()
                 # Check if there is an expected number of transactions in the mempool.
-                wait_until(lambda: len(self.nodes[0].getrawmempool()) == i, timeout=1)
+                wait_until(lambda: len(self.nodes[0].getrawmempool()) == sentTransactions, timeout=1)
                 (tx, sent_value, txSize) = self.chain_transaction(self.nodes[0], utxo['txid'], utxo['vout'], utxo['amount'], 1, connection)
                 chain_of_descendant_txns.append(tx.sha256)
                 connection.wait_for_reject()
