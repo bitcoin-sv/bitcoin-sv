@@ -2844,7 +2844,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     break;
                 }
 
-                if (!ReplayBlocks(config, pcoinsTip)) {
+                if (!ReplayBlocks(config, *pcoinsTip)) {
                     strLoadError =
                         _("Unable to replay blocks. You will need to rebuild "
                           "the database using -reindex-chainstate.");
@@ -2894,7 +2894,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 }
 
                 if (!CVerifyDB().VerifyDB(
-                        config, pcoinsTip,
+                        config, *pcoinsTip,
                         gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS),
                         shutdownToken)) {

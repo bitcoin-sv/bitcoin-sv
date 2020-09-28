@@ -618,7 +618,7 @@ public:
      * If sanity-checking is turned off, check does nothing.
      */
     void CheckMempool(
-        CoinsDB* pcoins,
+        CoinsDB& db,
         const mining::CJournalChangeSetPtr& changeSet) const;
 
     std::string CheckJournal() const;

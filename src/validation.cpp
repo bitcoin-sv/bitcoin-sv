@@ -2063,7 +2063,7 @@ static void PostValidationStepsForP2PTxn(
         // Finalising txns have another round of validation before making it into the
         // mempool, hold off relaying them until that has completed.
         if(pool.Exists(ptx->GetId()) || pool.getNonFinalPool().exists(ptx->GetId())) {
-            pool.CheckMempool(pcoinsTip, handlers.mJournalChangeSet);
+            pool.CheckMempool(*pcoinsTip, handlers.mJournalChangeSet);
             RelayTransaction(*ptx, *g_connman);
         }
         pNode->nLastTXTime = GetTime();
@@ -2098,7 +2098,7 @@ static void PostValidationStepsForFinalisedTxn(
 
     if(state.IsValid())
     {
-        pool.CheckMempool(pcoinsTip, handlers.mJournalChangeSet);
+        pool.CheckMempool(*pcoinsTip, handlers.mJournalChangeSet);
         RelayTransaction(*ptx, *g_connman);
     }
 }
@@ -4706,7 +4706,7 @@ static bool ActivateBestChainStep(
         {
             changeSet->apply();
         }
-        mempool.CheckMempool(pcoinsTip, changeSet);
+        mempool.CheckMempool(*pcoinsTip, changeSet);
     }
     catch(...) {
         // We were probably cancelled. Make the mempool consistent with the current tip.
@@ -5146,7 +5146,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     }
 
     // Check mempool & journal
-    mempool.CheckMempool(pcoinsTip, changeSet);
+    mempool.CheckMempool(*pcoinsTip, changeSet);
 
     return true;
 }
@@ -6203,7 +6203,6 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
                      state.GetRejectReason().c_str());
     }
 
-
     CoinsDBView view{ *pcoinsTip };
     CCoinsViewCache viewNew{ view };
     CBlockIndex indexDummy(block);
@@ -6513,7 +6512,7 @@ CVerifyDB::~CVerifyDB() {
     uiInterface.ShowProgress("", 100);
 }
 
-bool CVerifyDB::VerifyDB(const Config &config, CoinsDB *coinsview,
+bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                          int nCheckLevel, int nCheckDepth, const task::CCancellationToken& shutdownToken) {
     LOCK(cs_main);
     if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr) {
@@ -6534,7 +6533,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB *coinsview,
     LogPrintf("Verifying last %i blocks at level %i\n", nCheckDepth,
               nCheckLevel);
 
-    CoinsDBView view{ *coinsview };
+    CoinsDBView view{ coinsview };
     CCoinsViewCache coins{ view };
     CBlockIndex *pindexState = chainActive.Tip();
     CBlockIndex *pindexFailure = nullptr;
@@ -6711,10 +6710,10 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
     return true;
 }
 
-bool ReplayBlocks(const Config &config, CoinsDB *view) {
+bool ReplayBlocks(const Config &config, CoinsDB& view) {
     LOCK(cs_main);
 
-    CoinsDBSpan cache( *view );
+    CoinsDBSpan cache( view );
 
     std::vector<uint256> hashHeads = cache.GetHeadBlocks();
     if (hashHeads.empty()) {

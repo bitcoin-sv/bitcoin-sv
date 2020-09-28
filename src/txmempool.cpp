@@ -1010,7 +1010,7 @@ void CTxMemPool::Clear() {
 }
 
 void CTxMemPool::CheckMempool(
-    CoinsDB* pcoins,
+    CoinsDB& db,
     const mining::CJournalChangeSetPtr& changeSet) const {
 
     if (nCheckFrequency == 0) {
@@ -1020,7 +1020,7 @@ void CTxMemPool::CheckMempool(
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency) {
         return;
     }
-    CoinsDBView view{ *pcoins };
+    CoinsDBView view{ db };
     CCoinsViewCache mempoolDuplicate{view};
 
     // Get spend height and MTP

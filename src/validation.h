@@ -1025,12 +1025,12 @@ class CVerifyDB {
 public:
     CVerifyDB();
     ~CVerifyDB();
-    bool VerifyDB(const Config &config, CoinsDB *coinsview, int nCheckLevel,
+    bool VerifyDB(const Config &config, CoinsDB& db, int nCheckLevel,
                   int nCheckDepth, const task::CCancellationToken& shutdownToken);
 };
 
 /** Replay blocks that aren't fully applied to the database. */
-bool ReplayBlocks(const Config &config, CoinsDB *view);
+bool ReplayBlocks(const Config &config, CoinsDB& view);
 
 /** Find the last common block between the parameter chain and a locator. */
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
