@@ -98,6 +98,7 @@ public:
 private:
     CCoinsViewDBCursor(CDBIterator *pcursorIn, const uint256 &hashBlockIn)
         : CCoinsViewCursor(hashBlockIn), pcursor(pcursorIn) {}
+    std::optional<CoinImpl> GetCoin(uint64_t maxScriptSize) const;
     std::unique_ptr<CDBIterator> pcursor;
     std::pair<char, COutPoint> keyTmp;
 

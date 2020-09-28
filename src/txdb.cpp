@@ -344,10 +344,35 @@ bool CCoinsViewDBCursor::GetKey(COutPoint &key) const {
     return false;
 }
 
-bool CCoinsViewDBCursor::GetValue(Coin &coin) const {
-    if(CoinImpl tmp; pcursor->GetValue(tmp)) // TODO limit read size
+std::optional<CoinImpl> CCoinsViewDBCursor::GetCoin(uint64_t maxScriptSize) const {
+    std::optional<CoinImpl> coin{ CoinImpl{} };
+    // If script is not unserialized, this will be set to the actual size of the script.
+    // Otherwise (i.e. if script is unserialized), value will remain unset.
+    std::optional<std::size_t> actualScriptSize;
+    bool res = pcursor->GetValue<CDataStreamInput_NoScr>(coin.value(), maxScriptSize, actualScriptSize);
+    if( res )
     {
-        coin = Coin{tmp};
+        if(actualScriptSize.has_value())
+        {
+            // Script was not unserialized
+            return {
+                CoinImpl{
+                    coin->GetTxOut().nValue,
+                    *actualScriptSize,
+                    coin->GetHeight(),
+                    coin->IsCoinBase()}};
+        }
+
+        return coin;
+    }
+
+    return {};
+}
+
+bool CCoinsViewDBCursor::GetValue(Coin &coin) const {
+    if(auto tmp = GetCoin(0); tmp.has_value())
+    {
+        coin = Coin{tmp.value()};
 
         return true;
     }
@@ -356,9 +381,9 @@ bool CCoinsViewDBCursor::GetValue(Coin &coin) const {
 }
 
 bool CCoinsViewDBCursor::GetValue(CoinWithScript &coin) const {
-    if(CoinImpl tmp; pcursor->GetValue(tmp))
+    if(auto tmp = GetCoin(std::numeric_limits<uint64_t>::max()); tmp.has_value())
     {
-        coin = std::move(tmp);
+        coin = std::move(tmp.value());
 
         return true;
     }
