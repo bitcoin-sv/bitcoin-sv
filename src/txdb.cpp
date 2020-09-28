@@ -637,11 +637,6 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
     return cws.MakeNonOwning();
 }
 
-bool CoinsDB::HaveCoin(const COutPoint &outpoint) const {
-    auto coin = GetCoin(outpoint, 0);
-    return coin.has_value() && !coin->IsSpent();
-}
-
 bool CoinsDB::HaveCoinInCache(const COutPoint &outpoint) const {
     std::unique_lock lock { mCoinsViewCacheMtx };
     return mCache.FetchCoin(outpoint).has_value();

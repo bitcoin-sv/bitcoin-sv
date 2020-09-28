@@ -1070,7 +1070,6 @@ public:
     std::optional<Coin> GetCoinFromDB(const COutPoint& outpoint) const;
 
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override;
-    bool HaveCoin(const COutPoint &outpoint) const override;
 
 protected:
     uint256 GetBestBlock() const override;

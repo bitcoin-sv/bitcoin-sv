@@ -408,10 +408,6 @@ protected:
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
     virtual std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const = 0;
 
-    //! Just check whether we have data for a given outpoint.
-    //! This may (but cannot always) return true for spent outputs.
-    virtual bool HaveCoin(const COutPoint &outpoint) const = 0;
-
     //! Retrieve the block hash whose state this CCoinsProvider currently represents
     virtual uint256 GetBestBlock() const = 0;
 
@@ -428,7 +424,6 @@ class CCoinsViewEmpty : public ICoinsView
 {
 protected:
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override { return {}; }
-    bool HaveCoin(const COutPoint &outpoint) const override { return false; }
     uint256 GetBestBlock() const override { return {}; }
 
     void ReleaseLock() override {}

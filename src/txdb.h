@@ -156,8 +156,6 @@ public:
 
     /**
      * Check if we have the given utxo already loaded in this cache.
-     * The semantics are the same as HaveCoin(), but no calls to the backing
-     * CoinsDBView are made.
      */
     bool HaveCoinInCache(const COutPoint &outpoint) const;
 
@@ -214,7 +212,6 @@ private:
 
     // Standard CCoinsView methods
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
-    bool HaveCoin(const COutPoint &outpoint) const;
     std::optional<CoinImpl> DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
     uint256 DBGetBestBlock() const;
     std::vector<uint256> GetHeadBlocks() const;
@@ -313,7 +310,6 @@ public:
 
         return {};
     }
-    bool HaveCoin(const COutPoint& outpoint) const override { return mDB.GetCoin(outpoint, 0).has_value(); }
     uint256 GetBestBlock() const override { return mDB.GetBestBlock(); }
     std::vector<uint256> GetHeadBlocks() const { return mDB.GetHeadBlocks(); }
 

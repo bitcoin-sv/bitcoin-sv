@@ -53,11 +53,6 @@ using namespace mining;
             return mDBView.GetCoin(outpoint, maxScriptSize);
         }
 
-        bool HaveCoin(const COutPoint &outpoint) const override
-        {
-            return mempool.GetNL(outpoint.GetTxId()) || mDBView.HaveCoin(outpoint);
-        }
-
         std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
         {
             auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
@@ -1066,7 +1061,7 @@ void CTxMemPool::CheckMempool(
                     parentSigOpCount += it2->GetSigOpCount();
                 }
             } else {
-                assert(view.HaveCoin(txin.prevout));
+                assert(view.GetCoin(txin.prevout).has_value());
             }
             // Check whether its inputs are marked in mapNextTx.
             auto it3 = mapNextTx.find(txin.prevout);
@@ -1590,10 +1585,6 @@ std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, ui
     }
 
     return mDBView.GetCoin(outpoint, maxScriptSize);
-}
-
-bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const {
-    return GetCachedTransactionRef(outpoint) || mDBView.HaveCoin(outpoint);
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {
