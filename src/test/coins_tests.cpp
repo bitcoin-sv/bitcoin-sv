@@ -204,8 +204,10 @@ public:
             InsertCoinMapEntry(cache.map(), cache_value, cache_flags);
     }
 
-    CCoinsViewDB db{ 0, false, false };
-    CoinsDB base{db};
+private:
+    CoinsDB base{ 0, false, false };
+
+public:
     CCoinsViewCacheTest cache{&base};
 };
 
@@ -240,7 +242,7 @@ BOOST_AUTO_TEST_CASE(coin_access) {
     CheckAccessCoin(ABSENT, VALUE2, VALUE2, FRESH, FRESH);
     CheckAccessCoin(ABSENT, VALUE2, VALUE2, DIRTY, DIRTY);
     CheckAccessCoin(ABSENT, VALUE2, VALUE2, DIRTY | FRESH, DIRTY | FRESH);
-    CheckAccessCoin(PRUNED, ABSENT, PRUNED, NO_ENTRY, FRESH);
+    CheckAccessCoin(PRUNED, ABSENT, ABSENT, NO_ENTRY, NO_ENTRY);
     CheckAccessCoin(PRUNED, PRUNED, PRUNED, 0, 0);
     CheckAccessCoin(PRUNED, PRUNED, PRUNED, FRESH, FRESH);
     CheckAccessCoin(PRUNED, PRUNED, PRUNED, DIRTY, DIRTY);

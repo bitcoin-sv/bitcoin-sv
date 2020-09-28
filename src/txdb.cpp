@@ -57,10 +57,8 @@ struct CoinEntry {
 };
 } // namespace
 
-CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe)
-    : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true) {}
-
-bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
+bool CoinsDB::DBGetCoin(const COutPoint &outpoint, Coin &coin) const
+{
     try
     {
         return db.Read(CoinEntry(&outpoint), coin);
@@ -78,17 +76,13 @@ bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     }
 }
 
-bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const {
-    return db.Exists(CoinEntry(&outpoint));
-}
-
-uint256 CCoinsViewDB::GetBestBlock() const {
+uint256 CoinsDB::DBGetBestBlock() const {
     uint256 hashBestChain;
     if (!db.Read(DB_BEST_BLOCK, hashBestChain)) return uint256();
     return hashBestChain;
 }
 
-std::vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
+std::vector<uint256> CoinsDB::GetHeadBlocks() const {
     std::vector<uint256> vhashHeadBlocks;
     if (!db.Read(DB_HEAD_BLOCKS, vhashHeadBlocks)) {
         return std::vector<uint256>();
@@ -96,7 +90,7 @@ std::vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
     return vhashHeadBlocks;
 }
 
-bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
+bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     CDBBatch batch(db);
     size_t count = 0;
     size_t changed = 0;
@@ -105,7 +99,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     int crash_simulate = gArgs.GetArg("-dbcrashratio", 0);
     assert(!hashBlock.IsNull());
 
-    uint256 old_tip = GetBestBlock();
+    uint256 old_tip = DBGetBestBlock();
     if (old_tip.IsNull()) {
         // We may be in the middle of replaying.
         std::vector<uint256> old_heads = GetHeadBlocks();
@@ -163,7 +157,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     return ret;
 }
 
-size_t CCoinsViewDB::EstimateSize() const {
+size_t CoinsDB::EstimateSize() const {
     return db.EstimateSize(DB_COIN, char(DB_COIN + 1));
 }
 
@@ -191,7 +185,7 @@ bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
     return Read(DB_LAST_BLOCK, nFile);
 }
 
-CCoinsViewCursor *CCoinsViewDB::Cursor() const {
+CCoinsViewCursor *CoinsDB::Cursor() const {
     CCoinsViewDBCursor *i = new CCoinsViewDBCursor(
         const_cast<CDBWrapper &>(db).NewIterator(), GetBestBlock());
     /**
@@ -213,7 +207,7 @@ CCoinsViewCursor *CCoinsViewDB::Cursor() const {
 }
 
 // Same as CCoinsViewCursor::Cursor() with added Seek() to key txId
-CCoinsViewCursor* CCoinsViewDB::Cursor(const TxId &txId) const {
+CCoinsViewCursor* CoinsDB::Cursor(const TxId &txId) const {
     CCoinsViewDBCursor* i = new CCoinsViewDBCursor(
         const_cast<CDBWrapper&>(db).NewIterator(), GetBestBlock());
     
@@ -351,7 +345,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
     return true;
 }
 
-bool CCoinsViewDB::IsOldDBFormat()
+bool CoinsDB::IsOldDBFormat()
 {
     std::unique_ptr<CDBIterator> pcursor(db.NewIterator());
     pcursor->Seek(std::make_pair(DB_COINS, uint256()));
@@ -362,8 +356,11 @@ bool CCoinsViewDB::IsOldDBFormat()
     return true;
 }
 
-CoinsDB::CoinsDB(CCoinsViewDB& baseIn)
-    : mDBProvider{ baseIn }
+CoinsDB::CoinsDB(
+        size_t nCacheSize,
+        bool fMemory,
+        bool fWipe)
+    : db{ GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true }
 {}
 
 size_t CoinsDB::DynamicMemoryUsage() const {
@@ -389,6 +386,12 @@ CoinsDB::FetchCoin(const COutPoint &outpoint) const
             if (auto coin = mCache.FetchCoin(outpoint); coin.has_value())
             {
                 guard.release();
+
+                if (coin->get().IsSpent())
+                {
+                    return {};
+                }
+
                 return coin;
             }
             if(!mFetchingCoins.count(outpoint))
@@ -415,11 +418,15 @@ CoinsDB::FetchCoin(const COutPoint &outpoint) const
     // may continue.
 
     Coin tmp;
-    if (!mDBProvider.GetCoin(outpoint, tmp)) {
+    if (!DBGetCoin(outpoint, tmp)) {
         return {};
     }
 
     std::unique_lock lock { mCoinsViewCacheMtx };
+
+    mFetchingCoins.erase(outpoint);
+    guard.release();
+
     return mCache.AddCoin(outpoint, std::move(tmp));
 }
 
@@ -445,7 +452,7 @@ bool CoinsDB::HaveCoinInCache(const COutPoint &outpoint) const {
 uint256 CoinsDB::GetBestBlock() const {
     std::unique_lock lock { mCoinsViewCacheMtx };
     if (hashBlock.IsNull()) {
-        hashBlock = mDBProvider.GetBestBlock();
+        hashBlock = DBGetBestBlock();
     }
     return hashBlock;
 }
@@ -463,7 +470,7 @@ bool CoinsDB::Flush()
     std::unique_lock lock { mCoinsViewCacheMtx };
     auto coins = mCache.MoveOutCoins();
 
-    return mDBProvider.BatchWrite(coins, hashBlock);
+    return DBBatchWrite(coins, hashBlock);
 }
 
 void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)

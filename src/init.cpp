@@ -142,7 +142,6 @@ task::CCancellationToken GetShutdownToken()
     return shutdownSource->GetToken();
 }
 
-static CCoinsViewDB *pcoinsdbview = nullptr;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(boost::thread_group &threadGroup) {
@@ -211,8 +210,6 @@ void Shutdown() {
         }
         delete pcoinsTip;
         pcoinsTip = nullptr;
-        delete pcoinsdbview;
-        pcoinsdbview = nullptr;
         delete pblocktree;
         pblocktree = nullptr;
     }
@@ -2772,14 +2769,16 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
             try {
                 UnloadBlockIndex();
                 delete pcoinsTip;
-                delete pcoinsdbview;
                 delete pblocktree;
 
                 pblocktree =
                     new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
-                pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false,
-                                                fReindex || fReindexChainState);
                 pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
+                pcoinsTip =
+                    new CoinsDB(
+                        nCoinDBCache,
+                        false,
+                        fReindex || fReindexChainState);
 
                 if (fReindex) {
                     pblocktree->WriteReindexing(true);
@@ -2788,7 +2787,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     if (fPruneMode) {
                         CleanupBlockRevFiles();
                     }
-                } else if (pcoinsdbview->IsOldDBFormat()) {
+                } else if (pcoinsTip->IsOldDBFormat()) {
                     strLoadError = _("Refusing to start, older database format detected");
                     break;
                 }
@@ -2834,14 +2833,13 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     break;
                 }
 
-                if (!ReplayBlocks(config, pcoinsdbview)) {
+                if (!ReplayBlocks(config, pcoinsTip)) {
                     strLoadError =
                         _("Unable to replay blocks. You will need to rebuild "
                           "the database using -reindex-chainstate.");
                     break;
                 }
 
-                pcoinsTip = new CoinsDB(*pcoinsdbview);
                 {
                     LOCK(cs_main);
                     LoadChainTip(chainparams);
@@ -2885,7 +2883,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 }
 
                 if (!CVerifyDB().VerifyDB(
-                        config, pcoinsdbview,
+                        config, pcoinsTip,
                         gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS),
                         shutdownToken)) {

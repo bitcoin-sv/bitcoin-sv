@@ -81,29 +81,6 @@ struct CDiskTxPos : public CDiskBlockPos {
     }
 };
 
-/** CCoinsView backed by the coin database (chainstate/) */
-class CCoinsViewDB final : public CCoinsView {
-protected:
-    CDBWrapper db;
-
-public:
-    CCoinsViewDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
-
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
-    bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const override;
-    std::vector<uint256> GetHeadBlocks() const override;
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;
-    CCoinsViewCursor *Cursor() const override;
-    CCoinsViewCursor *Cursor(const TxId &txId) const override;
-
-    //! Returns true if database is in an older format.
-    bool IsOldDBFormat();
-    size_t EstimateSize() const override;
-
-    friend class CoinsDB;
-};
-
 /** Specialization of CCoinsViewCursor to iterate over a CCoinsViewDB */
 class CCoinsViewDBCursor : public CCoinsViewCursor {
 public:
@@ -122,12 +99,17 @@ private:
     std::unique_ptr<CDBIterator> pcursor;
     std::pair<char, COutPoint> keyTmp;
 
-    friend class CCoinsViewDB;
     friend class CoinsDB;
 };
 
 /**
- * CCoinsView that adds a memory cache for transactions to another CCoinsView
+ * CCoinsProvider backed by the coin database (chainstate/)
+ * and adds a memory cache of de-serialized coins.
+ *
+ * Cache is limited for loading new coins (they can still be flushed from child
+ * providers down without caring for the threshold limit) so once the cache is
+ * full only coins without script are stored in it while coins with script are
+ * re-requested from base on every call to GetCoin() that requires a script.
  */
 class CoinsDB : public CCoinsView {
 private:
@@ -141,7 +123,10 @@ private:
 public:
     template<typename T> struct UnitTestAccess;
 
-    CoinsDB(CCoinsViewDB& baseIn);
+    CoinsDB(
+        size_t nCacheSize,
+        bool fMemory = false,
+        bool fWipe = false);
 
     CoinsDB(const CoinsDB&) = delete;
     CoinsDB& operator=(const CoinsDB&) = delete;
@@ -159,6 +144,9 @@ public:
     unsigned int GetCacheSize() const;
 
     size_t DynamicMemoryUsage() const;
+
+    //! Returns true if database is in an older format.
+    bool IsOldDBFormat();
 
     // Standard CCoinsView methods
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
@@ -182,15 +170,18 @@ public:
     //! Get any unspent output with a given txid.
     Coin GetCoinByTxId(const TxId &txid) const;
 
-    std::vector<uint256> GetHeadBlocks() const override { return mDBProvider.GetHeadBlocks(); }
-    CCoinsViewCursor *Cursor() const override { return mDBProvider.Cursor(); }
-    CCoinsViewCursor* Cursor(const TxId &txId) const override { return mDBProvider.Cursor(txId); }
-    size_t EstimateSize() const override { return mDBProvider.EstimateSize(); }
+    std::vector<uint256> GetHeadBlocks() const override;
+    CCoinsViewCursor *Cursor() const override;
+    CCoinsViewCursor* Cursor(const TxId &txId) const override;
+    size_t EstimateSize() const override;
 
 private:
     std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint &outpoint) const;
+    bool DBGetCoin(const COutPoint &outpoint, Coin &coin) const;
+    uint256 DBGetBestBlock() const;
+    bool DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
 
-    CCoinsViewDB& mDBProvider;
+    CDBWrapper db;
 
     /* A mutex to support a thread safe access. */
     mutable std::mutex mCoinsViewCacheMtx {};
