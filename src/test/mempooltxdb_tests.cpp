@@ -6,6 +6,8 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include <vector>
 
@@ -237,6 +239,56 @@ BOOST_AUTO_TEST_CASE(GetContentsOfTxDB)
     BOOST_CHECK_EQUAL(keys.size(), 0);
 }
 
+BOOST_AUTO_TEST_CASE(GetSetXrefKey)
+{
+    boost::uuids::random_generator gen;
+    const auto uuid = gen();
+    auto xref = decltype(uuid)();
+    BOOST_CHECK_NE(to_string(uuid), to_string(xref));
+
+    CMempoolTxDB txdb(10000);
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+    BOOST_CHECK(txdb.SetXrefKey(uuid));
+    BOOST_CHECK(txdb.GetXrefKey(xref));
+    BOOST_CHECK_EQUAL(to_string(uuid), to_string(xref));
+}
+
+BOOST_AUTO_TEST_CASE(RemoveXrefKey)
+{
+    boost::uuids::random_generator gen;
+    const auto uuid = gen();
+    auto xref = decltype(uuid)();
+
+    CMempoolTxDB txdb(10000);
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+    BOOST_CHECK(txdb.SetXrefKey(uuid));
+    BOOST_CHECK(txdb.GetXrefKey(xref));
+    BOOST_CHECK(txdb.RemoveXrefKey());
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+}
+
+BOOST_AUTO_TEST_CASE(AutoRemoveXrefKey)
+{
+    boost::uuids::random_generator gen;
+    const auto uuid = gen();
+    auto xref = decltype(uuid)();
+    const auto entries = GetABunchOfEntries(1);
+    const auto& e = entries[0];
+
+    CMempoolTxDB txdb(10000);
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+    BOOST_CHECK(txdb.SetXrefKey(uuid));
+    BOOST_CHECK(txdb.GetXrefKey(xref));
+    txdb.AddTransactions({e.GetSharedTx()});
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+
+    BOOST_CHECK(txdb.SetXrefKey(uuid));
+    BOOST_CHECK(txdb.GetXrefKey(xref));
+    txdb.RemoveTransactions({e.GetTxId()}, e.GetTxSize());
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+}
+
 BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
 {
     const auto entries = GetABunchOfEntries(11);
@@ -329,6 +381,56 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
         CTransactionRef _;
         BOOST_CHECK(!innerdb->GetTransaction(e.GetTxId(), _));
     }
+}
+
+BOOST_AUTO_TEST_CASE(AsyncGetSetXrefKey)
+{
+    boost::uuids::random_generator gen;
+    const auto uuid = gen();
+    auto xref = decltype(uuid)();
+    BOOST_CHECK_NE(to_string(uuid), to_string(xref));
+
+    CAsyncMempoolTxDB txdb(10000);
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+    BOOST_CHECK(txdb.SetXrefKey(uuid));
+    BOOST_CHECK(txdb.GetXrefKey(xref));
+    BOOST_CHECK_EQUAL(to_string(uuid), to_string(xref));
+}
+
+BOOST_AUTO_TEST_CASE(AsyncRemoveXrefKey)
+{
+    boost::uuids::random_generator gen;
+    const auto uuid = gen();
+    auto xref = decltype(uuid)();
+
+    CAsyncMempoolTxDB txdb(10000);
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+    BOOST_CHECK(txdb.SetXrefKey(uuid));
+    BOOST_CHECK(txdb.GetXrefKey(xref));
+    BOOST_CHECK(txdb.RemoveXrefKey());
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+}
+
+BOOST_AUTO_TEST_CASE(AsyncAutoRemoveXrefKey)
+{
+    boost::uuids::random_generator gen;
+    const auto uuid = gen();
+    auto xref = decltype(uuid)();
+    auto entries = GetABunchOfEntries(1);
+    auto& e = entries[0];
+
+    CAsyncMempoolTxDB txdb(10000);
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+    BOOST_CHECK(txdb.SetXrefKey(uuid));
+    BOOST_CHECK(txdb.GetXrefKey(xref));
+    txdb.Add({CTestTxMemPoolEntry(e).Wrapper()});
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+
+    BOOST_CHECK(txdb.SetXrefKey(uuid));
+    BOOST_CHECK(txdb.GetXrefKey(xref));
+    txdb.Remove({e.GetTxId()}, e.GetTxSize());
+    BOOST_CHECK(!txdb.GetXrefKey(xref));
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
 }
 
 BOOST_AUTO_TEST_CASE(SaveOnFullMempool)

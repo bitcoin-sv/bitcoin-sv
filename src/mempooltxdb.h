@@ -8,6 +8,8 @@
 #include "dbwrapper.h"
 #include "tx_mempool_info.h"
 
+#include <boost/uuid/uuid.hpp>
+
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -36,6 +38,8 @@ private:
     static constexpr char DB_DISK_USAGE = 'D';
     // Prefix to store transaaction count
     static constexpr char DB_TX_COUNT = 'C';
+    // Prefix to store the mempool.dat cross-reference key
+    static constexpr char DB_MEMPOOL_XREF = 'X';
 
     // Saved database parameters
     const fs::path dbPath;
@@ -87,12 +91,29 @@ public:
      */
     uint64_t GetTxCount();
 
-
     using TxIdSet = std::unordered_set<uint256, SaltedTxidHasher>;
     /*
-     * Get the set of keys from the database.
+     * Get the set of transaction keys from the database.
      */
     TxIdSet GetKeys();
+
+    using XrefKey = boost::uuids::uuid;
+    /*
+     * Set the mempool.dat cross-reference key. Any later change to the
+     * database (i.e., calls to ClearDatabase(), AddTransactions() or
+     * RemoveTransactions() will remove this key.
+     */
+    bool SetXrefKey(const XrefKey& xrefKey);
+
+    /*
+     * Get the mempool.dat cross-reference key.
+     */
+    bool GetXrefKey(XrefKey& xrefKey);
+
+    /*
+     * Remove the mempool.dat cross-reference key.
+     */
+    bool RemoveXrefKey();
 };
 
 
@@ -141,6 +162,13 @@ public:
     // meantime).
     CMempoolTxDB::TxIdSet GetTxKeys();
 
+
+    // The following methods are synchronous wrappers of the equivalent
+    // CMempoolTxDB methods.
+    bool SetXrefKey(const CMempoolTxDB::XrefKey& xrefKey);
+    bool GetXrefKey(CMempoolTxDB::XrefKey& xrefKey);
+    bool RemoveXrefKey();
+
 private:
     struct StopTask{};
     struct SyncTask
@@ -157,7 +185,11 @@ private:
         std::vector<TxId> transactions;
         std::uint64_t size;
     };
-    using Task = std::variant<StopTask, SyncTask, ClearTask, AddTask, RemoveTask>;
+    struct InvokeTask
+    {
+        std::function<void(CMempoolTxDB&)> function;
+    };
+    using Task = std::variant<StopTask, SyncTask, ClearTask, AddTask, RemoveTask, InvokeTask>;
 
     // Task queue for the worker thread.
     std::deque<Task> taskList;

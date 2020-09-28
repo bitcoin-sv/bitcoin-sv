@@ -51,6 +51,7 @@ bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef> &txs)
     }
     batch.Write(DB_DISK_USAGE, prevDiskUsage + diskUsageAdded);
     batch.Write(DB_TX_COUNT, prevTxCount + txCountAdded);
+    batch.Erase(DB_MEMPOOL_XREF);
 
     if (!mempoolTxDB->WriteBatch(batch, true))
     {
@@ -89,6 +90,7 @@ bool CMempoolTxDB::RemoveTransactions(const std::vector<TxId> &txidsRemoved,
     }
     batch.Write(DB_DISK_USAGE, prevDiskUsage - diskUsageRemoved);
     batch.Write(DB_TX_COUNT, prevTxCount - txCountRemoved);
+    batch.Erase(DB_MEMPOOL_XREF);
 
     if (!mempoolTxDB->WriteBatch(batch, true))
     {
@@ -126,6 +128,31 @@ CMempoolTxDB::TxIdSet CMempoolTxDB::GetKeys()
     return result;
 }
 
+bool CMempoolTxDB::SetXrefKey(const XrefKey& xrefKey)
+{
+    CDBBatch batch{*mempoolTxDB};
+    batch.Write(DB_MEMPOOL_XREF, xrefKey);
+    return mempoolTxDB->WriteBatch(batch, true);
+}
+
+bool CMempoolTxDB::GetXrefKey(XrefKey& xrefKey)
+{
+    if (mempoolTxDB->Exists(DB_MEMPOOL_XREF))
+    {
+        if (mempoolTxDB->Read(DB_MEMPOOL_XREF, xrefKey))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool CMempoolTxDB::RemoveXrefKey()
+{
+    CDBBatch batch{*mempoolTxDB};
+    batch.Erase(DB_MEMPOOL_XREF);
+    return mempoolTxDB->WriteBatch(batch, true);
+}
 
 void CAsyncMempoolTxDB::EnqueueNL(std::initializer_list<Task>&& tasks, bool clearList)
 {
@@ -200,6 +227,43 @@ CMempoolTxDB::TxIdSet CAsyncMempoolTxDB::GetTxKeys()
     return txdb->GetKeys();
 }
 
+bool CAsyncMempoolTxDB::SetXrefKey(const CMempoolTxDB::XrefKey& xrefKey)
+{
+    bool result = false;
+    const auto function = [&xrefKey, &result](CMempoolTxDB& txdb)
+    {
+        result = txdb.SetXrefKey(xrefKey);
+    };
+
+    Synchronize({InvokeTask{function}});
+    return result;
+}
+
+bool CAsyncMempoolTxDB::GetXrefKey(CMempoolTxDB::XrefKey& xrefKey)
+{
+    bool result = false;
+    const auto function = [&xrefKey, &result](CMempoolTxDB& txdb)
+    {
+        result = txdb.GetXrefKey(xrefKey);
+    };
+
+    Synchronize({InvokeTask{function}});
+    return result;
+}
+
+bool CAsyncMempoolTxDB::RemoveXrefKey()
+{
+    bool result = false;
+    const auto function = [&result](CMempoolTxDB& txdb)
+    {
+        result = txdb.RemoveXrefKey();
+    };
+
+    Synchronize({InvokeTask{function}});
+    return result;
+}
+
+
 // Overload dispatcher for std::visit.
 // See the example at https://en.cppreference.com/w/cpp/utility/variant/visit
 namespace {
@@ -264,6 +328,12 @@ void CAsyncMempoolTxDB::Work()
         }
     };
 
+    // Invoke a function on the database.
+    const auto invoke = [this](const InvokeTask& task)
+    {
+        task.function(*txdb);
+    };
+
     while (running)
     {
         Task task;
@@ -276,6 +346,6 @@ void CAsyncMempoolTxDB::Work()
             std::swap(task, taskList.back());
             taskList.pop_back();
         }
-        std::visit(dispatch{stop, sync, clear, add, remove}, task);
+        std::visit(dispatch{stop, sync, clear, add, remove, invoke}, task);
     }
 }
