@@ -1389,7 +1389,7 @@ static void ApplyStats(CCoinsStats &stats, CHashWriter &ss, const uint256 &hash,
 
 //! Calculate statistics about the unspent transaction output set
 static bool GetUTXOStats(CoinsDB& coinsTip, CCoinsStats &stats) {
-    std::unique_ptr<CCoinsViewCursor> pcursor(coinsTip.Cursor());
+    std::unique_ptr<CCoinsViewDBCursor> pcursor(coinsTip.Cursor());
 
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
     stats.hashBlock = pcursor->GetBestBlock();

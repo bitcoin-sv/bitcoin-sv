@@ -291,7 +291,7 @@ bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
     return Read(DB_LAST_BLOCK, nFile);
 }
 
-CCoinsViewCursor *CoinsDB::Cursor() const {
+CCoinsViewDBCursor *CoinsDB::Cursor() const {
     CCoinsViewDBCursor *i = new CCoinsViewDBCursor(
         const_cast<CDBWrapper &>(db).NewIterator(), GetBestBlock());
     /**
@@ -313,7 +313,7 @@ CCoinsViewCursor *CoinsDB::Cursor() const {
 }
 
 // Same as CCoinsViewCursor::Cursor() with added Seek() to key txId
-CCoinsViewCursor* CoinsDB::Cursor(const TxId &txId) const {
+CCoinsViewDBCursor* CoinsDB::Cursor(const TxId &txId) const {
     CCoinsViewDBCursor* i = new CCoinsViewDBCursor(
         const_cast<CDBWrapper&>(db).NewIterator(), GetBestBlock());
     
@@ -389,10 +389,6 @@ bool CCoinsViewDBCursor::GetValue(CoinWithScript &coin) const {
     }
 
     return false;
-}
-
-unsigned int CCoinsViewDBCursor::GetValueSize() const {
-    return pcursor->GetValueSize();
 }
 
 bool CCoinsViewDBCursor::Valid() const {
@@ -717,7 +713,7 @@ std::optional<Coin> CoinsDB::GetCoinByTxId(const TxId& txid) const
     COutPoint key;
     std::optional<Coin> coin{ Coin{} };
 
-    std::unique_ptr<CCoinsViewCursor> cursor{ Cursor(txid) };
+    std::unique_ptr<CCoinsViewDBCursor> cursor{ Cursor(txid) };
 
     if (cursor->Valid())
     {

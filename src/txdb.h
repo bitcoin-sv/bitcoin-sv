@@ -17,7 +17,6 @@
 #include <vector>
 
 class CBlockIndex;
-class CCoinsViewDBCursor;
 class uint256;
 
 //! No need to periodic flush if at least this much space still available.
@@ -82,23 +81,26 @@ struct CDiskTxPos : public CDiskBlockPos {
     }
 };
 
-/** Specialization of CCoinsViewCursor to iterate over a CCoinsViewDB */
-class CCoinsViewDBCursor : public CCoinsViewCursor {
+/** Iterate over coins in DB */
+class CCoinsViewDBCursor {
 public:
     ~CCoinsViewDBCursor() {}
 
-    bool GetKey(COutPoint &key) const override;
-    bool GetValue(Coin &coin) const override;
-    bool GetValue(CoinWithScript &coin) const override;
-    unsigned int GetValueSize() const override;
+    bool GetKey(COutPoint &key) const;
+    bool GetValue(Coin &coin) const;
+    bool GetValue(CoinWithScript &coin) const;
 
-    bool Valid() const override;
-    void Next() override;
+    bool Valid() const;
+    void Next();
+
+    //! Get best block at the time this cursor was created
+    const uint256 &GetBestBlock() const { return hashBlock; }
 
 private:
     CCoinsViewDBCursor(CDBIterator *pcursorIn, const uint256 &hashBlockIn)
-        : CCoinsViewCursor(hashBlockIn), pcursor(pcursorIn) {}
+        : hashBlock(hashBlockIn), pcursor(pcursorIn) {}
     std::optional<CoinImpl> GetCoin(uint64_t maxScriptSize) const;
+    uint256 hashBlock;
     std::unique_ptr<CDBIterator> pcursor;
     std::pair<char, COutPoint> keyTmp;
 
@@ -168,7 +170,7 @@ public:
     //! Returns true if database is in an older format.
     bool IsOldDBFormat();
 
-    CCoinsViewCursor* Cursor() const;
+    CCoinsViewDBCursor* Cursor() const;
 
     size_t EstimateSize() const;
 
@@ -195,7 +197,9 @@ private:
         const uint256& hashBlock,
         CCoinsMap&& mapCoins);
 
-    CCoinsViewCursor* Cursor(const TxId& txId) const;
+    //! Get a cursor to iterate over coins by txId. Cursor is positioned at the first key in the source that is at or past target.
+    //! If coin with txId is not found then cursor is at position at first record after txId - source is sorted by txId
+    CCoinsViewDBCursor* Cursor(const TxId &txId) const;
 
     //! Get any unspent output with a given txid.
     std::optional<Coin> GetCoinByTxId(const TxId &txid) const;
@@ -210,7 +214,6 @@ private:
         return mMutex.TryWriteLock( lockHandle );
     }
 
-    // Standard CCoinsView methods
     std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
     std::optional<CoinImpl> DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
     uint256 DBGetBestBlock() const;
