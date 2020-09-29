@@ -455,7 +455,15 @@ BOOST_AUTO_TEST_CASE(coin_add) {
      * Cache   Write   Result  Cache        Result       potential_overwrite
      * Value   Value   Value   Flags        Flags
      */
-    CheckAddCoin(ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false);
+    {
+        // Adding coins behaves differently in this case depending on whether
+        // coin was already present beforehand or not.
+        // New coin is added if coin is absent beforehand, otherwise adding it
+        // is treated as an error.
+        CheckAddCoinBase(ABSENT, ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false);
+        CheckAddCoinBase(PRUNED, ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY | FRESH, false);
+        CheckAddCoinBase(VALUE1, ABSENT, VALUE3, FAIL, NO_ENTRY, NO_ENTRY, false);
+    }
     CheckAddCoin(ABSENT, VALUE3, VALUE3, NO_ENTRY, DIRTY, true);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, 0, DIRTY | FRESH, false);
     CheckAddCoin(PRUNED, VALUE3, VALUE3, 0, DIRTY, true);

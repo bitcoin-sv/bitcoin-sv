@@ -84,7 +84,9 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, CoinWithScript&& coin,
         return;
     }
 
-    //GetCoin(outpoint, 0); FIXME - why is something like this not part of add coin?
+    // Call GetCoin before adding coin since in case the coin is present in
+    // underlying coins view and not in mCache we would get wrong behavior.
+    GetCoin(outpoint, 0);
 
     mCache.AddCoin(outpoint, std::move(coin), possible_overwrite, genesisActivationHeight);
 }
