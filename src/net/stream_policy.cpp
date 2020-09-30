@@ -8,20 +8,22 @@
 namespace
 {
     // Classify messages we consider to be block related
-    bool IsBlockMsg(const std::string& cmd)
+    bool IsBlockMsg(const std::string& cmd, CSerializedNetMsg::PayloadType payloadType)
     {
         return cmd == NetMsgType::BLOCK ||
                cmd == NetMsgType::CMPCTBLOCK ||
                cmd == NetMsgType::BLOCKTXN ||
-               cmd == NetMsgType::GETBLOCKTXN;
+               cmd == NetMsgType::GETBLOCKTXN ||
+               payloadType == CSerializedNetMsg::PayloadType::BLOCK;
     }
 
     // Classify msgs we consider high priority
-    bool IsHighPriorityMsg(const std::string& cmd)
+    bool IsHighPriorityMsg(const CSerializedNetMsg& msg)
     {
+        const std::string& cmd { msg.Command() };
         return cmd == NetMsgType::PING ||
                cmd == NetMsgType::PONG ||
-               IsBlockMsg(cmd);
+               IsBlockMsg(cmd, msg.GetPayloadType());
     }
 }
 
@@ -157,8 +159,7 @@ uint64_t BlockPriorityStreamPolicy::PushMessage(StreamMap& streams, StreamType s
     // If we haven't been told which stream to use, decide which we would prefer
     if(!exactMatch)
     {
-        const std::string& cmd { msg.Command() };
-        if(IsHighPriorityMsg(cmd))
+        if(IsHighPriorityMsg(msg))
         {
             // Pings, pongs and block msgs are sent over the high priority DATA1 stream if we have it
             streamType = StreamType::DATA1;
