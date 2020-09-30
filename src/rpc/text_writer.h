@@ -6,6 +6,7 @@
 #include "consensus/consensus.h" // For ONE_MEGABYTE
 #include "httpserver.h" // For HTTPRequest
 #include <string>
+#include <fstream>
 
 class CTextWriter
 {
@@ -132,4 +133,70 @@ private:
         }
     }
 
+};
+
+class CFileTextWriter : public CTextWriter
+{
+public:
+    CFileTextWriter(const std::string& path)
+    {
+        file.open(path, std::ios::out | std::ios::trunc);
+        CheckForError();
+    }
+
+    void Write(char val) override
+    {
+        if (error.empty())
+        {
+            file << val;
+            CheckForError();
+        }
+    }
+
+    void Write(const std::string& jsonText) override
+    {
+        if (error.empty())
+        {
+            file << jsonText;
+            CheckForError();
+        }
+    }
+
+    void WriteLine(const std::string& jsonText = "") override
+    {
+        if (error.empty())
+        {
+            file << jsonText << '\n';
+            CheckForError();
+        }
+    }
+
+    void Flush() override
+    {
+        if (error.empty())
+        {
+            file.flush();
+            CheckForError();
+        }
+    }
+
+    void ReserveAdditional(size_t size) override {}
+
+    // returns empty string if no errors occured
+    std::string GetError()
+    {
+        return error;
+    }
+
+private:
+    void CheckForError()
+    {
+        if(file.fail())
+        {
+            error =  "Failed to write to file: " + std::generic_category().message(errno);
+        }
+    }
+
+    std::ofstream file;
+    std::string error;
 };

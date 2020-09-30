@@ -36,8 +36,8 @@ bool CTxnDoubleSpendDetector::insertTxnInputs(
     // before other txn is detected as a double spend txn.
     // It might happen when two transactions have a common input but the first one
     // has less inputs than the second one.
-    if (pool.CheckTxConflicts(ptx, isFinal)) {
-        state.SetMempoolConflictDetected();
+    if (auto conflictsWith = pool.CheckTxConflicts(ptx, isFinal); !conflictsWith.empty()) {
+        state.SetMempoolConflictDetected( std::move(conflictsWith) );
         return false;
     }
     // Check double spend attempt for the given txn.
@@ -46,14 +46,13 @@ bool CTxnDoubleSpendDetector::insertTxnInputs(
     // a) we want to process any number of potentially invalid double spends
     //    (detected and rejected by previous validation conditions) at the same time as the valid txn.
     // b) we want to select only the first valid txn if double spend occurs
-    if (isAnyOfInputsKnownNL(tx)) {
-        state.SetDoubleSpendDetected();
+    if (isAnyOfInputsKnownNL(tx, state)) {
         return false;
     }
     // Store the inputs
     mKnownSpendsTx.insert(&tx);
     for (const auto& input: tx.vin) {
-         mKnownSpends.emplace_back(input.prevout);
+         mKnownSpends.emplace_back(input.prevout, ptx);
     }
     return true;
 }
@@ -91,12 +90,24 @@ void CTxnDoubleSpendDetector::clear() {
     mKnownSpends.clear();
 }
 
-bool CTxnDoubleSpendDetector::isAnyOfInputsKnownNL(const CTransaction &tx) const {
+bool CTxnDoubleSpendDetector::isAnyOfInputsKnownNL(const CTransaction &tx, CValidationState& state) const {
+    std::set<CTransactionRef> isKnown;
+
     for (const auto& input: tx.vin) {
-         if (std::find(mKnownSpends.begin(), mKnownSpends.end(), input.prevout) != mKnownSpends.end()) {
-             return true;
-         }
+        if (auto found = std::find(mKnownSpends.begin(), mKnownSpends.end(), input.prevout);
+            found != mKnownSpends.end())
+        {
+            isKnown.insert(found->mTxRef);
+        }
     }
+
+    if( !isKnown.empty() )
+    {
+        state.SetDoubleSpendDetected( std::move(isKnown) );
+
+        return true;
+    }
+
     return false;
 }
 

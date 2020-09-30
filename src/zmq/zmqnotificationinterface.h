@@ -6,6 +6,7 @@
 #define BITCOIN_ZMQ_ZMQNOTIFICATIONINTERFACE_H
 
 #include "validationinterface.h"
+#include "zmq_publisher.h"
 
 #include <list>
 #include <map>
@@ -13,11 +14,18 @@
 class CBlockIndex;
 class CZMQAbstractNotifier;
 
+struct ActiveZMQNotifier
+{
+    std::string notifierName;
+    std::string notifierAddress;
+};
+
 class CZMQNotificationInterface final : public CValidationInterface {
 public:
     virtual ~CZMQNotificationInterface();
 
     static CZMQNotificationInterface *Create();
+    std::vector<ActiveZMQNotifier> ActiveZMQNotifiers();
 
 protected:
     bool Initialize();
@@ -25,6 +33,11 @@ protected:
 
     // CValidationInterface
     void TransactionAddedToMempool(const CTransactionRef &tx) override;
+    void TransactionRemovedFromMempool(const uint256& txid,
+                                       MemPoolRemovalReason reason,
+                                       const CTransaction* conflictedWith) override;
+    void TransactionRemovedFromMempoolBlock(const uint256& txid,
+                                            MemPoolRemovalReason reason) override;
     void
     BlockConnected(const std::shared_ptr<const CBlock> &pblock,
                    const CBlockIndex *pindexConnected,
@@ -35,11 +48,14 @@ protected:
                          const CBlockIndex *pindexFork,
                          bool fInitialDownload) override;
 
+    void InvalidTxMessage(std::string_view message) override;
+
 private:
     CZMQNotificationInterface();
 
     void *pcontext;
     std::list<CZMQAbstractNotifier *> notifiers;
+    std::shared_ptr<CZMQPublisher> zmqPublisher;
 };
 
 #endif // BITCOIN_ZMQ_ZMQNOTIFICATIONINTERFACE_H

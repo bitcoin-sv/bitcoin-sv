@@ -4,18 +4,22 @@
 
 #include "zmqnotificationinterface.h"
 #include "zmqpublishnotifier.h"
-
+#include "zmq_publisher.h"
 #include "streams.h"
 #include "util.h"
 #include "validation.h"
 #include "version.h"
+
 
 void zmqError(const char *str) {
     LogPrint(BCLog::ZMQ, "zmq: Error: %s, errno=%s\n", str,
              zmq_strerror(errno));
 }
 
-CZMQNotificationInterface::CZMQNotificationInterface() : pcontext(nullptr) {}
+CZMQNotificationInterface::CZMQNotificationInterface() :
+    pcontext(nullptr),
+    zmqPublisher(std::make_shared<CZMQPublisher>())
+{}
 
 CZMQNotificationInterface::~CZMQNotificationInterface() {
     Shutdown();
@@ -39,6 +43,13 @@ CZMQNotificationInterface *CZMQNotificationInterface::Create() {
         CZMQAbstractNotifier::Create<CZMQPublishRawBlockNotifier>;
     factories["pubrawtx"] =
         CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
+    factories["pubinvalidtx"] =
+        CZMQAbstractNotifier::Create<CZMQPublishTextNotifier>;
+    factories["pubremovedfrommempool"] =
+        CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolNotifier>;
+    factories["pubremovedfrommempoolblock"] =
+        CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolBlockNotifier>;
+
 
     for (std::map<std::string, CZMQNotifierFactory>::const_iterator i =
              factories.begin();
@@ -86,7 +97,7 @@ bool CZMQNotificationInterface::Initialize() {
     std::list<CZMQAbstractNotifier *>::iterator i = notifiers.begin();
     for (; i != notifiers.end(); ++i) {
         CZMQAbstractNotifier *notifier = *i;
-        if (notifier->Initialize(pcontext)) {
+        if (notifier->Initialize(pcontext, zmqPublisher)) {
             LogPrint(BCLog::ZMQ, "  Notifier %s ready (address = %s)\n",
                      notifier->GetType(), notifier->GetAddress());
         } else {
@@ -118,6 +129,20 @@ void CZMQNotificationInterface::Shutdown() {
 
         pcontext = 0;
     }
+    // stop publisher thread
+    zmqPublisher = nullptr;
+}
+
+std::vector<ActiveZMQNotifier> CZMQNotificationInterface::ActiveZMQNotifiers()
+{
+    std::vector<ActiveZMQNotifier> arrNotifiers;
+
+    for (auto& n : notifiers)
+    {
+        arrNotifiers.push_back({n->GetType(), n->GetAddress()});
+    }
+
+    return arrNotifiers;
 }
 
 void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,
@@ -138,6 +163,23 @@ void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,
     }
 }
 
+void CZMQNotificationInterface::InvalidTxMessage(std::string_view message)
+{
+    for (auto i = notifiers.begin(); i != notifiers.end();) 
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyTextMessage("invalidtx", message)) 
+        {
+            i++;
+        } 
+        else 
+        {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
 void CZMQNotificationInterface::TransactionAddedToMempool(
     const CTransactionRef &ptx) {
     // Used by BlockConnected and BlockDisconnected as well, because they're all
@@ -150,6 +192,43 @@ void CZMQNotificationInterface::TransactionAddedToMempool(
         if (notifier->NotifyTransaction(tx)) {
             i++;
         } else {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
+
+void CZMQNotificationInterface::TransactionRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason, 
+                                                              const CTransaction* conflictedWith)
+{
+
+    for (auto i = notifiers.begin(); i != notifiers.end();)
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyRemovedFromMempool(txid, reason, conflictedWith))
+        {
+            ++i;
+        }
+        else
+        {
+            notifier->Shutdown();
+            i = notifiers.erase(i);
+        }
+    }
+}
+
+void CZMQNotificationInterface::TransactionRemovedFromMempoolBlock(const uint256& txid, MemPoolRemovalReason reason) {
+
+    for (auto i = notifiers.begin(); i != notifiers.end();)
+    {
+        CZMQAbstractNotifier *notifier = *i;
+        if (notifier->NotifyRemovedFromMempoolBlock(txid, reason))
+        {
+            ++i;
+        }
+        else
+        {
             notifier->Shutdown();
             i = notifiers.erase(i);
         }

@@ -3,6 +3,10 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/client.h"
+#include "rpc/client_config.h"
+#include "rpc/client_utils.h"
+#include "rpc/http_request.h"
+#include "rpc/http_response.h"
 #include "rpc/server.h"
 
 #include "base58.h"
@@ -81,6 +85,57 @@ const UniValue& find_value_in_result(const UniValue& obj, const std::string& nam
         return find_value(obj, name);
     }
     return find_value(response, name);
+}
+
+bool FlagsNumericMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"flags\" must be a numeric value"));
+    return true;
+}
+bool FlagsValueMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("verifymerkleproof only supports \"flags\" with value 2"));
+    return true;
+}
+bool IndexNumericMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"index\" must be a numeric value"));
+    return true;
+}
+bool IndexValueMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"index\" must be a positive value"));
+    return true;
+}
+bool TxOrIdHashValueMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("txOrId must be hexadecimal string (not '') and length of it must be divisible by 2"));
+    return true;
+}
+bool TxOrIdHashValueMessage2(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("txOrId must be hexadecimal string (not 'wrong_hash') and length of it must be divisible by 2"));
+    return true;
+}
+bool TargetObjectMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"target\" must be a block header Json object"));
+    return true;
+}
+bool MerkleRootHashMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("merkleroot must be hexadecimal string (not '') and length of it must be divisible by 2"));
+    return true;
+}
+bool NodesArrayMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("\"nodes\" must be a Json array"));
+    return true;
+}
+bool NodeHashValueMessage(const std::runtime_error& ex)
+{
+    BOOST_CHECK_EQUAL(ex.what(), std::string("node must be hexadecimal string (not '**') and length of it must be divisible by 2"));
+    return true;
 }
 
 BOOST_FIXTURE_TEST_SUITE(rpc_tests, TestingSetup)
@@ -584,6 +639,250 @@ BOOST_AUTO_TEST_CASE(getminingcandidate_low_height)
     BOOST_CHECK_EQUAL(find_value(json.get_obj(), "height").get_int(), 1);
 
     nMaxTipAge = oldMaxAge;
+}
+
+// Create client configs for DS Authority
+BOOST_AUTO_TEST_CASE(client_config_dsa)
+{
+    using namespace rpc::client;
+
+    {
+        // All good
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/DsAuthority/proof/");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof/");
+
+            // Also just check other defaults
+            BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), RPCClientConfig::DEFAULT_DS_AUTHORITY_TIMEOUT);
+            BOOST_CHECK_EQUAL(config.GetCredentials(), "");
+            BOOST_CHECK(! config.UsesAuth());
+            BOOST_CHECK_EQUAL(config.GetWallet(), "");
+        );
+    }
+
+    {
+        // Mimimal endpoint (and override timeout)
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/D");
+        gArgs.ForceSetArg("-dsauthoritytimeout", "10");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/D");
+            BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), 10);
+        );
+    }
+
+    {
+        // Missing endpoint
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080/");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/");
+        );
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:8080");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
+        );
+    }
+
+    {
+        // Without http://
+        gArgs.ForceSetArg("-dsauthorityurl", "hostname:8080");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
+        );
+    }
+
+    {
+        // Missing port
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname:/DsAuthority/proof");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname:");
+            BOOST_CHECK_EQUAL(config.GetServerPort(), RPCClientConfig::DEFAULT_DS_AUTHORITY_PORT);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof");
+        );
+    }
+
+    {
+        // Unspecified port
+        gArgs.ForceSetArg("-dsauthorityurl", "http://hostname/DsAuthority/proof");
+        BOOST_CHECK_NO_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+            BOOST_CHECK_EQUAL(config.GetServerIP(), "hostname");
+            BOOST_CHECK_EQUAL(config.GetServerPort(), RPCClientConfig::DEFAULT_DS_AUTHORITY_PORT);
+            BOOST_CHECK_EQUAL(config.GetEndpoint(), "/DsAuthority/proof");
+        );
+    }
+
+    {
+        // Missing server address
+        gArgs.ForceSetArg("-dsauthorityurl", "http://");
+        BOOST_CHECK_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+        , std::runtime_error);
+    }
+
+    {
+        // Unsupported protocol
+        gArgs.ForceSetArg("-dsauthorityurl", "https://hostname:8080/DsAuthority/proof");
+        BOOST_CHECK_THROW(
+            RPCClientConfig config { RPCClientConfig::CreateForDSA() };
+        , std::runtime_error);
+    }
+}
+
+// Create client configs for bitcoind
+BOOST_AUTO_TEST_CASE(client_config_bitcoind)
+{
+    gArgs.ForceSetArg("-rpcconnect", "localhost:8080");
+    gArgs.ForceSetArg("-rpcuser", "user");
+    gArgs.ForceSetArg("-rpcpassword", "passwd");
+    gArgs.ForceSetArg("-rpcclienttimeout", "100");
+    gArgs.ForceSetArg("-rpcwallet", "wallet");
+
+    using namespace rpc::client;
+
+    BOOST_CHECK_NO_THROW(
+        RPCClientConfig config { RPCClientConfig::CreateForBitcoind() };
+        BOOST_CHECK_EQUAL(config.GetServerIP(), "localhost");
+        BOOST_CHECK_EQUAL(config.GetServerPort(), 8080);
+        BOOST_CHECK(config.UsesAuth());
+        BOOST_CHECK_EQUAL(config.GetCredentials(), "user:passwd");
+        BOOST_CHECK_EQUAL(config.GetConnectionTimeout(), 100);
+        BOOST_CHECK_EQUAL(config.GetWallet(), "wallet");
+        BOOST_CHECK_EQUAL(config.GetEndpoint(), "");
+    );
+}
+
+// HTTP request creation
+BOOST_AUTO_TEST_CASE(http_requests)
+{
+    // Some parameters passed throughout
+    std::string method { "somemethod" };
+    std::vector<std::string> args { "tx1=1", "tx2=2" };
+    UniValue params(UniValue::VARR);
+    params = RPCConvertNamedValues(method, args);
+
+    using namespace rpc::client;
+
+    {
+        // REST requests to the DS authority
+        RPCClientConfig config { RPCClientConfig::CreateForDSA("http://127.0.0.1:8080/DsAuthority/proof") };
+
+        auto postRequest { rpc::client::HTTPRequest::CreateRESTPostRequest(config, params) };
+        BOOST_CHECK_EQUAL(postRequest.GetContents(), "{\"tx1\":\"1\",\"tx2\":\"2\"}\n");
+        BOOST_CHECK_EQUAL(postRequest.GetEndpoint(), "/DsAuthority/proof/submit");
+
+        auto getRequest { rpc::client::HTTPRequest::CreateRESTGetRequest(config, "a56fd", 5) };
+        BOOST_CHECK_EQUAL(getRequest.GetContents(), "");
+        BOOST_CHECK_EQUAL(getRequest.GetEndpoint(), "/DsAuthority/proof/a56fd/5");
+    }
+
+    {
+        // JSON RPC requests to bitcoind
+        gArgs.ForceSetArg("-rpcconnect", "localhost:8080");
+        gArgs.ForceSetArg("-rpcuser", "user");
+        gArgs.ForceSetArg("-rpcpassword", "passwd");
+        gArgs.ForceSetArg("-rpcwallet", "walletname");
+        RPCClientConfig config { RPCClientConfig::CreateForBitcoind() };
+
+        auto rpcRequest { rpc::client::HTTPRequest::CreateJSONRPCRequest(config, method, params) };
+        BOOST_CHECK_EQUAL(rpcRequest.GetContents(), "{\"method\":\"somemethod\",\"params\":{\"tx1\":\"1\",\"tx2\":\"2\"},\"id\":1}\n");
+        BOOST_CHECK_EQUAL(rpcRequest.GetEndpoint(), "/wallet/walletname");
+    }
+}
+
+BOOST_AUTO_TEST_CASE(rpc_verifymerkleproofparams)
+{
+    // Test verifymerkleproof API argument handling
+
+    BOOST_CHECK_THROW(CallRPC("verifymerkleproof"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("verifymerkleproof not_json"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("verifymerkleproof []"), std::runtime_error);
+    BOOST_CHECK_THROW(CallRPC("verifymerkleproof {} extra"), std::runtime_error);
+
+    // Exceptions thrown with wrong flags values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":\"my_flag\","
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, FlagsNumericMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":1,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, FlagsValueMessage);
+    // Exceptions thrown with wrong index values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":\"my_index\","
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, IndexNumericMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":-1,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, IndexValueMessage);
+    // Exceptions thrown with wrong txOrId values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":1,"
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, TxOrIdHashValueMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"wrong_hash\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, TxOrIdHashValueMessage2);
+    // Exceptions thrown with wrong target values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":1,"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, TargetObjectMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkelroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, MerkleRootHashMessage);
+    // Exceptions thrown with wrong nodes values
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":\"my_nodes\"}"), std::runtime_error, NodesArrayMessage);
+    BOOST_CHECK_EXCEPTION(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"**\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"), std::runtime_error, NodeHashValueMessage);
+    // Proper Json format should not throw any exception
+    BOOST_CHECK_NO_THROW(CallRPC("verifymerkleproof {"
+        "\"flags\":2,"
+        "\"index\":4,"
+        "\"txOrId\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\","
+        "\"target\":{\"merkleroot\":\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"},"
+        "\"nodes\":[\"*\",\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\"]}"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

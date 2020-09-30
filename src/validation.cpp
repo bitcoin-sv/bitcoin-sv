@@ -47,6 +47,7 @@
 #include "versionbits.h"
 #include "warnings.h"
 #include "blockfileinfostore.h"
+#include "invalid_txn_publisher.h"
 
 #include <atomic>
 #include <sstream>
@@ -1218,8 +1219,8 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
     // Check for conflicts with in-memory transactions
-    if (pool.CheckTxConflicts(ptx, isFinal)) {
-        state.SetMempoolConflictDetected();
+    if (auto conflictsWith = pool.CheckTxConflicts(ptx, isFinal); !conflictsWith.empty()) {
+        state.SetMempoolConflictDetected( std::move(conflictsWith) );
         // Disable replacement feature for good
         state.Invalid(false, REJECT_CONFLICT, "txn-mempool-conflict");
         return Result{state, pTxInputData};
@@ -1738,6 +1739,32 @@ static void LogTxnCommitStatus(
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
 }
 
+void PublishInvalidTransaction(CTxnValResult& txStatus)
+{
+    if (!g_connman)
+    {
+        return;
+    }
+
+    const bool processingCompleted = 
+            (TxValidationPriority::low == txStatus.mTxInputData->GetTxValidationPriority() ||
+            !txStatus.mState.IsValidationTimeoutExceeded());
+
+    if (!processingCompleted)
+    {
+        // we will end up in the low priority queue
+        return;
+    }
+
+    auto pNode = txStatus.mTxInputData->GetNodePtr().lock();
+    InvalidTxnInfo::TxDetails details{
+        txStatus.mTxInputData->GetTxSource(),
+        pNode ? pNode->GetId() : -1,
+        pNode ? pNode->GetAddrName() : ""};
+    g_connman->getInvalidTxnPublisher().Publish(
+        {txStatus.mTxInputData->GetTxnPtr(), details, std::time(nullptr), txStatus.mState} );
+}
+
 void ProcessValidatedTxn(
     CTxMemPool& pool,
     CTxnValResult& txStatus,
@@ -1775,6 +1802,9 @@ void ProcessValidatedTxn(
         } else if (handlers.mpOrphanTxns && state.IsMissingInputs()) {
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
+
+        PublishInvalidTransaction(txStatus);
+
         // Logging txn status
         LogTxnInvalidStatus(txStatus);
     }
@@ -3640,10 +3670,15 @@ static bool ConnectBlock(
         for (const auto &tx : block.vtx) {
             for (size_t o = 0; o < tx->vout.size(); o++) {
                 if (view.HaveCoin(COutPoint(tx->GetId(), o))) {
-                    return state.DoS(
+                    auto result = state.DoS(
                         100,
                         error("ConnectBlock(): tried to overwrite transaction"),
                         REJECT_INVALID, "bad-txns-BIP30");
+                    if(!state.IsValid() && g_connman)
+                    {
+                        g_connman->getInvalidTxnPublisher().Publish( { tx, pindex, state } );
+                    }
+                    return result;
                 }
             }
         }
@@ -3695,7 +3730,12 @@ static bool ConnectBlock(
     uint64_t maxTxSigOpsCountConsensusBeforeGenesis = config.GetMaxTxSigOpsCountConsensusBeforeGenesis();
 
     for (size_t i = 0; i < block.vtx.size(); i++) {
-        const CTransaction &tx = *(block.vtx[i]);
+        auto& txRef = block.vtx[i];
+        const CTransaction &tx = *txRef;
+
+        CScopedInvalidTxSenderBlock dumper(
+            g_connman ? (&g_connman->getInvalidTxnPublisher()) : nullptr, 
+            txRef, pindex, state);
 
         nInputs += tx.vin.size();
 
@@ -3807,10 +3847,16 @@ static bool ConnectBlock(
     Amount blockReward =
         nFees + GetBlockSubsidy(pindex->nHeight, consensusParams);
     if (block.vtx[0]->GetValueOut() > blockReward) {
-        return state.DoS(100, error("ConnectBlock(): coinbase pays too much "
-                                    "(actual=%d vs limit=%d)",
-                                    block.vtx[0]->GetValueOut(), blockReward),
-                         REJECT_INVALID, "bad-cb-amount");
+        auto result = state.DoS(100, error("ConnectBlock(): coinbase pays too much "
+                                           "(actual=%d vs limit=%d)",
+                                           block.vtx[0]->GetValueOut(), blockReward),
+                                REJECT_INVALID, "bad-cb-amount");
+        if(!state.IsValid() && g_connman)
+        {
+            g_connman->getInvalidTxnPublisher().Publish( { block.vtx[0], pindex, state } );
+        }
+        return result;
+
     }
 
     const CBlockIndex* tipBeforeMainLockReleased = chainActive.Tip();
@@ -3839,7 +3885,9 @@ static bool ConnectBlock(
                 pindex->GetBlockHash(),
                 task::CCancellationToken::JoinToken(checkPoolToken.value(), token));
         }
-        auto controlValidationStatusOK = control.Wait();
+
+        std::vector<CScriptCheck> failedChecks;
+        auto controlValidationStatusOK = control.Wait(&failedChecks);
 
         if (!controlValidationStatusOK.has_value())
         {
@@ -3850,6 +3898,29 @@ static bool ConnectBlock(
 
         if (!controlValidationStatusOK.value())
         {
+            for(const auto& check : failedChecks)
+            {
+                auto it = std::find_if(block.vtx.begin(), block.vtx.end(),
+                                [&check](const CTransactionRef& tx)
+                                {
+                                    return tx.get() == check.GetTransaction();
+                                });
+                if (it == block.vtx.end())
+                {
+                    continue;
+                }
+
+                CValidationState state;
+                state.Invalid( false,
+                               REJECT_INVALID,
+                               strprintf("blk-bad-inputs (%s)",
+                                         ScriptErrorString(check.GetScriptError())));
+                if(g_connman)
+                {
+                    g_connman->getInvalidTxnPublisher().Publish( { *it, pindex, state } );
+                }
+            }
+
             return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
                              "parallel script check failed");
         }
@@ -5098,7 +5169,8 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     InvalidChainFound(pindex);
     uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
 
-    if (state.IsValid()) {
+    if (state.IsValid() && g_connman) {
+        CScopedBlockOriginRegistry reg(pindex->GetBlockHash(), "invalidateblock");
         auto source = task::CCancellationSource::Make();
         // state is used to report errors, not block related invalidity
         // (see description of ActivateBestChain)
@@ -5453,11 +5525,18 @@ bool CheckBlock(const Config &config, const CBlock &block,
 
     // And a valid coinbase.
     if (!CheckCoinbase(*block.vtx[0], state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
-        return state.Invalid(false, state.GetRejectCode(),
-                             state.GetRejectReason(),
-                             strprintf("Coinbase check failed (txid %s) %s",
-                                       block.vtx[0]->GetId().ToString(),
-                                       state.GetDebugMessage()));
+        auto result = state.Invalid(false, state.GetRejectCode(),
+                                    state.GetRejectReason(),
+                                    strprintf("Coinbase check failed (txid %s) %s",
+                                              block.vtx[0]->GetId().ToString(),
+                                              state.GetDebugMessage()));
+        if(!state.IsValid() && g_connman)
+        {
+            g_connman->getInvalidTxnPublisher().Publish(
+                { block.vtx[0], block.GetHash(), blockHeight, block.GetBlockTime(), state } );
+        }
+        return result;
+
     }
 
     // Keep track of the sigops count.
@@ -5478,8 +5557,14 @@ bool CheckBlock(const Config &config, const CBlock &block,
             bool sigOpCountError;
             nSigOps += GetSigOpCountWithoutP2SH(*tx, false, sigOpCountError);
             if (sigOpCountError || nSigOps > nMaxSigOpsCountConsensusBeforeGenesis) {
-                return state.DoS(100, false, REJECT_INVALID, "bad-blk-sigops",
-                    false, "out-of-bounds SigOpCount");
+                auto result = state.DoS(100, false, REJECT_INVALID, "bad-blk-sigops",
+                                        false, "out-of-bounds SigOpCount");
+                if(!state.IsValid() && g_connman)
+                {
+                    g_connman->getInvalidTxnPublisher().Publish(
+                        { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state } );
+                }
+                return result;
             }
         }
         // Go to the next transaction.
@@ -5495,10 +5580,17 @@ bool CheckBlock(const Config &config, const CBlock &block,
         // least one increment.
         tx = block.vtx[i].get();
         if (!CheckRegularTransaction(*tx, state, maxTxSigOpsCountConsensusBeforeGenesis, maxTxSizeConsensus, isGenesisEnabled)) {
-            return state.Invalid(
+            auto result = state.Invalid(
+
                 false, state.GetRejectCode(), state.GetRejectReason(),
                 strprintf("Transaction check failed (txid %s) %s",
                           tx->GetId().ToString(), state.GetDebugMessage()));
+            if(!state.IsValid() && g_connman)
+            {
+                g_connman->getInvalidTxnPublisher().Publish(
+                    { block.vtx[i], block.GetHash(), blockHeight, block.GetBlockTime(), state } );
+            }
+            return result;
         }
     }
 
@@ -5683,6 +5775,11 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
     for (const auto &tx : block.vtx) {
         if (!ContextualCheckTransaction(config, *tx, state, nHeight,
                                         nLockTimeCutoff, true)) {
+            if(g_connman)
+            {
+                g_connman->getInvalidTxnPublisher().Publish(
+                    { tx, block.GetHash(), nHeight, block.GetBlockTime(), state } );
+            }
             // state set by ContextualCheckTransaction.
             return false;
         }
@@ -5694,8 +5791,15 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
         if (block.vtx[0]->vin[0].scriptSig.size() < expect.size() ||
             !std::equal(expect.begin(), expect.end(),
                         block.vtx[0]->vin[0].scriptSig.begin())) {
-            return state.DoS(100, false, REJECT_INVALID, "bad-cb-height", false,
-                             "block height mismatch in coinbase");
+
+            auto result = state.DoS(100, false, REJECT_INVALID, "bad-cb-height", false,
+                                    "block height mismatch in coinbase");
+            if(!state.IsValid() && g_connman)
+            {
+                g_connman->getInvalidTxnPublisher().Publish(
+                    { block.vtx[0], block.GetHash(), nHeight, block.GetBlockTime(), state } );
+            }
+            return result;
         }
     }
 

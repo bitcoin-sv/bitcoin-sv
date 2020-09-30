@@ -120,6 +120,9 @@ BITCOIN_CORE_H = \
   httpserver.h \
   indirectmap.h \
   init.h \
+  invalid_txn_publisher.h \
+  invalid_txn_sinks/file_sink.h \
+  invalid_txn_sinks/zmq_sink.h \
   key.h \
   keystore.h \
   dbwrapper.h \
@@ -128,6 +131,8 @@ BITCOIN_CORE_H = \
   logging.h \
   memusage.h \
   merkleblock.h \
+  merkletreedb.h \
+  merkletreestore.h \
   mining/assembler.h \
   mining/candidates.h \
   mining/factory.h \
@@ -158,6 +163,11 @@ BITCOIN_CORE_H = \
   reverselock.h \
   rpc/blockchain.h \
   rpc/client.h \
+  rpc/client_config.h \
+  rpc/client_utils.h \
+  rpc/http_protocol.h \
+  rpc/http_request.h \
+  rpc/http_response.h \
   rpc/jsonwriter.h \
   rpc/mining.h \
   rpc/misc.h \
@@ -183,6 +193,7 @@ BITCOIN_CORE_H = \
   task.h \
   taskcancellation.h \
   task_helpers.h \
+  thread_safe_queue.h \
   threadpool.h \
   threadpoolT.h \
   threadpriority.h \
@@ -222,6 +233,7 @@ BITCOIN_CORE_H = \
   wallet/wallet.h \
   wallet/walletdb.h \
   warnings.h \
+  zmq/zmq_publisher.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
   zmq/zmqnotificationinterface.h \
@@ -249,8 +261,13 @@ libbitcoin_server_a_SOURCES = \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
+  invalid_txn_publisher.cpp \
+  invalid_txn_sinks/file_sink.cpp \
+  invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
   merkleblock.cpp \
+  merkletreedb.cpp \
+  merkletreestore.cpp \
   mining/assembler.cpp \
   mining/candidates.cpp \
   mining/factory.cpp \
@@ -302,6 +319,7 @@ if ENABLE_ZMQ
 libbitcoin_zmq_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(ZMQ_CFLAGS)
 libbitcoin_zmq_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_zmq_a_SOURCES = \
+  zmq/zmq_publisher.cpp \
   zmq/zmqabstractnotifier.cpp \
   zmq/zmqnotificationinterface.cpp \
   zmq/zmqpublishnotifier.cpp
@@ -459,6 +477,10 @@ libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
   rpc/client.cpp \
+  rpc/client_config.cpp \
+  rpc/client_utils.cpp \
+  rpc/http_request.cpp \
+  rpc/http_response.cpp \
   $(BITCOIN_CORE_H)
 
 # seeder library

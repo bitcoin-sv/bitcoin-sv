@@ -6,6 +6,7 @@
 
 from base64 import b64encode
 from binascii import hexlify, unhexlify
+import configparser
 from decimal import Decimal, ROUND_DOWN
 import glob
 import hashlib
@@ -19,7 +20,6 @@ import time
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
-import glob
 
 logger = logging.getLogger("TestFramework.utils")
 
@@ -779,3 +779,24 @@ def check_for_log_msg(rpc, log_msg, node_dir):
 
 def hashToHex(hash):
     return format(hash, '064x')
+
+def check_zmq_test_requirements(configfile, skip_test_exception):
+    # Check that bitcoin has been built with ZMQ enabled
+    config = configparser.ConfigParser()
+    if not configfile:
+        if os.path.exists(os.path.dirname(__file__) + "/../../../build/test/config.ini"):
+            configfile = os.path.dirname(__file__) + "/../../../build/test/config.ini"
+        elif os.path.exists(os.path.dirname(__file__) + "/../../config.ini"):
+            configfile = os.path.dirname(__file__) + "/../../config.ini"
+        else:
+            raise Exception("config.ini not found please provide path with --configfile <path to>/config.ini")
+    config.read_file(open(configfile))
+
+    if not config["components"].getboolean("ENABLE_ZMQ"):
+        raise skip_test_exception
+
+    # if we built bitcoind with ZMQ enabled, then we need zmq package to test its functionality
+    try:
+        import zmq
+    except ImportError:
+        raise Exception("pyzmq module not available.")

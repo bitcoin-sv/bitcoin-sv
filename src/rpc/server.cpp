@@ -10,6 +10,7 @@
 #include "fs.h"
 #include "init.h"
 #include "random.h"
+#include "rpc/http_protocol.h"
 #include "sync.h"
 #include "ui_interface.h"
 #include "util.h"

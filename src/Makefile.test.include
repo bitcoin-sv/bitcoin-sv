@@ -66,6 +66,7 @@ BITCOIN_TESTS =\
   test/instruction_iterator_tests.cpp \
   test/int_serialization_tests.cpp \
   test/inv_tests.cpp \
+  test/invalid_txn_publisher_tests.cpp \
   test/journal_tests.cpp \
   test/jsonutil.cpp \
   test/json_tests.cpp \
@@ -78,6 +79,7 @@ BITCOIN_TESTS =\
   test/main_tests.cpp \
   test/mempool_tests.cpp \
   test/merkle_tests.cpp \
+  test/merkletreefile_readwrite_tests.cpp \
   test/miner_tests.cpp \
   test/net_association_tests.cpp \
   test/object_stream_deserialization_tests.cpp \
@@ -124,6 +126,7 @@ BITCOIN_TESTS =\
   test/test_txnvalidator.cpp \
   test/testutil.cpp \
   test/testutil.h \
+  test/thread_safe_queue_tests.cpp \
   test/threadpool_tests.cpp \
   test/timedata_tests.cpp \
   test/time_locked_mempool_tests.cpp \
@@ -160,7 +163,7 @@ test_test_bitcoin_LDADD += $(LIBBITCOIN_CONSENSUS) $(BDB_LIBS) $(OPENSSL_LIBS) $
 test_test_bitcoin_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -static
 
 if ENABLE_ZMQ
-test_test_bitcoin_LDADD += $(ZMQ_LIBS)
+test_test_bitcoin_LDADD += $(LIBBITCOIN_ZMQ) $(ZMQ_LIBS)
 endif
 #
 

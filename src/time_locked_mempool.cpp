@@ -144,24 +144,26 @@ bool CTimeLockedMempool::finalisesExistingTransaction(const CTransactionRef& txn
 }
 
 // Check the given transaction doesn't try to double spend any of our locked UTXOs.
-bool CTimeLockedMempool::checkForDoubleSpend(const CTransactionRef& txn) const
+std::set<CTransactionRef> CTimeLockedMempool::checkForDoubleSpend(const CTransactionRef& txn) const
 {
     std::shared_lock lock { mMtx };
 
     if(mUTXOMap.empty())
     {
-        return false;
+        return {};
     }
+
+    std::set<CTransactionRef> conflictsWith;
 
     for(const CTxIn& txin : txn->vin)
     {
-        if(mUTXOMap.find(txin.prevout) != mUTXOMap.end())
+        if(auto it = mUTXOMap.find(txin.prevout); it != mUTXOMap.end())
         {
-            return true;
+            conflictsWith.insert(it->second);
         }
     }
 
-    return false;
+    return conflictsWith;
 }
 
 // Is the given txn ID for one currently held?

@@ -88,6 +88,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	inv_tests.cpp
     int_serialization_tests.cpp
     instruction_iterator_tests.cpp
+    invalid_txn_publisher_tests.cpp
 	journal_tests.cpp
 	json_tests.cpp
 	jsonutil.cpp
@@ -99,6 +100,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	main_tests.cpp
 	mempool_tests.cpp
 	merkle_tests.cpp
+	merkletreefile_readwrite_tests.cpp
 	miner_tests.cpp
     net_association_tests.cpp
 	object_stream_deserialization_tests.cpp
@@ -139,6 +141,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	test_txnvalidation_utils.cpp
 	test_txnvalidator.cpp
 	testutil.cpp
+	thread_safe_queue_tests.cpp
     threadpool_tests.cpp
 	timedata_tests.cpp
     time_locked_mempool_tests.cpp

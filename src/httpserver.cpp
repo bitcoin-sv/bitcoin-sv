@@ -8,7 +8,7 @@
 #include "compat.h"
 #include "config.h"
 #include "net/netbase.h"
-#include "rpc/protocol.h" // For HTTP status codes
+#include "rpc/http_protocol.h" // For HTTP status codes
 #include "sync.h"
 #include "ui_interface.h"
 #include "util.h"

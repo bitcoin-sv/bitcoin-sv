@@ -10,6 +10,7 @@
 #include "crypto/hmac_sha256.h"
 #include "httpserver.h"
 #include "random.h"
+#include "rpc/http_protocol.h"
 #include "rpc/protocol.h"
 #include "rpc/server.h"
 #include "sync.h"
