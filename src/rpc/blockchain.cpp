@@ -1133,26 +1133,25 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config,
 
     std::string delimiter;
 
-    req.WriteReplyChunk("{\"tx\":[");
+    CHttpTextWriter httpWriter(req);
+    CJSONWriter jWriter(httpWriter, false);
+
+    jWriter.writeBeginObject();
+    jWriter.writeBeginArray("tx");
+    bool isGenesisEnabled = IsGenesisEnabled(config, blockIndex.nHeight);
     do
     {
         const CTransaction& transaction = reader->ReadTransaction();
         if (showTxDetails)
         {
-            req.WriteReplyChunk(delimiter);
-
-            CHttpTextWriter httpWriter(req);
-            CJSONWriter jWritter(httpWriter, false);
-            TxToJSON(transaction, uint256(), IsGenesisEnabled(config, blockIndex.nHeight), RPCSerializationFlags(), jWritter);
-            delimiter = ",";
+            TxToJSON(transaction, uint256(), isGenesisEnabled, RPCSerializationFlags(), jWriter);
         }
         else
         {
-            std::string strJSON = delimiter + UniValue(transaction.GetId().GetHex()).write();
-            req.WriteReplyChunk(strJSON);
-            delimiter = ",";
+            jWriter.pushV(transaction.GetId().GetHex());
         }
     } while(!reader->EndOfStream() && !showOnlyCoinbase);
+    jWriter.writeEndArray();
 
     CBlockHeader header = reader->GetBlockHeader();
 
@@ -1162,8 +1161,8 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config,
         CDiskBlockMetaData metadata = reader->getDiskBlockMetadata();
         SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);
     }
-
-    req.WriteReplyChunk("]," + headerBlockToJSON(config, header, &blockIndex) + "}");
+    jWriter.pushVJSONFormatted(headerBlockToJSON(config, header, &blockIndex));
+    jWriter.writeEndObject();
 }
 
 std::string headerBlockToJSON(const Config &config,

@@ -10,126 +10,118 @@
 BOOST_FIXTURE_TEST_SUITE(json_tests, BasicTestingSetup)
 
 CStringWriter strWriter;
-CJSONWriter jsonWriter(strWriter, false);
 
-BOOST_AUTO_TEST_CASE(CJWriter_write_array) 
+BOOST_AUTO_TEST_CASE(CJWriter_write_array)
 {
+    CJSONWriter jsonWriter(strWriter, false);
     jsonWriter.writeBeginArray("Array");
     jsonWriter.writeEndArray();
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"Array\": [],");
-
-    jsonWriter.writeBeginArray("Array");
-    jsonWriter.writeEndArray(false);
 
     BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"Array\": []");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_write_object) 
 {
+    CJSONWriter jsonWriter(strWriter, false);
     jsonWriter.writeBeginObject("Object");
     jsonWriter.writeEndObject();
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"Object\": {},");
-
-    jsonWriter.writeBeginObject("Object");
-    jsonWriter.writeEndObject(false);
 
     BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"Object\": {}");
 }
 
-BOOST_AUTO_TEST_CASE(CJWriter_pushK_pushV) 
+BOOST_AUTO_TEST_CASE(CJWriter_pushK) 
 {
+    CJSONWriter jsonWriter(strWriter, false);
     jsonWriter.pushK("key");
-    jsonWriter.pushV("val", true);
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"val\",\n");
-
-    jsonWriter.pushK("key");
-    jsonWriter.pushV("val", false);
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"val\"\n");
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": ");
 }
 
-BOOST_AUTO_TEST_CASE(CJWriter_pushKVMoney) 
+BOOST_AUTO_TEST_CASE(CJWriter_pushV)
 {
-    jsonWriter.pushKVMoney("key", "0");
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.pushV("val");
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": 0,");
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"val\"");
+}
 
-    jsonWriter.pushKVMoney("key", "0", false);
+BOOST_AUTO_TEST_CASE(CJWriter_pushKVMoney)
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.pushKVJSONFormatted("key", "0");
 
     BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": 0");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_pushKVString) 
 {
+    CJSONWriter jsonWriter(strWriter, false);
     jsonWriter.pushKV("key", "val");
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"val\",");
-
-    jsonWriter.pushKV("key", "val", false);
 
     BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"val\"");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_pushKVChar) 
 {
+    CJSONWriter jsonWriter(strWriter, false);
     const char* c = "v";
     jsonWriter.pushKV("key", c);
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"v\",");
-
-    jsonWriter.pushKV("key", c, false);
 
     BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": \"v\"");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_pushKVInt64) 
 {
+    CJSONWriter jsonWriter(strWriter, false);
     jsonWriter.pushKV("key", int64_t(100));
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": 100,");
-
-    jsonWriter.pushKV("key", int64_t(100), false);
 
     BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": 100");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_pushKVInt) 
 {
+    CJSONWriter jsonWriter(strWriter, false);
     jsonWriter.pushKV("key", 100);
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": 100,");
-
-    jsonWriter.pushKV("key", 100, false);
 
     BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": 100");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_pushKVBool) 
 {
+    CJSONWriter jsonWriter(strWriter, false);
     jsonWriter.pushKV("key", true);
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": true,");
-
-    jsonWriter.pushKV("key", true, false);
 
     BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": true");
 }
 
-BOOST_AUTO_TEST_CASE(CJWriter_pushQuote) 
+BOOST_AUTO_TEST_CASE(CJWriter_pushKVDouble)
 {
-    jsonWriter.pushQuote(true);
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.pushKV("key", double(100.101));
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\",");
-
-    jsonWriter.pushQuote(true, false);
-
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"");
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": 100.101");
 }
 
-BOOST_AUTO_TEST_CASE(CJWriter_write_JSONText) 
+BOOST_AUTO_TEST_CASE(CJWriter_pushKVNullPtr)
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.pushKV("key", nullptr);
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"key\": null");
+}
+
+BOOST_AUTO_TEST_CASE(CJWriter_pushQuote)
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.pushK("quotes");
+    jsonWriter.pushQuote();
+    jsonWriter.getWriter().Write("test_quotes");
+    jsonWriter.pushQuote();
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "\"quotes\": \"test_quotes\"");
+}
+
+void CreateComplexJSONObject(CJSONWriter jsonWriter)
 {
     const char* c = "v";
 
@@ -137,47 +129,124 @@ BOOST_AUTO_TEST_CASE(CJWriter_write_JSONText)
     jsonWriter.pushKV("int", 1);
     jsonWriter.pushKV("bool", true);
     jsonWriter.pushKV("string", "val");
-    jsonWriter.pushKVMoney("money", "1");
+    jsonWriter.pushKVJSONFormatted("money", "1");
     jsonWriter.pushKV("int64", int64_t(64));
     jsonWriter.pushKV("char", c);
     jsonWriter.pushK("quotes");
-    jsonWriter.pushQuote(true, false);
+    jsonWriter.pushQuote();
     jsonWriter.getWriter().Write("test_quotes");
-    jsonWriter.pushQuote(true);
+    jsonWriter.pushQuote();
     jsonWriter.writeBeginArray("array");
-    jsonWriter.pushV("arr1", true);
-    jsonWriter.pushV("arr2", true);
-    jsonWriter.pushV("arr3", false);
-    jsonWriter.writeEndArray(false);
-    jsonWriter.writeEndObject(false);
+    std::vector<std::string> strings;
+    strings.push_back("arr1");
+    strings.push_back("arr2");
+    strings.push_back("arr3");
+    jsonWriter.pushV(strings);
+    jsonWriter.writeEndArray();
+    jsonWriter.writeBeginArray("emptyArray");
+    jsonWriter.writeEndArray();
+    jsonWriter.writeBeginObject("emptyObj");
+    jsonWriter.writeEndObject();
+    jsonWriter.writeBeginObject("obj");
+    jsonWriter.pushKV("null_type", nullptr);
+    jsonWriter.writeEndObject();
+    jsonWriter.writeEndObject();
+}
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\"int\": 1,\"bool\": true,\"string\": \"val\",\"money\": 1,\"int64\": 64,\"char\": \"v\",\"quotes\": \"test_quotes\",\"array\": [\"arr1\",\n\"arr2\",\n\"arr3\"\n]}");
+BOOST_AUTO_TEST_CASE(CJWriter_write_JSONText) 
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    CreateComplexJSONObject(jsonWriter);
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\"int\": 1,\"bool\": true,\"string\": \"val\",\"money\": 1,"\
+                                                 "\"int64\": 64,\"char\": \"v\",\"quotes\": \"test_quotes\","\
+                                                 "\"array\": [\"arr1\",\"arr2\",\"arr3\"],\"emptyArray\": [],"\
+                                                 "\"emptyObj\": {},\"obj\": {\"null_type\": null}}");
 }
 
 BOOST_AUTO_TEST_CASE(CJWriter_write_JSONText_with_indents)
 {
-    const char* c = "v";
     CJSONWriter indentJsonWriter(strWriter, true, 2);
+    CreateComplexJSONObject(indentJsonWriter);
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\n  \"int\": 1,\n  \"bool\": true,\n  \"string\": \"val\",\n  \"money\": 1,"\
+                                                 "\n  \"int64\": 64,\n  \"char\": \"v\",\n  \"quotes\": \"test_quotes\","\
+                                                 "\n  \"array\": [\n    \"arr1\",\n    \"arr2\",\n    \"arr3\"\n  ],\n  "\
+                                                 "\"emptyArray\": [\n  ],\n  \"emptyObj\": {\n  },\n  \"obj\": {\n    "\
+                                                 "\"null_type\": null\n  }\n}");
+}
 
-    indentJsonWriter.writeBeginObject();
-    indentJsonWriter.pushKV("int", 1);
-    indentJsonWriter.pushKV("bool", true);
-    indentJsonWriter.pushKV("string", "val");
-    indentJsonWriter.pushKVMoney("money", "1");
-    indentJsonWriter.pushKV("int64", int64_t(64));
-    indentJsonWriter.pushKV("char", c);
-    indentJsonWriter.pushK("quotes");
-    indentJsonWriter.pushQuote(true, false);
-    indentJsonWriter.getWriter().Write("test_quotes");
-    indentJsonWriter.pushQuote(false);
-    indentJsonWriter.writeBeginArray("array");
-    indentJsonWriter.pushV("arr1", true);
-    indentJsonWriter.pushV("arr2", true);
-    indentJsonWriter.pushV("arr3", false);
-    indentJsonWriter.writeEndArray(false);
-    indentJsonWriter.writeEndObject(false);
+BOOST_AUTO_TEST_CASE(CJWriter_write_array_of_objects)
+{
+    CJSONWriter jsonWriter(strWriter, false);
 
-    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\n  \"int\": 1,\n  \"bool\": true,\n  \"string\": \"val\",\n  \"money\": 1,\n  \"int64\": 64,\n  \"char\": \"v\",\n  \"quotes\": \"test_quotes\",\n  \"array\": [\n    \"arr1\",\n    \"arr2\",\n    \"arr3\"\n  ]\n}");
+    jsonWriter.writeBeginArray();
+    jsonWriter.writeBeginObject();
+    jsonWriter.pushKV("Name", "Value");
+    jsonWriter.writeEndObject();
+    jsonWriter.writeBeginObject();
+    jsonWriter.pushKV("Name", "Value");
+    jsonWriter.writeEndObject();
+    jsonWriter.writeBeginObject();
+    jsonWriter.pushKV("Name", "Value");
+    jsonWriter.writeEndObject();
+    jsonWriter.writeEndArray();
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "[{\"Name\": \"Value\"},{\"Name\": \"Value\"},{\"Name\": \"Value\"}]");
+}
+
+BOOST_AUTO_TEST_CASE(CJWriter_write_array_within_array)
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.writeBeginArray();
+    jsonWriter.writeBeginArray();
+    jsonWriter.pushV("val1");
+    jsonWriter.pushV("val2");
+    jsonWriter.writeEndArray();
+    jsonWriter.writeBeginArray();
+    jsonWriter.pushV("val3");
+    jsonWriter.pushV("val4");
+    jsonWriter.writeEndArray();
+    jsonWriter.writeEndArray();
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "[[\"val1\",\"val2\"],[\"val3\",\"val4\"]]");
+}
+
+BOOST_AUTO_TEST_CASE(CJWriter_empty_array)
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.writeBeginArray();
+    jsonWriter.writeEndArray();
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "[]");
+}
+
+BOOST_AUTO_TEST_CASE(CJWriter_array_with_value)
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.writeBeginArray();
+    jsonWriter.pushV("val1");
+    jsonWriter.writeEndArray();
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "[\"val1\"]");
+}
+
+BOOST_AUTO_TEST_CASE(CJWriter_empty_object)
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.writeBeginObject();
+    jsonWriter.writeEndObject();
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{}");
+}
+
+BOOST_AUTO_TEST_CASE(CJWriter_object_with_value)
+{
+    CJSONWriter jsonWriter(strWriter, false);
+    jsonWriter.writeBeginObject();
+    jsonWriter.pushKV("key", "value");
+    jsonWriter.writeEndObject();
+
+    BOOST_CHECK_EQUAL(strWriter.MoveOutString(), "{\"key\": \"value\"}");
 }
 
 BOOST_AUTO_TEST_CASE(json_decode_tx_from_mainnet)
@@ -242,6 +311,47 @@ BOOST_AUTO_TEST_CASE(json_decode_tx_with_2_same_inputs_outputs_addresses)
 
     CJSONWriter jWriter(strWriter, true, 2);
     TxToJSON(tx, uint256(), false, 0, jWriter);
+
+    UniValue uv(UniValue::VOBJ);
+    // Read the JSON string into UniValue object to check if JSON is well formed. 
+    // Method read returns false if it was unable to read JSON string
+    BOOST_CHECK(uv.read(strWriter.MoveOutString()));
+}
+
+BOOST_AUTO_TEST_CASE(json_decode_block_with_2tx_with_same_inputs_outputs_addresses)
+{
+    CKey key;
+    key.MakeNewKey(true);
+    // Create multisig operation with 2 same addresses
+    CScript multisig2;
+    multisig2 << OP_1 << ToByteVector(key.GetPubKey())
+        << ToByteVector(key.GetPubKey()) << OP_2 << OP_CHECKMULTISIG;
+
+    CMutableTransaction txFrom;
+    txFrom.vout.resize(1);
+    txFrom.vout[0].scriptPubKey = CScript(OP_RETURN);
+
+    // Create transaction with 2 equal inputs, 2 equal outputs and 2 equal addresses to test JSON output
+    CMutableTransaction mtx;
+    mtx.vout.resize(2);
+    mtx.vout[0].scriptPubKey = multisig2;
+    mtx.vout[1] = mtx.vout[0]; // Create copy of the first output 
+
+    mtx.vin.resize(2);
+    mtx.vin[0].prevout = COutPoint(txFrom.GetId(), 0);
+    mtx.vin[1] = mtx.vin[0]; // Create copy of the first input 
+
+    CTransaction tx(mtx);
+
+    CJSONWriter jWriter(strWriter, true, 2);
+    jWriter.writeBeginObject();
+    jWriter.writeBeginArray("tx");
+
+    TxToJSON(tx, uint256(), false, 0, jWriter);
+    TxToJSON(tx, uint256(), false, 0, jWriter);
+
+    jWriter.writeEndArray();
+    jWriter.writeEndObject();
 
     UniValue uv(UniValue::VOBJ);
     // Read the JSON string into UniValue object to check if JSON is well formed. 
