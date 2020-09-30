@@ -19,11 +19,13 @@ struct CThreadSafeQueue<T>::UnitTestAccess
     
     static auto Count(const CThreadSafeQueue& q)
     {
+        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx));
         return q.theQueue.size();
     }
 
     static auto Size(const CThreadSafeQueue& q)
     { 
+        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx));
         return q.currentSize;
     }
 };
