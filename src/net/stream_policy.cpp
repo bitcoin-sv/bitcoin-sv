@@ -14,6 +14,8 @@ namespace
                cmd == NetMsgType::CMPCTBLOCK ||
                cmd == NetMsgType::BLOCKTXN ||
                cmd == NetMsgType::GETBLOCKTXN ||
+               cmd == NetMsgType::HEADERS ||
+               cmd == NetMsgType::GETHEADERS ||
                payloadType == CSerializedNetMsg::PayloadType::BLOCK;
     }
 
