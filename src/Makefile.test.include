@@ -82,12 +82,13 @@ BITCOIN_TESTS =\
   test/merkle_tests.cpp \
   test/merkletreefile_readwrite_tests.cpp \
   test/miner_tests.cpp \
-  test/net_association_tests.cpp \
-  test/object_stream_deserialization_tests.cpp \
-  test/opcode_tests.cpp \
   test/multisig_tests.cpp \
+  test/net_association_tests.cpp \
+  test/net_message_maker_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
+  test/object_stream_deserialization_tests.cpp \
+  test/opcode_tests.cpp \
   test/pmt_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \
