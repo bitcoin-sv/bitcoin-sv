@@ -714,6 +714,7 @@ public:
 
     void InitMempoolTxDB();
     uint64_t GetDiskUsage();
+    uint64_t GetDiskTxCount();
     void SaveTxsToDisk(uint64_t requiredSize);
 
 public:

@@ -30,11 +30,12 @@ public:
 /** Access to the mempool transaction database (mempoolTxs/) */
 class CMempoolTxDB : public CMempoolTxDBReader {
 private:
-    // Prefix to store map of Transaction values with txid as a
-    // key
+    // Prefix to store map of Transaction values with txid as a key
     static constexpr char DB_TRANSACTIONS = 'T';
     // Prefix to store disk usage
     static constexpr char DB_DISK_USAGE = 'D';
+    // Prefix to store transaaction count
+    static constexpr char DB_TX_COUNT = 'C';
 
     // Saved database parameters
     const fs::path dbPath;
@@ -44,6 +45,7 @@ private:
     std::unique_ptr<CDBWrapper> mempoolTxDB;
 
     std::atomic_uint64_t diskUsage {0};
+    std::atomic_uint64_t txCount {0};
 
 public:
     /**
@@ -79,6 +81,11 @@ public:
      * Return the total size of transactions moved to disk.
      */
     uint64_t GetDiskUsage();
+
+    /*
+     * Return the number of transactions moved to disk.
+     */
+    uint64_t GetTxCount();
 
 
     using TxIdSet = std::unordered_set<uint256, SaltedTxidHasher>;
@@ -117,6 +124,12 @@ public:
     uint64_t GetDiskUsage()
     {
         return txdb->GetDiskUsage();
+    }
+
+    // Get the number of transactions in the database.
+    uint64_t GetTxCount()
+    {
+        return txdb->GetTxCount();
     }
 
     // Return a read-only database reference

@@ -36,6 +36,7 @@ BOOST_AUTO_TEST_CASE(WriteToTxDB)
 
     CMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -45,6 +46,7 @@ BOOST_AUTO_TEST_CASE(WriteToTxDB)
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Check that all transactions are in the database.
     for (const auto& e : entries)
@@ -60,6 +62,7 @@ BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
 
     CMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -69,6 +72,7 @@ BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Check that all transactions are in the database.
     for (const auto& e : entries)
@@ -83,7 +87,9 @@ BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
     BOOST_WARN_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_WARN_EQUAL(txdb.GetTxCount(), entries.size());
     BOOST_CHECK_GE(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_GE(txdb.GetTxCount(), entries.size());
     for (const auto& e : entries)
     {
         CTransactionRef _;
@@ -97,6 +103,7 @@ BOOST_AUTO_TEST_CASE(DeleteFromTxDB)
 
     CMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -106,6 +113,7 @@ BOOST_AUTO_TEST_CASE(DeleteFromTxDB)
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Remove transactions from the database one by one.
     for (const auto& e : entries)
@@ -114,6 +122,7 @@ BOOST_AUTO_TEST_CASE(DeleteFromTxDB)
         BOOST_CHECK(txdb.RemoveTransactions(txids, e.GetTxSize()));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
     for (const auto& e : entries)
     {
         CTransactionRef _;
@@ -127,6 +136,7 @@ BOOST_AUTO_TEST_CASE(BatchDeleteFromTxDB)
 
     CMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -138,10 +148,12 @@ BOOST_AUTO_TEST_CASE(BatchDeleteFromTxDB)
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Remove all transactions from the database at once.
     BOOST_CHECK(txdb.RemoveTransactions(txids, totalSize));
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
     for (const auto& e : entries)
     {
         CTransactionRef _;
@@ -153,11 +165,13 @@ BOOST_AUTO_TEST_CASE(BadDeleteFromTxDB)
 {
     CMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Remove nonexistent transactions.
     const auto e = GetABunchOfEntries(3);
     BOOST_CHECK(txdb.RemoveTransactions({e[0].GetTxId(), e[1].GetTxId(), e[2].GetTxId()}, 777));
     BOOST_WARN_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_WARN_EQUAL(txdb.GetTxCount(), 0);
 }
 
 BOOST_AUTO_TEST_CASE(ClearTxDB)
@@ -166,6 +180,7 @@ BOOST_AUTO_TEST_CASE(ClearTxDB)
 
     CMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -175,10 +190,12 @@ BOOST_AUTO_TEST_CASE(ClearTxDB)
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Clear the database and check that it's empty.
     txdb.ClearDatabase();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
     for (const auto& e : entries)
     {
         CTransactionRef _;
@@ -192,6 +209,7 @@ BOOST_AUTO_TEST_CASE(GetContentsOfTxDB)
 
     CMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -201,6 +219,7 @@ BOOST_AUTO_TEST_CASE(GetContentsOfTxDB)
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Check that all transactions are in the database and only the ones we wrote.
     auto keys = txdb.GetKeys();
@@ -224,6 +243,7 @@ BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
 
     CAsyncMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -237,6 +257,7 @@ BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
     txdb.Add(std::move(wrappers));
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Check that all transactions are in the databas.
     const auto innerdb = txdb.GetDatabase();
@@ -253,6 +274,7 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
 
     CAsyncMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -270,6 +292,7 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
     txdb.Remove(std::move(txids), totalSize);
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
     const auto innerdb = txdb.GetDatabase();
     for (const auto& e : entries)
     {
@@ -284,6 +307,7 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
 
     CAsyncMempoolTxDB txdb(10000);
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
@@ -297,6 +321,7 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
     txdb.Add(std::move(wrappers));
     txdb.Clear();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     const auto innerdb = txdb.GetDatabase();
     for (const auto& e : entries)
@@ -345,6 +370,7 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
     testPool.SaveTxsToDisk(10000);
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK_EQUAL(testPool.Size(), 0);
 
     // Add transactions:
@@ -362,17 +388,22 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
 
     // But it does store something to disk:
     const auto diskUsage = testPool.GetDiskUsage();
+    const auto txCount = testPool.GetDiskTxCount();
     BOOST_CHECK_GT(diskUsage, 0);
+    BOOST_CHECK_GT(txCount, 0);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 
     // Check that all transactions have been saved to disk:
-    uint64_t sizeTXsAdded = 0;
+    uint64_t sizeTxsAdded = 0;
+    uint64_t countTxsAdded = 0;
     for (const auto& entry : testPoolAccess.mapTx().get<entry_time>())
     {
         BOOST_CHECK(!entry.IsInMemory());
-        sizeTXsAdded += entry.GetTxSize();
+        sizeTxsAdded += entry.GetTxSize();
+        ++countTxsAdded;
     }
-    BOOST_CHECK_EQUAL(diskUsage, sizeTXsAdded);
+    BOOST_CHECK_EQUAL(diskUsage, sizeTxsAdded);
+    BOOST_CHECK_EQUAL(txCount, countTxsAdded);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 }
 
@@ -397,6 +428,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrim)
 
     // But it does store something to disk:
     BOOST_CHECK_GT(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_GT(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 
     // Trimming the mempool size should also remove transactions from disk:
@@ -404,6 +436,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrim)
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), 0);
     BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 }
 
@@ -427,11 +460,13 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), 0);
     BOOST_CHECK_GT(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_GT(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK(!testPoolAccess.CheckMempoolTxDB());
 
     // Clearing the database should put everything right again.
     testPoolAccess.mempoolTxDB()->Clear();
     BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 
     // Add transactions to the mempool and mark them saved without writing to disk.
@@ -447,12 +482,14 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), numberOfEntries);
     BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK(!testPoolAccess.CheckMempoolTxDB());
 
     // Clearing the mempool should put everything right again.
     testPool.Clear();
     BOOST_CHECK_EQUAL(testPool.Size(), 0);
     BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 }
 BOOST_AUTO_TEST_SUITE_END()

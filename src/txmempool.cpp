@@ -1414,9 +1414,11 @@ bool CTxMemPool::CheckMempoolTxDBNL(bool hardErrors) const
 
     mempoolTxDB->Sync();
     auto keys = mempoolTxDB->GetTxKeys();
-    for (auto& e : mapTx)
+    ASSERT_OR_FAIL(keys.size() == mempoolTxDB->GetTxCount());
+    uint64_t totalSize = 0;
+    for (const auto& e : mapTx)
     {
-        auto key = keys.find(e.GetTxId());
+        const auto key = keys.find(e.GetTxId());
         if (e.IsInMemory())
         {
             ASSERT_OR_FAIL(key == keys.end());
@@ -1425,9 +1427,11 @@ bool CTxMemPool::CheckMempoolTxDBNL(bool hardErrors) const
         {
             ASSERT_OR_FAIL(key != keys.end());
             keys.erase(key);
+            totalSize += e.GetTxSize();
         }
     }
     ASSERT_OR_FAIL(keys.size() == 0);
+    ASSERT_OR_FAIL(totalSize == mempoolTxDB->GetDiskUsage());
     return true;
 #undef ASSERT_OR_FAIL
 }
@@ -1600,6 +1604,11 @@ void CTxMemPool::InitMempoolTxDB() {
 uint64_t CTxMemPool::GetDiskUsage() {
     InitMempoolTxDB();
     return mempoolTxDB->GetDiskUsage();
+};
+
+uint64_t CTxMemPool::GetDiskTxCount() {
+    InitMempoolTxDB();
+    return mempoolTxDB->GetTxCount();
 };
 
 void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
