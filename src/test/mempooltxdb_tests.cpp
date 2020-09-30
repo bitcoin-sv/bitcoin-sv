@@ -476,10 +476,10 @@ BOOST_AUTO_TEST_CASE(SaveOnFullMempool)
     BOOST_CHECK_EQUAL(testPool.Size(), 0);
 
     // Add transactions:
-    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
+    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), TxStorage::memory, nullChangeSet);
     for (int i = 0; i < 3; i++) {
-        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), nullChangeSet);
-        testPool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), nullChangeSet);
+        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet);
+        testPool.AddUnchecked(txGrandChild[i].GetId(), entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet);
     }
 
     // Saving transactions to disk doesn't change the mempool size:
@@ -518,7 +518,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrim)
 
     // Add transactions:
     for (auto& entry : entries) {
-        testPool.AddUnchecked(entry.GetTxId(), entry, nullChangeSet);
+        testPool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);
     }
 
     // Saving transactions to disk doesn't change the mempool size:
@@ -574,7 +574,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
     // Add transactions to the mempool and mark them saved without writing to disk.
     for (auto& entry : entries)
     {
-        testPool.AddUnchecked(entry.GetTxId(), entry, nullChangeSet);
+        testPool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);
         auto it = testPoolAccess.mapTx().find(entry.GetTxId());
         BOOST_REQUIRE(it != testPoolAccess.mapTx().end());
         CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()->UpdateTxMovedToDisk();

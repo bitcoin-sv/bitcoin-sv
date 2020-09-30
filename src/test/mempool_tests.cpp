@@ -65,17 +65,17 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize);
 
     // Just the parent:
-    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
+    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), TxStorage::memory, nullChangeSet);
     poolSize = testPool.Size();
     testPoolAccess.RemoveRecursive(CTransaction(txParent), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize - 1);
 
     // Parent, children, grandchildren:
-    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
+    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), TxStorage::memory, nullChangeSet);
     for (int i = 0; i < 3; i++) {
-        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), nullChangeSet);
+        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet);
         testPool.AddUnchecked(txGrandChild[i].GetId(),
-                              entry.FromTx(txGrandChild[i]), nullChangeSet);
+                              entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet);
     }
     // Remove Child[0], GrandChild[0] should be removed:
     poolSize = testPool.Size();
@@ -97,9 +97,9 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     // Add children and grandchildren, but NOT the parent (simulate the parent
     // being in a block)
     for (int i = 0; i < 3; i++) {
-        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), nullChangeSet);
+        testPool.AddUnchecked(txChild[i].GetId(), entry.FromTx(txChild[i]), TxStorage::memory, nullChangeSet);
         testPool.AddUnchecked(txGrandChild[i].GetId(),
-                              entry.FromTx(txGrandChild[i]), nullChangeSet);
+                              entry.FromTx(txGrandChild[i]), TxStorage::memory, nullChangeSet);
     }
 
     // Now remove the parent, as might happen if a block-re-org occurs but the
@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(MempoolClearTest) {
     BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
 
     // Add the transaction
-    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
+    testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), 1UL);
     BOOST_CHECK_EQUAL(testPool.mapTx.size(), 1UL);
     BOOST_CHECK_EQUAL(testPoolAccess.mapNextTx().size(), 1UL);
@@ -166,7 +166,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx1.vout[0].nValue = 10 * COIN;
     pool.AddUnchecked(tx1.GetId(),
-                      entry.Fee(Amount(10000LL)).Priority(10.0).FromTx(tx1), nullChangeSet);
+                      entry.Fee(Amount(10000LL)).Priority(10.0).FromTx(tx1), TxStorage::memory, nullChangeSet);
 
     /* highest fee */
     CMutableTransaction tx2 = CMutableTransaction();
@@ -174,7 +174,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx2.vout[0].nValue = 2 * COIN;
     pool.AddUnchecked(tx2.GetId(),
-                      entry.Fee(Amount(20000LL)).Priority(9.0).FromTx(tx2), nullChangeSet);
+                      entry.Fee(Amount(20000LL)).Priority(9.0).FromTx(tx2), TxStorage::memory, nullChangeSet);
 
     /* lowest fee */
     CMutableTransaction tx3 = CMutableTransaction();
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx3.vout[0].nValue = 5 * COIN;
     pool.AddUnchecked(tx3.GetId(),
-                      entry.Fee(Amount(1000LL)).Priority(100.0).FromTx(tx3), nullChangeSet);
+                      entry.Fee(Amount(1000LL)).Priority(100.0).FromTx(tx3), TxStorage::memory, nullChangeSet);
 
     /* 2nd highest fee */
     CMutableTransaction tx4 = CMutableTransaction();
@@ -190,7 +190,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx4.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx4.vout[0].nValue = 6 * COIN;
     pool.AddUnchecked(tx4.GetId(),
-                      entry.Fee(Amount(15000LL)).Priority(1.0).FromTx(tx4), nullChangeSet);
+                      entry.Fee(Amount(15000LL)).Priority(1.0).FromTx(tx4), TxStorage::memory, nullChangeSet);
 
     /* equal fee rate to tx1, but newer */
     CMutableTransaction tx5 = CMutableTransaction();
@@ -199,8 +199,9 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx5.vout[0].nValue = 11 * COIN;
     entry.nTime = 1;
     entry.dPriority = 10.0;
-    pool.AddUnchecked(tx5.GetId(), entry.Fee(Amount(10000LL)).FromTx(tx5), nullChangeSet);
+    pool.AddUnchecked(tx5.GetId(), entry.Fee(Amount(10000LL)).FromTx(tx5), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 5UL);
+    BOOST_CHECK_EQUAL(pool.Size(), 5UL);
 
     /* low fee but with high fee child, will go into secondary mempool */
     /* tx6 -> tx7 -> tx8, tx9 -> tx10 */
@@ -208,9 +209,10 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx6.vout.resize(1);
     tx6.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx6.vout[0].nValue = 20 * COIN;
-    pool.AddUnchecked(tx6.GetId(), entry.Fee(Amount(0LL)).FromTx(tx6), nullChangeSet);
+    pool.AddUnchecked(tx6.GetId(), entry.Fee(Amount(0LL)).FromTx(tx6), TxStorage::memory, nullChangeSet);
     /* primary mempool size did not change */
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 5UL);
+    BOOST_CHECK_EQUAL(pool.Size(), 6UL);
 
     CTxMemPoolTestAccess::setEntries setAncestors;
     setAncestors.insert(pool.mapTx.find(tx6.GetId()));
@@ -244,7 +246,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     }
 
     /* will pull tx6 into the primary pool with tx7, whose fee was set above */
-    pool.AddUnchecked(tx7.GetId(), entry.Fee(Amount{2000000LL}).FromTx(tx7), nullChangeSet);
+    pool.AddUnchecked(tx7.GetId(), entry.Fee(Amount(2000000LL)).FromTx(tx7), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 7UL);
     BOOST_CHECK_EQUAL(pool.Size(), 7UL);
 }
@@ -262,7 +264,7 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     tx1.vout[0].scriptPubKey = CScript() << OP_1 << OP_EQUAL;
     tx1.vout[0].nValue = 10 * COIN;
     pool.AddUnchecked(tx1.GetId(),
-                      entry.Fee(Amount(10000LL)).FromTx(tx1, &pool), nullChangeSet);
+                      entry.Fee(Amount(10000LL)).FromTx(tx1, &pool), TxStorage::memory, nullChangeSet);
 
     CMutableTransaction tx2 = CMutableTransaction();
     tx2.vin.resize(1);
@@ -271,7 +273,7 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     tx2.vout[0].scriptPubKey = CScript() << OP_2 << OP_EQUAL;
     tx2.vout[0].nValue = 10 * COIN;
     pool.AddUnchecked(tx2.GetId(),
-                      entry.Fee(Amount(5000LL)).FromTx(tx2, &pool), nullChangeSet);
+                      entry.Fee(Amount(5000LL)).FromTx(tx2, &pool), TxStorage::memory, nullChangeSet);
 
     // should do nothing
     pool.TrimToSize(pool.DynamicMemoryUsage(), nullChangeSet);
@@ -283,7 +285,7 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     BOOST_CHECK(pool.Exists(tx1.GetId()));
     BOOST_CHECK(!pool.Exists(tx2.GetId()));
 
-    pool.AddUnchecked(tx2.GetId(), entry.FromTx(tx2, &pool), nullChangeSet);
+    pool.AddUnchecked(tx2.GetId(), entry.FromTx(tx2, &pool), TxStorage::memory, nullChangeSet);
     CMutableTransaction tx3 = CMutableTransaction();
     tx3.vin.resize(1);
     tx3.vin[0].prevout = COutPoint(tx2.GetId(), 0);
@@ -292,7 +294,7 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     tx3.vout[0].scriptPubKey = CScript() << OP_3 << OP_EQUAL;
     tx3.vout[0].nValue = 10 * COIN;
     pool.AddUnchecked(tx3.GetId(),
-                      entry.Fee(Amount(20000LL)).FromTx(tx3, &pool), nullChangeSet);
+                      entry.Fee(Amount(20000LL)).FromTx(tx3, &pool), TxStorage::memory, nullChangeSet);
 
     // tx3 should pay for tx2 (CPFP)
     pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4, nullChangeSet);
@@ -360,13 +362,13 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     tx7.vout[1].nValue = 10 * COIN;
 
     pool.AddUnchecked(tx4.GetId(),
-                      entry.Fee(Amount(7000LL)).FromTx(tx4, &pool), nullChangeSet);
+                      entry.Fee(Amount(7000LL)).FromTx(tx4, &pool), TxStorage::memory, nullChangeSet);
     pool.AddUnchecked(tx5.GetId(),
-                      entry.Fee(Amount(1000LL)).FromTx(tx5, &pool), nullChangeSet);
+                      entry.Fee(Amount(1000LL)).FromTx(tx5, &pool), TxStorage::memory, nullChangeSet);
     pool.AddUnchecked(tx6.GetId(),
-                      entry.Fee(Amount(1100LL)).FromTx(tx6, &pool), nullChangeSet);
+                      entry.Fee(Amount(1100LL)).FromTx(tx6, &pool), TxStorage::memory, nullChangeSet);
     pool.AddUnchecked(tx7.GetId(),
-                      entry.Fee(Amount(9000LL)).FromTx(tx7, &pool), nullChangeSet);
+                      entry.Fee(Amount(9000LL)).FromTx(tx7, &pool), TxStorage::memory, nullChangeSet);
 
     // we only require this remove, at max, 2 txn, because its not clear what
     // we're really optimizing for aside from that
@@ -377,9 +379,9 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
 
     if (!pool.Exists(tx5.GetId()))
         pool.AddUnchecked(tx5.GetId(),
-                          entry.Fee(Amount(1000LL)).FromTx(tx5, &pool), nullChangeSet);
+                          entry.Fee(Amount(1000LL)).FromTx(tx5, &pool), TxStorage::memory, nullChangeSet);
     pool.AddUnchecked(tx7.GetId(),
-                      entry.Fee(Amount(9000LL)).FromTx(tx7, &pool), nullChangeSet);
+                      entry.Fee(Amount(9000LL)).FromTx(tx7, &pool), TxStorage::memory, nullChangeSet);
 
     // should maximize mempool size by only removing 5/7
     pool.TrimToSize(pool.DynamicMemoryUsage() / 2, nullChangeSet);
@@ -389,9 +391,9 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     BOOST_CHECK(!pool.Exists(tx7.GetId()));
 
     pool.AddUnchecked(tx5.GetId(),
-                      entry.Fee(Amount(1000LL)).FromTx(tx5, &pool), nullChangeSet);
+                      entry.Fee(Amount(1000LL)).FromTx(tx5, &pool), TxStorage::memory, nullChangeSet);
     pool.AddUnchecked(tx7.GetId(),
-                      entry.Fee(Amount(9000LL)).FromTx(tx7, &pool), nullChangeSet);
+                      entry.Fee(Amount(9000LL)).FromTx(tx7, &pool), TxStorage::memory, nullChangeSet);
 
     std::vector<CTransactionRef> vtx;
     SetMockTime(42);
@@ -442,7 +444,8 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         const CMutableTransaction& txParent,
         const TxId& txid) {
         BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
-        testPool.AddUnchecked(txid, TestMemPoolEntryHelper{DEFAULT_TEST_TX_FEE}.FromTx(txParent), nullChangeSet);
+        testPool.AddUnchecked(txid, TestMemPoolEntryHelper{DEFAULT_TEST_TX_FEE}.FromTx(txParent),
+                              TxStorage::memory, nullChangeSet);
         BOOST_CHECK_EQUAL(testPool.Size(), 1UL);
         BOOST_CHECK(!testPoolAccess.mapDeltas().count(txid));
     };
@@ -525,7 +528,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolDecisionTest) {
     tx1.vout.resize(1);
     tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx1.vout[0].nValue = 10 * COIN;
-    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount(10000LL)).FromTx(tx1), nullChangeSet);
+    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount(10000LL)).FromTx(tx1), TxStorage::memory, nullChangeSet);
     const auto tx1it = testPoolAccess.mapTx().find(tx1.GetId());
     BOOST_CHECK(tx1it != testPoolAccess.mapTx().end());
 
@@ -534,7 +537,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolDecisionTest) {
     tx2.vout.resize(1);
     tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx2.vout[0].nValue = 2 * COIN;
-    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(1LL)).FromTx(tx2), nullChangeSet);
+    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(1LL)).FromTx(tx2), TxStorage::memory, nullChangeSet);
     const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
     BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
 
@@ -554,7 +557,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     tx1.vout.resize(1);
     tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx1.vout[0].nValue = 5 * COIN;
-    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount(2LL)).FromTx(tx1), nullChangeSet);
+    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount(2LL)).FromTx(tx1), TxStorage::memory, nullChangeSet);
     const auto tx1it = testPoolAccess.mapTx().find(tx1.GetId());
     BOOST_CHECK(tx1it != testPoolAccess.mapTx().end());
 
@@ -562,7 +565,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     tx2.vout.resize(1);
     tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx2.vout[0].nValue = 10 * COIN;
-    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(1LL)).FromTx(tx2), nullChangeSet);
+    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(1LL)).FromTx(tx2), TxStorage::memory, nullChangeSet);
     const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
     BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
 
@@ -575,7 +578,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     tx3.vout.resize(1);
     tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx3.vout[0].nValue = 15 * COIN;
-    pool.AddUnchecked(tx3.GetId(), entry.Fee(Amount(3LL)).FromTx(tx3), nullChangeSet);
+    pool.AddUnchecked(tx3.GetId(), entry.Fee(Amount(3LL)).FromTx(tx3), TxStorage::memory, nullChangeSet);
     const auto tx3it = testPoolAccess.mapTx().find(tx3.GetId());
     BOOST_CHECK(tx3it != testPoolAccess.mapTx().end());
 
@@ -626,7 +629,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
         tx1.vout[i].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
         tx1.vout[i].nValue = (5 + i) * COIN;
     }
-    pool.AddUnchecked(tx1.GetId(), entry.FromTx(tx1), nullChangeSet);
+    pool.AddUnchecked(tx1.GetId(), entry.FromTx(tx1), TxStorage::memory, nullChangeSet);
     const auto tx1it = testPoolAccess.mapTx().find(tx1.GetId());
     BOOST_CHECK(tx1it != testPoolAccess.mapTx().end());
     BOOST_CHECK(!tx1it->IsInPrimaryMempool());
@@ -642,7 +645,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     tx2.vout.resize(1);
     tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx2.vout[0].nValue = 1 * COIN;
-    pool.AddUnchecked(tx2.GetId(), entry.FromTx(tx2), nullChangeSet);
+    pool.AddUnchecked(tx2.GetId(), entry.FromTx(tx2), TxStorage::memory, nullChangeSet);
     const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
     BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
     BOOST_CHECK(!tx2it->IsInPrimaryMempool());
@@ -658,7 +661,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     tx3.vout.resize(1);
     tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx3.vout[0].nValue = 2 * COIN;
-    pool.AddUnchecked(tx3.GetId(), entry.FromTx(tx3), nullChangeSet);
+    pool.AddUnchecked(tx3.GetId(), entry.FromTx(tx3), TxStorage::memory, nullChangeSet);
     const auto tx3it = testPoolAccess.mapTx().find(tx3.GetId());
     BOOST_CHECK(tx3it != testPoolAccess.mapTx().end());
     BOOST_CHECK(!tx3it->IsInPrimaryMempool());
@@ -678,7 +681,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     tx4.vout.resize(1);
     tx4.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx4.vout[0].nValue = 3 * COIN;
-    pool.AddUnchecked(tx4.GetId(), entry.FromTx(tx4), nullChangeSet);
+    pool.AddUnchecked(tx4.GetId(), entry.FromTx(tx4), TxStorage::memory, nullChangeSet);
     const auto tx4it = testPoolAccess.mapTx().find(tx4.GetId());
     BOOST_CHECK(tx4it != testPoolAccess.mapTx().end());
     BOOST_CHECK(!tx4it->IsInPrimaryMempool());
@@ -699,7 +702,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     tx5.vout.resize(1);
     tx5.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx5.vout[0].nValue = 4 * COIN;
-    pool.AddUnchecked(tx5.GetId(), entry.Fee(Amount(100000)).FromTx(tx5), nullChangeSet);
+    pool.AddUnchecked(tx5.GetId(), entry.Fee(Amount(100000)).FromTx(tx5), TxStorage::memory, nullChangeSet);
 
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 5UL);
     BOOST_CHECK_EQUAL(pool.Size(), 5UL);

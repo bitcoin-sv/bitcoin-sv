@@ -21,6 +21,7 @@
 #include <boost/multi_index_container.hpp>
 
 #include <boost/signals2/signal.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #include <functional>
 #include <map>
@@ -232,7 +233,8 @@ public:
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     std::shared_ptr<const CPFPGroup> GetCPFPGroup() const { return group; }
 
-    bool IsInMemory() const;
+    bool IsInMemory() const noexcept { return tx->IsInMemory(); }
+    TxStorage GetTxStorage() const noexcept { return tx->GetTxStorage(); }
 
     template<typename X> struct UnitTestAccess;
 
@@ -566,6 +568,7 @@ public:
     void AddUnchecked(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
+            const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
@@ -795,6 +798,7 @@ public:
     void ClearPrioritisation(const uint256 &hash);
     void ClearPrioritisation(const std::vector<TxId>& vTxIds);
 
+private:
     /**
      * Retreive mempool data needed by DumpMempool().
      */
@@ -1044,6 +1048,7 @@ private:
     void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
+            const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
@@ -1113,8 +1118,12 @@ public:
     // Allow access to some mempool internals from unit tests.
     template<typename X> struct UnitTestAccess;
 
+    // Dumping and loading the mempool.
+    using DumpFileID = boost::uuids::uuid;
+    FILE* OpenDumpFile(uint64_t& version, DumpFileID& instanceId);
+
     /** Dump the mempool to disk. */
-    void DumpMempool();
+    void DumpMempool(uint64_t version = 0);
 
     /** Load the mempool from disk. */
     bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);

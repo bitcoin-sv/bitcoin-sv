@@ -114,7 +114,7 @@ namespace
             // Now insert everyting into the mempool.
             TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
             for (auto tx : allTxs) {
-                testPool.AddUnchecked(tx->GetId(), entry.FromTx(*tx),
+                testPool.AddUnchecked(tx->GetId(), entry.FromTx(*tx), TxStorage::memory,
                                       mining::CJournalChangeSetPtr{nullptr});
             }
         }

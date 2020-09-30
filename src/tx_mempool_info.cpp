@@ -14,6 +14,12 @@ CTransactionWrapper::CTransactionWrapper(const CTransactionRef &_tx,
       mempoolTxDB{txdb}
 {}
 
+CTransactionWrapper::CTransactionWrapper(const TxId &_txid,
+                                         const std::shared_ptr<CMempoolTxDBReader>& txdb)
+    : txid(_txid),
+      mempoolTxDB(txdb)
+{}
+
 CTransactionRef CTransactionWrapper::GetTxFromDB() const
 {
     CTransactionRef tmp;
@@ -25,7 +31,8 @@ CTransactionRef CTransactionWrapper::GetTxFromDB() const
 }
 
 
-const TxId& CTransactionWrapper::GetId() const {
+const TxId& CTransactionWrapper::GetId() const noexcept
+{
     return txid;
 }
 
@@ -44,7 +51,7 @@ void CTransactionWrapper::UpdateTxMovedToDisk() const
     std::atomic_store(&tx, CTransactionRef{nullptr});
 }
 
-bool CTransactionWrapper::IsInMemory() const
+bool CTransactionWrapper::IsInMemory() const noexcept
 {
     return std::atomic_load(&tx) != nullptr;
 }
@@ -88,9 +95,13 @@ const CTransactionRef& TxMempoolInfo::GetTx() const
     return tx;
 }
 
-bool TxMempoolInfo::IsTxInMemory() const
+TxStorage TxMempoolInfo::GetTxStorage() const noexcept
 {
-    return wrapper && wrapper->IsInMemory();
+    if (wrapper)
+    {
+        return wrapper->GetTxStorage();
+    }
+    return TxStorage::memory;
 }
 
 const TxId TxMempoolInfo::nullTxId {};

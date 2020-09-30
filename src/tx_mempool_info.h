@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include <amount.h>
-#include <primitives/transaction.h>
+#include "amount.h"
+#include "primitives/transaction.h"
+#include "txn_validation_data.h"
 
 class CTxMemPoolEntry;
 class CMempoolTxDBReader;
@@ -30,12 +31,18 @@ private:
 public:
     CTransactionWrapper(const CTransactionRef &tx,
                         const std::shared_ptr<CMempoolTxDBReader>& txDB);
+    CTransactionWrapper(const TxId &txid,
+                        const std::shared_ptr<CMempoolTxDBReader>& txDB);
 
     CTransactionRef GetTx() const;
-    const TxId& GetId() const;
+    const TxId& GetId() const noexcept;
 
     void UpdateTxMovedToDisk() const;
-    bool IsInMemory() const;
+    bool IsInMemory() const noexcept;
+    TxStorage GetTxStorage() const noexcept
+    {
+        return (IsInMemory() ? TxStorage::memory : TxStorage::txdb);
+    }
 
     bool HasDatabase(const std::shared_ptr<CMempoolTxDBReader>& txDB) const noexcept;
 };
@@ -58,7 +65,7 @@ struct TxMempoolInfo
 
     const CTransactionRef& GetTx() const;
 
-    bool IsTxInMemory() const;
+    TxStorage GetTxStorage() const noexcept;
 
     /** Time the transaction entered the mempool. */
     int64_t nTime {0};

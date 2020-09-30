@@ -23,7 +23,7 @@ static void AddTx(const CTransaction &tx, const Amount &nFee,
                       CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime,
                                       dPriority, nHeight, tx.GetValueOut(),
                                       spendsCoinbase, lp),
-                      nullChangeSet);
+                      TxStorage::memory, nullChangeSet);
 }
 
 // Right now this is only testing eviction performance in an extremely small

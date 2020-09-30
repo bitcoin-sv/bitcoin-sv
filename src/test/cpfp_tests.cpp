@@ -116,7 +116,7 @@ CFeeRate DefaultFeeRate()
 
 CTxMemPoolTestAccess::txiter AddToMempool(CTxMemPoolEntry& entry)
 {
-    mempool.AddUnchecked(entry.GetSharedTx()->GetId(), entry, {});
+    mempool.AddUnchecked(entry.GetSharedTx()->GetId(), entry, TxStorage::memory, {});
     CTxMemPoolTestAccess testAccess(mempool);
     auto it = testAccess.mapTx().find(entry.GetSharedTx()->GetId());
     BOOST_ASSERT(it != testAccess.mapTx().end());

@@ -412,6 +412,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
                 tx.GetValueOut(),
                 spendsCoinbase,
                 lp},
+            TxStorage::memory,
             nullChangeSet);
 
         CValidationState state;

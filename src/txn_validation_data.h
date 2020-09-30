@@ -126,6 +126,10 @@ public:
     /**
      * Setters
      */
+    // SetTxStorage
+    void SetTxStorage(TxStorage txStorage) {
+        mTxStorage = txStorage;
+    }
     // SetAcceptTime
     void SetAcceptTime(int64_t acceptTime) {
         mnAcceptTime = acceptTime;

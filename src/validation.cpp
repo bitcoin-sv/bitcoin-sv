@@ -985,7 +985,7 @@ std::vector<TxId> LimitMempoolSize(
 void CommitTxToMempool(
     const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& pMempoolEntry,
-    // FIXME: (CORE-130) CTxMemPool::setEntries& setAncestors,
+    TxStorage txStorage,
     CTxMemPool& pool,
     CValidationState& state,
     const CJournalChangeSetPtr& changeSet,
@@ -1002,6 +1002,7 @@ void CommitTxToMempool(
     {
         // Post-genesis, non-final txns have their own mempool
         TxMempoolInfo info { pMempoolEntry };
+        // FIXME FIXME FIXME: CORE-130: Remove tx from mempool txdb if (TxStorage::txdb)
         pool.getNonFinalPool().addOrUpdateTransaction(info, pTxInputData, state);
         return;
     }
@@ -1010,7 +1011,7 @@ void CommitTxToMempool(
     pool.AddUnchecked(
             txid,
             pMempoolEntry,
-            // FIXME: (CORE-130) setAncestors,
+            txStorage,
             changeSet,
             pnMempoolSize,
             pnDynamicMemoryUsage);
@@ -1732,6 +1733,7 @@ void ProcessValidatedTxn(
     CValidationState& state = txStatus.mState;
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
+    const TxStorage txStorage = txStatus.mTxInputData->GetTxStorage();
     /**
      * 1. Txn validation has failed
      *    - Handle an invalid state for p2p txn
@@ -1776,7 +1778,7 @@ void ProcessValidatedTxn(
         CommitTxToMempool(
             txStatus.mTxInputData,
             *(txStatus.mpEntry),
-            // FIXME: (CORE-130) txStatus.mSetAncestors,
+            txStorage,
             pool,
             state,
             handlers.mJournalChangeSet,

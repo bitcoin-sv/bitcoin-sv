@@ -23,6 +23,8 @@
 #include <boost/range/adaptor/reversed.hpp>
 #include <config.h>
 
+#include <boost/uuid/random_generator.hpp>
+
 using namespace mining;
 
     /**
@@ -165,10 +167,6 @@ void CTxMemPoolEntry::UpdateFeeDelta(Amount newFeeDelta) {
 
 void CTxMemPoolEntry::UpdateLockPoints(const LockPoints &lp) {
     lockPoints = lp;
-}
-
-bool CTxMemPoolEntry::IsInMemory() const {
-    return tx->IsInMemory();
 }
 
 namespace {
@@ -329,6 +327,7 @@ void CTxMemPool::AddTransactionsUpdated(unsigned int n) {
 void CTxMemPool::AddUnchecked(
     const uint256 &hash,
     const CTxMemPoolEntry &entry,
+    const TxStorage txStorage,
     const CJournalChangeSetPtr& changeSet,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage) {
@@ -339,6 +338,7 @@ void CTxMemPool::AddUnchecked(
         AddUncheckedNL(
             hash,
             entry,
+            txStorage,
             changeSet,
             pnMempoolSize,
             pnDynamicMemoryUsage);
@@ -692,6 +692,7 @@ void CTxMemPool::UpdateAncestorsCountNL(CTxMemPool::setEntriesTopoSorted entries
 void CTxMemPool::AddUncheckedNL(
     const uint256 &hash,
     const CTxMemPoolEntry &originalEntry,
+    const TxStorage txStorage,
     const CJournalChangeSetPtr& changeSet,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage)
@@ -707,18 +708,23 @@ void CTxMemPool::AddUncheckedNL(
     // During reorg, we could be re-adding an entry whose transaction was
     // previously moved to disk, in which case we must make sure that the entry
     // belongs to the same mempool.
-    const auto mustUpdateDatabase = newit->tx->HasDatabase(nullTxDB);
     const auto thisTxDB = mempoolTxDB->GetDatabase();
-    assert((mustUpdateDatabase && newit->IsInMemory()) || newit->tx->HasDatabase(thisTxDB));
+    assert(newit->tx->HasDatabase(nullTxDB) || newit->tx->HasDatabase(thisTxDB));
+    assert(txStorage == TxStorage::memory ? newit->IsInMemory() : true);
+    // FIXME: CORE-130: This is an important check but it's also quite expensive...
+    assert(txStorage == TxStorage::txdb ? thisTxDB->TransactionExists(newit->GetTxId()) : true);
 
     mapLinks.insert(make_pair(newit, TxLinks()));
-    mapTx.modify(newit, [this, &mustUpdateDatabase, &thisTxDB](CTxMemPoolEntry& entry) {
+    mapTx.modify(newit, [this, &txStorage, &thisTxDB](CTxMemPoolEntry& entry) {
         // Update insertion order indes for this entry.
         entry.SetInsertionIndex(insertionIndex.GetNext());
-        if (mustUpdateDatabase) {
-            // Update transaction database for this entry.
-            // This should not affect the mapTx index.
+
+        // Update the wrapper. This should not affect the mapTx index.
+        if (txStorage == TxStorage::memory) {
             entry.tx = std::make_shared<CTransactionWrapper>(entry.GetSharedTx(), thisTxDB);
+        }
+        else {
+            entry.tx = std::make_shared<CTransactionWrapper>(entry.GetTxId(), thisTxDB);
         }
     });
 
@@ -1460,8 +1466,8 @@ mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
 
     CJournalChangeSetPtr changeSet { mJournalBuilder.getNewChangeSet(JournalUpdateReason::RESET) };
     {
-        std::shared_lock lock(smtx);
         CoinsDBView coinsView{ *pcoinsTip };
+        std::shared_lock lock(smtx);
 
         // back-up txs currently in the mempool and clear the mempool
         auto oldMapTx = std::move(mapTx);
@@ -1907,7 +1913,7 @@ void CTxMemPool::ResubmitEntriesToMempoolNL(CTxMemPool::indexed_transaction_set&
                 entry.group.reset();
             }   
         );
-        AddUncheckedNL(itTemp->GetTxId(), *itTemp, changeSet);
+        AddUncheckedNL(itTemp->GetTxId(), *itTemp, itTemp->GetTxStorage(), changeSet);
         tempMapTxSequenced.erase(itTemp++);
     }
 }
@@ -2441,40 +2447,114 @@ std::vector<CTransactionRef> CTxMemPool::GetTransactions() const
     return result;
 }
 
-static const uint64_t MEMPOOL_DUMP_VERSION = 1;
+/*
+ * Format of the serialized mempool.dat file
+ * =========================================
+ *
+ * Overall file structure:
+ *
+ *     uint64   format-version
+ *     (uuid    file-instance)              if format-version >= 2
+ *     uint64   transaction-count
+ *     array    transaction-data            transaction-count elements
+ *     map      fee-deltas-map              {txid -> Amount}
+ *
+ * Version 2 transaction-data:
+ *
+ *     bool     transaction-in-memory
+ *     (txdata  transaction)                if transaction-in-memory
+ *     (uint256 transaction-id)             if not transaction-in-memory
+ *     int64    entry-time
+ *     int64    fee-delta
+ *
+ * Version 1 transaction-data:
+ *
+ *     txdata   transaction
+ *     int64    entry-time
+ *     int64    fee-delta
+ */
+
+namespace {
+    const uint64_t MEMPOOL_DUMP_VERSION = 2;
+    const uint64_t MEMPOOL_DUMP_COMPAT_VERSION = 1;
+    const uint64_t MEMPOOL_DUMP_HAS_INSTANCE_ID = 2;
+    const uint64_t MEMPOOL_DUMP_HAS_ON_DISK_TXS = 2;
+} // namespace
+
+FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
+{
+    FILE* filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
+    CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+    if (file.IsNull())
+    {
+        throw std::runtime_error("Failed to open mempool file from disk");
+    }
+
+    uint64_t version;
+    DumpFileID instanceId;
+
+    file >> version;
+    if (version > MEMPOOL_DUMP_VERSION || version < MEMPOOL_DUMP_COMPAT_VERSION)
+    {
+        std::stringstream msg;
+        msg << "Bad mempool dump version: " << version;
+        throw std::runtime_error(msg.str());
+    }
+
+    if (version >= MEMPOOL_DUMP_HAS_INSTANCE_ID)
+    {
+        file >> instanceId;
+    }
+
+    version_ = version;
+    instanceId_ = instanceId;
+    return file.release();
+}
 
 bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
 {
     try {
         int64_t nExpiryTimeout = config.GetMemPoolExpiry();
-        FILE *filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
-        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
-        if (file.IsNull()) {
-            throw std::runtime_error("Failed to open mempool file from disk");
-        }
+
+        uint64_t version;
+        DumpFileID instanceId;
+        CAutoFile file(OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION);
 
         int64_t count = 0;
         int64_t skipped = 0;
         int64_t failed = 0;
         int64_t nNow = GetTime();
 
-        uint64_t version;
-        file >> version;
-        if (version != MEMPOOL_DUMP_VERSION) {
-            throw std::runtime_error("Bad mempool dump version");
-        }
         uint64_t num;
         file >> num;
         double prioritydummy = 0;
         // Take a reference to the validator.
         const auto& txValidator = g_connman->getTxnValidator();
         // A pointer to the TxIdTracker.
-        const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
+        const auto& pTxIdTracker = g_connman->GetTxIdTracker();
+        const auto txdb = mempoolTxDB->GetDatabase();
         while (num--) {
+            bool txFromMemory {true};
             CTransactionRef tx;
             int64_t nTime;
             int64_t nFeeDelta;
-            file >> tx;
+
+            if (version >= MEMPOOL_DUMP_HAS_ON_DISK_TXS) {
+                file >> txFromMemory;
+            }
+            if (!txFromMemory) {
+                uint256 txid;
+                file >> txid;
+                if (!txdb->GetTransaction(txid, tx)) {
+                    std::stringstream msg;
+                    msg << "Transaction was not in mempool database: "
+                        << txid.ToString();
+                    throw std::runtime_error(msg.str());
+                }
+            }
+            else {
+                file >> tx;
+            }
             file >> nTime;
             file >> nFeeDelta;
             Amount amountdelta(nFeeDelta);
@@ -2488,6 +2568,7 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
                 CJournalChangeSetPtr changeSet {
                     getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
                 };
+                const auto txStorage = (txFromMemory ? TxStorage::memory : TxStorage::txdb);
                 const CValidationState& state {
                     // Execute txn validation synchronously.
                     txValidator->processValidation(
@@ -2496,7 +2577,7 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
                             tx,    // a pointer to the tx
                             TxSource::file, // tx source
                             TxValidationPriority::normal,  // tx validation priority
-                            TxStorage::memory, // tx storage
+                            txStorage, // tx storage
                             nTime, // nAcceptTime
                             true),  // fLimitFree
                         changeSet, // an instance of the mempool journal
@@ -2507,6 +2588,9 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
                     ++count;
                 } else {
                     ++failed;
+                    if (!txFromMemory) {
+                        mempoolTxDB->Remove({tx->GetId()}, tx->GetTotalSize());
+                    }
                 }
             } else {
                 ++skipped;
@@ -2529,15 +2613,22 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
 
     }
     catch (const std::exception &e) {
-        LogPrintf("Failed to deserialize mempool data on disk: %s. Continuing anyway.\n",
+        LogPrintf("Failed to deserialize mempool data on disk: %s."
+                  " Continuing anyway with empty mempool.\n",
                   e.what());
+        Clear();
     }
 
     // Restore non-final transactions
     return getNonFinalPool().loadMempool(shutdownToken);
 }
 
-void CTxMemPool::DumpMempool(void) {
+void CTxMemPool::DumpMempool(uint64_t version) {
+    // The version defaults to 0 so assume the current version.
+    if (version < MEMPOOL_DUMP_COMPAT_VERSION) {
+        version = MEMPOOL_DUMP_VERSION;
+    }
+
     int64_t start = GetTimeMicros();
 
     std::map<uint256, Amount> mapDeltas;
@@ -2554,12 +2645,29 @@ void CTxMemPool::DumpMempool(void) {
 
         CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
 
-        uint64_t version = MEMPOOL_DUMP_VERSION;
         file << version;
+        if (version >= MEMPOOL_DUMP_HAS_INSTANCE_ID) {
+            boost::uuids::random_generator gen;
+            DumpFileID instanceId = gen();
+            mempoolTxDB->SetXrefKey(instanceId);
+            file << instanceId;
+        }
 
         file << (uint64_t)vinfo.size();
         for (const auto &i : vinfo) {
-            file << *(i.GetTx());
+            if (version >= MEMPOOL_DUMP_HAS_ON_DISK_TXS) {
+                const bool txFromMemory = i.GetTxStorage() == TxStorage::memory;
+                file << txFromMemory;
+                if (!txFromMemory) {
+                    file << i.GetTxId();
+                }
+                else {
+                    file << *i.GetTx();
+                }
+            }
+            else {
+                file << *i.GetTx();
+            }
             file << (int64_t)i.nTime;
             file << (int64_t)i.nFeeDelta.GetSatoshis();
             mapDeltas.erase(i.GetTxId());
@@ -2575,6 +2683,7 @@ void CTxMemPool::DumpMempool(void) {
                   (mid - start) * 0.000001, (last - mid) * 0.000001);
     } catch (const std::exception &e) {
         LogPrintf("Failed to dump mempool: %s. Continuing anyway.\n", e.what());
+        mempoolTxDB->RemoveXrefKey();
     }
 
     // Dump non-final pool

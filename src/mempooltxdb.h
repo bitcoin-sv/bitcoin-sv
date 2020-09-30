@@ -27,6 +27,7 @@ class CMempoolTxDBReader {
 public:
     virtual ~CMempoolTxDBReader() = default;
     virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) = 0;
+    virtual bool TransactionExists(const uint256 &txid) = 0;
 };
 
 /** Access to the mempool transaction database (mempoolTxs/) */
@@ -75,6 +76,11 @@ public:
      * Used to retrieve transaction from the database.
      */
     virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override;
+
+    /*
+     * Checks if the transaction key is in the database.
+     */
+    virtual bool TransactionExists(const uint256 &txid) override;
 
     /*
      * Used to remove a batch of transactions from the database.

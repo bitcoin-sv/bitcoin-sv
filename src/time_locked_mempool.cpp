@@ -63,6 +63,7 @@ void CTimeLockedMempool::addOrUpdateTransaction(
                 LogPrint(BCLog::MEMPOOL, "Finalising non-final tx: %s\n", txn->GetId().ToString());
                 // For full belt-and-braces safety, resubmit newly final transaction for revalidation
                 pTxInputData->SetTxSource(TxSource::finalised);
+                pTxInputData->SetTxStorage(info.GetTxStorage()),
                 pTxInputData->SetAcceptTime(GetTime());
                 state.SetResubmitTx();
             }

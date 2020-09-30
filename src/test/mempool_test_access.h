@@ -9,9 +9,8 @@
 #include "txmempool.h"
 #include "mempooltxdb.h"
 
-namespace
-{
-    struct CTxMemPoolUnitTestAccessHack {};
+namespace {
+    struct UnitTestAccessTag;
 }
 
 // Note that the template specialization itself cannot be defined in an
@@ -19,7 +18,7 @@ namespace
 // namespace in each unit test compilation unit, so we're not violating the one
 // definition rule.
 template<>
-struct CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>
+struct CTxMemPool::UnitTestAccess<UnitTestAccessTag>
 {
 public:
     CTxMemPool& mempool;
@@ -82,11 +81,7 @@ public:
     }
 };
 
-using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>;
-
-namespace {
-    struct UnitTestAccessTag;
-}
+using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<UnitTestAccessTag>;
 
 template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
 {

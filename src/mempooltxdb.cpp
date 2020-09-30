@@ -77,6 +77,12 @@ bool CMempoolTxDB::GetTransaction(const uint256 &txid, CTransactionRef &tx)
     return false;
 }
 
+bool CMempoolTxDB::TransactionExists(const uint256 &txid)
+{
+    return mempoolTxDB->Exists(std::make_pair(DB_TRANSACTIONS, txid));
+}
+
+
 bool CMempoolTxDB::RemoveTransactions(const std::vector<TxId> &txidsRemoved,
                                       uint64_t diskUsageRemoved)
 {
