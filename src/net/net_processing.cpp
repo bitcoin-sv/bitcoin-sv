@@ -2850,7 +2850,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
                     }
                     connman.PushMessage(
                         pfrom,
-                        msgMaker.Make(NetMsgType::GETDATA, vGetData));
+                        msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vGetData));
                 }
             }
         }
@@ -2897,7 +2897,7 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
             std::vector<CInv> invs;
             invs.push_back(CInv(MSG_BLOCK, resp.blockhash));
             connman.PushMessage(pfrom,
-                                msgMaker.Make(NetMsgType::GETDATA, invs));
+                                msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, invs));
         }
         else {
             // Block is either okay, or possibly we received
@@ -3071,7 +3071,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                 std::vector<CInv> vInv(1);
                 vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
                 connman.PushMessage(
-                    pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
+                    pfrom, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vInv));
             }
             return true;
         }
@@ -3126,7 +3126,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                     // Duplicate txindices, the block is now in-flight, so just request it.
                     std::vector<CInv> vInv(1);
                     vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
-                    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
+                    connman.PushMessage(pfrom, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vInv));
                     return true;
                 }
 
@@ -3176,7 +3176,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                 // normally.
                 std::vector<CInv> vInv(1);
                 vInv[0] = CInv(MSG_BLOCK, cmpctblock.header.GetHash());
-                connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vInv));
+                connman.PushMessage(pfrom, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vInv));
                 return true;
             }
             else {
@@ -4511,7 +4511,7 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
         }
     }
     if (!vGetData.empty()) {
-        connman.PushMessage(pto, msgMaker.Make(NetMsgType::GETDATA, vGetData));
+        connman.PushMessage(pto, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, vGetData));
     }
 }
 
