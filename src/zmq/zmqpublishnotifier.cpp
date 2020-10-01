@@ -137,39 +137,39 @@ bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint2
     CJSONWriter jw(tw, false);
 
     jw.writeBeginObject();
-    jw.pushKV("txid", txid.GetHex(), true);
+    jw.pushKV("txid", txid.GetHex());
 
     switch (reason)
     {
         case MemPoolRemovalReason::EXPIRY:
-            jw.pushKV("reason", "expired", false);
+            jw.pushKV("reason", "expired");
             break;
         case MemPoolRemovalReason::SIZELIMIT:
-            jw.pushKV("reason", "mempool-sizelimit-exceeded", false);
+            jw.pushKV("reason", "mempool-sizelimit-exceeded");
             break;
         case MemPoolRemovalReason::CONFLICT:
             if (conflictedWith != nullptr)
             {
                 jw.pushKV("reason", "collision-in-block-tx");
                 jw.writeBeginObject("collidedWith");
-                jw.pushKV("txid", conflictedWith->GetId().GetHex(), true);
-                jw.pushKV("size", int64_t(conflictedWith->GetTotalSize()), true);
+                jw.pushKV("txid", conflictedWith->GetId().GetHex());
+                jw.pushKV("size", int64_t(conflictedWith->GetTotalSize()));
                 jw.pushK("hex");
-                jw.pushQuote(true, false);
+                jw.pushQuote();
                 EncodeHexTx(*conflictedWith, jw.getWriter(), 0);
-                jw.pushQuote(true, false);
-                jw.writeEndObject(false);
+                jw.pushQuote();
+                jw.writeEndObject();
             }
             else
             {
-                jw.pushKV("reason", "collision-in-block-tx", false);
+                jw.pushKV("reason", "collision-in-block-tx");
             }
             break;
         default:
-            jw.pushKV("reason", "unknown-reason", false);
+            jw.pushKV("reason", "unknown-reason");
     }
 
-    jw.writeEndObject(false);
+    jw.writeEndObject();
 
     std::string message = tw.MoveOutString();
 
@@ -197,9 +197,8 @@ bool CZMQPublishRemovedFromMempoolBlockNotifier::NotifyRemovedFromMempoolBlock(c
             jw.pushKV("reason", "unknown-reason");
     }
     
-    jw.pushK("txid");
-    jw.pushV(txid.GetHex(), false);
-    jw.writeEndObject(false);
+    jw.pushKV("txid", txid.GetHex());
+    jw.writeEndObject();
 
     std::string message = tw.MoveOutString();
 
