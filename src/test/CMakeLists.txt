@@ -102,6 +102,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	locked_ref_tests.cpp
 	m_candidates_tests.cpp
 	main_tests.cpp
+	mempool_dump_load_tests.cpp
 	mempool_snapshot_tests.cpp
 	mempool_tests.cpp
 	mempooltxdb_tests.cpp

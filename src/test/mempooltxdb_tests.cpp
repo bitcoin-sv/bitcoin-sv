@@ -549,7 +549,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
 
     CTxMemPool testPool;
     CTxMemPoolTestAccess testPoolAccess(testPool);
-    testPool.InitMempoolTxDB();
+    testPoolAccess.OpenMempoolTxDB();
 
     // Add transactions to the database that are not in the mempool.
     std::vector<CTransactionWrapperRef> wrappers;

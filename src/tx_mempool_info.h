@@ -20,7 +20,7 @@ class CMempoolTxDBReader;
  */
 class CTransactionWrapper {
 private:
-    mutable CTransactionRef tx;
+    CTransactionRef tx;
     // Transaction Id
     TxId txid;
     // Mempool Transaction database
@@ -36,15 +36,14 @@ public:
 
     CTransactionRef GetTx() const;
     const TxId& GetId() const noexcept;
-
-    void UpdateTxMovedToDisk() const;
     bool IsInMemory() const noexcept;
     TxStorage GetTxStorage() const noexcept
     {
         return (IsInMemory() ? TxStorage::memory : TxStorage::txdb);
     }
-
     bool HasDatabase(const std::shared_ptr<CMempoolTxDBReader>& txDB) const noexcept;
+
+    void UpdateTxMovedToDisk();
 };
 
 using CTransactionWrapperRef = std::shared_ptr<CTransactionWrapper>;

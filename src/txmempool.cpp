@@ -701,7 +701,7 @@ void CTxMemPool::AddUncheckedNL(
 
     // Make sure the transaction database is initialized so that we have
     // a valid mempoolTxDB for the following checks.
-    InitMempoolTxDB();
+    OpenMempoolTxDB();
 
     auto newit = mapTx.insert(originalEntry).first;
 
@@ -710,9 +710,6 @@ void CTxMemPool::AddUncheckedNL(
     // belongs to the same mempool.
     const auto thisTxDB = mempoolTxDB->GetDatabase();
     assert(newit->tx->HasDatabase(nullTxDB) || newit->tx->HasDatabase(thisTxDB));
-    assert(txStorage == TxStorage::memory ? newit->IsInMemory() : true);
-    // FIXME: CORE-130: This is an important check but it's also quite expensive...
-    assert(txStorage == TxStorage::txdb ? thisTxDB->TransactionExists(newit->GetTxId()) : true);
 
     mapLinks.insert(make_pair(newit, TxLinks()));
     mapTx.modify(newit, [this, &txStorage, &thisTxDB](CTxMemPoolEntry& entry) {
@@ -862,7 +859,7 @@ void CTxMemPool::removeUncheckedNL(
 
     if (transactionsToRemove.size() > 0)
     {
-        InitMempoolTxDB();
+        OpenMempoolTxDB();
         mempoolTxDB->Remove(std::move(transactionsToRemove), diskUsageRemoved);
     }
 }
@@ -1186,6 +1183,10 @@ bool CTxMemPool::ShouldCheckMempool() const
         return false;
     }
 
+    if (suspendSanityCheck.load()) {
+        return false;
+    }
+
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency) {
         return false;
     }
@@ -1356,30 +1357,37 @@ void CTxMemPool::CheckMempoolImplNL(
 
 bool CTxMemPool::CheckMempoolTxDBNL(bool hardErrors) const
 {
-#define ASSERT_OR_FAIL(condition)               \
-    do {                                        \
-        if (!(condition)) {                     \
-            if (hardErrors) {                   \
-                assert(condition);              \
-            }                                   \
-            return false;                       \
-        }                                       \
+#define ASSERT_OR_FAIL(condition) ASSERT_OR_FAIL_HELPER(condition, "", "")
+#define ASSERT_OR_FAIL_TX(condition, txid) ASSERT_OR_FAIL_HELPER(condition, " / ", txid)
+#define ASSERT_OR_FAIL_HELPER(condition, separator, txid)     \
+    do {                                                      \
+        if (!(condition)) {                                   \
+            if (hardErrors) {                                 \
+                assert(condition);                            \
+            }                                                 \
+            else {                                            \
+                LogPrintf("Checking mempool TxDB: assertion failed: %s%s%s\n", \
+                          #condition, separator, txid);       \
+            }                                                 \
+            return false;                                     \
+        }                                                     \
     } while(0)
 
     mempoolTxDB->Sync();
     auto keys = mempoolTxDB->GetTxKeys();
     ASSERT_OR_FAIL(keys.size() == mempoolTxDB->GetTxCount());
+    LogPrintf("Checking mempool TxDB: found %zu transactions\n", keys.size());
     uint64_t totalSize = 0;
     for (const auto& e : mapTx)
     {
         const auto key = keys.find(e.GetTxId());
         if (e.IsInMemory())
         {
-            ASSERT_OR_FAIL(key == keys.end());
+            ASSERT_OR_FAIL_TX(key == keys.end(), e.GetTxId().ToString());
         }
         else
         {
-            ASSERT_OR_FAIL(key != keys.end());
+            ASSERT_OR_FAIL_TX(key != keys.end(), e.GetTxId().ToString());
             keys.erase(key);
             totalSize += e.GetTxSize();
         }
@@ -1388,6 +1396,8 @@ bool CTxMemPool::CheckMempoolTxDBNL(bool hardErrors) const
     ASSERT_OR_FAIL(totalSize == mempoolTxDB->GetDiskUsage());
     return true;
 #undef ASSERT_OR_FAIL
+#undef ASSERT_OR_FAIL_TX
+#undef ASSERT_OR_FAIL_HELPER
 }
 
 std::string CTxMemPool::CheckJournal() const {
@@ -1485,21 +1495,24 @@ void CTxMemPool::SetSanityCheck(double dFrequency) {
     nCheckFrequency = dFrequency * 4294967295.0;
 }
 
-void CTxMemPool::InitMempoolTxDB() {
+void CTxMemPool::OpenMempoolTxDB(const bool clearDatabase) {
     static constexpr auto cacheSize = 1 << 20; /*TODO: remove constant*/
     std::call_once(db_initialized,
-                   [this] {
+                   [this, clearDatabase] {
                        mempoolTxDB = std::make_shared<CAsyncMempoolTxDB>(cacheSize);
+                       if (clearDatabase) {
+                           mempoolTxDB->Clear();
+                       }
                    });
 }
 
 uint64_t CTxMemPool::GetDiskUsage() {
-    InitMempoolTxDB();
+    OpenMempoolTxDB();
     return mempoolTxDB->GetDiskUsage();
 };
 
 uint64_t CTxMemPool::GetDiskTxCount() {
-    InitMempoolTxDB();
+    OpenMempoolTxDB();
     return mempoolTxDB->GetTxCount();
 };
 
@@ -1519,7 +1532,7 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
         }
     }
 
-    InitMempoolTxDB();
+    OpenMempoolTxDB();
     mempoolTxDB->Add(std::move(toBeMoved));
 
     if (movedToDiskSize < requiredSize)
@@ -2484,6 +2497,65 @@ namespace {
     const uint64_t MEMPOOL_DUMP_HAS_ON_DISK_TXS = 2;
 } // namespace
 
+void CTxMemPool::InitMempoolTxDB()
+{
+    if (!gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
+    {
+        // If we're not going to load mempool.dat, we have to start with an
+        // empty mempool database.
+        OpenMempoolTxDB(true);
+        return;
+    }
+
+    OpenMempoolTxDB();
+    try
+    {
+        uint64_t version;
+        DumpFileID instanceId;
+        CAutoFile file(OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION);
+
+        std::unique_lock lock(smtx);
+        if (file.IsNull())
+        {
+            LogPrint(BCLog::MEMPOOL,
+                     "No mempool file from previous session,"
+                     " clearing the transaction database.\n");
+            mempoolTxDB->Clear();
+            return;
+        }
+
+        if (version < MEMPOOL_DUMP_HAS_INSTANCE_ID)
+        {
+            LogPrint(BCLog::MEMPOOL,
+                     "Mempool file has format version %d,"
+                     " clearing the transaction database.\n",
+                     (int)version);
+            mempoolTxDB->Clear();
+            return;
+        }
+
+        CMempoolTxDB::XrefKey xrefKey;
+        if (!mempoolTxDB->GetXrefKey(xrefKey) || xrefKey != instanceId)
+        {
+            LogPrint(BCLog::MEMPOOL,
+                     "Mempool file and transaction database do not match,"
+                     " clearing the transaction database.\n");
+            mempoolTxDB->Clear();
+            return;
+        }
+
+        // Remove the UUID from the database until the next regular node shutdown.
+        mempoolTxDB->RemoveXrefKey();
+    }
+    catch (const std::exception &e)
+    {
+        LogPrintf("Cross-check of mempool file and transaction database failed: %s."
+                  " Continuing with empty mempool and transaction database.\n",
+                  e.what());
+        Clear();
+    }
+}
+
 FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
 {
     FILE* filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
@@ -2514,7 +2586,26 @@ FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
     return file.release();
 }
 
-bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
+bool CTxMemPool::LoadMempool(const Config &config,
+                             const task::CCancellationToken& shutdownToken)
+{
+    const auto& txValidator = g_connman->getTxnValidator();
+    const auto processValidation =
+        [&txValidator](const TxInputDataSPtr& txInputData,
+                       const mining::CJournalChangeSetPtr& changeSet,
+                       bool limitMempoolSize) -> CValidationState
+        {
+            return txValidator->processValidation(txInputData, changeSet, limitMempoolSize);
+        };
+    return LoadMempool(config, shutdownToken, processValidation);
+}
+
+bool CTxMemPool::LoadMempool(const Config &config,
+                             const task::CCancellationToken& shutdownToken,
+                             const std::function<CValidationState(
+                                 const TxInputDataSPtr& txInputData,
+                                 const mining::CJournalChangeSetPtr& changeSet,
+                                 bool limitMempoolSize)>& processValidation)
 {
     try {
         int64_t nExpiryTimeout = config.GetMemPoolExpiry();
@@ -2531,11 +2622,11 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
         uint64_t num;
         file >> num;
         double prioritydummy = 0;
-        // Take a reference to the validator.
-        const auto& txValidator = g_connman->getTxnValidator();
         // A pointer to the TxIdTracker.
         const auto& pTxIdTracker = g_connman->GetTxIdTracker();
         const auto txdb = mempoolTxDB->GetDatabase();
+        std::vector<TxId> transactionsToRemove;
+        std::uint64_t diskUsageRemoved = 0;
         while (num--) {
             bool txFromMemory {true};
             CTransactionRef tx;
@@ -2572,9 +2663,9 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
                     getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
                 };
                 const auto txStorage = (txFromMemory ? TxStorage::memory : TxStorage::txdb);
-                const CValidationState& state {
+                const CValidationState state {
                     // Execute txn validation synchronously.
-                    txValidator->processValidation(
+                    processValidation(
                         std::make_shared<CTxInputData>(
                             pTxIdTracker, // a pointer to the TxIdTracker
                             tx,    // a pointer to the tx
@@ -2592,22 +2683,37 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
                 } else {
                     ++failed;
                     if (!txFromMemory) {
-                        mempoolTxDB->Remove({tx->GetId()}, tx->GetTotalSize());
+                        transactionsToRemove.emplace_back(tx->GetId());
+                        diskUsageRemoved += tx->GetTotalSize();
                     }
                 }
             } else {
                 ++skipped;
+                if (!txFromMemory) {
+                    transactionsToRemove.emplace_back(tx->GetId());
+                    diskUsageRemoved += tx->GetTotalSize();
+                }
             }
             if (shutdownToken.IsCanceled()) {
                 return false;
             }
         }
+        if (diskUsageRemoved > 0) {
+            mempoolTxDB->Remove(std::move(transactionsToRemove), diskUsageRemoved);
+        }
+
         std::map<uint256, Amount> mapDeltas;
         file >> mapDeltas;
 
         for (const auto &i : mapDeltas) {
             PrioritiseTransaction(i.first, i.first.ToString(),
                                           prioritydummy, i.second);
+        }
+
+        // Check that the mempool and the database are in sync.
+        std::shared_lock lock(smtx);
+        if (!CheckMempoolTxDBNL(false)) {
+            throw std::runtime_error("Mempool and transaction database contents do not match");
         }
 
         LogPrintf("Imported mempool transactions from disk: %i successes, %i "
@@ -2626,12 +2732,11 @@ bool CTxMemPool::LoadMempool(const Config &config, const task::CCancellationToke
     return getNonFinalPool().loadMempool(shutdownToken);
 }
 
-void CTxMemPool::DumpMempool(uint64_t version) {
-    // The version defaults to 0 so assume the current version.
-    if (version < MEMPOOL_DUMP_COMPAT_VERSION) {
-        version = MEMPOOL_DUMP_VERSION;
-    }
+void CTxMemPool::DumpMempool() {
+    DumpMempool(MEMPOOL_DUMP_VERSION);
+}
 
+void CTxMemPool::DumpMempool(uint64_t version) {
     int64_t start = GetTimeMicros();
 
     std::map<uint256, Amount> mapDeltas;
@@ -2657,12 +2762,15 @@ void CTxMemPool::DumpMempool(uint64_t version) {
         }
 
         file << (uint64_t)vinfo.size();
+        size_t count = 0;
+        size_t txdb = 0;
         for (const auto &i : vinfo) {
             if (version >= MEMPOOL_DUMP_HAS_ON_DISK_TXS) {
                 const bool txFromMemory = i.GetTxStorage() == TxStorage::memory;
                 file << txFromMemory;
                 if (!txFromMemory) {
                     file << i.GetTxId();
+                    ++txdb;
                 }
                 else {
                     file << *i.GetTx();
@@ -2674,6 +2782,7 @@ void CTxMemPool::DumpMempool(uint64_t version) {
             file << (int64_t)i.nTime;
             file << (int64_t)i.nFeeDelta.GetSatoshis();
             mapDeltas.erase(i.GetTxId());
+            ++count;
         }
 
         file << mapDeltas;
@@ -2682,8 +2791,9 @@ void CTxMemPool::DumpMempool(uint64_t version) {
         RenameOver(GetDataDir() / "mempool.dat.new",
                    GetDataDir() / "mempool.dat");
         int64_t last = GetTimeMicros();
-        LogPrintf("Dumped mempool: %.6fs to copy, %.6fs to dump\n",
-                  (mid - start) * 0.000001, (last - mid) * 0.000001);
+        LogPrintf("Dumped mempool: %.6fs to copy, %.6fs to dump (%zu txs, %zu in txdb)\n",
+                  (mid - start) * 0.000001, (last - mid) * 0.000001,
+                  count, txdb);
     } catch (const std::exception &e) {
         LogPrintf("Failed to dump mempool: %s. Continuing anyway.\n", e.what());
         mempoolTxDB->RemoveXrefKey();

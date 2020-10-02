@@ -46,7 +46,7 @@ CTransactionRef CTransactionWrapper::GetTx() const
     return GetTxFromDB();
 }
 
-void CTransactionWrapper::UpdateTxMovedToDisk() const
+void CTransactionWrapper::UpdateTxMovedToDisk()
 {
     std::atomic_store(&tx, CTransactionRef{nullptr});
 }

@@ -64,8 +64,10 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     testConfig.Reset(); // make sure that we start every test with a clean config
     testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
+    mempool.SuspendSanityCheck();
     mempool.getNonFinalPool().loadConfig();
     mempool.InitMempoolTxDB();
+    mempool.ResumeSanityCheck();
 }
 
 BasicTestingSetup::~BasicTestingSetup() {

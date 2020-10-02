@@ -13,6 +13,7 @@
 #include "sync.h"
 #include "time_locked_mempool.h"
 #include "tx_mempool_info.h"
+#include "txn_validation_data.h"
 #include "policy/policy.h"
 
 #include <boost/multi_index/hashed_index.hpp>
@@ -411,6 +412,10 @@ private:
     // transactions becomes O(N^2) where N is the number of transactions in the
     // pool
     std::atomic_uint32_t nCheckFrequency {0};
+
+    // Flag to temporarily suspend sanity checking
+    std::atomic_bool suspendSanityCheck {false};
+
     std::atomic_uint nTransactionsUpdated {0};
 
     // fee that a transaction or a group needs to pay to enter the primary mempool
@@ -556,6 +561,8 @@ public:
     std::string CheckJournal() const;
 
     void SetSanityCheck(double dFrequency = 1.0);
+    void SuspendSanityCheck() { suspendSanityCheck.store(true); }
+    void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
 
@@ -684,12 +691,17 @@ public:
         const std::vector<COutPoint>& outpoints,
         const std::function<void(const CoinWithScript&, size_t)>& callback) const;
 
+private:
+    void OpenMempoolTxDB(const bool clearDatabase = false);
+
+public:
+    // Called at process init, opens the transaction database and checks its
+    // cross-reference with mempool.dat.
     void InitMempoolTxDB();
     uint64_t GetDiskUsage();
     uint64_t GetDiskTxCount();
     void SaveTxsToDisk(uint64_t requiredSize);
 
-public:
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
      * this set, then all in-mempool descendants must also be in the set, unless
@@ -1114,16 +1126,26 @@ private:
     // A non-locking version of DynamicMemoryUsage.
     size_t DynamicMemoryUsageNL() const;
 
-public:
-    // Allow access to some mempool internals from unit tests.
-    template<typename X> struct UnitTestAccess;
-
     // Dumping and loading the mempool.
     using DumpFileID = boost::uuids::uuid;
     FILE* OpenDumpFile(uint64_t& version, DumpFileID& instanceId);
 
+    // Mempool dump and load for testing different file formats
+    // and custion validation.
+    void DumpMempool(uint64_t version);
+    bool LoadMempool(const Config &config,
+                     const task::CCancellationToken& shutdownToken,
+                     const std::function<CValidationState(
+                         const TxInputDataSPtr& txInputData,
+                         const mining::CJournalChangeSetPtr& changeSet,
+                         bool limitMempoolSize)>& processValidation);
+
+public:
+    // Allow access to some mempool internals from unit tests.
+    template<typename X> struct UnitTestAccess;
+
     /** Dump the mempool to disk. */
-    void DumpMempool(uint64_t version = 0);
+    void DumpMempool();
 
     /** Load the mempool from disk. */
     bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);

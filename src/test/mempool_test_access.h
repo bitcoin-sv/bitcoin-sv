@@ -69,6 +69,11 @@ public:
         return mempool.removeStagedNL(stage, changeSet, reason);
     }
 
+    void OpenMempoolTxDB()
+    {
+        mempool.OpenMempoolTxDB();
+    }
+
     bool CheckMempoolTxDB()
     {
         std::shared_lock lock(mempool.smtx);
@@ -78,6 +83,21 @@ public:
     void SyncWithMempoolTxDB()
     {
         mempool.mempoolTxDB->Sync();
+    }
+
+    void DumpMempool(uint64_t version)
+    {
+        mempool.DumpMempool(version);
+    }
+
+    bool LoadMempool(const Config &config,
+                     const task::CCancellationToken& shutdownToken,
+                     const std::function<CValidationState(
+                         const TxInputDataSPtr& txInputData,
+                         const mining::CJournalChangeSetPtr& changeSet,
+                         bool limitMempoolSize)>& processValidation)
+    {
+        return mempool.LoadMempool(config, shutdownToken, processValidation);
     }
 };
 
