@@ -122,6 +122,10 @@ public:
      * @param[in] _parent          Parent CDBWrapper instance.
      * @param[in] _piter           The original leveldb iterator.
      */
+    CDBIterator(const CDBIterator&) = delete;
+    CDBIterator& operator=(const CDBIterator&) = delete;
+    CDBIterator(CDBIterator&&) = delete;
+    CDBIterator& operator=(CDBIterator&&) = delete;
     CDBIterator(const CDBWrapper &_parent, leveldb::Iterator *_piter)
         : parent(_parent), piter(_piter){};
     ~CDBIterator();
@@ -219,6 +223,10 @@ public:
      * false, XOR
      *                        with a zero'd byte array.
      */
+    CDBWrapper(const CDBWrapper&) = delete;
+    CDBWrapper& operator=(const CDBWrapper&) = delete;
+    CDBWrapper(CDBWrapper&&) = delete;
+    CDBWrapper& operator=(CDBWrapper&&) = delete;
     CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory = false,
                bool fWipe = false, bool obfuscate = false);
     ~CDBWrapper();

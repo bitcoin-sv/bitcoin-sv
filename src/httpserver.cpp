@@ -81,7 +81,11 @@ private:
     class ThreadCounter {
     public:
         WorkQueue &wq;
-        ThreadCounter(WorkQueue &w) : wq(w) {
+        ThreadCounter(const ThreadCounter&) = delete;
+        ThreadCounter& operator=(const ThreadCounter&) = delete;
+        ThreadCounter(ThreadCounter&&) = delete;
+        ThreadCounter& operator=(ThreadCounter&&) = delete;
+        explicit ThreadCounter(WorkQueue &w) : wq(w) {
             std::lock_guard<std::mutex> lock(wq.cs);
             wq.numThreads += 1;
         }
@@ -93,12 +97,15 @@ private:
     };
 
 public:
-    WorkQueue(size_t _maxDepth)
+    WorkQueue(const WorkQueue&) = delete;
+    WorkQueue& operator=(const WorkQueue&) = delete;
+    WorkQueue(WorkQueue&&) = delete;
+    WorkQueue& operator=(WorkQueue&&) = delete;
+    explicit WorkQueue(size_t _maxDepth)
         : running(true), maxDepth(_maxDepth), numThreads(0) {}
     /** Precondition: worker threads have all stopped
      * (call WaitExit)
      */
-    ~WorkQueue() {}
     /** Enqueue a work item */
     bool Enqueue(WorkItem *item) {
         std::unique_lock<std::mutex> lock(cs);
