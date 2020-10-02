@@ -990,7 +990,8 @@ void CommitTxToMempool(
     CValidationState& state,
     const CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize,
-    size_t* pnMempoolSize,
+    size_t* pnPrimaryMempoolSize,
+    size_t* pnSecondaryMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
@@ -1019,7 +1020,8 @@ void CommitTxToMempool(
             pMempoolEntry,
             txStorage,
             changeSet,
-            pnMempoolSize,
+            pnPrimaryMempoolSize,
+            pnSecondaryMempoolSize,
             pnDynamicMemoryUsage);
     // Check if the mempool size needs to be limited.
     if (fLimitMempoolSize) {
@@ -1661,7 +1663,8 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
 
 static void LogTxnCommitStatus(
     const CTxnValResult& txStatus,
-    const size_t& nMempoolSize,
+    const size_t& nPrimaryMempoolSize,
+    const size_t& nSecondaryMempoolSize,
     const size_t& nDynamicMemoryUsage) {
 
     const bool fOrphanTxn = txStatus.mTxInputData->IsOrphanTxn();
@@ -1689,12 +1692,14 @@ static void LogTxnCommitStatus(
         sTxnStatusMsg += FormatStateMessage(state);
     }
     LogPrint(state.IsValid() ? BCLog::MEMPOOL : BCLog::MEMPOOLREJ,
-            "%s: %s txn= %s %s (poolsz %u txn, %u kB) %s\n",
+             "%s: %s txn= %s %s (poolsz %zu txn (pri=%zu,sec=%zu), %zu kB) %s\n",
              enum_cast<std::string>(source),
              state.IsStandardTx() ? "standard" : "nonstandard",
              tx.GetId().ToString(),
              sTxnStatusMsg,
-             nMempoolSize,
+             nPrimaryMempoolSize + nSecondaryMempoolSize,
+             nPrimaryMempoolSize,
+             nSecondaryMempoolSize,
              nDynamicMemoryUsage / 1000,
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
 }
@@ -1774,7 +1779,8 @@ void ProcessValidatedTxn(
         /**
          * Send transaction to the mempool
          */
-        size_t nMempoolSize {};
+        size_t nPrimaryMempoolSize {};
+        size_t nSecondaryMempoolSize {};
         size_t nDynamicMemoryUsage {};
         // Check if required log categories are enabled
         bool fMempoolLogs = LogAcceptCategory(BCLog::MEMPOOL) || LogAcceptCategory(BCLog::MEMPOOLREJ);
@@ -1787,7 +1793,8 @@ void ProcessValidatedTxn(
             state,
             handlers.mJournalChangeSet,
             fLimitMempoolSize,
-            fMempoolLogs ? &nMempoolSize : nullptr,
+            fMempoolLogs ? &nPrimaryMempoolSize : nullptr,
+            fMempoolLogs ? &nSecondaryMempoolSize : nullptr,
             fMempoolLogs ? &nDynamicMemoryUsage : nullptr);
         // Check txn's commit status and do all required actions.
         if (TxSource::p2p == source) {
@@ -1798,7 +1805,10 @@ void ProcessValidatedTxn(
         }
         // Logging txn commit status
         if (!state.IsResubmittedTx()) {
-            LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
+            LogTxnCommitStatus(txStatus,
+                               nPrimaryMempoolSize,
+                               nSecondaryMempoolSize,
+                               nDynamicMemoryUsage);
         }
     }
     // If txn validation or commit has failed then:

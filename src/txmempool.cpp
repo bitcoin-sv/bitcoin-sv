@@ -329,7 +329,8 @@ void CTxMemPool::AddUnchecked(
     const CTxMemPoolEntry &entry,
     const TxStorage txStorage,
     const CJournalChangeSetPtr& changeSet,
-    size_t* pnMempoolSize,
+    size_t* pnPrimaryMempoolSize,
+    size_t* pnSecondaryMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
     {
@@ -341,7 +342,8 @@ void CTxMemPool::AddUnchecked(
             txStorage,
             changeSet,
             std::nullopt,
-            pnMempoolSize,
+            pnPrimaryMempoolSize,
+            pnSecondaryMempoolSize,
             pnDynamicMemoryUsage);
     }
     // Notify entry added without holding the mempool's lock
@@ -396,11 +398,12 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
     // assemble the group
     for(auto entry: groupMembers)
     {
+        // moving from secondary mempool to the primary
         mapTx.modify(entry, [&group](CTxMemPoolEntry& entry) {
                                 entry.group = group;
                                 entry.groupingData = std::nullopt;
                             });
-        secondaryMempoolSize--; // moving from secondary mempool to the primary
+        secondaryMempoolStats.Remove(entry);
         TrackEntryModified(entry);
     }
 
@@ -531,7 +534,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
             {
                 // accept it to primary mempool
                 changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry} );
-                secondaryMempoolSize--;
+                secondaryMempoolStats.Remove(entry);
                 // enqueue children to update
                 for(auto child: GetMemPoolChildrenNL(entry))
                 {
@@ -580,7 +583,7 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
             // accept it to primary mempool as standalone tx
             SetGroupingData(entry, std::nullopt);
             changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry} );
-            secondaryMempoolSize--;
+            secondaryMempoolStats.Remove(entry);
         }
         else
         {
@@ -639,8 +642,8 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
         {
             // add to change set, removin them from journal
             changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, {*entry});
-            secondaryMempoolSize++; // removing from primary to secondary mempool
-
+            // removing from primary to secondary mempool
+            secondaryMempoolStats.Add(entry);
             // add to set of removed
             removed.insert(entry);
 
@@ -696,7 +699,8 @@ void CTxMemPool::AddUncheckedNL(
     const TxStorage txStorage,
     const CJournalChangeSetPtr& changeSet,
     SpentOutputs spentOutputs,
-    size_t* pnMempoolSize,
+    size_t* pnPrimaryMempoolSize,
+    size_t* pnSecondaryMempoolSize,
     size_t* pnDynamicMemoryUsage)
 {
     static const auto nullTxDB = std::shared_ptr<CMempoolTxDBReader>{nullptr};
@@ -791,17 +795,20 @@ void CTxMemPool::AddUncheckedNL(
 
     // set dummy data that it looks like it is in the secondary mempool
     SetGroupingData(newit, SecondaryMempoolEntryData());
-    secondaryMempoolSize++;
     // now see if it can be accepted to primary mempool
     // this will set correct groupin data if it stays in the secondary mempool
+    secondaryMempoolStats.Add(newit);
     TryAcceptChildlessTxToPrimaryMempoolNL(newit, nonNullChangeSet.Get());
 
     nTransactionsUpdated++;
     totalTxSize += newit->GetTxSize();
 
     // If it is required calculate mempool size & dynamic memory usage.
-    if (pnMempoolSize) {
-        *pnMempoolSize = PrimaryMempoolSizeNL();
+    if (pnPrimaryMempoolSize) {
+        *pnPrimaryMempoolSize = PrimaryMempoolSizeNL();
+    }
+    if (pnSecondaryMempoolSize) {
+        *pnSecondaryMempoolSize = secondaryMempoolStats.Size();
     }
     if (pnDynamicMemoryUsage) {
         *pnDynamicMemoryUsage = DynamicMemoryUsageNL();
@@ -838,7 +845,7 @@ void CTxMemPool::removeUncheckedNL(
         }
         else
         {
-            secondaryMempoolSize--;
+            secondaryMempoolStats.Remove(entry);
         }
 
         totalTxSize -= entry->GetTxSize();
@@ -1140,7 +1147,7 @@ void CTxMemPool::clearNL(bool skipTransactionDatabase/* = false*/) {
     mapTx.clear();
     mapNextTx.clear();
     totalTxSize = 0;
-    secondaryMempoolSize = 0;
+    secondaryMempoolStats.Clear();
     cachedInnerUsage = 0;
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = false;
@@ -1215,11 +1222,18 @@ void CTxMemPool::CheckMempoolImplNL(
     // Get spend height and MTP
     const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(mempoolDuplicate);
 
-    LogPrint(BCLog::MEMPOOL,
-             "Checking mempool with %u transactions and %u inputs\n",
-             (unsigned int)PrimaryMempoolSizeNL(), (unsigned int)mapNextTx.size());
+    {
+        const auto primary = PrimaryMempoolSizeNL();
+        const auto secondary = secondaryMempoolStats.Size();
+        LogPrint(BCLog::MEMPOOL,
+                 "Checking mempool with %lu transactions "
+                 "(%lu primary, %lu secondary) and %zu inputs\n",
+                 primary + secondary, primary, secondary,
+                 size_t(mapNextTx.size()));
+    }
 
     size_t primaryMempoolSize = 0;
+    size_t secondaryMempoolSize = 0;
 
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;
@@ -1228,7 +1242,11 @@ void CTxMemPool::CheckMempoolImplNL(
     for (txiter it = mapTx.begin(); it != mapTx.end(); it++) {
         if(it->IsInPrimaryMempool())
         {
-            primaryMempoolSize++;
+            ++primaryMempoolSize;
+        }
+        else
+        {
+            ++secondaryMempoolSize;
         }
         unsigned int i = 0;
         checkTotal += it->GetTxSize();
@@ -1318,6 +1336,7 @@ void CTxMemPool::CheckMempoolImplNL(
     }
 
     assert(primaryMempoolSize == PrimaryMempoolSizeNL());
+    assert(secondaryMempoolSize == secondaryMempoolStats.Size());
 
     unsigned int stepsSinceLastRemove = 0;
     while (!waitingOnDependants.empty()) {
@@ -1813,7 +1832,7 @@ size_t CTxMemPool::DynamicMemoryUsage() const {
     return DynamicMemoryUsageNL();
 }
 
-size_t CTxMemPool::DynamicMemoryUsageNL() const {
+size_t CTxMemPool::DynamicMemoryIndexUsageNL() const {
     // Estimate the overhead of mapTx to be 12 pointers + two allocations, as
     // no exact formula for boost::multi_index_container is implemented.
     return mapTx.size() * memusage::MallocUsage(sizeof(CTxMemPoolEntry) +
@@ -1822,7 +1841,26 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
            mapNextTx.size() * memusage::MallocUsage(sizeof(OutpointTxPair) +
                                                     12 * sizeof(void *)) +
            memusage::DynamicUsage(mapDeltas) +
-           memusage::DynamicUsage(mapLinks) + cachedInnerUsage;
+           memusage::DynamicUsage(mapLinks);
+}
+
+size_t CTxMemPool::DynamicMemoryUsageNL() const {
+    return DynamicMemoryIndexUsageNL() + cachedInnerUsage;
+}
+
+size_t CTxMemPool::SecondaryMempoolUsage() const {
+    std::shared_lock lock(smtx);
+    return SecondaryMempoolUsageNL();
+}
+
+size_t CTxMemPool::SecondaryMempoolUsageNL() const {
+    // assume secondary mempool entries consume a proportional amount of index space.
+    // worst case is secondary mempool entries consume more index which will slightly
+    // increase memory pressure for primary mempool writeout instead of triggering
+    // eviction from the secondary mempool
+    double secondaryMempoolRatio = static_cast<double>(secondaryMempoolStats.Size()) / (mapTx.size() + 1);
+    size_t indexSize = DynamicMemoryIndexUsageNL();
+    return indexSize * secondaryMempoolRatio + secondaryMempoolStats.InnerUsage();
 }
 
 void CTxMemPool::removeStagedNL(
@@ -2352,7 +2390,7 @@ unsigned long CTxMemPool::Size() {
 }
 
 unsigned long CTxMemPool::PrimaryMempoolSizeNL() const {
-    return mapTx.size() - secondaryMempoolSize;
+    return mapTx.size() - secondaryMempoolStats.Size();
 }
 
 uint64_t CTxMemPool::GetTotalTxSize() {

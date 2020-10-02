@@ -428,9 +428,6 @@ private:
     //!< sum of all mempool tx's virtual sizes.
     uint64_t totalTxSize;
 
-    // Primary and secondary mempool sizes are tracked separately.
-    unsigned long secondaryMempoolSize;
-
     //!< sum of dynamic memory usage of all the map elements (NOT the maps
     //! themselves)
     uint64_t cachedInnerUsage;
@@ -581,6 +578,36 @@ private:
 
     std::vector<COutPoint> GetOutpointsSpentByNL(CTxMemPool::txiter entry) const;
 
+    class SecondaryMempoolStats {
+        // Primary and secondary mempool sizes are tracked separately.
+        uint64_t secondaryMempoolSize;
+
+        //!< sum of transaction sizes of secondary mempool map elements (NOT the maps
+        //! themselves)
+        uint64_t cachedSecondaryInnerUsage;
+
+        public:
+        SecondaryMempoolStats()
+        {
+            Clear();
+        }
+        void Clear() {
+            secondaryMempoolSize = 0;
+            cachedSecondaryInnerUsage = 0;
+        }
+        void Add(const txiter& entryIt) {
+            secondaryMempoolSize++;
+            cachedSecondaryInnerUsage += entryIt->DynamicMemoryUsage();
+        }
+        void Remove(const txiter& entryIt) {
+            secondaryMempoolSize--;
+            cachedSecondaryInnerUsage -= entryIt->DynamicMemoryUsage();
+        }
+        unsigned long Size() const { return secondaryMempoolSize; }
+        uint64_t InnerUsage() const { return cachedSecondaryInnerUsage; }
+    };
+    SecondaryMempoolStats secondaryMempoolStats;
+
 
 public:
     /** Create a new CTxMemPool. */
@@ -616,7 +643,8 @@ public:
             const CTxMemPoolEntry &entry,
             const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
-            size_t* pnMempoolSize = nullptr,
+            size_t* pnPrimaryMempoolSize = nullptr,
+            size_t* pnSecondaryMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
 private:
@@ -849,6 +877,7 @@ public:
     std::vector<TxMempoolInfo> InfoAll() const;
 
     size_t DynamicMemoryUsage() const;
+    size_t SecondaryMempoolUsage() const;
 
     CFeeRate estimateFee() const;
 
@@ -1113,7 +1142,8 @@ private:
             const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
             SpentOutputs spentOutputs = std::nullopt,
-            size_t* pnMempoolSize = nullptr,
+            size_t* pnPrimaryMempoolSize = nullptr,
+            size_t* pnSecondaryMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
     // A non-locking version of ApplyDeltas
@@ -1174,8 +1204,14 @@ private:
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;
 
+    // A non-locking estimate of usage of mempool indexes without actual transactions
+    size_t DynamicMemoryIndexUsageNL() const;
+
     // A non-locking version of DynamicMemoryUsage.
     size_t DynamicMemoryUsageNL() const;
+
+    // A non-locking version of SecondaryMempoolUsage.
+    size_t SecondaryMempoolUsageNL() const;
 
     // Dumping and loading the mempool.
     using DumpFileID = boost::uuids::uuid;
