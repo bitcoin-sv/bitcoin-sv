@@ -361,7 +361,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         _("Imports blocks from external blk000??.dat file on startup"));
 
     strUsage += HelpMessageOpt("-maxmempool=<n>",
-                   strprintf(_("Keep the transaction memory pool below <n> megabytes "
+                   strprintf(_("Keep the resident size of the transaction memory pool below <n> megabytes "
                                "(default: %u%s,  must be at least %d). "
                                "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
                              DEFAULT_MAX_MEMPOOL_SIZE,
