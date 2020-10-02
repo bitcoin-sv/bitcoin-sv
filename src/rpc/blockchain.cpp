@@ -1593,16 +1593,6 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
         }
     }
 
-    // last field has value of the last field in an array (needed to form valid JSON)
-    uint32_t lastField;
-    for(int i = 0; i < 5; i++)
-    {
-        if (returnFieldsFlags & (1 << i))
-        {
-            lastField = (1 << i);
-        }
-    }
-
     if(returnFieldsFlags == 0)
     {
         throw JSONRPCError(RPC_INVALID_PARAMS, "No return fields set");
@@ -1657,8 +1647,8 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
     CHttpTextWriter httpWriter(httpReq);
     CJSONWriter jWriter(httpWriter, false);
 
-    httpWriter.Write("{\"result\": ");
     jWriter.writeBeginObject();
+    jWriter.writeBeginObject("result");
     jWriter.writeBeginArray("txouts");
 
     for(size_t arrayIndex = 0; arrayIndex < outPoints.size(); arrayIndex++)
@@ -1672,8 +1662,8 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             CCoinsViewMemPool view(pcoinsTip, mempool);
             if (!view.GetCoin(outPoints[arrayIndex], coin))
             {
-                jWriter.pushKV("error", "missing", false);
-                jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
+                jWriter.pushKV("error", "missing");
+                jWriter.writeEndObject();
                 continue;
             }
             else if(const CTransaction* tx = mempool.IsSpentByNL(outPoints[arrayIndex]))
@@ -1682,9 +1672,9 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
                 jWriter.writeBeginObject("collidedWith");
                 jWriter.pushKV("txid", tx->GetId().GetHex());
                 jWriter.pushKV("size", int64_t(tx->GetTotalSize()));
-                jWriter.pushKV("hex", EncodeHexTx(*tx), false);
-                jWriter.writeEndObject(false);
-                jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
+                jWriter.pushKV("hex", EncodeHexTx(*tx));
+                jWriter.writeEndObject();
+                jWriter.writeEndObject();
                 continue;
             }
         }
@@ -1692,26 +1682,25 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
         {
             if (!pcoinsTip->GetCoin(outPoints[arrayIndex], coin) || coin.IsSpent())
             {
-                jWriter.pushKV("error", "missing", false);
-                jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
+                jWriter.pushKV("error", "missing");
+                jWriter.writeEndObject();
                 continue;
             }
         }
 
         if(returnFieldsFlags & scriptPubKeyFlag)
         {
-            jWriter.pushKV("scriptPubKey", HexStr(coin.GetTxOut().scriptPubKey), !(lastField==scriptPubKeyFlag));
+            jWriter.pushKV("scriptPubKey", HexStr(coin.GetTxOut().scriptPubKey));
         }
 
         if(returnFieldsFlags & scriptPubKeyLenFlag)
         {
-            jWriter.pushKV("scriptPubKeyLen", static_cast<int64_t>(coin.GetTxOut().scriptPubKey.size()),
-              !(lastField==scriptPubKeyLenFlag));
+            jWriter.pushKV("scriptPubKeyLen", static_cast<int64_t>(coin.GetTxOut().scriptPubKey.size()));
         }
 
         if(returnFieldsFlags & valueFlag)
         {
-            jWriter.pushKVMoney("value", ValueFromAmount(coin.GetTxOut().nValue).getValStr(), !(lastField==valueFlag));
+            jWriter.pushKVJSONFormatted("value", ValueFromAmount(coin.GetTxOut().nValue).getValStr());
         }
 
         if(returnFieldsFlags & isStandardFlag)
@@ -1720,7 +1709,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
                      ? (chainActive.Height() + 1)
                      : coin.GetHeight();
             txnouttype txOutType;
-            jWriter.pushKV("isStandard", IsStandard(config, coin.GetTxOut().scriptPubKey, height, txOutType), !(lastField==isStandardFlag));
+            jWriter.pushKV("isStandard", IsStandard(config, coin.GetTxOut().scriptPubKey, height, txOutType));
         }
 
         if(returnFieldsFlags & confirmationsFlag)
@@ -1737,15 +1726,17 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
                 CBlockIndex *pindex = it->second;
                 confirmations = int64_t(pindex->nHeight - coin.GetHeight() + 1);
             }
-            jWriter.pushKV("confirmations", confirmations, !(lastField==confirmationsFlag));
+            jWriter.pushKV("confirmations", confirmations);
         }
 
-        jWriter.writeEndObject(!(arrayIndex == txid_n_pairs.size()-1));
+        jWriter.writeEndObject();
     }
 
-    jWriter.writeEndArray(false);
+    jWriter.writeEndArray();
     jWriter.writeEndObject();
-    httpWriter.Write(" \"error\": " + NullUniValue.write() + ", \"id\": " + request.id.write() + "}");
+    jWriter.pushKV("error", nullptr);
+    jWriter.pushKV("id", request.id.write());
+    jWriter.writeEndObject();
     jWriter.flush();
 
     if (!processedInBatch)
