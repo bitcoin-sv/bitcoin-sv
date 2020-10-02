@@ -702,6 +702,10 @@ public:
     uint64_t GetDiskTxCount();
     void SaveTxsToDisk(uint64_t requiredSize);
 
+    // May be called during validation.
+    // The transaction must not exist in the mempool.
+    void RemoveTxFromDisk(const CTransactionRef& transaction);
+
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
      * this set, then all in-mempool descendants must also be in the set, unless

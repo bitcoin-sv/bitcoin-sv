@@ -1000,9 +1000,15 @@ void CommitTxToMempool(
     // Post-genesis, non-final txns have their own mempool
     if(state.IsNonFinal() || pool.getNonFinalPool().finalisesExistingTransaction(ptx))
     {
+        if (txStorage != TxStorage::memory)
+        {
+            // Remove the transaction from disk because the non-final memppool
+            // does not use the txdb.
+            pool.RemoveTxFromDisk(ptx);
+        }
+
         // Post-genesis, non-final txns have their own mempool
         TxMempoolInfo info { pMempoolEntry };
-        // FIXME FIXME FIXME: CORE-130: Remove tx from mempool txdb if (TxStorage::txdb)
         pool.getNonFinalPool().addOrUpdateTransaction(info, pTxInputData, state);
         return;
     }

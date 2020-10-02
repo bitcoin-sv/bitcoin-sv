@@ -1506,6 +1506,12 @@ void CTxMemPool::OpenMempoolTxDB(const bool clearDatabase) {
                    });
 }
 
+void CTxMemPool::RemoveTxFromDisk(const CTransactionRef& transaction) {
+    assert(!Exists(transaction->GetId()));
+    OpenMempoolTxDB();
+    mempoolTxDB->Remove({transaction->GetId()}, transaction->GetTotalSize());
+}
+
 uint64_t CTxMemPool::GetDiskUsage() {
     OpenMempoolTxDB();
     return mempoolTxDB->GetDiskUsage();
