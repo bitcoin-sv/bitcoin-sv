@@ -63,7 +63,7 @@ BOOST_AUTO_TEST_CASE(BelowLimitAllInRam)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), entries.size());
     BOOST_CHECK_EQUAL(testPool.DynamicMemoryUsage(), poolTotal);
@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_CASE(BelowLimitAllOnDisk)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), entries.size());
     BOOST_CHECK_EQUAL(testPool.DynamicMemoryUsage(), poolTotal);
@@ -105,7 +105,7 @@ BOOST_AUTO_TEST_CASE(BelowLimitThirdOnDisk)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), entries.size());
     BOOST_CHECK_EQUAL(testPool.DynamicMemoryUsage(), poolTotal);
@@ -126,7 +126,7 @@ BOOST_AUTO_TEST_CASE(AtLimitAllInRam)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), entries.size());
     BOOST_CHECK_EQUAL(testPool.DynamicMemoryUsage(), limitTotal);
@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE(AtLimitAllOnDisk)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), entries.size());
     BOOST_CHECK_EQUAL(testPool.DynamicMemoryUsage(), limitTotal);
@@ -168,7 +168,7 @@ BOOST_AUTO_TEST_CASE(AtLimitThirdOnDisk)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), entries.size());
     BOOST_CHECK_EQUAL(testPool.DynamicMemoryUsage(), limitTotal);
@@ -189,7 +189,7 @@ BOOST_AUTO_TEST_CASE(AboveLimitInRam)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK(testPool.Size() < entries.size());
     BOOST_CHECK(testPool.DynamicMemoryUsage() < limitTotal);
@@ -210,7 +210,7 @@ BOOST_AUTO_TEST_CASE(AboveLimitAllOnDisk)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK(testPool.Size() < entries.size());
     BOOST_CHECK(testPool.DynamicMemoryUsage() < limitTotal);
@@ -231,7 +231,7 @@ BOOST_AUTO_TEST_CASE(AboveLimitThirdOnDisk)
     const auto limitDisk = limitTotal - limitMemory;
     BOOST_CHECK_EQUAL(poolSize, entries.size());
 
-    LimitMempoolSize(testPool, nullChangeSet, limitMemory, limitDisk, 1000000);
+    LimitMempoolSize(testPool, nullChangeSet, MempoolSizeLimits(limitMemory, limitDisk, 1000000));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK(testPool.Size() < entries.size());
     BOOST_CHECK(testPool.DynamicMemoryUsage() < limitTotal);

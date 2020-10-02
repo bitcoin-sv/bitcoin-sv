@@ -656,22 +656,47 @@ size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
  */
 size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
 
+
+class MempoolSizeLimits {
+public:
+    MempoolSizeLimits(size_t memory, size_t disk, unsigned long age)
+    : limitMemory{memory}
+    , limitDisk{disk}
+    , limitAge{age}
+    {}
+
+    // A size limit for RAM used by mempool. When exceeded write out transactions to disk.
+    size_t Memory() const { return limitMemory; }
+
+    // A size limit for disk used by mempool.
+    size_t Disk() const { return limitDisk; }
+
+    // A size limit for mempool RAM and disk combined. When exceeded remove transactions.
+    size_t Total() const { return limitMemory + limitDisk; }
+
+    // A time limit for txn to be tracked by mempool. When exceeded remove transactions.
+    unsigned long Age() const { return limitAge; }
+
+    static MempoolSizeLimits FromConfig();
+
+private:
+    size_t limitMemory;
+    size_t limitDisk;
+    unsigned long limitAge;
+};
+
 /**
  * Limit mempool size.
  *
  * @param pool A reference to the mempool
  * @param changeSet A reference to the Jorunal ChangeSet
- * @param limit A size limit for txn to remove
- * @param limit A size limit for txn to move to disk
- * @param age Time limit for txn to remove
+ * @param limits The limits to enforce by writeout to disk or removal
  * @return A vector with all TxIds which were removed from the mempool
  */
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const mining::CJournalChangeSetPtr& changeSet,
-    size_t limitMemory,
-    size_t limitDisk,
-    unsigned long age);
+    const MempoolSizeLimits& limits);
 
 /**
  * Submit transaction to the mempool.

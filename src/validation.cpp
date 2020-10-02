@@ -946,28 +946,32 @@ size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue) {
     return numHardwareThrs - GetNumLowPriorityValidationThrs(numHardwareThrs);
 }
 
+MempoolSizeLimits MempoolSizeLimits::FromConfig() {
+    return MempoolSizeLimits(
+        GlobalConfig::GetConfig().GetMaxMempool(),
+        GlobalConfig::GetConfig().GetMaxMempoolSizeDisk(),
+        GlobalConfig::GetConfig().GetMemPoolExpiry());
+}
+
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const CJournalChangeSetPtr& changeSet,
-    size_t limitMemory,
-    size_t limitDisk,
-    unsigned long age) {
+    const MempoolSizeLimits& limits) {
 
-    size_t limitTotal = limitMemory + limitDisk;
-
-    int expired = pool.Expire(GetTime() - age, changeSet);
+    int expired = pool.Expire(GetTime() - limits.Age(), changeSet);
     if (expired != 0) {
         LogPrint(BCLog::MEMPOOL,
                  "Expired %i transactions from the memory pool\n", expired);
     }
     size_t usageTotal = pool.DynamicMemoryUsage();
+    size_t usageSecondary = pool.SecondaryMempoolUsage();
 
     std::vector<COutPoint> vNoSpendsRemaining;
     std::vector<TxId> vRemovedTxIds;
 
-    if (usageTotal > limitTotal)
+    if (usageTotal > limits.Total())
     {
-        size_t targetSize = limitTotal;
+        size_t targetSize = limits.Total();
         vRemovedTxIds =
             pool.TrimToSize(targetSize, changeSet, &vNoSpendsRemaining);
         usageTotal = pool.DynamicMemoryUsage();
@@ -979,8 +983,8 @@ std::vector<TxId> LimitMempoolSize(
     size_t usageMemory = std::max(usageTotal, usageDisk) - usageDisk;
 
     // Since this is called often we'll track the limit pretty close
-    if (usageMemory > limitMemory) {
-        size_t toWriteOut = usageMemory - limitMemory;
+    if (usageMemory > limits.Memory()) {
+        size_t toWriteOut = usageMemory - limits.Memory();
         pool.SaveTxsToDisk(toWriteOut);
     }
     pcoinsTip->Uncache(vNoSpendsRemaining);
@@ -1034,9 +1038,7 @@ void CommitTxToMempool(
         LimitMempoolSize(
             pool,
             changeSet,
-            GlobalConfig::GetConfig().GetMaxMempool(),
-            GlobalConfig::GetConfig().GetMaxMempoolSizeDisk(),
-            GlobalConfig::GetConfig().GetMemPoolExpiry());
+            MempoolSizeLimits::FromConfig());
         if (!pool.Exists(txid)) {
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                      "mempool full");

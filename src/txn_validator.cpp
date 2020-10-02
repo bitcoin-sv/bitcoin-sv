@@ -296,10 +296,8 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
             LimitMempoolSize(
                 mMempool,
                 changeSet,
-                mConfig.GetMaxMempool(),
-                mConfig.GetMaxMempoolSizeDisk(),
-                mConfig.GetMemPoolExpiry());
-    }
+                MempoolSizeLimits::FromConfig());
+    } /*TODO*/
     // Execute post processing steps.
     postProcessingStepsNL(vAcceptedTxns, vRemovedTxIds, handlers);
     // After we've (potentially) uncached entries, ensure our coins cache is
@@ -347,10 +345,10 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
         };
         // Ensure, that the last - long running task - won't exceed the limit.
         nMaxTxnValidatorAsyncTasksRunDuration -= mConfig.GetMaxNonStdTxnValidationDuration();
+
         // Get mempool limits.
-        size_t nMaxMempoolSize = mConfig.GetMaxMempool();
-        size_t nMaxMempoolSizeDisk = mConfig.GetMaxMempoolSizeDisk();
-        unsigned long nMempoolExpiry = mConfig.GetMemPoolExpiry();
+        MempoolSizeLimits nLimits(MempoolSizeLimits::FromConfig());
+
         // The main running loop
         while(mRunning) {
             // Run every few seconds or until stopping
@@ -432,9 +430,7 @@ void CTxnValidator::threadNewTxnHandler() noexcept {
                                     LimitMempoolSize(
                                         mMempool,
                                         handlers.mJournalChangeSet,
-                                        nMaxMempoolSize,
-                                        nMaxMempoolSizeDisk,
-                                        nMempoolExpiry)
+                                        nLimits)
                                 };
                                 // Execute post processing steps.
                                 postProcessingStepsNL(imdResult.mAcceptedTxns, vRemovedTxIds, handlers);
