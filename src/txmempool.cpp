@@ -798,16 +798,13 @@ void CTxMemPool::removeUncheckedNL(
     MemPoolRemovalReason reason,
     const CTransaction* conflictedWith)
 {
-    std::vector<TxId> transactionsToRemove;
-    std::uint64_t diskUsageRemoved = 0;
-
+    std::vector<CMempoolTxDB::TxData> transactionsToRemove;
     transactionsToRemove.reserve(entries.size());
-    for (auto entry : entries)
+    for (const auto& entry : entries)
     {
         if (!entry->IsInMemory())
         {
-            transactionsToRemove.emplace_back(entry->GetTxId());
-            diskUsageRemoved += entry->GetTxSize();
+            transactionsToRemove.emplace_back(entry->GetTxId(), entry->GetTxSize());
         }
 
         const auto txn = entry->GetSharedTx();
@@ -860,7 +857,7 @@ void CTxMemPool::removeUncheckedNL(
     if (transactionsToRemove.size() > 0)
     {
         OpenMempoolTxDB();
-        mempoolTxDB->Remove(std::move(transactionsToRemove), diskUsageRemoved);
+        mempoolTxDB->Remove(std::move(transactionsToRemove));
     }
 }
 
@@ -1509,7 +1506,7 @@ void CTxMemPool::OpenMempoolTxDB(const bool clearDatabase) {
 void CTxMemPool::RemoveTxFromDisk(const CTransactionRef& transaction) {
     assert(!Exists(transaction->GetId()));
     OpenMempoolTxDB();
-    mempoolTxDB->Remove({transaction->GetId()}, transaction->GetTotalSize());
+    mempoolTxDB->Remove({{transaction->GetId(), transaction->GetTotalSize()}});
 }
 
 uint64_t CTxMemPool::GetDiskUsage() {
@@ -2631,8 +2628,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
         // A pointer to the TxIdTracker.
         const auto& pTxIdTracker = g_connman->GetTxIdTracker();
         const auto txdb = mempoolTxDB->GetDatabase();
-        std::vector<TxId> transactionsToRemove;
-        std::uint64_t diskUsageRemoved = 0;
+        std::vector<CMempoolTxDB::TxData> transactionsToRemove;
         while (num--) {
             bool txFromMemory {true};
             CTransactionRef tx;
@@ -2689,23 +2685,21 @@ bool CTxMemPool::LoadMempool(const Config &config,
                 } else {
                     ++failed;
                     if (!txFromMemory) {
-                        transactionsToRemove.emplace_back(tx->GetId());
-                        diskUsageRemoved += tx->GetTotalSize();
+                        transactionsToRemove.emplace_back(tx->GetId(), tx->GetTotalSize());
                     }
                 }
             } else {
                 ++skipped;
                 if (!txFromMemory) {
-                    transactionsToRemove.emplace_back(tx->GetId());
-                    diskUsageRemoved += tx->GetTotalSize();
+                    transactionsToRemove.emplace_back(tx->GetId(), tx->GetTotalSize());
                 }
             }
             if (shutdownToken.IsCanceled()) {
                 return false;
             }
         }
-        if (diskUsageRemoved > 0) {
-            mempoolTxDB->Remove(std::move(transactionsToRemove), diskUsageRemoved);
+        if (transactionsToRemove.size() > 0) {
+            mempoolTxDB->Remove(std::move(transactionsToRemove));
         }
 
         std::map<uint256, Amount> mapDeltas;

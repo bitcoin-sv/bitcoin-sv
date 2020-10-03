@@ -82,10 +82,18 @@ public:
      */
     virtual bool TransactionExists(const uint256 &txid) override;
 
+    struct TxData
+    {
+        TxId txid;
+        uint64_t size;
+
+        TxData(TxId&& txid_, uint64_t size_) : txid{std::move(txid_)}, size{size_} {}
+        TxData(const TxId& txid_, uint64_t size_) : txid{txid_}, size{size_} {}
+    };
     /*
      * Used to remove a batch of transactions from the database.
      */
-    bool RemoveTransactions(const std::vector<TxId> &transactionsToRemove, uint64_t diskUsageRemoved);
+    bool RemoveTransactions(const std::vector<TxData>& transactionsToRemove);
 
     /**
      * Return the total size of transactions moved to disk.
@@ -142,8 +150,7 @@ public:
     void Add(std::vector<CTransactionWrapperRef>&& transactionsToAdd);
 
     // Asynchronously remove transactions from the database.
-    void Remove(std::vector<TxId>&& transactionsToRemove,
-                std::uint64_t diskUsageRemoved);
+    void Remove(std::vector<CMempoolTxDB::TxData>&& transactionsToRemove);
 
     // Get the size of the data in the database.
     uint64_t GetDiskUsage()
@@ -188,8 +195,7 @@ private:
     };
     struct RemoveTask
     {
-        std::vector<TxId> transactions;
-        std::uint64_t size;
+        std::vector<CMempoolTxDB::TxData> transactions;
     };
     struct InvokeTask
     {

@@ -83,16 +83,22 @@ bool CMempoolTxDB::TransactionExists(const uint256 &txid)
 }
 
 
-bool CMempoolTxDB::RemoveTransactions(const std::vector<TxId> &txidsRemoved,
-                                      uint64_t diskUsageRemoved)
+bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& transactionsToRemove)
 {
-    const uint64_t txCountRemoved = txidsRemoved.size();
+    const uint64_t txCountRemoved = transactionsToRemove.size();
+    const uint64_t diskUsageRemoved = [&transactionsToRemove]() {
+        auto accumulator = decltype(transactionsToRemove[0].size)(0);
+        for (const auto& td : transactionsToRemove) {
+            accumulator += td.size;
+        }
+        return accumulator;
+    }();
     const auto prevDiskUsage = diskUsage.fetch_sub(diskUsageRemoved);
     const auto prevTxCount = txCount.fetch_sub(txCountRemoved);
 
     CDBBatch batch{*mempoolTxDB};
-    for (const uint256 &txid : txidsRemoved) {
-        batch.Erase(std::make_pair(DB_TRANSACTIONS,txid));
+    for (const auto& td : transactionsToRemove) {
+        batch.Erase(std::make_pair(DB_TRANSACTIONS, td.txid));
     }
     batch.Write(DB_DISK_USAGE, prevDiskUsage - diskUsageRemoved);
     batch.Write(DB_TX_COUNT, prevTxCount - txCountRemoved);
@@ -217,10 +223,9 @@ void CAsyncMempoolTxDB::Add(std::vector<CTransactionWrapperRef>&& transactionsTo
     Enqueue({AddTask{std::move(transactionsToAdd)}});
 }
 
-void CAsyncMempoolTxDB::Remove(std::vector<TxId>&& transactionsToRemove,
-                               std::uint64_t diskUsageRemoved)
+void CAsyncMempoolTxDB::Remove(std::vector<CMempoolTxDB::TxData>&& transactionsToRemove)
 {
-    Enqueue({RemoveTask{std::move(transactionsToRemove), diskUsageRemoved}});
+    Enqueue({RemoveTask{std::move(transactionsToRemove)}});
 }
 
 std::shared_ptr<CMempoolTxDBReader> CAsyncMempoolTxDB::GetDatabase()
@@ -328,7 +333,7 @@ void CAsyncMempoolTxDB::Work()
     // Remove transactions from the database.
     const auto remove = [this](const RemoveTask& task)
     {
-        if (!txdb->RemoveTransactions(task.transactions, task.size))
+        if (!txdb->RemoveTransactions(task.transactions))
         {
             LogPrint(BCLog::MEMPOOL, "WriteBatch failed. Transactions were not removed from DB successfully.");
         }

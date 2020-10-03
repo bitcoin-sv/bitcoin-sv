@@ -120,8 +120,7 @@ BOOST_AUTO_TEST_CASE(DeleteFromTxDB)
     // Remove transactions from the database one by one.
     for (const auto& e : entries)
     {
-        std::vector<TxId> txids{e.GetTxId()};
-        BOOST_CHECK(txdb.RemoveTransactions(txids, e.GetTxSize()));
+        BOOST_CHECK(txdb.RemoveTransactions({{e.GetTxId(), e.GetTxSize()}}));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
@@ -142,18 +141,18 @@ BOOST_AUTO_TEST_CASE(BatchDeleteFromTxDB)
 
     // Write the entries to the database.
     uint64_t totalSize = 0;
-    std::vector<TxId> txids;
+    std::vector<CMempoolTxDB::TxData> txdata;
     for (const auto& e : entries)
     {
         totalSize += e.GetTxSize();
-        txids.emplace_back(e.GetTxId());
+        txdata.emplace_back(e.GetTxId(), e.GetTxSize());
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Remove all transactions from the database at once.
-    BOOST_CHECK(txdb.RemoveTransactions(txids, totalSize));
+    BOOST_CHECK(txdb.RemoveTransactions(txdata));
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
     for (const auto& e : entries)
@@ -171,7 +170,11 @@ BOOST_AUTO_TEST_CASE(BadDeleteFromTxDB)
 
     // Remove nonexistent transactions.
     const auto e = GetABunchOfEntries(3);
-    BOOST_CHECK(txdb.RemoveTransactions({e[0].GetTxId(), e[1].GetTxId(), e[2].GetTxId()}, 777));
+    BOOST_CHECK(txdb.RemoveTransactions({
+                {e[0].GetTxId(), e[0].GetTxSize()},
+                {e[1].GetTxId(), e[1].GetTxSize()},
+                {e[2].GetTxId(), e[2].GetTxSize()}
+            }));
     BOOST_WARN_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_WARN_EQUAL(txdb.GetTxCount(), 0);
 }
@@ -284,7 +287,7 @@ BOOST_AUTO_TEST_CASE(AutoRemoveXrefKey)
 
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
-    txdb.RemoveTransactions({e.GetTxId()}, e.GetTxSize());
+    txdb.RemoveTransactions({{e.GetTxId(), e.GetTxSize()}});
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
 }
@@ -329,19 +332,17 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
-    std::vector<TxId> txids;
+    std::vector<CMempoolTxDB::TxData> txdata;
     std::vector<CTransactionWrapperRef> wrappers;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
-        txids.emplace_back(e.GetTxId());
+        txdata.emplace_back(e.GetTxId(), e.GetTxSize());
         wrappers.emplace_back(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
     }
     txdb.Add(std::move(wrappers));
 
     // Remove all transactions from the database at once.
-    txdb.Remove(std::move(txids), totalSize);
+    txdb.Remove(std::move(txdata));
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
@@ -362,11 +363,9 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
     std::vector<CTransactionWrapperRef> wrappers;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
         wrappers.emplace_back(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
     }
 
@@ -428,7 +427,7 @@ BOOST_AUTO_TEST_CASE(AsyncAutoRemoveXrefKey)
 
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
-    txdb.Remove({e.GetTxId()}, e.GetTxSize());
+    txdb.Remove({{e.GetTxId(), e.GetTxSize()}});
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
 }
