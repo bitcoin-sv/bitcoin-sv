@@ -166,6 +166,86 @@ bool CMempoolTxDB::RemoveXrefKey()
     return mempoolTxDB->WriteBatch(batch, true);
 }
 
+void CMempoolTxDB::Batch::Add(const CTransactionRef& tx, const Updater& update)
+{
+    const auto& txid = tx->GetId();
+    if (0 == removes.erase(txid))
+    {
+        const auto [iter, inserted] = adds.try_emplace(txid, AddOp{tx, update});
+        assert(inserted || iter->second.tx->GetTotalSize() == tx->GetTotalSize());
+    }
+}
+
+void CMempoolTxDB::Batch::Remove(const TxId& txid, uint64_t size, const Updater& update)
+{
+    if (0 == adds.erase(txid))
+    {
+        const auto [iter, inserted] = removes.try_emplace(txid, RmOp{size, update});
+        assert(inserted || iter->second.size == size);
+    }
+}
+
+bool CMempoolTxDB::Commit(const Batch& batch)
+{
+    if (batch.adds.size() == 0 && batch.removes.size() == 0)
+    {
+        return true;
+    }
+
+    const uint64_t txCountDiff = batch.adds.size() - batch.removes.size();
+    const uint64_t diskUsageDiff = [&batch]() {
+        uint64_t accumulator = 0;
+        for (const auto& e : batch.adds)
+        {
+            accumulator += e.second.tx->GetTotalSize();
+        }
+        for (const auto& e : batch.removes)
+        {
+            accumulator -= e.second.size;
+        }
+        return accumulator;
+    }();
+
+    const auto prevDiskUsage = diskUsage.fetch_add(diskUsageDiff);
+    const auto prevTxCount = txCount.fetch_add(txCountDiff);
+
+    CDBBatch coalesced {*mempoolTxDB};
+    for (const auto& e : batch.adds)
+    {
+        coalesced.Write(std::make_pair(DB_TRANSACTIONS, e.first), e.second.tx);
+    }
+    for (const auto& e : batch.removes)
+    {
+        coalesced.Erase(std::make_pair(DB_TRANSACTIONS, e.first));
+    }
+    coalesced.Write(DB_DISK_USAGE, prevDiskUsage + diskUsageDiff);
+    coalesced.Write(DB_TX_COUNT, prevTxCount + txCountDiff);
+    coalesced.Erase(DB_MEMPOOL_XREF);
+
+    if (!mempoolTxDB->WriteBatch(coalesced, true))
+    {
+        diskUsage.fetch_sub(diskUsageDiff);
+        txCount.fetch_sub(txCountDiff);
+        return false;
+    }
+
+    for (const auto& e : batch.adds)
+    {
+        if (e.second.update)
+        {
+            e.second.update(e.first);
+        }
+    }
+    for (const auto& e : batch.removes)
+    {
+        if (e.second.update)
+        {
+            e.second.update(e.first);
+        }
+    }
+    return true;
+}
+
 void CAsyncMempoolTxDB::EnqueueNL(std::initializer_list<Task>&& tasks, bool clearList)
 {
     if (clearList)

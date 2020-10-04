@@ -292,6 +292,107 @@ BOOST_AUTO_TEST_CASE(AutoRemoveXrefKey)
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
 }
 
+BOOST_AUTO_TEST_CASE(BatchWriteWrite)
+{
+    const auto entries = GetABunchOfEntries(1);
+    const auto& entry = entries[0];
+
+    CMempoolTxDB txdb(10000);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+
+    int counter = 0;
+    const auto update = [&entry, &counter](const TxId& txid) {
+        BOOST_CHECK_EQUAL(txid.ToString(), entry.GetTxId().ToString());
+        ++counter;
+    };
+
+    CMempoolTxDB::Batch batch;
+    batch.Add(entry.GetSharedTx(), update);
+    batch.Add(entry.GetSharedTx(), update);
+    BOOST_CHECK(txdb.Commit(batch));
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), entry.GetTxSize());
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 1);
+    BOOST_CHECK_EQUAL(counter, 1);
+}
+
+BOOST_AUTO_TEST_CASE(BatchWriteRemove)
+{
+    const auto entries = GetABunchOfEntries(1);
+    const auto& entry = entries[0];
+
+    CMempoolTxDB txdb(10000);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+
+    int counter = 0;
+    const auto update = [&entry, &counter](const TxId& txid) {
+        BOOST_CHECK_EQUAL(txid.ToString(), entry.GetTxId().ToString());
+        ++counter;
+    };
+
+    CMempoolTxDB::Batch batch;
+    batch.Add(entry.GetSharedTx(), update);
+    batch.Remove(entry.GetTxId(), entry.GetTxSize());
+    BOOST_CHECK(txdb.Commit(batch));
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+    BOOST_CHECK_EQUAL(counter, 0);
+}
+
+BOOST_AUTO_TEST_CASE(BatchWriteRemoveWrite)
+{
+    const auto entries = GetABunchOfEntries(1);
+    const auto& entry = entries[0];
+
+    CMempoolTxDB txdb(10000);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+
+    int counter = 0;
+    const auto update = [&entry, &counter](const TxId& txid) {
+        BOOST_CHECK_EQUAL(txid.ToString(), entry.GetTxId().ToString());
+        ++counter;
+    };
+
+    CMempoolTxDB::Batch batch;
+    batch.Add(entry.GetSharedTx(), update);
+    batch.Remove(entry.GetTxId(), entry.GetTxSize());
+    batch.Add(entry.GetSharedTx(), update);
+    BOOST_CHECK(txdb.Commit(batch));
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), entry.GetTxSize());
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 1);
+    BOOST_CHECK_EQUAL(counter, 1);
+}
+
+BOOST_AUTO_TEST_CASE(Write_BatchRemoveWrite)
+{
+    const auto entries = GetABunchOfEntries(1);
+    const auto& entry = entries[0];
+
+    CMempoolTxDB txdb(10000);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+
+    BOOST_CHECK(txdb.AddTransactions({entry.GetSharedTx()}));
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), entry.GetTxSize());
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 1);
+
+    int counter = 0;
+    const auto update = [&entry, &counter](const TxId& txid) {
+        BOOST_CHECK_EQUAL(txid.ToString(), entry.GetTxId().ToString());
+        ++counter;
+    };
+
+    CMempoolTxDB::Batch batch;
+    batch.Remove(entry.GetTxId(), entry.GetTxSize());
+    batch.Add(entry.GetSharedTx(), update);
+    BOOST_CHECK(txdb.Commit(batch));
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), entry.GetTxSize());
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 1);
+    BOOST_CHECK_EQUAL(counter, 0);
+}
+
 BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
 {
     const auto entries = GetABunchOfEntries(11);

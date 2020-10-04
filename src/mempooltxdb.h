@@ -17,6 +17,7 @@
 #include <future>
 #include <initializer_list>
 #include <mutex>
+#include <unordered_map>
 #include <unordered_set>
 #include <thread>
 #include <variant>
@@ -128,6 +129,31 @@ public:
      * Remove the mempool.dat cross-reference key.
      */
     bool RemoveXrefKey();
+
+    // Interface for coalescing batch add/remove operations.
+    struct Batch
+    {
+        using Updater = std::function<void(const TxId&)>;
+
+        struct AddOp
+        {
+            CTransactionRef tx;
+            Updater update;
+        };
+        std::unordered_map<TxId, AddOp, SaltedTxidHasher> adds;
+
+        struct RmOp
+        {
+            uint64_t size;
+            Updater update;
+        };
+        std::unordered_map<TxId, RmOp, SaltedTxidHasher> removes;
+
+        void Add(const CTransactionRef& tx, const Updater& update = {nullptr});
+        void Remove(const TxId& txid, uint64_t size, const Updater& update = {nullptr});
+        void Clear() { adds.clear(); removes.clear(); }
+    };
+    bool Commit(const Batch& batch);
 };
 
 
