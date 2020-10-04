@@ -166,6 +166,16 @@ bool CMempoolTxDB::RemoveXrefKey()
     return mempoolTxDB->WriteBatch(batch, true);
 }
 
+// The coalescing batch operations assume that the transaction database is
+// consistent with the requested operation: that is, a transaction that is to be
+// added is not already in the database and a transaction to be removed is in
+// the database. Hence, an "add" combined with a "remove" becomes a no-op, and
+// vice versa. The corollary is that adds and removes are properly serialized at
+// the caller, specifically, you can't have two threads independently adding and
+// removing the same transaction. There is some protection against double-add
+// and double-remove (see the assertions in Batch::Add() and Batch::Remove()),
+// but ideally such double operations should never happen.
+
 void CMempoolTxDB::Batch::Add(const CTransactionRef& tx, const Updater& update)
 {
     const auto& txid = tx->GetId();
@@ -364,79 +374,88 @@ namespace {
 
 void CAsyncMempoolTxDB::Work()
 {
-    bool running = true;
-
     // Stop the background thread.
+    bool running = true;
     const auto stop = [&running](const StopTask&)
     {
         running = false;
     };
 
-    // Synchronize with the caller.
-    const auto sync = [](const SyncTask& task)
+    // Commit the adds and removes to the database.
+    CMempoolTxDB::Batch batch;
+    const auto commit = [this, &batch]()
     {
+        if (!txdb->Commit(batch))
+        {
+            LogPrint(BCLog::MEMPOOL, "Mempool TxDB Batch Commit failed.");
+        }
+        batch.Clear();
+    };
+
+    // Synchronize with the caller.
+    const auto sync = [&commit](const SyncTask& task)
+    {
+        commit();
         task.sync->set_value();
     };
 
     // Clear the transaction database.
-    const auto clear = [this](const ClearTask&)
+    const auto clear = [this, &batch](const ClearTask&)
     {
+        batch.Clear();
         txdb->ClearDatabase();
     };
 
     // Add transactions to the database and update the wrappers.
-    const auto add = [this](const AddTask& task)
+    const auto add = [&batch](const AddTask& task)
     {
-        std::vector<CTransactionRef> transactions;
-        transactions.reserve(task.transactions.size());
         for (const auto& wrapper : task.transactions)
         {
             if (wrapper->IsInMemory())
             {
-                transactions.emplace_back(wrapper->GetTx());
+                batch.Add(wrapper->GetTx(),
+                          [wrapper](const TxId&) {
+                              wrapper->UpdateTxMovedToDisk();
+                          });
             }
-        }
-
-        if (txdb->AddTransactions(transactions))
-        {
-            for (const auto& wrapper : task.transactions)
-            {
-                wrapper->UpdateTxMovedToDisk();
-            }
-        }
-        else
-        {
-            LogPrint(BCLog::MEMPOOL, "WriteBatch failed. Transactions were not moved to DB successfully.");
         }
     };
 
     // Remove transactions from the database.
-    const auto remove = [this](const RemoveTask& task)
+    const auto remove = [&batch](const RemoveTask& task)
     {
-        if (!txdb->RemoveTransactions(task.transactions))
+        for (const auto& txdata : task.transactions)
         {
-            LogPrint(BCLog::MEMPOOL, "WriteBatch failed. Transactions were not removed from DB successfully.");
+            batch.Remove(txdata.txid, txdata.size);
         }
     };
 
     // Invoke a function on the database.
-    const auto invoke = [this](const InvokeTask& task)
+    const auto invoke = [this, &commit](const InvokeTask& task)
     {
+        commit();
         task.function(*txdb);
     };
 
+    const auto dispatcher {dispatch{stop, sync, clear, add, remove, invoke}};
     while (running)
     {
-        Task task;
+        std::deque<Task> tasks;
         {
             std::unique_lock<std::mutex> taskLock(taskListGuard);
             while (taskList.size() == 0)
             {
                 taskListSignal.wait(taskLock);
             }
-            std::swap(task, taskList.back());
-            taskList.pop_back();
+
+            tasks = std::move(taskList);
         }
-        std::visit(dispatch{stop, sync, clear, add, remove, invoke}, task);
+
+        while (running && !tasks.empty())
+        {
+            std::visit(dispatcher, tasks.back());
+            tasks.pop_back();
+        }
+        commit();
     }
 }
