@@ -29,6 +29,7 @@ void CMempoolTxDB::ClearDatabase()
 {
     diskUsage.store(0);
     txCount.store(0);
+    dbWriteCount.store(0);
     mempoolTxDB.reset(); // make sure old db is closed before reopening
     mempoolTxDB = std::make_unique<CDBWrapper>(dbPath, nCacheSize, fMemory, true);
 }
@@ -53,6 +54,7 @@ bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef> &txs)
     batch.Write(DB_TX_COUNT, prevTxCount + txCountAdded);
     batch.Erase(DB_MEMPOOL_XREF);
 
+    ++dbWriteCount;
     if (!mempoolTxDB->WriteBatch(batch, true))
     {
         diskUsage.fetch_sub(diskUsageAdded);
@@ -104,6 +106,7 @@ bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& transactionsToR
     batch.Write(DB_TX_COUNT, prevTxCount - txCountRemoved);
     batch.Erase(DB_MEMPOOL_XREF);
 
+    ++dbWriteCount;
     if (!mempoolTxDB->WriteBatch(batch, true))
     {
         diskUsage.fetch_add(diskUsageRemoved);
@@ -144,6 +147,7 @@ bool CMempoolTxDB::SetXrefKey(const XrefKey& xrefKey)
 {
     CDBBatch batch{*mempoolTxDB};
     batch.Write(DB_MEMPOOL_XREF, xrefKey);
+    ++dbWriteCount;
     return mempoolTxDB->WriteBatch(batch, true);
 }
 
@@ -163,6 +167,7 @@ bool CMempoolTxDB::RemoveXrefKey()
 {
     CDBBatch batch{*mempoolTxDB};
     batch.Erase(DB_MEMPOOL_XREF);
+    ++dbWriteCount;
     return mempoolTxDB->WriteBatch(batch, true);
 }
 
@@ -232,6 +237,7 @@ bool CMempoolTxDB::Commit(const Batch& batch)
     coalesced.Write(DB_TX_COUNT, prevTxCount + txCountDiff);
     coalesced.Erase(DB_MEMPOOL_XREF);
 
+    ++dbWriteCount;
     if (!mempoolTxDB->WriteBatch(coalesced, true))
     {
         diskUsage.fetch_sub(diskUsageDiff);
@@ -255,6 +261,12 @@ bool CMempoolTxDB::Commit(const Batch& batch)
     }
     return true;
 }
+
+uint64_t CMempoolTxDB::GetWriteCount()
+{
+    return dbWriteCount.load();
+}
+
 
 void CAsyncMempoolTxDB::EnqueueNL(std::initializer_list<Task>&& tasks, bool clearList)
 {

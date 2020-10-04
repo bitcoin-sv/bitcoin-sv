@@ -9,6 +9,8 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include <algorithm>
+#include <random>
 #include <vector>
 
 namespace {
@@ -474,6 +476,81 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
     txdb.Clear();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+
+    const auto innerdb = txdb.GetDatabase();
+    for (const auto& e : entries)
+    {
+        CTransactionRef _;
+        BOOST_CHECK(!innerdb->GetTransaction(e.GetTxId(), _));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(AsyncMultiWriteCoalesce)
+{
+    const auto entries = GetABunchOfEntries(1223);
+
+    CAsyncMempoolTxDB txdb(10000);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+
+    for (const auto& e : entries)
+    {
+        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper()});
+    }
+
+    txdb.Sync();
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
+    BOOST_CHECK_LT(txdb.GetWriteCount(), entries.size());
+    BOOST_TEST_MESSAGE("AsyncMultiWriteCoalesce: " << txdb.GetWriteCount()
+                       << " batch writes for " << entries.size() << " adds");
+
+    const auto innerdb = txdb.GetDatabase();
+    for (const auto& e : entries)
+    {
+        CTransactionRef _;
+        BOOST_CHECK(innerdb->GetTransaction(e.GetTxId(), _));
+    }
+}
+
+BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
+{
+    std::random_device rndev;
+    std::mt19937 generator(rndev());
+
+    auto entries = GetABunchOfEntries(541);
+    const auto middle = entries.begin() + entries.size() / 2;
+
+    CAsyncMempoolTxDB txdb(10000);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+
+    for (auto it = entries.begin(); it != middle; ++it)
+    {
+        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()});
+    }
+    std::shuffle(entries.begin(), middle, generator);
+    for (auto it = entries.begin(); it != middle; ++it)
+    {
+        txdb.Remove({{it->GetTxId(), it->GetTxSize()}});
+    }
+    txdb.Sync();
+
+    for (auto it = middle; it != entries.end(); ++it)
+    {
+        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()});
+    }
+    std::shuffle(middle, entries.end(), generator);
+    for (auto it = middle; it != entries.end(); ++it)
+    {
+        txdb.Remove({{it->GetTxId(), it->GetTxSize()}});
+    }
+    txdb.Sync();
+
+    BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
+    BOOST_CHECK_LT(txdb.GetWriteCount(), 2 * entries.size());
+    BOOST_TEST_MESSAGE("AsyncMultiWriteRemoveCoalesce: " << txdb.GetWriteCount()
+                       << " batch writes for " << entries.size() << " adds"
+                       << " and " << entries.size() << " deletes");
 
     const auto innerdb = txdb.GetDatabase();
     for (const auto& e : entries)

@@ -52,6 +52,7 @@ private:
 
     std::atomic_uint64_t diskUsage {0};
     std::atomic_uint64_t txCount {0};
+    std::atomic_uint64_t dbWriteCount {0};
 
 public:
     /**
@@ -154,6 +155,9 @@ public:
         void Clear() { adds.clear(); removes.clear(); }
     };
     bool Commit(const Batch& batch);
+
+    // Get the number of batch writes performed on the database.
+    uint64_t GetWriteCount();
 };
 
 
@@ -188,6 +192,12 @@ public:
     uint64_t GetTxCount()
     {
         return txdb->GetTxCount();
+    }
+
+    // Get the number of batch writes performed on the database.
+    uint64_t GetWriteCount()
+    {
+        return txdb->GetWriteCount();
     }
 
     // Return a read-only database reference
