@@ -286,7 +286,7 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
 
 void PushProtoconf(const CNodePtr& pnode, CConnman& connman)
 {
-    std::string streamPolicies { connman.GetStreamPolicyFactory().GetPolicyNamesStr() };
+    std::string streamPolicies { connman.GetStreamPolicyFactory().GetSupportedPolicyNamesStr() };
     connman.PushMessage(
         pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::PROTOCONF,
             CProtoconf(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, streamPolicies)
@@ -3616,8 +3616,15 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
     }
 
     if(!pfrom->fInbound) {
-        // For outbound connections, now we can create any required further streams to this peer
-        pfrom->GetAssociation().OpenRequiredStreams(connman);
+        try {
+            // For outbound connections, now we can create any required further streams to this peer
+            pfrom->GetAssociation().OpenRequiredStreams(connman);
+        }
+        catch(std::exception& e) {
+            LogPrint(BCLog::NET, "Error opening required streams (%s) to peer=%d\n", e.what(), pfrom->id);
+            pfrom->fDisconnect = true;
+            return false;
+        }
     }
 
     return true;

@@ -519,5 +519,39 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: self.nodes[0].getbestblockhash() == tip, timeout=5)
         wait_until(lambda: self.nodes[1].getbestblockhash() == tip, timeout=5)
 
+        # Add another node, configured to only support the Default stream policy
+        self.add_node(3,
+                      extra_args = [ '-whitelist=127.0.0.1', '-multistreampolicies=Default'],
+                      init_data_dir=True)
+        self.start_node(3)
+
+        # Connect the new node to one of the existing nodes and check that they establish a Default association
+        connect_nodes(self.nodes[1], 3)
+        expected1 = [
+                {
+                    'id'           : 0,                                 # An association to node0
+                    'associd'      : '<UNKNOWN>',
+                    'streampolicy' : 'BlockPriority',
+                    'streams'      : [ 'GENERAL', 'DATA1' ]
+                },
+                {
+                    'id'           : 2,                                 # An association to node3
+                    'associd'      : '<UNKNOWN>',
+                    'streampolicy' : 'Default',
+                    'streams'      : [ 'GENERAL' ]
+                },
+            ]
+        wait_until(lambda: self.check_peer_info(self.nodes[1], expected1), timeout=5)
+        expected3 = [
+                {
+                    'id'           : 0,                                 # An association to node1
+                    'associd'      : '<UNKNOWN>',
+                    'streampolicy' : 'Default',
+                    'streams'      : [ 'GENERAL' ]
+                },
+            ]
+        wait_until(lambda: self.check_peer_info(self.nodes[3], expected3), timeout=5)
+
+
 if __name__ == '__main__':
     P2PAssociation().main()

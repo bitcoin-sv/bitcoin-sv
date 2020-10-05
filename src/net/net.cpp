@@ -871,7 +871,7 @@ void CNode::SetSupportedStreamPolicies(const std::string& policies)
 {
     LogPrint(BCLog::NET, "Setting known stream policies to %s for peer=%d\n", policies, id);
 
-    std::set<std::string> ourPolicies { g_connman->GetStreamPolicyFactory().GetPolicyNames() };
+    std::set<std::string> ourPolicies { g_connman->GetStreamPolicyFactory().GetSupportedPolicyNames() };
 
     LOCK(cs_supportedStreamPolicies);
     mSupportedStreamPolicies.clear();
@@ -906,6 +906,26 @@ std::string CNode::GetCommonStreamPoliciesStr() const
     }
 
     return commonPolicies;
+}
+
+/** Get the name of the preferred stream policy to use to this peer */
+std::string CNode::GetPreferredStreamPolicyName() const
+{
+    // Get the configured priritised list of policy names we're happy to use
+    std::vector<std::string> configuredPoliciesList { g_connman->GetStreamPolicyFactory().GetPrioritisedPolicyNames() };
+
+    // Find first one in common with peer
+    LOCK(cs_supportedStreamPolicies);
+    for(const std::string& policy : configuredPoliciesList)
+    {
+        if(mCommonStreamPolicies.count(policy) != 0)
+        {
+            // Got one to use
+            return policy;
+        }
+    }
+
+    throw std::runtime_error("No available stream policies in common");
 }
 
 void CNode::SetSendVersion(int nVersionIn) {

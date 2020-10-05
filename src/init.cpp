@@ -623,9 +623,16 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     "perspective of time may be influenced by peers forward or "
                     "backward by this amount. (default: %u seconds)"),
                   DEFAULT_MAX_TIME_ADJUSTMENT));
+
+    /** Multi-streaming */
     strUsage += HelpMessageOpt("-multistreams",
         _("Enable the use of multiple streams to our peers") + " " +
             strprintf(_("(default: %d)"), DEFAULT_STREAMS_ENABLED));
+    strUsage += HelpMessageOpt("-multistreampolicies",
+        _("List of stream policies to use with our peers in order of preference") + " " +
+            strprintf(_("(available policies: %s, default: %s)"),
+        StreamPolicyFactory{}.GetAllPolicyNamesStr(), DEFAULT_STREAM_POLICY_LIST));
+
     strUsage +=
         HelpMessageOpt("-onion=<ip:port>",
                        strprintf(_("Use separate SOCKS5 proxy to reach peers "

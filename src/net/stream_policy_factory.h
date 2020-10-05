@@ -24,9 +24,14 @@ class StreamPolicyFactory
     // Create and return the named stream policy
     std::unique_ptr<StreamPolicy> Make(const std::string& policyName) const;
 
-    // Return list of supported stream policy names
-    std::set<std::string> GetPolicyNames() const;
-    std::string GetPolicyNamesStr() const;
+    // Return list of all/supported stream policy names
+    std::set<std::string> GetAllPolicyNames() const;
+    std::set<std::string> GetSupportedPolicyNames() const;
+    std::string GetAllPolicyNamesStr() const;
+    std::string GetSupportedPolicyNamesStr() const;
+
+    // Return a prioritised list of supported stream policy names
+    std::vector<std::string> GetPrioritisedPolicyNames() const;
 
   private:
 
