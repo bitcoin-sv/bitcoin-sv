@@ -9,6 +9,8 @@
 # WARNING:
 # This test uses 4GB of disk space.
 # This test takes 30 mins or more (up to 2 hours)
+# This is not suitable to run on a debug build and will almost certainly fail
+# If the test wouldn't fail, it would need many hours, possibly tens of hours to complete
 # ********
 
 from test_framework.test_framework import BitcoinTestFramework
