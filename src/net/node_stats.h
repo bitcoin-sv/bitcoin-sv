@@ -19,6 +19,9 @@ public:
     uint64_t nSendSize;
     uint64_t nSpotBytesPerSec;
     uint64_t nMinuteBytesPerSec;
+    bool fPauseRecv;
+    mapMsgCmdSize mapSendBytesPerMsgCmd;
+    mapMsgCmdSize mapRecvBytesPerMsgCmd;
 };
 
 class AssociationStats
@@ -35,6 +38,8 @@ public:
     uint64_t nAvgBandwidth;
 
     std::vector<StreamStats> streamStats;
+    std::string assocID;
+    std::string streamPolicyName;
 };
 
 class NodeStats
@@ -44,7 +49,6 @@ public:
     ServiceFlags nServices;
     bool fRelayTxes;
     bool fPauseSend;
-    bool fPauseRecv;
     bool fInbound;
     bool fAddnode;
     bool fWhitelisted;

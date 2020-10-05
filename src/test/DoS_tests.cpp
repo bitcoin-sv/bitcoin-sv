@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(DoS_banning) {
             "",
             true);
     dummyNode1->SetSendVersion(PROTOCOL_VERSION);
-    GetNodeSignals().InitializeNode(dummyNode1, *connman);
+    GetNodeSignals().InitializeNode(dummyNode1, *connman, nullptr);
     dummyNode1->nVersion = 1;
     dummyNode1->fSuccessfullyConnected = true;
     // Should get banned.
@@ -77,7 +77,7 @@ BOOST_AUTO_TEST_CASE(DoS_banning) {
             "",
             true);
     dummyNode2->SetSendVersion(PROTOCOL_VERSION);
-    GetNodeSignals().InitializeNode(dummyNode2, *connman);
+    GetNodeSignals().InitializeNode(dummyNode2, *connman, nullptr);
     dummyNode2->nVersion = 1;
     dummyNode2->fSuccessfullyConnected = true;
     Misbehaving(dummyNode2->GetId(), 50, "");
@@ -113,7 +113,7 @@ BOOST_AUTO_TEST_CASE(DoS_banscore) {
             "",
             true);
     dummyNode1->SetSendVersion(PROTOCOL_VERSION);
-    GetNodeSignals().InitializeNode(dummyNode1, *connman);
+    GetNodeSignals().InitializeNode(dummyNode1, *connman, nullptr);
     dummyNode1->nVersion = 1;
     dummyNode1->fSuccessfullyConnected = true;
     Misbehaving(dummyNode1->GetId(), 100, "");
@@ -152,7 +152,7 @@ BOOST_AUTO_TEST_CASE(DoS_bantime) {
             "",
             true);
     dummyNode->SetSendVersion(PROTOCOL_VERSION);
-    GetNodeSignals().InitializeNode(dummyNode, *connman);
+    GetNodeSignals().InitializeNode(dummyNode, *connman, nullptr);
     dummyNode->nVersion = 1;
     dummyNode->fSuccessfullyConnected = true;
 

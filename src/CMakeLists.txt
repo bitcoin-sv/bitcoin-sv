@@ -250,10 +250,13 @@ add_library(server
 	mining/journaling_block_assembler.cpp
     mining/legacy.cpp
     net/association.cpp
+    net/association_id.cpp
 	net/net.cpp
     net/net_message.cpp
 	net/net_processing.cpp
     net/stream.cpp
+    net/stream_policy.cpp
+    net/stream_policy_factory.cpp
 	noui.cpp
 	orphan_txns.cpp
 	policy/fees.cpp

@@ -396,7 +396,8 @@ I ReadVarInt(Stream &is) {
     REF(CFlatData((char *)&(obj), (char *)&(obj) + sizeof(obj)))
 #define VARINT(obj) REF(WrapVarInt(REF(obj)))
 #define COMPACTSIZE(obj) REF(CCompactSize(REF(obj)))
-#define LIMITED_STRING(obj, n) REF(LimitedString<n>(REF(obj)))
+#define LIMITED_STRING(obj, n) REF(LimitedBytes<n, std::string>(REF(obj)))
+#define LIMITED_BYTE_VEC(obj, n) REF(LimitedBytes<n, std::vector<uint8_t>>(REF(obj)))
 
 /**
  * Wrapper for serializing arrays and POD.
@@ -464,28 +465,28 @@ public:
     }
 };
 
-template <size_t Limit> class LimitedString {
+template <size_t Limit, typename ArrayType> class LimitedBytes {
 protected:
-    std::string &string;
+    ArrayType& array;
 
 public:
-    LimitedString(std::string &_string) : string(_string) {}
+    LimitedBytes(ArrayType& _array) : array(_array) {}
 
     template <typename Stream> void Unserialize(Stream &s) {
         size_t size = ReadCompactSize(s);
         if (size > Limit) {
-            throw std::ios_base::failure("String length limit exceeded");
+            throw std::ios_base::failure("Array length limit exceeded");
         }
-        string.resize(size);
+        array.resize(size);
         if (size != 0) {
-            s.read((char *)&string[0], size);
+            s.read((char*)&array[0], size);
         }
     }
 
     template <typename Stream> void Serialize(Stream &s) const {
-        WriteCompactSize(s, string.size());
-        if (!string.empty()) {
-            s.write((char *)&string[0], string.size());
+        WriteCompactSize(s, array.size());
+        if (!array.empty()) {
+            s.write((char*)&array[0], array.size());
         }
     }
 };

@@ -42,6 +42,8 @@ const char *CMPCTBLOCK = "cmpctblock";
 const char *GETBLOCKTXN = "getblocktxn";
 const char *BLOCKTXN = "blocktxn";
 const char *PROTOCONF = "protoconf";
+const char *CREATESTREAM = "createstrm";
+const char *STREAMACK = "streamack";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
@@ -93,15 +95,16 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
  * above and in protocol.h.
  */
 static const std::string allNetMessageTypes[] = {
-    NetMsgType::VERSION,     NetMsgType::VERACK,     NetMsgType::ADDR,
-    NetMsgType::INV,         NetMsgType::GETDATA,    NetMsgType::MERKLEBLOCK,
-    NetMsgType::GETBLOCKS,   NetMsgType::GETHEADERS, NetMsgType::TX,
-    NetMsgType::HEADERS,     NetMsgType::BLOCK,      NetMsgType::GETADDR,
-    NetMsgType::MEMPOOL,     NetMsgType::PING,       NetMsgType::PONG,
-    NetMsgType::NOTFOUND,    NetMsgType::FILTERLOAD, NetMsgType::FILTERADD,
-    NetMsgType::FILTERCLEAR, NetMsgType::REJECT,     NetMsgType::SENDHEADERS,
-    NetMsgType::FEEFILTER,   NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
-    NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
+    NetMsgType::VERSION,      NetMsgType::VERACK,     NetMsgType::ADDR,
+    NetMsgType::INV,          NetMsgType::GETDATA,    NetMsgType::MERKLEBLOCK,
+    NetMsgType::GETBLOCKS,    NetMsgType::GETHEADERS, NetMsgType::TX,
+    NetMsgType::HEADERS,      NetMsgType::BLOCK,      NetMsgType::GETADDR,
+    NetMsgType::MEMPOOL,      NetMsgType::PING,       NetMsgType::PONG,
+    NetMsgType::NOTFOUND,     NetMsgType::FILTERLOAD, NetMsgType::FILTERADD,
+    NetMsgType::FILTERCLEAR,  NetMsgType::REJECT,     NetMsgType::SENDHEADERS,
+    NetMsgType::FEEFILTER,    NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
+    NetMsgType::GETBLOCKTXN,  NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
+    NetMsgType::CREATESTREAM, NetMsgType::STREAMACK,
 };
 static const std::vector<std::string>
     allNetMessageTypesVec(allNetMessageTypes,

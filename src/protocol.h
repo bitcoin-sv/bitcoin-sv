@@ -11,6 +11,7 @@
 #define BITCOIN_PROTOCOL_H
 
 #include "net/netaddress.h"
+#include "net/net_types.h"
 #include "serialize.h"
 #include "uint256.h"
 #include "version.h"
@@ -271,6 +272,16 @@ extern const char *BLOCKTXN;
  * Sent right after VERACK message, regardless of remote peer's protocol version
  */
 extern const char *PROTOCONF;
+/**
+ * The createstream message is for setting up a new stream within an existing
+ * association.
+ */
+extern const char *CREATESTREAM;
+/**
+ * The streamack message is an acknowledgement that a previously requested
+ * attempt to setup a new stream has been successful.
+ */
+extern const char *STREAMACK;
 
 /**
  * Indicate if the message is used to transmit the content of a block.
@@ -440,14 +451,19 @@ public:
 
 /** protoconf message data **/
 class CProtoconf {
+    // Maximum number of named stream policies
+    static constexpr size_t MAX_NUM_STREAM_POLICIES {10};
 
 public:
-    uint64_t numberOfFields;
-    uint32_t maxRecvPayloadLength;
+    /** numberOfFields is set to 2, increment if new properties are added **/
+    uint64_t numberOfFields {2};
+    uint32_t maxRecvPayloadLength {0};
+    std::string streamPolicies {};
 public:
-    CProtoconf() : numberOfFields(1), maxRecvPayloadLength(0) {}
-    /** numberOfFields is set to 1, increment if new properties are added **/
-    CProtoconf(unsigned int maxRecvPayloadLengthIn) : numberOfFields(1), maxRecvPayloadLength(maxRecvPayloadLengthIn) {}
+    CProtoconf() = default;
+    CProtoconf(unsigned int maxRecvPayloadLengthIn, const std::string& streamPoliciesIn)
+    : numberOfFields{2}, maxRecvPayloadLength{maxRecvPayloadLengthIn}, streamPolicies{streamPoliciesIn}
+    {}
 
     ADD_SERIALIZE_METHODS;
     template <typename Stream, typename Operation>
@@ -455,6 +471,9 @@ public:
         READWRITECOMPACTSIZE(numberOfFields);
         if (numberOfFields > 0) {
             READWRITE(maxRecvPayloadLength);
+            if(numberOfFields > 1) {
+                READWRITE(LIMITED_STRING(streamPolicies, (MAX_STREAM_POLICY_NAME_LENGTH + 1) * MAX_NUM_STREAM_POLICIES));
+            }
         } else {
             throw std::ios_base::failure("Invalid deserialization. Number of fields specified in protoconf is equal to 0.");
         }

@@ -47,6 +47,8 @@
 #include <optional>
 #include <utility>
 
+#include <boost/algorithm/string.hpp>
+
 // Dump addresses to peers.dat and banlist.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
@@ -342,35 +344,37 @@ bool CConnman::CheckIncomingNonce(uint64_t nonce) {
     return true;
 }
 
-CNodePtr CConnman::ConnectNode(CAddress addrConnect, const char *pszDest,
-                               bool fCountFailure) {
-    if (pszDest == nullptr) {
-        if (IsLocal(addrConnect)) {
+CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
+{
+    if (connect.pszDest == nullptr) {
+        if (IsLocal(connect.addrConnect)) {
             return nullptr;
         }
 
-        // Look for an existing connection
-        CNodePtr pnode = FindNode((CService)addrConnect);
-        if (pnode) {
-            LogPrintf("Failed to open new connection, already connected\n");
-            return nullptr;
+        if(!connect.fNewStream) {
+            // Look for an existing connection
+            CNodePtr pnode = FindNode((CService)connect.addrConnect);
+            if (pnode) {
+                LogPrintf("Failed to open new connection, already connected\n");
+                return nullptr;
+            }
         }
     }
 
     /// debug print
     LogPrint(BCLog::NET, "trying connection %s lastseen=%.1fhrs\n",
-             pszDest ? pszDest : addrConnect.ToString(),
-             pszDest
+             connect.pszDest ? connect.pszDest : connect.addrConnect.ToString(),
+             connect.pszDest
                  ? 0.0
-                 : (double)(GetAdjustedTime() - addrConnect.nTime) / 3600.0);
+                 : (double)(GetAdjustedTime() - connect.addrConnect.nTime) / 3600.0);
 
     // Connect
     SOCKET hSocket;
     bool proxyConnectionFailed = false;
-    if (pszDest ? ConnectSocketByName(addrConnect, hSocket, pszDest,
+    if (connect.pszDest ? ConnectSocketByName(connect.addrConnect, hSocket, connect.pszDest,
                                       config->GetChainParams().GetDefaultPort(),
                                       nConnectTimeout, &proxyConnectionFailed)
-                : ConnectSocket(addrConnect, hSocket, nConnectTimeout,
+                : ConnectSocket(connect.addrConnect, hSocket, nConnectTimeout,
                                 &proxyConnectionFailed)) {
         if (!IsSelectableSocket(hSocket)) {
             LogPrintf("Cannot create connection: non-selectable socket created "
@@ -379,23 +383,23 @@ CNodePtr CConnman::ConnectNode(CAddress addrConnect, const char *pszDest,
             return nullptr;
         }
 
-        if (pszDest && addrConnect.IsValid()) {
+        if (!connect.fNewStream && connect.pszDest && connect.addrConnect.IsValid()) {
             // It is possible that we already have a connection to the IP/port
             // pszDest resolved to. In that case, drop the connection that was
             // just created, and return the existing CNode instead. Also store
             // the name we used to connect in that CNode, so that future
             // FindNode() calls to that name catch this early.
             LOCK(cs_vNodes);
-            CNodePtr pnode = FindNode((CService)addrConnect);
+            CNodePtr pnode = FindNode((CService)connect.addrConnect);
             if (pnode) {
-                pnode->MaybeSetAddrName(std::string(pszDest));
+                pnode->MaybeSetAddrName(std::string(connect.pszDest));
                 CloseSocket(hSocket);
                 LogPrintf("Failed to open new connection, already connected\n");
                 return nullptr;
             }
         }
 
-        addrman.Attempt(addrConnect, fCountFailure);
+        addrman.Attempt(connect.addrConnect, connect.fCountFailure);
 
         // Add node
         NodeId id = GetNewNodeId();
@@ -409,19 +413,19 @@ CNodePtr CConnman::ConnectNode(CAddress addrConnect, const char *pszDest,
                 nLocalServices,
                 GetBestHeight(),
                 hSocket,
-                addrConnect,
-                CalculateKeyedNetGroup(addrConnect),
+                connect.addrConnect,
+                CalculateKeyedNetGroup(connect.addrConnect),
                 nonce,
                 mAsyncTaskPool,
-                pszDest ? pszDest : "",
+                connect.pszDest ? connect.pszDest : "",
                 false);
-        pnode->nServicesExpected = ServiceFlags(addrConnect.nServices & nRelevantServices);
+        pnode->nServicesExpected = ServiceFlags(connect.addrConnect.nServices & nRelevantServices);
 
         return pnode;
     } else if (!proxyConnectionFailed) {
         // If connecting to the node failed, and failure is not caused by a
         // problem connecting to the proxy, mark this as an attempt.
-        addrman.Attempt(addrConnect, fCountFailure);
+        addrman.Attempt(connect.addrConnect, connect.fCountFailure);
     }
 
     return nullptr;
@@ -726,7 +730,6 @@ void CNode::copyStats(NodeStats &stats)
         LOCK(cs_filter);
         stats.fRelayTxes = fRelayTxes;
     }
-    stats.fPauseRecv = fPauseRecv;
     stats.fPauseSend = fPauseSend;
     stats.nTimeConnected = nTimeConnected;
     stats.nTimeOffset = nTimeOffset;
@@ -863,6 +866,48 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
     return results;
 }
 
+/** Set peers known stream policies */
+void CNode::SetSupportedStreamPolicies(const std::string& policies)
+{
+    LogPrint(BCLog::NET, "Setting known stream policies to %s for peer=%d\n", policies, id);
+
+    std::set<std::string> ourPolicies { g_connman->GetStreamPolicyFactory().GetPolicyNames() };
+
+    LOCK(cs_supportedStreamPolicies);
+    mSupportedStreamPolicies.clear();
+    boost::split(mSupportedStreamPolicies, policies, boost::is_any_of(","));
+
+    // Filter common stream policies
+    mCommonStreamPolicies.clear();
+    std::set_intersection(
+        ourPolicies.begin(), ourPolicies.end(),
+        mSupportedStreamPolicies.begin(), mSupportedStreamPolicies.end(),
+        std::inserter(mCommonStreamPolicies, mCommonStreamPolicies.begin())
+    );
+    LogPrint(BCLog::NET, "Set common stream policies to %s for peer=%d\n", GetCommonStreamPoliciesStr(), id);
+}
+
+/** Get stream polices in common with this peer as a string formatted list */
+std::string CNode::GetCommonStreamPoliciesStr() const
+{
+    std::string commonPolicies {};
+
+    LOCK(cs_supportedStreamPolicies);
+    for(const std::string& name : mCommonStreamPolicies)
+    {
+        if(commonPolicies.empty())
+        {
+            commonPolicies += name;
+        }
+        else
+        {
+            commonPolicies += "," + name;
+        }
+    }
+
+    return commonPolicies;
+}
+
 void CNode::SetSendVersion(int nVersionIn) {
     // Send version may only be changed in the version message, and only one
     // version message is allowed per session. We can therefore treat this value
@@ -892,25 +937,17 @@ int CNode::GetSendVersion() const {
 bool CNode::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const
 {
     // Get all sockets from our association
-    return mAssociation.SetSocketsForSelect(setRecv, setSend, setError, socketMax, fPauseRecv);
+    return mAssociation.SetSocketsForSelect(setRecv, setSend, setError, socketMax);
 }
 
 void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
-                           const Config& config, size_t& bytesRecv, size_t& bytesSent)
+                           const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent)
 {
     // Let association service its sockets
     bool newMsgs {false};
     mAssociation.ServiceSockets(setRecv, setSend, setError, connman, config, newMsgs, bytesRecv, bytesSent);
     if(newMsgs)
     {
-        {
-            LOCK(cs_vProcessMsg);
-            size_t nSizeAdded { mAssociation.GetNewMsgs(vProcessMsg) };
-            // Pause/unpause receiving
-            nProcessQueueSize += nSizeAdded;
-            fPauseRecv = nProcessQueueSize > connman.GetReceiveFloodSize();
-        }
-
         connman.WakeMessageHandler();
     }
 
@@ -1240,7 +1277,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
             true);
     pnode->fWhitelisted = whitelisted;
 
-    GetNodeSignals().InitializeNode(pnode, *this);
+    GetNodeSignals().InitializeNode(pnode, *this, nullptr);
 
     LogPrint(BCLog::NET, "connection from %s accepted\n", addr.ToString());
 
@@ -1395,8 +1432,8 @@ void CConnman::ThreadSocketHandler() {
                 return;
             }
 
-            size_t bytesRecv {0};
-            size_t bytesSent {0};
+            uint64_t bytesRecv {0};
+            uint64_t bytesSent {0};
             pnode->ServiceSockets(fdsetRecv, fdsetSend, fdsetError, *this, *config, bytesRecv, bytesSent);
 
             if(bytesRecv > 0) {
@@ -1644,8 +1681,8 @@ void CConnman::ProcessOneShot() {
     CAddress addr;
     CSemaphoreGrant grant(semOutbound, true);
     if (grant) {
-        if (!OpenNetworkConnection(addr, false, &grant, strDest.c_str(),
-                                   true)) {
+        NodeConnectInfo connectInfo { addr, strDest.c_str() };
+        if (!OpenNetworkConnection(connectInfo, &grant, true)) {
             AddOneShot(strDest);
         }
     }
@@ -1658,7 +1695,8 @@ void CConnman::ThreadOpenConnections() {
             ProcessOneShot();
             for (const std::string &strAddr : gArgs.GetArgs("-connect")) {
                 CAddress addr(CService(), NODE_NONE);
-                OpenNetworkConnection(addr, false, nullptr, strAddr.c_str());
+                NodeConnectInfo connectInfo { addr, strAddr.c_str() };
+                OpenNetworkConnection(connectInfo, nullptr);
                 for (int i = 0; i < 10 && i < nLoop; i++) {
                     if (!interruptNet.sleep_for(
                             std::chrono::milliseconds(500))) {
@@ -1822,10 +1860,8 @@ void CConnman::ThreadOpenConnections() {
                          addrConnect.ToString());
             }
 
-            OpenNetworkConnection(addrConnect,
-                                  (int)setConnected.size() >=
-                                      std::min(nMaxConnections - 1, 2),
-                                  &grant, nullptr, false, fFeeler);
+            NodeConnectInfo connectInfo { addrConnect, nullptr, (int)setConnected.size() >= std::min(nMaxConnections - 1, 2) };
+            OpenNetworkConnection(connectInfo, &grant, false, fFeeler);
         }
     }
 }
@@ -1918,9 +1954,8 @@ void CConnman::ThreadOpenAddedConnections() {
                 CService service(
                     LookupNumeric(info.strAddedNode.c_str(),
                                   config->GetChainParams().GetDefaultPort()));
-                OpenNetworkConnection(CAddress(service, NODE_NONE), false,
-                                      &grant, info.strAddedNode.c_str(), false,
-                                      false, true);
+                NodeConnectInfo connectInfo { CAddress(service, NODE_NONE), info.strAddedNode.c_str() };
+                OpenNetworkConnection(connectInfo, &grant, false, false, true);
                 if (!interruptNet.sleep_for(std::chrono::milliseconds(500))) {
                     return;
                 }
@@ -1934,12 +1969,49 @@ void CConnman::ThreadOpenAddedConnections() {
     }
 }
 
+void CConnman::QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID,
+    const std::string& streamPolicyName)
+{
+    LOCK(cs_mPendingStreams);
+    mPendingStreams.emplace_back(addr, streamType, streamPolicyName, assocID);
+}
+
+void CConnman::ThreadOpenNewStreamConnections()
+{
+    while(true)
+    {
+        bool gotPendingStream {false};
+        NodeConnectInfo pendingStream {};
+        {
+            LOCK(cs_mPendingStreams);
+            if(!mPendingStreams.empty())
+            {
+                pendingStream = mPendingStreams.front();
+                mPendingStreams.pop_front();
+                gotPendingStream = true;
+            }
+        }
+
+        if(gotPendingStream)
+        {
+            // Try establishing connection for a new stream
+            if(!OpenNetworkConnection(pendingStream))
+            {
+                LogPrint(BCLog::NET, "Failed to open new stream connection\n");
+            }
+        }
+
+        if(!interruptNet.sleep_for(gotPendingStream? std::chrono::milliseconds(1) : std::chrono::milliseconds(100)))
+        {
+            return;
+        }
+    }
+}
+
 // If successful, this moves the passed grant to the constructed node.
-bool CConnman::OpenNetworkConnection(const CAddress &addrConnect,
-                                     bool fCountFailure,
+bool CConnman::OpenNetworkConnection(NodeConnectInfo& connectInfo,
                                      CSemaphoreGrant *grantOutbound,
-                                     const char *pszDest, bool fOneShot,
-                                     bool fFeeler, bool fAddnode) {
+                                     bool fOneShot, bool fFeeler, bool fAddnode) {
     //
     // Initiate outbound network connection
     //
@@ -1949,16 +2021,21 @@ bool CConnman::OpenNetworkConnection(const CAddress &addrConnect,
     if (!fNetworkActive) {
         return false;
     }
-    if (!pszDest) {
-        if (IsLocal(addrConnect) || FindNode((CNetAddr)addrConnect) ||
-            IsBanned(addrConnect) || FindNode(addrConnect.ToStringIPPort())) {
+    if (!connectInfo.pszDest) {
+        if (IsLocal(connectInfo.addrConnect) || IsBanned(connectInfo.addrConnect)) {
             return false;
         }
-    } else if (FindNode(std::string(pszDest))) {
+
+        // Only check for duplicate connections if this isn't a new stream we're trying to establish
+        if(!connectInfo.fNewStream &&
+           (FindNode((CNetAddr)connectInfo.addrConnect) || FindNode(connectInfo.addrConnect.ToStringIPPort()))) {
+            return false;
+        }
+    } else if (FindNode(std::string(connectInfo.pszDest))) {
         return false;
     }
 
-    CNodePtr pnode = ConnectNode(addrConnect, pszDest, fCountFailure);
+    CNodePtr pnode = ConnectNode(connectInfo);
 
     if (!pnode) {
         return false;
@@ -1976,59 +2053,13 @@ bool CConnman::OpenNetworkConnection(const CAddress &addrConnect,
         pnode->fAddnode = true;
     }
 
-    GetNodeSignals().InitializeNode(pnode, *this);
+    GetNodeSignals().InitializeNode(pnode, *this, &connectInfo);
     {
         LOCK(cs_vNodes);
         vNodes.push_back(pnode);
     }
 
     return true;
-}
-
-namespace
-{
-    /**
-     * Helper class for logging the duration of ThreadMessageHandler reqest
-     * processing. It writes to log all the requests that take more time to
-     * process than the provided threshold.
-     */
-    class CLogP2PStallDuration
-    {
-    public:
-        CLogP2PStallDuration(
-            std::string command,
-            std::chrono::milliseconds debugP2PTheadStallsThreshold)
-            : mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
-            , mProcessingStart{std::chrono::steady_clock::now()}
-            , mCommand{std::move(command)}
-        {/**/}
-
-
-        ~CLogP2PStallDuration()
-        {
-            if(!mCommand.empty())
-            {
-                auto processingDuration =
-                        std::chrono::steady_clock::now() - mProcessingStart;
-
-                if(processingDuration > mDebugP2PTheadStallsThreshold)
-                {
-                    LogPrint(
-                        BCLog::NET,
-                        "CConnman request processing took %s ms to complete "
-                        "processing '%s' request!\n",
-                        std::chrono::duration_cast<std::chrono::milliseconds>(
-                            processingDuration).count(),
-                        mCommand);
-                }
-            }
-        }
-
-    private:
-        std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
-        std::chrono::time_point<std::chrono::steady_clock> mProcessingStart;
-        std::string mCommand;
-    };
 }
 
 void CConnman::ThreadMessageHandler()
@@ -2056,26 +2087,10 @@ void CConnman::ThreadMessageHandler()
                 continue;
             }
 
-            std::optional<CLogP2PStallDuration> durationLog;
-
-            using namespace std::literals::chrono_literals;
-
-            if(mDebugP2PTheadStallsThreshold > 0ms)
-            {
-                LOCK(pnode->cs_vProcessMsg);
-                if(!pnode->vProcessMsg.empty())
-                {
-                    durationLog =
-                        {
-                            pnode->vProcessMsg.begin()->hdr.GetCommand(),
-                            mDebugP2PTheadStallsThreshold
-                        };
-                }
-            }
-
             // Receive messages
             bool fMoreNodeWork = GetNodeSignals().ProcessMessages(
-                *config, pnode, *this, flagInterruptMsgProc);
+                *config, pnode, *this, flagInterruptMsgProc,
+                mDebugP2PTheadStallsThreshold);
             fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
 
             if (flagInterruptMsgProc) {
@@ -2478,6 +2493,17 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
                             std::bind(&CConnman::ThreadOpenConnections, this)));
     }
 
+    // Initiate outbound connections for requested new streams
+    if (gArgs.GetBoolArg("-multistreams", DEFAULT_STREAMS_ENABLED)) {
+        threadOpenNewStreamConnections =
+            std::thread(&TraceThread<std::function<void()>>, "openstream",
+                std::function<void()>(std::bind(
+                    &CConnman::ThreadOpenNewStreamConnections, this)));
+    }
+    else {
+        LogPrint(BCLog::NET, "Multi-streams disabled\n");
+    }
+
     // Process messages
     threadMessageHandler =
         std::thread(&TraceThread<std::function<void()>>, "msghand",
@@ -2539,6 +2565,9 @@ void CConnman::Stop() {
     }
     if (threadOpenAddedConnections.joinable()) {
         threadOpenAddedConnections.join();
+    }
+    if (threadOpenNewStreamConnections.joinable()) {
+        threadOpenNewStreamConnections.join();
     }
     if (threadDNSAddressSeed.joinable()) {
         threadDNSAddressSeed.join();
@@ -2846,7 +2875,7 @@ CNode::CNode(
     , nLocalServices(nLocalServicesIn)
     , nMyStartingHeight(nMyStartingHeightIn)
     , mAsyncTaskPool{asyncTaskPool}
-    , mAssociation{*this, hSocketIn, addrIn}
+    , mAssociation{this, hSocketIn, addrIn}
 {
     addrName = addrNameIn == "" ? mAssociation.GetPeerAddr().ToStringIPPort() : addrNameIn;
 
@@ -2859,6 +2888,7 @@ CNode::CNode(
 
 CNode::~CNode()
 {
+    LogPrint(BCLog::NET, "Removing peer=%d\n", id);
 }
 
 void CNode::AskFor(const CInv &inv) {
@@ -2910,8 +2940,8 @@ bool CConnman::NodeFullyConnected(const CNodePtr& pnode) {
     return pnode && pnode->fSuccessfullyConnected && !pnode->fDisconnect;
 }
 
-void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
-    size_t nPayloadLength = msg.Size();
+void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream) {
+    uint64_t nPayloadLength = msg.Size();
     if (nPayloadLength > std::numeric_limits<uint32_t>::max())
     {
         LogPrint(BCLog::NET, "message %s (%d bytes) cannot be sent because it exceeds max P2P message limit peer=%d\n",
@@ -2929,20 +2959,80 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg) {
 
     CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
 
-    size_t nBytesSent { pnode->PushMessage(std::move(serializedHeader), std::move(msg)) };
+    uint64_t nBytesSent { pnode->PushMessage(std::move(serializedHeader), std::move(msg), stream) };
     if (nBytesSent > 0)
     {
         RecordBytesSent(nBytesSent);
     }
 }
 
-size_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg)
+uint64_t CNode::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream)
 {
-    size_t bytesSent { mAssociation.PushMessage(std::move(serialisedHeader), std::move(msg)) };
+    uint64_t bytesSent { mAssociation.PushMessage(std::move(serialisedHeader), std::move(msg), stream) };
 
     fPauseSend = (mAssociation.GetTotalSendQueueSize() > g_connman->GetSendBufferSize());
 
     return bytesSent;
+}
+
+/** Transfer ownership of a stream from one peer's association to another */
+CNodePtr CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType,
+    const std::string& streamPolicyName)
+{
+    LOCK(cs_vNodes);
+
+    // Lookup node we're moving this stream to
+    CNodePtr toNode {nullptr};
+    for(const CNodePtr& pnode : vNodes)
+    {
+        const AssociationIDPtr& assocID { pnode->GetAssociation().GetAssociationID() };
+        if(assocID && *assocID == *newAssocID)
+        {
+            toNode = pnode;
+            break;
+        }
+    }
+    if(toNode == nullptr)
+    {
+        std::stringstream err {};
+        err << "No node found with association ID " << newAssocID->ToString();
+        throw std::runtime_error(err.str());
+    }
+
+    // Lookup node we're moving this stream from
+    CNodePtr fromNode { FindNodeById(from) };
+    if(fromNode == nullptr)
+    {
+        std::stringstream err {};
+        err << "Failed to lookup node for peer " << from;
+        throw std::runtime_error(err.str());
+    }
+
+    // Check we're moving the stream between associations with the same endpoint (Dos prevention)
+    CNetAddr fromAddr { fromNode->GetAssociation().GetPeerAddr() };
+    CNetAddr toAddr { toNode->GetAssociation().GetPeerAddr() };
+    if(fromAddr != toAddr)
+    {
+        Ban(fromAddr, BanReasonNodeMisbehaving);
+
+        std::stringstream err {};
+        err << "Attempt to move stream between peers with different IPs: " <<
+            fromAddr.ToString() << " != " << toAddr.ToString();
+        throw std::runtime_error(err.str());
+    }
+
+    // Do we also have a new stream policy to use?
+    if(!streamPolicyName.empty())
+    {
+        toNode->GetAssociation().ReplaceStreamPolicy(mStreamPolicyFactory.Make(streamPolicyName));
+    }
+
+    // Transfer the stream
+    LogPrint(BCLog::NET, "Stream for association ID %s moving from peer=%d to peer=%d\n",
+        newAssocID->ToString(), from, toNode->id);
+    fromNode->GetAssociation().MoveStream(newStreamType, toNode->GetAssociation());
+
+    return toNode;
 }
 
 const TxIdTrackerSPtr& CConnman::GetTxIdTracker() {

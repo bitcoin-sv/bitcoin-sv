@@ -32,7 +32,7 @@ class NetTest(BitcoinTestFramework):
 
     def _test_connection_count(self):
         # connect_nodes_bi connects each node to the other
-        assert_equal(self.nodes[0].getconnectioncount(), 2)
+        wait_until(lambda: self.nodes[0].getconnectioncount() == 2, timeout=5)
 
     def _test_getnettotals(self):
         # check that getnettotals totalbytesrecv and totalbytessent

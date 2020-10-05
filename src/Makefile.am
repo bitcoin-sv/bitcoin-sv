@@ -143,6 +143,7 @@ BITCOIN_CORE_H = \
   mining/journaling_block_assembler.h \
   mining/legacy.h \
   net/association.h \
+  net/association_id.h \
   net/net.h \
   net/netaddress.h \
   net/netbase.h \
@@ -152,6 +153,8 @@ BITCOIN_CORE_H = \
   net/node_stats.h \
   net/send_queue_bytes.h \
   net/stream.h \
+  net/stream_policy.h \
+  net/stream_policy_factory.h \
   netmessagemaker.h \
   noui.h \
   orphan_txns.h \
@@ -277,10 +280,13 @@ libbitcoin_server_a_SOURCES = \
   mining/journaling_block_assembler.cpp \
   mining/legacy.cpp \
   net/association.cpp \
+  net/association_id.cpp \
   net/net.cpp \
   net/net_message.cpp \
   net/net_processing.cpp \
   net/stream.cpp \
+  net/stream_policy.cpp \
+  net/stream_policy_factory.cpp \
   noui.cpp \
   orphan_txns.cpp \
   policy/fees.cpp \

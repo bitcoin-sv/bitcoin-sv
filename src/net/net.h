@@ -21,6 +21,7 @@
 #include "net/net_message.h"
 #include "net/net_types.h"
 #include "net/node_stats.h"
+#include "net/stream_policy_factory.h"
 #include "netaddress.h"
 #include "protocol.h"
 #include "random.h"
@@ -112,14 +113,19 @@ static const unsigned int MICROS_PER_SECOND = 1000000;
 // as long as seeders are working.
 // TODO: Change this back to false after the forked network is stable.
 static const bool DEFAULT_FORCEDNSSEED = true;
-static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
-static const size_t DEFAULT_MAXSENDBUFFER = 1 * 1000;
+
+// Maximum sizes of queued messages for receiving and sending
+static const size_t DEFAULT_MAXRECEIVEBUFFER = 500 * 1000;
+static const size_t DEFAULT_MAXSENDBUFFER = 500 * 1000;
 
 static const ServiceFlags REQUIRED_SERVICES = ServiceFlags(NODE_NETWORK);
 
 // Default 24-hour ban.
 // NOTE: When adjusting this, update rpcnet:setban's help ("24h")
 static const unsigned int DEFAULT_MISBEHAVING_BANTIME = 60 * 60 * 24;
+
+// Multiple streams enabled by default
+static const bool DEFAULT_STREAMS_ENABLED = true;
 
 /**
  * Default maximum amount of concurrent async tasks per node before node message
@@ -132,6 +138,32 @@ struct AddedNodeInfo {
     CService resolvedAddress;
     bool fConnected;
     bool fInbound;
+};
+
+/**
+ * Details for a connection we should attempt to a peer.
+ */
+struct NodeConnectInfo
+{
+    NodeConnectInfo() = default;
+
+    NodeConnectInfo(const CAddress& addr, const char* dest = nullptr, bool count = false)
+    : addrConnect{addr}, pszDest{dest}, fCountFailure{count}
+    {}
+
+    NodeConnectInfo(const CAddress& addr, StreamType st, const std::string& streamPolicy,
+        const AssociationIDPtr& id)
+    : addrConnect{addr}, streamType{st}, streamPolicy{streamPolicy}, assocID{id}, fNewStream{true}
+    {}
+
+    CAddress addrConnect {};
+    const char* pszDest {nullptr};
+    bool fCountFailure {false};
+
+    StreamType streamType { StreamType::GENERAL };
+    std::string streamPolicy {};
+    AssociationIDPtr assocID {nullptr};
+    bool fNewStream {false};
 };
 
 class CGetBlockMessageRequest
@@ -238,16 +270,25 @@ public:
                         bool fWhitelisted = false);
     bool GetNetworkActive() const { return fNetworkActive; };
     void SetNetworkActive(bool active);
-    bool OpenNetworkConnection(const CAddress &addrConnect, bool fCountFailure,
+    bool OpenNetworkConnection(NodeConnectInfo& connectInfo,
                                CSemaphoreGrant *grantOutbound = nullptr,
-                               const char *strDest = nullptr,
                                bool fOneShot = false, bool fFeeler = false,
                                bool fAddnode = false);
     bool CheckIncomingNonce(uint64_t nonce);
 
     bool ForNode(NodeId id, std::function<bool(const CNodePtr& pnode)> func);
 
-    void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg);
+    void PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, StreamType stream = StreamType::UNKNOWN);
+
+    /** Transfer ownership of a stream from one peer's association to another */
+    CNodePtr MoveStream(NodeId from, const AssociationIDPtr& newAssocID, StreamType newStreamType,
+        const std::string& streamPolicyName = "");
+    /** Queue an attempt to open a new stream to a peer */
+    void QueueNewStream(const CAddress& addr, StreamType streamType, const AssociationIDPtr& assocID,
+        const std::string& streamPolicyName = "");
+
+    /** Get reference to stream policy factory */
+    const StreamPolicyFactory& GetStreamPolicyFactory() const { return mStreamPolicyFactory; }
 
     /** Enqueue a new transaction for later sending to our peers */
     void EnqueueTransaction(const CTxnSendingDetails& txn);
@@ -562,6 +603,7 @@ private:
     };
 
     void ThreadOpenAddedConnections();
+    void ThreadOpenNewStreamConnections();
     void ProcessOneShot();
     void ThreadOpenConnections();
     void ThreadMessageHandler();
@@ -577,8 +619,7 @@ private:
     CNodePtr FindNode(const CService &addr);
 
     bool AttemptToEvictConnection();
-    CNodePtr ConnectNode(CAddress addrConnect, const char *pszDest,
-                         bool fCountFailure);
+    CNodePtr ConnectNode(NodeConnectInfo& connect);
     bool IsWhitelistedRange(const CNetAddr &addr);
 
     void DeleteNode(const CNodePtr& pnode);
@@ -643,6 +684,13 @@ private:
     mutable CCriticalSection cs_vNodes;
     std::atomic<NodeId> nLastNodeId;
 
+    /** Additional streams we want to open to peers */
+    std::list<NodeConnectInfo> mPendingStreams {};
+    mutable CCriticalSection cs_mPendingStreams {};
+
+    /** Factory for creating stream policies */
+    StreamPolicyFactory mStreamPolicyFactory {};
+
     /** Services this instance offers */
     ServiceFlags nLocalServices;
 
@@ -686,6 +734,7 @@ private:
     std::thread threadSocketHandler;
     std::thread threadOpenAddedConnections;
     std::thread threadOpenConnections;
+    std::thread threadOpenNewStreamConnections;
     std::thread threadMessageHandler;
 
     std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
@@ -720,15 +769,14 @@ struct CombinerAll {
 // Signals for message handling
 struct CNodeSignals {
     boost::signals2::signal<bool(const Config &, const CNodePtr& , CConnman &,
-                                 std::atomic<bool> &),
+                                 std::atomic<bool> &, std::chrono::milliseconds),
                             CombinerAll>
         ProcessMessages;
     boost::signals2::signal<bool(const Config &, const CNodePtr& , CConnman &,
                                  std::atomic<bool> &),
                             CombinerAll>
         SendMessages;
-    boost::signals2::signal<void(const CNodePtr& , CConnman &)>
-        InitializeNode;
+    boost::signals2::signal<void(const CNodePtr&, CConnman&, const NodeConnectInfo* connectInfo)> InitializeNode;
     boost::signals2::signal<void(NodeId, bool &)> FinalizeNode;
 };
 
@@ -791,10 +839,6 @@ public:
     // Services expected from a peer, otherwise it will be disconnected
     ServiceFlags nServicesExpected {NODE_NONE};
 
-    CCriticalSection cs_vProcessMsg {};
-    std::list<CNetMessage> vProcessMsg {};
-    size_t nProcessQueueSize {0};
-
     CCriticalSection cs_sendProcessing {};
 
     std::optional<CGetBlockMessageRequest> mGetBlockMessageRequest;
@@ -837,7 +881,6 @@ public:
     const NodeId id {};
 
     const uint64_t nKeyedNetGroup {0};
-    std::atomic_bool fPauseRecv {false};
     std::atomic_bool fPauseSend {false};
 
 public:
@@ -945,6 +988,11 @@ private:
     // Peer association details
     Association mAssociation;
 
+    // Peer known stream policy names and common policy names
+    mutable CCriticalSection cs_supportedStreamPolicies {};
+    std::set<std::string> mSupportedStreamPolicies {};
+    std::set<std::string> mCommonStreamPolicies {};
+
 public:
 
     /** Add some new transactions to our pending inventory list */
@@ -960,13 +1008,18 @@ public:
     const Association& GetAssociation() const { return mAssociation; }
     Association& GetAssociation() { return mAssociation; }
 
+    // Set peers known stream policies
+    void SetSupportedStreamPolicies(const std::string& policies);
+    // Get stream polices in common with this peer as a string formatted list
+    std::string GetCommonStreamPoliciesStr() const;
+
     uint64_t GetLocalNonce() const { return nLocalHostNonce; }
 
     int GetMyStartingHeight() const { return nMyStartingHeight; }
 
     bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
     void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
-                        const Config& config, size_t& bytesRecv, size_t& bytesSent);
+                        const Config& config, uint64_t& bytesRecv, uint64_t& bytesSent);
 
     bool GetDisconnect() const { return fDisconnect; }
 
@@ -975,7 +1028,7 @@ public:
     void SetSendVersion(int nVersionIn);
     int GetSendVersion() const;
 
-    size_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg);
+    uint64_t PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerializedNetMsg&& msg, StreamType stream);
 
     void AddAddressKnown(const CAddress &_addr) {
         addrKnown.insert(_addr.GetKey());
