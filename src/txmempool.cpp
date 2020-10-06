@@ -736,12 +736,17 @@ void CTxMemPool::AddUncheckedNL(
 
     // Insert the new entry
     const auto newit = mapTx.insert(entry).first;
-    mapLinks.insert(make_pair(newit, TxLinks()));
+    const auto[linksit, success] = mapLinks.insert(make_pair(newit, TxLinks()));
 
     // Update cachedInnerUsage to include contained transaction's usage.
     // (When we update the entry for in-mempool parents, memory usage will be
     // further updated.)
     cachedInnerUsage += newit->DynamicMemoryUsage();
+    if(success)
+    {
+        cachedInnerUsage += memusage::DynamicUsage(linksit->second.parents);
+        cachedInnerUsage += memusage::DynamicUsage(linksit->second.children);
+    }
 
     std::set<uint256> setParentTransactions;
     if (spentOutputs.has_value())
@@ -836,13 +841,11 @@ void CTxMemPool::removeUncheckedNL(
             secondaryMempoolSize--;
         }
 
-
         totalTxSize -= entry->GetTxSize();
         cachedInnerUsage -= entry->DynamicMemoryUsage();
-        // FIXME: We are not implemented IncrementalDynamicMemoryUsage for unordered set.
-        //        See: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
-        //    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
-        //                        memusage::DynamicUsage(mapLinks[it].children);
+        cachedInnerUsage -= memusage::DynamicUsage(mapLinks[entry].parents) +
+                            memusage::DynamicUsage(mapLinks[entry].children);
+
         const auto txid = entry->GetTxId();
         setEntries parents;
         if (evictionTracker) {
@@ -1233,9 +1236,9 @@ void CTxMemPool::CheckMempoolImplNL(
         const auto tx = it->GetSharedTx();
         txlinksMap::const_iterator linksiter = mapLinks.find(it);
         assert(linksiter != mapLinks.end());
-        // FIXME: we are not implemented IncrementalDynamicMemoryUsage for unordered set. see: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
-        //innerUsage += memusage::DynamicUsage(links.parents) +
-        //              memusage::DynamicUsage(links.children);
+        const TxLinks &links = linksiter->second;
+        innerUsage += memusage::DynamicUsage(links.parents) +
+                      memusage::DynamicUsage(links.children);
         bool fDependsWait = false;
         setEntries setParentCheck;
         size_t ancestorsCount = 0;
@@ -2107,27 +2110,41 @@ void CTxMemPool::AddToDisconnectPoolUpToLimit(
     }
 }
 
+namespace {
+    enum class WhatToDoWithTheEntry : bool
+    {
+        INSERT = true,
+        ERASE = false
+    };
 
-void CTxMemPool::updateChildNL(txiter entry, txiter child, bool add) {
-    // FIXME: Implement IncrementalDynamicUsage for std::unordered_set
-    // before it was: static size_t memUsage = memusage::IncrementalDynamicUsage(setEntries());
-    static size_t memUsage = 0;
-    if (add && mapLinks[entry].children.insert(child).second) {
-        cachedInnerUsage += memUsage;
-    } else if (!add && mapLinks[entry].children.erase(child)) {
-        cachedInnerUsage -= memUsage;
+    template <typename Accumulator, typename Container, typename Entry>
+    void UpdateMemoryUsage(Accumulator& accumulator, Container& entries, Entry entry,
+                           WhatToDoWithTheEntry operation)
+    {
+        const auto before = memusage::DynamicUsage(entries);
+        if ((operation == WhatToDoWithTheEntry::INSERT && entries.insert(entry).second)
+            ||
+            (operation == WhatToDoWithTheEntry::ERASE && entries.erase(entry)))
+        {
+            // The correctness of the size computation below relies on
+            // well-defined unsigned integer overflow.
+            static_assert(std::is_integral<Accumulator>::value &&
+                          std::is_unsigned<Accumulator>::value);
+
+            accumulator += memusage::DynamicUsage(entries);
+            accumulator -= before;
+        }
     }
 }
 
+void CTxMemPool::updateChildNL(txiter entry, txiter child, bool add) {
+    UpdateMemoryUsage(cachedInnerUsage, mapLinks[entry].children, child,
+                      static_cast<WhatToDoWithTheEntry>(add));
+}
+
 void CTxMemPool::updateParentNL(txiter entry, txiter parent, bool add) {
-    // FIXME: Implement IncrementalDynamicUsage for std::unordered_set
-    // before it was: static size_t memUsage = memusage::IncrementalDynamicUsage(setEntries());
-    static size_t memUsage = 0;
-    if (add && mapLinks[entry].parents.insert(parent).second) {
-        cachedInnerUsage += memUsage;
-    } else if (!add && mapLinks[entry].parents.erase(parent)) {
-        cachedInnerUsage -= memUsage;
-    }
+    UpdateMemoryUsage(cachedInnerUsage, mapLinks[entry].parents, parent,
+                      static_cast<WhatToDoWithTheEntry>(add));
 }
 
 const CTxMemPool::setEntries &
