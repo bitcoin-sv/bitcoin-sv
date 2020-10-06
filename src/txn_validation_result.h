@@ -20,5 +20,4 @@ class CTxnValResult {
     TxInputDataSPtr mTxInputData {nullptr};
     std::vector<COutPoint> mCoinsToUncache {};
     std::shared_ptr<CTxMemPoolEntry> mpEntry {nullptr};
-    // FIXME: (CORE-130) CTxMemPool::setEntries mSetAncestors {};
 };

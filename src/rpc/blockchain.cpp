@@ -347,9 +347,6 @@ void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false)
     else
     {
         std::vector<uint256> vtxids;
-        // FIXME: This causes a really expensive copy & sort of the mempool
-        //        index. Is sorting really necessary? Note that the verbose
-        //        variant returns transactions in a different order.
         mempool.QueryHashes(vtxids);
 
         jWriter.writeBeginArray();

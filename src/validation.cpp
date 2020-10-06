@@ -1378,8 +1378,6 @@ CTxnValResult TxnValidation(
         }
     }
     // Calculate in-mempool ancestors, up to a limit.
-    // FIXME: (CORE-130) See comment at CommitTxToMempool in validation.h
-    // regarding validation performance.
     std::string errString;
     if (!CheckAncestorLimits(pool, *pMempoolEntry, errString)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
