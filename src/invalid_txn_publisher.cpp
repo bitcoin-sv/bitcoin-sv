@@ -4,7 +4,6 @@
 #include "invalid_txn_publisher.h"
 #include "core_io.h"
 #include "util.h"
-#include "config.h"
 #include "memusage.h"
 
 InvalidTxnInfo::InvalidTxnInfo(

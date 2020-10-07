@@ -36,10 +36,8 @@
 
 #endif // __linux__
 
-#include <algorithm>
 #include <fcntl.h>
 #include <sys/resource.h>
-#include <sys/stat.h>
 #include <thread>
 
 #else
@@ -75,13 +73,10 @@
 #endif
 
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
-#include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
 #include <boost/filesystem/fstream.hpp>
 #include <boost/program_options/detail/config_file.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/thread.hpp>
-
 #include <openssl/conf.h>
 #include <openssl/rand.h>
 

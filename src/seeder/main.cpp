@@ -166,10 +166,6 @@ public:
     }
 };
 
-extern "C" {
-#include "dns.h"
-}
-
 CAddrDb db;
 
 extern "C" void *ThreadCrawler(void *data) {

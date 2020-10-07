@@ -33,19 +33,10 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef WIN32
 
 #include "vmtouch.h"
-
 #include <unistd.h>
-#include <stdio.h>
-
-#include <exception>
-
-#include <sys/time.h>
+#include <string>
 #include <sys/resource.h>
 #include <sys/mman.h>
-
-#include <signal.h>
-
-#include "logging.h"
 
 #if defined(__linux__)
     #include <sys/ioctl.h>

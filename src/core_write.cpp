@@ -10,12 +10,9 @@
 #include "script/script_num.h"
 #include "script/standard.h"
 #include "serialize.h"
-#include "streams.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
-#include "rpc/server.h"
-
 #include <univalue.h>
 
 std::string FormatScript(const CScript &script) {

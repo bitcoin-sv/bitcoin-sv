@@ -7,9 +7,6 @@
 #include "policy/policy.h"
 #include "txmempool.h"
 
-#include <list>
-#include <vector>
-
 namespace
 {
     mining::CJournalChangeSetPtr nullChangeSet {nullptr};

@@ -5,11 +5,8 @@
 
 #include "script/standard.h"
 #include "script/script_num.h"
-
 #include "pubkey.h"
 #include "script/script.h"
-#include "util.h"
-#include "utilstrencodings.h"
 #include "int_serialization.h"
 
 typedef std::vector<uint8_t> valtype;

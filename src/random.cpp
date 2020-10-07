@@ -12,8 +12,6 @@
 #include <wincrypt.h>
 #endif
 #include "util.h"             // for LogPrint()
-#include "utilstrencodings.h" // for GetTime()
-
 #include <chrono>
 #include <cstdlib>
 #include <limits>
@@ -44,7 +42,6 @@
 #include <cpuid.h>
 #endif
 
-#include <openssl/err.h>
 #include <openssl/rand.h>
 
 [[noreturn]] static void RandFailure() {

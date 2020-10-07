@@ -3,21 +3,14 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "httpserver.h"
-
 #include "chainparamsbase.h"
-#include "compat.h"
 #include "config.h"
 #include "net/netbase.h"
 #include "rpc/http_protocol.h" // For HTTP status codes
-#include "sync.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
-#include <signal.h>
-#include <sys/stat.h>
 #include <sys/types.h>
-
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/http.h>
@@ -28,7 +21,6 @@
 #ifdef EVENT__HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #ifdef _XOPEN_SOURCE_EXTENDED
-#include <arpa/inet.h>
 #endif
 #endif
 

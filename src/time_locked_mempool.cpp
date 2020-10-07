@@ -3,7 +3,6 @@
 
 #include <clientversion.h>
 #include <config.h>
-#include <init.h>
 #include <logging.h>
 #include <memusage.h>
 #include <mining/journal_change_set.h>

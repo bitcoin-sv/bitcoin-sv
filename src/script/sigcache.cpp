@@ -4,9 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "sigcache.h"
-
 #include "cuckoocache.h"
-#include "memusage.h"
 #include "pubkey.h"
 #include "random.h"
 #include "uint256.h"

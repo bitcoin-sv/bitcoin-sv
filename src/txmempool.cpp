@@ -4,14 +4,11 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "txmempool.h"
-
-#include "chainparams.h" // for GetConsensus.
 #include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "policy/fees.h"
 #include "policy/policy.h"
-#include "streams.h"
 #include "timedata.h"
 #include "txdb.h"
 #include "util.h"
@@ -19,7 +16,6 @@
 #include "utiltime.h"
 #include "validation.h"
 #include "validationinterface.h"
-#include "version.h"
 #include <boost/range/adaptor/reversed.hpp>
 #include <config.h>
 

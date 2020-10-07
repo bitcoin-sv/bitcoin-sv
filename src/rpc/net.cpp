@@ -3,14 +3,12 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "rpc/server.h"
-
 #include "chainparams.h"
 #include "clientversion.h"
 #include "config.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
-#include "policy/policy.h"
 #include "protocol.h"
 #include "sync.h"
 #include "timedata.h"
@@ -20,7 +18,6 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "version.h"
-
 #include <univalue.h>
 
 static UniValue getconnectioncount(const Config &config,

@@ -8,12 +8,10 @@
 #endif
 
 #include "init.h"
-
 #include "addrman.h"
 #include "amount.h"
 #include "chain.h"
 #include "chainparams.h"
-#include "checkpoints.h"
 #include "compat/sanity.h"
 #include "config.h"
 #include "consensus/validation.h"
@@ -23,14 +21,12 @@
 #include "httpserver.h"
 #include "invalid_txn_publisher.h"
 #include "key.h"
-#include "mining/journal_builder.h"
 #include "mining/journaling_block_assembler.h"
 #include "mining/legacy.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
-#include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "scheduler.h"
@@ -69,10 +65,7 @@
 #endif
 
 #include <boost/algorithm/string.hpp>
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <boost/bind.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>

@@ -3,30 +3,22 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "mining.h"
-
-#include "amount.h"
 #include "config.h"
 #include "chain.h"
-#include "chainparams.h"
-#include "consensus/consensus.h"
 #include "consensus/merkle.h"
 #include "consensus/params.h"
-#include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
 #include "mining/candidates.h"
 #include "mining/factory.h"
 #include "net/net.h"
-#include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/server.h"
 #include "tinyformat.h"
 #include "util.h"
 #include "validationinterface.h"
 #include "validation.h"
-#include "version.h"
 #include "versionbits.h"
-#include "utilstrencodings.h"
 #include "invalid_txn_publisher.h"
 #include <iomanip>
 #include <limits>

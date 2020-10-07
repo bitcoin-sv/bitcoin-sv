@@ -8,14 +8,11 @@
 #endif
 
 #include "net/netbase.h"
-
-#include "hash.h"
 #include "random.h"
 #include "sync.h"
 #include "uint256.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
 #include <atomic>
 
 #ifndef WIN32

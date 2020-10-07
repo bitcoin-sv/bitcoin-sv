@@ -19,11 +19,7 @@
 #include "wallet/wallet.h"
 #include "config.h"
 
-#include <boost/thread.hpp>
-#include <boost/version.hpp>
-
 #include <atomic>
-#include <config.h>
 
 //
 // CWalletDB

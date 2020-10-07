@@ -2,10 +2,7 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <iostream>
-
 #include "bench.h"
-#include "bloom.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
@@ -13,7 +10,6 @@
 #include "hash.h"
 #include "random.h"
 #include "uint256.h"
-#include "utiltime.h"
 
 /* Number of bytes to hash per iteration */
 static const uint64_t BUFFER_SIZE = 1000 * 1000;

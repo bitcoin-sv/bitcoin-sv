@@ -7,7 +7,6 @@
 #include "rpc/blockchain.h"
 
 #include "amount.h"
-#include "blockfileinfostore.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -16,7 +15,6 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "hash.h"
-#include "mining/journal_builder.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
 #include "rpc/http_protocol.h"
@@ -33,10 +31,7 @@
 #include "validation.h"
 #include "init.h"
 #include "invalid_txn_publisher.h"
-
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
-#include <boost/thread/thread.hpp>              // boost::thread::interrupt
-
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>

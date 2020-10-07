@@ -4,11 +4,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "chain.h"
-#include "chainparams.h"
 #include "config.h"
 #include "httpserver.h"
 #include "core_io.h"
-#include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "rpc/blockchain.h"
 #include "rpc/http_protocol.h"
@@ -22,7 +20,6 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "version.h"
-
 #include <boost/algorithm/string.hpp>
 #include <univalue.h>
 

@@ -1,17 +1,14 @@
-#include "dns.h"
+// Copyright (c) 2017 The Bitcoin developers
+// Copyright (c) 2020 Bitcoin Association
+// Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <cctype>
-#include <cstdbool>
+#include "dns.h"
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <ctime>
-
-#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <strings.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #define BUFLEN 512

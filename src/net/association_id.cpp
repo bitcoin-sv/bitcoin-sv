@@ -2,8 +2,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <net/association_id.h>
-#include <logging.h>
-
 #include <sstream>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>

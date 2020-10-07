@@ -13,9 +13,7 @@
 #include "util.h"
 #include "validation.h"
 #include "zmq_publisher.h"
-
-#include <cstdarg>
-
+#include <string>
 
 static std::multimap<std::string, CZMQAbstractPublishNotifier *>
     mapPublishNotifiers;

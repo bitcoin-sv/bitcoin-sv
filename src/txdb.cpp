@@ -11,14 +11,11 @@
 #include "init.h"
 #include "pow.h"
 #include "random.h"
-#include "ui_interface.h"
 #include "uint256.h"
 #include "util.h"
-#include "validation.h" // required for IsGenesisEnabled()
-
 #include <boost/thread.hpp>
-
-#include <cstdint>
+#include <string>
+#include <vector>
 
 static const char DB_COIN = 'C';
 static const char DB_COINS = 'c';

@@ -9,10 +9,7 @@
 #include "instruction_iterator.h"
 #include "int_serialization.h"
 #include "script_num.h"
-
-#include "tinyformat.h"
 #include "utilstrencodings.h"
-
 #include <algorithm>
 #include <sstream>
 

@@ -5,7 +5,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "validation.h"
-
 #include "arith_uint256.h"
 #include "async_file_reader.h"
 #include "blockstreams.h"
@@ -23,12 +22,10 @@
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "netmessagemaker.h"
-#include "policy/fees.h"
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
-#include "random.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -50,7 +47,6 @@
 #include "invalid_txn_publisher.h"
 
 #include <atomic>
-#include <sstream>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
