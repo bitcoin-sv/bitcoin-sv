@@ -846,8 +846,8 @@ public:
 
     CFeeRate estimateFee() const;
 
-    boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
-    boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
+    boost::signals2::signal<void(const CTransactionWrapper&)> NotifyEntryAdded;
+    boost::signals2::signal<void(const CTransactionWrapper&, MemPoolRemovalReason)>
         NotifyEntryRemoved;
 
     void ClearPrioritisation(const uint256 &hash);

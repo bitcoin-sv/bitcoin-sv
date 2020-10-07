@@ -344,7 +344,7 @@ void CTxMemPool::AddUnchecked(
             pnDynamicMemoryUsage);
     }
     // Notify entry added without holding the mempool's lock
-    NotifyEntryAdded(entry.GetSharedTx());
+    NotifyEntryAdded(*entry.tx);
 }
 
 CTxMemPool::setEntriesTopoSorted CTxMemPool::GetSecondaryMempoolAncestorsNL(CTxMemPool::txiter payingTx) const
@@ -808,8 +808,7 @@ void CTxMemPool::removeUncheckedNL(
             transactionsToRemove.emplace_back(entry->GetTxId(), entry->GetTxSize());
         }
 
-        const auto txn = entry->GetSharedTx();
-        NotifyEntryRemoved(txn, reason);
+        NotifyEntryRemoved(*entry->tx, reason);
         
         auto [itBegin, itEnd] = mapNextTx.get<by_txiter>().equal_range(entry);
         mapNextTx.get<by_txiter>().erase(itBegin, itEnd);
@@ -831,10 +830,9 @@ void CTxMemPool::removeUncheckedNL(
         //        See: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
         //    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
         //                        memusage::DynamicUsage(mapLinks[it].children);
+        const auto txid = entry->GetTxId();
         setEntries parents;
-        TxId txid;
         if (evictionTracker) {
-            txid = entry->GetTxId();
             parents = std::move(mapLinks.at(entry).parents);
         }
 
@@ -844,11 +842,11 @@ void CTxMemPool::removeUncheckedNL(
 
         if (reason == MemPoolRemovalReason::BLOCK || reason == MemPoolRemovalReason::REORG)
         {
-            GetMainSignals().TransactionRemovedFromMempoolBlock(txn->GetId(), reason);
+            GetMainSignals().TransactionRemovedFromMempoolBlock(txid, reason);
         }
         else
         {
-            GetMainSignals().TransactionRemovedFromMempool(txn->GetId(), reason, conflictedWith);
+            GetMainSignals().TransactionRemovedFromMempool(txid, reason, conflictedWith);
         }
 
         // Update the eviction candidate tracker.
