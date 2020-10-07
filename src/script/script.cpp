@@ -177,17 +177,6 @@ bsv::instruction_iterator CScript::end_instructions() const
         bsv::span<const uint8_t>{data() + size(), 0}};
 }
 
-std::string CScriptWitness::ToString() const {
-    std::string ret = "CScriptWitness(";
-    for (unsigned int i = 0; i < stack.size(); i++) {
-        if (i) {
-            ret += ", ";
-        }
-        ret += HexStr(stack[i]);
-    }
-    return ret + ")";
-}
-
 std::ostream& operator<<(std::ostream& os, const CScript& script)
 {
     for(auto it = script.begin_instructions(); it != script.end_instructions();
