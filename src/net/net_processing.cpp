@@ -2289,8 +2289,6 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
     }
 
     LOCK(cs_main);
-    std::vector<CInv> vToFetch;
-
     for(size_t nInv = 0; nInv < vInv.size(); nInv++) {
         CInv &inv = vInv[nInv];
 
@@ -2337,10 +2335,6 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
 
         // Track requests for our stuff
         GetMainSignals().Inventory(inv.hash);
-    }
-
-    if(!vToFetch.empty()) {
-        connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::GETDATA, vToFetch));
     }
 }
 
@@ -2613,7 +2607,7 @@ static void ProcessTxMessage(const Config& config,
     // Update 'ask for' inv set
     {
         LOCK(cs_invQueries);
-        pfrom->setAskFor.erase(inv.hash);
+        pfrom->indexAskFor.get<CNode::TagTxnID>().erase(inv.hash);
         mapAlreadyAskedFor.erase(inv.hash);
     }
     // Enqueue txn for validation if it is not known
@@ -4548,14 +4542,14 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
                 }
                 else {
                     // If we're not going to ask, don't expect a response.
-                    pto->setAskFor.erase(inv.hash);
+                    pto->indexAskFor.get<CNode::TagTxnID>().erase(inv.hash);
                 }
                 pto->mapAskFor.erase(firstIt);
             }
             else {
                 // Look ahead to see if we can clear out some items we have already recieved from elsewhere
                 if(alreadyHave) {
-                    pto->setAskFor.erase(inv.hash);
+                    pto->indexAskFor.get<CNode::TagTxnID>().erase(inv.hash);
                     pto->mapAskFor.erase(firstIt);
                 }
                 else {
@@ -4565,6 +4559,17 @@ void SendGetDataNonBlocks(const CNodePtr& pto, CConnman& connman, const CNetMsgM
                     break;
                 }
             }
+        }
+
+        // Check and expire entries from indexAskFor
+        auto& timeIndex { pto->indexAskFor.get<CNode::TagInsertionTime>() };
+        for(auto it = timeIndex.begin(); it != timeIndex.end(); ) {
+            if(it->expiryTime > nNow) {
+                break;
+            }
+
+            // Remove expired entry
+            it = timeIndex.erase(it);
         }
     }
     if (!vGetData.empty()) {
