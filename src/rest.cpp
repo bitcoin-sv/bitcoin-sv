@@ -61,7 +61,7 @@ struct CCoin {
 };
 
 extern UniValue mempoolInfoToJSON(const Config& config);
-extern UniValue mempoolToJSON(bool fVerbose = false);
+extern void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false);
 
 static bool RESTERR(HTTPRequest *req, enum HTTPStatusCode status,
                     std::string message) {
@@ -384,11 +384,16 @@ static bool rest_mempool_contents(Config &config, HTTPRequest *req,
 
     switch (rf) {
         case RF_JSON: {
-            UniValue mempoolObject = mempoolToJSON(true);
-
-            std::string strJSON = mempoolObject.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");
-            req->WriteReply(HTTP_OK, strJSON);
+            req->StartWritingChunks(HTTP_OK);
+
+            CHttpTextWriter httpWriter(*req);
+            CJSONWriter jWriter(httpWriter, false);
+
+            writeMempoolToJson(jWriter, true);
+
+            httpWriter.Flush();
+            req->StopWritingChunks();
             return true;
         }
         default: {
