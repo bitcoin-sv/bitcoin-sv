@@ -727,6 +727,11 @@ inline unsigned int GetInventoryBroadcastMax(const Config& config)
 class CLogP2PStallDuration
 {
 public:
+    CLogP2PStallDuration(CLogP2PStallDuration const &) = delete;
+    CLogP2PStallDuration & operator= (CLogP2PStallDuration const &) = delete;
+    CLogP2PStallDuration(CLogP2PStallDuration &&) = default;
+    CLogP2PStallDuration & operator= (CLogP2PStallDuration &&) = default;
+
     CLogP2PStallDuration(
         std::string command,
         std::chrono::milliseconds debugP2PTheadStallsThreshold)
