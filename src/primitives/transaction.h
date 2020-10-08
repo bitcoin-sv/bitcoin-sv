@@ -20,8 +20,6 @@ namespace std
     template<> class hash<TxId> : public hash<uint256> {};
 }
 
-static const int SERIALIZE_TRANSACTION = 0x00;
-
 /**
  * A TxId is the identifier of a transaction. Currently identical to TxHash but
  * differentiated for type safety.

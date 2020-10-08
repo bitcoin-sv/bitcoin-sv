@@ -38,12 +38,7 @@ inline raii_event obtain_event(struct event_base *base, evutil_socket_t s,
     return raii_event(event_new(base, s, events, cb, arg));
 }
 
-inline raii_evhttp obtain_evhttp(struct event_base *base) 
-{
-    return raii_evhttp(evhttp_new(base));
-}
-
-inline raii_evhttp_request obtain_evhttp_request(void (*cb)(struct evhttp_request *, void *), void *arg) 
+inline raii_evhttp_request obtain_evhttp_request(void (*cb)(struct evhttp_request *, void *), void *arg)
 {
     return raii_evhttp_request(evhttp_request_new(cb, arg));
 }

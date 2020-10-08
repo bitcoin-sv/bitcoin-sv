@@ -35,9 +35,6 @@ static const uint64_t LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE;
  */
 static const uint64_t MAX_BLOCK_SIGOPS_PER_MB_BEFORE_GENESIS = 20000;
 
-/** allowed number of signature check operations per transaction. */
-static const uint64_t MAX_TX_SIGOPS_COUNT = 20000;
-
 // Maximum number of non-push operations per script before GENESIS
 static const uint64_t MAX_OPS_PER_SCRIPT_BEFORE_GENESIS = 500;
 

@@ -2541,8 +2541,6 @@ bool IsInitialBlockDownload() {
     return false;
 }
 
-CBlockIndex *pindexBestForkTip = nullptr, *pindexBestForkBase = nullptr;
-
 void AlertNotify(const std::string &strMessage) {
     uiInterface.NotifyAlertChanged();
     std::string strCmd = gArgs.GetArg("-alertnotify", "");
@@ -7421,10 +7419,6 @@ std::string CBlockFileInfo::ToString() const {
         DateTimeStrFormat("%Y-%m-%d", nTimeLast));
 }
 
-
-CBlockFileInfo *GetBlockFileInfo(size_t n) {
-    return pBlockFileInfoStore->GetBlockFileInfo(n);
-}
 
 static const uint64_t MEMPOOL_DUMP_VERSION = 1;
 

@@ -267,7 +267,6 @@ protected:
     // get an IP to test (must call Good_, Bad_, or Skipped_ on result
     // afterwards)
     bool Get_(CServiceResult &ip, int &wait);
-    bool GetMany_(std::vector<CServiceResult> &ips, int max, int &wait);
     // mark an IP as good (must have been returned by Get_)
     void Good_(const CService &ip, int clientV, std::string clientSV,
                int blocks);
