@@ -947,10 +947,15 @@ size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue) {
 }
 
 MempoolSizeLimits MempoolSizeLimits::FromConfig() {
+    const auto limitMemory = GlobalConfig::GetConfig().GetMaxMempool();
+    const auto limitDisk = GlobalConfig::GetConfig().GetMaxMempoolSizeDisk();
+    const auto limitSecondaryRatio = GlobalConfig::GetConfig().GetMempoolMaxPercentCPFP() / 100.0;
+    const auto limitExpiry = GlobalConfig::GetConfig().GetMemPoolExpiry();
     return MempoolSizeLimits(
-        GlobalConfig::GetConfig().GetMaxMempool(),
-        GlobalConfig::GetConfig().GetMaxMempoolSizeDisk(),
-        GlobalConfig::GetConfig().GetMemPoolExpiry());
+        limitMemory,
+        limitDisk,
+        limitSecondaryRatio * limitMemory,
+        limitExpiry);
 }
 
 std::vector<TxId> LimitMempoolSize(

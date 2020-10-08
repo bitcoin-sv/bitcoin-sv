@@ -372,6 +372,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                            "below <n> megabytes (default: %u). "
                                            "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
                                          DEFAULT_MAX_MEMPOOL_SIZE_DISK));
+    strUsage += HelpMessageOpt("-mempoolmaxpercentcpfp=<n>",
+                               strprintf(_("Percentage of total mempool size (ram+disk) to allow for "
+                                           "low paying transactions (0..100) (default: %u)"),
+                                         DEFAULT_MEMPOOL_MAX_PERCENT_CPFP));
     strUsage +=
         HelpMessageOpt("-mempoolexpiry=<n>",
                        strprintf(_("Do not keep transactions in the mempool "
@@ -1807,6 +1811,11 @@ bool AppInitParameterInteraction(Config &config) {
     }
     if (std::string err; !config.SetMaxMempoolSizeDisk(
         gArgs.GetArgAsBytes("-maxmempoolsizedisk", DEFAULT_MAX_MEMPOOL_SIZE_DISK, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
+    if (std::string err; !config.SetMempoolMaxPercentCPFP(
+            gArgs.GetArg("-mempoolmaxpercentcpfp", DEFAULT_MEMPOOL_MAX_PERCENT_CPFP), &err))
     {
         return InitError(err);
     }

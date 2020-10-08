@@ -659,9 +659,10 @@ size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
 
 class MempoolSizeLimits {
 public:
-    MempoolSizeLimits(size_t memory, size_t disk, unsigned long age)
+    MempoolSizeLimits(size_t memory, size_t disk, size_t secondary, unsigned long age)
     : limitMemory{memory}
     , limitDisk{disk}
+    , limitSecondary{secondary}
     , limitAge{age}
     {}
 
@@ -674,6 +675,9 @@ public:
     // A size limit for mempool RAM and disk combined. When exceeded remove transactions.
     size_t Total() const { return limitMemory + limitDisk; }
 
+    // A size limit for secondary mempool ram and disk. When exceeded remove transactions.
+    size_t Secondary() const { return limitSecondary; }
+
     // A time limit for txn to be tracked by mempool. When exceeded remove transactions.
     unsigned long Age() const { return limitAge; }
 
@@ -682,6 +686,7 @@ public:
 private:
     size_t limitMemory;
     size_t limitDisk;
+    size_t limitSecondary;
     unsigned long limitAge;
 };
 
