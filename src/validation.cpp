@@ -974,9 +974,14 @@ std::vector<TxId> LimitMempoolSize(
     std::vector<COutPoint> vNoSpendsRemaining;
     std::vector<TxId> vRemovedTxIds;
 
-    if (usageTotal > limits.Total())
+    if ((usageTotal > limits.Total()) || (usageSecondary > limits.Secondary()))
     {
-        size_t targetSize = limits.Total();
+        size_t targetSize = std::min(usageTotal, limits.Total());
+        if (usageSecondary > limits.Secondary())
+        {
+            size_t secondaryExcess = usageSecondary - limits.Secondary();
+            targetSize -= secondaryExcess;
+        }
         vRemovedTxIds =
             pool.TrimToSize(targetSize, changeSet, &vNoSpendsRemaining);
         usageTotal = pool.DynamicMemoryUsage();
