@@ -40,6 +40,7 @@ class MiningCoinbaseWithP2SHTest(BitcoinTestFramework):
         connections.append(NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], test_node))
         test_node.add_connection(connections[0])
         NetworkThread().start()
+        test_node.wait_for_verack()
 
         starting_height = 3
         self.nodes[0].generate(starting_height)
