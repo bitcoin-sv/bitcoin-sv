@@ -106,6 +106,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	mempool_snapshot_tests.cpp
 	mempool_tests.cpp
 	mempooltxdb_tests.cpp
+	mempool_limit_tests.cpp
 	merkle_tests.cpp
 	merkletreefile_readwrite_tests.cpp
 	miner_tests.cpp
