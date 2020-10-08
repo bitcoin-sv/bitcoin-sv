@@ -23,7 +23,7 @@ from .util import (
 )
 from .authproxy import JSONRPCException
 
-BITCOIND_PROC_WAIT_TIMEOUT = 60
+BITCOIND_PROC_WAIT_TIMEOUT = 120
 
 # Keep a global list of started external processes so that they can be killed
 # before Python exits if they are still running.
