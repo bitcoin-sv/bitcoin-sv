@@ -972,8 +972,13 @@ std::vector<TxId> LimitMempoolSize(
             pool.TrimToSize(targetSize, changeSet, &vNoSpendsRemaining);
         usageTotal = pool.DynamicMemoryUsage();
     }
+
+    // Disk usage is eventually consistent with total usage.
     size_t usageDisk = pool.GetDiskUsage();
-    size_t usageMemory = usageTotal - usageDisk;
+    // Clamp the difference to zero to avoid nasty surprises.
+    size_t usageMemory = std::max(usageTotal, usageDisk) - usageDisk;
+
+    // Since this is called often we'll track the limit pretty close
     if (usageMemory > limitMemory) {
         size_t toWriteOut = usageMemory - limitMemory;
         pool.SaveTxsToDisk(toWriteOut);
