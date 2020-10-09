@@ -67,14 +67,14 @@ class SpendingOpReturnTx(BitcoinTestFramework):
             tx_data = spend_tx_to_data(coinbase_tx, coinbase_key)
             conn.send_message(msg_tx(tx_data))
 
-            sleep(1)
+            conn.cb.sync_with_ping()
 
             url = urllib.parse.urlparse(self.nodes[0].url)
             json_mempool = json.loads(http_get_call(url.hostname, url.port, f'/rest/mempool/contents.json'))
             json_tx = json.loads(http_get_call(url.hostname, url.port, f'/rest/getutxos/checkmempool/{tx_data.hash}-0.json'))
 
             assert len(json_mempool) == 1, f"Only one tx should be in mempool. Found {len(json_mempool)}"
-            assert tx_data.hash in json_mempool, f"Our tx should be in mempool"
+            assert tx_data.hash in json_mempool, "Our tx should be in mempool"
             assert json_tx['utxos'][0]['scriptPubKey']['hex'] == bytes_to_hex_str(OP_TRUE_OP_RETURN_SCRIPT)
 
 
