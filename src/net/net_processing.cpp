@@ -247,7 +247,7 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
                      int64_t nTime) {
     ServiceFlags nLocalNodeServices = pnode->GetLocalServices();
     uint64_t nonce = pnode->GetLocalNonce();
-    int nNodeStartingHeight = pnode->GetMyStartingHeight();
+    int32_t nNodeStartingHeight = pnode->GetMyStartingHeight();
     NodeId nodeid = pnode->GetId();
     CAddress addr = pnode->GetAssociation().GetPeerAddr();
 
@@ -656,8 +656,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
     if(nWindowSize <= 0) {
         nWindowSize = DEFAULT_BLOCK_DOWNLOAD_WINDOW;
     }
-    int nWindowEnd = state->pindexLastCommonBlock->nHeight + nWindowSize;
-    int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
+    int32_t nWindowEnd = state->pindexLastCommonBlock->nHeight + nWindowSize;
+    int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed)
@@ -1049,7 +1049,7 @@ void PeerLogicValidation::NewPoWValidBlock(
 void PeerLogicValidation::UpdatedBlockTip(const CBlockIndex *pindexNew,
                                           const CBlockIndex *pindexFork,
                                           bool fInitialDownload) {
-    const int nNewHeight = pindexNew->nHeight;
+    const int32_t nNewHeight = pindexNew->nHeight;
     connman->SetBestHeight(nNewHeight);
 
     if (!fInitialDownload) {
@@ -1850,7 +1850,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     int nSendVersion;
     std::string strSubVer;
     std::string cleanSubVer;
-    int nStartingHeight = -1;
+    int32_t nStartingHeight = -1;
     bool fRelay = true;
     std::vector<uint8_t> associationID {};
 

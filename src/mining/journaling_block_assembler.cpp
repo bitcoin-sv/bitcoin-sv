@@ -170,7 +170,7 @@ void JournalingBlockAssembler::updateBlock(const CBlockIndex* pindex, uint64_t m
         // Update chain state
         if(pindex)
         {
-            int height { pindex->nHeight + 1 };
+            int32_t height { pindex->nHeight + 1 };
             mLockTimeCutoff = (StandardNonFinalVerifyFlags(IsGenesisEnabled(mConfig, height)) & LOCKTIME_MEDIAN_TIME_PAST) ?
                 pindex->GetMedianTimePast() : GetAdjustedTime();
         }

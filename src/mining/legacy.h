@@ -141,7 +141,7 @@ private:
     uint64_t nMaxGeneratedBlockSize;
 
     // Chain context for the block
-    int nHeight;
+    int32_t nHeight;
     int64_t nLockTimeCutoff;
 
     // Variables used for addPriorityTxs

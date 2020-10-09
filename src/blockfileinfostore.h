@@ -26,14 +26,14 @@ public:
     uint64_t CalculateCurrentUsage();
 
     bool FindBlockPos(const Config &config, CValidationState &state,
-        CDiskBlockPos &pos, uint64_t nAddSize, unsigned int nHeight,
+        CDiskBlockPos &pos, uint64_t nAddSize, int32_t nHeight,
         uint64_t nTime, bool& fCheckForPruning, bool fKnown = false);
 
     void FindFilesToPrune(std::set<int> &setFilesToPrune,
-        uint64_t nPruneAfterHeight);
+        int32_t nPruneAfterHeight);
 
     void FindFilesToPruneManual(std::set<int> &setFilesToPrune,
-        int nManualPruneHeight);
+        int32_t nManualPruneHeight);
 
     bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
         uint64_t nAddSize, bool& fCheckForPruning);

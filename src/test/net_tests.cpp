@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE(caddrdb_read_corrupted) {
 BOOST_AUTO_TEST_CASE(cnode_simple_test) {
     SOCKET hSocket = INVALID_SOCKET;
     NodeId id = 0;
-    int height = 0;
+    int32_t height = 0;
 
     in_addr ipv4Addr;
     ipv4Addr.s_addr = 0xa0b0c001;

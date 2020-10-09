@@ -28,7 +28,7 @@ struct SeedSpec6 {
     uint16_t port;
 };
 
-typedef std::map<int, uint256> MapCheckpoints;
+typedef std::map<int32_t, uint256> MapCheckpoints;
 
 struct CCheckpointData {
     MapCheckpoints mapCheckpoints;
@@ -81,7 +81,7 @@ public:
     bool DefaultConsistencyChecks() const { return fDefaultConsistencyChecks; }
     /** Policy: Filter transactions that do not match well-defined patterns */
     bool RequireStandard() const { return fRequireStandard; }
-    uint64_t PruneAfterHeight() const { return nPruneAfterHeight; }
+    int32_t PruneAfterHeight() const { return nPruneAfterHeight; }
     /**
      * Make miner stop after a block is found. In RPC, don't return until
      * nGenProcLimit blocks are generated.
@@ -108,7 +108,7 @@ protected:
     CMessageHeader::MessageMagic diskMagic;
     CMessageHeader::MessageMagic netMagic;
     int nDefaultPort;
-    uint64_t nPruneAfterHeight;
+    int32_t nPruneAfterHeight;
     std::vector<CDNSSeedData> vSeeds;
     std::vector<uint8_t> base58Prefixes[MAX_BASE58_TYPES];
     std::string strNetworkID;

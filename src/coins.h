@@ -32,6 +32,8 @@ class Coin {
 
     //! Whether containing transaction was a coinbase and height at which the
     //! transaction was included into a block.
+    // This variable is unsigned even though height is signed type consistently in the codebase.
+    // The reason is that shifting on negative numbers causes undefined behavior.
     uint32_t nHeightAndIsCoinBase;
 
 public:
@@ -39,11 +41,13 @@ public:
     Coin() : nHeightAndIsCoinBase(0) {}
 
     //! Constructor from a CTxOut and height/coinbase information.
-    Coin(CTxOut outIn, uint32_t nHeightIn, bool IsCoinbase)
+    Coin(CTxOut outIn, int32_t nHeightIn, bool IsCoinbase)
         : out(std::move(outIn)),
-          nHeightAndIsCoinBase((nHeightIn << 1) | IsCoinbase) {}
+          nHeightAndIsCoinBase((static_cast<uint32_t>(nHeightIn) << 1) | IsCoinbase) {}
 
-    uint32_t GetHeight() const { return nHeightAndIsCoinBase >> 1; }
+    int32_t GetHeight() const {
+        return static_cast<int32_t>(nHeightAndIsCoinBase >> 1);
+    }
     bool IsCoinBase() const { return nHeightAndIsCoinBase & 0x01; }
     bool IsSpent() const { return out.IsNull(); }
 
@@ -244,7 +248,7 @@ public:
      * are in effect for this coin. It is required to correctly determine if coin is unspendable.
      */
     void AddCoin(const COutPoint &outpoint, Coin coin,
-                 bool potential_overwrite, uint64_t genesisActivationHeight);
+                 bool potential_overwrite, int32_t genesisActivationHeight);
 
     /**
      * Spend a coin. Pass moveto in order to get the deleted data.
@@ -301,7 +305,7 @@ public:
      * values of the inputs that are already in the chain. These are the inputs
      * that will age and increase priority as new blocks are added to the chain.
      */
-    double GetPriority(const CTransaction &tx, int nHeight,
+    double GetPriority(const CTransaction &tx, int32_t nHeight,
                        Amount &inChainInputValue) const;
 
     const CTxOut &GetOutputFor(const CTxIn &input) const;
@@ -336,7 +340,7 @@ private:
 // an addition is an overwrite.
 // TODO: pass in a boolean to limit these possible overwrites to known
 // (pre-BIP34) cases.
-void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int nHeight, uint64_t genesisActivationHeight,
+void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, int32_t genesisActivationHeight,
               bool check = false);
 
 //! Utility function to find any unspent output with a given txid.

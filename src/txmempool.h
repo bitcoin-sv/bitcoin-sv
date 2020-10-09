@@ -49,13 +49,13 @@ inline bool AllowFree(double dPriority) {
  * Fake height value used in Coins to signify they are only in the memory
  * pool(since 0.8)
  */
-static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
+static const int32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 
 struct LockPoints {
     // Will be set to the blockchain height and median time past values that
     // would be necessary to satisfy all relative locktime constraints (BIP68)
     // of this tx given our view of block chain history
-    int height;
+    int32_t height;
     int64_t time;
     // As long as the current chain descends from the highest height block
     // containing one of the inputs used in the calculation, then the cached
@@ -167,14 +167,14 @@ private:
     int64_t nSigOpCountWithAncestors;
 
     //!< Chain height when entering the mempool
-    unsigned int entryHeight;
+    int32_t entryHeight;
     //!< keep track of transactions that spend a coinbase
     bool spendsCoinbase;
 
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime, double _entryPriority,
-                    unsigned int _entryHeight, Amount _inChainInputValue,
+                    int32_t _entryHeight, Amount _inChainInputValue,
                     bool spendsCoinbase, int64_t nSigOpsCost, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
@@ -186,11 +186,11 @@ public:
      * Fast calculation of lower bound of current priority as update from entry
      * priority. Only inputs that were originally in-chain will age.
      */
-    double GetPriority(unsigned int currentHeight) const;
+    double GetPriority(int32_t currentHeight) const;
     const Amount GetFee() const { return nFee; }
     size_t GetTxSize() const { return nTxSize; }
     int64_t GetTime() const { return nTime; }
-    unsigned int GetHeight() const { return entryHeight; }
+    int32_t GetHeight() const { return entryHeight; }
     int64_t GetSigOpCount() const { return sigOpCount; }
     Amount GetModifiedFee() const { return nFee + feeDelta; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
@@ -656,13 +656,13 @@ public:
             const Config &config,
             const CCoinsViewCache *pcoins,
             const mining::CJournalChangeSetPtr& changeSet,
-            int nChainActiveHeight,
+            int32_t nChainActiveHeight,
             int nMedianTimePast,
             int flags);
 
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
-            unsigned int nBlockHeight,
+            int32_t nBlockHeight,
             const mining::CJournalChangeSetPtr& changeSet);
 
     void Clear();

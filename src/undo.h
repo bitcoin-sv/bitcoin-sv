@@ -52,7 +52,7 @@ public:
     template <typename Stream> void Unserialize(Stream &s) {
         uint32_t nCode = 0;
         ::Unserialize(s, VARINT(nCode));
-        uint32_t nHeight = nCode / 2;
+        int32_t nHeight = nCode / 2;
         bool fCoinBase = nCode & 1;
         if (nHeight > 0) {
             // Old versions stored the version number for the last spend of a

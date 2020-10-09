@@ -98,8 +98,8 @@ public:
     virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
 
-    virtual bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
-    virtual uint64_t GetGenesisActivationHeight() const = 0;
+    virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
+    virtual int32_t GetGenesisActivationHeight() const = 0;
 
     virtual bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
@@ -172,8 +172,8 @@ public:
     virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
     virtual uint64_t GetMaxOrphanTxSize() const = 0;
 
-    virtual bool SetStopAtHeight(int64_t StopAtHeight, std::string* err) = 0;
-    virtual uint64_t GetStopAtHeight() const = 0;
+    virtual bool SetStopAtHeight(int32_t StopAtHeight, std::string* err) = 0;
+    virtual int32_t GetStopAtHeight() const = 0;
 
     virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
     virtual uint64_t GetPromiscuousMempoolFlags() const = 0;
@@ -269,8 +269,8 @@ public:
     void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) override;
     mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const override;
 
-    bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override;
-    uint64_t GetGenesisActivationHeight() const override;
+    bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) override;
+    int32_t GetGenesisActivationHeight() const override;
 
     bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
@@ -348,8 +348,8 @@ public:
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override;
     uint64_t GetMaxOrphanTxSize() const override;
 
-    bool SetStopAtHeight(int64_t stopAtHeight, std::string* err) override;
-    uint64_t GetStopAtHeight() const override;
+    bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override;
+    int32_t GetStopAtHeight() const override;
 
     bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) override;
     uint64_t GetPromiscuousMempoolFlags() const override;
@@ -411,7 +411,7 @@ private:
     bool testBlockCandidateValidity;
     mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
 
-    uint64_t genesisActivationHeight;
+    int32_t genesisActivationHeight;
 
     int mMaxConcurrentAsyncTasksPerNode;
 
@@ -443,7 +443,7 @@ private:
     uint64_t mMemPoolExpiry;
     uint64_t mLimitFreeRelay;
     uint64_t mMaxOrphanTxSize;
-    uint64_t mStopAtHeight;
+    int32_t mStopAtHeight;
     uint64_t mPromiscuousMempoolFlags;
     bool mIsSetPromiscuousMempoolFlags;
 
@@ -576,8 +576,8 @@ public:
         return mining::CMiningFactory::BlockAssemblerType::JOURNALING;
     }
 
-    bool SetGenesisActivationHeight(int64_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = static_cast<uint64_t>(genesisActivationHeightIn); return true; }
-    uint64_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
+    bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) override { genesisActivationHeight = genesisActivationHeightIn; return true; }
+    int32_t GetGenesisActivationHeight() const override { return genesisActivationHeight; }
 
     bool SetMaxConcurrentAsyncTasksPerNode(
         int maxConcurrentAsyncTasksPerNode,
@@ -728,13 +728,13 @@ public:
     }
     uint64_t GetMaxOrphanTxSize() const override { return COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE; }
 
-    bool SetStopAtHeight(int64_t stopAtHeight, std::string* err) override
+    bool SetStopAtHeight(int32_t stopAtHeight, std::string* err) override
     {
         SetErrorMsg(err);
 
         return true;
     }
-    uint64_t GetStopAtHeight() const override { return DEFAULT_STOPATHEIGHT; }
+    int32_t GetStopAtHeight() const override { return DEFAULT_STOPATHEIGHT; }
 
     bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) override
     {
@@ -818,7 +818,7 @@ public:
 private:
     std::unique_ptr<CChainParams> chainParams;
     uint64_t dataCarrierSize { DEFAULT_DATA_CARRIER_SIZE };
-    uint64_t genesisActivationHeight;
+    int32_t genesisActivationHeight;
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
     uint64_t minConsolidationFactor{ DEFAULT_MIN_CONSOLIDATION_FACTOR };
     uint64_t maxConsolidationInputScriptSize{DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE };

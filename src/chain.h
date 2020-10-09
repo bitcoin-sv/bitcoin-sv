@@ -39,9 +39,9 @@ public:
     //!< number of blocks stored in file
     unsigned int nBlocks;
     //!< lowest height of block in file
-    unsigned int nHeightFirst;
+    int32_t nHeightFirst;
     //!< highest height of block in file
-    unsigned int nHeightLast;
+    int32_t nHeightLast;
     //!< earliest time of block in file
     uint64_t nTimeFirst;
     //!< latest time of block in file
@@ -120,7 +120,7 @@ public:
     std::string ToString() const;
 
     /** update statistics (does not update nSize) */
-    void AddBlock(unsigned int nHeightIn, uint64_t nTimeIn) {
+    void AddBlock(int32_t nHeightIn, uint64_t nTimeIn) {
         if (nBlocks == 0 || nHeightFirst > nHeightIn) {
             nHeightFirst = nHeightIn;
         }
@@ -348,7 +348,7 @@ public:
     CBlockIndex *pskip;
 
     //! height of the entry in the chain. The genesis block has height 0
-    int nHeight;
+    int32_t nHeight;
 
     //! Which # file this block is stored in (blk?????.dat)
     int nFile;
@@ -625,8 +625,8 @@ public:
     void BuildSkip();
 
     //! Efficiently find an ancestor of this block.
-    CBlockIndex *GetAncestor(int height);
-    const CBlockIndex *GetAncestor(int height) const;
+    CBlockIndex *GetAncestor(int32_t height);
+    const CBlockIndex *GetAncestor(int32_t height) const;
 
 protected:
     CDiskBlockMetaData mDiskBlockMetaData;
@@ -776,11 +776,11 @@ public:
      * Returns the index entry at a particular height in this chain, or nullptr
      * if no such height exists.
      */
-    CBlockIndex *operator[](int nHeight) const {
-        if (nHeight < 0 || nHeight >= (int)vChain.size()) {
+    CBlockIndex *operator[](int32_t nHeight) const {
+        if (nHeight < 0 || nHeight >= static_cast<int32_t>(vChain.size())) {
             return nullptr;
         }
-        return vChain[nHeight];
+        return vChain[static_cast<size_t>(nHeight)];
     }
 
     /** Compare two chains efficiently. */
@@ -809,7 +809,7 @@ public:
     /**
      * Return the maximal height in the chain or -1 if tip is not set.
      */
-    int Height() const
+    int32_t Height() const
     {
         const CBlockIndex* tip = mChainTip;
         return tip ? tip->nHeight : -1;

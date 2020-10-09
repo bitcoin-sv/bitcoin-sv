@@ -222,7 +222,7 @@ UniValue waitforblockheight(const Config &config,
 
     int timeout = 0;
 
-    int height = request.params[0].get_int();
+    int32_t height = request.params[0].get_int();
 
     if (request.params.size() > 1) {
         timeout = request.params[1].get_int();
@@ -732,7 +732,7 @@ UniValue getblockhash(const Config &config, const JSONRPCRequest &request) {
 
     LOCK(cs_main);
 
-    int nHeight = request.params[0].get_int();
+    int32_t nHeight = request.params[0].get_int();
     if (nHeight < 0 || nHeight > chainActive.Height()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
     }
@@ -1142,7 +1142,7 @@ void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
 
     LOCK(cs_main);
 
-    int nHeight = jsonRPCReq.params[0].get_int();
+    int32_t nHeight = jsonRPCReq.params[0].get_int();
     if (nHeight < 0 || nHeight > chainActive.Height()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
     }
@@ -1351,7 +1351,7 @@ std::string headerBlockToJSON(const Config &config,
 }
 
 struct CCoinsStats {
-    int nHeight;
+    int32_t nHeight;
     uint256 hashBlock;
     uint64_t nTransactions;
     uint64_t nTransactionOutputs;
@@ -1447,7 +1447,7 @@ UniValue pruneblockchain(const Config &config, const JSONRPCRequest &request) {
 
     LOCK(cs_main);
 
-    int heightParam = request.params[0].get_int();
+    int32_t heightParam = request.params[0].get_int();
     if (heightParam < 0) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative block height.");
     }
@@ -1467,8 +1467,8 @@ UniValue pruneblockchain(const Config &config, const JSONRPCRequest &request) {
         heightParam = pindex->nHeight;
     }
 
-    unsigned int height = (unsigned int)heightParam;
-    unsigned int chainHeight = (unsigned int)chainActive.Height();
+    int32_t height = heightParam;
+    int32_t chainHeight = chainActive.Height();
     if (chainHeight < config.GetChainParams().PruneAfterHeight()) {
         throw JSONRPCError(RPC_MISC_ERROR,
                            "Blockchain is too short for pruning.");
@@ -1614,7 +1614,7 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     }
     ret.push_back(Pair("value", ValueFromAmount(coin.GetTxOut().nValue)));
     UniValue o(UniValue::VOBJ);
-    int height = (coin.GetHeight() == MEMPOOL_HEIGHT)
+    int32_t height = (coin.GetHeight() == MEMPOOL_HEIGHT)
                      ? (chainActive.Height() + 1)
                      : coin.GetHeight();
     ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true,
@@ -2650,7 +2650,7 @@ static UniValue getblockstatsbyheight(const Config &config,
     LOCK(cs_main);
 
     CBlockIndex *pindex;
-    const int height = request.params[0].get_int();
+    const int32_t height = request.params[0].get_int();
     const int current_tip = chainActive.Height();
     if (height < 0) {
         throw JSONRPCError(

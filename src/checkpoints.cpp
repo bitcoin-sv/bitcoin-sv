@@ -13,7 +13,7 @@
 
 namespace Checkpoints {
 
-bool CheckBlock(const CCheckpointData &data, int nHeight, const uint256 &hash) {
+bool CheckBlock(const CCheckpointData &data, int32_t nHeight, const uint256 &hash) {
     const MapCheckpoints &checkpoints = data.mapCheckpoints;
 
     MapCheckpoints::const_iterator i = checkpoints.find(nHeight);

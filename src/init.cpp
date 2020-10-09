@@ -2012,7 +2012,7 @@ bool AppInitParameterInteraction(Config &config) {
     }
 
     // Configure genesis activation height.
-    int64_t genesisActivationHeight = gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight);
+    int32_t genesisActivationHeight = static_cast<int32_t>(gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight));
     if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
         return InitError(err);
     }
