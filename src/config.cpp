@@ -315,9 +315,9 @@ uint64_t GlobalConfig::GetMinConsolidationInputMaturity() const
     return minConsolidationInputMaturity;
 }
 
-bool GlobalConfig::SetAcceptNonStdConsolidationInput(uint64_t acceptNonStdConsolidationInputIn, std::string* err)
+bool GlobalConfig::SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err)
 {
-    acceptNonStdConsolidationInput = acceptNonStdConsolidationInputIn;
+    acceptNonStdConsolidationInput = flagValue;
     return true;
 }
 

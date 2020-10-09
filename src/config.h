@@ -61,7 +61,7 @@ public:
     virtual bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMinConsolidationInputMaturity() const = 0;
 
-    virtual bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
     virtual bool GetAcceptNonStdConsolidationInput() const = 0;
 
     virtual void SetMinFeePerKB(CFeeRate amt) = 0;
@@ -232,7 +232,7 @@ public:
     bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) override;
     uint64_t GetMinConsolidationInputMaturity() const  override;
 
-    bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) override;
+    bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) override;
     bool GetAcceptNonStdConsolidationInput() const  override;
 
     void SetMinFeePerKB(CFeeRate amt) override;
@@ -401,7 +401,7 @@ private:
     uint64_t minConsolidationFactor;
     uint64_t maxConsolidationInputScriptSize;
     uint64_t minConsolidationInputMaturity;
-    uint64_t acceptNonStdConsolidationInput;
+    bool acceptNonStdConsolidationInput;
     uint64_t dataCarrierSize;
     uint64_t limitDescendantCount;
     uint64_t limitAncestorCount;
@@ -529,10 +529,10 @@ public:
     }
     uint64_t GetMinConsolidationInputMaturity() const override { return minConsolidationInputMaturity; }
 
-    bool SetAcceptNonStdConsolidationInput(uint64_t value, std::string* err = nullptr) override
+    bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        acceptNonStdConsolidationInput = value;
+        acceptNonStdConsolidationInput = flagValue;
         return false;
     }
     bool GetAcceptNonStdConsolidationInput() const override { return acceptNonStdConsolidationInput; }
