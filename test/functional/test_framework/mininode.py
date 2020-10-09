@@ -542,8 +542,9 @@ class CTransaction():
         return True
 
     def __repr__(self):
-        return "CTransaction(nVersion=%i vin=%s vout=%s nLockTime=%i)" \
-            % (self.nVersion, repr(self.vin), repr(self.vout), self.nLockTime)
+        self.rehash()
+        return "CTransaction(hash=%s nVersion=%i vin=%s vout=%s nLockTime=%i)" \
+            % (self.hash, self.nVersion, repr(self.vin), repr(self.vout), self.nLockTime)
 
 
 class CBlockHeader():
@@ -609,8 +610,9 @@ class CBlockHeader():
         return self.sha256
 
     def __repr__(self):
-        return "CBlockHeader(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x)" \
-            % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
+        self.rehash()
+        return "CBlockHeader(hash=%s nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x)" \
+            % (self.hash, self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
                time.ctime(self.nTime), self.nBits, self.nNonce)
 
 
@@ -667,8 +669,9 @@ class CBlock(CBlockHeader):
             self.rehash()
 
     def __repr__(self):
-        return "CBlock(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x vtx=%s)" \
-            % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
+        self.rehash()
+        return "CBlock(hash=%s nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x vtx=%s)" \
+            % (self.hash, self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
                time.ctime(self.nTime), self.nBits, self.nNonce, repr(self.vtx))
 
 
