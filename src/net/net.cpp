@@ -2013,8 +2013,7 @@ namespace
 
                 if(processingDuration > mDebugP2PTheadStallsThreshold)
                 {
-                    LogPrint(
-                        BCLog::NET,
+                    LogPrintf(
                         "CConnman request processing took %s ms to complete "
                         "processing '%s' request!\n",
                         std::chrono::duration_cast<std::chrono::milliseconds>(
