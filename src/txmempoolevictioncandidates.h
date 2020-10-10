@@ -27,32 +27,66 @@ private:
     // class that represents estimated worth of the transaction
     class EvalResult
     {
-        bool expired = false; // is result still relevant, will become irrelevant if transaction is removed from the mempool, or the score has changed
-        const int64_t score = 0; // the score of the entry, transactions with lower score will be evicted first
-        const CTxMemPool::txiter entry; // the entry for which the score is calculated
+        // the score of the entry, transactions with lower score will be evicted first.
+        // score should not be modified after it is initialized, if the score needs to be changed, a new EvalResult should be added and this one marked as invalid
+        int64_t score = 0;
+        // the entry for which the score is calculated, should not be modified. this iterator might be invalid if the entry is removed from the mempool
+        CTxMemPool::txiter entry;
+        // pointer to pointer to this object in the "entries" map. it tracks our position in the vector (heap). 
+        // if the value is nullptr the object is expired (not tracked any more) and not referenced in the map any more
+        EvalResult** ptrToMe; 
     public:
         
-        EvalResult(CTxMemPool::txiter _entry, Evaluator& evaluator)
-            :expired{false}
-            ,score{evaluator(_entry)}
+        EvalResult(CTxMemPool::txiter _entry, Evaluator& evaluator, EvalResult*& _ptrToMe )
+            :score{evaluator(_entry)}
             ,entry{_entry}
-        {}
+            ,ptrToMe{&_ptrToMe}
+        {
+            *ptrToMe = this;
+        }
+
+        EvalResult(EvalResult&& other)
+            :score{other.score}
+            ,entry{other.entry}
+            ,ptrToMe{other.ptrToMe}
+        {
+            if(ptrToMe != nullptr)
+            {
+                *ptrToMe = this;
+                other.ptrToMe = nullptr;
+            }
+        }
+
+        EvalResult& operator=(EvalResult&& other)
+        {
+            score = other.score;
+            entry = other.entry;
+            ptrToMe = other.ptrToMe;
+            if(ptrToMe != nullptr)
+            {
+                *ptrToMe = this;
+                other.ptrToMe = nullptr;
+            }
+            return *this;
+        }
+
+        EvalResult(const EvalResult&) = delete;
+        EvalResult& operator=(const EvalResult&) = delete;
 
         CTxMemPool::txiter Entry() const { return entry; }
-        void MarkExpired()               { expired = true; }
-        bool IsExpired() const           { return expired; }
+        void MarkExpired()               { ptrToMe = nullptr;}
+        bool IsExpired() const           { return ptrToMe == nullptr; }
         int64_t Score() const            { return score; }
     };
-    
-    using ResultRef = std::unique_ptr<EvalResult>;
 
     // the comparison function used for the creation of the heap, if the "first" is larger than
     // the second it returns true. used for the heap creation to make result with lowest score on the top of the heap
-    static bool CompareResult(const ResultRef& first, const ResultRef& second);
+    static bool CompareResult(const EvalResult& first, const EvalResult& second);
 
     // vector that represents the heap of the evaluation results, the most worthless entry is on the top
-    std::vector<ResultRef> heap;
-    // map txid to the representing evaluation result
+    std::vector<EvalResult> heap;
+    // map txid to the representing evaluation result. as the evaluation result moves inside heap this ptr will be changed. 
+    // when removing a result from this map it should be marked as expired first
     std::unordered_map<TxId, EvalResult*, SaltedTxidHasher> entries;
     
     // adds entry to the "heap" and "entries"

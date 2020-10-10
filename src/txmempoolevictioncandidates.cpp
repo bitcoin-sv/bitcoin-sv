@@ -4,16 +4,16 @@
 
 #include "txmempoolevictioncandidates.h"
 
-bool CEvictionCandidateTracker::CompareResult(const ResultRef& first, const ResultRef& second)
+bool CEvictionCandidateTracker::CompareResult(const EvalResult& first, const EvalResult& second)
 {
-    return first->Score() > second->Score();
+    return first.Score() > second.Score();
 }
 
 void CEvictionCandidateTracker::InsertEntry(CTxMemPool::txiter entry)
 {
-    heap.emplace_back(std::make_unique<EvalResult>(entry, evaluator));
-    auto result = entries.insert({entry->GetTxId(), heap.back().get()});
-    assert(result.second); // succesfull insertion
+    auto [iter, success] = entries.insert({entry->GetTxId(), nullptr});
+    assert(success); // successful insertion
+    heap.emplace_back(entry, evaluator, iter->second);
 
     std::push_heap(heap.begin(), heap.end(), CompareResult);
 }
@@ -37,14 +37,14 @@ void CEvictionCandidateTracker::PopExpired()
         heap.erase(
             std::remove_if(heap.begin(), 
                            heap.end(),
-                           [](const ResultRef& x){return x->IsExpired();}),
+                           [](const EvalResult& x){return x.IsExpired();}),
             heap.end());
 
         std::make_heap(heap.begin(), heap.end(), CompareResult);
     }
     else
     {
-        while (!heap.empty() && heap.front()->IsExpired())
+        while (!heap.empty() && heap.front().IsExpired())
         {
             std::pop_heap(heap.begin(), heap.end(), CompareResult);
             heap.pop_back();
@@ -107,8 +107,9 @@ CEvictionCandidateTracker::CEvictionCandidateTracker(CTxMemPool::txlinksMap& _li
             continue;
         }
 
-        heap.emplace_back(std::make_unique<EvalResult>(entry, evaluator));
-        entries.insert({entry->GetTxId(), heap.back().get()}); 
+        auto[iter, success] = entries.insert({entry->GetTxId(), nullptr});
+        assert(success);
+        heap.emplace_back(entry, evaluator, iter->second);
     }
     std::make_heap(heap.begin(), heap.end(), CompareResult);
 }
@@ -170,7 +171,7 @@ void CEvictionCandidateTracker::EntryModified(CTxMemPool::txiter entry)
 CTxMemPool::txiter CEvictionCandidateTracker::GetMostWorthles() const
 {
     assert(entries.size() != 0);
-    return heap.front()->Entry();
+    return heap.front().Entry();
 }
 
 CTxMemPool::setEntries CEvictionCandidateTracker::GetAllCandidates() const
@@ -187,6 +188,5 @@ size_t CEvictionCandidateTracker::DynamicMemoryUsage() const
 {
     return 
         memusage::DynamicUsage(heap) + 
-        memusage::DynamicUsage(entries) + 
-        heap.size() * memusage::MallocUsage(sizeof(EvalResult));
+        memusage::DynamicUsage(entries);
 }
