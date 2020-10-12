@@ -6,8 +6,9 @@
 Test some ZMQ notifications/messages when transaction get removed from mempool.
 
 Body of ZMQ message is in json format: {txid: hexstring, reason: string,
-                                        collidedWith: {txid: hexstring, size: integer, hex: hexstring}}
-The field collidedWith is only present when reason for removal is collision-in-block-tx
+                                        collidedWith: {txid: hexstring, size: integer, hex: hexstring},
+                                        blockhash: hexstring}
+The fields collidedWith and blockhash are only present when reason for removal is collision-in-block-tx
 
 To see if zmq notifiers works, we only check for particular
 reasons when transactions gets removed from mempool.
@@ -163,7 +164,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         tx2 = FromHex(CTransaction(), tx_hex)
         tx2.rehash()
         self.nodes[1].sendrawtransaction(tx_hex, True)
-        self.nodes[1].generate(1)
+        blockhash = self.nodes[1].generate(1)[0]
 
         tx1 = CTransaction()
         tx_outs = [CTxOut(4300000000, CScript([OP_TRUE]))]
@@ -187,6 +188,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         assert_equal(body["txid"], tx1.hash)
         assert_equal(body["collidedWith"]["txid"], tx2.hash)
         assert_equal(body["collidedWith"]["size"], tx2_size)
+        assert_equal(body["blockhash"], blockhash)
 
         """Test case 4"""
         # create tx with spendable output for both nodes to use

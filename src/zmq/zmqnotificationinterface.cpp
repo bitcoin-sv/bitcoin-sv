@@ -200,13 +200,13 @@ void CZMQNotificationInterface::TransactionAddedToMempool(
 
 
 void CZMQNotificationInterface::TransactionRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason, 
-                                                              const CTransaction* conflictedWith)
+                                                              const CTransaction* conflictedWith, const uint256* blockhash)
 {
 
     for (auto i = notifiers.begin(); i != notifiers.end();)
     {
         CZMQAbstractNotifier *notifier = *i;
-        if (notifier->NotifyRemovedFromMempool(txid, reason, conflictedWith))
+        if (notifier->NotifyRemovedFromMempool(txid, reason, conflictedWith, blockhash))
         {
             ++i;
         }

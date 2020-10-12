@@ -4480,7 +4480,7 @@ static bool ConnectTip(
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // Remove conflicting transactions from the mempool.;
-    mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
+    mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet, blockConnecting.GetHash());
     if(g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
