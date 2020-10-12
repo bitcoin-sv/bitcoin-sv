@@ -167,6 +167,10 @@ public:
         std::unique_ptr<CCheckQueue<T>, CNullDestructor<CCheckQueue<T>>> mQueue;
     };
 
+    CCheckQueuePool(CCheckQueuePool&&) = delete;
+    CCheckQueuePool& operator=(CCheckQueuePool&&) = delete;
+    CCheckQueuePool(const CCheckQueuePool&) = delete;
+    CCheckQueuePool& operator=(const CCheckQueuePool&) = delete;
     CCheckQueuePool(
         size_t poolSize,
         boost::thread_group& threadGroup,
