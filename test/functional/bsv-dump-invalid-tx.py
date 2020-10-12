@@ -124,7 +124,7 @@ class InvalidTx(BitcoinTestFramework):
 
     def check_message(self, data, tx, block=None, has_hex=None, rejectionFlags=None, rejectionReason=None, source=None, collidedTx=None, **kwargs):
         assert {"fromBlock", "txid", "isInvalid", "isValidationError", "isMissingInputs", "isDoubleSpendDetected",
-                "isMempoolConflictDetected", "isCorruptionPossible", "isNonFinal", "isValidationTimeoutExceeded",
+                "isMempoolConflictDetected", "isNonFinal", "isValidationTimeoutExceeded",
                 "isStandardTx", "rejectionCode", "rejectionReason", "rejectionTime"}.issubset(set(data.keys()))
 
         assert data["txid"] == tx.hash
@@ -170,7 +170,7 @@ class InvalidTx(BitcoinTestFramework):
 
         if rejectionFlags is not None:
             for flag in ["isInvalid", "isValidationError", "isMissingInputs", "isDoubleSpendDetected", "isMempoolConflictDetected",
-                         "isCorruptionPossible", "isNonFinal", "isValidationTimeoutExceeded", "isStandardTx"]:
+                         "isNonFinal", "isValidationTimeoutExceeded", "isStandardTx"]:
                 expected_flag_val = flag in rejectionFlags
                 assert data[flag] == expected_flag_val, f"Flag {flag} expected value is {expected_flag_val}, got {data[flag]}"
 
