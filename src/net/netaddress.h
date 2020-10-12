@@ -29,14 +29,13 @@ enum Network {
 class CNetAddr {
 protected:
     // in network byte order
-    uint8_t ip[16];
+    uint8_t ip[16] = {0};
     // for scoped/link-local ipv6 addresses
-    uint32_t scopeId;
+    uint32_t scopeId{0};
 
 public:
-    CNetAddr();
+    CNetAddr() = default;
     CNetAddr(const struct in_addr &ipv4Addr);
-    void Init();
     void SetIP(const CNetAddr &ip);
 
     /**
@@ -148,14 +147,13 @@ public:
 class CService : public CNetAddr {
 protected:
     // host order
-    unsigned short port;
+    unsigned short port{0};
 
 public:
-    CService();
+    CService() = default;
     CService(const CNetAddr &ip, unsigned short port);
     CService(const struct in_addr &ipv4Addr, unsigned short port);
     CService(const struct sockaddr_in &addr);
-    void Init();
     void SetPort(unsigned short portIn);
     unsigned short GetPort() const;
     bool GetSockAddr(struct sockaddr *paddr, socklen_t *addrlen) const;
