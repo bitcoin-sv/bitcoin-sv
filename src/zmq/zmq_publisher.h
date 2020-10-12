@@ -15,8 +15,8 @@ public:
 
     CZMQPublisher(CZMQPublisher const &) = delete;
     CZMQPublisher & operator= (CZMQPublisher const &) = delete;
-    CZMQPublisher(CZMQPublisher &&) = default;
-    CZMQPublisher & operator= (CZMQPublisher &&) = default;
+    CZMQPublisher(CZMQPublisher &&) = delete;
+    CZMQPublisher & operator= (CZMQPublisher &&) = delete;
     
     CZMQPublisher();
     ~CZMQPublisher();
