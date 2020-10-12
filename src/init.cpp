@@ -506,8 +506,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         HelpMessageOpt("-reindex", _("Rebuild chain state and block index from "
                                      "the blk*.dat files on disk"));
     strUsage +=
-        HelpMessageOpt("-rejectmempoolrequest", _("Reject every mempool request from "
-                                     "non-whitelisted peers."));
+        HelpMessageOpt("-rejectmempoolrequest", strprintf(_("Reject every mempool request from "
+                                     "non-whitelisted peers (default: %d)."), DEFAULT_REJECTMEMPOOLREQUEST));
 #ifndef WIN32
     strUsage += HelpMessageOpt(
         "-sysperms",
