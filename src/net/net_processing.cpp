@@ -1396,7 +1396,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
 
     while (it != pfrom->vRecvGetData.end()) {
         // Don't bother if send buffer is too full to respond anyway.
-        if (pfrom->fPauseSend) {
+        if (pfrom->GetPausedForSending()) {
             break;
         }
 
@@ -3874,7 +3874,7 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Don't bother if send buffer is too full to respond anyway
-    if (pfrom->fPauseSend) {
+    if (pfrom->GetPausedForSending(true)) {
         return false;
     }
 

@@ -119,6 +119,9 @@ class Stream
     // Set our owning CNode
     void SetOwningNode(CNode* newNode);
 
+    // Get whether we're paused for receiving
+    bool GetPausedForReceiving() const { return mPauseRecv; }
+
   private:
 
     // Node we are for

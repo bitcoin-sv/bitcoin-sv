@@ -256,6 +256,7 @@ void Stream::CopyStats(StreamStats& stats) const
         LOCK(cs_mRecvMsgQueue);
         stats.nRecvBytes = mTotalBytesRecv;
         stats.fPauseRecv = mPauseRecv;
+        stats.nRecvSize = mRecvMsgQueueSize;
         stats.mapRecvBytesPerMsgCmd = mRecvBytesPerMsgCmd;
 
         // Avg bandwidth measurements
