@@ -415,7 +415,7 @@ void getrawmempool(const Config &config, const JSONRPCRequest &request, HTTPRequ
         jWriter.pushKNoComma("result");
         writeMempoolToJson(jWriter, fVerbose);
         jWriter.pushKV("error", nullptr);
-        jWriter.pushKV("id", request.id.write());
+        jWriter.pushKVJSONFormatted("id", request.id.write());
         jWriter.writeEndObject();
         jWriter.flush();
     }
@@ -468,7 +468,7 @@ void getrawnonfinalmempool(const Config &config,
         jWriter.writeEndArray();
 
         jWriter.pushKV("error", nullptr);
-        jWriter.pushKV("id", request.id.write());
+        jWriter.pushKVJSONFormatted("id", request.id.write());
         jWriter.writeEndObject();
         jWriter.flush();
     }
@@ -559,7 +559,7 @@ void getmempoolancestors(const Config &config,
         }
 
         jWriter.pushKV("error", nullptr);
-        jWriter.pushKV("id", request.id.write());
+        jWriter.pushKVJSONFormatted("id", request.id.write());
         jWriter.writeEndObject();
         jWriter.flush();
     }
@@ -649,7 +649,7 @@ void getmempooldescendants(const Config &config,
         }
 
         jWriter.pushKV("error", nullptr);
-        jWriter.pushKV("id", request.id.write());
+        jWriter.pushKVJSONFormatted("id", request.id.write());
         jWriter.writeEndObject();
         jWriter.flush();
     }
@@ -706,7 +706,7 @@ void getmempoolentry(const Config &config,
         writeMempoolEntryToJsonNL(e, jWriter, false);
 
         jWriter.pushKV("error", nullptr);
-        jWriter.pushKV("id", request.id.write());
+        jWriter.pushKVJSONFormatted("id", request.id.write());
         jWriter.writeEndObject();
         jWriter.flush();
     }
@@ -1898,7 +1898,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
     jWriter.writeEndArray();
     jWriter.writeEndObject();
     jWriter.pushKV("error", nullptr);
-    jWriter.pushKV("id", request.id.write());
+    jWriter.pushKVJSONFormatted("id", request.id.write());
     jWriter.writeEndObject();
     jWriter.flush();
 
