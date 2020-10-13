@@ -4074,6 +4074,12 @@ bool FlushStateToDisk(
                 // already an overestimation, as most will delete an existing
                 // entry or overwrite one. Still, use a conservative safety
                 // factor of 2.
+                //
+                // FIXME: this value is imprecise as it expects default size of
+                //        scripts (so smaller than needed) while using script
+                //        size would require too much space as most scripts are
+                //        compressed. In future we will store compressed size
+                //        so this code should be changed then.
                 if (!CheckDiskSpace(48 * 2 * 2 * pcoinsTip->GetCacheSize())) {
                     return state.Error("out of disk space");
                 }

@@ -96,12 +96,14 @@ public:
     }
 };
 
-struct CCoinsCacheEntry {
+class CCoinsCacheEntry {
     // The actual cached data.
     Coin coin;
+
+public:
     uint8_t flags;
 
-    enum Flags {
+    enum Flags : uint8_t {
         // This cache entry is potentially different from the version in the
         // parent view.
         DIRTY = (1 << 0),
@@ -113,9 +115,16 @@ struct CCoinsCacheEntry {
            that condition is not guaranteed. */
     };
 
-    CCoinsCacheEntry() : flags(0) {}
-    explicit CCoinsCacheEntry(Coin coinIn)
-        : coin(std::move(coinIn)), flags(0) {}
+    CCoinsCacheEntry() : flags(0u) {}
+    CCoinsCacheEntry(Coin&& coinIn, uint8_t flagsIn)
+        : coin(std::move(coinIn))
+        , flags(flagsIn)
+    {}
+
+    const Coin& GetCoin() const {return coin;}
+    Coin MoveCoin() {return std::move(coin);}
+    void Clear() {coin.Clear();}
+    size_t DynamicMemoryUsage() const {return coin.DynamicMemoryUsage();}
 };
 
 typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher>
@@ -211,6 +220,48 @@ public:
     size_t EstimateSize() const override;
 };
 
+
+class CoinsStore
+{
+public:
+    template<typename T> struct UnitTestAccess;
+
+    size_t DynamicMemoryUsage() const;
+
+    size_t CachedCoinsCount() const { return cacheCoins.size(); }
+
+    std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint& outpoint) const;
+
+    CCoinsMap MoveOutCoins()
+    {
+        cachedCoinsUsage = 0;
+        auto map = std::move(cacheCoins);
+        cacheCoins.clear();
+
+        return map;
+    }
+
+    const Coin& AddCoin(const COutPoint& outpoint, Coin&& coin);
+    void AddCoin(
+        const COutPoint& outpoint,
+        Coin&& coin,
+        bool possible_overwrite,
+        uint64_t genesisActivationHeight);
+    bool SpendCoin(const COutPoint& outpoint, Coin* moveout);
+    void Uncache(const std::vector<COutPoint>& vOutpoints);
+    void BatchWrite(CCoinsMap& mapCoins);
+
+private:
+    void AddEntry(const COutPoint& outpoint, CCoinsCacheEntry&& entryIn);
+    void UpdateEntry(CCoinsMap::iterator itUs, CCoinsCacheEntry&& coinEntry);
+    void EraseCoin(CCoinsMap::const_iterator itUs);
+
+    mutable CCoinsMap cacheCoins;
+
+    /* Cached dynamic memory usage for the inner Coin objects. */
+    mutable size_t cachedCoinsUsage{0};
+};
+
 /**
  * CCoinsView that adds a memory cache for transactions to another CCoinsView
  */
@@ -221,10 +272,7 @@ protected:
      * declared as "const".
      */
     mutable uint256 hashBlock;
-    mutable CCoinsMap cacheCoins;
-
-    /* Cached dynamic memory usage for the inner Coin objects. */
-    mutable size_t cachedCoinsUsage;
+    mutable CoinsStore mCache;
 
 public:
     CCoinsViewCache(CCoinsView *baseIn);
@@ -320,7 +368,7 @@ private:
     // A non-locking version of HaveCoin
     bool HaveCoinNL(const COutPoint &outpoint) const;
     // A non-locking fetch coin
-    CCoinsMap::iterator FetchCoinNL(const COutPoint &outpoint) const;
+    std::optional<std::reference_wrapper<const Coin>> FetchCoinNL(const COutPoint &outpoint) const;
 
     /**
      * By making the copy constructor private, we prevent accidentally using it

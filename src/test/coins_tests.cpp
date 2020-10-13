@@ -18,6 +18,18 @@
 #include <boost/test/unit_test.hpp>
 #include <config.h>
 
+namespace{ class coins_tests_uid; } // only used as unique identifier
+
+template <>
+struct CoinsStore::UnitTestAccess<coins_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static CCoinsMap& GetRawCacheCoins(CoinsStore& cache) { return cache.cacheCoins; }
+    static size_t& GetCachedCoinsUsage(CoinsStore& cache) { return cache.cachedCoinsUsage; }
+};
+using TestAccessCoinsCache = CoinsStore::UnitTestAccess<coins_tests_uid>;
+
 namespace {
 
 //! equality test
@@ -85,8 +97,8 @@ public:
             if (it->second.flags & CCoinsCacheEntry::DIRTY) {
                 // Same optimization used in CCoinsViewDB is to only write dirty
                 // entries.
-                map_[it->first] = it->second.coin;
-                if (it->second.coin.IsSpent() && InsecureRandRange(3) == 0) {
+                map_[it->first] = it->second.GetCoin();
+                if (it->second.GetCoin().IsSpent() && InsecureRandRange(3) == 0) {
                     // Randomly delete empty entries on write.
                     map_.erase(it->first);
                 }
@@ -118,19 +130,19 @@ public:
     void SelfTest() const {
         // Manually recompute the dynamic usage of the whole data, and compare
         // it.
-        size_t ret = memusage::DynamicUsage(cacheCoins);
+        size_t ret = memusage::DynamicUsage(TestAccessCoinsCache::GetRawCacheCoins(mCache));
         size_t count = 0;
-        for (CCoinsMap::iterator it = cacheCoins.begin();
-             it != cacheCoins.end(); it++) {
-            ret += it->second.coin.DynamicMemoryUsage();
+        for (const auto& entry : TestAccessCoinsCache::GetRawCacheCoins(mCache))
+        {
+            ret += entry.second.DynamicMemoryUsage();
             count++;
         }
         BOOST_CHECK_EQUAL(GetCacheSize(), count);
         BOOST_CHECK_EQUAL(DynamicMemoryUsage(), ret);
     }
 
-    CCoinsMap &map() { return cacheCoins; }
-    size_t &usage() { return cachedCoinsUsage; }
+    CCoinsMap &map() { return TestAccessCoinsCache::GetRawCacheCoins(mCache); }
+    size_t &usage() { return TestAccessCoinsCache::GetCachedCoinsUsage(mCache); }
 };
 } // namespace
 
@@ -604,15 +616,18 @@ static const auto FLAGS = {char(0), FRESH, DIRTY, char(DIRTY | FRESH)};
 static const auto CLEAN_FLAGS = {char(0), FRESH};
 static const auto ABSENT_FLAGS = {NO_ENTRY};
 
-static void SetCoinValue(const Amount value, Coin &coin) {
+static void SetCoinValue(const Amount value, CCoinsCacheEntry &coin, char flags) {
     assert(value != ABSENT);
-    coin.Clear();
-    assert(coin.IsSpent());
+    coin = {Coin{}, static_cast<uint8_t>(flags)};
+    assert(coin.GetCoin().IsSpent());
     if (value != PRUNED) {
         CTxOut out;
         out.nValue = value;
-        coin = Coin(std::move(out), 1, false);
-        assert(!coin.IsSpent());
+        coin =
+            CCoinsCacheEntry(
+                Coin{std::move(out), 1, false},
+                static_cast<uint8_t>(flags));
+        assert(!coin.GetCoin().IsSpent());
     }
 }
 
@@ -623,12 +638,12 @@ size_t InsertCoinMapEntry(CCoinsMap &map, const Amount value, char flags) {
     }
     assert(flags != NO_ENTRY);
     CCoinsCacheEntry entry;
-    entry.flags = flags;
-    SetCoinValue(value, entry.coin);
+    SetCoinValue(value, entry, flags);
     auto inserted = map.emplace(OUTPOINT, std::move(entry));
     assert(inserted.second);
-    return inserted.first->second.coin.DynamicMemoryUsage();
+    return inserted.first->second.DynamicMemoryUsage();
 }
+
 
 void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
     auto it = map.find(OUTPOINT);
@@ -636,10 +651,10 @@ void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
         value = ABSENT;
         flags = NO_ENTRY;
     } else {
-        if (it->second.coin.IsSpent()) {
+        if (it->second.GetCoin().IsSpent()) {
             value = PRUNED;
         } else {
-            value = it->second.coin.GetTxOut().nValue;
+            value = it->second.GetCoin().GetTxOut().nValue;
         }
         flags = it->second.flags;
         assert(flags != NO_ENTRY);
