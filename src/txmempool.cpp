@@ -739,7 +739,8 @@ void CTxMemPool::AddUncheckedNL(
     }
 
     // Insert the new entry
-    const auto newit = mapTx.insert(entry).first;
+    const auto [newit, inserted] = mapTx.insert(entry);
+    assert(inserted);
     const auto[linksit, success] = mapLinks.insert(make_pair(newit, TxLinks()));
 
     // Update cachedInnerUsage to include contained transaction's usage.
