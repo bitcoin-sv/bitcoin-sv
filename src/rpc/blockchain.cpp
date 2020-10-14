@@ -1518,7 +1518,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             "  \"value\" : x.xxx,           (numeric) The output value "
             "in " +
             CURRENCY_UNIT + "\n"
-            "  \"isStandard\" : true|false   (boolean) Standard output or not\n"
+            "  \"isStandard\" : true|false,   (boolean) Standard output or not\n"
             "  \"confirmations\" : n,       (numeric) Number of confirmations\n"
             "}\n"
             ", ...\n"
@@ -1532,10 +1532,12 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             "\nExamples:\n"
             "\nGet unspent transactions\n" +
             HelpExampleCli("listunspent", "") + "\nView the details\n" +
-            HelpExampleCli("gettxouts", "\"[{\"txid\": txid, \"n\" : 0}, {\"txid\": txid2, \"n\" : 0}], [\"*\"]\" 1") +
+            HelpExampleCli("gettxouts", "\"[{\\\"txid\\\": \\\"txid1\\\", \\\"n\\\": 0}]\" \"[\\\"*\\\"]\" true") +
             "\nAs a json rpc call\n" +
-            HelpExampleRpc("gettxouts", "\"[{\"txid\": txid, \"n\" : 0}, {\"txid\": txid2, \"n\" : 0}], [\"*\"]\" 1"));
+            HelpExampleRpc("gettxouts", "[{\\\"txid\\\": \\\"txid1\\\", \\\"n\\\" : 0}, {\\\"txid\\\": \\\"txid2\\\", \\\"n\\\" : 0}], [\\\"*\\\"], true"));
     }
+
+    RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VARR});
     
     UniValue txid_n_pairs = request.params[0].get_array();
     UniValue returnFields = request.params[1].get_array();
