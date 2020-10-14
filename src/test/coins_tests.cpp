@@ -48,6 +48,49 @@ struct CoinsDBSpan::UnitTestAccess<coins_tests_uid> : public CoinsDBSpan
 };
 using TestCoinsSpanCache = CoinsDBSpan::UnitTestAccess<coins_tests_uid>;
 
+/**
+ * Class for testing provider internals that are otherwise not exposed through
+ * public API of views/spans
+ */
+template <>
+struct CoinsDB::UnitTestAccess<coins_tests_uid> : public CoinsDB
+{
+public:
+    UnitTestAccess( std::size_t cacheSize )
+        : CoinsDB{ cacheSize, 0, false, false }
+    {}
+
+    const std::optional<CoinImpl>& GetLatestCoin() const { return mLatestGetCoin; }
+    uint64_t GetLatestRequestedScriptSize() const { return mLatestRequestedScriptSize; }
+
+    void SizeOverride(std::optional<uint64_t> override) { mOverrideSize = override; }
+
+    CCoinsMap& GetRawCacheCoins()
+    {
+        return TestAccessCoinsCache::GetRawCacheCoins(mCache);
+    }
+
+protected:
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const
+    {
+        mLatestRequestedScriptSize = (mOverrideSize.has_value() ? mOverrideSize.value() : maxScriptSize);
+        mLatestGetCoin = CoinsDB::GetCoin(outpoint, mLatestRequestedScriptSize);
+
+        return mLatestGetCoin->MakeNonOwning();
+    }
+
+    void ReadLock(WPUSMutex::Lock& lockHandle)
+    {
+        return CoinsDB::ReadLock(lockHandle);
+    }
+
+private:
+    mutable uint64_t mLatestRequestedScriptSize;
+    mutable std::optional<CoinImpl> mLatestGetCoin;
+    std::optional<uint64_t> mOverrideSize;
+};
+using CCoinsProviderTest = CoinsDB::UnitTestAccess<coins_tests_uid>;
+
 namespace {
 
 class CCoinsViewCacheTest : public TestCoinsSpanCache {
@@ -219,7 +262,7 @@ public:
     }
 
 private:
-    CoinsDB base{ 0, false, false };
+    CoinsDB base{ std::numeric_limits<size_t>::max(), 0, false, false };
 
 public:
     std::unique_ptr<CCoinsViewCacheTest> cache;
@@ -613,6 +656,417 @@ BOOST_FIXTURE_TEST_CASE(coins_provider_locks, TestingSetup)
 
         BOOST_TEST(one.get() == false);
         BOOST_TEST(two.get());
+    }
+}
+
+// Test that coins caching works as expected when script cache is disabled
+BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
+{
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    delete pcoinsTip;
+    pcoinsTip = nullptr;
+
+    // Id of an unspent transaction
+    auto txId = uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+
+    // Hash and height of a block that contains unspent transaction (txId)
+    auto block_1_hash = uint256S("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    auto block_2_hash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    std::uint32_t blockHeight = 1;
+
+    CScript script_template =
+        []
+        {
+            // make sure that copies of this script don't end up smaller than
+            // expected as constructor from vector allocates more space than
+            // minimally needed
+            CScript tmp{std::vector<uint8_t>(1024*1024, 0xde)};
+            return CScript{tmp};
+        }();
+
+    // Dynamic memory usage of the scripts
+    std::uint32_t script_memory_usage = memusage::DynamicUsage(script_template);
+    BOOST_TEST(script_memory_usage != 0);
+
+    std::uint32_t coins_count = 5;
+
+    //
+    // Add sample UTXOs to database
+    //
+    CCoinsProviderTest primary{ 0 }; // no cache
+
+    // Each platform has its own default allocation policy for standard containers
+    // so even though the expected memory usage should be 0 that is not necessarily
+    // the case
+    auto defaultDynamicMemoryUsage = primary.DynamicMemoryUsage();
+
+    {
+        TestCoinsSpanCache secondary{primary};
+
+        // both caches are empty since we haven't added any coins
+        BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+        BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+
+        for(std::uint32_t i = 0; i < coins_count; ++i)
+        {
+            CTxOut txo;
+            txo.nValue = Amount(123);
+            txo.scriptPubKey = script_template;
+            secondary.AddCoin(
+                COutPoint{txId, i},
+                CoinWithScript::MakeOwning(std::move(txo), blockHeight, false),
+                false,
+                0); // UTXO is not coinbase
+
+            BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+            BOOST_TEST(
+                secondary.DynamicMemoryUsage() ==
+                (memusage::DynamicUsage(secondary.GetRawCacheCoins()) + (script_memory_usage * (i + 1))));
+        }
+
+        // And flush them to primary cache
+        secondary.SetBestBlock(block_1_hash);
+        BOOST_TEST((secondary.TryFlush() == CoinsDBSpan::WriteState::ok));
+
+        // After flush dynamic memory usage can only be seen in primary cache
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + (script_memory_usage * coins_count)));
+        BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+    }
+
+    // Flush sample UTXOs to DB
+    primary.Flush();
+
+    // After flush of primary cache to database the primary cache is empty
+    BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+
+    auto first_coin_outpoint = COutPoint{txId, 0};
+
+    //
+    // Read UTXOs from database without secondary cache
+    //
+    {
+        auto memory_usage_before_coin_load = primary.DynamicMemoryUsage();
+
+        CoinsDBView view{primary};
+        auto coin = view.GetCoin(first_coin_outpoint);
+
+        // Cache contains only coin without script
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(primary.DynamicMemoryUsage() == memusage::DynamicUsage(primary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_load < primary.DynamicMemoryUsage());
+
+        auto memory_usage_before_coin_with_script_load = primary.DynamicMemoryUsage();
+        auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
+
+        // Cache contains only coin without script
+        BOOST_TEST(coin_with_script.has_value());
+        BOOST_TEST(coin_with_script->IsStorageOwner());
+        BOOST_TEST(coin_with_script->IsSpent() == false);
+        BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(primary.DynamicMemoryUsage() == memusage::DynamicUsage(primary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_with_script_load == primary.DynamicMemoryUsage());
+    }
+
+    //
+    // Read UTXOs from database with secondary cache
+    //
+    {
+        auto provider_memory_usage_before_coin_load = primary.DynamicMemoryUsage();
+        TestCoinsSpanCache secondary{primary};
+        auto memory_usage_before_coin_load = secondary.DynamicMemoryUsage();
+        auto coin = secondary.GetCoin(first_coin_outpoint);
+
+        // Cache contains only coin without script
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(secondary.DynamicMemoryUsage() == memusage::DynamicUsage(secondary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_load < secondary.DynamicMemoryUsage());
+
+        auto memory_usage_before_coin_with_script_load = secondary.DynamicMemoryUsage();
+        auto coin_with_script = secondary.GetCoinWithScript(first_coin_outpoint);
+
+        // Cache contains only coin without script
+        BOOST_TEST(coin_with_script.has_value());
+        BOOST_TEST(coin_with_script->IsStorageOwner());
+        BOOST_TEST(coin_with_script->IsSpent() == false);
+        BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(secondary.DynamicMemoryUsage() == memusage::DynamicUsage(secondary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+
+        secondary.SpendCoin(first_coin_outpoint);
+
+        // Spending coin doesn't affect cache as the script was not in it
+        BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+
+        // Reading spent coin from secondary cache returns a spent coin
+        coin = secondary.GetCoin(first_coin_outpoint);
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(coin->IsSpent() == true);
+        auto coin_with_script_2 = secondary.GetCoinWithScript(first_coin_outpoint);
+        BOOST_TEST(coin_with_script_2.has_value());
+        BOOST_TEST(!coin_with_script_2->IsStorageOwner());
+        BOOST_TEST(coin_with_script_2->IsSpent() == true);
+
+        secondary.SetBestBlock(block_2_hash);
+        BOOST_TEST((secondary.TryFlush() == CoinsDBSpan::WriteState::ok));
+
+        // Flush spent coin to primary cache doesn't affect cache as the script was not in it
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+    }
+
+    //
+    // Reading spent coin from primary cache shouldn't return any coins
+    //
+    {
+        CoinsDBView view{primary};
+        auto coin = view.GetCoin(first_coin_outpoint);
+        BOOST_TEST(coin.has_value() == false);
+        auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
+        BOOST_TEST(coin_with_script.has_value() == false);
+    }
+}
+
+
+
+// Test that coins caching works as expected when script cache is disabled
+BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
+{
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    delete pcoinsTip;
+    pcoinsTip = nullptr;
+
+    // Id of an unspent transaction
+    auto txId = uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+
+    // Hash and height of a block that contains unspent transaction (txId)
+    auto block_1_hash = uint256S("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    auto block_2_hash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    std::uint32_t blockHeight = 1;
+
+    CScript script_template =
+        []
+        {
+            // make sure that copies of this script don't end up smaller than
+            // expected as constructor from vector allocates more space than
+            // minimally needed
+            CScript tmp{std::vector<uint8_t>(1024*1024, 0xde)};
+            return CScript{tmp};
+        }();
+
+    // Dynamic memory usage of the scripts
+    std::uint32_t script_memory_usage = memusage::DynamicUsage(script_template);
+    BOOST_TEST(script_memory_usage != 0);
+
+    std::uint32_t coins_count = 5;
+
+    //
+    // Add sample UTXOs to database
+    //
+
+    // cache a bit larger than two scripts since some of the cache is also used
+    // up by coins themselves without scripts and we want the third script to
+    // no longer fit into cache in this test
+    CCoinsProviderTest primary{ static_cast<std::uint32_t>(script_memory_usage * 2.5) };
+
+    // Each platform has its own default allocation policy for standard containers
+    // so even though the expected memory usage should be 0 that is not necessarily
+    // the case
+    auto defaultDynamicMemoryUsage = primary.DynamicMemoryUsage();
+
+    {
+        TestCoinsSpanCache secondary{primary};
+
+        // both caches are empty since we haven't added any coins
+        BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+        BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+
+        for(std::uint32_t i = 0; i < coins_count; ++i)
+        {
+            CTxOut txo;
+            txo.nValue = Amount(123);
+            txo.scriptPubKey = script_template;
+            auto size = memusage::DynamicUsage(txo.scriptPubKey);
+            secondary.AddCoin(
+                COutPoint{txId, i},
+                CoinWithScript::MakeOwning(std::move(txo), blockHeight, false),
+                false,
+                0); // UTXO is not coinbase
+
+            BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+            assert(script_memory_usage == size);
+            BOOST_TEST(
+                secondary.DynamicMemoryUsage() ==
+                (memusage::DynamicUsage(secondary.GetRawCacheCoins()) + (script_memory_usage * (i + 1))));
+        }
+
+        // And flush them to primary cache
+        secondary.SetBestBlock(block_1_hash);
+        BOOST_TEST((secondary.TryFlush() == CoinsDBSpan::WriteState::ok));
+
+        // After flush dynamic memory usage can only be seen in primary cache
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + (script_memory_usage * coins_count)));
+        BOOST_TEST(secondary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+    }
+
+    // Flush sample UTXOs to DB
+    primary.Flush();
+
+    // After flush of primary cache to database the primary cache is empty
+    BOOST_TEST(primary.DynamicMemoryUsage() == defaultDynamicMemoryUsage);
+
+    auto first_coin_outpoint = COutPoint{txId, 0};
+
+    //
+    // Read UTXOs from database without secondary cache
+    //
+    {
+        auto memory_usage_before_coin_load = primary.DynamicMemoryUsage();
+
+        CoinsDBView view{primary};
+        auto coin = view.GetCoin(first_coin_outpoint);
+
+        // Cache contains coin with script even though no script was requested
+        // as it had enough space to store it
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage));
+        BOOST_TEST(memory_usage_before_coin_load < primary.DynamicMemoryUsage());
+
+        auto memory_usage_before_coin_with_script_load = primary.DynamicMemoryUsage();
+        auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
+
+        // Cache contains coin with script
+        BOOST_TEST(coin_with_script.has_value());
+        BOOST_TEST(!coin_with_script->IsStorageOwner());
+        BOOST_TEST(coin_with_script->IsSpent() == false);
+        BOOST_TEST(coin_with_script->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage));
+        BOOST_TEST(memory_usage_before_coin_with_script_load == primary.DynamicMemoryUsage());
+
+        // Cache contains two coins with script
+        auto coin_with_script_2 = view.GetCoinWithScript(COutPoint{txId, 1});
+        BOOST_TEST(coin_with_script_2.has_value());
+        BOOST_TEST(!coin_with_script_2->IsStorageOwner());
+        BOOST_TEST(coin_with_script_2->IsSpent() == false);
+        BOOST_TEST(coin_with_script_2->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage * 2));
+
+        // Three was no more space for the third script
+        auto coin_with_script_3 = view.GetCoinWithScript(COutPoint{txId, 2});
+        BOOST_TEST(coin_with_script_3.has_value());
+        BOOST_TEST(coin_with_script_3->IsStorageOwner());
+        BOOST_TEST(coin_with_script_3->IsSpent() == false);
+        BOOST_TEST(coin_with_script_3->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage * 2));
+    }
+
+    //
+    // Uncache and read another coin into cache
+    //
+    {
+        auto memory_usage_before_uncache = primary.DynamicMemoryUsage();
+        primary.Uncache({COutPoint{txId, 1}});
+        BOOST_TEST(memory_usage_before_uncache > primary.DynamicMemoryUsage());
+
+        CoinsDBView view{primary};
+
+        // Cache contains two coins with script
+        auto coin_with_script_2 = view.GetCoinWithScript(COutPoint{txId, 3});
+        BOOST_TEST(coin_with_script_2.has_value());
+        BOOST_TEST(!coin_with_script_2->IsStorageOwner());
+        BOOST_TEST(coin_with_script_2->IsSpent() == false);
+        BOOST_TEST(coin_with_script_2->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage * 2));
+
+        // Three was no more space for the third script
+        auto coin_with_script_3 = view.GetCoinWithScript(COutPoint{txId, 4});
+        BOOST_TEST(coin_with_script_3.has_value());
+        BOOST_TEST(coin_with_script_3->IsStorageOwner());
+        BOOST_TEST(coin_with_script_3->IsSpent() == false);
+        BOOST_TEST(coin_with_script_3->GetTxOut().scriptPubKey == script_template);
+        BOOST_TEST(
+            primary.DynamicMemoryUsage() ==
+            (memusage::DynamicUsage(primary.GetRawCacheCoins()) + script_memory_usage * 2));
+    }
+
+    //
+    // Read UTXOs from database with secondary cache
+    //
+    {
+        auto provider_memory_usage_before_coin_load = primary.DynamicMemoryUsage();
+        TestCoinsSpanCache secondary{primary};
+        auto memory_usage_before_coin_load = secondary.DynamicMemoryUsage();
+        auto coin = secondary.GetCoin(first_coin_outpoint);
+
+        // Secondary cache contains only coin without script while primary cache
+        // now contains coin with script so we expect it to grow
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(
+            secondary.DynamicMemoryUsage() ==
+            memusage::DynamicUsage(secondary.GetRawCacheCoins()));
+        BOOST_TEST(memory_usage_before_coin_load < secondary.DynamicMemoryUsage());
+
+        auto memory_usage_before_coin_with_script_load = secondary.DynamicMemoryUsage();
+        auto coin_with_script = secondary.GetCoinWithScript(first_coin_outpoint);
+
+        // Cache doesn't change as there was enough space to load the script to
+        // cache while asking only for the coin
+        BOOST_TEST(coin_with_script.has_value());
+        BOOST_TEST(!coin_with_script->IsStorageOwner());
+        BOOST_TEST(coin_with_script->IsSpent() == false);
+        BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+
+        secondary.SpendCoin(first_coin_outpoint);
+
+        // Spending coin doesn't affect secondary cache as the script was not in
+        // it as it was in the primary cache. Primary cache doesn't change as
+        // the change wasn't flushed to it yet.
+        BOOST_TEST(memory_usage_before_coin_with_script_load == secondary.DynamicMemoryUsage());
+        BOOST_TEST(provider_memory_usage_before_coin_load == primary.DynamicMemoryUsage());
+
+        // Reading spent coin from secondary cache returns a spent coin
+        coin = secondary.GetCoin(first_coin_outpoint);
+        BOOST_TEST(coin.has_value());
+        BOOST_TEST(coin->IsSpent() == true);
+        auto coin_with_script_2 = secondary.GetCoinWithScript(first_coin_outpoint);
+        BOOST_TEST(coin_with_script_2.has_value());
+        BOOST_TEST(!coin_with_script_2->IsStorageOwner());
+        BOOST_TEST(coin_with_script_2->IsSpent() == true);
+
+        secondary.SetBestBlock(block_2_hash);
+        BOOST_TEST((secondary.TryFlush() == CoinsDBSpan::WriteState::ok));
+
+        // Flush spent coin to primary cache shrinks the primary cache as script
+        // is no longer present in the coin
+        BOOST_TEST(provider_memory_usage_before_coin_load > primary.DynamicMemoryUsage());
+    }
+
+    //
+    // Reading spent coin from primary cache shouldn't return any coins
+    //
+    {
+        CoinsDBView view{primary};
+        auto coin = view.GetCoin(first_coin_outpoint);
+        BOOST_TEST(coin.has_value() == false);
+        auto coin_with_script = view.GetCoinWithScript(first_coin_outpoint);
+        BOOST_TEST(coin_with_script.has_value() == false);
     }
 }
 

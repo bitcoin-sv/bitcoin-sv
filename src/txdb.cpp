@@ -386,10 +386,12 @@ bool CoinsDB::IsOldDBFormat()
 }
 
 CoinsDB::CoinsDB(
+        uint64_t cacheSizeThreshold,
         size_t nCacheSize,
         bool fMemory,
         bool fWipe)
     : db{ GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true }
+    , mCacheSizeThreshold{cacheSizeThreshold}
 {}
 
 size_t CoinsDB::DynamicMemoryUsage() const {
@@ -407,6 +409,7 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
     std::unique_ptr<const COutPoint, decltype(erase)> guard{&outpoint, erase};
 
     std::optional<CoinImpl> coinFromCache;
+    size_t maxScriptLoadingSize = 0;
 
     while(true)
     {
@@ -447,6 +450,11 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
             if(!mFetchingCoins.count(outpoint))
             {
                 mFetchingCoins.insert(outpoint);
+
+                // it can happen that we'll get multiple requests and unnecessarily
+                // load more scripts than needed but that should be rare enough
+                maxScriptLoadingSize = getMaxScriptLoadingSize(maxScriptSize);
+
                 break;
             }
         }
@@ -467,7 +475,7 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
     // the rare potential other threads that are waiting for the same outpoint
     // may continue.
 
-    auto coinFromView = DBGetCoin(outpoint, std::numeric_limits<uint64_t>::max() /*maxScriptSize*/); // TODO select either maxScriptSize or local cache size
+    auto coinFromView = DBGetCoin(outpoint, maxScriptLoadingSize);
     if (!coinFromView.has_value())
     {
         return {};
@@ -482,10 +490,26 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
     {
         assert(coinFromView->HasScript());
 
-        return mCache.ReplaceWithCoinWithScript(outpoint, std::move(coinFromView.value())).MakeNonOwning();
+        if (hasSpaceForScript(coinFromView.value().GetScriptSize()))
+        {
+            return mCache.ReplaceWithCoinWithScript(outpoint, std::move(coinFromView.value())).MakeNonOwning();
+        }
+
+        return coinFromView;
     }
 
-    assert(!mCache.FetchCoin(outpoint).has_value());
+    if (!hasSpaceForScript(coinFromView->GetScriptSize()))
+    {
+        mCache.AddCoin(
+            outpoint,
+            CoinImpl{
+                coinFromView->GetTxOut().nValue,
+                coinFromView->GetScriptSize(),
+                coinFromView->GetHeight(),
+                coinFromView->IsCoinBase()});
+
+        return coinFromView;
+    }
 
     auto& cws = mCache.AddCoin(outpoint, std::move(coinFromView.value()));
     assert(cws.IsStorageOwner());

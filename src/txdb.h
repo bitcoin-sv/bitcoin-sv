@@ -134,13 +134,16 @@ public:
 
     /**
      * @param[in] cacheSizeThreshold
-                              Maximum amount of coins that can be stored in
-     *                        cache after being loaded from the database
+     *                        Maximum amount of coins that can be stored in
+     *                        cache after being loaded from the database.
+     *                        Added coins and coins without scripts do not count
+     *                        to this limit and may exceed it.
      * @param[in] nCacheSize  Underlying database cache size
      * @param[in] fMemory     If true, use leveldb's memory environment.
      * @param[in] fWipe       If true, remove all existing data.
      */
     CoinsDB(
+        uint64_t cacheSizeThreshold,
         size_t nCacheSize,
         bool fMemory = false,
         bool fWipe = false);
@@ -224,6 +227,28 @@ private:
     mutable WPUSMutex mMutex;
 
     CDBWrapper db;
+
+    /**
+     * Return the larger script loading size - either the requested size or the
+     * remaining size of the remaining available cache of current class instance.
+     */
+    uint64_t getMaxScriptLoadingSize(uint64_t requestedMaxScriptSize) const
+    {
+        if(mCacheSizeThreshold > mCache.DynamicMemoryUsage())
+        {
+            return std::max(requestedMaxScriptSize, mCacheSizeThreshold - mCache.DynamicMemoryUsage());
+        }
+
+        return requestedMaxScriptSize;
+    }
+
+    //! Returns whether we still have space to store a script of certain size
+    bool hasSpaceForScript(uint64_t scriptSize) const
+    {
+        return mCacheSizeThreshold >= (mCache.DynamicMemoryUsage() + scriptSize);
+    }
+
+    uint64_t mCacheSizeThreshold;
 
     /* A mutex to support a thread safe access to cache. */
     mutable std::mutex mCoinsViewCacheMtx {};

@@ -1201,6 +1201,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         _("Set the maximum cumulative size of accepted transaction inputs inside coins cache (default: unlimited -> 0). "
             "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
+        "-maxcoinsprovidercachesize=<n>",
+        _("Set soft maximum limit of cached coin tip buffer size (default: unlimited -> 0). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."));
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -2135,6 +2139,12 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(err);
     }
 
+    if(std::string err; !config.SetMaxCoinsProviderCacheSize(
+        gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", 0), &err))
+    {
+        return InitError(err);
+    }
+
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     RegisterWalletRPCCommands(tableRPC);
@@ -2776,6 +2786,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
                 pcoinsTip =
                     new CoinsDB(
+                        config.GetMaxCoinsProviderCacheSize(),
                         nCoinDBCache,
                         false,
                         fReindex || fReindexChainState);

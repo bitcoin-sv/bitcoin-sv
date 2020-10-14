@@ -69,6 +69,7 @@ void GlobalConfig::Reset()
     mAcceptNonStandardOutput = true;
 
     mMaxCoinsViewCacheSize = 0;
+    mMaxCoinsProviderCacheSize = 0;
     
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
@@ -828,6 +829,18 @@ bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
     }
 
     mMaxCoinsViewCacheSize = static_cast<uint64_t>(max);
+
+    return true;
+}
+
+bool GlobalConfig::SetMaxCoinsProviderCacheSize(int64_t max, std::string* err)
+{
+    if (LessThanZero(max, err, "Policy value for maximum coins provider cache size must not be less than 0."))
+    {
+        return false;
+    }
+
+    mMaxCoinsProviderCacheSize = static_cast<uint64_t>(max);
 
     return true;
 }
