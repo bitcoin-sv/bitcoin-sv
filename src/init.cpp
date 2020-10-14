@@ -1335,6 +1335,10 @@ static void BlockNotifyGenesisWait(bool, const CBlockIndex *pBlockIndex) {
 }
 
 struct CImportingNow {
+    CImportingNow(const CImportingNow&) = delete;
+    CImportingNow& operator=(const CImportingNow&) = delete;
+    CImportingNow(CImportingNow&&) = delete;
+    CImportingNow& operator=(CImportingNow&&) = delete;
     CImportingNow() {
         assert(fImporting == false);
         fImporting = true;
