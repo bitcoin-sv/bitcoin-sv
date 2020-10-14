@@ -1269,13 +1269,16 @@ static UniValue sendrawtransaction(const Config &config,
     }
     // Check if txn is present in one of the mempools.
     if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
-        if (dontCheckFee) {
-            mempool.PrioritiseTransaction(txid, txid.ToString(), 0.0, MAX_MONEY);
-        }
         // Mempool Journal ChangeSet
         CJournalChangeSetPtr changeSet {
             mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::NEW_TXN)
         };
+        // Prioritise transaction (if it was requested to prioritise)
+        // - mempool prioritisation cleanup is done during destruction,
+        //   if the prioritised txn was not accepted by the mempool
+        // The mempool prioritisation is not executed on a null TxId
+        // - no-op in terms of prioritise/clear operations
+        CTxPrioritizer txPrioritizer(mempool, dontCheckFee ? txid : TxId());
         // Forward transaction to the validator and wait for results.
         const auto& txValidator = g_connman->getTxnValidator();
         const CValidationState& status {
@@ -1289,9 +1292,6 @@ static UniValue sendrawtransaction(const Config &config,
         // checking a result from the status variable.
         if (!mempool.Exists(txid) && !mempool.getNonFinalPool().exists(txid)) {
             if (!status.IsValid()) {
-                if (dontCheckFee) {
-                    mempool.ClearPrioritisation(txid);
-                }
                 if (status.IsMissingInputs()) {
                         throw JSONRPCError(RPC_TRANSACTION_ERROR, "Missing inputs");
                 } else if (status.IsInvalid()) {

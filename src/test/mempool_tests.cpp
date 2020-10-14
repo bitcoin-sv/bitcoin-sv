@@ -644,25 +644,78 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
 
     CTxMemPool testPool;
     const TxId& txid = txParent.GetId();
-    // Add txn to the testPool
-    {
+    // A lambda-helper to add a txn to the empty testPool and to do basic checks.
+    const auto& add_txn_to_testpool = [&testPool, &entry](
+        const CMutableTransaction& txParent,
+        const TxId& txid) {
         BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
         testPool.AddUnchecked(txid, entry.FromTx(txParent), nullChangeSet);
         BOOST_CHECK_EQUAL(testPool.Size(), 1UL);
         BOOST_CHECK(!testPool.mapDeltas.count(txid));
-    }
-    // Instantiate txPrioritizer to prioritise txParent.
-    {
-        CTxPrioritizer txPrioritizer(testPool, txid);
-        // This should add a new entry into mapDeltas.
+    };
+    // A lambda-helper to check if an entry was added to the mapDeltas.
+    const auto& check_entry_added_to_mapdeltas = [&testPool](
+        const TxId& txid) {
         BOOST_CHECK(testPool.mapDeltas.count(txid));
         BOOST_CHECK_EQUAL(testPool.mapDeltas[txid].first, 0UL);
         BOOST_CHECK_EQUAL(testPool.mapDeltas[txid].second, MAX_MONEY);
+    };
+    // Case 1.
+    // Instantiate txPrioritizer to prioritise a single txn.
+    {
+        // Add txn to the testPool
+        add_txn_to_testpool(txParent, txid);
+        // Instantiate txPrioritizer with a single tx.
+        CTxPrioritizer txPrioritizer(testPool, txid);
+        // This should add a new entry into mapDeltas.
+        check_entry_added_to_mapdeltas(txid);
         // Remove txid from the mapTx.
         testPool.mapTx.erase(txid);
     }
     // During txPrioritizer's destruction txid should be removed from mapDeltas.
     BOOST_CHECK(!testPool.mapDeltas.count(txid));
+    // Case 2.
+    // Instantiate txPrioritizer to prioritise a vector of txns.
+    {
+        // Add txn to the testPool
+        add_txn_to_testpool(txParent, txid);
+        // Instantiate txPrioritizer with a vector.
+        CTxPrioritizer txPrioritizer(testPool, std::vector<TxId>{txid});
+        // This should add a new entry into mapDeltas.
+        check_entry_added_to_mapdeltas(txid);
+        // Remove txid from the mapTx.
+        testPool.mapTx.erase(txid);
+    }
+    // During txPrioritizer's destruction txid should be removed from mapDeltas.
+    BOOST_CHECK(!testPool.mapDeltas.count(txid));
+    // Case 3.
+    // Instantiate a no-op txPrioritizer with a null TxId.
+    {
+        // Add txn to the testPool
+        add_txn_to_testpool(txParent, txid);
+        // Instantiate txPrioritizer with a null TxId.
+        CTxPrioritizer txPrioritizer(testPool, TxId());
+        // There should be no operations on the mapDeltas.
+        BOOST_CHECK(testPool.mapDeltas.empty());
+        // Remove txid from the mapTx.
+        testPool.mapTx.erase(txid);
+    }
+    // Check if mapDeltas remains empty.
+    BOOST_CHECK(testPool.mapDeltas.empty());
+    // Case 4.
+    // Instantiate a no-op txPrioritizer with an empty vector.
+    {
+        // Add txn to the testPool
+        add_txn_to_testpool(txParent, txid);
+        // Instantiate txPrioritizer with an empty vector.
+        CTxPrioritizer txPrioritizer(testPool, std::vector<TxId>{});
+        // There should be no operations on the mapDeltas.
+        BOOST_CHECK(testPool.mapDeltas.empty());
+        // Remove txid from the mapTx.
+        testPool.mapTx.erase(txid);
+    }
+    // Check if mapDeltas remains empty.
+    BOOST_CHECK(testPool.mapDeltas.empty());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

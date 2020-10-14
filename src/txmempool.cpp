@@ -27,22 +27,32 @@ using namespace mining;
 /**
  * class CTxPrioritizer
  */
-CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, TxId txnToPrioritise)
-    : mMempool(mempool), mTxnsToPrioritise{std::move(txnToPrioritise)}
+CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, const TxId& txnToPrioritise)
+    : mMempool(mempool)
 {
-    mMempool.PrioritiseTransaction(mTxnsToPrioritise, 0.0, MAX_MONEY);
+    // A nulness detection.
+    if (!txnToPrioritise.IsNull()) {
+        mTxnsToPrioritise.push_back(txnToPrioritise);
+        mMempool.PrioritiseTransaction(mTxnsToPrioritise, 0.0, MAX_MONEY);
+    }
 }
 
 CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrioritise)
     : mMempool(mempool), mTxnsToPrioritise(std::move(txnsToPrioritise))
 {
-    mMempool.PrioritiseTransaction(mTxnsToPrioritise, 0.0, MAX_MONEY);
+    // An early emptiness check.
+    if (!mTxnsToPrioritise.empty()) {
+        mMempool.PrioritiseTransaction(mTxnsToPrioritise, 0.0, MAX_MONEY);
+    }
 }
 
 CTxPrioritizer::~CTxPrioritizer()
 {
     try {
-        mMempool.ClearPrioritisation(mTxnsToPrioritise);
+        // An early emptiness check.
+        if (!mTxnsToPrioritise.empty()) {
+            mMempool.ClearPrioritisation(mTxnsToPrioritise);
+        }
     } catch (...) {
         LogPrint(BCLog::MEMPOOL, "~CTxPrioritizer: Unexpected exception during destruction.\n");
     }
