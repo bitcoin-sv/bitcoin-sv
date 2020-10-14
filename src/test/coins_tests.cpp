@@ -15,6 +15,7 @@
 
 #include <chrono>
 #include <map>
+#include <optional>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -88,8 +89,47 @@ private:
     mutable uint64_t mLatestRequestedScriptSize;
     mutable std::optional<CoinImpl> mLatestGetCoin;
     std::optional<uint64_t> mOverrideSize;
+
+    friend class CTestCoinsView;
 };
 using CCoinsProviderTest = CoinsDB::UnitTestAccess<coins_tests_uid>;
+
+class CTestCoinsView
+{
+public:
+    CTestCoinsView(CCoinsProviderTest& providerIn)
+        : provider{providerIn}
+    {
+        provider.ReadLock( mLock );
+    }
+
+    std::optional<Coin> GetCoin(const COutPoint& outpoint) const
+    {
+        auto coinData = provider.GetCoin(outpoint, 0);
+        if(coinData.has_value())
+        {
+            return Coin{coinData.value()};
+        }
+
+        return {};
+    }
+    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+    {
+        auto coinData = provider.GetCoin(outpoint, std::numeric_limits<size_t>::max());
+        if(coinData.has_value())
+        {
+            assert(coinData->HasScript());
+
+            return std::move(coinData.value());
+        }
+
+        return {};
+    }
+
+private:
+    CCoinsProviderTest& provider;
+    WPUSMutex::Lock mLock;
+};
 
 namespace {
 
@@ -531,6 +571,131 @@ BOOST_AUTO_TEST_CASE(coin_write) {
                 }
             }
         }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
+    // First delete pcoinsTip as we don't want to cause a dead lock in this
+    // test since we'll be instantiating a pcoinsTip alternative
+    delete pcoinsTip;
+    pcoinsTip = nullptr;
+
+    /* Check method CCoinsViewDB::GetCoin_NoLargeScript
+     * Method should unserialize contents of the script only if size of script is not larger than specified.
+     * Otherwise member coin.out.scriptPubKey should be default initialized.
+     * In addition, method must always provide actual size of script, whether it was unserialized or not.
+     */
+
+    // Id of an unspent transaction
+    auto txId = uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+
+    // Hash and height of a block that contains unspent transaction (txId)
+    auto blockHash = uint256S("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    std::uint32_t blockHeight = 1;
+
+    // Size (in bytes) of small locking script
+    std::size_t script_small_size = 0;
+
+    // Size (in bytes) of big locking script
+    std::size_t script_big_size = 0;
+
+    //
+    // Add sample UTXOs to database
+    //
+    CCoinsProviderTest provider{ script_small_size }; // small cache
+
+    {
+        CoinsDBSpan span{provider};
+        span.SetBestBlock(blockHash);
+
+        {
+            // Output 0 - small locking script
+            CScript scr(OP_RETURN);
+            CTxOut txo(Amount(123), scr);
+            script_small_size = txo.scriptPubKey.size(); // remember size of small script for later
+            span.AddCoin(COutPoint(txId, 0), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false), false, 0); // UTXO is not coinbase
+        }
+
+        {
+            // Output 1 - big locking script
+            CTxOut txo;
+            txo.nValue = Amount(456);
+            txo.scriptPubKey = CScript(std::vector<uint8_t>(1024*1024, 0xde));
+            script_big_size = txo.scriptPubKey.size(); // remember size of big script for later
+            span.AddCoin(COutPoint(txId, 1), CoinWithScript::MakeOwning(std::move(txo), blockHeight, false), false, 0); // UTXO is not coinbase
+        }
+
+        // And flush them to provider
+        BOOST_TEST((span.TryFlush() == CoinsDBSpan::WriteState::ok));
+    }
+
+    // Flush sample UTXOs to DB
+    BOOST_TEST(provider.Flush());
+
+    //
+    // Check that reading UTXOs from DB using GetCoinWithScript() method always also gets script
+    //
+    {
+        // Get output 0 from DB
+        auto c0 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 0));
+        BOOST_TEST(c0.has_value());
+        BOOST_TEST(c0->GetTxOut().nValue == Amount(123)); // check that we got the correct output
+        BOOST_TEST(c0->GetTxOut().scriptPubKey.size()==script_small_size);
+    }
+
+    {
+        // Get output 1 from DB
+        auto c1 = CTestCoinsView{ provider }.GetCoinWithScript(COutPoint(txId, 1));
+        BOOST_TEST(c1.has_value());
+        BOOST_TEST(c1->GetTxOut().nValue == Amount(456)); // check that we got the correct output
+        BOOST_TEST(c1->GetTxOut().scriptPubKey.size()==script_big_size);
+    }
+
+    //
+    // Check that reading UTXOs from DB using GetCoin() only gets script if it is not larger than specified
+    //
+    {
+        // Get output 0 from DB with script regardless of its size
+        provider.SizeOverride(script_small_size);
+        auto c0 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 0));
+        BOOST_TEST(c0.has_value());
+        BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_small_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_small_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+    }
+
+    {
+        // Get output 0 from DB without script (even if it is a very small one)
+        provider.SizeOverride( {} );
+        auto c0 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 0));
+        BOOST_TEST(c0.has_value());
+        BOOST_TEST(c0->GetAmount() == Amount(123)); // check that we got the correct output
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_small_size);
+    }
+
+    {
+        // Get output 1 from DB with script regardless of its size
+        provider.SizeOverride(script_big_size);
+        auto c1 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 1));
+        BOOST_TEST(c1.has_value());
+        BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==script_big_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==script_big_size);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
+    }
+
+    {
+        // Get output 1 from DB without script
+        provider.SizeOverride( {} );
+        auto c1 = CTestCoinsView{ provider }.GetCoin(COutPoint(txId, 1));
+        BOOST_TEST(c1.has_value());
+        BOOST_TEST(c1->GetAmount() == Amount(456)); // check that we got the correct output
+        BOOST_TEST(provider.GetLatestRequestedScriptSize()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetTxOut().scriptPubKey.size()==0);
+        BOOST_TEST(provider.GetLatestCoin()->GetScriptSize()==script_big_size);
     }
 }
 

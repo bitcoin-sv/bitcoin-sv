@@ -57,12 +57,107 @@ struct CoinEntry {
 };
 } // namespace
 
+namespace {
+
+/**
+ * Custom stream class that only unserializes the script if it is not larger than maxScriptSize.
+ *
+ * If the script is larger, it is not unserialized and the actualScriptSize is set to the actual size of script.
+ * Otherwise value of actualScriptSize is left as is (i.e. empty).
+ *
+ * After unserialization, caller can use member actualScriptSIze to check if script was actually unserialized
+ * and determine actual length of the script.
+ *
+ * This roundabout way of unserializing script and template trickery is needed to preserve compatibility with other
+ * Unserialize() functions that unconditionally unserialize everything.
+ *
+ * @note This only works correctly when unserializing classes with at most one script because actual size of only
+ *       one script can be provided. It is enforced (assert) within implementation of Unserialize() method.
+ *
+ * @see CScriptCompressor::NonSpecialScriptUnserializer<CDataStreamInput_NoScr> that provides actual Unserialize() method.
+ */
+template<class TBase>
+struct CDataStreamInput_NoScr : TBase
+{
+    using Base = TBase;
+
+    CDataStreamInput_NoScr(std::string_view buf, const std::vector<uint8_t>& key, std::size_t maxScriptSize, std::optional<std::size_t>& actualScriptSize)
+    : Base(buf, key)
+    , maxScriptSize(maxScriptSize)
+    , actualScriptSize(actualScriptSize)
+    , wasUnserializeScriptCalled(false)
+    {}
+
+    template<typename T>
+    CDataStreamInput_NoScr& operator>>(T& obj)
+    {
+        ::Unserialize(*this, obj);
+        return *this;
+    }
+
+    const std::size_t maxScriptSize;
+    std::optional<std::size_t>& actualScriptSize;
+    bool wasUnserializeScriptCalled;
+};
+
+} // anonymous namespace
+
+/**
+ * Implements unserialization of locking script only if it is not larger than maximum size specified
+ * in CDataStreamInput_NoScr object.
+ */
+template<class TBase>
+class CScriptCompressor::NonSpecialScriptUnserializer< CDataStreamInput_NoScr<TBase> >
+{
+public:
+    using Stream = CDataStreamInput_NoScr<TBase>;
+
+    static void Unserialize(CScriptCompressor* self, Stream& s, unsigned int nSize)
+    {
+        assert([](auto& s){
+            bool result = !s.wasUnserializeScriptCalled;
+            s.wasUnserializeScriptCalled = true;
+            return result;
+        }(s)); // Cannot unserialize more than one script using only one CDataStreamInput_NoScr object!
+               // NOTE: Lambda is used because we want to remember within assert expression that Unserialize was called since
+               //       this flag is only needed by assert expression. I.e.: No assert, no need to change the flag.
+        if(nSize > s.maxScriptSize)
+        {
+            // Default initialize script if it is too large
+            self->script = CScript();
+
+            // Provide actual script size to the caller
+            s.actualScriptSize = nSize;
+
+            return;
+        }
+
+        // Unserialize script using Base of our custom stream class
+        NonSpecialScriptUnserializer<typename Stream::Base>::Unserialize(self, s, nSize);
+    }
+};
+
 std::optional<CoinImpl> CoinsDB::DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
     try
     {
         std::optional<CoinImpl> coin{CoinImpl{}};
-        if( db.Read(CoinEntry(&outpoint), coin.value()) )
+        // If script is not unserialized, this will be set to the actual size of the script.
+        // Otherwise (i.e. if script is unserialized), value will remain unset.
+        std::optional<std::size_t> actualScriptSize;
+        bool res = db.Read<CDataStreamInput_NoScr>(CoinEntry(&outpoint), coin.value(), maxScriptSize, actualScriptSize);
+        if( res )
         {
+            if(actualScriptSize.has_value())
+            {
+                // Script was not unserialized
+                return {
+                    CoinImpl{
+                        coin->GetTxOut().nValue,
+                        *actualScriptSize,
+                        coin->GetHeight(),
+                        coin->IsCoinBase()}};
+            }
+
             return coin;
         }
 
