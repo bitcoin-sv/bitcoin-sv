@@ -5,7 +5,6 @@
 #include "merkle.h"
 #include "hash.h"
 #include "utilstrencodings.h"
-#include "logging.h"
 #include <algorithm>
 #include "task_helpers.h"
 #include "blockstreams.h"
@@ -307,7 +306,7 @@ void CMerkleTree::CalculateMerkleTree(const std::vector<elementType>& vTransacti
     {
         if (!MergeSubTree(f.get()))
         {
-            throw std::runtime_error("Unexpected error during merkle tree calculation.");
+            throw std::runtime_error("Unexpected error during merkle tree calculation: cannot merge with higher subtree.");
         }
     }
 }
@@ -403,7 +402,6 @@ bool CMerkleTree::MergeSubTree(const CMerkleTree& subTree)
     else
     {
         // Unexpected, this should not happen
-        LogPrintf("CMerkleTree::MergeSubTree: Error calculating Merkle Tree. Cannot merge with higher subtree.\n");
         return false;
     }
     return true;
