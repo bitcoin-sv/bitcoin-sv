@@ -22,10 +22,31 @@
 
 class CoinWithScript;
 
+/**
+ * Immutable coin type for use inside CCoinsProvider structure.
+ *
+ * Storage content:
+ * It can either store coin data with or without scriptPubKey being present.
+ *
+ * Storage ownership:
+ * It can store either its own CTxOut data or point to CTxOut data that is
+ * owned by a different CoinImpl.
+ *
+ * NOTE: Only CoinImpl instances that contain the script and are not spent
+ *       can be serialized.
+ */
 class CoinImpl
 {
-    //! Unspent transaction output.
+    /**
+     * Unspent transaction output that is only set if coin instance is storage
+     * owner - otherwise it's not set.
+     */
     std::optional<CTxOut> storage;
+    /**
+     * Pointer to either local storage or to a different CoinImpl::storage.
+     * In case the instance is not the owner it is expected that lifetime of
+     * owning CoinImpl is longer than the non-owning instance.
+     */
     const CTxOut* out;
 
     //! Whether containing transaction was a coinbase and height at which the
@@ -34,6 +55,10 @@ class CoinImpl
     // The reason is that shifting on negative numbers causes undefined behavior.
     uint32_t nHeightAndIsCoinBase{0};
 
+    /**
+     * Size of the storage.scriptPubKey that is available even if the script
+     * itself is not loaded.
+     */
     uint64_t mScriptSize{0};
 
 public:
@@ -84,6 +109,7 @@ public:
         return {outIn, outIn.scriptPubKey.size(), nHeightIn, IsCoinbase};
     }
 
+    //! NOTE: serialization is only allowed if scriptPubKey is loaded!
     template <typename Stream> void Serialize(Stream &s) const {
         assert(!IsSpent());
         assert(HasScript());
@@ -151,11 +177,7 @@ private:
 };
 
 /**
- * A UTXO entry without script - has to be serialized through CoinWithScript.
- *
- * This class doesn't necessarily hold CTxOut script data. For that reason it
- * doesn't allow direct access to CTxOut or serialization - for that
- * CoinWithScript should be used.
+ * A UTXO entry without scriptPubKey.
  */
 class Coin
 {
@@ -192,6 +214,17 @@ public:
 
 /**
  * A UTXO entry.
+ *
+ * NOTE: CoinWithScript is not necessarily storage owner and in case we need to
+ *       extend the lifetime of this coin past the storage owner's destruction
+ *       (usually that is an object on which GetCoinWithScript() was called)
+ *       we need to make a deep copy.
+ *
+ * This is a public API wrapper around CoinImpl so it can either own or point
+ * to the CTxOut content.
+ * It is always guaranteed to contain scriptPubKey data.
+ * Class is used in code outside CCoinsProvider structure and can be retrieved
+ * through provider views/spans.
  *
  * This class is used for access to CTxOut and serialization of Coin class as
  * it is guaranteed to contain loaded CTxOut script data.
@@ -402,6 +435,11 @@ protected:
     void ReLock() override {}
 };
 
+/**
+ * Class for storing coins - either owning or non-owning.
+ *
+ * This is a helper class intended to be used by coin view/span/coins db classes.
+ */
 class CoinsStore
 {
 public:
