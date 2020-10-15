@@ -471,12 +471,12 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     auto source = task::CCancellationSource::Make();
     auto control = pool.GetChecker(0, source->GetToken());
 
-    std::vector<Coin> coins;
+    std::vector<CoinWithScript> coins;
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         CTxOut out;
         out.nValue = Amount(1000);
         out.scriptPubKey = scriptPubKey;
-        coins.emplace_back(std::move(out), 1, false);
+        coins.push_back(CoinWithScript::MakeOwning(std::move(out), 1, false));
     }
 
     for (size_t i = 0; i < mtx.vin.size(); i++) {

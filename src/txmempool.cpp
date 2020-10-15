@@ -40,24 +40,35 @@ using namespace mining;
             , mDBView{ DBView }
         {}
 
-        bool GetCoin(const COutPoint &outpoint, Coin &coin) const override
+        std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override
         {
             CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
             if (ptx) {
                 if (outpoint.GetN() < ptx->vout.size()) {
-                    coin = Coin{ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false};
-                    return true;
+                    return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
                 }
-                return false;
+                return {};
             }
 
-            return mDBView.GetCoin(outpoint, coin) && !coin.IsSpent();
+            return mDBView.GetCoin(outpoint, maxScriptSize);
         }
 
         bool HaveCoin(const COutPoint &outpoint) const override
         {
-            Coin coin;
-            return mempool.GetNL(outpoint.GetTxId()) || mDBView.GetCoin(outpoint, coin);
+            return mempool.GetNL(outpoint.GetTxId()) || mDBView.HaveCoin(outpoint);
+        }
+
+        std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+        {
+            auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
+            if(coinData.has_value())
+            {
+                assert(coinData->HasScript());
+
+                return std::move(coinData.value());
+            }
+
+            return {};
         }
 
     private:
@@ -867,16 +878,15 @@ void CTxMemPool::RemoveForReorg(
                     continue;
                 }
 
-                Coin coin;
-                bool hasValue = tipView.GetCoin(txin.prevout, coin);
-                assert(hasValue);
+                auto coin = tipView.GetCoin(txin.prevout);
+                assert( coin.has_value() );
                 if (nCheckFrequency != 0) {
-                    assert(!coin.IsSpent());
+                    assert(!coin->IsSpent());
                 }
 
-                if (coin.IsSpent() ||
-                    (coin.IsCoinBase() &&
-                     nMemPoolHeight - coin.GetHeight() <
+                if (coin->IsSpent() ||
+                    (coin->IsCoinBase() &&
+                     nMemPoolHeight - coin->GetHeight() <
                          COINBASE_MATURITY)) {
                     txToRemove.insert(it);
                     break;
@@ -1496,10 +1506,10 @@ bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const {
     return true;
 }
 
-void CTxMemPool::OnUnspentCoins(
+void CTxMemPool::OnUnspentCoinsWithScript(
     const CoinsDBView& tip,
     const std::vector<COutPoint>& outpoints,
-    const std::function<void(Coin&&, size_t)>& callback) const
+    const std::function<void(const CoinWithScript&, size_t)>& callback) const
 {
     std::shared_lock lock{ smtx };
 
@@ -1511,9 +1521,10 @@ void CTxMemPool::OnUnspentCoins(
     {
         if (!IsSpentNL( out ))
         {
-            if (Coin coin; viewMemPool.GetCoin( out, coin ) && !coin.IsSpent())
+            if (auto coin = viewMemPool.GetCoinWithScript( out );
+                coin.has_value() && !coin->IsSpent())
             {
-                callback( std::move( coin ), idx );
+                callback( coin.value(), idx );
             }
         }
 
@@ -1529,10 +1540,9 @@ CCoinsViewMemPool::CCoinsViewMemPool(const CoinsDBView& DBView,
 
 std::optional<Coin> CCoinsViewMemPool::GetCoinFromDB(const COutPoint& outpoint) const
 {
-    Coin coin;
-    if(mDBView.GetCoin(outpoint, coin) && !coin.IsSpent())
+    if(auto coin = mDBView.GetCoin(outpoint, 0); coin.has_value())
     {
-        return coin;
+        return Coin{coin.value()};
     }
 
     return {};
@@ -1565,7 +1575,7 @@ CTransactionRef CCoinsViewMemPool::GetCachedTransactionRef(const COutPoint& outp
     return tx;
 }
 
-bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const
+std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const
 {
     // If an entry in the mempool exists, always return that one, as it's
     // guaranteed to never conflict with the underlying view, and it cannot
@@ -1574,13 +1584,12 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const
     CTransactionRef ptx = GetCachedTransactionRef(outpoint);
     if (ptx) {
         if (outpoint.GetN() < ptx->vout.size()) {
-            coin = Coin(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
-            return true;
+            return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
         }
-        return false;
+        return {};
     }
 
-    return mDBView.GetCoin(outpoint, coin) && !coin.IsSpent();
+    return mDBView.GetCoin(outpoint, maxScriptSize);
 }
 
 bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const {

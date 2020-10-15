@@ -623,7 +623,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         CScript scriptPubKey(pkData.begin(), pkData.end());
 
         {
-            const Coin &coin = view.AccessCoin(out);
+            CoinWithScript coin = view.AccessCoinWithScript(out);
             if (!coin.IsSpent() &&
                 coin.GetTxOut().scriptPubKey != scriptPubKey) {
                 std::string err("Previous output scriptPubKey mismatch:\n");
@@ -643,7 +643,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
             // and Genesis activation height is 1, effectively using Genesis rules. 
             // This basically means, that output script starting with OP_RETURN will
             // be treated as possibly spendable.
-            view.AddCoin(out, Coin(txout, 1, false), true, 1);
+            view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), 1, false), true, 1);
         }
 
         // If redeemScript given and private keys given, add redeemScript to the
@@ -662,7 +662,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
-        const Coin &coin = view.AccessCoin(txin.prevout);
+        CoinWithScript coin = view.AccessCoinWithScript(txin.prevout);
         if (coin.IsSpent()) {
             fComplete = false;
             continue;

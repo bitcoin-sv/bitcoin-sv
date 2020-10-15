@@ -26,23 +26,60 @@ size_t CCoinsViewCache::DynamicMemoryUsage() const {
     return mCache.DynamicMemoryUsage();
 }
 
-std::optional<std::reference_wrapper<const Coin>>
-CCoinsViewCache::FetchCoin(const COutPoint &outpoint) const
-{
-    if (auto it = mCache.FetchCoin(outpoint); it.has_value())
+std::optional<CoinImpl> CCoinsViewCache::GetCoin(const COutPoint &outpoint, bool requiresScript) const {
+    assert(mThreadId == std::this_thread::get_id());
+    auto coinFromCache = mCache.FetchCoin(outpoint);
+
+    if (coinFromCache.has_value())
     {
-        return it;
+        if(coinFromCache->IsSpent() || coinFromCache->HasScript())
+        {
+            return coinFromCache;
+        }
+        else if (!requiresScript)
+        {
+            // Do not bother loading the missing script
+            return
+                CoinImpl{
+                    coinFromCache->GetTxOut().nValue,
+                    coinFromCache->GetScriptSize(),
+                    coinFromCache->GetHeight(),
+                    coinFromCache->IsCoinBase()};
+        }
     }
 
-    Coin tmp;
-    if (!mView->GetCoin(outpoint, tmp)) {
-        return {};
+    auto coinFromView =
+        mView->GetCoin(
+            outpoint,
+            requiresScript ? std::numeric_limits<uint64_t>::max() : 0);
+
+    if (coinFromView.has_value() && !coinFromCache.has_value())
+    {
+        if (coinFromView->IsStorageOwner())
+        {
+            // since we want to only store coin without script on this cache
+            // level we must create a new coin without script as the coin is
+            // not present in underlying cache
+            mCache.AddCoin(
+                outpoint,
+                CoinImpl{
+                    coinFromView->GetTxOut().nValue,
+                    coinFromView->GetScriptSize(),
+                    coinFromView->GetHeight(),
+                    coinFromView->IsCoinBase()});
+        }
+        else
+        {
+            // coin is already stored in underlying cache so so we should
+            // store a handle to point to that coin on this cache level
+            mCache.AddCoin(outpoint, coinFromView.value().MakeNonOwning());
+        }
     }
 
-    return mCache.AddCoin(outpoint, std::move(tmp));
+    return coinFromView;
 }
 
-void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin&& coin,
+void CCoinsViewCache::AddCoin(const COutPoint &outpoint, CoinWithScript&& coin,
                               bool possible_overwrite,
                               int32_t genesisActivationHeight) {
     assert(mThreadId == std::this_thread::get_id());
@@ -50,6 +87,8 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin&& coin,
     if (coin.GetTxOut().scriptPubKey.IsUnspendable( coin.GetHeight() >= genesisActivationHeight)) {
         return;
     }
+
+    //GetCoin(outpoint, 0); FIXME - why is something like this not part of add coin?
 
     mCache.AddCoin(outpoint, std::move(coin), possible_overwrite, genesisActivationHeight);
 }
@@ -64,38 +103,53 @@ void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, i
         // Always set the possible_overwrite flag to AddCoin for coinbase txn,
         // in order to correctly deal with the pre-BIP30 occurrences of
         // duplicate coinbase transactions.
-        cache.AddCoin(outpoint, Coin(tx.vout[i], nHeight, fCoinbase),
+        cache.AddCoin(outpoint, CoinWithScript::MakeOwning(CTxOut{tx.vout[i]}, nHeight, fCoinbase),
                       overwrite, genesisActivationHeight);
     }
 }
 
-bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout) {
+bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, CoinWithScript *moveout) {
     assert(mThreadId == std::this_thread::get_id());
-    auto it = FetchCoin(outpoint);
-    if (!it.has_value()) {
+    auto coin = GetCoin(outpoint, (moveout != nullptr));
+    if (!coin.has_value()) {
         return false;
     }
 
-    mCache.SpendCoin(outpoint, moveout);
+    if(moveout)
+    {
+        *moveout = coin->MakeOwning();
+    }
 
-    return true;
+    return mCache.SpendCoin(outpoint);
 }
 
 static const Coin coinEmpty;
+static const CoinWithScript coinWithScriptEmpty;
 
-const Coin& CCoinsViewCache::AccessCoin(const COutPoint &outpoint) const {
+Coin CCoinsViewCache::AccessCoin(const COutPoint& outpoint) const
+{
     assert(mThreadId == std::this_thread::get_id());
-    auto coin = FetchCoin(outpoint);
+    auto coin = GetCoin(outpoint, 0);
     if (!coin.has_value()) {
         return coinEmpty;
     }
-    return coin.value();
+    return Coin{ coin.value() };
+}
+
+CoinWithScript CCoinsViewCache::AccessCoinWithScript(const COutPoint& outpoint) const
+{
+    assert(mThreadId == std::this_thread::get_id());
+    auto coin = GetCoin(outpoint, std::numeric_limits<uint64_t>::max());
+    if (!coin.has_value()) {
+        return coinWithScriptEmpty.MakeOwning();
+    }
+    return std::move(coin.value());
 }
 
 bool CCoinsViewCache::HaveCoin(const COutPoint &outpoint) const {
     assert(mThreadId == std::this_thread::get_id());
-    auto coin = FetchCoin(outpoint);
-    return coin.has_value() && !coin->get().IsSpent();
+    auto coin = GetCoin(outpoint, 0);
+    return coin.has_value() && !coin->IsSpent();
 }
 
 uint256 CCoinsViewCache::GetBestBlock() const {
@@ -120,11 +174,10 @@ Amount CCoinsViewCache::GetValueIn(const CTransaction &tx) const {
     Amount nResult(0);
 
     for (const auto& input: tx.vin) {
-        auto coin = mCache.FetchCoin(input.prevout);
-        assert(coin.has_value());
-        assert(!coin->get().IsSpent());
-
-        nResult += coin->get().GetTxOut().nValue;
+        auto coin = GetCoin(input.prevout, 0);
+        assert(coin.has_value() && !coin->IsSpent());
+        // amount is guaranteed to be set even if the script is missing from TxOut
+        nResult += coin->GetTxOut().nValue;
     }
 
     return nResult;
@@ -154,12 +207,18 @@ std::optional<bool> CCoinsViewCache::HaveInputsLimited(
         return true;
     }
 
+    size_t cacheUsedAfterScriptLoad = 0;
+
     for (const auto& input: tx.vin) {
-        if (!HaveCoin(input.prevout)) {
+        if (auto coin = GetCoin(input.prevout, 0); !coin.has_value()) {
             return false;
         }
+        else
+        {
+            cacheUsedAfterScriptLoad += coin->GetScriptSize() * sizeof(CScriptBase::value_type);
+        }
 
-        if(maxCachedCoinsUsage > 0 && mCache.DynamicMemoryUsage() >= maxCachedCoinsUsage)
+        if(maxCachedCoinsUsage > 0 && cacheUsedAfterScriptLoad >= maxCachedCoinsUsage)
         {
             return {};
         }
@@ -178,14 +237,14 @@ double CCoinsViewCache::GetPriority(const CTransaction &tx, int32_t nHeight,
     double dResult = 0.0;
 
     for (const CTxIn &txin : tx.vin) {
-        const Coin &coin = AccessCoin(txin.prevout);
-        if (coin.IsSpent()) {
+        auto coin = GetCoin(txin.prevout, 0);
+        if (!coin.has_value() || coin->IsSpent()) {
             continue;
         }
-        if (int64_t(coin.GetHeight()) <= nHeight) {
-            dResult += double(coin.GetTxOut().nValue.GetSatoshis()) *
-                       (nHeight - coin.GetHeight());
-            inChainInputValue += coin.GetTxOut().nValue;
+        if (int64_t(coin->GetHeight()) <= nHeight) {
+            dResult += double(coin->GetTxOut().nValue.GetSatoshis()) *
+                       (nHeight - coin->GetHeight());
+            inChainInputValue += coin->GetTxOut().nValue;
         }
     }
 
@@ -197,36 +256,47 @@ size_t CoinsStore::DynamicMemoryUsage() const
     return memusage::DynamicUsage(cacheCoins) + cachedCoinsUsage;
 }
 
-std::optional<std::reference_wrapper<const Coin>> CoinsStore::FetchCoin(const COutPoint& outpoint) const
+std::optional<CoinImpl> CoinsStore::FetchCoin(const COutPoint& outpoint) const
 {
     if (auto it = cacheCoins.find(outpoint); it != cacheCoins.end())
     {
-        return it->second.GetCoin();
+        auto& coin = it->second.GetCoinImpl();
+
+        if (coin.HasScript())
+        {
+            return coin.MakeNonOwning();
+        }
+
+        return coin.MakeOwning();
     }
 
     return {};
 }
 
-const Coin& CoinsStore::AddCoin(const COutPoint& outpoint, Coin&& coin)
+const CoinImpl& CoinsStore::AddCoin(const COutPoint& outpoint, CoinImpl&& coin)
 {
-    CCoinsMap::iterator it =
+    auto res =
         cacheCoins
             .emplace(std::piecewise_construct, std::forward_as_tuple(outpoint),
-                     std::forward_as_tuple(std::move(coin), CCoinsCacheEntry::Flags(0)))
-            .first;
-    if (it->second.GetCoin().IsSpent()) {
+                     std::forward_as_tuple(std::move(coin), CCoinsCacheEntry::Flags(0)));
+
+    assert(res.second);
+
+    CCoinsMap::iterator it = res.first;
+
+    if (it->second.GetCoinImpl().IsSpent()) {
         // The parent only has an empty entry for this outpoint; we can consider
         // our version as fresh.
         it->second.flags = CCoinsCacheEntry::FRESH;
     }
     cachedCoinsUsage += it->second.DynamicMemoryUsage();
 
-    return it->second.GetCoin();
+    return it->second.GetCoinImpl();
 }
 
 void CoinsStore::AddCoin(
     const COutPoint& outpoint,
-    Coin&& coin,
+    CoinWithScript&& coin,
     bool possible_overwrite,
     uint64_t genesisActivationHeight)
 {
@@ -246,8 +316,8 @@ void CoinsStore::AddCoin(
     }
     it->second =
         CCoinsCacheEntry{
-            std::move(coin),
-            static_cast<uint8_t>(it->second.flags | CCoinsCacheEntry::DIRTY | (fresh ? CCoinsCacheEntry::FRESH : 0u))
+            CoinImpl::FromCoinWithScript( std::move( coin ) ),
+            static_cast<uint8_t>(it->second.flags | CCoinsCacheEntry::DIRTY | (fresh ? static_cast<uint8_t>(CCoinsCacheEntry::FRESH) : 0u))
         };
     cachedCoinsUsage += it->second.DynamicMemoryUsage();
 }
@@ -270,16 +340,13 @@ void CoinsStore::AddEntry(const COutPoint& outpoint, CCoinsCacheEntry&& entryIn)
     entry.flags = flags;
 }
 
-bool CoinsStore::SpendCoin(const COutPoint& outpoint, Coin* moveout)
+bool CoinsStore::SpendCoin(const COutPoint& outpoint)
 {
     CCoinsMap::iterator it = cacheCoins.find(outpoint);
     if (it == cacheCoins.end()) {
         return false;
     }
     cachedCoinsUsage -= it->second.DynamicMemoryUsage();
-    if (moveout) {
-        *moveout = it->second.MoveCoin();
-    }
     if (it->second.flags & CCoinsCacheEntry::FRESH) {
         cacheCoins.erase(it);
     } else {

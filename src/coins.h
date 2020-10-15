@@ -20,61 +20,251 @@
 #include <optional>
 #include <thread>
 
-/**
- * A UTXO entry.
- *
- * Serialized format:
- * - VARINT((coinbase ? 1 : 0) | (height << 1))
- * - the non-spent CTxOut (via CTxOutCompressor)
- */
-class Coin {
+class CoinWithScript;
+
+class CoinImpl
+{
     //! Unspent transaction output.
-    CTxOut out;
+    std::optional<CTxOut> storage;
+    const CTxOut* out;
 
     //! Whether containing transaction was a coinbase and height at which the
     //! transaction was included into a block.
     // This variable is unsigned even though height is signed type consistently in the codebase.
     // The reason is that shifting on negative numbers causes undefined behavior.
-    uint32_t nHeightAndIsCoinBase;
+    uint32_t nHeightAndIsCoinBase{0};
+
+    uint64_t mScriptSize{0};
 
 public:
-    //! Empty constructor
-    Coin() : nHeightAndIsCoinBase(0) {}
+    CoinImpl() : storage{CTxOut{}}, out{&storage.value()} {}
 
-    //! Constructor from a CTxOut and height/coinbase information.
-    Coin(CTxOut outIn, int32_t nHeightIn, bool IsCoinbase)
-        : out(std::move(outIn)),
-          nHeightAndIsCoinBase((static_cast<uint32_t>(nHeightIn) << 1) | IsCoinbase) {}
+    CoinImpl(Amount amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
+        : storage{CTxOut{amount, {}}}
+        , out{&storage.value()}
+        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | IsCoinbase}
+        , mScriptSize{scriptSize}
+    {}
+
+    CoinImpl(CoinImpl&& other) noexcept
+        : storage{std::move(other.storage)}
+        , out{storage.has_value() ? &storage.value() : other.out}
+        , nHeightAndIsCoinBase{other.nHeightAndIsCoinBase}
+        , mScriptSize{other.mScriptSize}
+    {
+        other.Clear();
+    }
+
+    static CoinImpl FromCoinWithScript(CoinWithScript&& other) noexcept;
+
+    CoinImpl& operator=(CoinImpl&& other) noexcept
+    {
+        storage = std::move(other.storage);
+        out = (storage.has_value() ? &storage.value() : other.out);
+        nHeightAndIsCoinBase = other.nHeightAndIsCoinBase;
+        mScriptSize = other.mScriptSize;
+
+        other.Clear();
+
+        return *this;
+    }
+
+    CoinImpl MakeOwning() const
+    {
+        return {CTxOut{GetTxOut()}, GetScriptSize(), GetHeight(), IsCoinBase()};
+    }
+
+    CoinImpl MakeNonOwning() const
+    {
+        return {GetTxOut(), GetScriptSize(), GetHeight(), IsCoinBase()};
+    }
+
+    static CoinImpl MakeNonOwningWithScript(const CTxOut& outIn, int32_t nHeightIn, bool IsCoinbase)
+    {
+        return {outIn, outIn.scriptPubKey.size(), nHeightIn, IsCoinbase};
+    }
+
+    template <typename Stream> void Serialize(Stream &s) const {
+        assert(!IsSpent());
+        assert(HasScript());
+
+        ::Serialize(s, VARINT(nHeightAndIsCoinBase));
+        ::Serialize(s, CTxOutCompressor(REF(*out)));
+    }
+
+    template <typename Stream> void Unserialize(Stream &s)
+    {
+        assert(storage.has_value());
+
+        ::Unserialize(s, VARINT(nHeightAndIsCoinBase));
+        ::Unserialize(s, REF(CTxOutCompressor(storage.value())));
+        mScriptSize = out->scriptPubKey.size();
+    }
 
     int32_t GetHeight() const {
         return static_cast<int32_t>(nHeightAndIsCoinBase >> 1);
     }
     bool IsCoinBase() const { return nHeightAndIsCoinBase & 0x01; }
-    bool IsSpent() const { return out.IsNull(); }
+    uint64_t GetScriptSize() const { return mScriptSize; }
 
-    CTxOut &GetTxOut() { return out; }
-    const CTxOut &GetTxOut() const { return out; }
+    bool IsSpent() const { return out->nValue == Amount{-1}; }
+    bool HasScript() const { return mScriptSize == out->scriptPubKey.size(); }
 
-    void Clear() {
-        out.SetNull();
-        nHeightAndIsCoinBase = 0;
-    }
-
-    template <typename Stream> void Serialize(Stream &s) const {
-        assert(!IsSpent());
-        ::Serialize(s, VARINT(nHeightAndIsCoinBase));
-        ::Serialize(s, CTxOutCompressor(REF(out)));
-    }
-
-    template <typename Stream> void Unserialize(Stream &s) {
-        ::Unserialize(s, VARINT(nHeightAndIsCoinBase));
-        ::Unserialize(s, REF(CTxOutCompressor(out)));
-    }
+    const CTxOut& GetTxOut() const { return *out; }
 
     size_t DynamicMemoryUsage() const {
-        return memusage::DynamicUsage(out.scriptPubKey);
+        return (HasScript() && IsStorageOwner() ? memusage::DynamicUsage(out->scriptPubKey) : 0);
+    }
+
+    bool IsStorageOwner() const { return storage.has_value(); };
+
+protected:
+    CoinImpl(const CoinImpl& other)
+        : storage{other.storage}
+        , out{storage.has_value() ? &storage.value() : other.out}
+        , nHeightAndIsCoinBase{other.nHeightAndIsCoinBase}
+        , mScriptSize{other.mScriptSize}
+    {}
+
+    CoinImpl(CTxOut&& outIn, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
+        : storage{std::move(outIn)}
+        , out{&storage.value()}
+        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | IsCoinbase}
+        , mScriptSize{scriptSize}
+    {}
+
+private:
+    CoinImpl(const CTxOut& outIn, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
+        : out{&outIn}
+        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | IsCoinbase}
+        , mScriptSize{scriptSize}
+    {}
+
+    CoinImpl& operator=(const CoinImpl& other) = delete;
+
+    void Clear()
+    {
+        storage = CTxOut{};
+        out = &storage.value();
+        nHeightAndIsCoinBase = 0;
     }
 };
+
+/**
+ * A UTXO entry without script - has to be serialized through CoinWithScript.
+ *
+ * This class doesn't necessarily hold CTxOut script data. For that reason it
+ * doesn't allow direct access to CTxOut or serialization - for that
+ * CoinWithScript should be used.
+ */
+class Coin
+{
+    //! Unspent transaction output amount
+    Amount mAmount{ -1 };
+
+    //! Whether containing transaction was a coinbase and height at which the
+    //! transaction was included into a block.
+    // This variable is unsigned even though height is signed type consistently in the codebase.
+    // The reason is that shifting on negative numbers causes undefined behavior.
+    uint32_t nHeightAndIsCoinBase{ 0 };
+
+    uint64_t mScriptSize{ 0 };
+
+public:
+    Coin() = default;
+
+    explicit Coin(const CoinImpl& coin)
+        : mAmount{coin.GetTxOut().nValue}
+        , nHeightAndIsCoinBase((static_cast<uint32_t>(coin.GetHeight()) << 1) | coin.IsCoinBase())
+        , mScriptSize{coin.GetScriptSize()}
+    {}
+
+    int32_t GetHeight() const
+    {
+        return static_cast<int32_t>(nHeightAndIsCoinBase >> 1);
+    }
+    bool IsCoinBase() const { return nHeightAndIsCoinBase & 0x01; }
+    bool IsSpent() const { return mAmount == Amount{-1}; }
+    uint64_t GetScriptSize() const { return mScriptSize; }
+
+    const Amount& GetAmount() const { return mAmount; }
+};
+
+/**
+ * A UTXO entry.
+ *
+ * This class is used for access to CTxOut and serialization of Coin class as
+ * it is guaranteed to contain loaded CTxOut script data.
+ *
+ * Serialized format:
+ * - VARINT((coinbase ? 1 : 0) | (height << 1))
+ * - the non-spent CTxOut (via CTxOutCompressor)
+ */
+class CoinWithScript : private CoinImpl
+{
+public:
+    //! Empty constructor
+    CoinWithScript() = default;
+
+    CoinWithScript(CoinWithScript&& coin) noexcept
+        : CoinImpl{std::move(coin)}
+    {}
+
+    CoinWithScript(CoinImpl&& coin) noexcept
+        : CoinImpl{std::move(coin)}
+    {}
+
+    CoinWithScript MakeNonOwning()
+    {
+        return {*this};
+    }
+
+    CoinWithScript MakeOwning() const
+    {
+        return {CTxOut(GetTxOut()), GetHeight(), IsCoinBase()};
+    }
+
+    static CoinWithScript MakeOwning(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase)
+    {
+        return {std::move(outIn), nHeightIn, IsCoinbase};
+    }
+
+    CoinWithScript& operator=(CoinWithScript&& other)
+    {
+        static_cast<CoinImpl&>(*this) = std::move(other);
+
+        return *this;
+    }
+
+    using
+        CoinImpl::Serialize,
+        CoinImpl::GetTxOut,
+        CoinImpl::DynamicMemoryUsage,
+        CoinImpl::GetHeight,
+        CoinImpl::IsCoinBase,
+        CoinImpl::IsSpent,
+        CoinImpl::GetScriptSize,
+        CoinImpl::IsStorageOwner;
+
+    const Amount& GetAmount() const { return GetTxOut().nValue; }
+
+private:
+    CoinWithScript(const CoinWithScript&) = default;
+
+    //! Constructor from a CTxOut and height/coinbase information.
+    CoinWithScript(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase)
+        : CoinImpl{std::move(outIn), outIn.scriptPubKey.size(), nHeightIn, IsCoinbase}
+    {}
+
+    CoinImpl ToCoinImpl() && { return std::move( *this ); }
+
+    friend CoinImpl CoinImpl::FromCoinWithScript(CoinWithScript&& other) noexcept;
+};
+
+inline CoinImpl CoinImpl::FromCoinWithScript(CoinWithScript&& other) noexcept
+{
+    return std::move( other ).ToCoinImpl();
+}
 
 class SaltedOutpointHasher {
 private:
@@ -99,12 +289,12 @@ public:
 
 class CCoinsCacheEntry {
     // The actual cached data.
-    Coin coin;
+    CoinImpl coin;
 
 public:
     uint8_t flags;
 
-    enum Flags : uint8_t {
+    enum Flags : uint8_t{
         // This cache entry is potentially different from the version in the
         // parent view.
         DIRTY = (1 << 0),
@@ -117,15 +307,37 @@ public:
     };
 
     CCoinsCacheEntry() : flags(0u) {}
-    CCoinsCacheEntry(Coin&& coinIn, uint8_t flagsIn)
+    CCoinsCacheEntry(CoinImpl&& coinIn, uint8_t flagsIn)
         : coin(std::move(coinIn))
         , flags(flagsIn)
     {}
 
-    const Coin& GetCoin() const {return coin;}
-    Coin MoveCoin() {return std::move(coin);}
-    void Clear() {coin.Clear();}
-    size_t DynamicMemoryUsage() const {return coin.DynamicMemoryUsage();}
+    const CoinImpl& GetCoinImpl() const { return coin; }
+    Coin GetCoin() const { return Coin{coin}; }
+
+    std::optional<CoinWithScript> GetCoinWithScript() const
+    {
+        if(coin.HasScript() || coin.IsSpent())
+        {
+            return coin.MakeNonOwning();
+        }
+
+        return {};
+    }
+
+    void Clear()
+    {
+        coin = {};
+    }
+
+    void ReplaceWithCoinWithScript(CoinImpl&& newCoin)
+    {
+        assert(!coin.HasScript());
+        assert(newCoin.HasScript());
+        coin = std::move(newCoin);
+    }
+
+    size_t DynamicMemoryUsage() const { return coin.DynamicMemoryUsage(); }
 };
 
 typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher>
@@ -139,6 +351,7 @@ public:
 
     virtual bool GetKey(COutPoint &key) const = 0;
     virtual bool GetValue(Coin &coin) const = 0;
+    virtual bool GetValue(CoinWithScript &coin) const = 0;
     virtual unsigned int GetValueSize() const = 0;
 
     virtual bool Valid() const = 0;
@@ -164,7 +377,7 @@ protected:
     ~ICoinsView() = default;
 
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
-    virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const = 0;
+    virtual std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const = 0;
 
     //! Just check whether we have data for a given outpoint.
     //! This may (but cannot always) return true for spent outputs.
@@ -185,7 +398,7 @@ protected:
 class CCoinsViewEmpty : public ICoinsView
 {
 protected:
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override { return false; }
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override { return {}; }
     bool HaveCoin(const COutPoint &outpoint) const override { return false; }
     uint256 GetBestBlock() const override { return {}; }
 
@@ -202,7 +415,7 @@ public:
 
     size_t CachedCoinsCount() const { return cacheCoins.size(); }
 
-    std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint& outpoint) const;
+    std::optional<CoinImpl> FetchCoin(const COutPoint& outpoint) const;
 
     CCoinsMap MoveOutCoins()
     {
@@ -213,15 +426,26 @@ public:
         return map;
     }
 
-    const Coin& AddCoin(const COutPoint& outpoint, Coin&& coin);
+    const CoinImpl& AddCoin(const COutPoint& outpoint, CoinImpl&& coin);
     void AddCoin(
         const COutPoint& outpoint,
-        Coin&& coin,
+        CoinWithScript&& coin,
         bool possible_overwrite,
         uint64_t genesisActivationHeight);
-    bool SpendCoin(const COutPoint& outpoint, Coin* moveout);
+    bool SpendCoin(const COutPoint& outpoint);
     void Uncache(const std::vector<COutPoint>& vOutpoints);
     void BatchWrite(CCoinsMap& mapCoins);
+
+    const CoinImpl& ReplaceWithCoinWithScript(const COutPoint& outpoint, CoinImpl&& newCoin)
+    {
+        auto it = cacheCoins.find(outpoint);
+        assert(it != cacheCoins.end());
+
+        it->second.ReplaceWithCoinWithScript(std::move(newCoin));
+        cachedCoinsUsage += it->second.DynamicMemoryUsage();
+
+        return it->second.GetCoinImpl();
+    }
 
 private:
     void AddEntry(const COutPoint& outpoint, CCoinsCacheEntry&& entryIn);
@@ -268,11 +492,14 @@ public:
     void SetBestBlock(const uint256 &hashBlock);
 
     /**
-     * Return a reference to a Coin in the cache, or a pruned one if not found.
-     * This is more efficient than GetCoin. Modifications to other cache entries
-     * are allowed while accessing the returned pointer.
+     * Return a Coin with data, or a pruned one if not found.
+     *
+     * TODO: Merge this function with GetCoin() in a future commit.
      */
-    const Coin &AccessCoin(const COutPoint &output) const;
+    Coin AccessCoin(const COutPoint& output) const;
+
+    //! Same as AccessCoin but returns CoinWithScript
+    CoinWithScript AccessCoinWithScript(const COutPoint& output) const;
 
     /**
      * Add a coin. Set potential_overwrite to true if a non-pruned version may
@@ -280,7 +507,7 @@ public:
      * genesisActivationHeight parameter is used to check if Genesis upgrade rules
      * are in effect for this coin. It is required to correctly determine if coin is unspendable.
      */
-    void AddCoin(const COutPoint &outpoint, Coin&& coin,
+    void AddCoin(const COutPoint &outpoint, CoinWithScript&& coin,
                  bool potential_overwrite, int32_t genesisActivationHeight);
 
     /**
@@ -288,7 +515,7 @@ public:
      * If no unspent output exists for the passed outpoint, this call has no
      * effect.
      */
-    bool SpendCoin(const COutPoint &outpoint, Coin *moveto = nullptr);
+    bool SpendCoin(const COutPoint &outpoint, CoinWithScript *moveto = nullptr);
 
     /**
      * Amount of bitcoins coming in to a transaction
@@ -371,8 +598,28 @@ public:
     }
 
 private:
-    // A non-locking fetch coin
-    std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint &outpoint) const;
+    /**
+     * The function returns a CoinImpl object:
+     * - If a non owning coin is in cache it is returned (non owning coin points
+     *   to underlying view cache entry) and is guaranteed to have a loaded
+     *   script
+     * - If an owning coin is in cache:
+     *   + If requiresScript is false an owning coin without script is returned
+     *   + If requiresScript is true a GetCoin() is called on underlying view
+     * - If coin is not in cache GetCoin() is called on underlying view
+     *
+     * Call to underlying view returns:
+     * - Owning coin without script:
+     *   + Owning coin without script is stored in cache
+     *   + Another owning coin is returned
+     * - Owning coin with script:
+     *   + Owning coin without script is stored in cache
+     *   + Owning coin with script is returned
+     * - Non owning coin (guaranteed to contain script):
+     *   + Non owning coin is stored in cache
+     *   + Another non owning coin is returned
+     */
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, bool requiresScript) const;
 
     inline static CCoinsViewEmpty mViewEmpty;
 

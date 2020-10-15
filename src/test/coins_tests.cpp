@@ -69,6 +69,14 @@ public:
     }
 };
 
+CoinWithScript DataStreamToCoinWithScript(CDataStream& stream)
+{
+    CoinImpl coin;
+    stream >> coin;
+
+    return coin;
+}
+
 } // namespace
 
 BOOST_FIXTURE_TEST_SUITE(coins_tests, BasicTestingSetup)
@@ -78,8 +86,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     CDataStream ss1(
         ParseHex("97f23c835800816115944e077fe7c803cfa57f29b36bf87c1d35"),
         SER_DISK, CLIENT_VERSION);
-    Coin c1;
-    ss1 >> c1;
+    CoinWithScript c1 = DataStreamToCoinWithScript(ss1);
     BOOST_CHECK_EQUAL(c1.IsCoinBase(), false);
     BOOST_CHECK_EQUAL(c1.GetHeight(), 203998U);
     BOOST_CHECK_EQUAL(c1.GetTxOut().nValue, Amount(60000000000LL));
@@ -91,8 +98,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     CDataStream ss2(
         ParseHex("8ddf77bbd123008c988f1a4a4de2161e0f50aac7f17e7f9555caa4"),
         SER_DISK, CLIENT_VERSION);
-    Coin c2;
-    ss2 >> c2;
+    CoinWithScript c2 = DataStreamToCoinWithScript(ss2);
     BOOST_CHECK_EQUAL(c2.IsCoinBase(), true);
     BOOST_CHECK_EQUAL(c2.GetHeight(), 120891);
     BOOST_CHECK_EQUAL(c2.GetTxOut().nValue, Amount(110397LL));
@@ -102,8 +108,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
 
     // Smallest possible example
     CDataStream ss3(ParseHex("000006"), SER_DISK, CLIENT_VERSION);
-    Coin c3;
-    ss3 >> c3;
+    CoinWithScript c3 = DataStreamToCoinWithScript(ss3);
     BOOST_CHECK_EQUAL(c3.IsCoinBase(), false);
     BOOST_CHECK_EQUAL(c3.GetHeight(), 0);
     BOOST_CHECK_EQUAL(c3.GetTxOut().nValue, Amount(0));
@@ -112,8 +117,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     // scriptPubKey that ends beyond the end of the stream
     CDataStream ss4(ParseHex("000007"), SER_DISK, CLIENT_VERSION);
     try {
-        Coin c4;
-        ss4 >> c4;
+        CoinWithScript c4 = DataStreamToCoinWithScript(ss4);
         BOOST_CHECK_MESSAGE(false, "We should have thrown");
     } catch (const std::ios_base::failure &e) {
     }
@@ -125,8 +129,7 @@ BOOST_AUTO_TEST_CASE(coin_serialization) {
     BOOST_CHECK_EQUAL(HexStr(tmp.begin(), tmp.end()), "8a95c0bb00");
     CDataStream ss5(ParseHex("00008a95c0bb00"), SER_DISK, CLIENT_VERSION);
     try {
-        Coin c5;
-        ss5 >> c5;
+        CoinWithScript c5 = DataStreamToCoinWithScript(ss5);
         BOOST_CHECK_MESSAGE(false, "We should have thrown");
     } catch (const std::ios_base::failure &e) {
     }
@@ -149,14 +152,15 @@ static const auto ABSENT_FLAGS = {NO_ENTRY};
 
 static void SetCoinValue(const Amount value, CCoinsCacheEntry &coin, char flags) {
     assert(value != ABSENT);
-    coin = {Coin{}, static_cast<uint8_t>(flags)};
+    coin = {CoinImpl{}, static_cast<uint8_t>(flags)};
     assert(coin.GetCoin().IsSpent());
     if (value != PRUNED) {
         CTxOut out;
         out.nValue = value;
         coin =
             CCoinsCacheEntry(
-                Coin{std::move(out), 1, false},
+                CoinImpl::FromCoinWithScript(
+                    CoinWithScript::MakeOwning(std::move(out), 1, false) ),
                 static_cast<uint8_t>(flags));
         assert(!coin.GetCoin().IsSpent());
     }
@@ -182,7 +186,7 @@ void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
         value = ABSENT;
         flags = NO_ENTRY;
     } else {
-        value = it->second.GetCoin().GetTxOut().nValue;
+        value = it->second.GetCoin().GetAmount();
 
         if (it->second.GetCoin().IsSpent()) {
             assert(value == PRUNED);
@@ -334,7 +338,7 @@ void CheckAddCoinBase(Amount base_value, Amount cache_value,
     try {
         CTxOut output;
         output.nValue = modify_value;
-        test.cache->AddCoin(OUTPOINT, Coin(std::move(output), 1, coinbase),
+        test.cache->AddCoin(OUTPOINT, CoinWithScript::MakeOwning(std::move(output), 1, coinbase),
                            coinbase, GlobalConfig::GetConfig().GetGenesisActivationHeight());
         test.cache->SelfTest();
         GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);

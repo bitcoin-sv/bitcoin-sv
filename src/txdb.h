@@ -89,6 +89,7 @@ public:
 
     bool GetKey(COutPoint &key) const override;
     bool GetValue(Coin &coin) const override;
+    bool GetValue(CoinWithScript &coin) const override;
     unsigned int GetValueSize() const override;
 
     bool Valid() const override;
@@ -195,7 +196,7 @@ private:
     CCoinsViewCursor* Cursor(const TxId& txId) const;
 
     //! Get any unspent output with a given txid.
-    Coin GetCoinByTxId(const TxId &txid) const;
+    std::optional<Coin> GetCoinByTxId(const TxId &txid) const;
 
     void ReadLock(WPUSMutex::Lock& lockHandle) const
     {
@@ -207,9 +208,10 @@ private:
         return mMutex.TryWriteLock( lockHandle );
     }
 
-    std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint &outpoint) const;
-    bool HaveCoin(const COutPoint& outpoint) const;
-    bool DBGetCoin(const COutPoint &outpoint, Coin &coin) const;
+    // Standard CCoinsView methods
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
+    bool HaveCoin(const COutPoint &outpoint) const;
+    std::optional<CoinImpl> DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
     uint256 DBGetBestBlock() const;
     std::vector<uint256> GetHeadBlocks() const;
     bool DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
@@ -244,29 +246,50 @@ private:
 class CoinsDBView : public ICoinsView
 {
 public:
+    friend class CoinsViewLockedMemPoolNL;
+    friend class CCoinsViewMemPool;
+
     CoinsDBView(const CoinsDB& db)
         : mDB{db}
     {
         mDB.ReadLock( mLock );
     }
 
-    bool GetCoin(const COutPoint& outpoint, Coin& coin) const override
+    std::optional<Coin> GetCoin(const COutPoint& outpoint) const
     {
-        auto fetchCoin = mDB.FetchCoin(outpoint);
-        if (!fetchCoin.has_value()) {
-            return false;
+        auto coinData = mDB.GetCoin(outpoint, 0);
+        if(coinData.has_value())
+        {
+            return Coin{coinData.value()};
         }
-        coin = fetchCoin.value();
-        return true;
-    }
 
-    bool HaveCoin(const COutPoint& outpoint) const override { return mDB.HaveCoin(outpoint); }
+        return {};
+    }
+    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+    {
+        auto coinData = mDB.GetCoin(outpoint, std::numeric_limits<size_t>::max());
+        if(coinData.has_value())
+        {
+            assert(coinData->HasScript());
+
+            return std::move(coinData.value());
+        }
+
+        return {};
+    }
+    bool HaveCoin(const COutPoint& outpoint) const override { return mDB.GetCoin(outpoint, 0).has_value(); }
     uint256 GetBestBlock() const override { return mDB.GetBestBlock(); }
     std::vector<uint256> GetHeadBlocks() const { return mDB.GetHeadBlocks(); }
 
-    Coin GetCoinByTxId(const TxId &txid) const { return mDB.GetCoinByTxId(txid); }
+    std::optional<Coin> GetCoinByTxId(const TxId &txid) const { return mDB.GetCoinByTxId(txid); }
 
 private:
+    // The caller of GetCoin needs to hold mempool.smtx.
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override
+    {
+        return mDB.GetCoin(outpoint, maxScriptSize);
+    }
+
     const CoinsDB& mDB;
 
     // This variable enforces read only access to mDB

@@ -635,7 +635,7 @@ bool IsGenesisEnabled(const Config& config, int32_t nHeight);
  * In this case, you should call this overload and specify the mempool height (chainActive.Height()+1) 
  *as parameter to correctly determine if genesis is enabled for this coin.
  */
-bool IsGenesisEnabled(const Config& config, const Coin& coin, int32_t mempoolHeight  );
+bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight);
 int GetGenesisActivationHeight(const Config& config);
 
 /**

@@ -298,9 +298,9 @@ static CBlockIndex* GetBlockIndex(const Config& config,
         // Try to find a block containing at least one requested transaction with utxo
         for (const TxId& txid : setTxIds)
         {
-            Coin coin = tipView.GetCoinByTxId(txid);
-            if (!coin.IsSpent()) {
-                pblockindex = chainActive[coin.GetHeight()];
+            auto coin = tipView.GetCoinByTxId(txid);
+            if (coin.has_value()) {
+                pblockindex = chainActive[coin->GetHeight()];
                 break;
             }
         }
@@ -1003,7 +1003,7 @@ static UniValue signrawtransaction(const Config &config,
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                const Coin &coin = view.AccessCoin(out);
+                CoinWithScript coin = view.AccessCoinWithScript(out);
                 if (!coin.IsSpent() &&
                     coin.GetTxOut().scriptPubKey != scriptPubKey) {
                     std::string err("Previous output scriptPubKey mismatch:\n");
@@ -1043,7 +1043,7 @@ static UniValue signrawtransaction(const Config &config,
                     coinHeight = genesisActivationHeight - 1;
                 }
 
-                view.AddCoin(out, Coin(txout, coinHeight, false), true, genesisActivationHeight);
+                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false), true, genesisActivationHeight);
             }
 
             // If redeemScript given and not using the local wallet (private
@@ -1118,7 +1118,7 @@ static UniValue signrawtransaction(const Config &config,
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
-        const Coin &coin = view.AccessCoin(txin.prevout);
+        CoinWithScript coin = view.AccessCoinWithScript(txin.prevout);
         if (coin.IsSpent()) {
             TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
             continue;

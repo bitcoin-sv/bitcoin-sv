@@ -81,7 +81,7 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
     for (CTxIn const & u: tx.vin) {
 
         // accept only with many confirmations
-        const Coin &coin = inputs.AccessCoin(u.prevout);
+        const auto& coin = inputs.AccessCoinWithScript(u.prevout);
         const auto coinHeight = coin.GetHeight();
 
         if (coinHeight == MEMPOOL_HEIGHT)
@@ -197,7 +197,7 @@ std::optional<bool> AreInputsStandard(
     }
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
-        const Coin& prev = mapInputs.AccessCoin(tx.vin[i].prevout);
+        CoinWithScript prev = mapInputs.AccessCoinWithScript(tx.vin[i].prevout);
         assert(!prev.IsSpent());
 
         std::vector<std::vector<uint8_t>> vSolutions;

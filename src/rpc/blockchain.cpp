@@ -1367,13 +1367,13 @@ struct CCoinsStats {
 };
 
 static void ApplyStats(CCoinsStats &stats, CHashWriter &ss, const uint256 &hash,
-                       const std::map<uint32_t, Coin> &outputs) {
+                       const std::map<uint32_t, CoinWithScript> &outputs) {
     assert(!outputs.empty());
     ss << hash;
     ss << VARINT(outputs.begin()->second.GetHeight() * 2 +
                  outputs.begin()->second.IsCoinBase());
     stats.nTransactions++;
-    for (const auto output : outputs) {
+    for (const auto& output : outputs) {
         ss << VARINT(output.first + 1);
         ss << output.second.GetTxOut().scriptPubKey;
         ss << VARINT(output.second.GetTxOut().nValue.GetSatoshis());
@@ -1399,11 +1399,11 @@ static bool GetUTXOStats(CoinsDB& coinsTip, CCoinsStats &stats) {
     }
     ss << stats.hashBlock;
     uint256 prevkey;
-    std::map<uint32_t, Coin> outputs;
+    std::map<uint32_t, CoinWithScript> outputs;
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
         COutPoint key;
-        Coin coin;
+        CoinWithScript coin;
         if (pcursor->GetKey(key) && pcursor->GetValue(coin)) {
             if (!outputs.empty() && key.GetTxId() != prevkey) {
                 ApplyStats(stats, ss, prevkey, outputs);
@@ -1577,8 +1577,6 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
             HelpExampleRpc("gettxout", "\"txid\", 1"));
     }
 
-    LOCK(cs_main);
-
     UniValue ret(UniValue::VOBJ);
 
     std::string strHash = request.params[0].get_str();
@@ -1591,40 +1589,53 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     }
 
     CoinsDBView tipView{*pcoinsTip};
-    Coin coin;
+
+    auto writeCoin =
+        [&](const CoinWithScript& coin)
+        {
+            CBlockIndex* pindex;
+            {
+                LOCK(cs_main);
+                BlockMap::const_iterator it = mapBlockIndex.find(tipView.GetBestBlock());
+                pindex = it->second;
+            }
+            ret.push_back(Pair("bestblock", pindex->GetBlockHash().GetHex()));
+            if (coin.GetHeight() == MEMPOOL_HEIGHT) {
+                ret.push_back(Pair("confirmations", 0));
+            } else {
+                ret.push_back(Pair("confirmations",
+                                   int64_t(pindex->nHeight - coin.GetHeight() + 1)));
+            }
+            ret.push_back(Pair("value", ValueFromAmount(coin.GetTxOut().nValue)));
+            UniValue o(UniValue::VOBJ);
+            int height = (coin.GetHeight() == MEMPOOL_HEIGHT)
+                             ? (chainActive.Height() + 1)
+                             : coin.GetHeight();
+            ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true,
+                               IsGenesisEnabled(config, height), o);
+            ret.push_back(Pair("scriptPubKey", o));
+            ret.push_back(Pair("coinbase", coin.IsCoinBase()));
+        };
+
     if (fMempool) {
         CCoinsViewMemPool view(tipView, mempool);
 
-        if (!tipView.GetCoin(out, coin) || mempool.IsSpent(out)) {
-            // TODO: this should be done by the CCoinsViewMemPool
-            return NullUniValue;
-        }
-     } else {
-        if (!tipView.GetCoin(out, coin)) {
-             return NullUniValue;
+        if (auto coin = view.GetCoinWithScript(out);
+            coin.has_value() && !mempool.IsSpent(out))
+        {
+            writeCoin( coin.value() );
+
+            return ret;
         }
     }
+    else if (auto coin = tipView.GetCoinWithScript(out); coin.has_value())
+    {
+        writeCoin( coin.value() );
 
-    BlockMap::iterator it = mapBlockIndex.find(tipView.GetBestBlock());
-    CBlockIndex *pindex = it->second;
-    ret.push_back(Pair("bestblock", pindex->GetBlockHash().GetHex()));
-    if (coin.GetHeight() == MEMPOOL_HEIGHT) {
-        ret.push_back(Pair("confirmations", 0));
-    } else {
-        ret.push_back(Pair("confirmations",
-                           int64_t(pindex->nHeight - coin.GetHeight() + 1)));
+        return ret;
     }
-    ret.push_back(Pair("value", ValueFromAmount(coin.GetTxOut().nValue)));
-    UniValue o(UniValue::VOBJ);
-    int32_t height = (coin.GetHeight() == MEMPOOL_HEIGHT)
-                     ? (chainActive.Height() + 1)
-                     : coin.GetHeight();
-    ScriptPubKeyToUniv(coin.GetTxOut().scriptPubKey, true,
-                       IsGenesisEnabled(config, height), o);
-    ret.push_back(Pair("scriptPubKey", o));
-    ret.push_back(Pair("coinbase", coin.IsCoinBase()));
 
-    return ret;
+    return NullUniValue;
 }
 
 void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
@@ -1792,19 +1803,61 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
 
     CoinsDBView tipView{ *pcoinsTip };
 
-    for(size_t arrayIndex = 0; arrayIndex < outPoints.size(); arrayIndex++)
-    {
-        jWriter.writeBeginObject();
-
-        Coin coin;
-        if (fMempool)
+    auto writeCoin =
+        [&](const CoinWithScript& coin)
         {
+            if(returnFieldsFlags & scriptPubKeyFlag)
+            {
+                jWriter.pushKV("scriptPubKey", HexStr(coin.GetTxOut().scriptPubKey));
+            }
+
+            if(returnFieldsFlags & scriptPubKeyLenFlag)
+            {
+                jWriter.pushKV("scriptPubKeyLen", static_cast<int64_t>(coin.GetTxOut().scriptPubKey.size()));
+            }
+
+            if(returnFieldsFlags & valueFlag)
+            {
+                jWriter.pushKVJSONFormatted("value", ValueFromAmount(coin.GetTxOut().nValue).getValStr());
+            }
+
+            if(returnFieldsFlags & isStandardFlag)
+            {
+                int height = (coin.GetHeight() == MEMPOOL_HEIGHT)
+                         ? (chainActive.Height() + 1)
+                         : coin.GetHeight();
+                txnouttype txOutType;
+                jWriter.pushKV("isStandard", IsStandard(config, coin.GetTxOut().scriptPubKey, height, txOutType));
+            }
+
+            if(returnFieldsFlags & confirmationsFlag)
+            {
+                int64_t confirmations;
+                if (coin.GetHeight() == MEMPOOL_HEIGHT)
+                {
+                    confirmations = 0;
+                }
+                else
+                {
+                    LOCK(cs_main);
+                    BlockMap::const_iterator it = mapBlockIndex.find(tipView.GetBestBlock());
+                    CBlockIndex *pindex = it->second;
+                    confirmations = int64_t(pindex->nHeight - coin.GetHeight() + 1);
+                }
+                jWriter.pushKV("confirmations", confirmations);
+            }
+        };
+
+    if (fMempool)
+    {
+        for(size_t arrayIndex = 0; arrayIndex < outPoints.size(); arrayIndex++)
+        {
+            jWriter.writeBeginObject();
+
             CCoinsViewMemPool view(tipView, mempool);
-            if (!view.GetCoin(outPoints[arrayIndex], coin))
+            if (auto coin = view.GetCoinWithScript(outPoints[arrayIndex]); !coin.has_value())
             {
                 jWriter.pushKV("error", "missing");
-                jWriter.writeEndObject();
-                continue;
             }
             else if(const CTransaction* tx = mempool.IsSpentBy(outPoints[arrayIndex]))
             {
@@ -1814,62 +1867,32 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
                 jWriter.pushKV("size", int64_t(tx->GetTotalSize()));
                 jWriter.pushKV("hex", EncodeHexTx(*tx));
                 jWriter.writeEndObject();
-                jWriter.writeEndObject();
-                continue;
-            }
-        }
-        else
-        {
-            if (!tipView.GetCoin(outPoints[arrayIndex], coin))
-            {
-                jWriter.pushKV("error", "missing");
-                jWriter.writeEndObject();
-                continue;
-            }
-        }
-
-        if(returnFieldsFlags & scriptPubKeyFlag)
-        {
-            jWriter.pushKV("scriptPubKey", HexStr(coin.GetTxOut().scriptPubKey));
-        }
-
-        if(returnFieldsFlags & scriptPubKeyLenFlag)
-        {
-            jWriter.pushKV("scriptPubKeyLen", static_cast<int64_t>(coin.GetTxOut().scriptPubKey.size()));
-        }
-
-        if(returnFieldsFlags & valueFlag)
-        {
-            jWriter.pushKVJSONFormatted("value", ValueFromAmount(coin.GetTxOut().nValue).getValStr());
-        }
-
-        if(returnFieldsFlags & isStandardFlag)
-        {
-            int height = (coin.GetHeight() == MEMPOOL_HEIGHT)
-                     ? (chainActive.Height() + 1)
-                     : coin.GetHeight();
-            txnouttype txOutType;
-            jWriter.pushKV("isStandard", IsStandard(config, coin.GetTxOut().scriptPubKey, height, txOutType));
-        }
-
-        if(returnFieldsFlags & confirmationsFlag)
-        {
-            int64_t confirmations;
-            if (coin.GetHeight() == MEMPOOL_HEIGHT)
-            {
-                confirmations = 0;
             }
             else
             {
-                LOCK(cs_main);
-                BlockMap::iterator it = mapBlockIndex.find(tipView.GetBestBlock());
-                CBlockIndex *pindex = it->second;
-                confirmations = int64_t(pindex->nHeight - coin.GetHeight() + 1);
+                writeCoin( coin.value() );
             }
-            jWriter.pushKV("confirmations", confirmations);
-        }
 
-        jWriter.writeEndObject();
+            jWriter.writeEndObject();
+        }
+    }
+    else
+    {
+        for(size_t arrayIndex = 0; arrayIndex < outPoints.size(); arrayIndex++)
+        {
+            jWriter.writeBeginObject();
+
+            if (auto coin = tipView.GetCoinWithScript(outPoints[arrayIndex]); !coin.has_value())
+            {
+                jWriter.pushKV("error", "missing");
+            }
+            else
+            {
+                writeCoin( coin.value() );
+            }
+
+            jWriter.writeEndObject();
+        }
     }
 
     jWriter.writeEndArray();

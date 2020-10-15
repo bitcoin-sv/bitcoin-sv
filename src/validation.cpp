@@ -501,7 +501,7 @@ uint64_t GetP2SHSigOpCount(const Config &config,
 
     uint64_t nSigOps = 0;
     for (auto &i : tx.vin) {
-        const Coin &coin = inputs.AccessCoin(i.prevout);
+        CoinWithScript coin = inputs.AccessCoinWithScript(i.prevout);
         assert(!coin.IsSpent());
 
         bool genesisEnabled = true;
@@ -699,7 +699,7 @@ bool IsGenesisEnabled(const Config &config, int32_t nHeight) {
     return nHeight >= config.GetGenesisActivationHeight();
 }
 
-bool IsGenesisEnabled(const Config& config, const Coin& coin, int32_t mempoolHeight) {
+bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight) {
     auto height = coin.GetHeight();
     if (height == MEMPOOL_HEIGHT) {
         return mempoolHeight >= config.GetGenesisActivationHeight();
@@ -737,7 +737,7 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
 
     assert(!tx.IsCoinBase());
     for (const CTxIn &txin : tx.vin) {
-        const Coin &coin = view.AccessCoin(txin.prevout);
+        Coin coin = view.AccessCoin(txin.prevout);
         // At this point we haven't actually checked if the coins are all
         // available (or shouldn't assume we have, since CheckInputs does). So
         // we just return failure if the inputs are not available here, and then
@@ -749,11 +749,17 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
         if (txFrom) {
             assert(txFrom->GetHash() == txin.prevout.GetTxId());
             assert(txFrom->vout.size() > txin.prevout.GetN());
-            assert(txFrom->vout[txin.prevout.GetN()] == coin.GetTxOut());
+            assert(txFrom->vout[txin.prevout.GetN()].nValue == coin.GetAmount());
+            // Most scripts are of the same size but we don't want to pay for
+            // script loading just to assert
+            assert(txFrom->vout[txin.prevout.GetN()].scriptPubKey.size() == coin.GetScriptSize());
         } else {
             auto coinFromDisk = underlyingMempool.GetCoinFromDB(txin.prevout);
             assert(coinFromDisk.has_value() && !coinFromDisk->IsSpent());
-            assert(coinFromDisk->GetTxOut() == coin.GetTxOut());
+            assert(coinFromDisk->GetAmount() == coin.GetAmount());
+            // Most scripts are of the same size but we don't want to pay for
+            // script loading just to assert
+            assert(coinFromDisk->GetScriptSize() == coin.GetScriptSize());
         }
     }
 
@@ -812,7 +818,7 @@ static bool CheckTxSpendsCoinbase(
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
     for (const CTxIn &txin : tx.vin) {
-        const Coin &coin = view.AccessCoin(txin.prevout);
+        Coin coin = view.AccessCoin(txin.prevout);
         if (coin.IsCoinBase()) {
             return true;
         }
@@ -2236,8 +2242,9 @@ bool GetTransaction(const Config &config, const TxId &txid,
     if (fAllowSlow) {
         CoinsDBView view{ *pcoinsTip };
 
-        if (Coin coin = view.GetCoinByTxId(txid); !coin.IsSpent()) {
-            pindexSlow = chainActive[coin.GetHeight()];
+        if (auto coin = view.GetCoinByTxId(txid);
+            coin.has_value() && !coin->IsSpent()) {
+            pindexSlow = chainActive[coin->GetHeight()];
         }
     }
 
@@ -2972,7 +2979,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
     Amount nFees(0);
     for (const auto &in : tx.vin) {
         const COutPoint &prevout = in.prevout;
-        const Coin &coin = inputs.AccessCoin(prevout);
+        Coin coin = inputs.AccessCoin(prevout);
         assert(!coin.IsSpent());
 
         // If prev is coinbase, check that it's matured
@@ -2987,8 +2994,8 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
         }
 
         // Check for negative or overflow input values
-        nValueIn += coin.GetTxOut().nValue;
-        if (!MoneyRange(coin.GetTxOut().nValue) || !MoneyRange(nValueIn)) {
+        nValueIn += coin.GetAmount();
+        if (!MoneyRange(coin.GetAmount()) || !MoneyRange(nValueIn)) {
             return state.DoS(100, false, REJECT_INVALID,
                              "bad-txns-inputvalues-outofrange");
         }
@@ -3079,7 +3086,7 @@ std::optional<bool> CheckInputs(
     for (size_t i = 0; i < tx.vin.size(); i++) 
     {
         const COutPoint &prevout = tx.vin[i].prevout;
-        const Coin &coin = inputs.AccessCoin(prevout);
+        CoinWithScript coin = inputs.AccessCoinWithScript(prevout);
         assert(!coin.IsSpent());
 
         // We very carefully only pass in things to CScriptCheck which are
@@ -3276,7 +3283,7 @@ bool AbortNode(CValidationState &state, const std::string &strMessage,
 } // namespace
 
 /** Restore the UTXO in a Coin at a given COutPoint. */
-DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
+DisconnectResult UndoCoinSpend(const CoinWithScript &undo, CCoinsViewCache &view,
                                const COutPoint &out, const Config &config) {
     bool fClean = true;
 
@@ -3289,7 +3296,7 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
     // if we know for sure that the coin did not already exist in the cache. As
     // we have queried for that above using HaveCoin, we don't need to guess.
     // When fClean is false, a coin already existed and it is an overwrite.
-    view.AddCoin(out, Coin{undo}, !fClean, config.GetGenesisActivationHeight()); // FIXME making a copy of the coin
+    view.AddCoin(out, undo.MakeOwning(), !fClean, config.GetGenesisActivationHeight());
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
@@ -3349,7 +3356,7 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
             }
 
             COutPoint out(txid, o);
-            Coin coin;
+            CoinWithScript coin;
             bool is_spent = view.SpendCoin(out, &coin);
             if (!is_spent || tx.vout[o] != coin.GetTxOut()) {
                 // transaction output mismatch
@@ -3371,7 +3378,7 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
 
         for (size_t j = tx.vin.size(); j-- > 0;) {
             const COutPoint &out = tx.vin[j].prevout;
-            const Coin &undo = txundo.vprevout[j];
+            const CoinWithScript &undo = txundo.vprevout[j];
             DisconnectResult res = UndoCoinSpend(undo, view, out, config);
             if (res == DISCONNECT_FAILED) {
                 return DISCONNECT_FAILED;

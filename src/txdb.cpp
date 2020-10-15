@@ -57,11 +57,16 @@ struct CoinEntry {
 };
 } // namespace
 
-bool CoinsDB::DBGetCoin(const COutPoint &outpoint, Coin &coin) const
-{
+std::optional<CoinImpl> CoinsDB::DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
     try
     {
-        return db.Read(CoinEntry(&outpoint), coin);
+        std::optional<CoinImpl> coin{CoinImpl{}};
+        if( db.Read(CoinEntry(&outpoint), coin.value()) )
+        {
+            return coin;
+        }
+
+        return {};
     } catch (const std::runtime_error &e) {
         uiInterface.ThreadSafeMessageBox(
             _("Error reading from database, shutting down."), "",
@@ -122,7 +127,13 @@ bool CoinsDB::DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
             if (it->second.GetCoin().IsSpent()) {
                 batch.Erase(entry);
             } else {
-                batch.Write(entry, it->second.GetCoin());
+                auto coinWithScript = it->second.GetCoinWithScript();
+
+                // coin entries that have DIRTY flag set and are not spent must
+                // always contain the script
+                assert(coinWithScript.has_value());
+
+                batch.Write(entry, coinWithScript.value());
             }
             changed++;
         }
@@ -239,7 +250,25 @@ bool CCoinsViewDBCursor::GetKey(COutPoint &key) const {
 }
 
 bool CCoinsViewDBCursor::GetValue(Coin &coin) const {
-    return pcursor->GetValue(coin);
+    if(CoinImpl tmp; pcursor->GetValue(tmp)) // TODO limit read size
+    {
+        coin = Coin{tmp};
+
+        return true;
+    }
+
+    return false;
+}
+
+bool CCoinsViewDBCursor::GetValue(CoinWithScript &coin) const {
+    if(CoinImpl tmp; pcursor->GetValue(tmp))
+    {
+        coin = std::move(tmp);
+
+        return true;
+    }
+
+    return false;
 }
 
 unsigned int CCoinsViewDBCursor::GetValueSize() const {
@@ -368,9 +397,7 @@ size_t CoinsDB::DynamicMemoryUsage() const {
     return mCache.DynamicMemoryUsage();
 }
 
-std::optional<std::reference_wrapper<const Coin>>
-CoinsDB::FetchCoin(const COutPoint &outpoint) const
-{
+std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const {
     auto erase =
         [this](const COutPoint* outpoint)
         {
@@ -379,20 +406,43 @@ CoinsDB::FetchCoin(const COutPoint &outpoint) const
         };
     std::unique_ptr<const COutPoint, decltype(erase)> guard{&outpoint, erase};
 
+    std::optional<CoinImpl> coinFromCache;
+
     while(true)
     {
         {
             std::unique_lock lock { mCoinsViewCacheMtx };
-            if (auto coin = mCache.FetchCoin(outpoint); coin.has_value())
-            {
-                guard.release();
 
-                if (coin->get().IsSpent())
+            coinFromCache = mCache.FetchCoin(outpoint);
+
+            if (coinFromCache.has_value())
+            {
+                if (coinFromCache->IsSpent())
                 {
+                    guard.release();
+
                     return {};
                 }
+                else if (coinFromCache->HasScript())
+                {
+                    guard.release();
 
-                return coin;
+                    return coinFromCache;
+                }
+                else if(maxScriptSize < coinFromCache->GetScriptSize())
+                {
+                    guard.release();
+
+                    // make a copy since we will swap the cached value on script load
+                    // and we want the child view to re-request the coin from us
+                    // at that point to preserve thread safety
+                    return
+                        CoinImpl{
+                            coinFromCache->GetTxOut().nValue,
+                            coinFromCache->GetScriptSize(),
+                            coinFromCache->GetHeight(),
+                            coinFromCache->IsCoinBase()};
+                }
             }
             if(!mFetchingCoins.count(outpoint))
             {
@@ -417,8 +467,9 @@ CoinsDB::FetchCoin(const COutPoint &outpoint) const
     // the rare potential other threads that are waiting for the same outpoint
     // may continue.
 
-    Coin tmp;
-    if (!DBGetCoin(outpoint, tmp)) {
+    auto coinFromView = DBGetCoin(outpoint, std::numeric_limits<uint64_t>::max() /*maxScriptSize*/); // TODO select either maxScriptSize or local cache size
+    if (!coinFromView.has_value())
+    {
         return {};
     }
 
@@ -427,12 +478,24 @@ CoinsDB::FetchCoin(const COutPoint &outpoint) const
     mFetchingCoins.erase(outpoint);
     guard.release();
 
-    return mCache.AddCoin(outpoint, std::move(tmp));
+    if (coinFromCache.has_value())
+    {
+        assert(coinFromView->HasScript());
+
+        return mCache.ReplaceWithCoinWithScript(outpoint, std::move(coinFromView.value())).MakeNonOwning();
+    }
+
+    assert(!mCache.FetchCoin(outpoint).has_value());
+
+    auto& cws = mCache.AddCoin(outpoint, std::move(coinFromView.value()));
+    assert(cws.IsStorageOwner());
+
+    return cws.MakeNonOwning();
 }
 
 bool CoinsDB::HaveCoin(const COutPoint &outpoint) const {
-    auto coin = FetchCoin(outpoint);
-    return coin.has_value() && !coin->get().IsSpent();
+    auto coin = GetCoin(outpoint, 0);
+    return coin.has_value() && !coin->IsSpent();
 }
 
 bool CoinsDB::HaveCoinInCache(const COutPoint &outpoint) const {
@@ -496,7 +559,7 @@ unsigned int CoinsDB::GetCacheSize() const {
     return mCache.CachedCoinsCount();
 }
 
-Coin CoinsDB::GetCoinByTxId(const TxId& txid) const
+std::optional<Coin> CoinsDB::GetCoinByTxId(const TxId& txid) const
 {
     constexpr int MAX_VIEW_ITERATIONS = 100;
 
@@ -504,15 +567,16 @@ Coin CoinsDB::GetCoinByTxId(const TxId& txid) const
     // performance testing indicates that after 100 look up by cursor becomes faster
 
     for (int n = 0; n < MAX_VIEW_ITERATIONS; n++) {
-        if (auto alternate = FetchCoin(COutPoint(txid, n)); alternate.has_value() && !alternate->get().IsSpent()) {
-            return alternate.value();
+        auto alternate = GetCoin(COutPoint(txid, n), 0);
+        if (alternate.has_value()) {
+            return Coin{alternate.value()};
         }
     }
 
     // for large output indexes delegate search to db cursor/iterator by key prefix (txId)
 
     COutPoint key;
-    Coin coin;
+    std::optional<Coin> coin{ Coin{} };
 
     std::unique_ptr<CCoinsViewCursor> cursor{ Cursor(txid) };
 
@@ -522,19 +586,12 @@ Coin CoinsDB::GetCoinByTxId(const TxId& txid) const
     }
     while (cursor->Valid() && key.GetTxId() == txid)
     {
-        if (!cursor->GetValue(coin))
+        if (!cursor->GetValue(coin.value()))
         {
             return {};
         }
-        if (!coin.IsSpent())
-        {
-            return coin;
-        }
-        cursor->Next();
-        if (cursor->Valid())
-        {
-            cursor->GetKey(key);
-        }
+        assert(!coin->IsSpent());
+        return coin;
     }
     return {};
 }

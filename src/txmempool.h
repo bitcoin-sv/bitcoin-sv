@@ -723,10 +723,10 @@ public:
      * Execute callback function on coins that are unspent in view and in mempool.
      * Callback parameters: coin and consecutive index of view outpoints
      */
-    void OnUnspentCoins(
+    void OnUnspentCoinsWithScript(
         const CoinsDBView& tip,
         const std::vector<COutPoint>& outpoints,
-        const std::function<void(Coin&&, size_t)>& callback) const;
+        const std::function<void(const CoinWithScript&, size_t)>& callback) const;
 
 public:
     /**
@@ -1054,9 +1054,22 @@ public:
      */
     CTransactionRef GetCachedTransactionRef(const COutPoint& outpoint) const;
 
+    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+    {
+        auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
+        if(coinData.has_value())
+        {
+            assert(coinData->HasScript());
+
+            return std::move(coinData.value());
+        }
+
+        return {};
+    }
+
     std::optional<Coin> GetCoinFromDB(const COutPoint& outpoint) const;
 
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
 
 protected:
