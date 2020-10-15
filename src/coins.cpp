@@ -123,29 +123,6 @@ bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, CoinWithScript *moveo
     return mCache.SpendCoin(outpoint);
 }
 
-static const Coin coinEmpty;
-static const CoinWithScript coinWithScriptEmpty;
-
-Coin CCoinsViewCache::AccessCoin(const COutPoint& outpoint) const
-{
-    assert(mThreadId == std::this_thread::get_id());
-    auto coin = GetCoin(outpoint, 0);
-    if (!coin.has_value()) {
-        return coinEmpty;
-    }
-    return Coin{ coin.value() };
-}
-
-CoinWithScript CCoinsViewCache::AccessCoinWithScript(const COutPoint& outpoint) const
-{
-    assert(mThreadId == std::this_thread::get_id());
-    auto coin = GetCoin(outpoint, std::numeric_limits<uint64_t>::max());
-    if (!coin.has_value()) {
-        return coinWithScriptEmpty.MakeOwning();
-    }
-    return std::move(coin.value());
-}
-
 bool CCoinsViewCache::HaveCoin(const COutPoint &outpoint) const {
     assert(mThreadId == std::this_thread::get_id());
     auto coin = GetCoin(outpoint, 0);

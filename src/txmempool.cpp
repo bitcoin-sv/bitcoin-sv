@@ -881,10 +881,10 @@ void CTxMemPool::RemoveForReorg(
                 auto coin = tipView.GetCoin(txin.prevout);
                 assert( coin.has_value() );
                 if (nCheckFrequency != 0) {
-                    assert(!coin->IsSpent());
+                    assert(coin.has_value() && !coin->IsSpent());
                 }
 
-                if (coin->IsSpent() ||
+                if (!coin.has_value() || coin->IsSpent() ||
                     (coin->IsCoinBase() &&
                      nMemPoolHeight - coin->GetHeight() <
                          COINBASE_MATURITY)) {

@@ -623,11 +623,11 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         CScript scriptPubKey(pkData.begin(), pkData.end());
 
         {
-            CoinWithScript coin = view.AccessCoinWithScript(out);
-            if (!coin.IsSpent() &&
-                coin.GetTxOut().scriptPubKey != scriptPubKey) {
+            if (auto coin = view.GetCoinWithScript(out);
+                coin.has_value() && !coin->IsSpent() &&
+                coin->GetTxOut().scriptPubKey != scriptPubKey) {
                 std::string err("Previous output scriptPubKey mismatch:\n");
-                err = err + ScriptToAsmStr(coin.GetTxOut().scriptPubKey) +
+                err = err + ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
                       "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                 throw std::runtime_error(err);
             }
@@ -662,14 +662,15 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
-        CoinWithScript coin = view.AccessCoinWithScript(txin.prevout);
-        if (coin.IsSpent()) {
+        auto coin = view.GetCoinWithScript(txin.prevout);
+        if (!coin.has_value() || coin->IsSpent())
+        {
             fComplete = false;
             continue;
         }
 
-        const CScript &prevPubKey = coin.GetTxOut().scriptPubKey;
-        const Amount amount = coin.GetTxOut().nValue;
+        const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
+        const Amount amount = coin->GetTxOut().nValue;
 
         // we will assume that script is after genesis for every script type except p2sh
         bool assumeUtxoAfterGenesis = !IsP2SH(prevPubKey);

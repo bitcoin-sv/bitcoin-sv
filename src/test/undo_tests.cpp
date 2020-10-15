@@ -38,7 +38,8 @@ static void UndoBlock(const CBlock &block, CCoinsViewCache &view,
 }
 
 static bool HasSpendableCoin(const CCoinsViewCache &view, const uint256 &txid) {
-    return !view.AccessCoin(COutPoint(txid, 0)).IsSpent();
+    auto coin = view.GetCoin(COutPoint(txid, 0));
+    return (coin.has_value() && !coin->IsSpent());
 }
 
 BOOST_AUTO_TEST_CASE(connect_utxo_extblock) {

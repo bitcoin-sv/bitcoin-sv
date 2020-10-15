@@ -423,15 +423,16 @@ bool CheckSequenceLocks(
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
             const CTxIn &txin = tx.vin[txinIndex];
-            auto coin = viewMemPool->AccessCoin(txin.prevout);
-            if (coin.IsSpent()) {
+            if (auto coin = viewMemPool->GetCoin(txin.prevout); !coin.has_value() || coin->IsSpent())
+            {
                 return error("%s: Missing input", __func__);
             }
-            if (coin.GetHeight() == MEMPOOL_HEIGHT) {
+            else if (coin->GetHeight() == MEMPOOL_HEIGHT)
+            {
                 // Assume all mempool transaction confirm in the next block
                 prevheights[txinIndex] = tip.nHeight + 1;
             } else {
-                prevheights[txinIndex] = coin.GetHeight();
+                prevheights[txinIndex] = coin->GetHeight();
             }
         }
         lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
@@ -501,17 +502,17 @@ uint64_t GetP2SHSigOpCount(const Config &config,
 
     uint64_t nSigOps = 0;
     for (auto &i : tx.vin) {
-        CoinWithScript coin = inputs.AccessCoinWithScript(i.prevout);
-        assert(!coin.IsSpent());
+        auto coin = inputs.GetCoinWithScript(i.prevout);
+        assert(coin.has_value() && !coin->IsSpent());
 
         bool genesisEnabled = true;
-        if (coin.GetHeight() != MEMPOOL_HEIGHT){
-            genesisEnabled = IsGenesisEnabled(config, coin.GetHeight());
+        if (coin->GetHeight() != MEMPOOL_HEIGHT){
+            genesisEnabled = IsGenesisEnabled(config, coin->GetHeight());
         }
         if (genesisEnabled) {
             continue;
         }
-        const CTxOut &prevout = coin.GetTxOut();
+        const CTxOut &prevout = coin->GetTxOut();
         if (IsP2SH(prevout.scriptPubKey)) {
             nSigOps += prevout.scriptPubKey.GetSigOpCount(i.scriptSig, genesisEnabled, sigOpCountError);
             if (sigOpCountError) {
@@ -737,29 +738,29 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
 
     assert(!tx.IsCoinBase());
     for (const CTxIn &txin : tx.vin) {
-        Coin coin = view.AccessCoin(txin.prevout);
         // At this point we haven't actually checked if the coins are all
         // available (or shouldn't assume we have, since CheckInputs does). So
         // we just return failure if the inputs are not available here, and then
         // only have to check equivalence for available inputs.
-        if (coin.IsSpent()) {
+        auto coin = view.GetCoin(txin.prevout);
+        if (!coin.has_value() || coin->IsSpent()) {
             return false;
         }
         auto txFrom = underlyingMempool.GetCachedTransactionRef(txin.prevout);
         if (txFrom) {
             assert(txFrom->GetHash() == txin.prevout.GetTxId());
             assert(txFrom->vout.size() > txin.prevout.GetN());
-            assert(txFrom->vout[txin.prevout.GetN()].nValue == coin.GetAmount());
+            assert(txFrom->vout[txin.prevout.GetN()].nValue == coin->GetAmount());
             // Most scripts are of the same size but we don't want to pay for
             // script loading just to assert
-            assert(txFrom->vout[txin.prevout.GetN()].scriptPubKey.size() == coin.GetScriptSize());
+            assert(txFrom->vout[txin.prevout.GetN()].scriptPubKey.size() == coin->GetScriptSize());
         } else {
             auto coinFromDisk = underlyingMempool.GetCoinFromDB(txin.prevout);
             assert(coinFromDisk.has_value() && !coinFromDisk->IsSpent());
-            assert(coinFromDisk->GetAmount() == coin.GetAmount());
+            assert(coinFromDisk->GetAmount() == coin->GetAmount());
             // Most scripts are of the same size but we don't want to pay for
             // script loading just to assert
-            assert(coinFromDisk->GetScriptSize() == coin.GetScriptSize());
+            assert(coinFromDisk->GetScriptSize() == coin->GetScriptSize());
         }
     }
 
@@ -818,8 +819,8 @@ static bool CheckTxSpendsCoinbase(
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
     for (const CTxIn &txin : tx.vin) {
-        Coin coin = view.AccessCoin(txin.prevout);
-        if (coin.IsCoinBase()) {
+        if (auto coin = view.GetCoin(txin.prevout);
+            coin.has_value() && coin->IsCoinBase()) {
             return true;
         }
     }
@@ -2979,23 +2980,23 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
     Amount nFees(0);
     for (const auto &in : tx.vin) {
         const COutPoint &prevout = in.prevout;
-        Coin coin = inputs.AccessCoin(prevout);
-        assert(!coin.IsSpent());
+        auto coin = inputs.GetCoin(prevout);
+        assert(coin.has_value() && !coin->IsSpent());
 
         // If prev is coinbase, check that it's matured
-        if (coin.IsCoinBase()) {
-            if (nSpendHeight - coin.GetHeight() < COINBASE_MATURITY) {
+        if (coin->IsCoinBase()) {
+            if (nSpendHeight - coin->GetHeight() < COINBASE_MATURITY) {
                 return state.Invalid(
                     false, REJECT_INVALID,
                     "bad-txns-premature-spend-of-coinbase",
                     strprintf("tried to spend coinbase at depth %d",
-                              nSpendHeight - coin.GetHeight()));
+                              nSpendHeight - coin->GetHeight()));
             }
         }
 
         // Check for negative or overflow input values
-        nValueIn += coin.GetAmount();
-        if (!MoneyRange(coin.GetAmount()) || !MoneyRange(nValueIn)) {
+        nValueIn += coin->GetAmount();
+        if (!MoneyRange(coin->GetAmount()) || !MoneyRange(nValueIn)) {
             return state.DoS(100, false, REJECT_INVALID,
                              "bad-txns-inputvalues-outofrange");
         }
@@ -3086,19 +3087,19 @@ std::optional<bool> CheckInputs(
     for (size_t i = 0; i < tx.vin.size(); i++) 
     {
         const COutPoint &prevout = tx.vin[i].prevout;
-        CoinWithScript coin = inputs.AccessCoinWithScript(prevout);
-        assert(!coin.IsSpent());
+        auto coin = inputs.GetCoinWithScript(prevout);
+        assert(coin.has_value() && !coin->IsSpent());
 
         // We very carefully only pass in things to CScriptCheck which are
         // clearly committed to by tx' witness hash. This provides a sanity
         // check that our caching is not introducing consensus failures through
         // additional data in, eg, the coins being spent being checked as a part
         // of CScriptCheck.
-        const CScript &scriptPubKey = coin.GetTxOut().scriptPubKey;
-        const Amount amount = coin.GetTxOut().nValue;
+        const CScript &scriptPubKey = coin->GetTxOut().scriptPubKey;
+        const Amount amount = coin->GetTxOut().nValue;
 
         uint32_t perInputScriptFlags = 0;
-        int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coin.GetHeight());
+        int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coin->GetHeight());
         bool isGenesisEnabled = IsGenesisEnabled(config, inputScriptBlockHeight);
         if (isGenesisEnabled)
         {
@@ -3697,7 +3698,7 @@ static bool ConnectBlock(
             // require the UTXO set.
             prevheights.resize(tx.vin.size());
             for (size_t j = 0; j < tx.vin.size(); j++) {
-                prevheights[j] = view.AccessCoin(tx.vin[j].prevout).GetHeight();
+                prevheights[j] = view.GetCoin(tx.vin[j].prevout)->GetHeight();
             }
 
             if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {

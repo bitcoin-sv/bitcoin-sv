@@ -229,7 +229,7 @@ void CheckAccessCoin(const Amount base_value, const Amount cache_value,
                      const Amount expected_value, char cache_flags,
                      char expected_flags) {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
-    test.cache->AccessCoin(OUTPOINT);
+    test.cache->GetCoin(OUTPOINT);
     test.cache->SelfTest();
 
     Amount result_value;

@@ -206,6 +206,9 @@ public:
     //! Empty constructor
     CoinWithScript() = default;
 
+    CoinWithScript(const CoinWithScript&) = delete;
+    CoinWithScript& operator=(const CoinWithScript&) = delete;
+
     CoinWithScript(CoinWithScript&& coin) noexcept
         : CoinImpl{std::move(coin)}
     {}
@@ -213,11 +216,6 @@ public:
     CoinWithScript(CoinImpl&& coin) noexcept
         : CoinImpl{std::move(coin)}
     {}
-
-    CoinWithScript MakeNonOwning()
-    {
-        return {*this};
-    }
 
     CoinWithScript MakeOwning() const
     {
@@ -249,8 +247,6 @@ public:
     const Amount& GetAmount() const { return GetTxOut().nValue; }
 
 private:
-    CoinWithScript(const CoinWithScript&) = default;
-
     //! Constructor from a CTxOut and height/coinbase information.
     CoinWithScript(CTxOut&& outIn, int32_t nHeightIn, bool IsCoinbase)
         : CoinImpl{std::move(outIn), outIn.scriptPubKey.size(), nHeightIn, IsCoinbase}
@@ -491,15 +487,38 @@ public:
     uint256 GetBestBlock() const;
     void SetBestBlock(const uint256 &hashBlock);
 
-    /**
-     * Return a Coin with data, or a pruned one if not found.
-     *
-     * TODO: Merge this function with GetCoin() in a future commit.
-     */
-    Coin AccessCoin(const COutPoint& output) const;
+    // If found return basic coin info without script loaded
+    std::optional<Coin> GetCoin(const COutPoint& outpoint) const
+    {
+        auto coinData = GetCoin(outpoint, 0);
+        if(coinData.has_value())
+        {
+            return Coin{coinData.value()};
+        }
 
-    //! Same as AccessCoin but returns CoinWithScript
-    CoinWithScript AccessCoinWithScript(const COutPoint& output) const;
+        return {};
+    }
+
+    // Return coin with script loaded
+    //
+    // It will return either:
+    // * a non owning coin pointing to the coin stored in view hierarchy cache
+    // * an owning coin if there is not enough space for coin in cache
+    // * nothing if coin is not found
+    //
+    // Non owning coins must be released before view goes out of scope
+    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+    {
+        auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
+        if(coinData.has_value())
+        {
+            assert(coinData->HasScript());
+
+            return std::move(coinData.value());
+        }
+
+        return {};
+    }
 
     /**
      * Add a coin. Set potential_overwrite to true if a non-pruned version may

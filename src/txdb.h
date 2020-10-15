@@ -255,6 +255,7 @@ public:
         mDB.ReadLock( mLock );
     }
 
+    // If found return basic coin info without script loaded
     std::optional<Coin> GetCoin(const COutPoint& outpoint) const
     {
         auto coinData = mDB.GetCoin(outpoint, 0);
@@ -265,6 +266,15 @@ public:
 
         return {};
     }
+
+    // Return coin with script loaded
+    //
+    // It will return either:
+    // * a non owning coin pointing to the coin stored in view hierarchy cache
+    // * an owning coin if there is not enough space for coin in cache
+    // * nothing if coin is not found
+    //
+    // Non owning coins must be released before view goes out of scope
     std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
     {
         auto coinData = mDB.GetCoin(outpoint, std::numeric_limits<size_t>::max());
