@@ -48,7 +48,7 @@ protected:
                          const CBlockIndex *pindexFork,
                          bool fInitialDownload) override;
 
-    void InvalidTxMessage(std::string_view message) override;
+    void InvalidTxMessageZMQ(std::string_view message) override;
 
 private:
     CZMQNotificationInterface();
