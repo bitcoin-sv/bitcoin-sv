@@ -12,6 +12,12 @@
 class CZMQPublisher
 {
 public:
+
+    CZMQPublisher(CZMQPublisher const &) = delete;
+    CZMQPublisher & operator= (CZMQPublisher const &) = delete;
+    CZMQPublisher(CZMQPublisher &&) = delete;
+    CZMQPublisher & operator= (CZMQPublisher &&) = delete;
+    
     CZMQPublisher();
     ~CZMQPublisher();
     bool SendZMQMessage(void* psocket, const char* command, const void* data, size_t size, uint32_t nSequence);
