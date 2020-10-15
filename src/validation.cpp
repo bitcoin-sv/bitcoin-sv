@@ -641,8 +641,7 @@ bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, ui
 
     }
 
-    static SaltedOutpointHasher hasher {};
-    std::unordered_set<COutPoint, SaltedOutpointHasher> inOutPoints { 1, hasher };
+    std::set<COutPoint> inOutPoints;
     for (const auto &txin : tx.vin) {
         if (txin.prevout.IsNull()) {
             return state.DoS(10, false, REJECT_INVALID,

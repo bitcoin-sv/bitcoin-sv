@@ -11,10 +11,6 @@
 #include <cassert>
 #include <config.h>
 
-SaltedOutpointHasher::SaltedOutpointHasher()
-    : k0(GetRand(std::numeric_limits<uint64_t>::max())),
-      k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
-
 CCoinsViewCache::CCoinsViewCache(const ICoinsView& view)
     : mThreadId{std::this_thread::get_id()}
     , mSourceView{&view}
