@@ -6,12 +6,14 @@
 #include "consensus/validation.h"
 #include "script/standard.h"
 #include "test/test_bitcoin.h"
+#include "testutil.h"
 #include "uint256.h"
 #include "undo.h"
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "chainparams.h"
 
+#include <chrono>
 #include <map>
 #include <vector>
 
@@ -30,35 +32,43 @@ struct CoinsStore::UnitTestAccess<coins_tests_uid>
 };
 using TestAccessCoinsCache = CoinsStore::UnitTestAccess<coins_tests_uid>;
 
-namespace {
+template <>
+struct CoinsDBSpan::UnitTestAccess<coins_tests_uid> : public CoinsDBSpan
+{
+    using CoinsDBSpan::CoinsDBSpan;
 
-class CCoinsViewCacheTest : public CCoinsViewCache {
-public:
-    CCoinsViewCacheTest(CCoinsView *base) : CCoinsViewCache(base) {}
-
-    void SelfTest() const {
-        // Manually recompute the dynamic usage of the whole data, and compare
-        // it.
-        size_t ret = memusage::DynamicUsage(TestAccessCoinsCache::GetRawCacheCoins(mCache));
-        size_t count = 0;
-        for (const auto& entry : TestAccessCoinsCache::GetRawCacheCoins(mCache))
-        {
-            ret += entry.second.DynamicMemoryUsage();
-            count++;
-        }
-        BOOST_CHECK_EQUAL(mCache.CachedCoinsCount(), count);
-        BOOST_CHECK_EQUAL(DynamicMemoryUsage(), ret);
-    }
+    CCoinsMap& GetRawCacheCoins() { return TestAccessCoinsCache::GetRawCacheCoins(mCache); }
+    size_t& GetCachedCoinsUsage() { return TestAccessCoinsCache::GetCachedCoinsUsage(mCache); }
 
     void BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlockIn)
     {
         mCache.BatchWrite(mapCoins);
         hashBlock = hashBlockIn;
     }
-
-    CCoinsMap &map() { return TestAccessCoinsCache::GetRawCacheCoins(mCache); }
-    size_t &usage() { return TestAccessCoinsCache::GetCachedCoinsUsage(mCache); }
 };
+using TestCoinsSpanCache = CoinsDBSpan::UnitTestAccess<coins_tests_uid>;
+
+namespace {
+
+class CCoinsViewCacheTest : public TestCoinsSpanCache {
+public:
+    CCoinsViewCacheTest( CoinsDB& db ) : TestCoinsSpanCache(db) {}
+
+    void SelfTest() {
+        // Manually recompute the dynamic usage of the whole data, and compare
+        // it.
+        size_t ret = memusage::DynamicUsage(GetRawCacheCoins());
+        size_t count = 0;
+        for (const auto& entry : GetRawCacheCoins())
+        {
+            ret += entry.second.DynamicMemoryUsage();
+            count++;
+        }
+        BOOST_CHECK_EQUAL(GetRawCacheCoins().size(), count);
+        BOOST_CHECK_EQUAL(DynamicMemoryUsage(), ret);
+    }
+};
+
 } // namespace
 
 BOOST_FIXTURE_TEST_SUITE(coins_tests, BasicTestingSetup)
@@ -183,44 +193,44 @@ void GetCoinMapEntry(const CCoinsMap &map, Amount &value, char &flags) {
     }
 }
 
-void WriteCoinViewEntry(CCoinsViewCacheTest &view, const Amount value, char flags) {
+void WriteCoinViewEntry(TestCoinsSpanCache& span, const Amount value, char flags) {
     CCoinsMap map;
     InsertCoinMapEntry(map, value, flags);
-    view.BatchWrite(map, uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
+    span.BatchWrite(map, uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
 }
 
 class SingleEntryCacheTest {
 public:
     SingleEntryCacheTest(const Amount base_value, const Amount cache_value,
-                         char cache_flags) {
-
+                         char cache_flags){
         {
-            CCoinsViewCacheTest tmp{&base};
-            WriteCoinViewEntry(tmp, base_value,
+            TestCoinsSpanCache span{base};
+            WriteCoinViewEntry(span, base_value,
                                base_value == ABSENT ? NO_ENTRY : DIRTY);
-            tmp.Flush();
+            span.TryFlush();
         }
-        cache.usage() +=
-            InsertCoinMapEntry(cache.map(), cache_value, cache_flags);
+        cache = std::make_unique<CCoinsViewCacheTest>(base);
+        cache->GetCachedCoinsUsage() +=
+            InsertCoinMapEntry(cache->GetRawCacheCoins(), cache_value, cache_flags);
     }
 
 private:
     CoinsDB base{ 0, false, false };
 
 public:
-    CCoinsViewCacheTest cache{&base};
+    std::unique_ptr<CCoinsViewCacheTest> cache;
 };
 
 void CheckAccessCoin(const Amount base_value, const Amount cache_value,
                      const Amount expected_value, char cache_flags,
                      char expected_flags) {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
-    test.cache.AccessCoin(OUTPOINT);
-    test.cache.SelfTest();
+    test.cache->AccessCoin(OUTPOINT);
+    test.cache->SelfTest();
 
     Amount result_value;
     char result_flags;
-    GetCoinMapEntry(test.cache.map(), result_value, result_flags);
+    GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
 }
@@ -266,12 +276,12 @@ void CheckSpendCoin(Amount base_value, Amount cache_value,
                     Amount expected_value, char cache_flags,
                     char expected_flags) {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
-    test.cache.SpendCoin(OUTPOINT);
-    test.cache.SelfTest();
+    test.cache->SpendCoin(OUTPOINT);
+    test.cache->SelfTest();
 
     Amount result_value;
     char result_flags;
-    GetCoinMapEntry(test.cache.map(), result_value, result_flags);
+    GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     BOOST_CHECK_EQUAL(result_value, expected_value);
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
 };
@@ -324,10 +334,10 @@ void CheckAddCoinBase(Amount base_value, Amount cache_value,
     try {
         CTxOut output;
         output.nValue = modify_value;
-        test.cache.AddCoin(OUTPOINT, Coin(std::move(output), 1, coinbase),
+        test.cache->AddCoin(OUTPOINT, Coin(std::move(output), 1, coinbase),
                            coinbase, GlobalConfig::GetConfig().GetGenesisActivationHeight());
-        test.cache.SelfTest();
-        GetCoinMapEntry(test.cache.map(), result_value, result_flags);
+        test.cache->SelfTest();
+        GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     } catch (std::logic_error &e) {
         result_value = FAIL;
         result_flags = NO_ENTRY;
@@ -386,9 +396,9 @@ void CheckWriteCoin(Amount parent_value, Amount child_value,
     Amount result_value;
     char result_flags;
     try {
-        WriteCoinViewEntry(test.cache, child_value, child_flags);
-        test.cache.SelfTest();
-        GetCoinMapEntry(test.cache.map(), result_value, result_flags);
+        WriteCoinViewEntry(*test.cache, child_value, child_flags);
+        test.cache->SelfTest();
+        GetCoinMapEntry(test.cache->GetRawCacheCoins(), result_value, result_flags);
     } catch (std::logic_error &e) {
         result_value = FAIL;
         result_flags = NO_ENTRY;
@@ -474,6 +484,131 @@ BOOST_AUTO_TEST_CASE(coin_write) {
                 }
             }
         }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(coins_provider_locks, TestingSetup)
+{
+    using namespace std::literals::chrono_literals;
+
+    auto test_try_flush =
+        [](std::atomic<int>& step)
+        {
+            // initialize first
+            CoinsDBSpan span{*pcoinsTip};
+            step = 1;
+
+            // wait for others to finish initialization
+            while(step.load() == 1);
+
+            // one thread should succeed, the rest should fail
+            return (span.TryFlush() == CoinsDBSpan::WriteState::ok);
+        };
+    auto test_read_lock =
+        [](std::atomic<int>& step)
+        {
+            // initialize first
+            CoinsDBView view{ *pcoinsTip };
+            CCoinsViewCache provider{ view };
+            step = 1;
+
+            // wait for others to finish initialization
+            while(step.load() == 1);
+        };
+
+    // TryFlush can be performed only if there are no other view locks
+    {
+        std::atomic<int> one_step{0};
+        auto one = std::async(std::launch::async, test_read_lock, std::reference_wrapper{one_step});
+        std::atomic<int> two_step{0};
+        auto two = std::async(std::launch::async, test_try_flush, std::reference_wrapper{two_step});
+
+        // wait for all to initialize
+        BOOST_TEST(wait_for([&]{ return one_step.load() == 1 && two_step.load() == 1; }, 200ms));
+
+        two_step = 2;
+
+        // make sure that TryFlush keeps waiting for the read lock to be dropped
+        BOOST_TEST((two.wait_for(500ms) == std::future_status::timeout));
+
+        one_step = 2;
+
+        BOOST_TEST(two.get());
+        one.wait();
+    }
+
+    // TryFlush from second location fails
+    {
+        std::atomic<int> one_step{0};
+        auto one = std::async(std::launch::async, test_try_flush, std::reference_wrapper{one_step});
+        std::atomic<int> two_step{0};
+        auto two = std::async(std::launch::async, test_try_flush, std::reference_wrapper{two_step});
+
+        // wait for all to initialize
+        BOOST_TEST(wait_for([&]{ return one_step.load() == 1 && two_step.load() == 1; }, 200ms));
+
+        one_step = 2;
+        two_step = 2;
+
+        BOOST_TEST(one.get() != two.get());
+    }
+
+    auto test_flush =
+        [](std::atomic<int>& step)
+        {
+            bool result = pcoinsTip->Flush();
+
+            step = 1;
+
+            return result;
+        };
+
+    // MT span creation waits until other view locks are present
+    {
+        std::atomic<int> one_step{0};
+        auto one = std::async(std::launch::async, test_read_lock, std::reference_wrapper{one_step});
+
+        // wait for all to initialize
+        BOOST_TEST(wait_for([&]{ return one_step.load() == 1; }, 200ms));
+
+        std::atomic<int> two_step{0};
+        auto two = std::async(std::launch::async, test_flush, std::reference_wrapper{two_step});
+
+        // make sure that Flush keeps waiting for the read lock to be dropped
+        BOOST_TEST((one.wait_for(500ms) == std::future_status::timeout));
+
+        // MT span still hasn't been flushed
+        BOOST_TEST(two_step == 0);
+
+        one_step = 2;
+        one.wait();
+        BOOST_TEST(two.get());
+    }
+
+    // TryFlush fails if MT span creation is pending
+    {
+        std::atomic<int> one_step{0};
+        auto one = std::async(std::launch::async, test_try_flush, std::reference_wrapper{one_step});
+
+        // wait for all to initialize
+        BOOST_TEST(wait_for([&]{ return one_step.load() == 1; }, 200ms));
+
+        std::atomic<int> two_step{0};
+        auto two = std::async(std::launch::async, test_flush, std::reference_wrapper{two_step});
+
+        // make sure that Flush keeps waiting for the read lock held inside
+        // test_try_flush to be dropped
+        BOOST_TEST((two.wait_for(500ms) == std::future_status::timeout));
+
+        ++one_step;
+
+        // make sure that TryFlush immediately fails since an exclusive write
+        // lock is pending
+        BOOST_TEST((one.wait_for(500ms) == std::future_status::ready));
+        BOOST_TEST((two.wait_for(500ms) == std::future_status::ready));
+
+        BOOST_TEST(one.get() == false);
+        BOOST_TEST(two.get());
     }
 }
 

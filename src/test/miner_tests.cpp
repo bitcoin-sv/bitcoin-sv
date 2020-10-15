@@ -113,8 +113,9 @@ CBlockIndex CreateBlockIndex(int32_t nHeight) {
 }
 
 bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) {
-    CCoinsViewMemPool viewMemPool{pcoinsTip, mempool};
-    CCoinsViewCache cache{&viewMemPool};
+    CoinsDBView view{ *pcoinsTip };
+    CCoinsViewMemPool viewMemPool{view, mempool};
+    CCoinsViewCache cache{viewMemPool};
 
     return CheckSequenceLocks(*chainActive.Tip(), tx, config, flags, nullptr, &cache);
 }

@@ -36,6 +36,7 @@ class CAutoFile;
 class CBlockIndex;
 class Config;
 class CoinsDB;
+class CoinsDBView;
 
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
@@ -723,7 +724,7 @@ public:
      * Callback parameters: coin and consecutive index of view outpoints
      */
     void OnUnspentCoins(
-        CoinsDB& tip,
+        const CoinsDBView& tip,
         const std::vector<COutPoint>& outpoints,
         const std::function<void(Coin&&, size_t)>& callback) const;
 
@@ -1021,7 +1022,7 @@ private:
 };
 
 /**
- * CCoinsView that brings transactions from a memorypool into view.
+ * ICoinsView that brings transactions from a memorypool into view.
  * If a transaction is in mempool this class will return an unspent coin even
  *
  * - If GetCoin/HaveCoin finds a coin  it will always return it in subsequent calls.
@@ -1039,12 +1040,12 @@ private:
  *   + CTxnDoubleSpendDetector::insertTxnInputs  - this is final check, executed
  *     while holding double spend detector lock
  */
-class CCoinsViewMemPool : public CCoinsViewBacked {
-protected:
+class CCoinsViewMemPool : public ICoinsView {
+private:
     const CTxMemPool &mempool;
 
 public:
-    CCoinsViewMemPool(CCoinsView *baseIn, const CTxMemPool &mempoolIn);
+    CCoinsViewMemPool(const CoinsDBView& DBView, const CTxMemPool &mempoolIn);
 
     /**
      * Returns cached transaction reference.
@@ -1053,10 +1054,17 @@ public:
      */
     CTransactionRef GetCachedTransactionRef(const COutPoint& outpoint) const;
 
+    std::optional<Coin> GetCoinFromDB(const COutPoint& outpoint) const;
+
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
 
+protected:
+    uint256 GetBestBlock() const override;
+
 private:
+    const CoinsDBView& mDBView;
+
     mutable std::mutex mMutex;
     mutable std::map<TxId, CTransactionRef> mCache;
 };

@@ -2890,6 +2890,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     strLoadError = _("Corrupted block database detected");
                     break;
                 }
+                // Make sure that nothing stays in cache as VerifyDB loads coins
+                // from database.
+                FlushStateToDisk();
 
                 InvalidateBlocksFromConfig(config);
 

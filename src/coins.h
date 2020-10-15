@@ -151,9 +151,18 @@ private:
     uint256 hashBlock;
 };
 
-/** Abstract view on the open txout dataset. */
-class CCoinsView {
-public:
+/**
+ * UTXO coins view interface.
+ *
+ * Implementations of this interface provide basic functionality that is needed
+ * by CCoinsViewCache.
+ */
+class ICoinsView {
+protected:
+    //! As we use CCoinsViews polymorphically, have protected destructor as we
+    //! don't want to support polymorphic destruction.
+    ~ICoinsView() = default;
+
     //! Retrieve the Coin (unspent transaction output) for a given outpoint.
     virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const = 0;
 
@@ -161,66 +170,28 @@ public:
     //! This may (but cannot always) return true for spent outputs.
     virtual bool HaveCoin(const COutPoint &outpoint) const = 0;
 
-    //! Retrieve the block hash whose state this CCoinsView currently represents
+    //! Retrieve the block hash whose state this CCoinsProvider currently represents
     virtual uint256 GetBestBlock() const = 0;
 
-    //! Retrieve the range of blocks that may have been only partially written.
-    //! If the database is in a consistent state, the result is the empty
-    //! vector.
-    //! Otherwise, a two-element vector is returned consisting of the new and
-    //! the old block hash, in that order.
-    virtual std::vector<uint256> GetHeadBlocks() const = 0;
+    virtual void ReleaseLock() { assert(!"Should not be used!"); }
+    virtual void ReLock() { assert(!"Should not be used!"); }
 
-    //! Do a bulk modification (multiple Coin changes + BestBlock change).
-    //! The passed mapCoins can be modified.
-    virtual bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) = 0;
-
-    //! Get a cursor to iterate over the whole state
-    virtual CCoinsViewCursor *Cursor() const = 0;
-
-    //! Get a cursor to iterate over coins by txId. Cursor is positioned at the first key in the source that is at or past target.
-    //! If coin with txId is not found then cursor is at position at first record after txId - source is sorted by txId
-    virtual CCoinsViewCursor* Cursor(const TxId& txId) const = 0;
-
-    //! As we use CCoinsViews polymorphically, have a virtual destructor
-    virtual ~CCoinsView() = default;
-
-    //! Estimate database size (0 if not implemented)
-    virtual size_t EstimateSize() const = 0;
+    friend class CCoinsViewCache;
 };
 
-
-/** Coins provider that never contains coins - dummy. */
-class CCoinsViewEmpty : public CCoinsView
+/**
+ * Coins view that never contains coins - dummy.
+ */
+class CCoinsViewEmpty : public ICoinsView
 {
-public:
+protected:
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override { return false; }
     bool HaveCoin(const COutPoint &outpoint) const override { return false; }
     uint256 GetBestBlock() const override { return {}; }
-    std::vector<uint256> GetHeadBlocks() const override { return {}; }
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override { return false; }
-    CCoinsViewCursor *Cursor() const override { return nullptr; }
-    CCoinsViewCursor* Cursor(const TxId& txId) const override { return nullptr; }
-    size_t EstimateSize() const override { return 0; }
+
+    void ReleaseLock() override {}
+    void ReLock() override {}
 };
-
-/** CCoinsView backed by another CCoinsView */
-class CCoinsViewBacked : public CCoinsView {
-protected:
-    CCoinsView *base;
-
-public:
-    CCoinsViewBacked(CCoinsView *viewIn);
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
-    bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const override;
-    std::vector<uint256> GetHeadBlocks() const override;
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;
-    CCoinsViewCursor *Cursor() const override;
-    CCoinsViewCursor *Cursor(const TxId &txId) const override;
-    size_t EstimateSize() const override;
-};
-
 
 class CoinsStore
 {
@@ -263,6 +234,15 @@ private:
     mutable size_t cachedCoinsUsage{0};
 };
 
+/**
+ * A cached coins view that is expected to be used from only one thread.
+ *
+ * Cache of this class stores:
+ * - non-owning coins pointing to owning coin with script in underlying view
+ * - owning coins without script retrieved from the underlying view
+ * - owning coins without script that were spent with through SpendCoin()
+ * - owning coins with script added to this cache through AddCoin()
+ */
 class CCoinsViewCache
 {
 protected:
@@ -274,7 +254,7 @@ protected:
     mutable CoinsStore mCache;
 
 public:
-    explicit CCoinsViewCache(CCoinsView* baseIn);
+    explicit CCoinsViewCache(const ICoinsView& view);
 
     CCoinsViewCache(const CCoinsViewCache&) = delete;
     CCoinsViewCache& operator=(const CCoinsViewCache&) = delete;
@@ -311,11 +291,6 @@ public:
     bool SpendCoin(const COutPoint &outpoint, Coin *moveto = nullptr);
 
     /**
-     * WARNING: Calling this function expects that we already have the coins in
-     *          cache and that we haven't spent them yet. This limitation will
-     *          be removed with internal locking mechanism guarantee in later
-     *          commit.
-     *
      * Amount of bitcoins coming in to a transaction
      * Note that lightweight clients may not know anything besides the hash of
      * previous transactions, so may not be able to calculate this.
@@ -342,23 +317,72 @@ public:
                        Amount &inChainInputValue) const;
 
     /**
-     * Push the modifications applied to this cache to its base.
-     * Failure to call this method before destruction will cause the changes to
-     * be forgotten. If false is returned, the state of this cache (and its
-     * backing view) will be undefined.
+     * Detach provider - this function expects that view won't be used until
+     * it is re-attached by calling TryReattach().
+     *
+     * This functionality is needed for parallel block validation so that it
+     * can continue validating loosing blocks while still being able to commit
+     * the changes for the block that won to the database.
+     *
+     * Function is dangerous to use since it removes coins cache stability so
+     * the code between detach and re-attach should not access any coins.
+     *
+     * It is used in combination wit TryReattach()
      */
-    bool Flush();
+    void ForceDetach()
+    {
+        assert(mThreadId == std::this_thread::get_id());
+        if(mView != &mViewEmpty)
+        {
+            GetBestBlock();
+            mView = &mViewEmpty;
+            const_cast<ICoinsView*>( mSourceView )->ReleaseLock();
+        }
+    }
+
+    /**
+     * Try to re-attach view to once again use it. It is expected that in case
+     * best block hash hasn't changed the cached entries are still valid.
+     *
+     * Function returns true if re-attachment is possible (current best block
+     * hasn't changed) and false otherwise. In case false is returned the class
+     * should be destroyed without using any other functions.
+     *
+     * It is used in combination wit ForceDetach() - see for use
+     */
+    bool TryReattach()
+    {
+        assert(mThreadId == std::this_thread::get_id());
+        if(mView == mSourceView)
+        {
+            return true;
+        }
+
+        const_cast<ICoinsView*>( mSourceView )->ReLock();
+
+        if(mSourceView->GetBestBlock() != GetBestBlock())
+        {
+            return false;
+        }
+
+        mView = mSourceView;
+
+        return true;
+    }
 
 private:
     // A non-locking fetch coin
     std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint &outpoint) const;
+
+    inline static CCoinsViewEmpty mViewEmpty;
 
 protected:
     // variable is only used for asserts to make sure that users are not using
     // it in an unsupported way - from more than one thread
     std::thread::id mThreadId;
 
-    CCoinsView* mProvider;
+    const ICoinsView* mSourceView; // can't be null but must be a pointer for lazy binding
+    const ICoinsView* mView;
 };
 
 //! Utility function to add all of a transaction's outputs to a cache.

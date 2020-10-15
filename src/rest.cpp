@@ -17,6 +17,7 @@
 #include "rpc/tojson.h"
 #include "streams.h"
 #include "sync.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "utilstrencodings.h"
 #include "validation.h"
@@ -591,10 +592,8 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
     if( fCheckMemPool )
     {
-        LOCK(cs_main); // TODO remove locks in future commit
-
         mempool.OnUnspentCoins(
-            *pcoinsTip,
+            CoinsDBView{ *pcoinsTip },
             vOutPoints,
             [&outs, &bitmapStringRepresentation, &bitmap]
             (Coin&& coin, size_t idx)

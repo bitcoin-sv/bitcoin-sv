@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE(connect_utxo_extblock) {
     CMutableTransaction tx;
 
     CCoinsViewEmpty coinsDummy;
-    CCoinsViewCache view(&coinsDummy);
+    CCoinsViewCache view(coinsDummy);
 
     block.hashPrevBlock = InsecureRand256();
     view.SetBestBlock(block.hashPrevBlock);

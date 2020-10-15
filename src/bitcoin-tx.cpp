@@ -565,7 +565,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     CMutableTransaction mergedTx(txVariants[0]);
     bool fComplete = true;
     CCoinsViewEmpty dummy;
-    CCoinsViewCache view(&dummy);
+    CCoinsViewCache view{dummy};
 
     if (!registers.count("privatekeys")) {
         throw std::runtime_error("privatekeys register variable must be set.");

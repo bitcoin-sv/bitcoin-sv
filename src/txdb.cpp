@@ -430,15 +430,6 @@ CoinsDB::FetchCoin(const COutPoint &outpoint) const
     return mCache.AddCoin(outpoint, std::move(tmp));
 }
 
-bool CoinsDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    auto fetchCoin = FetchCoin(outpoint);
-    if (!fetchCoin.has_value()) {
-        return false;
-    }
-    coin = fetchCoin.value();
-    return true;
-}
-
 bool CoinsDB::HaveCoin(const COutPoint &outpoint) const {
     auto coin = FetchCoin(outpoint);
     return coin.has_value() && !coin->get().IsSpent();
@@ -457,17 +448,37 @@ uint256 CoinsDB::GetBestBlock() const {
     return hashBlock;
 }
 
-bool CoinsDB::BatchWrite(CCoinsMap &mapCoins,
-                                 const uint256 &hashBlockIn) {
+bool CoinsDB::BatchWrite(
+    const WPUSMutex::Lock& writeLock,
+    const uint256& hashBlockIn,
+    CCoinsMap&& mapCoins)
+{
+    assert( writeLock.GetLockType() == WPUSMutex::Lock::Type::write );
     std::unique_lock lock { mCoinsViewCacheMtx };
-    mCache.BatchWrite(mapCoins);
-    hashBlock = hashBlockIn;
+
+    if(hashBlockIn.IsNull())
+    {
+        assert(mapCoins.empty());
+    }
+    else
+    {
+        mCache.BatchWrite(mapCoins);
+        hashBlock = hashBlockIn;
+    }
     return true;
 }
 
 bool CoinsDB::Flush()
 {
+    WPUSMutex::Lock writeLock = mMutex.WriteLock();
     std::unique_lock lock { mCoinsViewCacheMtx };
+
+    if(hashBlock.IsNull())
+    {
+        // nothing new was added
+        return true;
+    }
+
     auto coins = mCache.MoveOutCoins();
 
     return DBBatchWrite(coins, hashBlock);
@@ -475,6 +486,7 @@ bool CoinsDB::Flush()
 
 void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)
 {
+    WPUSMutex::Lock writeLock = mMutex.WriteLock();
     std::unique_lock lock { mCoinsViewCacheMtx };
     mCache.Uncache(vOutpoints);
 }
@@ -492,9 +504,8 @@ Coin CoinsDB::GetCoinByTxId(const TxId& txid) const
     // performance testing indicates that after 100 look up by cursor becomes faster
 
     for (int n = 0; n < MAX_VIEW_ITERATIONS; n++) {
-        if (Coin alternate;
-            GetCoin(COutPoint(txid, n), alternate) && !alternate.IsSpent()) {
-            return alternate;
+        if (auto alternate = FetchCoin(COutPoint(txid, n)); alternate.has_value() && !alternate->get().IsSpent()) {
+            return alternate.value();
         }
     }
 
@@ -526,4 +537,26 @@ Coin CoinsDB::GetCoinByTxId(const TxId& txid) const
         }
     }
     return {};
+}
+
+auto CoinsDBSpan::TryFlush() -> WriteState
+{
+    assert(mThreadId == std::this_thread::get_id());
+
+    if (!mDB.TryWriteLock( mView.mLock ))
+    {
+        return WriteState::invalidated;
+    }
+
+    auto revertToReadLock =
+        [this](void*)
+        {
+             mDB.ReadLock( mView.mLock );
+        };
+    std::unique_ptr<WPUSMutex::Lock, decltype(revertToReadLock)> guard{&mView.mLock, revertToReadLock};
+
+    return
+        mDB.BatchWrite(mView.mLock, hashBlock, mCache.MoveOutCoins())
+        ? WriteState::ok
+        : WriteState::error;
 }

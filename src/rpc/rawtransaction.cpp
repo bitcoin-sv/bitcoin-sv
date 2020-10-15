@@ -293,10 +293,12 @@ static CBlockIndex* GetBlockIndex(const Config& config,
     }
     else
     {
+        CoinsDBView tipView{ *pcoinsTip };
+
         // Try to find a block containing at least one requested transaction with utxo
         for (const TxId& txid : setTxIds)
         {
-            Coin coin = pcoinsTip->GetCoinByTxId(txid);
+            Coin coin = tipView.GetCoinByTxId(txid);
             if (!coin.IsSpent()) {
                 pblockindex = chainActive[coin.GetHeight()];
                 break;
@@ -931,8 +933,9 @@ static UniValue signrawtransaction(const Config &config,
     CMutableTransaction mergedTx(txVariants[0]);
 
     // Fetch previous transactions (inputs):
-    CCoinsViewMemPool viewMempool(pcoinsTip, mempool);
-    CCoinsViewCache view(&viewMempool);
+    CoinsDBView tipView{ *pcoinsTip };
+    CCoinsViewMemPool viewMempool(tipView, mempool);
+    CCoinsViewCache view(viewMempool);
 
     bool fGivenKeys = false;
     CBasicKeyStore tempKeystore;

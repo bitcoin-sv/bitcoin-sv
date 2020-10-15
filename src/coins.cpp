@@ -11,40 +11,14 @@
 #include <cassert>
 #include <config.h>
 
-CCoinsViewBacked::CCoinsViewBacked(CCoinsView *viewIn) : base(viewIn) {}
-bool CCoinsViewBacked::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    return base->GetCoin(outpoint, coin);
-}
-bool CCoinsViewBacked::HaveCoin(const COutPoint &outpoint) const {
-    return base->HaveCoin(outpoint);
-}
-uint256 CCoinsViewBacked::GetBestBlock() const {
-    return base->GetBestBlock();
-}
-std::vector<uint256> CCoinsViewBacked::GetHeadBlocks() const {
-    return base->GetHeadBlocks();
-}
-bool CCoinsViewBacked::BatchWrite(CCoinsMap &mapCoins,
-                                  const uint256 &hashBlock) {
-    return base->BatchWrite(mapCoins, hashBlock);
-}
-CCoinsViewCursor *CCoinsViewBacked::Cursor() const {
-    return base->Cursor();
-}
-CCoinsViewCursor* CCoinsViewBacked::Cursor(const TxId &txId) const {
-    return base->Cursor(txId);
-}
-size_t CCoinsViewBacked::EstimateSize() const {
-    return base->EstimateSize();
-}
-
 SaltedOutpointHasher::SaltedOutpointHasher()
     : k0(GetRand(std::numeric_limits<uint64_t>::max())),
       k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
 
-CCoinsViewCache::CCoinsViewCache(CCoinsView *baseIn)
+CCoinsViewCache::CCoinsViewCache(const ICoinsView& view)
     : mThreadId{std::this_thread::get_id()}
-    , mProvider{baseIn}
+    , mSourceView{&view}
+    , mView{mSourceView}
 {}
 
 size_t CCoinsViewCache::DynamicMemoryUsage() const {
@@ -61,7 +35,7 @@ CCoinsViewCache::FetchCoin(const COutPoint &outpoint) const
     }
 
     Coin tmp;
-    if (!mProvider->GetCoin(outpoint, tmp)) {
+    if (!mView->GetCoin(outpoint, tmp)) {
         return {};
     }
 
@@ -127,7 +101,7 @@ bool CCoinsViewCache::HaveCoin(const COutPoint &outpoint) const {
 uint256 CCoinsViewCache::GetBestBlock() const {
     assert(mThreadId == std::this_thread::get_id());
     if (hashBlock.IsNull()) {
-        hashBlock = mProvider->GetBestBlock();
+        hashBlock = mView->GetBestBlock();
     }
     return hashBlock;
 }
@@ -135,13 +109,6 @@ uint256 CCoinsViewCache::GetBestBlock() const {
 void CCoinsViewCache::SetBestBlock(const uint256 &hashBlockIn) {
     assert(mThreadId == std::this_thread::get_id());
     hashBlock = hashBlockIn;
-}
-
-bool CCoinsViewCache::Flush() {
-    assert(mThreadId == std::this_thread::get_id());
-    auto coins = mCache.MoveOutCoins();
-
-    return mProvider->BatchWrite(coins, hashBlock);
 }
 
 Amount CCoinsViewCache::GetValueIn(const CTransaction &tx) const {
@@ -153,9 +120,11 @@ Amount CCoinsViewCache::GetValueIn(const CTransaction &tx) const {
     Amount nResult(0);
 
     for (const auto& input: tx.vin) {
-        const Coin& coin = AccessCoin( input.prevout );
-        assert(!coin.IsSpent());
-        nResult += coin.GetTxOut().nValue;
+        auto coin = mCache.FetchCoin(input.prevout);
+        assert(coin.has_value());
+        assert(!coin->get().IsSpent());
+
+        nResult += coin->get().GetTxOut().nValue;
     }
 
     return nResult;

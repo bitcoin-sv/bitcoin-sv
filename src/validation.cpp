@@ -524,7 +524,7 @@ uint64_t GetP2SHSigOpCount(const Config &config,
 
 uint64_t GetTransactionSigOpCount(const Config &config, 
                                   const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, 
+                                  const CCoinsViewCache &inputs,
                                   bool checkP2SH,
                                   bool isGenesisEnabled, 
                                   bool& sigOpCountError) {
@@ -751,10 +751,9 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
             assert(txFrom->vout.size() > txin.prevout.GetN());
             assert(txFrom->vout[txin.prevout.GetN()] == coin.GetTxOut());
         } else {
-            Coin coinFromDisk;
-            pcoinsTip->GetCoin(txin.prevout, coinFromDisk);
-            assert(!coinFromDisk.IsSpent());
-            assert(coinFromDisk.GetTxOut() == coin.GetTxOut());
+            auto coinFromDisk = underlyingMempool.GetCoinFromDB(txin.prevout);
+            assert(coinFromDisk.has_value() && !coinFromDisk->IsSpent());
+            assert(coinFromDisk->GetTxOut() == coin.GetTxOut());
         }
     }
 
@@ -1197,8 +1196,9 @@ CTxnValResult TxnValidation(
     Amount nValueIn(0);
     LockPoints lp;
     // Combine db & mempool views together.
-    CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
-    CCoinsViewCache view(&viewMemPool);
+    CoinsDBView tipView{ *pcoinsTip };
+    CCoinsViewMemPool viewMemPool(tipView, pool);
+    CCoinsViewCache view(viewMemPool);
     // Do we already have it?
     if(!CheckTxOutputs(tx, pcoinsTip, view, vCoinsToUncache)) {
        state.Invalid(false, REJECT_ALREADY_KNOWN,
@@ -1797,8 +1797,14 @@ void ProcessValidatedTxn(
     // - collect txn's outpoints
     // - remove txn from the orphan queue
     if (!state.IsValid()) {
-        // coins to uncache
-        pcoinsTip->Uncache(txStatus.mCoinsToUncache);
+        if(!txStatus.mCoinsToUncache.empty())
+        {
+            // This is necessary even for new transactions that don't change
+            // coins database as there is uncaching mechanism that uncaches
+            // coins that were loaded for transaction validation and weren't
+            // in the cache before the validation started.
+            pcoinsTip->Uncache(txStatus.mCoinsToUncache);
+        }
     } else if (handlers.mpOrphanTxns) {
         // At this stage we want to collect outpoints of successfully submitted txn.
         // There might be other related txns being validated at the same time.
@@ -2228,8 +2234,9 @@ bool GetTransaction(const Config &config, const TxId &txid,
 
     // use coin database to locate block that contains transaction, and scan it
     if (fAllowSlow) {
-        Coin coin = pcoinsTip->GetCoinByTxId(txid);
-        if (!coin.IsSpent()) {
+        CoinsDBView view{ *pcoinsTip };
+
+        if (Coin coin = view.GetCoinByTxId(txid); !coin.IsSpent()) {
             pindexSlow = chainActive[coin.GetHeight()];
         }
     }
@@ -3282,7 +3289,7 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
     // if we know for sure that the coin did not already exist in the cache. As
     // we have queried for that above using HaveCoin, we don't need to guess.
     // When fClean is false, a coin already existed and it is an overwrite.
-    view.AddCoin(out, Coin{undo}, !fClean, config.GetGenesisActivationHeight());
+    view.AddCoin(out, Coin{undo}, !fClean, config.GetGenesisActivationHeight()); // FIXME making a copy of the coin
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
@@ -3766,6 +3773,11 @@ static bool ConnectBlock(
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
 
+    if (parallelBlockValidation)
+    {
+        view.ForceDetach();
+    }
+
     int64_t nTime3 = GetTimeMicros();
     nTimeConnect += nTime3 - nTime2;
     LogPrint(BCLog::BENCH,
@@ -3790,8 +3802,6 @@ static bool ConnectBlock(
         return result;
 
     }
-
-    const CBlockIndex* tipBeforeMainLockReleased = chainActive.Tip();
 
     int64_t nTime4; // This is set inside scope below
     {
@@ -3916,12 +3926,16 @@ static bool ConnectBlock(
         return AbortNode(state, "Failed to write transaction index");
     }
 
-    if (parallelBlockValidation &&
-        tipBeforeMainLockReleased != chainActive.Tip())
+    if (parallelBlockValidation)
     {
-        // a different block managed to become best block before this one
-        // so we should terminate connecting process
-        throw CBestBlockAttachmentCancellation{};
+        // TryReattach() will succeed if best block in active chain hasn't
+        // changed since ForceDetach().
+        if (!view.TryReattach())
+        {
+            // a different block managed to become best block before this one
+            // so we should terminate connecting process
+            throw CBestBlockAttachmentCancellation{};
+        }
     }
 
     // add this block to the view's block chain
@@ -4199,16 +4213,19 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     // Apply the block atomically to the chain state.
     int64_t nStart = GetTimeMicros();
     {
-        CCoinsViewCache view(pcoinsTip);
-        assert(view.GetBestBlock() == pindexDelete->GetBlockHash());
-        // Use new private CancellationSource that can not be cancelled
-        if (DisconnectBlock(block, pindexDelete, view, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
+        CoinsDBSpan pCoinsTipSpan{ *pcoinsTip };
+        assert(pCoinsTipSpan.GetBestBlock() == pindexDelete->GetBlockHash());
+        if (DisconnectBlock(block, pindexDelete, pCoinsTipSpan, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
             return error("DisconnectTip(): DisconnectBlock %s failed",
                          pindexDelete->GetBlockHash().ToString());
         }
 
-        bool flushed = view.Flush();
-        assert(flushed);
+        // NOTE:
+        // TryFlush() will never fail as cs_main is used to synchronize
+        // the different threads that Flush() or TryFlush() data. If cs_main
+        // guarantee is removed we must decide what to do in this case.
+        auto flushed = pCoinsTipSpan.TryFlush();
+        assert(flushed == CoinsDBSpan::WriteState::ok);
     }
 
     LogPrint(BCLog::BENCH, "- Disconnect block: %.2fms\n",
@@ -4394,7 +4411,7 @@ static bool ConnectTip(
     LogPrint(BCLog::BENCH, "  - Load block from disk: %.2fms [%.2fs]\n",
              (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
-        CCoinsViewCache view(pcoinsTip);
+        CoinsDBSpan pCoinsTipSpan{ *pcoinsTip };
 
         // Temporarily stop tracing events if we are in parallel validation as
         // we will possibly release cs_main lock for a while. In case of an
@@ -4410,7 +4427,7 @@ static bool ConnectTip(
                 blockConnecting,
                 state,
                 pindexNew,
-                view,
+                pCoinsTipSpan,
                 mostWorkOnChain);
 
         // re-enable tracing of events if it was disabled
@@ -4429,8 +4446,13 @@ static bool ConnectTip(
         nTimeConnectTotal += nTime3 - nTime2;
         LogPrint(BCLog::BENCH, "  - Connect total: %.2fms [%.2fs]\n",
                  (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
-        bool flushed = view.Flush();
-        assert(flushed);
+
+        // NOTE:
+        // TryFlush() will never fail as cs_main is used to synchronize
+        // the different threads that Flush() or TryFlush() data. If cs_main
+        // guarantee is removed we must decide what to do in this case.
+        auto flushed = pCoinsTipSpan.TryFlush();
+        assert(flushed == CoinsDBSpan::WriteState::ok);
     }
     int64_t nTime4 = GetTimeMicros();
     nTimeFlush += nTime4 - nTime3;
@@ -6173,7 +6195,9 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
                      state.GetRejectReason().c_str());
     }
 
-    CCoinsViewCache viewNew(pcoinsTip);
+
+    CoinsDBView view{ *pcoinsTip };
+    CCoinsViewCache viewNew{ view };
     CBlockIndex indexDummy(block);
     uint256 dummyHash;
     indexDummy.phashBlock = &dummyHash;
@@ -6449,13 +6473,15 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
 }
 
 void LoadChainTip(const CChainParams &chainparams) {
+    CoinsDBView view{*pcoinsTip};
+
     if (chainActive.Tip() &&
-        chainActive.Tip()->GetBlockHash() == pcoinsTip->GetBestBlock()) {
+        chainActive.Tip()->GetBlockHash() == view.GetBestBlock()) {
         return;
     }
 
     // Load pointer to end of best chain
-    BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
+    BlockMap::iterator it = mapBlockIndex.find(view.GetBestBlock());
     if (it == mapBlockIndex.end()) {
         return;
     }
@@ -6479,7 +6505,7 @@ CVerifyDB::~CVerifyDB() {
     uiInterface.ShowProgress("", 100);
 }
 
-bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
+bool CVerifyDB::VerifyDB(const Config &config, CoinsDB *coinsview,
                          int nCheckLevel, int nCheckDepth, const task::CCancellationToken& shutdownToken) {
     LOCK(cs_main);
     if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr) {
@@ -6500,7 +6526,8 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
     LogPrintf("Verifying last %i blocks at level %i\n", nCheckDepth,
               nCheckLevel);
 
-    CCoinsViewCache coins(coinsview);
+    CoinsDBView view{ *coinsview };
+    CCoinsViewCache coins{ view };
     CBlockIndex *pindexState = chainActive.Tip();
     CBlockIndex *pindexFailure = nullptr;
     size_t nGoodTransactions = 0;
@@ -6653,7 +6680,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
  * Apply the effects of a block on the utxo cache, ignoring that it may already
  * have been applied.
  */
-static bool RollforwardBlock(const CBlockIndex *pindex, CCoinsViewCache &inputs,
+static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
                              const Config &config) {
     // TODO: merge with ConnectBlock
     CBlock block;
@@ -6676,12 +6703,12 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CCoinsViewCache &inputs,
     return true;
 }
 
-bool ReplayBlocks(const Config &config, CCoinsView *view) {
+bool ReplayBlocks(const Config &config, CoinsDB *view) {
     LOCK(cs_main);
 
-    CCoinsViewCache cache(view);
+    CoinsDBSpan cache( *view );
 
-    std::vector<uint256> hashHeads = view->GetHeadBlocks();
+    std::vector<uint256> hashHeads = cache.GetHeadBlocks();
     if (hashHeads.empty()) {
         // We're already in a consistent state.
         return true;
@@ -6761,7 +6788,13 @@ bool ReplayBlocks(const Config &config, CCoinsView *view) {
     }
 
     cache.SetBestBlock(pindexNew->GetBlockHash());
-    cache.Flush();
+
+    // NOTE:
+    // TryFlush() will never fail as cs_main is used to synchronize
+    // the different threads that Flush() or TryFlush() data. If cs_main
+    // guarantee is removed we must decide what to do in this case.
+    auto flushed = cache.TryFlush();
+    assert(flushed == CoinsDBSpan::WriteState::ok);
     uiInterface.ShowProgress("", 100);
     return true;
 }

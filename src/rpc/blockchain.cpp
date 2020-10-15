@@ -1388,8 +1388,8 @@ static void ApplyStats(CCoinsStats &stats, CHashWriter &ss, const uint256 &hash,
 }
 
 //! Calculate statistics about the unspent transaction output set
-static bool GetUTXOStats(CCoinsView *view, CCoinsStats &stats) {
-    std::unique_ptr<CCoinsViewCursor> pcursor(view->Cursor());
+static bool GetUTXOStats(CoinsDB& coinsTip, CCoinsStats &stats) {
+    std::unique_ptr<CCoinsViewCursor> pcursor(coinsTip.Cursor());
 
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
     stats.hashBlock = pcursor->GetBestBlock();
@@ -1420,7 +1420,7 @@ static bool GetUTXOStats(CCoinsView *view, CCoinsStats &stats) {
         ApplyStats(stats, ss, prevkey, outputs);
     }
     stats.hashSerialized = ss.GetHash();
-    stats.nDiskSize = view->EstimateSize();
+    stats.nDiskSize = coinsTip.EstimateSize();
     return true;
 }
 
@@ -1516,7 +1516,7 @@ UniValue gettxoutsetinfo(const Config &config, const JSONRPCRequest &request) {
 
     CCoinsStats stats;
     FlushStateToDisk();
-    if (GetUTXOStats(pcoinsTip, stats)) {
+    if (GetUTXOStats(*pcoinsTip, stats)) {
         ret.push_back(Pair("height", int64_t(stats.nHeight)));
         ret.push_back(Pair("bestblock", stats.hashBlock.GetHex()));
         ret.push_back(Pair("transactions", int64_t(stats.nTransactions)));
@@ -1590,20 +1590,22 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
         fMempool = request.params[2].get_bool();
     }
 
+    CoinsDBView tipView{*pcoinsTip};
     Coin coin;
     if (fMempool) {
-        CCoinsViewMemPool view(pcoinsTip, mempool);
-        if (!view.GetCoin(out, coin) || mempool.IsSpent(out)) {
+        CCoinsViewMemPool view(tipView, mempool);
+
+        if (!tipView.GetCoin(out, coin) || mempool.IsSpent(out)) {
             // TODO: this should be done by the CCoinsViewMemPool
             return NullUniValue;
         }
-    } else {
-        if (!pcoinsTip->GetCoin(out, coin)  || coin.IsSpent()) {
-            return NullUniValue;
+     } else {
+        if (!tipView.GetCoin(out, coin)) {
+             return NullUniValue;
         }
     }
 
-    BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
+    BlockMap::iterator it = mapBlockIndex.find(tipView.GetBestBlock());
     CBlockIndex *pindex = it->second;
     ret.push_back(Pair("bestblock", pindex->GetBlockHash().GetHex()));
     if (coin.GetHeight() == MEMPOOL_HEIGHT) {
@@ -1788,6 +1790,8 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
     jWriter.writeBeginObject("result");
     jWriter.writeBeginArray("txouts");
 
+    CoinsDBView tipView{ *pcoinsTip };
+
     for(size_t arrayIndex = 0; arrayIndex < outPoints.size(); arrayIndex++)
     {
         jWriter.writeBeginObject();
@@ -1795,7 +1799,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
         Coin coin;
         if (fMempool)
         {
-            CCoinsViewMemPool view(pcoinsTip, mempool);
+            CCoinsViewMemPool view(tipView, mempool);
             if (!view.GetCoin(outPoints[arrayIndex], coin))
             {
                 jWriter.pushKV("error", "missing");
@@ -1816,7 +1820,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
         }
         else
         {
-            if (!pcoinsTip->GetCoin(outPoints[arrayIndex], coin) || coin.IsSpent())
+            if (!tipView.GetCoin(outPoints[arrayIndex], coin))
             {
                 jWriter.pushKV("error", "missing");
                 jWriter.writeEndObject();
@@ -1858,7 +1862,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             else
             {
                 LOCK(cs_main);
-                BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
+                BlockMap::iterator it = mapBlockIndex.find(tipView.GetBestBlock());
                 CBlockIndex *pindex = it->second;
                 confirmations = int64_t(pindex->nHeight - coin.GetHeight() + 1);
             }
