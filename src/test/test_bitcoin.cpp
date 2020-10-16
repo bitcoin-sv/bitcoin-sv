@@ -96,7 +96,11 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     gArgs.ForceSetArg("-datadir", pathTemp.string());
     mempool.SetSanityCheck(1.0);
     pblocktree = new CBlockTreeDB(1 << 20, true);
-    pcoinsTip = new CoinsDB(std::numeric_limits<size_t>::max(), 1 << 23, true);
+    pcoinsTip =
+        std::make_unique<CoinsDB>(
+            std::numeric_limits<size_t>::max(),
+            1 << 23,
+            true);
     if (!InitBlockIndex(testConfig)) {
         throw std::runtime_error("InitBlockIndex failed.");
     }
@@ -128,7 +132,7 @@ TestingSetup::~TestingSetup() {
     threadGroup.interrupt_all();
     threadGroup.join_all();
     UnloadBlockIndex();
-    delete pcoinsTip;
+    pcoinsTip.release();
     delete pblocktree;
     fs::remove_all(pathTemp);
 }

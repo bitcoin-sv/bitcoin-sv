@@ -245,7 +245,7 @@ CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
     return chain.Genesis();
 }
 
-CoinsDB* pcoinsTip = nullptr;
+std::unique_ptr<CoinsDB> pcoinsTip;
 CBlockTreeDB *pblocktree = nullptr;
 
 static uint32_t GetBlockScriptFlags(const Config &config,
@@ -782,17 +782,14 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
 
 static bool CheckTxOutputs(
     const CTransaction &tx,
-    const CoinsDB* pcoinsTip,
+    const CoinsDB& coinsTip,
     const CCoinsViewCache& view,
     std::vector<COutPoint> &vCoinsToUncache) {
-    if (!pcoinsTip) {
-        throw std::runtime_error("UTXO cache is not initialized.");
-    }
     const TxId txid = tx.GetId();
     // Do we already have it?
     for (size_t out = 0; out < tx.vout.size(); out++) {
         COutPoint outpoint(txid, out);
-        bool had_coin_in_cache = pcoinsTip->HaveCoinInCache(outpoint);
+        bool had_coin_in_cache = coinsTip.HaveCoinInCache(outpoint);
         // Check if outpoint present in the mempool
         if (view.HaveCoin(outpoint)) {
             // Check if outpoint available as a UTXO tx.
@@ -1206,7 +1203,7 @@ CTxnValResult TxnValidation(
     CCoinsViewMemPool viewMemPool(tipView, pool);
     CCoinsViewCache view(viewMemPool);
     // Do we already have it?
-    if(!CheckTxOutputs(tx, pcoinsTip, view, vCoinsToUncache)) {
+    if(!CheckTxOutputs(tx, *pcoinsTip, view, vCoinsToUncache)) {
        state.Invalid(false, REJECT_ALREADY_KNOWN,
                     "txn-already-known");
        return Result{state, pTxInputData, vCoinsToUncache};

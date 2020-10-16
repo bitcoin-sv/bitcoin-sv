@@ -1062,7 +1062,7 @@ extern CChain chainActive;
 
 /** Global variable that points to the active CCoinsProvider (protected by cs_main)
  */
-extern CoinsDB* pcoinsTip;
+extern std::unique_ptr<CoinsDB> pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main)
  */

@@ -208,8 +208,7 @@ void Shutdown() {
         if (pcoinsTip != nullptr) {
             FlushStateToDisk();
         }
-        delete pcoinsTip;
-        pcoinsTip = nullptr;
+        pcoinsTip.release();
         delete pblocktree;
         pblocktree = nullptr;
     }
@@ -2778,14 +2777,14 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         do {
             try {
                 UnloadBlockIndex();
-                delete pcoinsTip;
+                pcoinsTip.release();
                 delete pblocktree;
 
                 pblocktree =
                     new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
                 pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
                 pcoinsTip =
-                    new CoinsDB(
+                    std::make_unique<CoinsDB>(
                         config.GetMaxCoinsProviderCacheSize(),
                         nCoinDBCache,
                         false,
