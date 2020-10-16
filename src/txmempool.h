@@ -60,7 +60,7 @@ struct LockPoints {
     // As long as the current chain descends from the highest height block
     // containing one of the inputs used in the calculation, then the cached
     // values are still valid even after a reorg.
-    CBlockIndex *maxInputBlock;
+    const CBlockIndex *maxInputBlock;
 
     LockPoints() : height(0), time(0), maxInputBlock(nullptr) {}
 };
@@ -656,8 +656,7 @@ public:
             const Config &config,
             const CCoinsViewCache *pcoins,
             const mining::CJournalChangeSetPtr& changeSet,
-            int32_t nChainActiveHeight,
-            int nMedianTimePast,
+            const CBlockIndex& tip,
             int flags);
 
     void RemoveForBlock(
@@ -678,12 +677,9 @@ public:
 
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
-    // A non-locking version of IsSpent
-    // DEPRECATED - this will become private and ultimately changed or removed
-    bool IsSpentNL(const COutPoint &outpoint);
     // Returns const pointer to transaction that spends outpoint.
     // Pointer is valid and transaction will not change as long as mempool smtx lock is held
-    const CTransaction* IsSpentByNL(const COutPoint &outpoint);
+    const CTransaction* IsSpentBy(const COutPoint &outpoint) const;
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
     /**
@@ -720,6 +716,15 @@ public:
 
     // Get a reference to the time-locked (non-final txn) mempool
     CTimeLockedMempool& getNonFinalPool() { return mTimeLockedPool; }
+
+    /**
+     * Execute callback function on coins that are unspent in view and in mempool.
+     * Callback parameters: coin and consecutive index of view outpoints
+     */
+    void OnUnspentCoins(
+        CCoinsViewCache& tip,
+        const std::vector<COutPoint>& outpoints,
+        const std::function<void(Coin&&, size_t)>& callback) const;
 
 public:
     /**
@@ -875,6 +880,9 @@ public:
     void ClearPrioritisation(const std::vector<TxId>& vTxIds);
 
 private:
+    // A non-locking version of IsSpent
+    bool IsSpentNL(const COutPoint &outpoint) const;
+
     /**
      * updateForDescendantsNL is used by UpdateTransactionsFromBlock to update the
      * descendants for a single transaction that has been added to the mempool
@@ -1013,18 +1021,43 @@ private:
 
 /**
  * CCoinsView that brings transactions from a memorypool into view.
- * It does not check for spendings by memory pool transactions.
+ * If a transaction is in mempool this class will return an unspent coin even
+ *
+ * - If GetCoin/HaveCoin finds a coin  it will always return it in subsequent calls.
+ * - If GetCoin/HaveCoin does NOT return a coin on first call it can still return
+ *   them on later calls - coins can be added to mempool when transaction are added).
+ * - If GetCoin/HaveCoin return coin from a transaction that is stored inside
+ *   mempool for one outpoint it is guaranteed that it will also return coins
+ *   for all the other outpoints that exist inside that transaction.
+ * - GetCoin/HaveCoin return true even if the coin is spend by another transaction
+ *   in the mempool (This is different from implementation of provider used by
+ *   pcoinsTip as there we cant have a parent and a child coin present in the database
+ *   at the same time). The final check against coins that are spent in mempool
+ *   is done by CTxMemPool::CheckTxConflicts which is called from two places:
+ *   + TxnValidation (this is preliminary check, subject to race conditions)
+ *   + CTxnDoubleSpendDetector::insertTxnInputs  - this is final check, executed
+ *     while holding double spend detector lock
  */
 class CCoinsViewMemPool : public CCoinsViewBacked {
 protected:
     const CTxMemPool &mempool;
 
 public:
-    // The caller of the constructor needs to hold mempool.smtx.
     CCoinsViewMemPool(CCoinsView *baseIn, const CTxMemPool &mempoolIn);
-    // The caller of GetCoin needs to hold mempool.smtx.
+
+    /**
+     * Returns cached transaction reference.
+     * In case the reference is not found in cache it tries to load it from the
+     * underlying mempool.
+     */
+    CTransactionRef GetCachedTransactionRef(const COutPoint& outpoint) const;
+
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
+
+private:
+    mutable std::mutex mMutex;
+    mutable std::map<TxId, CTransactionRef> mCache;
 };
 
 // We want to sort transactions by coin age priority

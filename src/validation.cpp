@@ -390,51 +390,46 @@ bool TestLockPointValidity(const LockPoints *lp) {
 }
 
 bool CheckSequenceLocks(
+    const CBlockIndex& tip,
     const CTransaction &tx,
-    const CTxMemPool &pool,
     const Config& config,
     int flags,
     LockPoints *lp,
-    bool useExistingLockPoints) {
-
-    // cs_main is held by TxnValidator during TxnValidation call.
-    // pool.smtx is held by TxnValidation method. It is required for viewMemPool::GetCoin()
-    CBlockIndex *tip = chainActive.Tip();
-
+    CCoinsView* viewMemPool)
+{
     // Post-genesis we don't care about the old sequence lock calculations
-    if(IsGenesisEnabled(config, tip->nHeight))
+    if(IsGenesisEnabled(config, tip.nHeight))
     {
         return true;
     }
 
     CBlockIndex index;
-    index.pprev = tip;
+    index.pprev = const_cast<CBlockIndex*>(&tip); // safe to cast as tip won't change
+
     // CheckSequenceLocks() uses chainActive.Height()+1 to evaluate height based
     // locks because when SequenceLocks() is called within ConnectBlock(), the
     // height of the block *being* evaluated is what is used. Thus if we want to
     // know if a transaction can be part of the *next* block, we need to use one
     // more than chainActive.Height()
-    index.nHeight = tip->nHeight + 1;
+    index.nHeight = tip.nHeight + 1;
 
     std::pair<int32_t, int64_t> lockPair;
-    if (useExistingLockPoints) {
+    if (bool useExistingLockPoints = (viewMemPool == nullptr); useExistingLockPoints) {
         assert(lp);
         lockPair.first = lp->height;
         lockPair.second = lp->time;
     } else {
-        // pcoinsTip contains the UTXO set for chainActive.Tip()
-        CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
         std::vector<int32_t> prevheights;
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
             const CTxIn &txin = tx.vin[txinIndex];
             Coin coin;
-            if (!viewMemPool.GetCoin(txin.prevout, coin)) {
+            if (!viewMemPool->GetCoin(txin.prevout, coin)) {
                 return error("%s: Missing input", __func__);
             }
             if (coin.GetHeight() == MEMPOOL_HEIGHT) {
                 // Assume all mempool transaction confirm in the next block
-                prevheights[txinIndex] = tip->nHeight + 1;
+                prevheights[txinIndex] = tip.nHeight + 1;
             } else {
                 prevheights[txinIndex] = coin.GetHeight();
             }
@@ -460,11 +455,11 @@ bool CheckSequenceLocks(
             for (int32_t height : prevheights) {
                 // Can ignore mempool inputs since we'll fail if they had
                 // non-zero locks
-                if (height != tip->nHeight + 1) {
+                if (height != tip.nHeight + 1) {
                     maxInputHeight = std::max(maxInputHeight, height);
                 }
             }
-            lp->maxInputBlock = tip->GetAncestor(maxInputHeight);
+            lp->maxInputBlock = tip.GetAncestor(maxInputHeight);
         }
     }
     return EvaluateSequenceLocks(index, lockPair);
@@ -734,16 +729,11 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
     const Config& config,
     const CTransaction& tx,
     CValidationState& state,
-    const CCoinsViewCache* pcoinsTip,
+    CCoinsViewMemPool& underlyingMempool,
     const CCoinsViewCache& view,
-    CTxMemPool& pool,
     const uint32_t flags,
     bool cacheSigStore,
     PrecomputedTransactionData& txdata) {
-
-    // Take the mempool lock to enforce that the mempool doesn't change
-    // between when we check the view and when we actually call through to CheckInputs
-    std::shared_lock lock(pool.smtx);
 
     assert(!tx.IsCoinBase());
     for (const CTxIn &txin : tx.vin) {
@@ -755,7 +745,7 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
         if (coin.IsSpent()) {
             return false;
         }
-        const CTransactionRef &txFrom = pool.GetNL(txin.prevout.GetTxId());
+        auto txFrom = underlyingMempool.GetCachedTransactionRef(txin.prevout);
         if (txFrom) {
             assert(txFrom->GetHash() == txin.prevout.GetTxId());
             assert(txFrom->vout.size() > txin.prevout.GetN());
@@ -1224,32 +1214,29 @@ CTxnValResult TxnValidation(
         }
     }
     // Are the actual inputs available?
+    if (auto have = view.HaveInputsLimited(tx, fUseLimits ? config.GetMaxCoinsViewCacheSize() : 0);
+        !have.has_value())
     {
-        std::shared_lock lock(pool.smtx); // FIXME - should lock coins... but it produces a deadlocks so temporarily limit it's scope...
-        if (auto have = view.HaveInputsLimited(tx, fUseLimits ? config.GetMaxCoinsViewCacheSize() : 0);
-            !have.has_value())
-        {
-            state.Invalid(false, REJECT_INVALID,
-                         "bad-txns-inputs-too-large");
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
-        else if (!have.value())
-        {
-            state.SetMissingInputs();
-            state.Invalid();
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
-        // Bring the best block into scope.
-        view.GetBestBlock();
-        // Calculate txn's value-in
-        nValueIn = view.GetValueIn(tx);
+        state.Invalid(false, REJECT_INVALID,
+                     "bad-txns-inputs-too-large");
+        return Result{state, pTxInputData, vCoinsToUncache};
     }
+    else if (!have.value())
+    {
+        state.SetMissingInputs();
+        state.Invalid();
+        return Result{state, pTxInputData, vCoinsToUncache};
+    }
+    // Bring the best block into scope.
+    view.GetBestBlock();
+    // Calculate txn's value-in
+    nValueIn = view.GetValueIn(tx);
     // Only accept BIP68 sequence locked transactions that can be mined
     // in the next block; we don't want our mempool filled up with
     // transactions that can't be mined yet. Must keep pool.cs for this
     // unless we change CheckSequenceLocks to take a CoinsViewCache
     // instead of create its own.
-    if (!CheckSequenceLocks(tx, pool, config, lockTimeFlags, &lp)) {
+    if (!CheckSequenceLocks(*chainActive.Tip(), tx, config, lockTimeFlags, &lp, &view)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "non-BIP68-final");
         return Result{state, pTxInputData, vCoinsToUncache};
@@ -1445,9 +1432,8 @@ CTxnValResult TxnValidation(
             config,
             tx,
             state,
-            pcoinsTip,
+            viewMemPool,
             view,
-            pool,
             currentBlockScriptVerifyFlags,
             true,
             txdata);
@@ -2172,15 +2158,14 @@ static void UpdateMempoolForReorg(const Config &config,
     mempool.UpdateTransactionsFromBlock(vHashUpdate, changeSet);
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
-    int32_t height { chainActive.Height() };
+    const CBlockIndex& tip = *chainActive.Tip();
     mempool.
         RemoveForReorg(
             config,
             pcoinsTip,
             changeSet,
-            height,
-            chainActive.Tip()->GetMedianTimePast(),
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, height)));
+            tip,
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
 }
 
 /**

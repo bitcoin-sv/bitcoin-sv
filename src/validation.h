@@ -904,16 +904,14 @@ bool SequenceLocks(const CTransaction &tx, int flags,
  * should not be considered valid if CheckSequenceLocks returns false.
  *
  * See consensus/consensus.h for flag definitions.
- *
- * The caller of the method needs to hold the mempool's smtx.
  */
 bool CheckSequenceLocks(
+    const CBlockIndex& tip,
     const CTransaction &tx,
-    const CTxMemPool &pool,
     const Config& config,
     int flags,
     LockPoints *lp = nullptr,
-    bool useExistingLockPoints = false);
+    CCoinsView* viewMemPool = nullptr); // if set lockpoints are re-calculated
 
 /**
  * Closure representing one script verification.

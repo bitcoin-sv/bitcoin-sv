@@ -584,39 +584,29 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
     // check spentness and form a bitmap (as well as a JSON capable
     // human-readable string representation)
-    std::vector<uint8_t> bitmap;
+    std::vector<uint8_t> bitmap((vOutPoints.size() + 7) / 8);
     std::vector<CCoin> outs;
-    std::string bitmapStringRepresentation;
-    std::vector<bool> hits;
-    bitmap.resize((vOutPoints.size() + 7) / 8);
+    outs.reserve(vOutPoints.size()); // reserve space for max possible amount of coins
+    std::string bitmapStringRepresentation( vOutPoints.size(), '0' );
+
+    if( fCheckMemPool )
     {
         LOCK(cs_main); // TODO remove locks in future commit
-        std::shared_lock lock(mempool.smtx);
 
-        CCoinsViewEmpty dummy;
-        CCoinsViewMemPool viewMempool(pcoinsTip, mempool);
-        // use cache backend to db+mempool in case user likes to query mempool
-        CCoinsViewCache view(
-            fCheckMemPool
-            ? static_cast<CCoinsView*>(&viewMempool)
-            : static_cast<CCoinsView*>(&dummy));
-
-        for (size_t i = 0; i < vOutPoints.size(); i++) {
-            Coin coin;
-            bool hit = false;
-            if (view.GetCoin(vOutPoints[i], coin) &&
-                !mempool.IsSpentNL(vOutPoints[i])) {
-                hit = true;
-                outs.emplace_back(std::move(coin));
-            }
-
-            hits.push_back(hit);
-            // form a binary string representation (human-readable for json
-            // output)
-            bitmapStringRepresentation.append(hit ? "1" : "0");
-            bitmap[i / 8] |= ((uint8_t)hit) << (i % 8);
-        }
+        mempool.OnUnspentCoins(
+            *pcoinsTip,
+            vOutPoints,
+            [&outs, &bitmapStringRepresentation, &bitmap]
+            (Coin&& coin, size_t idx)
+            {
+                outs.emplace_back( std::move( coin ) );
+                // form a binary string representation (human-readable
+                // for json output)
+                bitmapStringRepresentation[ idx ] = '1';
+                bitmap[idx / 8] |= (1 << (idx % 8));
+            });
     }
+    // FIXME implement proper db only support
 
     switch (rf) {
         case RF_BINARY: {

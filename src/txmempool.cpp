@@ -24,6 +24,46 @@
 
 using namespace mining;
 
+namespace
+{
+    /**
+     * Special mempool coins provider for internal CTxMemPool use where smtx
+     * mutex is expected to be locked.
+     */
+    class CoinsViewLockedMemPoolNL : public CCoinsViewBacked
+    {
+    public:
+        CoinsViewLockedMemPoolNL(
+            const CTxMemPool& mempoolIn,
+            CCoinsViewCache& coinsTip)
+            : CCoinsViewBacked{ &coinsTip }
+            , mempool{ mempoolIn }
+        {}
+
+        bool GetCoin(const COutPoint &outpoint, Coin &coin) const override
+        {
+            CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
+            if (ptx) {
+                if (outpoint.GetN() < ptx->vout.size()) {
+                    coin = Coin{ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false};
+                    return true;
+                }
+                return false;
+            }
+
+            return CCoinsViewBacked::GetCoin(outpoint, coin) && !coin.IsSpent();
+        }
+
+        bool HaveCoin(const COutPoint &outpoint) const override
+        {
+            return mempool.GetNL(outpoint.GetTxId()) || CCoinsViewBacked::HaveCoin(outpoint);
+        }
+
+    private:
+        const CTxMemPool& mempool;
+    };
+}
+
 /**
  * class CTxPrioritizer
  */
@@ -497,11 +537,13 @@ bool CTxMemPool::IsSpent(const COutPoint &outpoint) {
     return IsSpentNL(outpoint);
 }
 
-bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) {
+bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) const {
     return mapNextTx.count(outpoint);
 }
 
-const CTransaction* CTxMemPool::IsSpentByNL(const COutPoint &outpoint) {
+const CTransaction* CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
+    std::shared_lock lock{ smtx };
+
     auto it = mapNextTx.find(outpoint);
     if (it == mapNextTx.end())
     {
@@ -764,7 +806,6 @@ void CTxMemPool::removeRecursiveNL(
             txToRemove.insert(nextit);
         }
     }
-
     setEntries setAllRemoves;
     for (txiter it : txToRemove) {
         CalculateDescendantsNL(it, setAllRemoves);
@@ -777,11 +818,11 @@ void CTxMemPool::RemoveForReorg(
     const Config &config,
     const CCoinsViewCache *pcoins,
     const CJournalChangeSetPtr& changeSet,
-    int32_t nChainActiveHeight,
-    int nMedianTimePast,
+    const CBlockIndex& tip,
     int flags) {
 
-    const int32_t nMemPoolHeight = nChainActiveHeight + 1;
+    const int32_t nMemPoolHeight = tip.nHeight + 1;
+    const int nMedianTimePast = tip.GetMedianTimePast();
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
     std::unique_lock lock(smtx);
@@ -792,21 +833,23 @@ void CTxMemPool::RemoveForReorg(
         LockPoints lp = it->GetLockPoints();
         bool validLP = TestLockPointValidity(&lp);
 
+        CoinsViewLockedMemPoolNL viewMemPool{*this, *pcoinsTip};
+
         CValidationState state;
         if (!ContextualCheckTransactionForCurrentBlock(
                 config,
                 tx,
-                nChainActiveHeight,
+                tip.nHeight,
                 nMedianTimePast,
                 state,
                 flags) ||
-            !CheckSequenceLocks(
-                tx,
-                *this,
-                config,
-                flags,
-                &lp,
-                validLP)) {
+                !CheckSequenceLocks(
+                    tip,
+                    tx,
+                    config,
+                    flags,
+                    &lp,
+                    validLP ? nullptr : &viewMemPool)) {
             // Note if CheckSequenceLocks fails the LockPoints may still be
             // invalid. So it's critical that we remove the tx and not depend on
             // the LockPoints.
@@ -837,6 +880,7 @@ void CTxMemPool::RemoveForReorg(
             mapTx.modify(it, update_lock_points(lp));
         }
     }
+
     setEntries setAllRemoves;
     for (txiter it : txToRemove) {
         CalculateDescendantsNL(it, setAllRemoves);
@@ -1296,7 +1340,7 @@ std::vector<TxMempoolInfo> CTxMemPool::InfoAllNL() const {
 }
 
 CTransactionRef CTxMemPool::Get(const uint256 &txid) const {
-    std::unique_lock lock(smtx);
+    std::shared_lock lock(smtx);
     return GetNL(txid);
 }
 
@@ -1445,16 +1489,66 @@ bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const {
     return true;
 }
 
-CCoinsViewMemPool::CCoinsViewMemPool(CCoinsView *baseIn,
-                                     const CTxMemPool &mempoolIn)
-    : CCoinsViewBacked(baseIn), mempool(mempoolIn) {}
+void CTxMemPool::OnUnspentCoins(
+    CCoinsViewCache& tip,
+    const std::vector<COutPoint>& outpoints,
+    const std::function<void(Coin&&, size_t)>& callback) const
+{
+    std::shared_lock lock{ smtx };
 
-bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
+    CoinsViewLockedMemPoolNL viewMemPool{ *this, tip };
+
+    std::size_t idx = 0;
+
+    for(const auto& out : outpoints)
+    {
+        if (!IsSpentNL( out ))
+        {
+            if (Coin coin; viewMemPool.GetCoin( out, coin ) && !coin.IsSpent())
+            {
+                callback( std::move( coin ), idx );
+            }
+        }
+
+        ++idx;
+    }
+}
+
+CCoinsViewMemPool::CCoinsViewMemPool(CCoinsView* baseIn,
+                                     const CTxMemPool &mempoolIn)
+    : CCoinsViewBacked(baseIn)
+    , mempool(mempoolIn)
+{}
+
+CTransactionRef CCoinsViewMemPool::GetCachedTransactionRef(const COutPoint& outpoint) const
+{
+    std::unique_lock lock{mMutex};
+
+    // Local cache makes sure that once we read the coin we have guaranteed
+    // coin stability until the provider is destroyed even in case mempool
+    // changes during task execution.
+    if (auto it = mCache.find(outpoint.GetTxId()); it != mCache.end())
+    {
+        return it->second;
+    }
+
+    CTransactionRef tx = mempool.Get(outpoint.GetTxId());
+
+    if (tx)
+    {
+        mCache.emplace(outpoint.GetTxId(), tx);
+    }
+
+    return tx;
+}
+
+bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const
+{
     // If an entry in the mempool exists, always return that one, as it's
-    // guaranteed to never conflict with the underlying cache, and it cannot
+    // guaranteed to never conflict with the underlying view, and it cannot
     // have pruned entries (as it contains full) transactions. First checking
-    // the underlying cache risks returning a pruned entry instead.
-    CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
+    // the underlying provider risks returning a pruned entry instead.
+    CTransactionRef ptx = GetCachedTransactionRef(outpoint);
     if (ptx) {
         if (outpoint.GetN() < ptx->vout.size()) {
             coin = Coin(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
@@ -1467,7 +1561,7 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
 }
 
 bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const {
-    return mempool.ExistsNL(outpoint) || base->HaveCoin(outpoint);
+    return GetCachedTransactionRef(outpoint) || base->HaveCoin(outpoint);
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {

@@ -930,7 +930,6 @@ static UniValue signrawtransaction(const Config &config,
     CMutableTransaction mergedTx(txVariants[0]);
 
     // Fetch previous transactions (inputs):
-    std::shared_lock lock(mempool.smtx);
     CCoinsViewMemPool viewMempool(pcoinsTip, mempool);
     CCoinsViewCache view(&viewMempool);
 

@@ -1591,9 +1591,8 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
 
     Coin coin;
     if (fMempool) {
-        std::shared_lock lock(mempool.smtx);
         CCoinsViewMemPool view(pcoinsTip, mempool);
-        if (!view.GetCoin(out, coin) || mempool.IsSpentNL(out)) {
+        if (!view.GetCoin(out, coin) || mempool.IsSpent(out)) {
             // TODO: this should be done by the CCoinsViewMemPool
             return NullUniValue;
         }
@@ -1795,7 +1794,6 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
         Coin coin;
         if (fMempool)
         {
-            std::shared_lock lock(mempool.smtx);
             CCoinsViewMemPool view(pcoinsTip, mempool);
             if (!view.GetCoin(outPoints[arrayIndex], coin))
             {
@@ -1803,7 +1801,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
                 jWriter.writeEndObject();
                 continue;
             }
-            else if(const CTransaction* tx = mempool.IsSpentByNL(outPoints[arrayIndex]))
+            else if(const CTransaction* tx = mempool.IsSpentBy(outPoints[arrayIndex]))
             {
                 jWriter.pushKV("error", "spent");
                 jWriter.writeBeginObject("collidedWith");

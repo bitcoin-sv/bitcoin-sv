@@ -99,8 +99,9 @@ CBlockIndex CreateBlockIndex(int32_t nHeight) {
 }
 
 bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) {
-    std::shared_lock lock(mempool.smtx);
-    return CheckSequenceLocks(tx, mempool, config, flags);
+    CCoinsViewMemPool viewMemPool{pcoinsTip, mempool};
+
+    return CheckSequenceLocks(*chainActive.Tip(), tx, config, flags, nullptr, &viewMemPool);
 }
 
 // Test suite for ancestor feerate transaction selection.
