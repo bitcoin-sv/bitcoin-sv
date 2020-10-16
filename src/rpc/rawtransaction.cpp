@@ -24,6 +24,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "txn_validator.h"
 #include "uint256.h"

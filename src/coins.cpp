@@ -43,83 +43,40 @@ SaltedOutpointHasher::SaltedOutpointHasher()
       k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
 
 CCoinsViewCache::CCoinsViewCache(CCoinsView *baseIn)
-    : CCoinsViewBacked(baseIn) {}
+    : mThreadId{std::this_thread::get_id()}
+    , mProvider{baseIn}
+{}
 
 size_t CCoinsViewCache::DynamicMemoryUsage() const {
-    std::unique_lock lock { mCoinsViewCacheMtx };
+    assert(mThreadId == std::this_thread::get_id());
     return mCache.DynamicMemoryUsage();
 }
 
 std::optional<std::reference_wrapper<const Coin>>
 CCoinsViewCache::FetchCoin(const COutPoint &outpoint) const
 {
-    auto erase =
-        [this](const COutPoint* outpoint)
-        {
-            std::unique_lock lock{ mCoinsViewCacheMtx };
-            mFetchingCoins.erase(*outpoint);
-        };
-    std::unique_ptr<const COutPoint, decltype(erase)> guard{&outpoint, erase};
-
-    while(true)
+    if (auto it = mCache.FetchCoin(outpoint); it.has_value())
     {
-        {
-            std::unique_lock lock { mCoinsViewCacheMtx };
-            if (auto it = mCache.FetchCoin(outpoint); it.has_value())
-            {
-                guard.release();
-                return it;
-            }
-            if(!mFetchingCoins.count(outpoint))
-            {
-                mFetchingCoins.insert(outpoint);
-                break;
-            }
-        }
-
-        // sleep for a while to give the other thread a chance to load the coin
-        // before re-attempting to access it
-        //
-        // the code would get here extremely rarely (e.g. during parallel block
-        // validation and almost simultaneous request of the same coin) so we
-        // don't need to worry about this sleep penalty
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(5ms);
+        return it;
     }
 
-    // Only one thread can reach this point for each distinct outpoint – this
-    // will perform a read from the backing view and remove the outpoint from
-    // mFetchcingCoins when local variable “guard” goes out of scope so that
-    // the rare potential other threads that are waiting for the same outpoint
-    // may continue.
-
     Coin tmp;
-    if (!base->GetCoin(outpoint, tmp)) {
+    if (!mProvider->GetCoin(outpoint, tmp)) {
         return {};
     }
 
-    std::unique_lock lock { mCoinsViewCacheMtx };
     return mCache.AddCoin(outpoint, std::move(tmp));
 }
 
-bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    auto fetchCoin = FetchCoin(outpoint);
-    if (!fetchCoin.has_value()) {
-        return false;
-    }
-    coin = fetchCoin.value();
-    return true;
-}
-
-void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin coin,
+void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin&& coin,
                               bool possible_overwrite,
                               int32_t genesisActivationHeight) {
+    assert(mThreadId == std::this_thread::get_id());
     assert(!coin.IsSpent());
     if (coin.GetTxOut().scriptPubKey.IsUnspendable( coin.GetHeight() >= genesisActivationHeight)) {
         return;
     }
 
-    std::unique_lock lock { mCoinsViewCacheMtx };
     mCache.AddCoin(outpoint, std::move(coin), possible_overwrite, genesisActivationHeight);
 }
 
@@ -139,12 +96,12 @@ void AddCoins(CCoinsViewCache &cache, const CTransaction &tx, int32_t nHeight, i
 }
 
 bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout) {
+    assert(mThreadId == std::this_thread::get_id());
     auto it = FetchCoin(outpoint);
     if (!it.has_value()) {
         return false;
     }
 
-    std::unique_lock lock { mCoinsViewCacheMtx };
     mCache.SpendCoin(outpoint, moveout);
 
     return true;
@@ -153,6 +110,7 @@ bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin *moveout) {
 static const Coin coinEmpty;
 
 const Coin& CCoinsViewCache::AccessCoin(const COutPoint &outpoint) const {
+    assert(mThreadId == std::this_thread::get_id());
     auto coin = FetchCoin(outpoint);
     if (!coin.has_value()) {
         return coinEmpty;
@@ -161,54 +119,33 @@ const Coin& CCoinsViewCache::AccessCoin(const COutPoint &outpoint) const {
 }
 
 bool CCoinsViewCache::HaveCoin(const COutPoint &outpoint) const {
+    assert(mThreadId == std::this_thread::get_id());
     auto coin = FetchCoin(outpoint);
     return coin.has_value() && !coin->get().IsSpent();
 }
 
-bool CCoinsViewCache::HaveCoinInCache(const COutPoint &outpoint) const {
-    std::unique_lock lock { mCoinsViewCacheMtx };
-    return mCache.FetchCoin(outpoint).has_value();
-}
-
 uint256 CCoinsViewCache::GetBestBlock() const {
-    std::unique_lock lock { mCoinsViewCacheMtx };
+    assert(mThreadId == std::this_thread::get_id());
     if (hashBlock.IsNull()) {
-        hashBlock = base->GetBestBlock();
+        hashBlock = mProvider->GetBestBlock();
     }
     return hashBlock;
 }
 
 void CCoinsViewCache::SetBestBlock(const uint256 &hashBlockIn) {
-    std::unique_lock lock { mCoinsViewCacheMtx };
+    assert(mThreadId == std::this_thread::get_id());
     hashBlock = hashBlockIn;
-}
-
-bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins,
-                                 const uint256 &hashBlockIn) {
-    std::unique_lock lock { mCoinsViewCacheMtx };
-    mCache.BatchWrite(mapCoins);
-    hashBlock = hashBlockIn;
-    return true;
 }
 
 bool CCoinsViewCache::Flush() {
-    std::unique_lock lock { mCoinsViewCacheMtx };
+    assert(mThreadId == std::this_thread::get_id());
     auto coins = mCache.MoveOutCoins();
 
-    return CCoinsViewBacked::BatchWrite(coins, hashBlock);
-}
-
-void CCoinsViewCache::Uncache(const std::vector<COutPoint>& vOutpoints) { // FIXME not thread safe in MT mode
-    std::unique_lock lock { mCoinsViewCacheMtx };
-    mCache.Uncache(vOutpoints);
-}
-
-unsigned int CCoinsViewCache::GetCacheSize() const {
-    std::unique_lock lock { mCoinsViewCacheMtx };
-    return mCache.CachedCoinsCount();
+    return mProvider->BatchWrite(coins, hashBlock);
 }
 
 Amount CCoinsViewCache::GetValueIn(const CTransaction &tx) const {
+    assert(mThreadId == std::this_thread::get_id());
     if (tx.IsCoinBase()) {
         return Amount(0);
     }
@@ -225,6 +162,7 @@ Amount CCoinsViewCache::GetValueIn(const CTransaction &tx) const {
 }
 
 bool CCoinsViewCache::HaveInputs(const CTransaction &tx) const {
+    assert(mThreadId == std::this_thread::get_id());
     if (tx.IsCoinBase()) {
         return true;
     }
@@ -242,6 +180,7 @@ std::optional<bool> CCoinsViewCache::HaveInputsLimited(
     const CTransaction &tx,
     size_t maxCachedCoinsUsage) const
 {
+    assert(mThreadId == std::this_thread::get_id());
     if (tx.IsCoinBase()) {
         return true;
     }
@@ -262,6 +201,7 @@ std::optional<bool> CCoinsViewCache::HaveInputsLimited(
 
 double CCoinsViewCache::GetPriority(const CTransaction &tx, int32_t nHeight,
                                     Amount &inChainInputValue) const {
+    assert(mThreadId == std::this_thread::get_id());
     inChainInputValue = Amount(0);
     if (tx.IsCoinBase()) {
         return 0.0;
@@ -281,50 +221,6 @@ double CCoinsViewCache::GetPriority(const CTransaction &tx, int32_t nHeight,
     }
 
     return tx.ComputePriority(dResult);
-}
-
-static const int MAX_VIEW_ITERATIONS = 100;
-
-Coin CCoinsViewCache::GetCoinByTxId(const TxId& txid) const
-{
-    // wtih MAX_VIEW_ITERATIONS we are avoiding for loop to MAX_OUTPUTS_PER_TX (in millions after genesis)
-    // performance testing indicates that after 100 look up by cursor becomes faster
-
-    for (int n = 0; n < MAX_VIEW_ITERATIONS; n++) {
-        const Coin& alternate = AccessCoin(COutPoint(txid, n));
-        if (!alternate.IsSpent()) {
-            return alternate;
-        }
-    }
-
-    // for large output indexes delegate search to db cursor/iterator by key prefix (txId)
-
-    COutPoint key;
-    Coin coin;
-
-    std::unique_ptr<CCoinsViewCursor> cursor{ Cursor(txid) };
-
-    if (cursor->Valid())
-    {
-        cursor->GetKey(key);
-    }
-    while (cursor->Valid() && key.GetTxId() == txid)
-    {
-        if (!cursor->GetValue(coin))
-        {
-            return coinEmpty;
-        }
-        if (!coin.IsSpent())
-        {
-            return coin;
-        }
-        cursor->Next();
-        if (cursor->Valid())
-        {
-            cursor->GetKey(key);
-        }
-    }
-    return coinEmpty;
 }
 
 size_t CoinsStore::DynamicMemoryUsage() const

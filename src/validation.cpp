@@ -245,7 +245,7 @@ CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
     return chain.Genesis();
 }
 
-CCoinsViewCache *pcoinsTip = nullptr;
+CoinsDB* pcoinsTip = nullptr;
 CBlockTreeDB *pblocktree = nullptr;
 
 static uint32_t GetBlockScriptFlags(const Config &config,
@@ -395,7 +395,7 @@ bool CheckSequenceLocks(
     const Config& config,
     int flags,
     LockPoints *lp,
-    CCoinsView* viewMemPool)
+    CCoinsViewCache* viewMemPool)
 {
     // Post-genesis we don't care about the old sequence lock calculations
     if(IsGenesisEnabled(config, tip.nHeight))
@@ -423,8 +423,8 @@ bool CheckSequenceLocks(
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
             const CTxIn &txin = tx.vin[txinIndex];
-            Coin coin;
-            if (!viewMemPool->GetCoin(txin.prevout, coin)) {
+            auto coin = viewMemPool->AccessCoin(txin.prevout);
+            if (coin.IsSpent()) {
                 return error("%s: Missing input", __func__);
             }
             if (coin.GetHeight() == MEMPOOL_HEIGHT) {
@@ -723,7 +723,7 @@ bool IsGenesisEnabled(const Config &config, const CBlockIndex* pindexPrev) {
 // TxnValidation is called by the Validator which holds cs_main lock during a call.
 // view is constructed as local variable (by TxnValidation), populated and then disconnected from backing view,
 // so that it can not be shared by other threads.
-// Mt support is present in CCoinsViewCache class.
+// Mt support is present in CoinsDB class.
 static std::optional<bool> CheckInputsFromMempoolAndCache(
     const task::CCancellationToken& token,
     const Config& config,
@@ -751,7 +751,8 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
             assert(txFrom->vout.size() > txin.prevout.GetN());
             assert(txFrom->vout[txin.prevout.GetN()] == coin.GetTxOut());
         } else {
-            const Coin &coinFromDisk = pcoinsTip->AccessCoin(txin.prevout);
+            Coin coinFromDisk;
+            pcoinsTip->GetCoin(txin.prevout, coinFromDisk);
             assert(!coinFromDisk.IsSpent());
             assert(coinFromDisk.GetTxOut() == coin.GetTxOut());
         }
@@ -776,7 +777,7 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
 
 static bool CheckTxOutputs(
     const CTransaction &tx,
-    const CCoinsViewCache* pcoinsTip,
+    const CoinsDB* pcoinsTip,
     const CCoinsViewCache& view,
     std::vector<COutPoint> &vCoinsToUncache) {
     if (!pcoinsTip) {
@@ -2162,7 +2163,7 @@ static void UpdateMempoolForReorg(const Config &config,
     mempool.
         RemoveForReorg(
             config,
-            pcoinsTip,
+            *pcoinsTip,
             changeSet,
             tip,
             StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
@@ -3281,7 +3282,7 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
     // if we know for sure that the coin did not already exist in the cache. As
     // we have queried for that above using HaveCoin, we don't need to guess.
     // When fClean is false, a coin already existed and it is an overwrite.
-    view.AddCoin(out, std::move(undo), !fClean, config.GetGenesisActivationHeight());
+    view.AddCoin(out, Coin{undo}, !fClean, config.GetGenesisActivationHeight());
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }

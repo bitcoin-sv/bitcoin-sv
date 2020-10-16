@@ -13,6 +13,7 @@
 #include "policy/policy.h"
 #include "streams.h"
 #include "timedata.h"
+#include "txdb.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utiltime.h"
@@ -35,7 +36,7 @@ namespace
     public:
         CoinsViewLockedMemPoolNL(
             const CTxMemPool& mempoolIn,
-            CCoinsViewCache& coinsTip)
+            CoinsDB& coinsTip)
             : CCoinsViewBacked{ &coinsTip }
             , mempool{ mempoolIn }
         {}
@@ -816,7 +817,7 @@ void CTxMemPool::removeRecursiveNL(
 
 void CTxMemPool::RemoveForReorg(
     const Config &config,
-    const CCoinsViewCache *pcoins,
+    const CoinsDB& coinsTip,
     const CJournalChangeSetPtr& changeSet,
     const CBlockIndex& tip,
     int flags) {
@@ -832,8 +833,8 @@ void CTxMemPool::RemoveForReorg(
         const CTransaction &tx = it->GetTx();
         LockPoints lp = it->GetLockPoints();
         bool validLP = TestLockPointValidity(&lp);
-
-        CoinsViewLockedMemPoolNL viewMemPool{*this, *pcoinsTip};
+        CoinsViewLockedMemPoolNL view{*this, *pcoinsTip};
+        CCoinsViewCache viewMemPool{&view};
 
         CValidationState state;
         if (!ContextualCheckTransactionForCurrentBlock(
@@ -862,7 +863,8 @@ void CTxMemPool::RemoveForReorg(
                     continue;
                 }
 
-                const Coin &coin = pcoins->AccessCoin(txin.prevout);
+                Coin coin;
+                coinsTip.GetCoin(txin.prevout, coin);
                 if (nCheckFrequency != 0) {
                     assert(!coin.IsSpent());
                 }
@@ -993,7 +995,7 @@ void CTxMemPool::Clear() {
 }
 
 void CTxMemPool::CheckMempool(
-    const CCoinsViewCache *pcoins,
+    CoinsDB* pcoins,
     const mining::CJournalChangeSetPtr& changeSet) const {
 
     if (nCheckFrequency == 0) {
@@ -1005,7 +1007,7 @@ void CTxMemPool::CheckMempool(
     }
 
     // Get spend height and MTP
-    const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(*pcoins);
+    const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(CCoinsViewCache{pcoins});
 
     std::shared_lock lock(smtx);
 
@@ -1016,7 +1018,7 @@ void CTxMemPool::CheckMempool(
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;
 
-    CCoinsViewCache mempoolDuplicate(const_cast<CCoinsViewCache *>(pcoins));
+    CCoinsViewCache mempoolDuplicate(pcoins);
 
     std::list<const CTxMemPoolEntry *> waitingOnDependants;
     for (indexed_transaction_set::const_iterator it = mapTx.begin();
@@ -1490,7 +1492,7 @@ bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const {
 }
 
 void CTxMemPool::OnUnspentCoins(
-    CCoinsViewCache& tip,
+    CoinsDB& tip,
     const std::vector<COutPoint>& outpoints,
     const std::function<void(Coin&&, size_t)>& callback) const
 {

@@ -481,7 +481,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
 
     for (size_t i = 0; i < mtx.vin.size(); i++) {
         std::vector<CScriptCheck> vChecks;
-        CTxOut &out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
+        const CTxOut& out = coins[tx.vin[i].prevout.GetN()].GetTxOut();
         vChecks.emplace_back(testConfig, true, out.scriptPubKey, out.nValue, tx, i,
                              MANDATORY_SCRIPT_VERIFY_FLAGS, false, txdata);
         

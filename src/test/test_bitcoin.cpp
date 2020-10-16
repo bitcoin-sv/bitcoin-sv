@@ -97,7 +97,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     mempool.SetSanityCheck(1.0);
     pblocktree = new CBlockTreeDB(1 << 20, true);
     pcoinsdbview = new CCoinsViewDB(1 << 23, true);
-    pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+    pcoinsTip = new CoinsDB(*pcoinsdbview);
     if (!InitBlockIndex(testConfig)) {
         throw std::runtime_error("InitBlockIndex failed.");
     }

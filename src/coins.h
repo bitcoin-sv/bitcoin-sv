@@ -18,6 +18,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <optional>
+#include <thread>
 
 /**
  * A UTXO entry.
@@ -262,10 +263,8 @@ private:
     mutable size_t cachedCoinsUsage{0};
 };
 
-/**
- * CCoinsView that adds a memory cache for transactions to another CCoinsView
- */
-class CCoinsViewCache : public CCoinsViewBacked {
+class CCoinsViewCache
+{
 protected:
     /**
      * Make mutable so that we can "fill the cache" even from Get-methods
@@ -275,21 +274,18 @@ protected:
     mutable CoinsStore mCache;
 
 public:
-    CCoinsViewCache(CCoinsView *baseIn);
+    explicit CCoinsViewCache(CCoinsView* baseIn);
 
-    // Standard CCoinsView methods
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
-    bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const override;
+    CCoinsViewCache(const CCoinsViewCache&) = delete;
+    CCoinsViewCache& operator=(const CCoinsViewCache&) = delete;
+    CCoinsViewCache(CCoinsViewCache&&) = delete;
+    CCoinsViewCache& operator=(CCoinsViewCache&&) = delete;
+
+    //! Calculate the size of the cache (in bytes)
+    size_t DynamicMemoryUsage() const;
+    bool HaveCoin(const COutPoint &outpoint) const;
+    uint256 GetBestBlock() const;
     void SetBestBlock(const uint256 &hashBlock);
-    bool BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlock) override;
-
-    /**
-     * Check if we have the given utxo already loaded in this cache.
-     * The semantics are the same as HaveCoin(), but no calls to the backing
-     * CCoinsView are made.
-     */
-    bool HaveCoinInCache(const COutPoint &outpoint) const;
 
     /**
      * Return a reference to a Coin in the cache, or a pruned one if not found.
@@ -304,7 +300,7 @@ public:
      * genesisActivationHeight parameter is used to check if Genesis upgrade rules
      * are in effect for this coin. It is required to correctly determine if coin is unspendable.
      */
-    void AddCoin(const COutPoint &outpoint, Coin coin,
+    void AddCoin(const COutPoint &outpoint, Coin&& coin,
                  bool potential_overwrite, int32_t genesisActivationHeight);
 
     /**
@@ -313,25 +309,6 @@ public:
      * effect.
      */
     bool SpendCoin(const COutPoint &outpoint, Coin *moveto = nullptr);
-
-    /**
-     * Push the modifications applied to this cache to its base.
-     * Failure to call this method before destruction will cause the changes to
-     * be forgotten. If false is returned, the state of this cache (and its
-     * backing view) will be undefined.
-     */
-    bool Flush();
-
-    /**
-     * Removes UTXOs with the given outpoints from the cache.
-     */
-    void Uncache(const std::vector<COutPoint>& vOutpoints);
-
-    //! Calculate the size of the cache (in number of transaction outputs)
-    unsigned int GetCacheSize() const;
-
-    //! Calculate the size of the cache (in bytes)
-    size_t DynamicMemoryUsage() const;
 
     /**
      * WARNING: Calling this function expects that we already have the coins in
@@ -343,8 +320,8 @@ public:
      * Note that lightweight clients may not know anything besides the hash of
      * previous transactions, so may not be able to calculate this.
      *
-     * @param[in] tx	transaction for which we are checking input total
-     * @return	Sum of value of all inputs (scriptSigs)
+     * @param[in] tx    transaction for which we are checking input total
+     * @return  Sum of value of all inputs (scriptSigs)
      */
     Amount GetValueIn(const CTransaction &tx) const;
 
@@ -364,30 +341,24 @@ public:
     double GetPriority(const CTransaction &tx, int32_t nHeight,
                        Amount &inChainInputValue) const;
 
-    //! Get any unspent output with a given txid.
-    Coin GetCoinByTxId(const TxId &txid) const;
+    /**
+     * Push the modifications applied to this cache to its base.
+     * Failure to call this method before destruction will cause the changes to
+     * be forgotten. If false is returned, the state of this cache (and its
+     * backing view) will be undefined.
+     */
+    bool Flush();
 
 private:
     // A non-locking fetch coin
     std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint &outpoint) const;
 
-    /**
-     * By making the copy constructor private, we prevent accidentally using it
-     * when one intends to create a cache on top of a base cache.
-     */
-    CCoinsViewCache(const CCoinsViewCache &);
+protected:
+    // variable is only used for asserts to make sure that users are not using
+    // it in an unsupported way - from more than one thread
+    std::thread::id mThreadId;
 
-private:
-    /* A mutex to support a thread safe access. */
-    mutable std::mutex mCoinsViewCacheMtx {};
-
-    /**
-     * Contains outpoints that are currently being loaded from base view by
-     * FetchCoin(). This prevents simultaneous loads of the same coin by
-     * multiple threads and enables us not to hold the locks while loading from
-     * base view, which can be slow if it is backed by disk.
-     */
-    mutable std::set<COutPoint> mFetchingCoins;
+    CCoinsView* mProvider;
 };
 
 //! Utility function to add all of a transaction's outputs to a cache.

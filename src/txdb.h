@@ -100,6 +100,8 @@ public:
     //! Returns true if database is in an older format.
     bool IsOldDBFormat();
     size_t EstimateSize() const override;
+
+    friend class CoinsDB;
 };
 
 /** Specialization of CCoinsViewCursor to iterate over a CCoinsViewDB */
@@ -121,6 +123,85 @@ private:
     std::pair<char, COutPoint> keyTmp;
 
     friend class CCoinsViewDB;
+    friend class CoinsDB;
+};
+
+/**
+ * CCoinsView that adds a memory cache for transactions to another CCoinsView
+ */
+class CoinsDB : public CCoinsView {
+private:
+    /**
+     * Make mutable so that we can "fill the cache" even from Get-methods
+     * declared as "const".
+     */
+    mutable uint256 hashBlock;
+    mutable CoinsStore mCache;
+
+public:
+    template<typename T> struct UnitTestAccess;
+
+    CoinsDB(CCoinsViewDB& baseIn);
+
+    CoinsDB(const CoinsDB&) = delete;
+    CoinsDB& operator=(const CoinsDB&) = delete;
+    CoinsDB(CoinsDB&&) = delete;
+    CoinsDB& operator=(CoinsDB&&) = delete;
+
+    /**
+     * Check if we have the given utxo already loaded in this cache.
+     * The semantics are the same as HaveCoin(), but no calls to the backing
+     * CCoinsView are made.
+     */
+    bool HaveCoinInCache(const COutPoint &outpoint) const;
+
+    //! Calculate the size of the cache (in number of transaction outputs)
+    unsigned int GetCacheSize() const;
+
+    size_t DynamicMemoryUsage() const;
+
+    // Standard CCoinsView methods
+    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
+    bool HaveCoin(const COutPoint &outpoint) const override;
+    uint256 GetBestBlock() const override;
+    bool BatchWrite(CCoinsMap& mapCoins, const uint256& hashBlock) override;
+
+    /**
+     * Push the modifications applied to this cache to its base.
+     * Failure to call this method before destruction will cause the changes to
+     * be forgotten. If false is returned, the state of this cache (and its
+     * backing view) will be undefined.
+     */
+    bool Flush();
+
+    /**
+     * Removes UTXOs with the given outpoints from the cache.
+     */
+    void Uncache(const std::vector<COutPoint>& vOutpoints);
+
+    //! Get any unspent output with a given txid.
+    Coin GetCoinByTxId(const TxId &txid) const;
+
+    std::vector<uint256> GetHeadBlocks() const override { return mDBProvider.GetHeadBlocks(); }
+    CCoinsViewCursor *Cursor() const override { return mDBProvider.Cursor(); }
+    CCoinsViewCursor* Cursor(const TxId &txId) const override { return mDBProvider.Cursor(txId); }
+    size_t EstimateSize() const override { return mDBProvider.EstimateSize(); }
+
+private:
+    std::optional<std::reference_wrapper<const Coin>> FetchCoin(const COutPoint &outpoint) const;
+
+    CCoinsViewDB& mDBProvider;
+
+    /* A mutex to support a thread safe access. */
+    mutable std::mutex mCoinsViewCacheMtx {};
+
+    /**
+     * Contains outpoints that are currently being loaded from base view by
+     * FetchCoin(). This prevents simultaneous loads of the same coin by
+     * multiple threads and enables us not to hold the locks while loading from
+     * base view, which can be slow if it is backed by disk.
+     */
+    mutable std::set<COutPoint> mFetchingCoins;
 };
 
 /** Access to the block database (blocks/index/) */

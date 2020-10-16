@@ -911,7 +911,7 @@ bool CheckSequenceLocks(
     const Config& config,
     int flags,
     LockPoints *lp = nullptr,
-    CCoinsView* viewMemPool = nullptr); // if set lockpoints are re-calculated
+    CCoinsViewCache* viewMemPool = nullptr); // if set lockpoints are re-calculated
 
 /**
  * Closure representing one script verification.
@@ -1062,7 +1062,7 @@ extern CChain chainActive;
 
 /** Global variable that points to the active CCoinsView (protected by cs_main)
  */
-extern CCoinsViewCache *pcoinsTip;
+extern CoinsDB* pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main)
  */

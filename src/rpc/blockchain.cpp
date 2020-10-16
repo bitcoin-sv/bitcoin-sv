@@ -25,6 +25,7 @@
 #include "streams.h"
 #include "sync.h"
 #include "taskcancellation.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "txn_validator.h"
 #include "util.h"

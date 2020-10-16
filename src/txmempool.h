@@ -35,6 +35,7 @@
 class CAutoFile;
 class CBlockIndex;
 class Config;
+class CoinsDB;
 
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
@@ -616,7 +617,7 @@ public:
      * If sanity-checking is turned off, check does nothing.
      */
     void CheckMempool(
-        const CCoinsViewCache *pcoins,
+        CoinsDB* pcoins,
         const mining::CJournalChangeSetPtr& changeSet) const;
 
     std::string CheckJournal() const;
@@ -654,7 +655,7 @@ public:
 
     void RemoveForReorg(
             const Config &config,
-            const CCoinsViewCache *pcoins,
+            const CoinsDB& coinsTip,
             const mining::CJournalChangeSetPtr& changeSet,
             const CBlockIndex& tip,
             int flags);
@@ -722,7 +723,7 @@ public:
      * Callback parameters: coin and consecutive index of view outpoints
      */
     void OnUnspentCoins(
-        CCoinsViewCache& tip,
+        CoinsDB& tip,
         const std::vector<COutPoint>& outpoints,
         const std::function<void(Coin&&, size_t)>& callback) const;
 

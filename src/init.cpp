@@ -2841,7 +2841,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     break;
                 }
 
-                pcoinsTip = new CCoinsViewCache(pcoinsdbview);
+                pcoinsTip = new CoinsDB(*pcoinsdbview);
                 {
                     LOCK(cs_main);
                     LoadChainTip(chainparams);

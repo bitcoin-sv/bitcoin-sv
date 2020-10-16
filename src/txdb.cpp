@@ -361,3 +361,162 @@ bool CCoinsViewDB::IsOldDBFormat()
     }
     return true;
 }
+
+CoinsDB::CoinsDB(CCoinsViewDB& baseIn)
+    : mDBProvider{ baseIn }
+{}
+
+size_t CoinsDB::DynamicMemoryUsage() const {
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    return mCache.DynamicMemoryUsage();
+}
+
+std::optional<std::reference_wrapper<const Coin>>
+CoinsDB::FetchCoin(const COutPoint &outpoint) const
+{
+    auto erase =
+        [this](const COutPoint* outpoint)
+        {
+            std::unique_lock lock{ mCoinsViewCacheMtx };
+            mFetchingCoins.erase(*outpoint);
+        };
+    std::unique_ptr<const COutPoint, decltype(erase)> guard{&outpoint, erase};
+
+    while(true)
+    {
+        {
+            std::unique_lock lock { mCoinsViewCacheMtx };
+            if (auto coin = mCache.FetchCoin(outpoint); coin.has_value())
+            {
+                guard.release();
+                return coin;
+            }
+            if(!mFetchingCoins.count(outpoint))
+            {
+                mFetchingCoins.insert(outpoint);
+                break;
+            }
+        }
+
+        // sleep for a while to give the other thread a chance to load the coin
+        // before re-attempting to access it
+        //
+        // the code would get here extremely rarely (e.g. during parallel block
+        // validation and almost simultaneous request of the same coin) so we
+        // don't need to worry about this sleep penalty
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(5ms);
+    }
+
+    // Only one thread can reach this point for each distinct outpoint – this
+    // will perform a read from the backing view and remove the outpoint from
+    // mFetchcingCoins when local variable “guard” goes out of scope so that
+    // the rare potential other threads that are waiting for the same outpoint
+    // may continue.
+
+    Coin tmp;
+    if (!mDBProvider.GetCoin(outpoint, tmp)) {
+        return {};
+    }
+
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    return mCache.AddCoin(outpoint, std::move(tmp));
+}
+
+bool CoinsDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
+    auto fetchCoin = FetchCoin(outpoint);
+    if (!fetchCoin.has_value()) {
+        return false;
+    }
+    coin = fetchCoin.value();
+    return true;
+}
+
+bool CoinsDB::HaveCoin(const COutPoint &outpoint) const {
+    auto coin = FetchCoin(outpoint);
+    return coin.has_value() && !coin->get().IsSpent();
+}
+
+bool CoinsDB::HaveCoinInCache(const COutPoint &outpoint) const {
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    return mCache.FetchCoin(outpoint).has_value();
+}
+
+uint256 CoinsDB::GetBestBlock() const {
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    if (hashBlock.IsNull()) {
+        hashBlock = mDBProvider.GetBestBlock();
+    }
+    return hashBlock;
+}
+
+bool CoinsDB::BatchWrite(CCoinsMap &mapCoins,
+                                 const uint256 &hashBlockIn) {
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    mCache.BatchWrite(mapCoins);
+    hashBlock = hashBlockIn;
+    return true;
+}
+
+bool CoinsDB::Flush()
+{
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    auto coins = mCache.MoveOutCoins();
+
+    return mDBProvider.BatchWrite(coins, hashBlock);
+}
+
+void CoinsDB::Uncache(const std::vector<COutPoint>& vOutpoints)
+{
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    mCache.Uncache(vOutpoints);
+}
+
+unsigned int CoinsDB::GetCacheSize() const {
+    std::unique_lock lock { mCoinsViewCacheMtx };
+    return mCache.CachedCoinsCount();
+}
+
+Coin CoinsDB::GetCoinByTxId(const TxId& txid) const
+{
+    constexpr int MAX_VIEW_ITERATIONS = 100;
+
+    // wtih MAX_VIEW_ITERATIONS we are avoiding for loop to MAX_OUTPUTS_PER_TX (in millions after genesis)
+    // performance testing indicates that after 100 look up by cursor becomes faster
+
+    for (int n = 0; n < MAX_VIEW_ITERATIONS; n++) {
+        if (Coin alternate;
+            GetCoin(COutPoint(txid, n), alternate) && !alternate.IsSpent()) {
+            return alternate;
+        }
+    }
+
+    // for large output indexes delegate search to db cursor/iterator by key prefix (txId)
+
+    COutPoint key;
+    Coin coin;
+
+    std::unique_ptr<CCoinsViewCursor> cursor{ Cursor(txid) };
+
+    if (cursor->Valid())
+    {
+        cursor->GetKey(key);
+    }
+    while (cursor->Valid() && key.GetTxId() == txid)
+    {
+        if (!cursor->GetValue(coin))
+        {
+            return {};
+        }
+        if (!coin.IsSpent())
+        {
+            return coin;
+        }
+        cursor->Next();
+        if (cursor->Valid())
+        {
+            cursor->GetKey(key);
+        }
+    }
+    return {};
+}

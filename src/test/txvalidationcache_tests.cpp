@@ -114,7 +114,7 @@ namespace {
                     true,
                     tx,
                     state,
-                    pcoinsTip,
+                    CCoinsViewCache{pcoinsTip},
                     true,
                     test_flags,
                     true,
@@ -145,7 +145,7 @@ namespace {
                         true,
                         tx,
                         state,
-                        pcoinsTip,
+                        CCoinsViewCache{pcoinsTip},
                         true,
                         test_flags,
                         true,
@@ -164,7 +164,7 @@ namespace {
                         true,
                         tx,
                         state,
-                        pcoinsTip,
+                        CCoinsViewCache{pcoinsTip},
                         true,
                         test_flags,
                         true,
@@ -296,6 +296,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
     auto& config = GlobalConfig::GetConfig();
     config.SetGenesisActivationHeight(102);
 
+
     // Test that invalidity under a set of flags doesn't preclude validity under
     // other (eg consensus) flags.
     // spend_tx is invalid according to DERSIG
@@ -311,7 +312,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 spend_tx,
                 state,
-                pcoinsTip,
+                CCoinsViewCache{pcoinsTip},
                 true,
                 MANDATORY_SCRIPT_VERIFY_FLAGS |
                     SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
@@ -331,7 +332,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 spend_tx,
                 state,
-                pcoinsTip,
+                CCoinsViewCache{pcoinsTip},
                 true,
                 MANDATORY_SCRIPT_VERIFY_FLAGS |
                     SCRIPT_VERIFY_CLEANSTACK | SCRIPT_GENESIS,
@@ -371,7 +372,6 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
         std::vector<uint8_t> vchSig2(p2pk_scriptPubKey.begin(),
                                      p2pk_scriptPubKey.end());
         invalid_under_p2sh_tx.vin[0].scriptSig << vchSig2;
-
 
         ValidateCheckInputsForAllFlags(invalid_under_p2sh_tx,
                                        [](uint32_t flags) -> bool { return (flags & SCRIPT_UTXO_AFTER_GENESIS); },
@@ -419,7 +419,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 transaction,
                 state,
-                pcoinsTip,
+                CCoinsViewCache{pcoinsTip},
                 true,
                 MANDATORY_SCRIPT_VERIFY_FLAGS |
                     SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_GENESIS,
@@ -468,7 +468,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 transaction,
                 state,
-                pcoinsTip,
+                CCoinsViewCache{pcoinsTip},
                 true,
                 MANDATORY_SCRIPT_VERIFY_FLAGS |
                     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | SCRIPT_GENESIS,
@@ -533,7 +533,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 transaction,
                 state,
-                pcoinsTip,
+                CCoinsViewCache{pcoinsTip},
                 true,
                 MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
                 true,
@@ -551,7 +551,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
                 true,
                 transaction,
                 state,
-                pcoinsTip,
+                CCoinsViewCache{pcoinsTip},
                 true,
                 MANDATORY_SCRIPT_VERIFY_FLAGS | SCRIPT_GENESIS,
                 true,
