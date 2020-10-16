@@ -86,10 +86,11 @@ private:
     FILE* OpenMerkleTreeFile(const MerkleTreeDiskPosition& merkleTreeDiskPosition, bool fReadOnly = false) const;
 
     /*
-     * Removes all data file's disk positions for specified suffixOfDataFileToRemove
+     * Removes all data file's disk positions for the removed file specified by fileInfoToRemove
      * Block hashes of removed Merkle Trees will be put into blockHashesOfMerkleTreesRemovedOut
+     * Returns the iterator to the next data file.
      */
-    void RemoveOldDataNL(const int suffixOfDataFileToRemove, std::vector<uint256>& blockHashesOfMerkleTreesRemovedOut);
+    [[nodiscard]] MerkleTreeFileInfoMap::const_iterator RemoveOldDataNL(MerkleTreeFileInfoMap::const_iterator fileInfoToRemove, std::vector<uint256>& blockHashesOfMerkleTreesRemovedOut);
 
     /*
      * Adds new disk position

@@ -15,6 +15,6 @@ void CInvalidTxnZmqSink::Publish(const InvalidTxnInfo& invalidTxInfo)
     CJSONWriter jw(tw, false);
     invalidTxInfo.ToJson(jw, messageSize <= maxMessageSize);
     std::string jsonString = tw.MoveOutString();
-    GetMainSignals().InvalidTxMessage(jsonString);
+    GetMainSignals().InvalidTxMessageZMQ(jsonString);
 }
 #endif

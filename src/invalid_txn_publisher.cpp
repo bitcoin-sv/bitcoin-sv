@@ -138,7 +138,6 @@ void InvalidTxnInfo::PutState(CJSONWriter& writer) const
     writer.pushKV("isMissingInputs", mTxValidationState.IsMissingInputs());
     writer.pushKV("isDoubleSpendDetected", mTxValidationState.IsDoubleSpendDetected());
     writer.pushKV("isMempoolConflictDetected", mTxValidationState.IsMempoolConflictDetected());
-    writer.pushKV("isCorruptionPossible", mTxValidationState.CorruptionPossible());
     writer.pushKV("isNonFinal", mTxValidationState.IsNonFinal());
     writer.pushKV("isValidationTimeoutExceeded", mTxValidationState.IsValidationTimeoutExceeded());
     writer.pushKV("isStandardTx", mTxValidationState.IsStandardTx());

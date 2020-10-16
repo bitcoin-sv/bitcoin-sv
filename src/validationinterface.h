@@ -53,7 +53,8 @@ protected:
     virtual void BlockChecked(const CBlock &, const CValidationState &) {}
     virtual void GetScriptForMining(std::shared_ptr<CReserveScript> &){};
     virtual void NewPoWValidBlock(const CBlockIndex *pindex, const std::shared_ptr<const CBlock> &block){};
-    virtual void InvalidTxMessage(std::string_view message) {};
+    // This function is called only when there is an active ZMQ subscription of invalid transacion ("-zmqpubinvalidtx")
+    virtual void InvalidTxMessageZMQ(std::string_view message) {};
 
     friend void ::RegisterValidationInterface(CValidationInterface *);
     friend void ::UnregisterValidationInterface(CValidationInterface *);
@@ -99,7 +100,7 @@ struct CMainSignals {
     /** Notifies listeners that a key for mining is required (coinbase) */
     boost::signals2::signal<void(std::shared_ptr<CReserveScript> &)> ScriptForMining;
     /** Notifies listeners that a message part of the invalid transaction dump is ready to send */
-    boost::signals2::signal<void(std::string_view)> InvalidTxMessage;
+    boost::signals2::signal<void(std::string_view)> InvalidTxMessageZMQ;
 
     /**
      * Notifies listeners that a block which builds directly on our current tip

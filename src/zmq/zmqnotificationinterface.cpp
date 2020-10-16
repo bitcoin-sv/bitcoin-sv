@@ -163,7 +163,7 @@ void CZMQNotificationInterface::UpdatedBlockTip(const CBlockIndex *pindexNew,
     }
 }
 
-void CZMQNotificationInterface::InvalidTxMessage(std::string_view message)
+void CZMQNotificationInterface::InvalidTxMessageZMQ(std::string_view message)
 {
     for (auto i = notifiers.begin(); i != notifiers.end();) 
     {
