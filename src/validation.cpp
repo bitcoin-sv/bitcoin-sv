@@ -1203,32 +1203,29 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
 
-    CCoinsViewEmpty dummy;
-    CCoinsViewCache view(&dummy);
     Amount nValueIn(0);
     LockPoints lp;
+    // Combine db & mempool views together.
+    CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
+    CCoinsViewCache view(&viewMemPool);
+    // Do we already have it?
+    if(!CheckTxOutputs(tx, pcoinsTip, view, vCoinsToUncache)) {
+       state.Invalid(false, REJECT_ALREADY_KNOWN,
+                    "txn-already-known");
+       return Result{state, pTxInputData, vCoinsToUncache};
+    }
+    // Prepare coins to uncache list for inputs
+    for (const CTxIn& txin : tx.vin)
     {
-        std::shared_lock lock(pool.smtx);
-        // Combine db & mempool views together.
-        CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
-        // Temporarily switch cache backend to db+mempool view
-        view.SetBackend(viewMemPool);
-        // Do we already have it?
-        if(!CheckTxOutputs(tx, pcoinsTip, view, vCoinsToUncache)) {
-           state.Invalid(false, REJECT_ALREADY_KNOWN,
-                        "txn-already-known");
-           return Result{state, pTxInputData, vCoinsToUncache};
-        }
-        // Prepare coins to uncache list for inputs
-        for (const CTxIn& txin : tx.vin)
+        // Check if txin.prevout available as a UTXO tx.
+        if (!pcoinsTip->HaveCoinInCache(txin.prevout))
         {
-            // Check if txin.prevout available as a UTXO tx.
-            if (!pcoinsTip->HaveCoinInCache(txin.prevout))
-            {
-                vCoinsToUncache.push_back(txin.prevout);
-            }
+            vCoinsToUncache.push_back(txin.prevout);
         }
-        // Are the actual inputs available?
+    }
+    // Are the actual inputs available?
+    {
+        std::shared_lock lock(pool.smtx); // FIXME - should lock coins... but it produces a deadlocks so temporarily limit it's scope...
         if (auto have = view.HaveInputsLimited(tx, fUseLimits ? config.GetMaxCoinsViewCacheSize() : 0);
             !have.has_value())
         {
@@ -1246,19 +1243,16 @@ CTxnValResult TxnValidation(
         view.GetBestBlock();
         // Calculate txn's value-in
         nValueIn = view.GetValueIn(tx);
-        // We have all inputs cached now, so switch back to dummy, so we
-        // don't need to keep lock on mempool.
-        view.SetBackend(dummy);
-        // Only accept BIP68 sequence locked transactions that can be mined
-        // in the next block; we don't want our mempool filled up with
-        // transactions that can't be mined yet. Must keep pool.cs for this
-        // unless we change CheckSequenceLocks to take a CoinsViewCache
-        // instead of create its own.
-        if (!CheckSequenceLocks(tx, pool, config, lockTimeFlags, &lp)) {
-            state.DoS(0, false, REJECT_NONSTANDARD,
-                     "non-BIP68-final");
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
+    }
+    // Only accept BIP68 sequence locked transactions that can be mined
+    // in the next block; we don't want our mempool filled up with
+    // transactions that can't be mined yet. Must keep pool.cs for this
+    // unless we change CheckSequenceLocks to take a CoinsViewCache
+    // instead of create its own.
+    if (!CheckSequenceLocks(tx, pool, config, lockTimeFlags, &lp)) {
+        state.DoS(0, false, REJECT_NONSTANDARD,
+                 "non-BIP68-final");
+        return Result{state, pTxInputData, vCoinsToUncache};
     }
 
     // Checking for non-standard outputs as inputs.

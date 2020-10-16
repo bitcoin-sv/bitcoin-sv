@@ -590,20 +590,16 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
     std::vector<bool> hits;
     bitmap.resize((vOutPoints.size() + 7) / 8);
     {
-        LOCK(cs_main);
+        LOCK(cs_main); // TODO remove locks in future commit
         std::shared_lock lock(mempool.smtx);
 
         CCoinsViewEmpty dummy;
-        CCoinsViewCache view(&dummy);
-
-        CCoinsViewCache &viewChain = *pcoinsTip;
-        CCoinsViewMemPool viewMempool(&viewChain, mempool);
-
-        if (fCheckMemPool) {
-            // switch cache backend to db+mempool in case user likes to query
-            // mempool.
-            view.SetBackend(viewMempool);
-        }
+        CCoinsViewMemPool viewMempool(pcoinsTip, mempool);
+        // use cache backend to db+mempool in case user likes to query mempool
+        CCoinsViewCache view(
+            fCheckMemPool
+            ? static_cast<CCoinsView*>(&viewMempool)
+            : static_cast<CCoinsView*>(&dummy));
 
         for (size_t i = 0; i < vOutPoints.size(); i++) {
             Coin coin;

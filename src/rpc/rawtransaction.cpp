@@ -930,23 +930,9 @@ static UniValue signrawtransaction(const Config &config,
     CMutableTransaction mergedTx(txVariants[0]);
 
     // Fetch previous transactions (inputs):
-    CCoinsViewEmpty dummy;
-    CCoinsViewCache view(&dummy);
-    {
-        std::shared_lock lock(mempool.smtx);
-        CCoinsViewCache &viewChain = *pcoinsTip;
-        CCoinsViewMemPool viewMempool(&viewChain, mempool);
-        // Temporarily switch cache backend to db+mempool view.
-        view.SetBackend(viewMempool);
-
-        for (const CTxIn &txin : mergedTx.vin) {
-            // Load entries from viewChain into view; can fail.
-            view.AccessCoin(txin.prevout);
-        }
-
-        // Switch back to avoid locking mempool for too long.
-        view.SetBackend(dummy);
-    }
+    std::shared_lock lock(mempool.smtx);
+    CCoinsViewMemPool viewMempool(pcoinsTip, mempool);
+    CCoinsViewCache view(&viewMempool);
 
     bool fGivenKeys = false;
     CBasicKeyStore tempKeystore;

@@ -24,9 +24,6 @@ uint256 CCoinsViewBacked::GetBestBlock() const {
 std::vector<uint256> CCoinsViewBacked::GetHeadBlocks() const {
     return base->GetHeadBlocks();
 }
-void CCoinsViewBacked::SetBackend(CCoinsView &viewIn) {
-    base = &viewIn;
-}
 bool CCoinsViewBacked::BatchWrite(CCoinsMap &mapCoins,
                                   const uint256 &hashBlock) {
     return base->BatchWrite(mapCoins, hashBlock);
@@ -272,11 +269,6 @@ CCoinsViewCursor* CCoinsViewCache::Cursor(const TxId &txId) const {
 std::vector<uint256> CCoinsViewCache::GetHeadBlocks() const {
     std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
     return base->GetHeadBlocks();
-}
-
-void CCoinsViewCache::SetBackend(CCoinsView &viewIn) {
-    std::unique_lock<std::mutex> lock { mCoinsViewCacheMtx };
-    base = &viewIn;
 }
 
 size_t CCoinsViewCache::EstimateSize() const {

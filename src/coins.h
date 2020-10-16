@@ -205,7 +205,6 @@ public:
     bool HaveCoin(const COutPoint &outpoint) const override;
     uint256 GetBestBlock() const override;
     std::vector<uint256> GetHeadBlocks() const override;
-    virtual void SetBackend(CCoinsView &viewIn);
     bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;
     CCoinsViewCursor *Cursor() const override;
     CCoinsViewCursor *Cursor(const TxId &txId) const override;
@@ -239,7 +238,6 @@ public:
     CCoinsViewCursor *Cursor() const override;
     CCoinsViewCursor *Cursor(const TxId &txId) const override;
     std::vector<uint256> GetHeadBlocks() const override;
-    void SetBackend(CCoinsView &viewIn) override;
     size_t EstimateSize() const override;
 
     /**
