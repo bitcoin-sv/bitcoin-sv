@@ -604,7 +604,7 @@ static bool CheckTransactionCommon(const CTransaction& tx,
 bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t maxTxSigOpsCountConsensusBeforeGenesis, uint64_t maxTxSizeConsensus, bool isGenesisEnabled)
 {
     if (!tx.IsCoinBase()) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
+        return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing",
                          "first tx is not coinbase");
     }
 
@@ -1168,7 +1168,6 @@ CTxnValResult TxnValidation(
                 // ban score of peer for transaction that could be valid in the future.
                 state.DoS(0, false, REJECT_NONSTANDARD,
                           ctxState.GetRejectReason(),
-                          ctxState.CorruptionPossible(),
                           ctxState.GetDebugMessage());
                 return Result{state, pTxInputData};
             }
@@ -1186,7 +1185,7 @@ CTxnValResult TxnValidation(
             // Currently we don't allow chains of non-final txns
             if(DoesNonFinalSpendNonFinal(tx)) {
                 state.DoS(0, false, REJECT_NONSTANDARD, "too-long-non-final-chain",
-                    false, "Attempt to spend non-final transaction");
+                    "Attempt to spend non-final transaction");
                 return Result{state, pTxInputData};
             }
         }
@@ -1272,9 +1271,7 @@ CTxnValResult TxnValidation(
         if (!res.has_value())
         {
             state.SetValidationTimeoutExceeded();
-            state.DoS(0, false, REJECT_NONSTANDARD,
-                     "too-long-validation-time",
-                      false);
+            state.DoS(0, false, REJECT_NONSTANDARD, "too-long-validation-time");
             return Result{state, pTxInputData, vCoinsToUncache};
         }
         else if (!res.value())
@@ -1290,9 +1287,7 @@ CTxnValResult TxnValidation(
             AreInputsStandard(source->GetToken(), config, tx, view, chainActive.Height() + 1);
         if (!res.has_value() || !res.value()) {
             state.SetValidationTimeoutExceeded();
-            state.DoS(0, false, REJECT_NONSTANDARD,
-                     "too-long-validation-time",
-                      false);
+            state.DoS(0, false, REJECT_NONSTANDARD, "too-long-validation-time");
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }
@@ -1306,7 +1301,6 @@ CTxnValResult TxnValidation(
     if (sigOpCountError || nSigOpsCount > config.GetMaxTxSigOpsCountPolicy(IsGenesisEnabled(config, chainActive.Height() + 1))) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "bad-txns-too-many-sigops",
-                  false,
                   strprintf("%d", nSigOpsCount));
         return Result{state, pTxInputData, vCoinsToUncache};
     }
@@ -1352,7 +1346,6 @@ CTxnValResult TxnValidation(
     if(!CheckMempoolMinFee(nModifiedFees, nMempoolRejectFee)) {
         state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                  "mempool min fee not met",
-                  false,
                   strprintf("%d < %d", nFees, nMempoolRejectFee));
         return Result{state, pTxInputData, vCoinsToUncache};
     }
@@ -1400,7 +1393,6 @@ CTxnValResult TxnValidation(
     if (!CalculateMempoolAncestors(pool, *pMempoolEntry, setAncestors, errString)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-mempool-chain",
-                  false,
                   errString);
         return Result{state, pTxInputData, vCoinsToUncache};
     }
@@ -1430,7 +1422,6 @@ CTxnValResult TxnValidation(
         state.SetValidationTimeoutExceeded();
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-validation-time",
-                  false,
                   errString);
         return Result{state, pTxInputData, vCoinsToUncache};
     }
@@ -1473,7 +1464,6 @@ CTxnValResult TxnValidation(
         state.SetValidationTimeoutExceeded();
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-validation-time",
-                  false,
                   errString);
         return Result{state, pTxInputData, vCoinsToUncache};
     }
@@ -1507,7 +1497,6 @@ CTxnValResult TxnValidation(
             state.SetValidationTimeoutExceeded();
             state.DoS(0, false, REJECT_NONSTANDARD,
                      "too-long-validation-time",
-                      false,
                       errString);
             return Result{state, pTxInputData, vCoinsToUncache};
         }
@@ -3022,7 +3011,7 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
 
     if (nValueIn < tx.GetValueOut()) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-belowout",
-                         false, strprintf("value in (%s) < value out (%s)",
+                         strprintf("value in (%s) < value out (%s)",
                                           FormatMoney(nValueIn),
                                           FormatMoney(tx.GetValueOut())));
     }
@@ -3904,7 +3893,7 @@ static bool ConnectBlock(
                 }
             }
 
-            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs", false,
+            return state.DoS(100, false, REJECT_INVALID, "blk-bad-inputs",
                              "parallel script check failed");
         }
 
@@ -5437,7 +5426,7 @@ static bool CheckBlockHeader(
     // Check proof of work matches claimed amount
     if (validationOptions.shouldValidatePoW() &&
         !CheckProofOfWork(block.GetHash(), block.nBits, config)) {
-        return state.DoS(50, false, REJECT_INVALID, "high-hash", false,
+        return state.DoS(50, false, REJECT_INVALID, "high-hash",
                          "proof of work failed");
     }
 
@@ -5464,16 +5453,14 @@ bool CheckBlock(const Config &config, const CBlock &block,
         bool mutated;
         uint256 hashMerkleRoot2 = BlockMerkleRoot(block, &mutated);
         if (block.hashMerkleRoot != hashMerkleRoot2) {
-            return state.DoS(100, false, REJECT_INVALID, "bad-txnmrklroot",
-                             true, "hashMerkleRoot mismatch");
+            return state.CorruptionOrDoS("bad-txnmrklroot", "hashMerkleRoot mismatch");
         }
 
         // Check for merkle tree malleability (CVE-2012-2459): repeating
         // sequences of transactions in a block without affecting the merkle
         // root of a block, while still invalidating it.
         if (mutated) {
-            return state.DoS(100, false, REJECT_INVALID, "bad-txns-duplicate",
-                             true, "duplicate transaction");
+            return state.CorruptionOrDoS("bad-txns-duplicate", "duplicate transaction");
         }
     }
 
@@ -5483,7 +5470,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
 
     // First transaction must be coinbase.
     if (block.vtx.empty()) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing", false,
+        return state.DoS(100, false, REJECT_INVALID, "bad-cb-missing",
                          "first tx is not coinbase");
     }
 
@@ -5492,13 +5479,13 @@ bool CheckBlock(const Config &config, const CBlock &block,
 
     // Bail early if there is no way this block is of reasonable size.  
     if ( MIN_TRANSACTION_SIZE > 0 && block.vtx.size () > (nMaxBlockSize/MIN_TRANSACTION_SIZE)){
-        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length", false,"size limits failed");
+        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length", "size limits failed");
     }
 
     auto currentBlockSize =
         ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
     if (currentBlockSize > nMaxBlockSize) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length", false,
+        return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
                          "size limits failed");
     }
 
@@ -5541,7 +5528,7 @@ bool CheckBlock(const Config &config, const CBlock &block,
             nSigOps += GetSigOpCountWithoutP2SH(*tx, false, sigOpCountError);
             if (sigOpCountError || nSigOps > nMaxSigOpsCountConsensusBeforeGenesis) {
                 auto result = state.DoS(100, false, REJECT_INVALID, "bad-blk-sigops",
-                                        false, "out-of-bounds SigOpCount");
+                                        "out-of-bounds SigOpCount");
                 if(!state.IsValid() && g_connman)
                 {
                     g_connman->getInvalidTxnPublisher().Publish(
@@ -5629,7 +5616,7 @@ static bool ContextualCheckBlockHeader(const Config &config,
     // Check proof of work
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, config)) {
         LogPrintf("bad bits after height: %d\n", pindexPrev->nHeight);
-        return state.DoS(100, false, REJECT_INVALID, "bad-diffbits", false,
+        return state.DoS(100, false, REJECT_INVALID, "bad-diffbits",
                          "incorrect proof of work");
     }
 
@@ -5674,7 +5661,7 @@ bool ContextualCheckTransaction(const Config &config, const CTransaction &tx,
 
         // While this is only one transaction, we use txns in the error to
         // ensure continuity with other clients.
-        return state.DoS(10, false, REJECT_INVALID, "bad-txns-nonfinal", false,
+        return state.DoS(10, false, REJECT_INVALID, "bad-txns-nonfinal",
                          "non-final transaction");
     }
 
@@ -5747,7 +5734,7 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
         ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
     if (currentBlockSize > nMaxBlockSize) {
         return state.DoS(100, false, REJECT_INVALID, "bad-blk-length",
-                        false, "size limits failed");
+                        "size limits failed");
     }
 
     const int64_t nLockTimeCutoff = (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST)
@@ -5775,7 +5762,7 @@ static bool ContextualCheckBlock(const Config &config, const CBlock &block,
             !std::equal(expect.begin(), expect.end(),
                         block.vtx[0]->vin[0].scriptSig.begin())) {
 
-            auto result = state.DoS(100, false, REJECT_INVALID, "bad-cb-height", false,
+            auto result = state.DoS(100, false, REJECT_INVALID, "bad-cb-height",
                                     "block height mismatch in coinbase");
             if(!state.IsValid() && g_connman)
             {
