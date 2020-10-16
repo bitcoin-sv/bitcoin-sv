@@ -19,11 +19,13 @@ struct CThreadSafeQueue<T>::UnitTestAccess
     
     static auto Count(const CThreadSafeQueue& q)
     {
+        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx));
         return q.theQueue.size();
     }
 
     static auto Size(const CThreadSafeQueue& q)
     { 
+        std::unique_lock<std::mutex> lock(const_cast<std::mutex&>(q.mtx));
         return q.currentSize;
     }
 };
@@ -50,13 +52,23 @@ bool is_ready(std::future<T> const& f)
     return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; 
 }
 
+
 template<typename T>
-int NumberOfRunningThreads(const std::vector<std::future<T>>& threads)
+bool CheckNumberOfRunningThreads(const std::vector<std::future<T>>& threads, int expectedNumberOfThreads)
 {
-    return std::count_if(threads.begin(), threads.end(), 
-        [](const std::future<void>& f){
-            return !is_ready(f);
-        });
+    auto checkIfNumberOfRunningThreadsIsAsExpected = [&threads, expectedNumberOfThreads]()
+    {
+        auto numberOfThreads = 
+        std::count_if(threads.begin(), threads.end(), 
+            [](const std::future<void>& f){
+                return !is_ready(f);
+            }
+        );
+
+        return numberOfThreads == expectedNumberOfThreads;
+    };
+
+    return WaitFor(checkIfNumberOfRunningThreadsIsAsExpected);
 }
 
 template<class T>
@@ -97,7 +109,7 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
         }));
 
     // two more threads are waiting to push
-    BOOST_CHECK(NumberOfRunningThreads(pushers) == 2);
+    BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 2));
 
     // popping one value
     outValues.insert(theQueue.PopWait().value());
@@ -109,7 +121,7 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
         }));
 
     // one more thread is trying to push value
-    BOOST_CHECK(NumberOfRunningThreads(pushers) == 1); 
+    BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 1)); 
 
     // close the queue
     BOOST_CHECK(!theQueue.IsClosed());
@@ -117,9 +129,7 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
     BOOST_CHECK(theQueue.IsClosed());
 
     // thread that was waiting to push value waits no more
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(10ms);
-    BOOST_CHECK(NumberOfRunningThreads(pushers) == 0);
+    BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 0));
 
     // take all values from queue, there should be 6 different integers
     while(true)
@@ -174,7 +184,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs) {
     BOOST_CHECK(get_Count(collectingQueue) == 5);
 
     // three more threads are waiting to pop next value
-    BOOST_CHECK(NumberOfRunningThreads(outs) == 3);
+    BOOST_CHECK(CheckNumberOfRunningThreads(outs, 3));
 
     // pushing one more value
     theQueue.PushWait(5);
@@ -186,7 +196,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs) {
         }));
 
     // two threads are trying to pop value
-    BOOST_CHECK(NumberOfRunningThreads(outs) == 2); 
+    BOOST_CHECK(CheckNumberOfRunningThreads(outs, 2)); 
 
     // close the queue
     BOOST_CHECK(!theQueue.IsClosed());
@@ -194,9 +204,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs) {
     BOOST_CHECK(theQueue.IsClosed());
 
     // threads that were waiting to pop value are waiting no more
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(10ms);
-    BOOST_CHECK(NumberOfRunningThreads(outs) == 0);
+    BOOST_CHECK(CheckNumberOfRunningThreads(outs, 0));
 
     BOOST_CHECK(get_Count(collectingQueue) == 6);
 
@@ -274,15 +282,8 @@ BOOST_AUTO_TEST_CASE(multiple_outputs) {
 
     theQueue.Close();
 
-    auto isAllInputsFinished = [&ins]() {
-        return NumberOfRunningThreads(ins) == 0;
-    };
-    BOOST_CHECK(WaitFor(isAllInputsFinished));
-    
-    auto isAllOutputsFinished = [&outs]() {
-        return NumberOfRunningThreads(outs) == 0;
-    };
-    BOOST_CHECK(WaitFor(isAllOutputsFinished));
+    BOOST_CHECK(CheckNumberOfRunningThreads(ins, 0));
+    BOOST_CHECK(CheckNumberOfRunningThreads(outs, 0));
 }
 
 BOOST_AUTO_TEST_CASE(stress_test_fixed_element_size)

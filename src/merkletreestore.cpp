@@ -49,16 +49,18 @@ FILE* CMerkleTreeStore::OpenMerkleTreeFile(const MerkleTreeDiskPosition& merkleT
     return file;
 }
 
-void CMerkleTreeStore::RemoveOldDataNL(const int suffixOfDataFileToRemove, std::vector<uint256>& blockHashesOfMerkleTreesRemovedOut)
+MerkleTreeFileInfoMap::const_iterator CMerkleTreeStore::RemoveOldDataNL(MerkleTreeFileInfoMap::const_iterator fileInfoToRemove, std::vector<uint256>& blockHashesOfMerkleTreesRemovedOut)
 {
-    AssertLockHeld(cs_merkleTreeStore);
-    // Remove file info and decrease datafile usage
-    auto fileInfoToRemove = fileInfoMap.find(suffixOfDataFileToRemove);
-    if (fileInfoToRemove != fileInfoMap.cend())
+    if (fileInfoToRemove == fileInfoMap.cend())
     {
-        diskUsage -= fileInfoToRemove->second.fileSize;
-        fileInfoMap.erase(fileInfoToRemove);
+        return fileInfoToRemove;
     }
+
+    AssertLockHeld(cs_merkleTreeStore);
+    const int suffixOfDataFileToRemove = fileInfoToRemove->first;
+    // Remove file info and decrease datafile usage
+    diskUsage -= fileInfoToRemove->second.fileSize;
+    auto nextFileInfo = fileInfoMap.erase(fileInfoToRemove);
 
     // Remove all related positions
     auto diskPositionToRemove = diskPositionMap.cbegin();
@@ -80,6 +82,8 @@ void CMerkleTreeStore::RemoveOldDataNL(const int suffixOfDataFileToRemove, std::
     {
         nextDiskPosition.fileOffset = 0;
     }
+
+    return nextFileInfo;
 }
 
 void CMerkleTreeStore::AddNewDataNL(const uint256& newBlockHash, const int32_t newBlockHeight, const MerkleTreeDiskPosition& newDiskPosition, uint64_t writtenDataInBytes)
@@ -142,26 +146,29 @@ bool CMerkleTreeStore::PruneDataFilesNL(const uint64_t maxDiskSpace, uint64_t ne
     auto pruningCandidate = fileInfoMap.cbegin();
     while ((diskUsage + newDataSizeInBytesToAdd) > maxDiskSpace && pruningCandidate != fileInfoMap.cend())
     {
-        auto nextCandidate = pruningCandidate;
-        ++nextCandidate;
         // We don't want to prune data files that contain merkle trees from latest MIN_BLOCKS_TO_KEEP blocks
         if ((chainHeight - pruningCandidate->second.greatestBlockHeight) > numberOfLatestBlocksToKeep)
         {
             boost::system::error_code errorCode;
-            fs::remove(GetDataFilename(pruningCandidate->first), errorCode);
+            int removeFileWithSuffix = pruningCandidate->first;
+            fs::remove(GetDataFilename(removeFileWithSuffix), errorCode);
 
             if (errorCode)
             {
-                LogPrintf("PruneDataFilesNL: cannot delete mrk file at the moment (%08u): error code %d - %s.\n", pruningCandidate->first, errorCode.value(), errorCode.message());
+                LogPrintf("PruneDataFilesNL: cannot delete mrk file at the moment (%08u): error code %d - %s.\n", removeFileWithSuffix, errorCode.value(), errorCode.message());
+                ++pruningCandidate;
             }
             else
             {
-                LogPrintf("PruneDataFilesNL: deleted mrk file (%08u)\n", pruningCandidate->first);
-                RemoveOldDataNL(pruningCandidate->first, blockHashesOfMerkleTreesRemoved);
-                suffixesOfDataFilesRemoved.push_back(pruningCandidate->first);
+                LogPrintf("PruneDataFilesNL: deleted mrk file (%08u)\n", removeFileWithSuffix);
+                pruningCandidate = RemoveOldDataNL(pruningCandidate, blockHashesOfMerkleTreesRemoved);
+                suffixesOfDataFilesRemoved.push_back(removeFileWithSuffix);
             }
         }
-        pruningCandidate = nextCandidate;
+        else
+        {
+            ++pruningCandidate;
+        }
     }
 
     // Sync with the database

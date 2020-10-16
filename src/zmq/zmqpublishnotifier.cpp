@@ -65,8 +65,6 @@ bool CZMQAbstractPublishNotifier::Initialize(void *pcontext, std::shared_ptr<CZM
 }
 
 void CZMQAbstractPublishNotifier::Shutdown() {
-    assert(psocket);
-
     int count = mapPublishNotifiers.count(address);
 
     // remove this notifier from the list of publishers using this address
@@ -85,7 +83,7 @@ void CZMQAbstractPublishNotifier::Shutdown() {
     // release reference to threadSafePublisher
     zmqPublisher = nullptr;
 
-    if (count == 1) {
+    if (count == 1 && psocket) {
         LogPrint(BCLog::ZMQ, "Close socket at address %s\n", address);
         int linger = 0;
         zmq_setsockopt(psocket, ZMQ_LINGER, &linger, sizeof(linger));
