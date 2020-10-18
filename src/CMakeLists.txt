@@ -193,6 +193,7 @@ add_library(common
 	script/sign.cpp
 	script/standard.cpp
 	warnings.cpp
+    write_preferring_upgradable_mutex.cpp
 )
 
 target_link_libraries(common util secp256k1)

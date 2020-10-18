@@ -236,6 +236,7 @@ BITCOIN_CORE_H = \
   wallet/wallet.h \
   wallet/walletdb.h \
   warnings.h \
+  write_preferring_upgradable_mutex.h \
   zmq/zmq_publisher.h \
   zmq/zmqabstractnotifier.h \
   zmq/zmqconfig.h\
@@ -443,6 +444,7 @@ libbitcoin_common_a_SOURCES = \
   script/sign.cpp \
   script/standard.cpp \
   warnings.cpp \
+  write_preferring_upgradable_mutex.cpp \
   $(BITCOIN_CORE_H)
 
 # util: shared between all executables.

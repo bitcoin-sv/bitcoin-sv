@@ -52,8 +52,22 @@ namespace
         {}
     };
 
+    class miner_tests_uid; // only used as unique identifier
 }
 
+template <>
+struct CoinsDB::UnitTestAccess<miner_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static void SetBestBlock(
+        CoinsDB& provider,
+        const uint256& hashBlock)
+    {
+        provider.hashBlock = hashBlock;
+    }
+};
+using TestAccessCoinsDB = CoinsDB::UnitTestAccess<miner_tests_uid>;
 
 static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
 
@@ -99,8 +113,11 @@ CBlockIndex CreateBlockIndex(int32_t nHeight) {
 }
 
 bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) {
-    std::shared_lock lock(mempool.smtx);
-    return CheckSequenceLocks(tx, mempool, config, flags);
+    CoinsDBView view{ *pcoinsTip };
+    CCoinsViewMemPool viewMemPool{view, mempool};
+    CCoinsViewCache cache{viewMemPool};
+
+    return CheckSequenceLocks(*chainActive.Tip(), tx, config, flags, nullptr, &cache);
 }
 
 // Test suite for ancestor feerate transaction selection.
@@ -504,7 +521,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         CBlockIndex *prev = chainActive.Tip();
         CBlockIndex *next = new CBlockIndex();
         next->phashBlock = new uint256(InsecureRand256());
-        pcoinsTip->SetBestBlock(next->GetBlockHash());
+        TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
         next->pprev = prev;
         next->nHeight = prev->nHeight + 1;
         next->BuildSkip();
@@ -516,7 +533,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         CBlockIndex *prev = chainActive.Tip();
         CBlockIndex *next = new CBlockIndex();
         next->phashBlock = new uint256(InsecureRand256());
-        pcoinsTip->SetBestBlock(next->GetBlockHash());
+        TestAccessCoinsDB::SetBestBlock(*pcoinsTip, next->GetBlockHash());
         next->pprev = prev;
         next->nHeight = prev->nHeight + 1;
         next->BuildSkip();
@@ -533,7 +550,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     while (chainActive.Tip()->nHeight > nHeight) {
         CBlockIndex *del = chainActive.Tip();
         chainActive.SetTip(del->pprev);
-        pcoinsTip->SetBestBlock(del->pprev->GetBlockHash());
+        TestAccessCoinsDB::SetBestBlock(*pcoinsTip, del->pprev->GetBlockHash());
         delete del->phashBlock;
         delete del;
     }

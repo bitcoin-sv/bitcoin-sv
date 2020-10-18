@@ -31,6 +31,7 @@
 #include "random.h"
 #include "taskcancellation.h"
 #include "tinyformat.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "util.h"

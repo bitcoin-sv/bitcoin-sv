@@ -13,6 +13,7 @@
 #include "policy/policy.h"
 #include "streams.h"
 #include "timedata.h"
+#include "txdb.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utiltime.h"
@@ -23,6 +24,54 @@
 #include <config.h>
 
 using namespace mining;
+
+
+    /**
+     * Special mempool coins provider for internal CTxMemPool use where smtx
+     * mutex is expected to be locked.
+     */
+    class CoinsViewLockedMemPoolNL : public ICoinsView
+    {
+    public:
+        CoinsViewLockedMemPoolNL(
+            const CTxMemPool& mempoolIn,
+            const CoinsDBView& DBView)
+            : mempool{ mempoolIn }
+            , mDBView{ DBView }
+        {}
+
+        std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override
+        {
+            CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
+            if (ptx) {
+                if (outpoint.GetN() < ptx->vout.size()) {
+                    return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
+                }
+                return {};
+            }
+
+            return mDBView.GetCoin(outpoint, maxScriptSize);
+        }
+
+        std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+        {
+            auto coinData = GetCoin(outpoint, std::numeric_limits<size_t>::max());
+            if(coinData.has_value())
+            {
+                assert(coinData->HasScript());
+
+                return std::move(coinData.value());
+            }
+
+            return {};
+        }
+
+    private:
+        uint256 GetBestBlock() const override { assert(!"Should not be used!"); return {}; }
+
+        const CTxMemPool& mempool;
+        const CoinsDBView& mDBView;
+    };
 
 /**
  * class CTxPrioritizer
@@ -497,11 +546,13 @@ bool CTxMemPool::IsSpent(const COutPoint &outpoint) {
     return IsSpentNL(outpoint);
 }
 
-bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) {
+bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) const {
     return mapNextTx.count(outpoint);
 }
 
-const CTransaction* CTxMemPool::IsSpentByNL(const COutPoint &outpoint) {
+const CTransaction* CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
+    std::shared_lock lock{ smtx };
+
     auto it = mapNextTx.find(outpoint);
     if (it == mapNextTx.end())
     {
@@ -764,7 +815,6 @@ void CTxMemPool::removeRecursiveNL(
             txToRemove.insert(nextit);
         }
     }
-
     setEntries setAllRemoves;
     for (txiter it : txToRemove) {
         CalculateDescendantsNL(it, setAllRemoves);
@@ -775,13 +825,13 @@ void CTxMemPool::removeRecursiveNL(
 
 void CTxMemPool::RemoveForReorg(
     const Config &config,
-    const CCoinsViewCache *pcoins,
+    const CoinsDB& coinsTip,
     const CJournalChangeSetPtr& changeSet,
-    int32_t nChainActiveHeight,
-    int nMedianTimePast,
+    const CBlockIndex& tip,
     int flags) {
 
-    const int32_t nMemPoolHeight = nChainActiveHeight + 1;
+    const int32_t nMemPoolHeight = tip.nHeight + 1;
+    const int nMedianTimePast = tip.GetMedianTimePast();
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
     std::unique_lock lock(smtx);
@@ -792,21 +842,25 @@ void CTxMemPool::RemoveForReorg(
         LockPoints lp = it->GetLockPoints();
         bool validLP = TestLockPointValidity(&lp);
 
+        CoinsDBView tipView{ *pcoinsTip };
+        CoinsViewLockedMemPoolNL view{ *this, tipView };
+        CCoinsViewCache viewMemPool{ view };
+
         CValidationState state;
         if (!ContextualCheckTransactionForCurrentBlock(
                 config,
                 tx,
-                nChainActiveHeight,
+                tip.nHeight,
                 nMedianTimePast,
                 state,
                 flags) ||
-            !CheckSequenceLocks(
-                tx,
-                *this,
-                config,
-                flags,
-                &lp,
-                validLP)) {
+                !CheckSequenceLocks(
+                    tip,
+                    tx,
+                    config,
+                    flags,
+                    &lp,
+                    validLP ? nullptr : &viewMemPool)) {
             // Note if CheckSequenceLocks fails the LockPoints may still be
             // invalid. So it's critical that we remove the tx and not depend on
             // the LockPoints.
@@ -819,14 +873,15 @@ void CTxMemPool::RemoveForReorg(
                     continue;
                 }
 
-                const Coin &coin = pcoins->AccessCoin(txin.prevout);
+                auto coin = tipView.GetCoin(txin.prevout);
+                assert( coin.has_value() );
                 if (nCheckFrequency != 0) {
-                    assert(!coin.IsSpent());
+                    assert(coin.has_value() && !coin->IsSpent());
                 }
 
-                if (coin.IsSpent() ||
-                    (coin.IsCoinBase() &&
-                     nMemPoolHeight - coin.GetHeight() <
+                if (!coin.has_value() || coin->IsSpent() ||
+                    (coin->IsCoinBase() &&
+                     nMemPoolHeight - coin->GetHeight() <
                          COINBASE_MATURITY)) {
                     txToRemove.insert(it);
                     break;
@@ -837,6 +892,7 @@ void CTxMemPool::RemoveForReorg(
             mapTx.modify(it, update_lock_points(lp));
         }
     }
+
     setEntries setAllRemoves;
     for (txiter it : txToRemove) {
         CalculateDescendantsNL(it, setAllRemoves);
@@ -949,7 +1005,7 @@ void CTxMemPool::Clear() {
 }
 
 void CTxMemPool::CheckMempool(
-    const CCoinsViewCache *pcoins,
+    CoinsDB& db,
     const mining::CJournalChangeSetPtr& changeSet) const {
 
     if (nCheckFrequency == 0) {
@@ -959,9 +1015,11 @@ void CTxMemPool::CheckMempool(
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency) {
         return;
     }
+    CoinsDBView view{ db };
+    CCoinsViewCache mempoolDuplicate{view};
 
     // Get spend height and MTP
-    const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(*pcoins);
+    const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(mempoolDuplicate);
 
     std::shared_lock lock(smtx);
 
@@ -971,8 +1029,6 @@ void CTxMemPool::CheckMempool(
 
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;
-
-    CCoinsViewCache mempoolDuplicate(const_cast<CCoinsViewCache *>(pcoins));
 
     std::list<const CTxMemPoolEntry *> waitingOnDependants;
     for (indexed_transaction_set::const_iterator it = mapTx.begin();
@@ -1005,7 +1061,7 @@ void CTxMemPool::CheckMempool(
                     parentSigOpCount += it2->GetSigOpCount();
                 }
             } else {
-                assert(pcoins->HaveCoin(txin.prevout));
+                assert(view.GetCoin(txin.prevout).has_value());
             }
             // Check whether its inputs are marked in mapNextTx.
             auto it3 = mapNextTx.find(txin.prevout);
@@ -1296,7 +1352,7 @@ std::vector<TxMempoolInfo> CTxMemPool::InfoAllNL() const {
 }
 
 CTransactionRef CTxMemPool::Get(const uint256 &txid) const {
-    std::unique_lock lock(smtx);
+    std::shared_lock lock(smtx);
     return GetNL(txid);
 }
 
@@ -1445,29 +1501,90 @@ bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const {
     return true;
 }
 
-CCoinsViewMemPool::CCoinsViewMemPool(CCoinsView *baseIn,
-                                     const CTxMemPool &mempoolIn)
-    : CCoinsViewBacked(baseIn), mempool(mempoolIn) {}
+void CTxMemPool::OnUnspentCoinsWithScript(
+    const CoinsDBView& tip,
+    const std::vector<COutPoint>& outpoints,
+    const std::function<void(const CoinWithScript&, size_t)>& callback) const
+{
+    std::shared_lock lock{ smtx };
 
-bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    // If an entry in the mempool exists, always return that one, as it's
-    // guaranteed to never conflict with the underlying cache, and it cannot
-    // have pruned entries (as it contains full) transactions. First checking
-    // the underlying cache risks returning a pruned entry instead.
-    CTransactionRef ptx = mempool.GetNL(outpoint.GetTxId());
-    if (ptx) {
-        if (outpoint.GetN() < ptx->vout.size()) {
-            coin = Coin(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
-            return true;
+    CoinsViewLockedMemPoolNL viewMemPool{ *this, tip };
+
+    std::size_t idx = 0;
+
+    for(const auto& out : outpoints)
+    {
+        if (!IsSpentNL( out ))
+        {
+            if (auto coin = viewMemPool.GetCoinWithScript( out );
+                coin.has_value() && !coin->IsSpent())
+            {
+                callback( coin.value(), idx );
+            }
         }
-        return false;
-    }
 
-    return base->GetCoin(outpoint, coin) && !coin.IsSpent();
+        ++idx;
+    }
 }
 
-bool CCoinsViewMemPool::HaveCoin(const COutPoint &outpoint) const {
-    return mempool.ExistsNL(outpoint) || base->HaveCoin(outpoint);
+CCoinsViewMemPool::CCoinsViewMemPool(const CoinsDBView& DBView,
+                                     const CTxMemPool &mempoolIn)
+    : mempool(mempoolIn)
+    , mDBView{DBView}
+{}
+
+std::optional<Coin> CCoinsViewMemPool::GetCoinFromDB(const COutPoint& outpoint) const
+{
+    if(auto coin = mDBView.GetCoin(outpoint, 0); coin.has_value())
+    {
+        return Coin{coin.value()};
+    }
+
+    return {};
+}
+
+uint256 CCoinsViewMemPool::GetBestBlock() const
+{
+    return mDBView.GetBestBlock();
+}
+
+CTransactionRef CCoinsViewMemPool::GetCachedTransactionRef(const COutPoint& outpoint) const
+{
+    std::unique_lock lock{mMutex};
+
+    // Local cache makes sure that once we read the coin we have guaranteed
+    // coin stability until the provider is destroyed even in case mempool
+    // changes during task execution.
+    if (auto it = mCache.find(outpoint.GetTxId()); it != mCache.end())
+    {
+        return it->second;
+    }
+
+    CTransactionRef tx = mempool.Get(outpoint.GetTxId());
+
+    if (tx)
+    {
+        mCache.emplace(outpoint.GetTxId(), tx);
+    }
+
+    return tx;
+}
+
+std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const
+{
+    // If an entry in the mempool exists, always return that one, as it's
+    // guaranteed to never conflict with the underlying view, and it cannot
+    // have pruned entries (as it contains full) transactions. First checking
+    // the underlying provider risks returning a pruned entry instead.
+    CTransactionRef ptx = GetCachedTransactionRef(outpoint);
+    if (ptx) {
+        if (outpoint.GetN() < ptx->vout.size()) {
+            return CoinImpl::MakeNonOwningWithScript(ptx->vout[outpoint.GetN()], MEMPOOL_HEIGHT, false);
+        }
+        return {};
+    }
+
+    return mDBView.GetCoin(outpoint, maxScriptSize);
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {

@@ -24,6 +24,7 @@
 #include "script/sign.h"
 #include "script/standard.h"
 #include "taskcancellation.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "txn_validator.h"
 #include "uint256.h"
@@ -292,14 +293,14 @@ static CBlockIndex* GetBlockIndex(const Config& config,
     }
     else
     {
+        CoinsDBView tipView{ *pcoinsTip };
+
         // Try to find a block containing at least one requested transaction with utxo
         for (const TxId& txid : setTxIds)
         {
-            const Coin& coin = AccessByTxid(*pcoinsTip, txid);
-            if (!coin.IsSpent())
-            {
-                LOCK(cs_main);
-                pblockindex = chainActive[coin.GetHeight()];
+            auto coin = tipView.GetCoinByTxId(txid);
+            if (coin.has_value()) {
+                pblockindex = chainActive[coin->GetHeight()];
                 break;
             }
         }
@@ -932,23 +933,9 @@ static UniValue signrawtransaction(const Config &config,
     CMutableTransaction mergedTx(txVariants[0]);
 
     // Fetch previous transactions (inputs):
-    CCoinsView viewDummy;
-    CCoinsViewCache view(&viewDummy);
-    {
-        std::shared_lock lock(mempool.smtx);
-        CCoinsViewCache &viewChain = *pcoinsTip;
-        CCoinsViewMemPool viewMempool(&viewChain, mempool);
-        // Temporarily switch cache backend to db+mempool view.
-        view.SetBackend(viewMempool);
-
-        for (const CTxIn &txin : mergedTx.vin) {
-            // Load entries from viewChain into view; can fail.
-            view.AccessCoin(txin.prevout);
-        }
-
-        // Switch back to avoid locking mempool for too long.
-        view.SetBackend(viewDummy);
-    }
+    CoinsDBView tipView{ *pcoinsTip };
+    CCoinsViewMemPool viewMempool(tipView, mempool);
+    CCoinsViewCache view(viewMempool);
 
     bool fGivenKeys = false;
     CBasicKeyStore tempKeystore;
@@ -1016,11 +1003,11 @@ static UniValue signrawtransaction(const Config &config,
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
             {
-                const Coin &coin = view.AccessCoin(out);
-                if (!coin.IsSpent() &&
-                    coin.GetTxOut().scriptPubKey != scriptPubKey) {
+                if (auto coin = view.GetCoinWithScript(out);
+                    coin.has_value() && !coin->IsSpent() &&
+                    coin->GetTxOut().scriptPubKey != scriptPubKey) {
                     std::string err("Previous output scriptPubKey mismatch:\n");
-                    err = err + ScriptToAsmStr(coin.GetTxOut().scriptPubKey) +
+                    err = err + ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
                           "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                     throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
                 }
@@ -1056,7 +1043,7 @@ static UniValue signrawtransaction(const Config &config,
                     coinHeight = genesisActivationHeight - 1;
                 }
 
-                view.AddCoin(out, Coin(txout, coinHeight, false), true, genesisActivationHeight);
+                view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), coinHeight, false), true, genesisActivationHeight);
             }
 
             // If redeemScript given and not using the local wallet (private
@@ -1131,16 +1118,17 @@ static UniValue signrawtransaction(const Config &config,
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
-        const Coin &coin = view.AccessCoin(txin.prevout);
-        if (coin.IsSpent()) {
+        auto coin = view.GetCoinWithScript(txin.prevout);
+        if (!coin.has_value() || coin->IsSpent())
+        {
             TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
             continue;
         }
 
-        const CScript &prevPubKey = coin.GetTxOut().scriptPubKey;
-        const Amount amount = coin.GetTxOut().nValue;
+        const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
+        const Amount amount = coin->GetTxOut().nValue;
 
-        bool utxoAfterGenesis = IsGenesisEnabled(config, coin, chainActive.Height() + 1); 
+        bool utxoAfterGenesis = IsGenesisEnabled(config, coin.value(), chainActive.Height() + 1);
 
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:

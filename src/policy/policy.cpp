@@ -81,8 +81,9 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
     for (CTxIn const & u: tx.vin) {
 
         // accept only with many confirmations
-        const Coin &coin = inputs.AccessCoin(u.prevout);
-        const auto coinHeight = coin.GetHeight();
+        const auto& coin = inputs.GetCoinWithScript(u.prevout);
+        assert(coin.has_value());
+        const auto coinHeight = coin->GetHeight();
 
         if (coinHeight == MEMPOOL_HEIGHT)
             return false;
@@ -97,11 +98,11 @@ bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoi
         // if not acceptnonstdconsolidationinput then check if inputs are standard
         // and fail otherwise
         txnouttype dummyType;
-        if (stdInputOnly  && !IsStandard(config, coin.GetTxOut().scriptPubKey, coinHeight, dummyType))
+        if (stdInputOnly  && !IsStandard(config, coin->GetTxOut().scriptPubKey, coinHeight, dummyType))
             return false;
 
         // sum up some script sizes
-        sumScriptPubKeySizeOfTxInputs += coin.GetTxOut().scriptPubKey.size();
+        sumScriptPubKeySizeOfTxInputs += coin->GetTxOut().scriptPubKey.size();
     }
 
     // check ratio between sum of tx-scriptPubKeys to sum of parent-scriptPubKeys
@@ -197,15 +198,16 @@ std::optional<bool> AreInputsStandard(
     }
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
-        const CTxOut &prev = mapInputs.GetOutputFor(tx.vin[i]);
-        const Coin& coin = mapInputs.AccessCoin(tx.vin[i].prevout);
+        auto prev = mapInputs.GetCoinWithScript( tx.vin[i].prevout );
+        assert(prev.has_value());
+        assert(!prev->IsSpent());
 
         std::vector<std::vector<uint8_t>> vSolutions;
         txnouttype whichType;
         // get the scriptPubKey corresponding to this input:
-        const CScript &prevScript = prev.scriptPubKey;
-        
-        if (!Solver(prevScript, IsGenesisEnabled(config, coin, mempoolHeight),
+        const CScript &prevScript = prev->GetTxOut().scriptPubKey;
+
+        if (!Solver(prevScript, IsGenesisEnabled(config, prev.value(), mempoolHeight),
                     whichType, vSolutions)) {
             return false;
         }

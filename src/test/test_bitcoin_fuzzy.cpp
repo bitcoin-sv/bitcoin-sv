@@ -165,7 +165,7 @@ int main(int argc, char **argv) {
         }
         case COIN_DESERIALIZE: {
             try {
-                Coin coin;
+                CoinImpl coin;
                 ds >> coin;
             } catch (const std::ios_base::failure &e) {
                 return 0;

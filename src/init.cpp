@@ -142,36 +142,6 @@ task::CCancellationToken GetShutdownToken()
     return shutdownSource->GetToken();
 }
 
-/**
- * This is a minimally invasive approach to shutdown on LevelDB read errors from
- * the chainstate, while keeping user interface out of the common library, which
- * is shared between bitcoind and non-server tools.
- */
-class CCoinsViewErrorCatcher final : public CCoinsViewBacked {
-public:
-    CCoinsViewErrorCatcher(CCoinsView *view) : CCoinsViewBacked(view) {}
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override {
-        try {
-            return CCoinsViewBacked::GetCoin(outpoint, coin);
-        } catch (const std::runtime_error &e) {
-            uiInterface.ThreadSafeMessageBox(
-                _("Error reading from database, shutting down."), "",
-                CClientUIInterface::MSG_ERROR);
-            LogPrintf("Error reading from database: %s\n", e.what());
-            // Starting the shutdown sequence and returning false to the caller
-            // would be interpreted as 'entry not found' (as opposed to unable
-            // to read data), and could lead to invalid interpretation. Just
-            // exit immediately, as we can't continue anyway, and all writes
-            // should be atomic.
-            abort();
-        }
-    }
-    // Writes do not need similar protection, as failure to write is handled by
-    // the caller.
-};
-
-static CCoinsViewDB *pcoinsdbview = nullptr;
-static CCoinsViewErrorCatcher *pcoinscatcher = nullptr;
 static std::unique_ptr<ECCVerifyHandle> globalVerifyHandle;
 
 void Interrupt(boost::thread_group &threadGroup) {
@@ -238,12 +208,7 @@ void Shutdown() {
         if (pcoinsTip != nullptr) {
             FlushStateToDisk();
         }
-        delete pcoinsTip;
-        pcoinsTip = nullptr;
-        delete pcoinscatcher;
-        pcoinscatcher = nullptr;
-        delete pcoinsdbview;
-        pcoinsdbview = nullptr;
+        pcoinsTip.release();
         delete pblocktree;
         pblocktree = nullptr;
     }
@@ -1235,6 +1200,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         _("Set the maximum cumulative size of accepted transaction inputs inside coins cache (default: unlimited -> 0). "
             "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
+        "-maxcoinsprovidercachesize=<n>",
+        _("Set soft maximum limit of cached coin tip buffer size (default: unlimited -> 0). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."));
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -2169,6 +2138,12 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(err);
     }
 
+    if(std::string err; !config.SetMaxCoinsProviderCacheSize(
+        gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", 0), &err))
+    {
+        return InitError(err);
+    }
+
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     RegisterWalletRPCCommands(tableRPC);
@@ -2802,18 +2777,19 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         do {
             try {
                 UnloadBlockIndex();
-                delete pcoinsTip;
-                delete pcoinsdbview;
-                delete pcoinscatcher;
+                pcoinsTip.release();
                 delete pblocktree;
 
                 pblocktree =
                     new CBlockTreeDB(nBlockTreeDBCache, false, fReindex);
-                pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false,
-                                                fReindex || fReindexChainState);
-                pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
                 pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
-                
+                pcoinsTip =
+                    std::make_unique<CoinsDB>(
+                        config.GetMaxCoinsProviderCacheSize(),
+                        nCoinDBCache,
+                        false,
+                        fReindex || fReindexChainState);
+
                 if (fReindex) {
                     pblocktree->WriteReindexing(true);
                     // If we're reindexing in prune mode, wipe away unusable
@@ -2821,7 +2797,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     if (fPruneMode) {
                         CleanupBlockRevFiles();
                     }
-                } else if (pcoinsdbview->IsOldDBFormat()) {
+                } else if (pcoinsTip->IsOldDBFormat()) {
                     strLoadError = _("Refusing to start, older database format detected");
                     break;
                 }
@@ -2867,14 +2843,13 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     break;
                 }
 
-                if (!ReplayBlocks(config, pcoinsdbview)) {
+                if (!ReplayBlocks(config, *pcoinsTip)) {
                     strLoadError =
                         _("Unable to replay blocks. You will need to rebuild "
                           "the database using -reindex-chainstate.");
                     break;
                 }
 
-                pcoinsTip = new CCoinsViewCache(pcoinscatcher);
                 {
                     LOCK(cs_main);
                     LoadChainTip(chainparams);
@@ -2918,13 +2893,16 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 }
 
                 if (!CVerifyDB().VerifyDB(
-                        config, pcoinsdbview,
+                        config, *pcoinsTip,
                         gArgs.GetArg("-checklevel", DEFAULT_CHECKLEVEL),
                         gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS),
                         shutdownToken)) {
                     strLoadError = _("Corrupted block database detected");
                     break;
                 }
+                // Make sure that nothing stays in cache as VerifyDB loads coins
+                // from database.
+                FlushStateToDisk();
 
                 InvalidateBlocksFromConfig(config);
 

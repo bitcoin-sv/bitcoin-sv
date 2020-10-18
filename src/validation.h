@@ -635,7 +635,7 @@ bool IsGenesisEnabled(const Config& config, int32_t nHeight);
  * In this case, you should call this overload and specify the mempool height (chainActive.Height()+1) 
  *as parameter to correctly determine if genesis is enabled for this coin.
  */
-bool IsGenesisEnabled(const Config& config, const Coin& coin, int32_t mempoolHeight  );
+bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight);
 int GetGenesisActivationHeight(const Config& config);
 
 /**
@@ -805,7 +805,7 @@ uint64_t GetSigOpCountWithoutP2SH(const CTransaction &tx, bool isGenesisEnabled,
  */
 uint64_t GetP2SHSigOpCount(const Config &config, 
                            const CTransaction &tx,
-                           const CCoinsViewCache &mapInputs, 
+                           const CCoinsViewCache &mapInputs,
                            bool& sigOpCountError);
 
 /**
@@ -818,7 +818,7 @@ uint64_t GetP2SHSigOpCount(const Config &config,
  */
 uint64_t GetTransactionSigOpCount(const Config &config, 
                                   const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, 
+                                  const CCoinsViewCache &inputs,
                                   bool checkP2SH, 
                                   bool isGenesisEnabled, 
                                   bool& sigOpCountError);
@@ -904,16 +904,14 @@ bool SequenceLocks(const CTransaction &tx, int flags,
  * should not be considered valid if CheckSequenceLocks returns false.
  *
  * See consensus/consensus.h for flag definitions.
- *
- * The caller of the method needs to hold the mempool's smtx.
  */
 bool CheckSequenceLocks(
+    const CBlockIndex& tip,
     const CTransaction &tx,
-    const CTxMemPool &pool,
     const Config& config,
     int flags,
     LockPoints *lp = nullptr,
-    bool useExistingLockPoints = false);
+    CCoinsViewCache* viewMemPool = nullptr); // if set lockpoints are re-calculated
 
 /**
  * Closure representing one script verification.
@@ -1027,12 +1025,12 @@ class CVerifyDB {
 public:
     CVerifyDB();
     ~CVerifyDB();
-    bool VerifyDB(const Config &config, CCoinsView *coinsview, int nCheckLevel,
+    bool VerifyDB(const Config &config, CoinsDB& db, int nCheckLevel,
                   int nCheckDepth, const task::CCancellationToken& shutdownToken);
 };
 
 /** Replay blocks that aren't fully applied to the database. */
-bool ReplayBlocks(const Config &config, CCoinsView *view);
+bool ReplayBlocks(const Config &config, CoinsDB& view);
 
 /** Find the last common block between the parameter chain and a locator. */
 CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
@@ -1062,9 +1060,9 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex);
 /** The currently-connected chain of blocks (protected by cs_main). */
 extern CChain chainActive;
 
-/** Global variable that points to the active CCoinsView (protected by cs_main)
+/** Global variable that points to the active CCoinsProvider (protected by cs_main)
  */
-extern CCoinsViewCache *pcoinsTip;
+extern std::unique_ptr<CoinsDB> pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main)
  */

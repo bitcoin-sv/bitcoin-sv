@@ -245,7 +245,7 @@ CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
     return chain.Genesis();
 }
 
-CCoinsViewCache *pcoinsTip = nullptr;
+std::unique_ptr<CoinsDB> pcoinsTip;
 CBlockTreeDB *pblocktree = nullptr;
 
 static uint32_t GetBlockScriptFlags(const Config &config,
@@ -390,53 +390,49 @@ bool TestLockPointValidity(const LockPoints *lp) {
 }
 
 bool CheckSequenceLocks(
+    const CBlockIndex& tip,
     const CTransaction &tx,
-    const CTxMemPool &pool,
     const Config& config,
     int flags,
     LockPoints *lp,
-    bool useExistingLockPoints) {
-
-    // cs_main is held by TxnValidator during TxnValidation call.
-    // pool.smtx is held by TxnValidation method. It is required for viewMemPool::GetCoin()
-    CBlockIndex *tip = chainActive.Tip();
-
+    CCoinsViewCache* viewMemPool)
+{
     // Post-genesis we don't care about the old sequence lock calculations
-    if(IsGenesisEnabled(config, tip->nHeight))
+    if(IsGenesisEnabled(config, tip.nHeight))
     {
         return true;
     }
 
     CBlockIndex index;
-    index.pprev = tip;
+    index.pprev = const_cast<CBlockIndex*>(&tip); // safe to cast as tip won't change
+
     // CheckSequenceLocks() uses chainActive.Height()+1 to evaluate height based
     // locks because when SequenceLocks() is called within ConnectBlock(), the
     // height of the block *being* evaluated is what is used. Thus if we want to
     // know if a transaction can be part of the *next* block, we need to use one
     // more than chainActive.Height()
-    index.nHeight = tip->nHeight + 1;
+    index.nHeight = tip.nHeight + 1;
 
     std::pair<int32_t, int64_t> lockPair;
-    if (useExistingLockPoints) {
+    if (bool useExistingLockPoints = (viewMemPool == nullptr); useExistingLockPoints) {
         assert(lp);
         lockPair.first = lp->height;
         lockPair.second = lp->time;
     } else {
-        // pcoinsTip contains the UTXO set for chainActive.Tip()
-        CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
         std::vector<int32_t> prevheights;
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
             const CTxIn &txin = tx.vin[txinIndex];
-            Coin coin;
-            if (!viewMemPool.GetCoin(txin.prevout, coin)) {
+            if (auto coin = viewMemPool->GetCoin(txin.prevout); !coin.has_value() || coin->IsSpent())
+            {
                 return error("%s: Missing input", __func__);
             }
-            if (coin.GetHeight() == MEMPOOL_HEIGHT) {
+            else if (coin->GetHeight() == MEMPOOL_HEIGHT)
+            {
                 // Assume all mempool transaction confirm in the next block
-                prevheights[txinIndex] = tip->nHeight + 1;
+                prevheights[txinIndex] = tip.nHeight + 1;
             } else {
-                prevheights[txinIndex] = coin.GetHeight();
+                prevheights[txinIndex] = coin->GetHeight();
             }
         }
         lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
@@ -460,11 +456,11 @@ bool CheckSequenceLocks(
             for (int32_t height : prevheights) {
                 // Can ignore mempool inputs since we'll fail if they had
                 // non-zero locks
-                if (height != tip->nHeight + 1) {
+                if (height != tip.nHeight + 1) {
                     maxInputHeight = std::max(maxInputHeight, height);
                 }
             }
-            lp->maxInputBlock = tip->GetAncestor(maxInputHeight);
+            lp->maxInputBlock = tip.GetAncestor(maxInputHeight);
         }
     }
     return EvaluateSequenceLocks(index, lockPair);
@@ -506,17 +502,17 @@ uint64_t GetP2SHSigOpCount(const Config &config,
 
     uint64_t nSigOps = 0;
     for (auto &i : tx.vin) {
-        const Coin &coin = inputs.AccessCoin(i.prevout);
-        assert(!coin.IsSpent());
+        auto coin = inputs.GetCoinWithScript(i.prevout);
+        assert(coin.has_value() && !coin->IsSpent());
 
         bool genesisEnabled = true;
-        if (coin.GetHeight() != MEMPOOL_HEIGHT){
-            genesisEnabled = IsGenesisEnabled(config, coin.GetHeight());
+        if (coin->GetHeight() != MEMPOOL_HEIGHT){
+            genesisEnabled = IsGenesisEnabled(config, coin->GetHeight());
         }
         if (genesisEnabled) {
             continue;
         }
-        const CTxOut &prevout = coin.GetTxOut();
+        const CTxOut &prevout = coin->GetTxOut();
         if (IsP2SH(prevout.scriptPubKey)) {
             nSigOps += prevout.scriptPubKey.GetSigOpCount(i.scriptSig, genesisEnabled, sigOpCountError);
             if (sigOpCountError) {
@@ -529,7 +525,7 @@ uint64_t GetP2SHSigOpCount(const Config &config,
 
 uint64_t GetTransactionSigOpCount(const Config &config, 
                                   const CTransaction &tx,
-                                  const CCoinsViewCache &inputs, 
+                                  const CCoinsViewCache &inputs,
                                   bool checkP2SH,
                                   bool isGenesisEnabled, 
                                   bool& sigOpCountError) {
@@ -645,8 +641,7 @@ bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, ui
 
     }
 
-    static SaltedOutpointHasher hasher {};
-    std::unordered_set<COutPoint, SaltedOutpointHasher> inOutPoints { 1, hasher };
+    std::set<COutPoint> inOutPoints;
     for (const auto &txin : tx.vin) {
         if (txin.prevout.IsNull()) {
             return state.DoS(10, false, REJECT_INVALID,
@@ -704,7 +699,7 @@ bool IsGenesisEnabled(const Config &config, int32_t nHeight) {
     return nHeight >= config.GetGenesisActivationHeight();
 }
 
-bool IsGenesisEnabled(const Config& config, const Coin& coin, int32_t mempoolHeight) {
+bool IsGenesisEnabled(const Config& config, const CoinWithScript& coin, int32_t mempoolHeight) {
     auto height = coin.GetHeight();
     if (height == MEMPOOL_HEIGHT) {
         return mempoolHeight >= config.GetGenesisActivationHeight();
@@ -728,42 +723,43 @@ bool IsGenesisEnabled(const Config &config, const CBlockIndex* pindexPrev) {
 // TxnValidation is called by the Validator which holds cs_main lock during a call.
 // view is constructed as local variable (by TxnValidation), populated and then disconnected from backing view,
 // so that it can not be shared by other threads.
-// Mt support is present in CCoinsViewCache class.
+// Mt support is present in CoinsDB class.
 static std::optional<bool> CheckInputsFromMempoolAndCache(
     const task::CCancellationToken& token,
     const Config& config,
     const CTransaction& tx,
     CValidationState& state,
-    const CCoinsViewCache* pcoinsTip,
+    CCoinsViewMemPool& underlyingMempool,
     const CCoinsViewCache& view,
-    CTxMemPool& pool,
     const uint32_t flags,
     bool cacheSigStore,
     PrecomputedTransactionData& txdata) {
 
-    // Take the mempool lock to enforce that the mempool doesn't change
-    // between when we check the view and when we actually call through to CheckInputs
-    std::shared_lock lock(pool.smtx);
-
     assert(!tx.IsCoinBase());
     for (const CTxIn &txin : tx.vin) {
-        const Coin &coin = view.AccessCoin(txin.prevout);
         // At this point we haven't actually checked if the coins are all
         // available (or shouldn't assume we have, since CheckInputs does). So
         // we just return failure if the inputs are not available here, and then
         // only have to check equivalence for available inputs.
-        if (coin.IsSpent()) {
+        auto coin = view.GetCoin(txin.prevout);
+        if (!coin.has_value() || coin->IsSpent()) {
             return false;
         }
-        const CTransactionRef &txFrom = pool.GetNL(txin.prevout.GetTxId());
+        auto txFrom = underlyingMempool.GetCachedTransactionRef(txin.prevout);
         if (txFrom) {
             assert(txFrom->GetHash() == txin.prevout.GetTxId());
             assert(txFrom->vout.size() > txin.prevout.GetN());
-            assert(txFrom->vout[txin.prevout.GetN()] == coin.GetTxOut());
+            assert(txFrom->vout[txin.prevout.GetN()].nValue == coin->GetAmount());
+            // Most scripts are of the same size but we don't want to pay for
+            // script loading just to assert
+            assert(txFrom->vout[txin.prevout.GetN()].scriptPubKey.size() == coin->GetScriptSize());
         } else {
-            const Coin &coinFromDisk = pcoinsTip->AccessCoin(txin.prevout);
-            assert(!coinFromDisk.IsSpent());
-            assert(coinFromDisk.GetTxOut() == coin.GetTxOut());
+            auto coinFromDisk = underlyingMempool.GetCoinFromDB(txin.prevout);
+            assert(coinFromDisk.has_value() && !coinFromDisk->IsSpent());
+            assert(coinFromDisk->GetAmount() == coin->GetAmount());
+            // Most scripts are of the same size but we don't want to pay for
+            // script loading just to assert
+            assert(coinFromDisk->GetScriptSize() == coin->GetScriptSize());
         }
     }
 
@@ -786,17 +782,14 @@ static std::optional<bool> CheckInputsFromMempoolAndCache(
 
 static bool CheckTxOutputs(
     const CTransaction &tx,
-    const CCoinsViewCache* pcoinsTip,
+    const CoinsDB& coinsTip,
     const CCoinsViewCache& view,
     std::vector<COutPoint> &vCoinsToUncache) {
-    if (!pcoinsTip) {
-        throw std::runtime_error("UTXO cache is not initialized.");
-    }
     const TxId txid = tx.GetId();
     // Do we already have it?
     for (size_t out = 0; out < tx.vout.size(); out++) {
         COutPoint outpoint(txid, out);
-        bool had_coin_in_cache = pcoinsTip->HaveCoinInCache(outpoint);
+        bool had_coin_in_cache = coinsTip.HaveCoinInCache(outpoint);
         // Check if outpoint present in the mempool
         if (view.HaveCoin(outpoint)) {
             // Check if outpoint available as a UTXO tx.
@@ -822,8 +815,8 @@ static bool CheckTxSpendsCoinbase(
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
     for (const CTxIn &txin : tx.vin) {
-        const Coin &coin = view.AccessCoin(txin.prevout);
-        if (coin.IsCoinBase()) {
+        if (auto coin = view.GetCoin(txin.prevout);
+            coin.has_value() && coin->IsCoinBase()) {
             return true;
         }
     }
@@ -1203,62 +1196,54 @@ CTxnValResult TxnValidation(
         return Result{state, pTxInputData};
     }
 
-    CCoinsView dummy;
-    CCoinsViewCache view(&dummy);
     Amount nValueIn(0);
     LockPoints lp;
+    // Combine db & mempool views together.
+    CoinsDBView tipView{ *pcoinsTip };
+    CCoinsViewMemPool viewMemPool(tipView, pool);
+    CCoinsViewCache view(viewMemPool);
+    // Do we already have it?
+    if(!CheckTxOutputs(tx, *pcoinsTip, view, vCoinsToUncache)) {
+       state.Invalid(false, REJECT_ALREADY_KNOWN,
+                    "txn-already-known");
+       return Result{state, pTxInputData, vCoinsToUncache};
+    }
+    // Prepare coins to uncache list for inputs
+    for (const CTxIn& txin : tx.vin)
     {
-        std::shared_lock lock(pool.smtx);
-        // Combine db & mempool views together.
-        CCoinsViewMemPool viewMemPool(pcoinsTip, pool);
-        // Temporarily switch cache backend to db+mempool view
-        view.SetBackend(viewMemPool);
-        // Do we already have it?
-        if(!CheckTxOutputs(tx, pcoinsTip, view, vCoinsToUncache)) {
-           state.Invalid(false, REJECT_ALREADY_KNOWN,
-                        "txn-already-known");
-           return Result{state, pTxInputData, vCoinsToUncache};
-        }
-        // Prepare coins to uncache list for inputs
-        for (const CTxIn& txin : tx.vin)
+        // Check if txin.prevout available as a UTXO tx.
+        if (!pcoinsTip->HaveCoinInCache(txin.prevout))
         {
-            // Check if txin.prevout available as a UTXO tx.
-            if (!pcoinsTip->HaveCoinInCache(txin.prevout))
-            {
-                vCoinsToUncache.push_back(txin.prevout);
-            }
+            vCoinsToUncache.push_back(txin.prevout);
         }
-        // Are the actual inputs available?
-        if (auto have = view.HaveInputsLimited(tx, fUseLimits ? config.GetMaxCoinsViewCacheSize() : 0);
-            !have.has_value())
-        {
-            state.Invalid(false, REJECT_INVALID,
-                         "bad-txns-inputs-too-large");
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
-        else if (!have.value())
-        {
-            state.SetMissingInputs();
-            state.Invalid();
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
-        // Bring the best block into scope.
-        view.GetBestBlock();
-        // Calculate txn's value-in
-        nValueIn = view.GetValueIn(tx);
-        // We have all inputs cached now, so switch back to dummy, so we
-        // don't need to keep lock on mempool.
-        view.SetBackend(dummy);
-        // Only accept BIP68 sequence locked transactions that can be mined
-        // in the next block; we don't want our mempool filled up with
-        // transactions that can't be mined yet. Must keep pool.cs for this
-        // unless we change CheckSequenceLocks to take a CoinsViewCache
-        // instead of create its own.
-        if (!CheckSequenceLocks(tx, pool, config, lockTimeFlags, &lp)) {
-            state.DoS(0, false, REJECT_NONSTANDARD,
-                     "non-BIP68-final");
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
+    }
+    // Are the actual inputs available?
+    if (auto have = view.HaveInputsLimited(tx, fUseLimits ? config.GetMaxCoinsViewCacheSize() : 0);
+        !have.has_value())
+    {
+        state.Invalid(false, REJECT_INVALID,
+                     "bad-txns-inputs-too-large");
+        return Result{state, pTxInputData, vCoinsToUncache};
+    }
+    else if (!have.value())
+    {
+        state.SetMissingInputs();
+        state.Invalid();
+        return Result{state, pTxInputData, vCoinsToUncache};
+    }
+    // Bring the best block into scope.
+    view.GetBestBlock();
+    // Calculate txn's value-in
+    nValueIn = view.GetValueIn(tx);
+    // Only accept BIP68 sequence locked transactions that can be mined
+    // in the next block; we don't want our mempool filled up with
+    // transactions that can't be mined yet. Must keep pool.cs for this
+    // unless we change CheckSequenceLocks to take a CoinsViewCache
+    // instead of create its own.
+    if (!CheckSequenceLocks(*chainActive.Tip(), tx, config, lockTimeFlags, &lp, &view)) {
+        state.DoS(0, false, REJECT_NONSTANDARD,
+                 "non-BIP68-final");
+        return Result{state, pTxInputData, vCoinsToUncache};
     }
 
     // Checking for non-standard outputs as inputs.
@@ -1451,9 +1436,8 @@ CTxnValResult TxnValidation(
             config,
             tx,
             state,
-            pcoinsTip,
+            viewMemPool,
             view,
-            pool,
             currentBlockScriptVerifyFlags,
             true,
             txdata);
@@ -1816,8 +1800,14 @@ void ProcessValidatedTxn(
     // - collect txn's outpoints
     // - remove txn from the orphan queue
     if (!state.IsValid()) {
-        // coins to uncache
-        pcoinsTip->Uncache(txStatus.mCoinsToUncache);
+        if(!txStatus.mCoinsToUncache.empty())
+        {
+            // This is necessary even for new transactions that don't change
+            // coins database as there is uncaching mechanism that uncaches
+            // coins that were loaded for transaction validation and weren't
+            // in the cache before the validation started.
+            pcoinsTip->Uncache(txStatus.mCoinsToUncache);
+        }
     } else if (handlers.mpOrphanTxns) {
         // At this stage we want to collect outpoints of successfully submitted txn.
         // There might be other related txns being validated at the same time.
@@ -2069,7 +2059,7 @@ static void PostValidationStepsForP2PTxn(
         // Finalising txns have another round of validation before making it into the
         // mempool, hold off relaying them until that has completed.
         if(pool.Exists(ptx->GetId()) || pool.getNonFinalPool().exists(ptx->GetId())) {
-            pool.CheckMempool(pcoinsTip, handlers.mJournalChangeSet);
+            pool.CheckMempool(*pcoinsTip, handlers.mJournalChangeSet);
             RelayTransaction(*ptx, *g_connman);
         }
         pNode->nLastTXTime = GetTime();
@@ -2104,7 +2094,7 @@ static void PostValidationStepsForFinalisedTxn(
 
     if(state.IsValid())
     {
-        pool.CheckMempool(pcoinsTip, handlers.mJournalChangeSet);
+        pool.CheckMempool(*pcoinsTip, handlers.mJournalChangeSet);
         RelayTransaction(*ptx, *g_connman);
     }
 }
@@ -2178,15 +2168,14 @@ static void UpdateMempoolForReorg(const Config &config,
     mempool.UpdateTransactionsFromBlock(vHashUpdate, changeSet);
     // We also need to remove any now-immature transactions
     LogPrint(BCLog::MEMPOOL, "Removing any now-immature transactions\n");
-    int32_t height { chainActive.Height() };
+    const CBlockIndex& tip = *chainActive.Tip();
     mempool.
         RemoveForReorg(
             config,
-            pcoinsTip,
+            *pcoinsTip,
             changeSet,
-            height,
-            chainActive.Tip()->GetMedianTimePast(),
-            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, height)));
+            tip,
+            StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
 }
 
 /**
@@ -2248,9 +2237,11 @@ bool GetTransaction(const Config &config, const TxId &txid,
 
     // use coin database to locate block that contains transaction, and scan it
     if (fAllowSlow) {
-        const Coin &coin = AccessByTxid(*pcoinsTip, txid);
-        if (!coin.IsSpent()) {
-            pindexSlow = chainActive[coin.GetHeight()];
+        CoinsDBView view{ *pcoinsTip };
+
+        if (auto coin = view.GetCoinByTxId(txid);
+            coin.has_value() && !coin->IsSpent()) {
+            pindexSlow = chainActive[coin->GetHeight()];
         }
     }
 
@@ -2985,23 +2976,23 @@ bool CheckTxInputs(const CTransaction &tx, CValidationState &state,
     Amount nFees(0);
     for (const auto &in : tx.vin) {
         const COutPoint &prevout = in.prevout;
-        const Coin &coin = inputs.AccessCoin(prevout);
-        assert(!coin.IsSpent());
+        auto coin = inputs.GetCoin(prevout);
+        assert(coin.has_value() && !coin->IsSpent());
 
         // If prev is coinbase, check that it's matured
-        if (coin.IsCoinBase()) {
-            if (nSpendHeight - coin.GetHeight() < COINBASE_MATURITY) {
+        if (coin->IsCoinBase()) {
+            if (nSpendHeight - coin->GetHeight() < COINBASE_MATURITY) {
                 return state.Invalid(
                     false, REJECT_INVALID,
                     "bad-txns-premature-spend-of-coinbase",
                     strprintf("tried to spend coinbase at depth %d",
-                              nSpendHeight - coin.GetHeight()));
+                              nSpendHeight - coin->GetHeight()));
             }
         }
 
         // Check for negative or overflow input values
-        nValueIn += coin.GetTxOut().nValue;
-        if (!MoneyRange(coin.GetTxOut().nValue) || !MoneyRange(nValueIn)) {
+        nValueIn += coin->GetAmount();
+        if (!MoneyRange(coin->GetAmount()) || !MoneyRange(nValueIn)) {
             return state.DoS(100, false, REJECT_INVALID,
                              "bad-txns-inputvalues-outofrange");
         }
@@ -3092,19 +3083,19 @@ std::optional<bool> CheckInputs(
     for (size_t i = 0; i < tx.vin.size(); i++) 
     {
         const COutPoint &prevout = tx.vin[i].prevout;
-        const Coin &coin = inputs.AccessCoin(prevout);
-        assert(!coin.IsSpent());
+        auto coin = inputs.GetCoinWithScript(prevout);
+        assert(coin.has_value() && !coin->IsSpent());
 
         // We very carefully only pass in things to CScriptCheck which are
         // clearly committed to by tx' witness hash. This provides a sanity
         // check that our caching is not introducing consensus failures through
         // additional data in, eg, the coins being spent being checked as a part
         // of CScriptCheck.
-        const CScript &scriptPubKey = coin.GetTxOut().scriptPubKey;
-        const Amount amount = coin.GetTxOut().nValue;
+        const CScript &scriptPubKey = coin->GetTxOut().scriptPubKey;
+        const Amount amount = coin->GetTxOut().nValue;
 
         uint32_t perInputScriptFlags = 0;
-        int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coin.GetHeight());
+        int32_t inputScriptBlockHeight = GetInputScriptBlockHeight(coin->GetHeight());
         bool isGenesisEnabled = IsGenesisEnabled(config, inputScriptBlockHeight);
         if (isGenesisEnabled)
         {
@@ -3289,7 +3280,7 @@ bool AbortNode(CValidationState &state, const std::string &strMessage,
 } // namespace
 
 /** Restore the UTXO in a Coin at a given COutPoint. */
-DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
+DisconnectResult UndoCoinSpend(const CoinWithScript &undo, CCoinsViewCache &view,
                                const COutPoint &out, const Config &config) {
     bool fClean = true;
 
@@ -3298,29 +3289,11 @@ DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
         fClean = false;
     }
 
-    if (undo.GetHeight() == 0) {
-        // Missing undo metadata (height and coinbase). Older versions included
-        // this information only in undo records for the last spend of a
-        // transactions' outputs. This implies that it must be present for some
-        // other output of the same tx.
-        const Coin &alternate = AccessByTxid(view, out.GetTxId());
-        if (alternate.IsSpent()) {
-            // Adding output for transaction without known metadata
-            return DISCONNECT_FAILED;
-        }
-
-        // This is somewhat ugly, but hopefully utility is limited. This is only
-        // useful when working from legacy on disck data. In any case, putting
-        // the correct information in there doesn't hurt.
-        const_cast<Coin &>(undo) = Coin(undo.GetTxOut(), alternate.GetHeight(),
-                                        alternate.IsCoinBase());
-    }
-
     // The potential_overwrite parameter to AddCoin is only allowed to be false
     // if we know for sure that the coin did not already exist in the cache. As
     // we have queried for that above using HaveCoin, we don't need to guess.
     // When fClean is false, a coin already existed and it is an overwrite.
-    view.AddCoin(out, std::move(undo), !fClean, config.GetGenesisActivationHeight());
+    view.AddCoin(out, undo.MakeOwning(), !fClean, config.GetGenesisActivationHeight());
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
@@ -3380,7 +3353,7 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
             }
 
             COutPoint out(txid, o);
-            Coin coin;
+            CoinWithScript coin;
             bool is_spent = view.SpendCoin(out, &coin);
             if (!is_spent || tx.vout[o] != coin.GetTxOut()) {
                 // transaction output mismatch
@@ -3402,7 +3375,7 @@ DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
 
         for (size_t j = tx.vin.size(); j-- > 0;) {
             const COutPoint &out = tx.vin[j].prevout;
-            const Coin &undo = txundo.vprevout[j];
+            const CoinWithScript &undo = txundo.vprevout[j];
             DisconnectResult res = UndoCoinSpend(undo, view, out, config);
             if (res == DISCONNECT_FAILED) {
                 return DISCONNECT_FAILED;
@@ -3721,7 +3694,7 @@ static bool ConnectBlock(
             // require the UTXO set.
             prevheights.resize(tx.vin.size());
             for (size_t j = 0; j < tx.vin.size(); j++) {
-                prevheights[j] = view.AccessCoin(tx.vin[j].prevout).GetHeight();
+                prevheights[j] = view.GetCoin(tx.vin[j].prevout)->GetHeight();
             }
 
             if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
@@ -3804,6 +3777,11 @@ static bool ConnectBlock(
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
 
+    if (parallelBlockValidation)
+    {
+        view.ForceDetach();
+    }
+
     int64_t nTime3 = GetTimeMicros();
     nTimeConnect += nTime3 - nTime2;
     LogPrint(BCLog::BENCH,
@@ -3828,8 +3806,6 @@ static bool ConnectBlock(
         return result;
 
     }
-
-    const CBlockIndex* tipBeforeMainLockReleased = chainActive.Tip();
 
     int64_t nTime4; // This is set inside scope below
     {
@@ -3954,12 +3930,16 @@ static bool ConnectBlock(
         return AbortNode(state, "Failed to write transaction index");
     }
 
-    if (parallelBlockValidation &&
-        tipBeforeMainLockReleased != chainActive.Tip())
+    if (parallelBlockValidation)
     {
-        // a different block managed to become best block before this one
-        // so we should terminate connecting process
-        throw CBestBlockAttachmentCancellation{};
+        // TryReattach() will succeed if best block in active chain hasn't
+        // changed since ForceDetach().
+        if (!view.TryReattach())
+        {
+            // a different block managed to become best block before this one
+            // so we should terminate connecting process
+            throw CBestBlockAttachmentCancellation{};
+        }
     }
 
     // add this block to the view's block chain
@@ -4095,6 +4075,12 @@ bool FlushStateToDisk(
                 // already an overestimation, as most will delete an existing
                 // entry or overwrite one. Still, use a conservative safety
                 // factor of 2.
+                //
+                // FIXME: this value is imprecise as it expects default size of
+                //        scripts (so smaller than needed) while using script
+                //        size would require too much space as most scripts are
+                //        compressed. In future we will store compressed size
+                //        so this code should be changed then.
                 if (!CheckDiskSpace(48 * 2 * 2 * pcoinsTip->GetCacheSize())) {
                     return state.Error("out of disk space");
                 }
@@ -4231,16 +4217,19 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     // Apply the block atomically to the chain state.
     int64_t nStart = GetTimeMicros();
     {
-        CCoinsViewCache view(pcoinsTip);
-        assert(view.GetBestBlock() == pindexDelete->GetBlockHash());
-        // Use new private CancellationSource that can not be cancelled
-        if (DisconnectBlock(block, pindexDelete, view, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
+        CoinsDBSpan pCoinsTipSpan{ *pcoinsTip };
+        assert(pCoinsTipSpan.GetBestBlock() == pindexDelete->GetBlockHash());
+        if (DisconnectBlock(block, pindexDelete, pCoinsTipSpan, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
             return error("DisconnectTip(): DisconnectBlock %s failed",
                          pindexDelete->GetBlockHash().ToString());
         }
 
-        bool flushed = view.Flush();
-        assert(flushed);
+        // NOTE:
+        // TryFlush() will never fail as cs_main is used to synchronize
+        // the different threads that Flush() or TryFlush() data. If cs_main
+        // guarantee is removed we must decide what to do in this case.
+        auto flushed = pCoinsTipSpan.TryFlush();
+        assert(flushed == CoinsDBSpan::WriteState::ok);
     }
 
     LogPrint(BCLog::BENCH, "- Disconnect block: %.2fms\n",
@@ -4426,7 +4415,7 @@ static bool ConnectTip(
     LogPrint(BCLog::BENCH, "  - Load block from disk: %.2fms [%.2fs]\n",
              (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
-        CCoinsViewCache view(pcoinsTip);
+        CoinsDBSpan pCoinsTipSpan{ *pcoinsTip };
 
         // Temporarily stop tracing events if we are in parallel validation as
         // we will possibly release cs_main lock for a while. In case of an
@@ -4442,7 +4431,7 @@ static bool ConnectTip(
                 blockConnecting,
                 state,
                 pindexNew,
-                view,
+                pCoinsTipSpan,
                 mostWorkOnChain);
 
         // re-enable tracing of events if it was disabled
@@ -4461,8 +4450,13 @@ static bool ConnectTip(
         nTimeConnectTotal += nTime3 - nTime2;
         LogPrint(BCLog::BENCH, "  - Connect total: %.2fms [%.2fs]\n",
                  (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
-        bool flushed = view.Flush();
-        assert(flushed);
+
+        // NOTE:
+        // TryFlush() will never fail as cs_main is used to synchronize
+        // the different threads that Flush() or TryFlush() data. If cs_main
+        // guarantee is removed we must decide what to do in this case.
+        auto flushed = pCoinsTipSpan.TryFlush();
+        assert(flushed == CoinsDBSpan::WriteState::ok);
     }
     int64_t nTime4 = GetTimeMicros();
     nTimeFlush += nTime4 - nTime3;
@@ -4708,7 +4702,7 @@ static bool ActivateBestChainStep(
         {
             changeSet->apply();
         }
-        mempool.CheckMempool(pcoinsTip, changeSet);
+        mempool.CheckMempool(*pcoinsTip, changeSet);
     }
     catch(...) {
         // We were probably cancelled. Make the mempool consistent with the current tip.
@@ -5148,7 +5142,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     }
 
     // Check mempool & journal
-    mempool.CheckMempool(pcoinsTip, changeSet);
+    mempool.CheckMempool(*pcoinsTip, changeSet);
 
     return true;
 }
@@ -6205,7 +6199,8 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
                      state.GetRejectReason().c_str());
     }
 
-    CCoinsViewCache viewNew(pcoinsTip);
+    CoinsDBView view{ *pcoinsTip };
+    CCoinsViewCache viewNew{ view };
     CBlockIndex indexDummy(block);
     uint256 dummyHash;
     indexDummy.phashBlock = &dummyHash;
@@ -6481,13 +6476,15 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
 }
 
 void LoadChainTip(const CChainParams &chainparams) {
+    CoinsDBView view{*pcoinsTip};
+
     if (chainActive.Tip() &&
-        chainActive.Tip()->GetBlockHash() == pcoinsTip->GetBestBlock()) {
+        chainActive.Tip()->GetBlockHash() == view.GetBestBlock()) {
         return;
     }
 
     // Load pointer to end of best chain
-    BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
+    BlockMap::iterator it = mapBlockIndex.find(view.GetBestBlock());
     if (it == mapBlockIndex.end()) {
         return;
     }
@@ -6511,7 +6508,7 @@ CVerifyDB::~CVerifyDB() {
     uiInterface.ShowProgress("", 100);
 }
 
-bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
+bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                          int nCheckLevel, int nCheckDepth, const task::CCancellationToken& shutdownToken) {
     LOCK(cs_main);
     if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr) {
@@ -6532,7 +6529,8 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
     LogPrintf("Verifying last %i blocks at level %i\n", nCheckDepth,
               nCheckLevel);
 
-    CCoinsViewCache coins(coinsview);
+    CoinsDBView view{ coinsview };
+    CCoinsViewCache coins{ view };
     CBlockIndex *pindexState = chainActive.Tip();
     CBlockIndex *pindexFailure = nullptr;
     size_t nGoodTransactions = 0;
@@ -6685,7 +6683,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CCoinsView *coinsview,
  * Apply the effects of a block on the utxo cache, ignoring that it may already
  * have been applied.
  */
-static bool RollforwardBlock(const CBlockIndex *pindex, CCoinsViewCache &inputs,
+static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
                              const Config &config) {
     // TODO: merge with ConnectBlock
     CBlock block;
@@ -6708,12 +6706,12 @@ static bool RollforwardBlock(const CBlockIndex *pindex, CCoinsViewCache &inputs,
     return true;
 }
 
-bool ReplayBlocks(const Config &config, CCoinsView *view) {
+bool ReplayBlocks(const Config &config, CoinsDB& view) {
     LOCK(cs_main);
 
-    CCoinsViewCache cache(view);
+    CoinsDBSpan cache( view );
 
-    std::vector<uint256> hashHeads = view->GetHeadBlocks();
+    std::vector<uint256> hashHeads = cache.GetHeadBlocks();
     if (hashHeads.empty()) {
         // We're already in a consistent state.
         return true;
@@ -6793,7 +6791,13 @@ bool ReplayBlocks(const Config &config, CCoinsView *view) {
     }
 
     cache.SetBestBlock(pindexNew->GetBlockHash());
-    cache.Flush();
+
+    // NOTE:
+    // TryFlush() will never fail as cs_main is used to synchronize
+    // the different threads that Flush() or TryFlush() data. If cs_main
+    // guarantee is removed we must decide what to do in this case.
+    auto flushed = cache.TryFlush();
+    assert(flushed == CoinsDBSpan::WriteState::ok);
     uiInterface.ShowProgress("", 100);
     return true;
 }

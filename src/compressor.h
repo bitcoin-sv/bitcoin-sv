@@ -83,10 +83,28 @@ public:
             script << OP_FALSE << OP_RETURN;
             s.ignore(nSize);
         } else {
-            script.resize(nSize);
-            s >> REF(CFlatData(script));
+            NonSpecialScriptUnserializer<Stream>::Unserialize(this, s, nSize);
         }
     }
+
+private:
+    /**
+    * Helper class that provides a static method used to unserialize non-special script
+    *
+    * @note This is a separate class, so that it can be specialized for a custom Stream class, which
+    *       allows customization for special cases (e.g. not loading script if it is too large).
+    *       See an example in txdb.cpp.
+    */
+    template<typename Stream>
+    class NonSpecialScriptUnserializer
+    {
+    public:
+        static void Unserialize(CScriptCompressor* self, Stream& s, unsigned int nSize)
+        {
+            self->script.resize(nSize);
+            s >> REF(CFlatData(self->script));
+        }
+    };
 };
 
 /** wrapper for CTxOut that provides a more compact serialization */

@@ -17,6 +17,7 @@
 #include "rpc/tojson.h"
 #include "streams.h"
 #include "sync.h"
+#include "txdb.h"
 #include "txmempool.h"
 #include "utilstrencodings.h"
 #include "validation.h"
@@ -42,23 +43,30 @@ static const struct {
     {RF_UNDEF, ""}, {RF_BINARY, "bin"}, {RF_HEX, "hex"}, {RF_JSON, "json"},
 };
 
-struct CCoin {
-    int32_t nHeight;
-    CTxOut out;
+namespace {
 
-    CCoin() : nHeight(0) {}
-    CCoin(Coin in) : nHeight(in.GetHeight()), out(std::move(in.GetTxOut())) {}
+class CCoin {
+private:
+    CoinWithScript coin;
 
-    ADD_SERIALIZE_METHODS;
+public:
+    CCoin() = default;
+    CCoin(CoinWithScript&& in) noexcept : coin{std::move(in)} {}
 
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream &s, Operation ser_action) {
+    int32_t GetHeight() const { return coin.GetHeight(); }
+    const Amount& GetAmount() const { return coin.GetTxOut().nValue; }
+    const CScript& GetScriptPubKey() const { return coin.GetTxOut().scriptPubKey; }
+
+    template <typename Stream>
+    inline void Serialize(Stream &s) const {
         uint32_t nTxVerDummy = 0;
-        READWRITE(nTxVerDummy);
-        READWRITE(nHeight);
-        READWRITE(out);
+        s << nTxVerDummy;
+        s << coin.GetHeight();
+        s << coin.GetTxOut();
     }
 };
+
+} // namespace
 
 extern UniValue mempoolInfoToJSON(const Config& config);
 extern void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false);
@@ -584,41 +592,43 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
 
     // check spentness and form a bitmap (as well as a JSON capable
     // human-readable string representation)
-    std::vector<uint8_t> bitmap;
+    std::vector<uint8_t> bitmap((vOutPoints.size() + 7) / 8);
     std::vector<CCoin> outs;
-    std::string bitmapStringRepresentation;
-    std::vector<bool> hits;
-    bitmap.resize((vOutPoints.size() + 7) / 8);
+    outs.reserve(vOutPoints.size()); // reserve space for max possible amount of coins
+    std::string bitmapStringRepresentation( vOutPoints.size(), '0' );
+
+    auto handleUnspentCoin =
+        [&outs, &bitmapStringRepresentation, &bitmap]
+        (const CoinWithScript& coin, size_t idx)
+        {
+            outs.emplace_back( coin.MakeOwning() );
+            // form a binary string representation (human-readable
+            // for json output)
+            bitmapStringRepresentation[ idx ] = '1';
+            bitmap[idx / 8] |= (1 << (idx % 8));
+        };
+
+    if( fCheckMemPool )
     {
-        LOCK(cs_main);
-        std::shared_lock lock(mempool.smtx);
+        mempool.OnUnspentCoinsWithScript(
+            CoinsDBView{ *pcoinsTip },
+            vOutPoints,
+            handleUnspentCoin);
+    }
+    else
+    {
+        CoinsDBView view{ *pcoinsTip };
+        std::size_t idx = 0;
 
-        CCoinsView viewDummy;
-        CCoinsViewCache view(&viewDummy);
-
-        CCoinsViewCache &viewChain = *pcoinsTip;
-        CCoinsViewMemPool viewMempool(&viewChain, mempool);
-
-        if (fCheckMemPool) {
-            // switch cache backend to db+mempool in case user likes to query
-            // mempool.
-            view.SetBackend(viewMempool);
-        }
-
-        for (size_t i = 0; i < vOutPoints.size(); i++) {
-            Coin coin;
-            bool hit = false;
-            if (view.GetCoin(vOutPoints[i], coin) &&
-                !mempool.IsSpentNL(vOutPoints[i])) {
-                hit = true;
-                outs.emplace_back(std::move(coin));
+        for(const auto& out : vOutPoints)
+        {
+            if (auto coin = view.GetCoinWithScript( out );
+                coin.has_value() && !coin->IsSpent())
+            {
+                handleUnspentCoin( std::move( coin.value() ), idx );
             }
 
-            hits.push_back(hit);
-            // form a binary string representation (human-readable for json
-            // output)
-            bitmapStringRepresentation.append(hit ? "1" : "0");
-            bitmap[i / 8] |= ((uint8_t)hit) << (i % 8);
+            ++idx;
         }
     }
 
@@ -666,13 +676,13 @@ static bool rest_getutxos(Config &config, HTTPRequest *req,
             UniValue utxos(UniValue::VARR);
             for (const CCoin &coin : outs) {
                 UniValue utxo(UniValue::VOBJ);
-                utxo.push_back(Pair("height", coin.nHeight));
-                utxo.push_back(Pair("value", ValueFromAmount(coin.out.nValue)));
+                utxo.push_back(Pair("height", coin.GetHeight()));
+                utxo.push_back(Pair("value", ValueFromAmount(coin.GetAmount())));
 
                 // include the script in a json output
                 UniValue o(UniValue::VOBJ);
-                int32_t height = (coin.nHeight == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.nHeight;
-                ScriptPubKeyToUniv(coin.out.scriptPubKey, true, IsGenesisEnabled(config, height), o);
+                int32_t height = (coin.GetHeight() == MEMPOOL_HEIGHT) ? (chainActive.Height() + 1) : coin.GetHeight();
+                ScriptPubKeyToUniv(coin.GetScriptPubKey(), true, IsGenesisEnabled(config, height), o);
                 utxo.push_back(Pair("scriptPubKey", o));
                 utxos.push_back(utxo);
             }
