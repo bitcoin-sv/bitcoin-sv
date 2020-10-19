@@ -87,6 +87,8 @@ class CJournalChangeSet final
     // Checks if the transaction is already removed
     bool checkTxnRemoved(const TxId& txid) const;
 
+    // Check that changeset is topologically sorted
+    bool CheckTopoSort() const;
 
   private:
 

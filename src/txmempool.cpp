@@ -1163,6 +1163,9 @@ void CTxMemPool::CheckMempool(
     /* Journal checking */
     if(changeSet)
     {
+        // Check that the change set respects the toposort
+        bool changeSetSorted { changeSet->CheckTopoSort() };
+        assert(changeSetSorted);
         // Make journal consitent with mempool & check
         changeSet->apply();
         std::string journalResult { checkJournalNL() };
