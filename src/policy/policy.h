@@ -97,7 +97,9 @@ static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
 static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
 /** Default -maxmempoolsizedisk factor, maximum megabytes of total mempool disk usage as scaled -maxmempool */
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR = 10;
+/** Default percentage of total mempool size (ram+disk) to use as max limit for CPFP transactions */
 static const unsigned int DEFAULT_MEMPOOL_MAX_PERCENT_CPFP = 10;
+
 /**
  * Min feerate for defining dust. Historically this has been the same as the
  * minRelayTxFee, however changing the dust limit changes which transactions are
