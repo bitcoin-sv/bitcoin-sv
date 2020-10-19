@@ -32,6 +32,7 @@
 #include "init.h"
 #include "invalid_txn_publisher.h"
 #include <boost/algorithm/string/case_conv.hpp> // for boost::to_upper
+#include <boost/thread/thread.hpp>              // boost::thread::interrupt
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>

@@ -79,6 +79,7 @@
 #include <boost/thread.hpp>
 #include <openssl/conf.h>
 #include <openssl/rand.h>
+#include <boost/algorithm/string/predicate.hpp>
 
 // Application startup time (used for uptime calculation)
 const int64_t nStartupTime = GetTime();

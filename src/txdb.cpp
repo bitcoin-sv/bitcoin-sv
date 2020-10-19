@@ -13,6 +13,7 @@
 #include "random.h"
 #include "uint256.h"
 #include "util.h"
+#include "ui_interface.h"
 #include <boost/thread.hpp>
 #include <string>
 #include <vector>

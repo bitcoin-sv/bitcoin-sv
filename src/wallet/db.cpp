@@ -18,7 +18,7 @@
 //
 // CDB
 //
-
+#include <boost/thread/thread.hpp>
 CDBEnv bitdb;
 
 void CDBEnv::EnvShutdown() {

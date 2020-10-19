@@ -4299,6 +4299,7 @@ private:
 
     void ConnectToPoolEntryRemovedEvent()
     {
+        using namespace boost::placeholders;
         mTracingPoolEntryRemovedEvents = true;
         pool.NotifyEntryRemoved.connect(
             boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
@@ -4306,6 +4307,7 @@ private:
 
     void DisconnectFromPoolEntryRemovedEvent()
     {
+        using namespace boost::placeholders;
         mTracingPoolEntryRemovedEvents = false;
         pool.NotifyEntryRemoved.disconnect(
             boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
