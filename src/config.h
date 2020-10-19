@@ -731,7 +731,9 @@ public:
 
         return true;
     }
-    uint64_t GetMaxMempoolSizeDisk() const override { return DEFAULT_MAX_MEMPOOL_SIZE_DISK * ONE_MEGABYTE; }
+    uint64_t GetMaxMempoolSizeDisk() const override {
+        return DEFAULT_MAX_MEMPOOL_SIZE * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR * ONE_MEGABYTE;
+    }
 
     bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) override
     {

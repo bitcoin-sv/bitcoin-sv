@@ -368,10 +368,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                              showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "",
                              std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
     strUsage += HelpMessageOpt("-maxmempoolsizedisk=<n>",
-                               strprintf(_("Keep the total disk usage for storing mempool transactions "
-                                           "below <n> megabytes (default: %u). "
+                               strprintf(_("Additional amount of mempool transactions to keep stored on disk "
+                                           "below <n> megabytes (default: -maxmempool x %u). Actual disk usage will "
+                                           "be larger due to leveldb compaction strategy."
                                            "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
-                                         DEFAULT_MAX_MEMPOOL_SIZE_DISK));
+                                         DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR));
     strUsage += HelpMessageOpt("-mempoolmaxpercentcpfp=<n>",
                                strprintf(_("Percentage of total mempool size (ram+disk) to allow for "
                                            "low paying transactions (0..100) (default: %u)"),
@@ -1802,20 +1803,23 @@ bool AppInitParameterInteraction(Config &config) {
         LogPrintf("Warning: nMinimumChainWork set below default value of %s\n",
                   chainparams.GetConsensus().nMinimumChainWork.GetHex());
     }
-    
-    // mempool limits  
+
+    // mempool limits
     if (std::string err; !config.SetMaxMempool(
         gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE), &err))
     {
         return InitError(err);
     }
+    const auto defaultMaxMempoolSizeDisk = int64_t(
+        std::ceil(1.0 * config.GetMaxMempool() * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR
+                  / ONE_MEGABYTE));
     if (std::string err; !config.SetMaxMempoolSizeDisk(
-        gArgs.GetArgAsBytes("-maxmempoolsizedisk", DEFAULT_MAX_MEMPOOL_SIZE_DISK, ONE_MEGABYTE), &err))
+        gArgs.GetArgAsBytes("-maxmempoolsizedisk", defaultMaxMempoolSizeDisk, ONE_MEGABYTE), &err))
     {
         return InitError(err);
     }
     if (std::string err; !config.SetMempoolMaxPercentCPFP(
-            gArgs.GetArg("-mempoolmaxpercentcpfp", DEFAULT_MEMPOOL_MAX_PERCENT_CPFP), &err))
+        gArgs.GetArg("-mempoolmaxpercentcpfp", DEFAULT_MEMPOOL_MAX_PERCENT_CPFP), &err))
     {
         return InitError(err);
     }

@@ -70,7 +70,7 @@ void GlobalConfig::Reset()
     mMaxCoinsProviderCacheSize = 0;
     
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
-    mMaxMempoolSizeDisk = DEFAULT_MAX_MEMPOOL_SIZE_DISK * ONE_MEGABYTE;
+    mMaxMempoolSizeDisk = mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
     mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
