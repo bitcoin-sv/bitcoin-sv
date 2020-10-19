@@ -2763,8 +2763,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     nTotalCache -= nMerkleTreeIndexDBCache;
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
-    int64_t nMempoolSizeMax = config.GetMaxMempool();
-    int64_t nMempoolSizeDiskMax = config.GetMaxMempoolSizeDisk();
+    MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
@@ -2774,9 +2773,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
               nCoinDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
               "unused mempool space and %.1fMiB of disk space)\n",
-              nCoinCacheUsage * (1.0 / ONE_MEBIBYTE),
-              nMempoolSizeMax * (1.0 / ONE_MEBIBYTE),
-              nMempoolSizeDiskMax * (1.0 / ONE_MEBIBYTE));
+              nCoinCacheUsage * (1.0 / 1024 / 1024),
+              limits.Memory() * (1.0 / 1024 / 1024),
+              limits.Disk() * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
     while (!fLoaded && !shutdownToken.IsCanceled()) {
