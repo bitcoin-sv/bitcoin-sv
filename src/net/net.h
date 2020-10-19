@@ -207,6 +207,10 @@ class CClientUIInterface;
 class CSerializedNetMsg
 {
 public:
+    // Optional metadata to describe the contents of the payload, for when
+    // it might not be obvious from the message type alone.
+    enum class PayloadType { UNKNOWN, BLOCK };
+
     CSerializedNetMsg(CSerializedNetMsg &&) = default;
     CSerializedNetMsg &operator=(CSerializedNetMsg &&) = default;
     // No copying, only moves.
@@ -215,8 +219,10 @@ public:
 
     CSerializedNetMsg(
         std::string&& command,
+        PayloadType payloadType,
         std::vector<uint8_t>&& data)
         : mCommand{std::move(command)}
+        , mPayloadType{payloadType}
         , mHash{::Hash(data.data(), data.data() + data.size())}
         , mSize{data.size()}
         , mData{std::make_unique<CVectorStream>(std::move(data))}
@@ -234,15 +240,17 @@ public:
     {/**/}
 
     const std::string& Command() const {return mCommand;}
+    PayloadType GetPayloadType() const {return mPayloadType;}
     std::unique_ptr<CForwardAsyncReadonlyStream> MoveData() {return std::move(mData);}
     const uint256& Hash() const {return mHash;}
     size_t Size() const {return mSize;}
 
 private:
-    std::string mCommand;
-    uint256 mHash;
-    size_t mSize;
-    std::unique_ptr<CForwardAsyncReadonlyStream> mData;
+    std::string mCommand {};
+    PayloadType mPayloadType { PayloadType::UNKNOWN };
+    uint256 mHash {};
+    size_t mSize {0};
+    std::unique_ptr<CForwardAsyncReadonlyStream> mData {nullptr};
 };
 
 class CConnman {

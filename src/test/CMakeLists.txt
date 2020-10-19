@@ -103,12 +103,13 @@ add_test_to_suite(bitcoin test_bitcoin
 	merkle_tests.cpp
 	merkletreefile_readwrite_tests.cpp
 	miner_tests.cpp
-    net_association_tests.cpp
-	object_stream_deserialization_tests.cpp
-	opcode_tests.cpp
 	multisig_tests.cpp
+    net_message_maker_tests.cpp
+    net_association_tests.cpp
 	net_tests.cpp
 	netbase_tests.cpp
+	object_stream_deserialization_tests.cpp
+	opcode_tests.cpp
 	pmt_tests.cpp
 	pow_tests.cpp
 	prevector_tests.cpp

@@ -16,17 +16,23 @@ public:
     CNetMsgMaker(int nVersionIn) : nVersion(nVersionIn) {}
 
     template <typename... Args>
-    CSerializedNetMsg Make(int nFlags, std::string sCommand,
+    CSerializedNetMsg Make(int nFlags, CSerializedNetMsg::PayloadType payloadType, std::string sCommand,
                            Args &&... args) const {
         std::vector<uint8_t> data;
         CVectorWriter{SER_NETWORK, nFlags | nVersion, data, 0,
                       std::forward<Args>(args)...};
-        return {std::move(sCommand), std::move(data)};
+        return {std::move(sCommand), payloadType, std::move(data)};
     }
 
     template <typename... Args>
     CSerializedNetMsg Make(std::string sCommand, Args &&... args) const {
-        return Make(0, std::move(sCommand), std::forward<Args>(args)...);
+        return Make(0, CSerializedNetMsg::PayloadType::UNKNOWN, std::move(sCommand), std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
+    CSerializedNetMsg Make(CSerializedNetMsg::PayloadType payloadType, std::string sCommand,
+                           Args &&... args) const {
+        return Make(0, payloadType, std::move(sCommand), std::forward<Args>(args)...);
     }
 
 private:
