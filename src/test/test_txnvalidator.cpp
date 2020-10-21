@@ -131,56 +131,65 @@ namespace {
         return vTxInputData;
     }
     // Validate txn using asynchronous validation interface
-    void ProcessTxnsAsynchApi(std::vector<CMutableTransaction>& spends,
-                              TxSource source,
-                              std::shared_ptr<CNode> pNode = nullptr) {
+    void ProcessTxnsAsynchApi(
+        CTxMemPool& pool,
+        std::vector<CMutableTransaction>& spends,
+        TxSource source,
+        std::shared_ptr<CNode> pNode = nullptr) {
+
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
-                    mempool,
+                    pool,
                     std::make_shared<CTxnDoubleSpendDetector>(),
                     g_connman->GetTxIdTracker())
         };
         // Clear mempool before validation
-        mempool.Clear();
+        pool.Clear();
         // Schedule txns for processing.
         txnValidator->newTransaction(TxInputDataVec(source, spends, pNode));
         // Wait for the Validator to process all queued txns.
         txnValidator->waitForEmptyQueue();
     }
     // Validate a single txn using synchronous validation interface
-    CValidationState ProcessTxnSynchApi(CMutableTransaction& spend,
-                                        TxSource source,
-                                        std::shared_ptr<CNode> pNode = nullptr) {
+    CValidationState ProcessTxnSynchApi(
+        CTxMemPool& pool,
+        CMutableTransaction& spend,
+        TxSource source,
+        std::shared_ptr<CNode> pNode = nullptr) {
+
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
-                    mempool,
+                    pool,
                     std::make_shared<CTxnDoubleSpendDetector>(),
                     g_connman->GetTxIdTracker())
         };
         // Clear mempool before validation
-        mempool.Clear();
+        pool.Clear();
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
         return txnValidator->processValidation(TxInputData(source, spend, pNode), changeSet);
     }
     // Validate txn using synchronous validation interface
-    void ProcessTxnsSynchApi(std::vector<CMutableTransaction>& spends,
-                             TxSource source,
-                             std::shared_ptr<CNode> pNode = nullptr) {
+    void ProcessTxnsSynchApi(
+        CTxMemPool& pool,
+        std::vector<CMutableTransaction>& spends,
+        TxSource source,
+        std::shared_ptr<CNode> pNode = nullptr) {
+
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
-                    mempool,
+                    pool,
                     std::make_shared<CTxnDoubleSpendDetector>(),
                     g_connman->GetTxIdTracker())
         };
         // Clear mempool before validation
-        mempool.Clear();
+        pool.Clear();
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
         // Validate the first txn
@@ -194,19 +203,22 @@ namespace {
         BOOST_CHECK(!result.IsValid());
     }
     // Validate txns using synchronous batch validation interface
-    CTxnValidator::RejectedTxns ProcessTxnsSynchBatchApi(std::vector<CMutableTransaction>& spends,
-                                  TxSource source,
-                                  std::shared_ptr<CNode> pNode = nullptr) {
+    CTxnValidator::RejectedTxns ProcessTxnsSynchBatchApi(
+        CTxMemPool& pool,
+        std::vector<CMutableTransaction>& spends,
+        TxSource source,
+        std::shared_ptr<CNode> pNode = nullptr) {
+
         // Create txn validator
         std::shared_ptr<CTxnValidator> txnValidator {
             std::make_shared<CTxnValidator>(
                     GlobalConfig::GetConfig(),
-                    mempool,
+                    pool,
                     std::make_shared<CTxnDoubleSpendDetector>(),
                     g_connman->GetTxIdTracker())
         };
         // Clear mempool before validation
-        mempool.Clear();
+        pool.Clear();
         // Mempool Journal ChangeSet
         mining::CJournalChangeSetPtr changeSet {nullptr};
         // Validate the first txn
@@ -231,11 +243,12 @@ namespace {
 BOOST_FIXTURE_TEST_SUITE(test_txnvalidator, TestChain100Setup2)
 
 BOOST_AUTO_TEST_CASE(txn_validator_creation) {
+    CTxMemPool pool;
     // Create txn validator
     std::shared_ptr<CTxnValidator> txnValidator {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
-                mempool,
+                pool,
                 std::make_shared<CTxnDoubleSpendDetector>(),
                 g_connman->GetTxIdTracker())
     };
@@ -248,11 +261,12 @@ BOOST_AUTO_TEST_CASE(txn_validator_creation) {
 }
 
 BOOST_AUTO_TEST_CASE(txn_validator_set_get_frequency) {
+    CTxMemPool pool;
     // Create txn validator
     std::shared_ptr<CTxnValidator> txnValidator {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
-                mempool,
+                pool,
                 std::make_shared<CTxnDoubleSpendDetector>(),
                 g_connman->GetTxIdTracker())
     };
@@ -263,11 +277,12 @@ BOOST_AUTO_TEST_CASE(txn_validator_set_get_frequency) {
 }
 
 BOOST_AUTO_TEST_CASE(txn_validator_istxnknown) {
+    CTxMemPool pool;
     // Create txn validator
     std::shared_ptr<CTxnValidator> txnValidator {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
-                mempool,
+                pool,
                 std::make_shared<CTxnDoubleSpendDetector>(),
                 g_connman->GetTxIdTracker())
     };
@@ -281,6 +296,7 @@ BOOST_AUTO_TEST_CASE(txn_validator_istxnknown) {
 
 BOOST_AUTO_TEST_CASE(double_spend_detector)
 {
+    CTxMemPool pool;
     CTxnDoubleSpendDetector detector;
     std::vector<CMutableTransaction> txns{ MakeNLargeTxns(5, coinbaseTxns[0], scriptPubKey) };
     std::size_t parentOfDoubleSpendIdx = 1;
@@ -291,7 +307,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
     for(const auto& data : txnsData)
     {
         CValidationState state;
-        BOOST_CHECK(detector.insertTxnInputs(data, mempool, state, true) == true);
+        BOOST_CHECK(detector.insertTxnInputs(data, pool, state, true) == true);
 
         BOOST_CHECK(state.IsDoubleSpendDetected() == false);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);
@@ -318,7 +334,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
     {
         CValidationState state;
         BOOST_CHECK(
-            detector.insertTxnInputs(txnsData[doubleSpendIdx], mempool, state, true)
+            detector.insertTxnInputs(txnsData[doubleSpendIdx], pool, state, true)
             == false);
         BOOST_CHECK(state.IsDoubleSpendDetected() == true);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);
@@ -331,7 +347,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
         detector.removeTxnInputs( CTransaction{txns[doubleSpendIdx]} );
         CValidationState state;
         BOOST_CHECK(
-            detector.insertTxnInputs(doubleSpendData, mempool, state, true)
+            detector.insertTxnInputs(doubleSpendData, pool, state, true)
             == false);
         BOOST_CHECK(state.IsDoubleSpendDetected() == true);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);
@@ -344,7 +360,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
         detector.removeTxnInputs(*doubleSpendTx);
         CValidationState state;
         BOOST_CHECK(
-            detector.insertTxnInputs(doubleSpendData, mempool, state, true)
+            detector.insertTxnInputs(doubleSpendData, pool, state, true)
             == false);
         BOOST_CHECK(state.IsDoubleSpendDetected() == true);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);
@@ -357,7 +373,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
     {
         detector.removeTxnInputs(*txnsData[doubleSpendIdx]->GetTxnPtr());
         CValidationState state;
-        BOOST_CHECK(detector.insertTxnInputs(doubleSpendData, mempool, state, true) == true);
+        BOOST_CHECK(detector.insertTxnInputs(doubleSpendData, pool, state, true) == true);
 
         BOOST_CHECK(state.IsDoubleSpendDetected() == false);
         BOOST_CHECK(state.IsMempoolConflictDetected() == false);
@@ -379,7 +395,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
         LockPoints lp;
         mining::CJournalChangeSetPtr nullChangeSet{nullptr};
         auto& tx = *txnsData[doubleSpendIdx]->GetTxnPtr();
-        mempool.AddUnchecked(
+        pool.AddUnchecked(
             tx.GetId(),
             CTxMemPoolEntry{
                 txnsData[doubleSpendIdx]->GetTxnPtr(),
@@ -395,7 +411,7 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
 
         CValidationState state;
         BOOST_CHECK(
-            detector.insertTxnInputs(doubleSpendData, mempool, state, true)
+            detector.insertTxnInputs(doubleSpendData, pool, state, true)
             == false);
         BOOST_CHECK(state.IsDoubleSpendDetected() == false);
         BOOST_CHECK(state.IsMempoolConflictDetected() == true);
@@ -472,10 +488,11 @@ BOOST_AUTO_TEST_CASE(validation_state_collided_with_tx)
  * TxnValidator: Test synch interface.
  */
 BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
+    CTxMemPool pool;
     // Test all sources.
     for (const auto& txsource: vTxSources) {
-        ProcessTxnsSynchApi(doubleSpend2Txns, txsource);
-        BOOST_CHECK_EQUAL(mempool.Size(), 1);
+        ProcessTxnsSynchApi(pool, doubleSpend2Txns, txsource);
+        BOOST_CHECK_EQUAL(pool.Size(), 1);
     }
     // Test: Txns from p2p with a pointer to a dummy node.
     {
@@ -494,17 +511,18 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_api) {
                 asyncTaskPool,
                 "",
                 true);
-        ProcessTxnsSynchApi(doubleSpend2Txns, TxSource::p2p, pDummyNode);
-        BOOST_CHECK_EQUAL(mempool.Size(), 1);
+        ProcessTxnsSynchApi(pool, doubleSpend2Txns, TxSource::p2p, pDummyNode);
+        BOOST_CHECK_EQUAL(pool.Size(), 1);
     }
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_batch_api) {
+    CTxMemPool pool;
     CTxnValidator::RejectedTxns mRejectedTxns {};
     // Test all sources.
     for (const auto& txsource: vTxSources) {
-        mRejectedTxns = ProcessTxnsSynchBatchApi(doubleSpend10Txns, txsource);
-        BOOST_CHECK_EQUAL(mempool.Size(), 1);
+        mRejectedTxns = ProcessTxnsSynchBatchApi(pool, doubleSpend10Txns, txsource);
+        BOOST_CHECK_EQUAL(pool.Size(), 1);
         // There should be no insufficient fee txns returned.
         BOOST_REQUIRE(!mRejectedTxns.second.size());
         // Check an expected number of invalid txns returned.
@@ -536,8 +554,8 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_batch_api) {
                 asyncTaskPool,
                 "",
                 true);
-        mRejectedTxns = ProcessTxnsSynchBatchApi(doubleSpend10Txns, TxSource::p2p, pDummyNode);
-        BOOST_CHECK_EQUAL(mempool.Size(), 1);
+        mRejectedTxns = ProcessTxnsSynchBatchApi(pool, doubleSpend10Txns, TxSource::p2p, pDummyNode);
+        BOOST_CHECK_EQUAL(pool.Size(), 1);
         // There should be no insufficient fee txns returned.
         BOOST_REQUIRE(!mRejectedTxns.second.size());
         // Check an expected number of invalid txns returned.
@@ -557,26 +575,14 @@ BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_synch_batch_api) {
 /**
  * TxnValidator: Test asynch interface.
  */
-BOOST_AUTO_TEST_CASE(txnvalidator_wallet_doublespend_via_asynch_api) {
-    // Test: Txns from wallet.
-    ProcessTxnsAsynchApi(doubleSpend10Txns, TxSource::wallet);
-    BOOST_CHECK_EQUAL(mempool.Size(), 1);
-}
-
-BOOST_AUTO_TEST_CASE(txnvalidator_rpc_doublespend_via_asynch_api) {
-    // Test: Txns from rpc.
-    ProcessTxnsAsynchApi(doubleSpend10Txns, TxSource::rpc);
-    BOOST_CHECK_EQUAL(mempool.Size(), 1);
-}
-
-BOOST_AUTO_TEST_CASE(txnvalidator_file_doublespend_via_asynch_api) {
-    // Test: Txns from file.
-    ProcessTxnsAsynchApi(doubleSpend10Txns, TxSource::file);
-    BOOST_CHECK_EQUAL(mempool.Size(), 1);
-}
-
-BOOST_AUTO_TEST_CASE(txnvalidator_p2p_doublespend_via_asynch_api) {
-    // Test: Txns from p2p.
+BOOST_AUTO_TEST_CASE(txnvalidator_doublespend_asynch_api) {
+    CTxMemPool pool;
+    // Test all sources.
+    for (const auto& txsource: vTxSources) {
+        ProcessTxnsAsynchApi(pool, doubleSpend10Txns, txsource);
+        BOOST_CHECK_EQUAL(pool.Size(), 1);
+    }
+    // Test: Txns from p2p with a pointer to a dummy node.
     {
         // Create a dummy address
         CAddress dummy_addr(ip(0xa0b0c001), NODE_NONE);
@@ -593,28 +599,14 @@ BOOST_AUTO_TEST_CASE(txnvalidator_p2p_doublespend_via_asynch_api) {
                 asyncTaskPool,
                 "",
                 true);
-        ProcessTxnsAsynchApi(doubleSpend10Txns, TxSource::p2p, pDummyNode);
-        BOOST_CHECK_EQUAL(mempool.Size(), 1);
+        ProcessTxnsAsynchApi(pool, doubleSpend10Txns, TxSource::p2p, pDummyNode);
+        BOOST_CHECK_EQUAL(pool.Size(), 1);
     }
-    // Process txn if it is valid.
-    ProcessTxnsAsynchApi(doubleSpend10Txns, TxSource::p2p);
-    BOOST_CHECK_EQUAL(mempool.Size(), 1);
-}
-
-BOOST_AUTO_TEST_CASE(txnvalidator_reorg_doublespend_via_asynch_api) {
-    // Test: Txns from reorg.
-    ProcessTxnsAsynchApi(doubleSpend10Txns, TxSource::reorg);
-    BOOST_CHECK_EQUAL(mempool.Size(), 1);
-}
-
-BOOST_AUTO_TEST_CASE(txnvalidator_dummy_doublespend_via_asynch_api) {
-    // Process txn if it is valid.
-    ProcessTxnsAsynchApi(doubleSpend10Txns, TxSource::unknown);
-    BOOST_CHECK_EQUAL(mempool.Size(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_limit_memory_usage)
 {
+    CTxMemPool pool;
     // Make sure validation thread won't run during this test
     gArgs.ForceSetArg("-txnvalidationasynchrunfreq", "10000");
     gArgs.ForceSetArg("-txnvalidationqueuesmaxmemory", "1");
@@ -627,7 +619,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_limit_memory_usage)
     std::shared_ptr<CTxnValidator> txnValidator {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
-                mempool,
+                pool,
                 std::make_shared<CTxnDoubleSpendDetector>(),
                 g_connman->GetTxIdTracker())
     };
@@ -640,6 +632,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_limit_memory_usage)
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_sync_api) {
+    CTxMemPool pool;
     // spendtx_nValue_OutOfRange (a copy of doubleSpend2Txns[0]) with unsupported nValue amount.
     // Set nValue = MAX_MONEY + 1 for the txn to trigger exception when GetValueOut is called.
     auto spendtx_nValue_OutOfRange = doubleSpend2Txns[0];
@@ -651,18 +644,19 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_sync_api) {
     CValidationState result {};
     // Test all sources.
     for (const auto& txsource: vTxSources) {
-        result = ProcessTxnSynchApi(spendtx_nValue_OutOfRange, txsource);
+        result = ProcessTxnSynchApi(pool, spendtx_nValue_OutOfRange, txsource);
         BOOST_CHECK(!result.IsValid());
-        BOOST_CHECK_EQUAL(mempool.Size(), 0);
+        BOOST_CHECK_EQUAL(pool.Size(), 0);
     }
 }
 
 BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
+    CTxMemPool pool;
     // Create txn validator
     std::shared_ptr<CTxnValidator> txnValidator {
         std::make_shared<CTxnValidator>(
                 GlobalConfig::GetConfig(),
-                mempool,
+                pool,
                 std::make_shared<CTxnDoubleSpendDetector>(),
                 g_connman->GetTxIdTracker())
     };
@@ -680,7 +674,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
         // Wait for the Validator to process all queued txns.
         txnValidator->waitForEmptyQueue();
         // Non transaction should be accepted due to nValue (value out of range).
-        BOOST_CHECK_EQUAL(mempool.Size(), 0);
+        BOOST_CHECK_EQUAL(pool.Size(), 0);
     }
     // Case2:
     // Send the same txns again (with valid nValue).
@@ -688,7 +682,7 @@ BOOST_AUTO_TEST_CASE(txnvalidator_nvalueoutofrange_async_api) {
     {
         txnValidator->newTransaction(TxInputDataVec(TxSource::p2p, doubleSpend10Txns));
         txnValidator->waitForEmptyQueue();
-        BOOST_CHECK_EQUAL(mempool.Size(), 1);
+        BOOST_CHECK_EQUAL(pool.Size(), 1);
     }
 }
 
