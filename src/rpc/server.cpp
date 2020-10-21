@@ -19,7 +19,7 @@
 
 #include <univalue.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/signals2/signal.hpp>
 #include <boost/thread.hpp>
 #include <boost/algorithm/string/case_conv.hpp> // for to_upper()
@@ -55,10 +55,12 @@ void RPCServer::OnStopped(std::function<void()> slot) {
 }
 
 void RPCServer::OnPreCommand(std::function<void(const CRPCCommand &)> slot) {
+    using namespace boost::placeholders;
     g_rpcSignals.PreCommand.connect(boost::bind(slot, _1));
 }
 
 void RPCServer::OnPostCommand(std::function<void(const CRPCCommand &)> slot) {
+    using namespace boost::placeholders;
     g_rpcSignals.PostCommand.connect(boost::bind(slot, _1));
 }
 
@@ -550,6 +552,7 @@ std::vector<std::string> CRPCTable::listCommands() const {
     std::vector<std::string> commandList;
     typedef std::map<std::string, const CRPCCommand *> commandMap;
 
+    using namespace boost::placeholders;
     std::transform(mapCommands.begin(), mapCommands.end(),
                    std::back_inserter(commandList),
                    boost::bind(&commandMap::value_type::first, _1));

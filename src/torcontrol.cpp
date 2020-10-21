@@ -18,7 +18,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/signals2/signal.hpp>
 
 #include <event2/buffer.h>
@@ -413,6 +413,8 @@ private:
     /** Callback for reconnect timer */
     static void reconnect_cb(evutil_socket_t fd, short what, void *arg);
 };
+
+using namespace boost::placeholders;
 
 TorController::TorController(struct event_base *_base,
                              const std::string &_target)
