@@ -283,11 +283,12 @@ void CTxMemPool::UpdateTransactionsFromBlock(
 
     CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
 
-    // Now we will check transactions connected with newly added transactions 
+    // Now we will recheck added transactions 
     // We are doing this because it could be that a newly added transaction
     // did not end up in the journal but have descendants which are in the journal already.
-    setEntries affected = getConnectedNL(addedTransactions);
-    checkJournalAcceptanceNL(affected, nonNullChangeSet.Get());
+    // This kind of is suboptimal because we will check fees for second time for most of the transactions
+    extendWithConnectedNL(addedTransactions);
+    checkJournalAcceptanceNL(addedTransactions, nonNullChangeSet.Get());
 }
 
 bool CTxMemPool::CalculateMemPoolAncestors(
@@ -661,9 +662,10 @@ void CTxMemPool::AddUncheckedNL(
     if (blockMinTxfee.GetFee(newit->GetTxSize()) <= newit->GetModifiedFee())
     {
         // transaction pays enough for mining
-        
-        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
 
+        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+        setEntries affected;
+        affected.insert(newit);
         auto filterOutAlreadyAccepted = [this, &changeSet](txiter entry)
         {
             auto txid = entry->GetTx().GetId();
@@ -681,11 +683,7 @@ void CTxMemPool::AddUncheckedNL(
         // we will limit ourself to check limited number of transactions in order 
         // to prevent possible attacks. 
         constexpr size_t MAX_TX_TO_CONSIDER = 100;
-
-        // transaction connected to newit which did not make to the journal
-        setEntries affected = getConnectedNL(setEntries{newit}, filterOutAlreadyAccepted, MAX_TX_TO_CONSIDER);
-        affected.insert(newit);
-        
+        extendWithConnectedNL(affected, filterOutAlreadyAccepted, MAX_TX_TO_CONSIDER);
         checkJournalAcceptanceNL(affected, nonNullChangeSet.Get());
     }
 }
@@ -818,7 +816,7 @@ void CTxMemPool::removeRecursiveNL(
         CalculateDescendantsNL(it, setAllRemoves);
     }
 
-    removeStagedNL(setAllRemoves, false, changeSet, reason, true, conflictedWith);
+    removeStagedNL(setAllRemoves, false, changeSet, reason, conflictedWith);
 }
 
 void CTxMemPool::RemoveForReorg(
@@ -925,34 +923,14 @@ void CTxMemPool::RemoveForBlock(
 
     std::unique_lock lock(smtx);
     std::vector<const CTxMemPoolEntry *> entries;
-    setEntries toBeRemoved;
     for (const auto &tx : vtx) {
         uint256 txid = tx->GetId();
 
         indexed_transaction_set::iterator i = mapTx.find(txid);
         if (i != mapTx.end()) {
             entries.push_back(&*i);
-            toBeRemoved.insert(i);
         }
     }
-    
-    // returns true if tx is not in the journal nor it is added to changeset
-    auto isTxOutsideJournal = [this, &changeSet](txiter entry)
-    {
-        auto txid = entry->GetTx().GetId();
-        if (mJournalBuilder.getCurrentJournal()->checkTxnExists(txid))
-        {
-            return false;
-        }
-                
-        if (changeSet && changeSet->checkTxnAdded(txid))
-        {
-            return false;
-        }
-        return true;
-    };
-
-    setEntries affectedStillInMempool = getConnectedNL(toBeRemoved, isTxOutsideJournal);
 
     // Before the txs in the new block have been removed from the mempool,
     for (const auto &tx : vtx) {
@@ -960,14 +938,8 @@ void CTxMemPool::RemoveForBlock(
         if (it != mapTx.end()) {
             setEntries stage;
             stage.insert(it);
-            removeStagedNL(stage, true, changeSet, MemPoolRemovalReason::BLOCK, false);
+            removeStagedNL(stage, true, changeSet, MemPoolRemovalReason::BLOCK);
         }
-    }
-
-    CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
-    checkJournalAcceptanceNL(affectedStillInMempool, nonNullChangeSet.Get());
-
-    for (const auto &tx : vtx) {
         removeConflictsNL(*tx, changeSet);
         clearPrioritisationNL(tx->GetId());
     }
@@ -1523,7 +1495,7 @@ void CTxMemPool::prioritiseTransactionNL(
                          update_ancestor_state(0, nFeeDelta, 0, 0));
         }
 
-        setEntries affectedTxs = getConnectedNL(setEntries{it});
+        setEntries affectedTxs;
         affectedTxs.insert(it);
         CJournalChangeSetPtr tmpChangeSet { getJournalBuilder().getNewChangeSet(JournalUpdateReason::UNKNOWN) };
         checkJournalAcceptanceNL(affectedTxs, *tmpChangeSet);
@@ -1647,10 +1619,8 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
            memusage::DynamicUsage(vTxHashes) + cachedInnerUsage;
 }
 
-CTxMemPool::setEntries CTxMemPool::getConnectedNL(const CTxMemPool::setEntries& entries, std::function<bool(txiter)> filter, std::optional<size_t> limit) const
+void CTxMemPool::extendWithConnectedNL(CTxMemPool::setEntries& entries, std::function<bool(txiter)> filter, std::optional<size_t> limit) const
 {
-    setEntries connected;
-
     // tracking of the unvisited children with preserving order of insertion 
     // these variables and lambdas deserve their own class but as this is one-release change
     // it is better to have it here, will be easier to remove them later
@@ -1677,25 +1647,19 @@ CTxMemPool::setEntries CTxMemPool::getConnectedNL(const CTxMemPool::setEntries& 
     };
 
     // adds children to the list of the unvisited children
-    auto addChildrenToTheUnvisited = [this, &connected, &entries, &pushUnvisitedChild](txiter entry){
+    auto addChildrenToTheUnvisited = [this, &entries, &pushUnvisitedChild](txiter entry){
         for(txiter child: GetMemPoolChildrenNL(entry))
         {
             if(entries.find(child) != entries.end())
             {
                 continue;
             }
-            
-            if(connected.find(child) != connected.end())
-            {
-                continue;
-            }
-
             pushUnvisitedChild(child);
         }
     };
 
     // adds all ancestors of the given entry to the set, and their children to the list of the unvisited children
-    auto addAncestors = [this, &connected, &entries, &filter, &addChildrenToTheUnvisited](txiter child){
+    auto addAncestors = [this, &entries, &filter, &addChildrenToTheUnvisited](txiter child){
         setEntries nextStep = {child};
         while(!nextStep.empty())
         {
@@ -1709,12 +1673,7 @@ CTxMemPool::setEntries CTxMemPool::getConnectedNL(const CTxMemPool::setEntries& 
                         continue;
                     }
 
-                    if(entries.find(parent) != entries.end())
-                    {
-                        continue;
-                    }
-
-                    auto success = connected.insert(parent);
+                    auto success = entries.insert(parent);
                     if(success.second)
                     {
                         newNextStep.insert(parent);
@@ -1744,7 +1703,7 @@ CTxMemPool::setEntries CTxMemPool::getConnectedNL(const CTxMemPool::setEntries& 
     // continue adding unvisited entries (with their parents) until we have them
     while(hasUnvisitedChildren())
     {
-        if(limit.has_value() && (connected.size() >= limit.value()) )
+        if(limit.has_value() && (entries.size() >= limit.value()) )
         {
             break;
         }
@@ -1756,26 +1715,19 @@ CTxMemPool::setEntries CTxMemPool::getConnectedNL(const CTxMemPool::setEntries& 
             continue;
         }
 
-        if(entries.find(entry) != entries.end())
-        {
-            continue;
-        }
-
-        auto success = connected.insert(entry);
+         auto success = entries.insert(entry);
         if(success.second)
         {
             addChildrenToTheUnvisited(entry);
             addAncestors(entry);
         }
     }
-
-    return connected;
 }
 
-CTxMemPool::setEntries CTxMemPool::getConnectedNL(const CTxMemPool::setEntries& entries) const
+void CTxMemPool::extendWithConnectedNL(setEntries& entries) const
 {
     auto allwaysTrue = [](txiter){ return true; };
-    return getConnectedNL(entries, allwaysTrue);
+    extendWithConnectedNL(entries, allwaysTrue, 0);
 }
 
 void CTxMemPool::checkJournalAcceptanceNL(const CTxMemPool::setEntries& affectedTransactions, CJournalChangeSet& changeSet) const
@@ -1947,29 +1899,24 @@ void CTxMemPool::removeStagedNL(
     bool updateDescendants,
     const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason,
-    bool updateJournal,
     const CTransaction* conflictedWith) {
 
     updateForRemoveFromMempoolNL(stage, updateDescendants);
 
-    if(updateJournal)
-    {
-        // let's find all transactions which acceptance to the journal could be affected with removing these transactions
-        setEntries affectedStillInMempool = getConnectedNL(stage);
+    // let's find all transactions which acceptance to the journal could be affected with removing these transactions
+    setEntries affected = stage;
+    extendWithConnectedNL(affected);
 
-        for (const txiter &it : stage) {
-            removeUncheckedNL(it, changeSet, reason, conflictedWith);
-        }
+    setEntries affectedStillInMempool;
+    std::set_difference(affected.begin(), affected.end(), stage.begin(), stage.end(), 
+                        std::inserter(affectedStillInMempool, affectedStillInMempool.begin()), CompareIteratorByHash());
+
+    for (const txiter &it : stage) {
+        removeUncheckedNL(it, changeSet, reason, conflictedWith);
+    }
     
-        CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
-        checkJournalAcceptanceNL(affectedStillInMempool, nonNullChangeSet.Get());
-    }
-    else
-    {
-        for (const txiter &it : stage) {
-            removeUncheckedNL(it, changeSet, reason, conflictedWith);
-        }
-    }
+    CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+    checkJournalAcceptanceNL(affectedStillInMempool, nonNullChangeSet.Get());    
 }
 
 int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)
