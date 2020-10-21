@@ -8,7 +8,7 @@
 #include "reverselock.h"
 #include "util.h"
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <cassert>
 #include <chrono>
 #include <thread>
