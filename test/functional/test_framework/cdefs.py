@@ -49,6 +49,12 @@ _validation_h_fh = open(os.path.join(get_srcdir(), 'src',
 _validation_h_contents = _validation_h_fh.read()
 _validation_h_fh.close()
 
+# Slurp in text_writer.h contents
+_textwriter_h_fh = open(os.path.join(get_srcdir(), 'src', 'rpc',
+                                    'text_writer.h'), 'rt')
+_textwriter_h_contents = _textwriter_h_fh.read()
+_textwriter_h_fh.close()
+
 def _extractConsensusValue(name):
     return int(eval(re.search(name + ' = (.+);', _consensus_h_contents).group(1)))
 
@@ -73,6 +79,9 @@ def _extractLimitedStackValue(name):
 
 def _extractValidationValue(name):
     return int(eval(re.search(name + ' = (.+);', _validation_h_contents).group(1)))
+
+def _extractTextWriterValue(name):
+    return int(eval(re.search(name + ' = (.+);', _textwriter_h_contents).group(1)))
 
 # Extract relevant default values parameters
 
@@ -152,6 +161,8 @@ SAFE_MODE_MAX_VALID_FORK_DISTANCE = _extractValidationValue('SAFE_MODE_MAX_VALID
 SAFE_MODE_MAX_FORK_DISTANCE = _extractValidationValue('SAFE_MODE_MAX_FORK_DISTANCE')
 SAFE_MODE_MIN_POW_DIFFERENCE = _extractValidationValue('SAFE_MODE_MIN_POW_DIFFERENCE')
 
+BUFFER_SIZE_HttpTextWriter = _extractTextWriterValue('BUFFER_SIZE')
+
 if __name__ == "__main__":
     # Output values if run standalone to verify
     print("REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME = %d" % REGTEST_NEW_BLOCKSIZE_ACTIVATION_TIME)
@@ -181,3 +192,5 @@ if __name__ == "__main__":
     print("SAFE_MODE_MAX_VALID_FORK_DISTANCE = %d" % SAFE_MODE_MAX_VALID_FORK_DISTANCE)
     print("SAFE_MODE_MAX_FORK_DISTANCE = %d" % SAFE_MODE_MAX_FORK_DISTANCE)
     print("SAFE_MODE_MIN_POW_DIFFERENCE = %d" % SAFE_MODE_MIN_POW_DIFFERENCE)
+
+    print("BUFFER_SIZE_HttpTextWriter = %d" % BUFFER_SIZE_HttpTextWriter)
