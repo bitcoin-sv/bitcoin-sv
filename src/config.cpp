@@ -74,6 +74,8 @@ void GlobalConfig::Reset()
     maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
     maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
 
+    recvInvQueueFactor = DEFAULT_RECV_INV_QUEUE_FACTOR;
+
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
@@ -1074,6 +1076,21 @@ bool GlobalConfig::SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* 
     return true;
 }
 
+bool GlobalConfig::SetRecvInvQueueFactor(uint64_t value, std::string* err)
+{
+    if(value < MIN_RECV_INV_QUEUE_FACTOR || value > MAX_RECV_INV_QUEUE_FACTOR)
+    {
+        if(err)
+        {
+            *err = "RecvInvQueueFactor should not be between: " + std::to_string(MIN_RECV_INV_QUEUE_FACTOR) + " and " + 
+                   std::to_string(MAX_RECV_INV_QUEUE_FACTOR) + ".";
+        }
+        return false;
+    }
+    recvInvQueueFactor = value;
+    return true;
+}
+
 unsigned int GlobalConfig::GetMaxProtocolRecvPayloadLength() const
 {
   return maxProtocolRecvPayloadLength;
@@ -1082,6 +1099,11 @@ unsigned int GlobalConfig::GetMaxProtocolRecvPayloadLength() const
 unsigned int GlobalConfig::GetMaxProtocolSendPayloadLength() const
 {
   return maxProtocolSendPayloadLength;
+}
+
+unsigned int GlobalConfig::GetRecvInvQueueFactor() const
+{
+  return recvInvQueueFactor;
 }
 
 DummyConfig::DummyConfig()

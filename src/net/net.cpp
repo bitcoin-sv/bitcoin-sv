@@ -2959,7 +2959,7 @@ void CNode::AskFor(const CInv &inv, const Config &config) {
     LOCK(cs_invQueries);
     // if mapAskFor is too large, we will never ask for it (it becomes lost)
     constexpr unsigned IDINDEXSIZE_FACTOR {4};
-    const size_t mapAskForMaxSize { CInv::estimateMaxInvElements(config.GetMaxProtocolRecvPayloadLength()) };
+    const size_t mapAskForMaxSize { CInv::estimateMaxInvElements(config.GetMaxProtocolRecvPayloadLength() * config.GetRecvInvQueueFactor()) };
     const size_t idIndexMaxSize { mapAskForMaxSize * IDINDEXSIZE_FACTOR };
     auto& idIndex { indexAskFor.get<TagTxnID>() };
     if(mapAskFor.size() > mapAskForMaxSize || idIndex.size() > idIndexMaxSize) {
