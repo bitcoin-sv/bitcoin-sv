@@ -6,7 +6,7 @@
 #include "random.h"
 #include "reverselock.h"
 #include "util.h"
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <chrono>
 #include <thread>
 #include <utility>

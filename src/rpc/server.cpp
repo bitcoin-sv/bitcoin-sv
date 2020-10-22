@@ -13,7 +13,7 @@
 #include "utilstrencodings.h"
 #include "blockchain.h"
 #include <univalue.h>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/signals2/signal.hpp>
 #include <boost/algorithm/string/case_conv.hpp> // for to_upper()
 #include <boost/algorithm/string/classification.hpp>
@@ -47,10 +47,12 @@ void RPCServer::OnStopped(std::function<void()> slot) {
 }
 
 void RPCServer::OnPreCommand(std::function<void(const CRPCCommand &)> slot) {
+    using namespace boost::placeholders;
     g_rpcSignals.PreCommand.connect(boost::bind(slot, _1));
 }
 
 void RPCServer::OnPostCommand(std::function<void(const CRPCCommand &)> slot) {
+    using namespace boost::placeholders;
     g_rpcSignals.PostCommand.connect(boost::bind(slot, _1));
 }
 
@@ -539,6 +541,7 @@ void CRPCTable::execute(Config &config,
 }
 
 std::vector<std::string> CRPCTable::listCommands() const {
+    using namespace boost::placeholders;
     std::vector<std::string> commandList;
     typedef std::map<std::string, const CRPCCommand *> commandMap;
 
