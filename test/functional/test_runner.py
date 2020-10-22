@@ -79,6 +79,7 @@ JOURNAL_BROKEN_TESTS = [
     "bip68-sequence.py",
     "bsv-genesis-general.py",
     "prioritise_transaction.py",
+    "bsv-cpfp.py"
 ]
 
 TEST_PARAMS = {
