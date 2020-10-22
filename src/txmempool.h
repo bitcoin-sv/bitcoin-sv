@@ -882,6 +882,20 @@ public:
     void ClearPrioritisation(const std::vector<TxId>& vTxIds);
 
 private:
+
+    // A non-locking version of CheckMempool
+    void CheckMempoolNL(
+            CoinsDBView& view,
+            const mining::CJournalChangeSetPtr& changeSet) const;
+
+    // The implementation of CheckMempool
+    void CheckMempoolImplNL(
+            CoinsDBView& view,
+            const mining::CJournalChangeSetPtr& changeSet) const;
+
+    // common condition for CheckMempool and CheckMempoolNL
+    bool ShouldCheckMempool() const;
+
     // A non-locking version of IsSpent
     bool IsSpentNL(const COutPoint &outpoint) const;
 

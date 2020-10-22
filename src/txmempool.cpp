@@ -1002,22 +1002,48 @@ void CTxMemPool::Clear() {
 
 void CTxMemPool::CheckMempool(
     CoinsDB& db,
-    const mining::CJournalChangeSetPtr& changeSet) const {
+    const mining::CJournalChangeSetPtr& changeSet) const
+{
 
+    if (ShouldCheckMempool())
+    {
+        CoinsDBView view{ db };
+        std::shared_lock lock(smtx);
+        CheckMempoolImplNL(view, changeSet);
+    }
+}
+
+// A non-locking version of CheckMempool
+void CTxMemPool::CheckMempoolNL(
+    CoinsDBView& view,
+    const mining::CJournalChangeSetPtr& changeSet) const
+{
+
+    if (ShouldCheckMempool())
+    {
+        CheckMempoolImplNL(view, changeSet);
+    }
+}
+
+bool CTxMemPool::ShouldCheckMempool() const
+{
     if (nCheckFrequency == 0) {
-        return;
+        return false;
     }
 
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency) {
-        return;
+        return false;
     }
-    CoinsDBView view{ db };
-    CCoinsViewCache mempoolDuplicate{view};
+    return true;
+}
 
+void CTxMemPool::CheckMempoolImplNL(
+    CoinsDBView& view,
+    const mining::CJournalChangeSetPtr& changeSet) const
+{
+    CCoinsViewCache mempoolDuplicate{view};
     // Get spend height and MTP
     const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(mempoolDuplicate);
-
-    std::shared_lock lock(smtx);
 
     LogPrint(BCLog::MEMPOOL,
              "Checking mempool with %u transactions and %u inputs\n",
