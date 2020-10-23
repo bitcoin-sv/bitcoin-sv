@@ -128,7 +128,8 @@ bool CZMQPublishHashTransactionNotifier::NotifyTransaction(
 
 bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint256& txid,
                                                                      MemPoolRemovalReason reason,
-                                                                     const CTransaction* conflictedWith)
+                                                                     const CTransaction* conflictedWith,
+                                                                     const uint256* blockhash)
 {
 
     CStringWriter tw;
@@ -156,7 +157,16 @@ bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint2
                 jw.pushQuote(true, false);
                 EncodeHexTx(*conflictedWith, jw.getWriter(), 0);
                 jw.pushQuote(true, false);
-                jw.writeEndObject(false);
+                // push hash of block in which transaction we "collided with" arrived.
+                if (blockhash != nullptr)
+                {  
+                    jw.writeEndObject(true);
+                    jw.pushKV("blockhash", blockhash->GetHex(), false);
+                }
+                else
+                {
+                    jw.writeEndObject(false);
+                } 
             }
             else
             {
