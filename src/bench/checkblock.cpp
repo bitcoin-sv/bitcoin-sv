@@ -44,6 +44,8 @@ static void DeserializeAndCheckBlockTest(benchmark::State &state) {
 
     SelectParams(CBaseChainParams::MAIN);
     Config &config = GlobalConfig::GetConfig();
+    config.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
+
     assert(AppInitParameterInteraction(config));
 
     while (state.KeepRunning()) {
