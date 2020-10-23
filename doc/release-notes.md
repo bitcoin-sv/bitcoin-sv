@@ -1,4 +1,4 @@
-# Bitcoin SV version 1.0.6-beta Release Notes
+# Bitcoin SV version 1.0.6 Release Notes
 
 ## List of Changes since 1.0.5
 * New RPC to retrieve UTXOs.
@@ -13,6 +13,16 @@
 * Ensure the fallback path for packages (bitcoinsv.io) in the Gitian build contains all required packages.
 * Fix to Gitian build.
 * Fix: Accessing memory after std::move.
+* ZMQ: Push information (blockhash) in which block transaction we collided with arrived.
+* Do not use deprecated boost bind features.
+* Remove logging from consensus.
+* Validation status dos cleanup.
+* ThreadSanitiser reports issues in thread safe queue tests.
+* ThreadSanitiser reported heap-use-after-free.
+* Fix: gettxouts parameters CLI type mismatch.
+* Fix: CheckTxInputExists should not be used.
+* Remove assert and fix shutdown after unsuccessful startup.
+* Unconditionally log P2P stall messages if denugp2pthreadstalls is specified.
 
 ## Scaling Test Network (STN) Reset
 N/A
