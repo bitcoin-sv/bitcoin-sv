@@ -1775,7 +1775,11 @@ void ProcessValidatedTxn(
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
 
-        PublishInvalidTransaction(txStatus);
+        // Skip publish transactions with rejection reason txn-already-in-mempool
+        // or txn-already-known.
+        if (state.GetRejectCode() != REJECT_ALREADY_KNOWN) {
+            PublishInvalidTransaction(txStatus);
+        }
 
         // Logging txn status
         LogTxnInvalidStatus(txStatus);
