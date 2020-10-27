@@ -7,7 +7,6 @@
 #include "config.h"
 #include "core_io.h"
 #include "dstencode.h"
-#include "init.h"
 #include "merkleblock.h"
 #include "rpc/server.h"
 #include "rpcwallet.h"
@@ -18,14 +17,10 @@
 #include "utiltime.h"
 #include "validation.h"
 #include "wallet.h"
-
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-
 #include <univalue.h>
-
-#include <cstdint>
-#include <fstream>
+#include <string>
 #include <iostream>
 
 static std::string EncodeDumpTime(int64_t nTime) {

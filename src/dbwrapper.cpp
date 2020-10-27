@@ -3,12 +3,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "dbwrapper.h"
-
 #include "random.h"
 #include "util.h"
-
 #include <boost/filesystem.hpp>
-
 #include <algorithm>
 #include <cstdint>
 #include <leveldb/cache.h>

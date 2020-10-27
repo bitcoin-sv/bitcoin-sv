@@ -4,10 +4,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "addrman.h"
-
 #include "hash.h"
 #include "serialize.h"
-#include "streams.h"
 
 int CAddrInfo::GetTriedBucket(const uint256 &nKey) const {
     uint64_t hash1 = (CHashWriter(SER_GETHASH, 0) << nKey << GetKey())

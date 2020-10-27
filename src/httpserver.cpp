@@ -3,21 +3,14 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "httpserver.h"
-
 #include "chainparamsbase.h"
-#include "compat.h"
 #include "config.h"
 #include "net/netbase.h"
 #include "rpc/http_protocol.h" // For HTTP status codes
-#include "sync.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
-#include <signal.h>
-#include <sys/stat.h>
 #include <sys/types.h>
-
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/http.h>
@@ -143,12 +136,6 @@ public:
         std::unique_lock<std::mutex> lock(cs);
         while (numThreads > 0)
             cond.wait(lock);
-    }
-
-    /** Return current depth of queue */
-    size_t Depth() {
-        std::unique_lock<std::mutex> lock(cs);
-        return queue.size();
     }
 };
 

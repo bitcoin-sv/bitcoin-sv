@@ -11,6 +11,8 @@ CMainSignals &GetMainSignals() {
     return g_signals;
 }
 
+using namespace boost::placeholders;
+
 void RegisterValidationInterface(CValidationInterface *pwalletIn) {
     g_signals.UpdatedBlockTip.connect(boost::bind( &CValidationInterface::UpdatedBlockTip, pwalletIn, _1, _2, _3));
     g_signals.TransactionAddedToMempool.connect(boost::bind( &CValidationInterface::TransactionAddedToMempool, pwalletIn, _1));

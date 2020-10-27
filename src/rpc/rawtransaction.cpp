@@ -10,7 +10,6 @@
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
-#include "init.h"
 #include "keystore.h"
 #include "merkleblock.h"
 #include "mining/journal_builder.h"
@@ -37,7 +36,6 @@
 #endif
 
 #include <cstdint>
-
 #include <univalue.h>
 
 using namespace mining;

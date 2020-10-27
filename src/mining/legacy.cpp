@@ -4,36 +4,26 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "legacy.h"
-
 #include "amount.h"
 #include "chain.h"
-#include "chainparams.h"
-#include "coins.h"
 #include "config.h"
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
 #include "hash.h"
-#include "net/net.h"
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"
 #include "script/script_num.h"
-#include "script/standard.h"
 #include "timedata.h"
 #include "txmempool.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validation.h"
-#include "validationinterface.h"
-#include "versionbits.h"
-
 #include <algorithm>
 #include <queue>
 #include <utility>
-
 #include <boost/thread.hpp>
-#include <boost/tuple/tuple.hpp>
 
 using mining::BlockAssembler;
 using mining::CBlockTemplate;

@@ -18,18 +18,15 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
-#include "invalid_txn_publisher.h"
+
 #ifdef ENABLE_WALLET
 #include "wallet/rpcwallet.h"
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
-
 #endif
 
 #include "vmtouch.h"
-
 #include <univalue.h>
-
 #include <cstdint>
 
 /**

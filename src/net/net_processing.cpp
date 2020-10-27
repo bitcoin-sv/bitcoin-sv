@@ -3,12 +3,7 @@
 // Copyright (c) 2019-2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include <chrono>
-#include <optional>
-#include <shared_mutex>
-#include <algorithm>
 #include "net/net_processing.h"
-
 #include "addrman.h"
 #include "arith_uint256.h"
 #include "blockencodings.h"
@@ -21,12 +16,10 @@
 #include "init.h"
 #include "locked_ref.h"
 #include "merkleblock.h"
-#include "mining/journal_builder.h"
 #include "net/net.h"
 #include "net/netbase.h"
 #include "netmessagemaker.h"
 #include "policy/fees.h"
-#include "policy/policy.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "random.h"
@@ -42,11 +35,12 @@
 #include "protocol.h"
 #include "validationinterface.h"
 #include "invalid_txn_publisher.h"
-
+#include <algorithm>
+#include <chrono>
+#include <optional>
+#include <shared_mutex>
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
-
-#include "blockfileinfostore.h"
 
 #if defined(NDEBUG)
 #error "Bitcoin cannot be compiled without assertions."

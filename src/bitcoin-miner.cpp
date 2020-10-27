@@ -10,7 +10,6 @@
 ///////////////////////////////////#include "allowed_args.h"
 #include "arith_uint256.h"
 #include "chainparamsbase.h"
-#include "fs.h"
 #include "hash.h"
 #include "primitives/block.h"
 #include "rpc/client_utils.h"
@@ -19,17 +18,10 @@
 #include "sync.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
 #include <boost/thread.hpp>
-
 #include <cstdlib>
 #include <stdio.h>
-
-#include <event2/buffer.h>
-#include <event2/event.h>
 #include <event2/http.h>
-#include <event2/keyvalq_struct.h>
-
 #include <univalue.h>
 
 using namespace std;

@@ -129,12 +129,6 @@ public:
         return count >= thresholdNumber;
     }
 
-    bool areBlocksInValidation() const
-    {
-        std::lock_guard lockGuard{mMutexCurrentlyValidatingBlocks};
-        return !mCurrentlyValidatingBlocks.empty();
-    }
-
     std::vector<uint256> getCurrentlyValidatingBlocks() const
     {
         std::lock_guard<std::mutex> lockGuard(mMutexCurrentlyValidatingBlocks);

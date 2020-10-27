@@ -4,12 +4,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "primitives/block.h"
-
 #include "crypto/common.h"
 #include "hash.h"
 #include "script/script_num.h"
 #include "tinyformat.h"
-#include "utilstrencodings.h"
 
 uint256 CBlockHeader::GetHash() const {
     return SerializeHash(*this);

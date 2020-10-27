@@ -5,7 +5,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "validation.h"
-
 #include "arith_uint256.h"
 #include "async_file_reader.h"
 #include "blockstreams.h"
@@ -23,12 +22,10 @@
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "netmessagemaker.h"
-#include "policy/fees.h"
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
-#include "random.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -50,7 +47,6 @@
 #include "invalid_txn_publisher.h"
 
 #include <atomic>
-#include <sstream>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -2545,8 +2541,6 @@ bool IsInitialBlockDownload() {
     return false;
 }
 
-CBlockIndex *pindexBestForkTip = nullptr, *pindexBestForkBase = nullptr;
-
 void AlertNotify(const std::string &strMessage) {
     uiInterface.NotifyAlertChanged();
     std::string strCmd = gArgs.GetArg("-alertnotify", "");
@@ -4305,6 +4299,7 @@ private:
 
     void ConnectToPoolEntryRemovedEvent()
     {
+        using namespace boost::placeholders;
         mTracingPoolEntryRemovedEvents = true;
         pool.NotifyEntryRemoved.connect(
             boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
@@ -4312,6 +4307,7 @@ private:
 
     void DisconnectFromPoolEntryRemovedEvent()
     {
+        using namespace boost::placeholders;
         mTracingPoolEntryRemovedEvents = false;
         pool.NotifyEntryRemoved.disconnect(
             boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
@@ -7425,10 +7421,6 @@ std::string CBlockFileInfo::ToString() const {
         DateTimeStrFormat("%Y-%m-%d", nTimeLast));
 }
 
-
-CBlockFileInfo *GetBlockFileInfo(size_t n) {
-    return pBlockFileInfoStore->GetBlockFileInfo(n);
-}
 
 static const uint64_t MEMPOOL_DUMP_VERSION = 1;
 

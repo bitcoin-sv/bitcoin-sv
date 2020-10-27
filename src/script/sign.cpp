@@ -4,7 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "script/sign.h"
-
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
@@ -13,7 +12,6 @@
 #include "taskcancellation.h"
 #include "uint256.h"
 #include "config.h"
-#include "validation.h"
 
 TransactionSignatureCreator::TransactionSignatureCreator(
     const CKeyStore *keystoreIn, const CTransaction *txToIn, unsigned int nInIn,

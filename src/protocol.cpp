@@ -4,8 +4,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "protocol.h"
-
-#include "chainparams.h"
 #include "config.h"
 #include "util.h"
 #include "utilstrencodings.h"

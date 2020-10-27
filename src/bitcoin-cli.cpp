@@ -9,14 +9,10 @@
 
 #include "chainparamsbase.h"
 #include "clientversion.h"
-#include "fs.h"
 #include "rpc/client_utils.h"
 #include "rpc/protocol.h"
 #include "util.h"
-
-#include <boost/filesystem/operations.hpp>
 #include <cstdio>
-
 #include <univalue.h>
 
 std::string HelpMessageCli() {

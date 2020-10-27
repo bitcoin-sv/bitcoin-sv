@@ -20,7 +20,7 @@
 #endif
 #include <windows.h>
 #else
-#include <climits>        // for PAGESIZE
+#include <limits>        // for PAGESIZE
 #include <sys/mman.h>     // for mmap
 #include <sys/resource.h> // for getrlimit
 #include <unistd.h>       // for sysconf

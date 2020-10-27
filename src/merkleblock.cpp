@@ -7,7 +7,6 @@
 
 #include "blockstreams.h"
 #include "clientversion.h"
-#include "consensus/consensus.h"
 #include "hash.h"
 #include "utilstrencodings.h"
 #include "streams.h"

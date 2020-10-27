@@ -3,10 +3,8 @@
 
 #include "script/limitedstack.h"
 #include "crypto/ripemd160.h"
-#include "crypto/sha1.h"
 #include "crypto/sha256.h"
 #include "script/int_serialization.h"
-#include "hash.h"
 #include <iostream>
 
 LimitedVector::LimitedVector(const valtype& stackElementIn, LimitedStack& stackIn) : stackElement(stackElementIn), stack(stackIn)

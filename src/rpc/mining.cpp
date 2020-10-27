@@ -8,12 +8,10 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "config.h"
-#include "consensus/consensus.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
-#include "init.h"
 #include "mining/factory.h"
 #include "net/net.h"
 #include "policy/policy.h"
@@ -21,16 +19,13 @@
 #include "pow.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
-#include "txmempool.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "validationinterface.h"
 #include "invalid_txn_publisher.h"
 #include "rpc/http_protocol.h"
-
 #include <univalue.h>
-
 #include <cstdint>
 #include <memory>
 

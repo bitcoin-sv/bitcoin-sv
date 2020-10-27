@@ -3,12 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "checkpoints.h"
-
 #include "chain.h"
 #include "chainparams.h"
-
-#include <cstdint>
-
 #include <boost/range/adaptor/reversed.hpp>
 
 namespace Checkpoints {

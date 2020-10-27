@@ -4,8 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "utilmoneystr.h"
-
-#include "primitives/transaction.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 

@@ -4,9 +4,7 @@
 #include <net/net.h>
 #include <net/stream_policy_factory.h>
 #include <util.h>
-
 #include <boost/algorithm/string.hpp>
-#include <exception>
 
 namespace
 {

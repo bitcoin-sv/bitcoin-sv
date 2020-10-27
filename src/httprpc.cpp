@@ -3,9 +3,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "httprpc.h"
-
-#include "base58.h"
-#include "chainparams.h"
 #include "config.h"
 #include "crypto/hmac_sha256.h"
 #include "httpserver.h"
@@ -13,15 +10,11 @@
 #include "rpc/http_protocol.h"
 #include "rpc/protocol.h"
 #include "rpc/server.h"
-#include "sync.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "rpc/blockchain.h"
-
 #include <boost/algorithm/string.hpp> // boost::trim
-
-#include <cstdio>
 
 /** WWW-Authenticate to present with 401 Unauthorized response */
 static const char *WWW_AUTH_HEADER_DATA = "Basic realm=\"jsonrpc\"";

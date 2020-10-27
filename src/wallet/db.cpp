@@ -4,17 +4,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "db.h"
-
-#include "addrman.h"
 #include "fs.h"
 #include "hash.h"
 #include "protocol.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
-#include <boost/thread.hpp>
-#include <boost/version.hpp>
-
 #include <cstdint>
 
 #ifndef WIN32
@@ -24,7 +18,7 @@
 //
 // CDB
 //
-
+#include <boost/thread/thread.hpp>
 CDBEnv bitdb;
 
 void CDBEnv::EnvShutdown() {
