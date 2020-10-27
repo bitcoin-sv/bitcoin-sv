@@ -1719,7 +1719,7 @@ static UniValue getmerkleproof(const Config& config,
             HelpExampleRpc("getmerkleproof", "\"mytxid\", myblockhash"));
     }
 
-    TxId transactionId = TxId(ParseHashV(request.params[0], "hash"));
+    TxId transactionId = TxId(ParseHashV(request.params[0], "txid"));
     std::set<TxId> setTxIds;
     setTxIds.insert(transactionId);
 
