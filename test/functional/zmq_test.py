@@ -7,10 +7,9 @@
 import struct
 
 from test_framework.test_framework import BitcoinTestFramework, SkipTest
-from test_framework.util import (assert_equal,
-                                 bytes_to_hex_str,
-                                 hash256, check_zmq_test_requirements
-                                 )
+from test_framework.util import (assert_equal, bytes_to_hex_str,
+                                 hash256, check_zmq_test_requirements,
+                                 zmq_port)
 
 
 class ZMQTest (BitcoinTestFramework):
@@ -32,7 +31,7 @@ class ZMQTest (BitcoinTestFramework):
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"hashtx")
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"rawblock")
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"rawtx")
-        ip_address = "tcp://127.0.0.1:28332"
+        ip_address = f"tcp://127.0.0.1:{zmq_port(0)}"
         self.zmqSubSocket.connect(ip_address)
         self.extra_args = [['-zmqpubhashblock=%s' % ip_address, '-zmqpubhashtx=%s' % ip_address,
                             '-zmqpubrawblock=%s' % ip_address, '-zmqpubrawtx=%s' % ip_address], []]
@@ -50,15 +49,16 @@ class ZMQTest (BitcoinTestFramework):
 
     def test_activenotifications(self):
         active_notifications = self.nodes[0].activezmqnotifications()
+        address = f'tcp://127.0.0.1:{zmq_port(0)}'
 
         assert_equal({'notification': 'pubhashblock',
-                      'address': 'tcp://127.0.0.1:28332'} in active_notifications, True)
+                      'address': address} in active_notifications, True)
         assert_equal({'notification': 'pubhashtx',
-                      'address': 'tcp://127.0.0.1:28332'} in active_notifications, True)
+                      'address': address} in active_notifications, True)
         assert_equal({'notification': 'pubrawblock',
-                      'address': 'tcp://127.0.0.1:28332'} in active_notifications, True)
+                      'address': address} in active_notifications, True)
         assert_equal({'notification': 'pubrawtx',
-                      'address': 'tcp://127.0.0.1:28332'} in active_notifications, True)
+                      'address': address} in active_notifications, True)
 
 
     def _zmq_test(self):
