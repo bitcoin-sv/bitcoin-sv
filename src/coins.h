@@ -295,6 +295,27 @@ inline CoinImpl CoinImpl::FromCoinWithScript(CoinWithScript&& other) noexcept
     return std::move( other ).ToCoinImpl();
 }
 
+class SaltedOutpointHasher {
+private:
+    /** Salt */
+    const uint64_t k0, k1;
+
+public:
+    SaltedOutpointHasher();
+
+    /**
+     * This *must* return size_t. With Boost 1.46 on 32-bit systems the
+     * unordered_map will behave unpredictably if the custom hasher returns a
+     * uint64_t, resulting in failures when syncing the chain (#4634).
+     * Note: This information above might be outdated as the unordered map
+     * container type has meanwhile been switched to the C++ standard library
+     * implementation.
+     */
+    size_t operator()(const COutPoint &outpoint) const {
+        return SipHashUint256Extra(k0, k1, outpoint.GetTxId(), outpoint.GetN());
+    }
+};
+
 class CCoinsCacheEntry {
     // The actual cached data.
     CoinImpl coin;
@@ -348,7 +369,8 @@ public:
     size_t DynamicMemoryUsage() const { return coin.DynamicMemoryUsage(); }
 };
 
-using CCoinsMap = std::map<COutPoint, CCoinsCacheEntry>;
+typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher>
+    CCoinsMap;
 
 /**
  * UTXO coins view interface.
