@@ -615,6 +615,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf(_("Number of seconds before timing out some operations "
                 "within the P2P layer. Affected operations include pings and "
                 "send/receive inactivity (default: %u seconds)"), DEFAULT_P2P_TIMEOUT_INTERVAL));
+        strUsage += HelpMessageOpt("-p2phandshaketimeout=<n>",
+            strprintf(_("Number of seconds to wait for a P2P connection to fully "
+                "establish before timing out and dropping it (default: %u seconds)"),
+                DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL));
     }
     strUsage += HelpMessageOpt(
         "-peerbloomfilters",
@@ -2004,7 +2008,7 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
-    
+    // Txn sinks
     if (gArgs.IsArgSet("-invalidtxsink"))
     {
         for (const std::string &sink : gArgs.GetArgs("-invalidtxsink"))
@@ -2014,6 +2018,11 @@ bool AppInitParameterInteraction(Config &config) {
                 return InitError(err);
             }
         }
+    }
+
+    // P2P parameters
+    if(std::string err; !config.SetP2PHandshakeTimeout(gArgs.GetArg("-p2phandshaketimeout", DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL), &err)) {
+        return InitError(err);
     }
 
 #if ENABLE_ZMQ

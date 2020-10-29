@@ -300,4 +300,16 @@ BOOST_AUTO_TEST_CASE(max_send_queues_size) {
     BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * testFactor);
 }
 
+BOOST_AUTO_TEST_CASE(p2p_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
+    BOOST_CHECK(config.SetP2PHandshakeTimeout(2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL, &err));
+    BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), 2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
+    BOOST_CHECK(!config.SetP2PHandshakeTimeout(0, &err));
+    BOOST_CHECK(!config.SetP2PHandshakeTimeout(-1, &err));
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -192,6 +192,10 @@ public:
     virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
 
+    // P2P parameters
+    virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual int64_t GetP2PHandshakeTimeout() const = 0;
+
 #if ENABLE_ZMQ
     virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
@@ -371,6 +375,10 @@ public:
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
 
+    // P2P parameters
+    bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
+    int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
+
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override;
     int64_t GetInvalidTxZMQMaxMessageSize() const override;
@@ -465,6 +473,10 @@ private:
     std::set<std::string> invalidTxSinks;
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
+
+    // P2P parameters
+    int64_t p2pHandshakeTimeout;
+
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
 #endif
@@ -794,6 +806,10 @@ public:
 
     bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
     InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
+
+    // P2P parameters
+    bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override { return true; }
+    int64_t GetP2PHandshakeTimeout() const override { return DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL; }
 
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };

@@ -75,10 +75,11 @@ namespace task
 /** Time between pings automatically sent out for latency probing and keepalive
  * (in seconds). */
 static const int PING_INTERVAL = 2 * 60;
-/** Time after which to disconnect, after waiting for a ping response (or
- * inactivity). */
+/** Time after which to disconnect, after waiting for a ping response (or inactivity). */
 static const int DEFAULT_P2P_TIMEOUT_INTERVAL = 20 * 60;
-/** Run the feeler connection loop once every 2 minutes or 120 seconds. **/
+/** Time after which to disconnect, if connection handshaking has not completed. */
+static const int DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL = 1 * 60;
+/** Run the feeler connection loop once every 2 minutes or 120 seconds. */
 static const int FEELER_INTERVAL = 120;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
