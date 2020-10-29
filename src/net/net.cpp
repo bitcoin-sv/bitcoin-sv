@@ -1025,15 +1025,16 @@ void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, C
     //
     // Inactivity checking
     //
-    int64_t nLastSend = mAssociation.GetLastSendTime();
-    int64_t nLastRecv = mAssociation.GetLastRecvTime();
+    int64_t nLastSend { mAssociation.GetLastSendTime() };
+    int64_t nLastRecv { mAssociation.GetLastRecvTime() };
 
-    int64_t nTime = GetSystemTimeInSeconds();
-    if (nTime - nTimeConnected > 60) {
+    int64_t nTime { GetSystemTimeInSeconds() };
+    int64_t nHandshakeTimeout { config.GetP2PHandshakeTimeout() };
+    if (nTime - nTimeConnected > nHandshakeTimeout) {
         auto timeout = gArgs.GetArg("-p2ptimeout", DEFAULT_P2P_TIMEOUT_INTERVAL);
         if (nLastRecv == 0 || nLastSend == 0) {
-            LogPrint(BCLog::NET, "socket no message in first 60 seconds, %d %d from %d\n",
-                     nLastRecv != 0, nLastSend != 0, id);
+            LogPrint(BCLog::NET, "socket no message in first %d seconds, %d %d from %d\n",
+                     nHandshakeTimeout, nLastRecv != 0, nLastSend != 0, id);
             fDisconnect = true;
         }
         else if (nTime - nLastSend > timeout) {
