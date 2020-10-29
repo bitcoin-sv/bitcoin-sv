@@ -420,7 +420,7 @@ bool CBlockTreeDB::WriteBatchSync(
              blockinfo.begin();
          it != blockinfo.end(); it++) {
         batch.Write(std::make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()),
-                    CDiskBlockIndex(*it));
+                    CDiskBlockIndex(const_cast<CBlockIndex&>(**it)));
     }
     return WriteBatch(batch, true);
 }
@@ -466,7 +466,8 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
             break;
         }
 
-        CDiskBlockIndex diskindex;
+        CBlockIndex idx;
+        CDiskBlockIndex diskindex{ idx };
         if (!pcursor->GetValue(diskindex)) {
             return error("LoadBlockIndex() : failed to read value");
         }
@@ -474,8 +475,8 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
         // Construct block index object
         CBlockIndex *pindexNew = insertBlockIndex(diskindex.GetBlockHash());
         pindexNew->LoadFromPersistentData(
-            diskindex,
-            insertBlockIndex(diskindex.hashPrev));
+            idx,
+            insertBlockIndex(diskindex.GetHashPrev()));
 
         if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits,
                               config)) {

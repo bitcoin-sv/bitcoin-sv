@@ -613,6 +613,7 @@ public:
     bool ReadBlockFromDisk(CBlock &block,
                             const Config &config) const;
 
+    friend class CDiskBlockIndex;
 protected:
     CDiskBlockMetaData mDiskBlockMetaData;
 
@@ -675,14 +676,11 @@ const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
                                       const CBlockIndex *pb);
 
 /** Used to marshal pointers into hashes for db storage. */
-class CDiskBlockIndex : public CBlockIndex {
+class CDiskBlockIndex {
 public:
-    uint256 hashPrev;
 
-    CDiskBlockIndex() { hashPrev = uint256(); }
-
-    explicit CDiskBlockIndex(const CBlockIndex *pindex) : CBlockIndex(*pindex) {
-        hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
+    explicit CDiskBlockIndex(CBlockIndex &pindexIn) : blockIndex(pindexIn) {
+        hashPrev = (blockIndex.pprev ? blockIndex.pprev->GetBlockHash() : uint256());
     }
 
     ADD_SERIALIZE_METHODS
@@ -694,37 +692,37 @@ public:
             READWRITE(VARINT(nVersion));
         }
 
-        READWRITE(VARINT(nHeight));
-        READWRITE(nStatus);
-        READWRITE(VARINT(nTx));
-        if (nStatus.hasData() || nStatus.hasUndo()) {
-            READWRITE(VARINT(nFile));
+        READWRITE(VARINT(blockIndex.nHeight));
+        READWRITE(blockIndex.nStatus);
+        READWRITE(VARINT(blockIndex.nTx));
+        if (blockIndex.nStatus.hasData() || blockIndex.nStatus.hasUndo()) {
+            READWRITE(VARINT(blockIndex.nFile));
         }
-        if (nStatus.hasData()) {
-            READWRITE(VARINT(nDataPos));
+        if (blockIndex.nStatus.hasData()) {
+            READWRITE(VARINT(blockIndex.nDataPos));
         }
-        if (nStatus.hasUndo()) {
-            READWRITE(VARINT(nUndoPos));
+        if (blockIndex.nStatus.hasUndo()) {
+            READWRITE(VARINT(blockIndex.nUndoPos));
         }
-        if(nStatus.getValidity() == BlockValidity::SCRIPTS)
+        if(blockIndex.nStatus.getValidity() == BlockValidity::SCRIPTS)
         {
-            mValidationCompletionTime =
+            blockIndex.mValidationCompletionTime =
                 CBlockIndex::SteadyClockTimePoint::min();
         }
 
         // block header
-        READWRITE(this->nVersion);
+        READWRITE(blockIndex.nVersion);
         READWRITE(hashPrev);
-        READWRITE(hashMerkleRoot);
-        READWRITE(nTime);
-        READWRITE(nBits);
-        READWRITE(nNonce);
-        if (nStatus.hasDiskBlockMetaData())
+        READWRITE(blockIndex.hashMerkleRoot);
+        READWRITE(blockIndex.nTime);
+        READWRITE(blockIndex.nBits);
+        READWRITE(blockIndex.nNonce);
+        if (blockIndex.nStatus.hasDiskBlockMetaData())
         {
             try {
-                READWRITE(mDiskBlockMetaData);
+                READWRITE(blockIndex.mDiskBlockMetaData);
             } catch (std::ios_base::failure &) {
-                nStatus = nStatus.withDiskBlockMetaData(false);
+                blockIndex.nStatus = blockIndex.nStatus.withDiskBlockMetaData(false);
                 LogPrintf("Can not read metadata from block %s. Probably upgrading from downgraded version. \n", GetBlockHash().ToString());
             }
         }
@@ -765,22 +763,28 @@ public:
 
     uint256 GetBlockHash() const {
         CBlockHeader block;
-        block.nVersion = nVersion;
+        block.nVersion = blockIndex.nVersion;
         block.hashPrevBlock = hashPrev;
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.nTime = nTime;
-        block.nBits = nBits;
-        block.nNonce = nNonce;
+        block.hashMerkleRoot = blockIndex.hashMerkleRoot;
+        block.nTime = blockIndex.nTime;
+        block.nBits = blockIndex.nBits;
+        block.nNonce = blockIndex.nNonce;
         return block.GetHash();
     }
 
+    const uint256& GetHashPrev() const { return hashPrev; }
+
     std::string ToString() const {
         std::string str = "CDiskBlockIndex(";
-        str += CBlockIndex::ToString();
+        str += blockIndex.ToString();
         str += strprintf("\n                hashBlock=%s, hashPrev=%s)",
                          GetBlockHash().ToString(), hashPrev.ToString());
         return str;
     }
+
+private:
+    uint256 hashPrev;
+    CBlockIndex& blockIndex;
 };
 
 
