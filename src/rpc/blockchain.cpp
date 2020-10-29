@@ -307,7 +307,7 @@ std::string EntryDescriptionString() {
 }
 
 void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
-                               const CTxMemPool::Slice &snapshot,
+                               const CTxMemPool::Snapshot &snapshot,
                                CJSONWriter& jWriter, bool pushId = true)
 {
     if (pushId)

@@ -2209,62 +2209,35 @@ SaltedTxidHasher::SaltedTxidHasher()
       k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
 
 
-const CTxMemPool::Slice::Contents CTxMemPool::Slice::mFakeContents {};
-const CTxMemPool::Slice::const_iterator CTxMemPool::Slice::mFakeIterator {mFakeContents.cend()};
-
-CTxMemPool::Slice::Slice(ContentsRef&& contents,
-                         CachedTxIdsRef&& relevantTxIds)
-    : mContents(std::move(contents)),
+CTxMemPool::Snapshot::Snapshot(Contents&& contents,
+                               CachedTxIdsRef&& relevantTxIds)
+    : mValid(true),
+      mContents(std::move(contents)),
       mRelevantTxIds(std::move(relevantTxIds))
 {}
 
-bool CTxMemPool::Slice::IsValid() const noexcept
+CTxMemPool::Snapshot::const_iterator CTxMemPool::Snapshot::find(const uint256& hash) const
 {
-    return (mContents != nullptr);
-}
-
-bool CTxMemPool::Slice::empty() const noexcept
-{
-    return (IsValid() ? mContents->empty() : true);
-}
-
-CTxMemPool::Slice::size_type CTxMemPool::Slice::size() const noexcept
-{
-    return (IsValid() ? mContents->size() : 0);
-}
-
-CTxMemPool::Slice::const_iterator CTxMemPool::Slice::begin() const noexcept
-{
-    return (IsValid() ? mContents->cbegin() : mFakeIterator);
-}
-
-CTxMemPool::Slice::const_iterator CTxMemPool::Slice::end() const noexcept
-{
-    return (IsValid() ? mContents->cend() : mFakeIterator);
-}
-
-CTxMemPool::Slice::const_iterator CTxMemPool::Slice::find(const uint256& hash) const
-{
-    if (IsValid()) {
+    if (mValid) {
         CreateIndex();
         const auto iter = mIndex.find(hash);
-        if (iter != mIndex.end() && iter->second != mFakeIterator) {
+        if (iter != mIndex.end()) {
             return iter->second;
         }
     }
     return cend();
 }
 
-bool CTxMemPool::Slice::TxIdExists(const uint256& hash) const
+bool CTxMemPool::Snapshot::TxIdExists(const uint256& hash) const
 {
-    if (IsValid()) {
+    if (mValid) {
         CreateIndex();
         return (1 == mIndex.count(hash));
     }
     return false;
 }
 
-void CTxMemPool::Slice::CreateIndex() const
+void CTxMemPool::Snapshot::CreateIndex() const
 {
     std::call_once(
         mCreateIndexOnce,
@@ -2274,48 +2247,48 @@ void CTxMemPool::Slice::CreateIndex() const
 
             // Build the transaction index from the slice contents and
             // additional relevant transaction IDs.
-            mIndex.reserve(mContents->size()
+            mIndex.reserve(mContents.size()
                            + (mRelevantTxIds ? mRelevantTxIds->size() : 0));
-            for (auto it = mContents->cbegin(); it != mContents->cend(); ++it) {
+            for (auto it = cbegin(); it != cend(); ++it) {
                 mIndex.emplace(it->GetTx().GetId(), it);
             }
             if (mRelevantTxIds) {
                 for (const auto& txid : *mRelevantTxIds) {
-                    mIndex.emplace(txid, mFakeIterator);
+                    mIndex.emplace(txid, cend());
                 }
             }
         });
 }
 
-CTxMemPool::Slice CTxMemPool::GetSnapshot() const
+CTxMemPool::Snapshot CTxMemPool::GetSnapshot() const
 {
     std::shared_lock lock(smtx);
 
-    auto contents = std::make_unique<Slice::Contents>();
-    contents->reserve(mapTx.size());
+    Snapshot::Contents contents;
+    contents.reserve(mapTx.size());
     for (const auto& entry : mapTx) {
-        contents->emplace_back(entry);
+        contents.emplace_back(entry);
     }
-    return Slice(std::move(contents), nullptr);
+    return Snapshot(std::move(contents), nullptr);
 }
 
-CTxMemPool::Slice CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const
+CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const
 {
     std::shared_lock lock(smtx);
 
     const auto baseTx = mapTx.find(hash);
     if (baseTx == mapTx.end()) {
-        return Slice();
+        return Snapshot();
     }
 
-    auto contents = std::make_unique<Slice::Contents>();
-    auto relevantTxIds = std::make_unique<Slice::CachedTxIds>();
+    Snapshot::Contents contents;
+    auto relevantTxIds = std::make_unique<Snapshot::CachedTxIds>();
     // This closure is essentially a local function that stores
     // information about a single transaction and its inputs.
     const auto recordTransaction =
         [this, &contents, &relevantTxIds](const CTxMemPoolEntry& entry)
         {
-            contents->emplace_back(entry);
+            contents.emplace_back(entry);
             for (const auto& input : entry.GetTx().vin) {
                 const auto& id = input.prevout.GetTxId();
                 if (ExistsNL(id)) {
@@ -2366,5 +2339,5 @@ CTxMemPool::Slice CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKind 
         assert(!"CTxMemPool::GetTxSnapshot(): invalid 'kind'");
     }
 
-    return Slice(std::move(contents), std::move(relevantTxIds));
+    return Snapshot(std::move(contents), std::move(relevantTxIds));
 }
