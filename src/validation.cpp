@@ -2361,7 +2361,13 @@ bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
 void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata)
 {
     LOCK(cs_main);
-    if (!index.nStatus.hasDiskBlockMetaData()) {
+    if (!index.nStatus.hasDiskBlockMetaData()) 
+    {
+        if (!index.nStatus.hasData())
+        {
+            LogPrintf("Block index file metadata for block %s will not be set, because disk block data was pruned while processing block.\n", index.GetBlockHash().ToString());
+            return;
+        }
         LogPrintf("Setting block index file metadata for block %s\n", index.GetBlockHash().ToString());
         index.SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
         setDirtyBlockIndex.insert(&index);
