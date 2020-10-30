@@ -628,24 +628,8 @@ static bool IsUAHFenabled(const Config &config, int32_t nHeight) {
     return nHeight >= config.GetChainParams().GetConsensus().uahfHeight;
 }
 
-bool IsUAHFenabled(const Config &config, const CBlockIndex *pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
-    }
-
-    return IsUAHFenabled(config, pindexPrev->nHeight);
-}
-
-static bool IsDAAEnabled(const Config &config, int32_t nHeight) {
+bool IsDAAEnabled(const Config &config, int32_t nHeight) {
     return nHeight >= config.GetChainParams().GetConsensus().daaHeight;
-}
-
-bool IsDAAEnabled(const Config &config, const CBlockIndex *pindexPrev) {
-    if (pindexPrev == nullptr) {
-        return false;
-    }
-
-    return IsDAAEnabled(config, pindexPrev->nHeight);
 }
 
 bool IsGenesisEnabled(const Config &config, int32_t nHeight) {
@@ -3040,7 +3024,7 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     }
 
     // If the UAHF is enabled, we start accepting replay protected txns
-    if (IsUAHFenabled(config, pChainTip)) {
+    if (IsUAHFenabled(config, pChainTip->nHeight)) {
         flags |= SCRIPT_VERIFY_STRICTENC;
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
     }
@@ -3049,7 +3033,7 @@ static uint32_t GetBlockScriptFlags(const Config &config,
     // s in their signature. We also make sure that signature that are supposed
     // to fail (for instance in multisig or other forms of smart contracts) are
     // null.
-    if (IsDAAEnabled(config, pChainTip)) {
+    if (IsDAAEnabled(config, pChainTip->nHeight)) {
         flags |= SCRIPT_VERIFY_LOW_S;
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }

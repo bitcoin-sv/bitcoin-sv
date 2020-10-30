@@ -103,7 +103,7 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,
         return pindexPrev->nBits;
     }
 
-    if (IsDAAEnabled(config, pindexPrev)) {
+    if (IsDAAEnabled(config, pindexPrev->nHeight)) {
         return GetNextCashWorkRequired(pindexPrev, pblock, config);
     }
 
