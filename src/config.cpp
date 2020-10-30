@@ -81,6 +81,10 @@ void GlobalConfig::Reset()
 
     invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
     invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
+
+    // P2P parameters
+    p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
+
 #if ENABLE_ZMQ
     invalidTxZMQMaxMessageSize = CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE;
 #endif
@@ -988,6 +992,19 @@ bool GlobalConfig::SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::s
 InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
 {
     return invalidTxFileSinkEvictionPolicy;
+}
+
+// P2P Parameters
+bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        *err = "P2P handshake timeout must be greater than 0.";
+        return false;
+    }
+
+    p2pHandshakeTimeout = timeout;
+    return true;
 }
 
 #if ENABLE_ZMQ
