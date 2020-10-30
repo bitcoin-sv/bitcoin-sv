@@ -297,7 +297,7 @@ bool IsReachable(const CNetAddr &addr) {
 CNodePtr CConnman::FindNode(const CNetAddr &ip) {
     LOCK(cs_vNodes);
     for (const CNodePtr& pnode : vNodes) {
-        if ((CNetAddr)pnode->GetAssociation().GetPeerAddr() == ip) {
+        if (pnode->GetAssociation().GetPeerAddr() == ip) {
             return pnode;
         }
     }
@@ -307,7 +307,7 @@ CNodePtr CConnman::FindNode(const CNetAddr &ip) {
 CNodePtr CConnman::FindNode(const CSubNet &subNet) {
     LOCK(cs_vNodes);
     for (const CNodePtr& pnode : vNodes) {
-        if (subNet.Match((CNetAddr)pnode->GetAssociation().GetPeerAddr())) {
+        if (subNet.Match(pnode->GetAssociation().GetPeerAddr())) {
             return pnode;
         }
     }
@@ -327,7 +327,7 @@ CNodePtr CConnman::FindNode(const std::string &addrName) {
 CNodePtr CConnman::FindNode(const CService &addr) {
     LOCK(cs_vNodes);
     for (const CNodePtr& pnode : vNodes) {
-        if ((CService)pnode->GetAssociation().GetPeerAddr() == addr) {
+        if (pnode->GetAssociation().GetPeerAddr() == addr) {
             return pnode;
         }
     }
@@ -353,7 +353,7 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
 
         if(!connect.fNewStream) {
             // Look for an existing connection
-            CNodePtr pnode = FindNode((CService)connect.addrConnect);
+            CNodePtr pnode = FindNode(connect.addrConnect);
             if (pnode) {
                 LogPrintf("Failed to open new connection, already connected\n");
                 return nullptr;
@@ -390,7 +390,7 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
             // the name we used to connect in that CNode, so that future
             // FindNode() calls to that name catch this early.
             LOCK(cs_vNodes);
-            CNodePtr pnode = FindNode((CService)connect.addrConnect);
+            CNodePtr pnode = FindNode(connect.addrConnect);
             if (pnode) {
                 pnode->MaybeSetAddrName(std::string(connect.pszDest));
                 CloseSocket(hSocket);
@@ -472,7 +472,7 @@ void CConnman::ClearBanned() {
     }
 }
 
-bool CConnman::IsBanned(CNetAddr ip) {
+bool CConnman::IsBanned(const CNetAddr &ip) {
     LOCK(cs_setBanned);
 
     bool fResult = false;
@@ -489,7 +489,7 @@ bool CConnman::IsBanned(CNetAddr ip) {
     return fResult;
 }
 
-bool CConnman::IsBanned(CSubNet subnet) {
+bool CConnman::IsBanned(const CSubNet &subnet) {
     LOCK(cs_setBanned);
 
     bool fResult = false;
@@ -506,7 +506,7 @@ bool CConnman::IsBanned(CSubNet subnet) {
 
 void CConnman::Ban(const CNetAddr &addr, const BanReason &banReason,
                    int64_t bantimeoffset, bool sinceUnixEpoch) {
-    CSubNet subNet(addr);
+    CSubNet const subNet(addr);
     Ban(subNet, banReason, bantimeoffset, sinceUnixEpoch);
 }
 
@@ -2097,7 +2097,7 @@ bool CConnman::OpenNetworkConnection(NodeConnectInfo& connectInfo,
 
         // Only check for duplicate connections if this isn't a new stream we're trying to establish
         if(!connectInfo.fNewStream &&
-           (FindNode((CNetAddr)connectInfo.addrConnect) || FindNode(connectInfo.addrConnect.ToStringIPPort()))) {
+           (FindNode(connectInfo.addrConnect) || FindNode(connectInfo.addrConnect.ToStringIPPort()))) {
             return false;
         }
     } else if (FindNode(std::string(connectInfo.pszDest))) {
@@ -3080,8 +3080,8 @@ CNodePtr CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, S
     }
 
     // Check we're moving the stream between associations with the same endpoint (Dos prevention)
-    CNetAddr fromAddr { fromNode->GetAssociation().GetPeerAddr() };
-    CNetAddr toAddr { toNode->GetAssociation().GetPeerAddr() };
+    CNetAddr const & fromAddr = fromNode->GetAssociation().GetPeerAddr();
+    CNetAddr const & toAddr = toNode->GetAssociation().GetPeerAddr();
     if(fromAddr != toAddr)
     {
         Ban(fromAddr, BanReasonNodeMisbehaving);
