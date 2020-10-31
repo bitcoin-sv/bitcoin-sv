@@ -415,7 +415,6 @@ libbitcoin_consensus_a_SOURCES = \
   serialize.h \
   span.h \
   tinyformat.h \
-  uint256.cpp \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
@@ -467,7 +466,6 @@ libbitcoin_util_a_SOURCES = \
   sync.cpp \
   threadinterrupt.cpp \
   threadpriority.cpp \
-  uint256.cpp \
   uint256.h \
   util.cpp \
   utilmoneystr.cpp \
@@ -601,7 +599,6 @@ bitcoin_tx_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS)
 bitcoin_miner_SOURCES = bitcoin-miner.cpp \
 arith_uint256.cpp \
 arith_uint256.h \
-uint256.cpp \
 uint256.h \
 crypto/sha512.cpp \
 crypto/sha512.h \
