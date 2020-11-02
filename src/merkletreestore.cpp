@@ -520,7 +520,7 @@ CMerkleTreeFactory::CMerkleTreeFactory(const fs::path& storePath, size_t databas
     {
         LogPrintf("Merkle Trees will not be stored to disk until next successful initialization.");
     }
-};
+}
 
 CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockIndex& blockIndex, const int32_t currentChainHeight)
 {

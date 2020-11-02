@@ -90,7 +90,7 @@ public:
     bool IsValid(const Config &config) const;
     bool IsOversized(const Config &config) const;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -312,7 +312,7 @@ bool IsBlockLike(const std::string &strCommand);
  */
 uint64_t GetMaxMessageLength(const std::string& command, const Config& config);
 
-}; // namespace NetMsgType
+} // namespace NetMsgType
 
 /* Get a vector of all valid message types (see above) */
 const std::vector<std::string> &getAllNetMessageTypes();
@@ -365,7 +365,7 @@ public:
     CAddress() = default;
     explicit CAddress(CService ipIn, ServiceFlags nServicesIn);
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -417,7 +417,7 @@ public:
     CInv() : type(0), hash() {}
     CInv(uint32_t typeIn, const uint256 &hashIn) : type(typeIn), hash(hashIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -479,7 +479,7 @@ public:
     : numberOfFields{2}, maxRecvPayloadLength{maxRecvPayloadLengthIn}, streamPolicies{streamPoliciesIn}
     {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
         READWRITECOMPACTSIZE(numberOfFields);

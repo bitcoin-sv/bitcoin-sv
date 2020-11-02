@@ -8,7 +8,7 @@
 
 #include <vector>
 
-BOOST_AUTO_TEST_SUITE(NetMessageMaker);
+BOOST_AUTO_TEST_SUITE(NetMessageMaker)
 
 BOOST_AUTO_TEST_CASE(Make)
 {
@@ -26,4 +26,4 @@ BOOST_AUTO_TEST_CASE(Make)
     BOOST_CHECK(msg2.GetPayloadType() == CSerializedNetMsg::PayloadType::BLOCK);
 }
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END()

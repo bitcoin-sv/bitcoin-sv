@@ -49,7 +49,7 @@ public:
         : intval(intvalin), boolval(boolvalin),
           stringval(std::move(stringvalin)), charstrval(charstrvalin),
           txval(MakeTransactionRef(txvalin)) {}
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -70,7 +70,7 @@ public:
 class CSerializeMethodsTestMany : public CSerializeMethodsTestSingle {
 public:
     using CSerializeMethodsTestSingle::CSerializeMethodsTestSingle;
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

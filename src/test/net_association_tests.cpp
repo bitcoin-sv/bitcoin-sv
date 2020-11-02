@@ -238,5 +238,5 @@ BOOST_AUTO_TEST_CASE(TestStreamPolicyConfig)
     BOOST_CHECK(StreamPolicyFactory{}.GetPrioritisedPolicyNames() == expectedPri);
 }
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END()
 
