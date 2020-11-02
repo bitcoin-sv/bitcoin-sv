@@ -234,7 +234,7 @@ BOOST_AUTO_TEST_CASE(varints) {
     {
         // Deserialising a larger value than can fit into any integral type
         ss.clear();
-        ss.insert(ss.end(), 64, 0x80);
+        ss.insert(ss.end(), 64, char(0x80));
         uint32_t j;
         BOOST_CHECK_THROW({ss >> VARINT(j);}, std::runtime_error);
     }
@@ -242,7 +242,7 @@ BOOST_AUTO_TEST_CASE(varints) {
     {
         // Deserialising a larger value than can fit into the given type
         ss.clear();
-        ss.insert(ss.end(), 4, 0xFF);
+        ss.insert(ss.end(), 4, char(0xFF));
         uint16_t j;
         BOOST_CHECK_THROW({ss >> VARINT(j);}, std::runtime_error);
     }
