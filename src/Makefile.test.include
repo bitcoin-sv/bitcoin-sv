@@ -205,6 +205,6 @@ endif
 	 echo "namespace json_tests{" && \
 	 echo "static unsigned const char $(*F)[] = {" && \
 	 $(HEXDUMP) -v -e '8/1 "0x%02x, "' -e '"\n"' $< | $(SED) -e 's/0x  ,//g' && \
-	 echo "};};"; \
+	 echo "};}"; \
 	} > "$@.new" && mv -f "$@.new" "$@"
 	@echo "Generated $@"
