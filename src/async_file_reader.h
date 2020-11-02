@@ -155,7 +155,15 @@
         std::unique_ptr<FILE, CCloseFile> mFile;
         int mFileId;
         size_t mOffset;
+#if !defined(__clang__) && defined(__GNUC__)
+	//warning: invalid use of ‘struct aiocb’ with a zero-size array in ‘class CAsyncFileReader’ [-Wpedantic]
+        #pragma GCC diagnostic ignored "-Wpedantic"
+#endif
         aiocb mControllBlock;
+#if !defined(__clang__) && defined(__GNUC__)
+        #pragma GCC diagnostic pop
+#endif
+
         bool mReadInProgress = false;
         bool mEndOfStream = false;
     };
