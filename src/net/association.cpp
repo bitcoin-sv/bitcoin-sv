@@ -356,10 +356,10 @@ bool Association::SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& 
     return havefds;
 }
 
-bool Association::GetNextMessage(std::list<CNetMessage>& msg)
+std::pair<Stream::QueuedNetMessage, bool> Association::GetNextMessage()
 {
     LOCK(cs_mStreams);
-    return mStreamPolicy->GetNextMessage(mStreams, msg);
+    return mStreamPolicy->GetNextMessage(mStreams);
 }
 
 void Association::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError,

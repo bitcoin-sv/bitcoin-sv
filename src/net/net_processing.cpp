@@ -3879,12 +3879,12 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Get next message for processing
-    std::list<CNetMessage> nextMsg {};
-    fMoreWork = pfrom->GetAssociation().GetNextMessage(nextMsg);
-    if(nextMsg.empty()) {
+    auto [ nextMsg, moreMsgs ] { pfrom->GetAssociation().GetNextMessage() };
+    if(!nextMsg) {
         return false;
     }
-    CNetMessage& msg { nextMsg.front() };
+    fMoreWork = moreMsgs;
+    CNetMessage& msg { *nextMsg };
     msg.SetVersion(pfrom->GetRecvVersion());
 
     std::optional<CLogP2PStallDuration> durationLog;
