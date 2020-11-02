@@ -97,7 +97,7 @@ void CJournalChangeSet::clear()
 }
 
 
-// Try to disprove toposort by trying to find ADD Change in the changeset
+// Try to disprove toposort by trying to find an ADD Change in the changeset
 // that references another ADD transaction that appears later in the changeset.
 bool CJournalChangeSet::CheckTopoSort() const
 {
@@ -127,10 +127,6 @@ bool CJournalChangeSet::CheckTopoSort() const
 
     const auto effectiveTransactionsSize = laterTransactions.size();
 
-    auto hasForwardReferences = [&laterTransactions](const CTxIn& txInput) {
-        return laterTransactions.count(txInput.prevout.GetTxId());
-    };
-
     bool sorted = true;
 
     for(auto i = mChangeSet.cbegin(); i != mChangeSet.cend(); ++i) {
@@ -140,7 +136,12 @@ bool CJournalChangeSet::CheckTopoSort() const
         const CTransactionRef& txn = i->second.getTxn();
         auto unsorted = std::find_if(txn->vin.cbegin(),
                                     txn->vin.cend(),
-                                     hasForwardReferences);
+                                     [&laterTransactions](const CTxIn& txInput) {
+                                         return laterTransactions.count(txInput.prevout.GetTxId());
+                                     });
+        // subsequent entries are allowed to see us
+        laterTransactions.erase(txn->GetHash());
+
         if (unsorted != txn->vin.cend()) {
             if (sorted) {
                 LogPrintf("=x===== Toposort violation in ChangeSet %s with %d changes %d effective %d ADD %d REMOVE\n",
@@ -167,8 +168,6 @@ bool CJournalChangeSet::CheckTopoSort() const
                       prevTx->second.getAncestorCount()->nCountWithAncestors
                       );
         }
-        // subsequent entries are allowed to see us
-        laterTransactions.erase(txn->GetHash());
     }
 
     return sorted;
