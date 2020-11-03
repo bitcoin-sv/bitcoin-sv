@@ -2172,6 +2172,12 @@ static void UpdateMempoolForReorg(const Config &config,
             changeSet,
             tip,
             StandardNonFinalVerifyFlags(IsGenesisEnabled(config, tip.nHeight)));
+
+    // Check mempool & journal
+    mempool.CheckMempool(*pcoinsTip, changeSet);
+
+    // Mempool is now consistent. Synchronize with journal.
+    changeSet->apply();
 }
 
 /**
@@ -4700,11 +4706,11 @@ static bool ActivateBestChainStep(
             UpdateMempoolForReorg(config, disconnectpool, true, changeSet);
         }
 
+        mempool.CheckMempool(*pcoinsTip, changeSet);
         if(changeSet)
         {
             changeSet->apply();
         }
-        mempool.CheckMempool(*pcoinsTip, changeSet);
     }
     catch(...) {
         // We were probably cancelled. Make the mempool consistent with the current tip.

@@ -372,8 +372,6 @@ class PTVP2PTest(ComparisonTestFramework):
             assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs)+tc5_num_of_subsets)
             # Only tc5_num_of_subsets txns are allowed to be in the mempool from the given ds set.
             assert_equal(len(self.check_intersec_with_mempool(conn.rpc, ds_txs)), tc5_num_of_subsets)
-            # There is a high chance of getting 'txn-double-spend-detected' reject msgs (the exact number is runtime-dependant)
-            assert_greater_than(len(rejected_txs), 0)
 
         #
         # Test Case 6 (TC6).

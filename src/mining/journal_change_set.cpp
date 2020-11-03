@@ -1,6 +1,7 @@
 // Copyright (c) 2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include <boost/iterator/filter_iterator.hpp>
 #include <mining/journal_builder.h>
 #include <mining/journal_change_set.h>
 #include <txmempool.h>
@@ -95,33 +96,88 @@ void CJournalChangeSet::clear()
     clearNL();
 }
 
+
+// Try to disprove toposort by trying to find an ADD Change in the changeset
+// that references another ADD transaction that appears later in the changeset.
+bool CJournalChangeSet::CheckTopoSort() const
+{
+
+    auto filterAndSort = [this](auto predicate) {
+        std::vector<uint256> transactionIds;
+        transactionIds.reserve(mChangeSet.size());
+        auto selections = boost::make_filter_iterator(predicate, mChangeSet.cbegin(), mChangeSet.cend());
+        auto selectionsEnd =boost::make_filter_iterator(predicate, mChangeSet.cend(), mChangeSet.cend());
+        std::transform(selections, selectionsEnd,
+                       std::inserter(transactionIds, transactionIds.begin()),
+                       [](auto& change) { return change.second.getTxn()->GetHash(); });
+        std::sort(transactionIds.begin(), transactionIds.end());
+        return transactionIds;
+    };
+
+    auto isAddition = [](auto& change) { return change.first == CJournalChangeSet::Operation::ADD; };
+    std::vector<uint256> addedTransactions = filterAndSort(isAddition);
+    std::vector<uint256> removedTransactions = filterAndSort(
+        [](auto& change) {return change.first == CJournalChangeSet::Operation::REMOVE; });
+
+    std::unordered_set<uint256> laterTransactions;
+    laterTransactions.reserve(addedTransactions.size());
+    std::set_difference(addedTransactions.cbegin(), addedTransactions.cend(),
+                        removedTransactions.cbegin(), removedTransactions.cend(),
+                        std::inserter(laterTransactions, laterTransactions.begin()));
+
+    const auto effectiveTransactionsSize = laterTransactions.size();
+
+    bool sorted = true;
+
+    for(auto i = mChangeSet.cbegin(); i != mChangeSet.cend(); ++i) {
+        if (!isAddition(*i)) {
+            continue;
+        }
+        const CTransactionRef& txn = i->second.getTxn();
+        auto unsorted = std::find_if(txn->vin.cbegin(),
+                                    txn->vin.cend(),
+                                     [&laterTransactions](const CTxIn& txInput) {
+                                         return laterTransactions.count(txInput.prevout.GetTxId());
+                                     });
+        // subsequent entries are allowed to see us
+        laterTransactions.erase(txn->GetHash());
+
+        if (unsorted != txn->vin.cend()) {
+            if (sorted) {
+                LogPrintf("=x===== Toposort violation in ChangeSet %s with %d changes %d effective %d ADD %d REMOVE\n",
+                          enum_cast<std::string>(getUpdateReason()),
+                          std::distance(mChangeSet.cbegin(), mChangeSet.cend()),
+                          effectiveTransactionsSize,
+                          addedTransactions.size(),
+                          removedTransactions.size());
+                sorted = false;
+            }
+            uint256 prevTxId(unsorted->prevout.GetTxId());
+            const auto prevTx = std::find_if(mChangeSet.cbegin(), mChangeSet.cend(), [&prevTxId](const auto &change) {
+                return change.second.getTxn()->GetHash() == prevTxId;
+            });
+            size_t prevTxIdx = std::distance(mChangeSet.cbegin(), prevTx);
+            LogPrintf("=x== ChangeSet[%d] %s input %d ancestor depth %d"
+                      " references a later ChangeSet[%d] %s ancestor depth %d\n",
+                      (std::distance(mChangeSet.cbegin(), i)),
+                      txn->GetHash().GetHex(),
+                      std::distance(txn->vin.cbegin(), unsorted),
+                      i->second.getAncestorCount()->nCountWithAncestors,
+                      prevTxIdx,
+                      prevTxId.GetHex(),
+                      prevTx->second.getAncestorCount()->nCountWithAncestors
+                      );
+        }
+    }
+
+    return sorted;
+}
+
 // Apply our changes to the journal - Caller holds mutex
 void CJournalChangeSet::applyNL()
 {
     if(!mChangeSet.empty())
     {
-        // There are a lot of corner cases that can happen with REORG change sets,
-        // particularly to do with error handling, that can result in surprising
-        // ordering of the transactions within the change set. Rather than trying
-        // to handle them all individually just do a sort of the change set to
-        // ensure it is always right.
-        //
-        // Also sort RESET change sets here because they have been created directly
-        // from the mempool with no attempt to put things in the correct order.
-        if(mUpdateReason == JournalUpdateReason::REORG || mUpdateReason == JournalUpdateReason::RESET)
-        {
-            // FIXME: Once C++17 parallel algorithms are widely supported, make this
-            // use them.
-            std::stable_sort(mChangeSet.begin(), mChangeSet.end(),
-                [](const Change& change1, const Change& change2)
-                {
-                    const AncestorDescendantCountsPtr& count1 { change1.second.getAncestorCount() };
-                    const AncestorDescendantCountsPtr& count2 { change2.second.getAncestorCount() };
-                    return count1->nCountWithAncestors < count2->nCountWithAncestors;
-                }
-            );
-        }
-
         mBuilder.applyChangeSet(*this);
 
         // Make sure we don't get applied again if we are later called by the destructor

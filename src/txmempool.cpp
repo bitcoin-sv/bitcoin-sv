@@ -1002,22 +1002,48 @@ void CTxMemPool::Clear() {
 
 void CTxMemPool::CheckMempool(
     CoinsDB& db,
-    const mining::CJournalChangeSetPtr& changeSet) const {
+    const mining::CJournalChangeSetPtr& changeSet) const
+{
 
+    if (ShouldCheckMempool())
+    {
+        CoinsDBView view{ db };
+        std::shared_lock lock(smtx);
+        CheckMempoolImplNL(view, changeSet);
+    }
+}
+
+// A non-locking version of CheckMempool
+void CTxMemPool::CheckMempoolNL(
+    CoinsDBView& view,
+    const mining::CJournalChangeSetPtr& changeSet) const
+{
+
+    if (ShouldCheckMempool())
+    {
+        CheckMempoolImplNL(view, changeSet);
+    }
+}
+
+bool CTxMemPool::ShouldCheckMempool() const
+{
     if (nCheckFrequency == 0) {
-        return;
+        return false;
     }
 
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency) {
-        return;
+        return false;
     }
-    CoinsDBView view{ db };
-    CCoinsViewCache mempoolDuplicate{view};
+    return true;
+}
 
+void CTxMemPool::CheckMempoolImplNL(
+    CoinsDBView& view,
+    const mining::CJournalChangeSetPtr& changeSet) const
+{
+    CCoinsViewCache mempoolDuplicate{view};
     // Get spend height and MTP
     const auto [ nSpendHeight, medianTimePast] = GetSpendHeightAndMTP(mempoolDuplicate);
-
-    std::shared_lock lock(smtx);
 
     LogPrint(BCLog::MEMPOOL,
              "Checking mempool with %u transactions and %u inputs\n",
@@ -1163,6 +1189,9 @@ void CTxMemPool::CheckMempool(
     /* Journal checking */
     if(changeSet)
     {
+        // Check that the change set respects the toposort
+        bool changeSetSorted { changeSet->CheckTopoSort() };
+        assert(changeSetSorted);
         // Make journal consitent with mempool & check
         changeSet->apply();
         std::string journalResult { checkJournalNL() };
@@ -1239,15 +1268,28 @@ void CTxMemPool::RebuildJournal() const
 
     CJournalChangeSetPtr changeSet { mJournalBuilder.getNewChangeSet(JournalUpdateReason::RESET) };
 
-    std::shared_lock lock(smtx);
-
-    setEntries allTxs;
-    for(txiter entry = mapTx.cbegin(); entry != mapTx.cend(); entry++)
     {
-        allTxs.insert(entry);
+        std::shared_lock lock(smtx);
+        CoinsDBView coinsView{ *pcoinsTip };
+
+        // FIXME: once mempool properly maintains own toposort the copying and explicit sorting can be replaced with sorted iteration
+        std::vector<std::reference_wrapper<const CTxMemPoolEntry>> entries{
+            mapTx.cbegin(),
+            mapTx.cend() };
+        std::stable_sort(entries.begin(), entries.end(),
+                         [](const CTxMemPoolEntry& entry1, const CTxMemPoolEntry& entry2)
+                         {
+            const auto& count1 = entry1.GetAncestorDescendantCounts();
+            const auto& count2 = entry2.GetAncestorDescendantCounts();
+            return (count1->nCountWithAncestors < count2->nCountWithAncestors);
+        });
+        for(const auto& entry : entries)
+        {
+            changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
+        }
+
+        CheckMempoolNL(coinsView, changeSet);
     }
-    
-    checkJournalAcceptanceNL(allTxs, *changeSet);
 
     // Apply the changes
     changeSet->apply();
