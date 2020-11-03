@@ -10,6 +10,7 @@
 #include "config.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
+#include "mining/factory.h"
 #include "core_io.h"
 #include "dstencode.h"
 #include "mining/factory.h"
@@ -262,8 +263,9 @@ static UniValue getmininginfo(const Config &config,
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("blocks", int(chainActive.Height())));
-    obj.push_back(Pair("currentblocksize", uint64_t(nLastBlockSize)));
-    obj.push_back(Pair("currentblocktx", uint64_t(nLastBlockTx)));
+    auto stats = mining::g_miningFactory->GetAssembler()->getLastBlockStats();
+    obj.push_back(Pair("currentblocksize", uint64_t(stats.blockSize)));
+    obj.push_back(Pair("currentblocktx", uint64_t(stats.txCount)));
     obj.push_back(Pair("difficulty", double(GetDifficulty(chainActive.Tip()))));
     obj.push_back(
         Pair("blockprioritypercentage",
