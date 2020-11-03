@@ -1019,7 +1019,7 @@ public:
         // The transaction lookup index.
         using TxIdIndex = std::unordered_map<uint256, Snapshot::const_iterator>;
         mutable TxIdIndex mIndex;
-        mutable std::once_flag mCreateIndexOnce;
+        mutable std::once_flag mCreateIndexOnce{};
         void CreateIndex() const;
     };
 
