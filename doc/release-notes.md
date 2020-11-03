@@ -23,9 +23,11 @@
 * Fix: CheckTxInputExists should not be used.
 * Remove assert and fix shutdown after unsuccessful startup.
 * Unconditionally log P2P stall messages if denugp2pthreadstalls is specified.
+* November 2020 STN reset.
 
 ## Scaling Test Network (STN) Reset
-N/A
+The Scaling Test Network has been reset at block height 4. This block has hash 
+`00000000d33661d5a6906f84e3c64ea6101d144ec83760bcb4ba81edcb15e68d`.
 
 # Previous Releases
 * [Version 0.1.0](release-notes-v0.1.0.md) - [Download](https://download.bitcoinsv.io/bitcoinsv/0.1.0/) - [Source](https://github.com/bitcoin-sv/bitcoin-sv/tree/v0.1.0) - 2018-10-15
