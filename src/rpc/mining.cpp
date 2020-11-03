@@ -291,7 +291,7 @@ static UniValue getmininginfo(const Config &config,
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("blocks", int(chainActive.Height())));
-    auto stats = mining::g_miningFactory->GetAssembler()->getLastBlockStats();
+    auto const stats = mining::g_miningFactory->GetAssembler()->getLastBlockStats();
     obj.push_back(Pair("currentblocksize", uint64_t(stats.blockSize)));
     obj.push_back(Pair("currentblocktx", uint64_t(stats.txCount)));
     obj.push_back(Pair("difficulty", double(GetDifficulty(chainActive.Tip()))));
