@@ -3,6 +3,7 @@
 
 #include <config.h>
 #include <mining/factory.h>
+#include <mining/legacy.h>
 #include <mining/journaling_block_assembler.h>
 #include <stdexcept>
 
