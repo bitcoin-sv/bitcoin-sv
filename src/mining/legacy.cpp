@@ -28,6 +28,8 @@
 using mining::BlockAssembler;
 using mining::CBlockTemplate;
 
+extern uint64_t nLastBlockTx; // temporary move from validation.h
+extern uint64_t nLastBlockSize; // temporary move from validation.h
 
 //////////////////////////////////////////////////////////////////////////////
 //
