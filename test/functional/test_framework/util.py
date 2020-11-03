@@ -800,3 +800,8 @@ def check_zmq_test_requirements(configfile, skip_test_exception):
         import zmq
     except ImportError:
         raise Exception("pyzmq module not available.")
+
+def wait_for_txn_propagator(node):
+    # Wait for this node's transactions propagator to finish relaying transactions to other nodes.
+    # Can be used to make sure current transactions are not relayed to nodes being reconnected later.
+    wait_until(lambda: (node.getnetworkinfo()['txnpropagationqlen'] == 0))
