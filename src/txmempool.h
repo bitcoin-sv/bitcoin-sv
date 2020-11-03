@@ -421,6 +421,8 @@ public:
     }
 };
 
+struct DisconnectedBlockTransactions;
+
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain transactions that
  * may be included in the next block.
@@ -654,13 +656,6 @@ public:
         const CTransaction &tx,
         const mining::CJournalChangeSetPtr& changeSet,
         MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
-
-    void RemoveForReorg(
-            const Config &config,
-            const CoinsDB& coinsTip,
-            const mining::CJournalChangeSetPtr& changeSet,
-            const CBlockIndex& tip,
-            int flags);
 
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
@@ -996,6 +991,48 @@ public:
      */
     Snapshot GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const;
 
+    /**
+     * Make mempool consistent after a reorg, by re-adding
+     * disconnected block transactions from the mempool, and also removing any other
+     * transactions from the mempool that are no longer valid given the new
+     * tip/height, most notably coinbase transactions and their descendants.
+     *
+     * Note: we assume that disconnectpool only contains transactions that are NOT
+     * confirmed in the current chain nor already in the mempool (otherwise,
+     * in-mempool descendants of such transactions would be removed).
+     *
+     * Note: this function currently still runs under `cs_main` and does *not*
+     * lock mempool. It calls mempool-locking functions internally, and
+     * not their `NL` variants. Therefore it should *not* have the `NL` postfix.
+     */
+    void AddToMempoolForReorg(
+        const Config &config,
+        DisconnectedBlockTransactions &disconnectpool,
+        const mining::CJournalChangeSetPtr& changeSet);
+
+    /**
+     * Make mempool consistent after a reorg, by recursively erasing
+     * disconnected block transactions from the mempool
+     *
+     * Note: this function currently still runs under `cs_main` and does *not*
+     * lock mempool. It calls mempool-locking functions internally, and
+     * not their `NL` variants. Therefore it should *not* have the `NL` postfix.
+     */
+    void RemoveFromMempoolForReorg(
+        const Config &config,
+        DisconnectedBlockTransactions &disconnectpool,
+        const mining::CJournalChangeSetPtr& changeSet);
+
+    /**
+     * Add vtx to disconnectpool observing the limit. block transactions that do not make it
+     * into disconnectpool need to have their descendants removed from mempool, too
+     */
+    void AddToDisconnectPoolUpToLimit(
+        const mining::CJournalChangeSetPtr &changeSet,
+        DisconnectedBlockTransactions *disconnectpool,
+        uint64_t maxDisconnectedTxPoolSize,
+        const std::vector<CTransactionRef> &vtx);
+
 private:
 
     // A non-locking version of CheckMempool
@@ -1013,6 +1050,13 @@ private:
 
     // A non-locking version of IsSpent
     bool IsSpentNL(const COutPoint &outpoint) const;
+
+    void RemoveForReorg(
+        const Config &config,
+        const CoinsDB& coinsTip,
+        const mining::CJournalChangeSetPtr& changeSet,
+        const CBlockIndex& tip,
+        int flags);
 
     /**
      * updateForDescendantsNL is used by UpdateTransactionsFromBlock to update the
@@ -1264,9 +1308,12 @@ struct DisconnectedBlockTransactions {
     // reorg, besides draining this object).
     ~DisconnectedBlockTransactions() { assert(queuedTx.empty()); }
 
+private:
     indexed_disconnected_transactions queuedTx;
     uint64_t cachedInnerUsage = 0;
 
+    friend class CTxMemPool;
+public:
     // Estimate the overhead of queuedTx to be 6 pointers + an allocation, as
     // no exact formula for boost::multi_index_contained is implemented.
     size_t DynamicMemoryUsage() const {
