@@ -28,7 +28,6 @@
 using mining::BlockAssembler;
 using mining::CBlockTemplate;
 
-static const int MAX_COINBASE_SCRIPTSIG_SIZE = 100;
 
 //////////////////////////////////////////////////////////////////////////////
 //
