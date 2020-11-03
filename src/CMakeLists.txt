@@ -115,7 +115,6 @@ add_library(util
 	sync.cpp
 	threadinterrupt.cpp
 	threadpriority.cpp
-	uint256.cpp
 	util.cpp
 	utilmoneystr.cpp
 	utilstrencodings.cpp
@@ -212,7 +211,6 @@ add_library(bitcoinconsensus
 	script/script.cpp
 	script/script_num.cpp
 	script/script_error.cpp
-	uint256.cpp
 	utilstrencodings.cpp
 )
 
