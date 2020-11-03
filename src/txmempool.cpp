@@ -742,13 +742,13 @@ void CTxMemPool::removeUncheckedNL(
 // it are already in setDescendants as well, so that we can save time by not
 // iterating over those entries.
 void CTxMemPool::CalculateDescendants(txiter entryit,
-                                      setEntries &setDescendants) {
+                                      setEntries &setDescendants) const {
     std::shared_lock lock(smtx);
     CalculateDescendantsNL(entryit, setDescendants);
 }
 
 void CTxMemPool::CalculateDescendantsNL(txiter entryit,
-                                        setEntries &setDescendants) {
+                                        setEntries &setDescendants) const {
     setEntries stage;
     if (setDescendants.count(entryit) == 0) {
         stage.insert(entryit);
@@ -1309,6 +1309,30 @@ bool CTxMemPool::CompareDepthAndScore(const uint256 &hasha,
     return CompareDepthAndScoreNL(hasha, hashb);
 }
 
+namespace {
+class DepthAndScoreComparator {
+public:
+    template<typename MempoolEntryIterator>
+    bool operator()(const MempoolEntryIterator& a,
+                    const MempoolEntryIterator& b) const
+    {
+        return compare(*a, *b);
+    }
+
+private:
+    static bool compare(const CTxMemPoolEntry& a,
+                        const CTxMemPoolEntry& b)
+    {
+        const auto counta = a.GetCountWithAncestors();
+        const auto countb = b.GetCountWithAncestors();
+        if (counta == countb) {
+            return CompareTxMemPoolEntryByScore()(a, b);
+        }
+        return counta < countb;
+    }
+};
+} // namespace
+
 /**
 * Compare 2 transactions to determine their relative priority.
 * Does it wothout taking the mutex; it is up to the caller to
@@ -1317,37 +1341,16 @@ bool CTxMemPool::CompareDepthAndScore(const uint256 &hasha,
 bool CTxMemPool::CompareDepthAndScoreNL(const uint256 &hasha,
                                         const uint256 &hashb)
 {
-    indexed_transaction_set::const_iterator i = mapTx.find(hasha);
+    const auto i = mapTx.find(hasha);
     if (i == mapTx.end()) {
         return false;
     }
-    indexed_transaction_set::const_iterator j = mapTx.find(hashb);
+    const auto j = mapTx.find(hashb);
     if (j == mapTx.end()) {
         return true;
     }
-    uint64_t counta = i->GetCountWithAncestors();
-    uint64_t countb = j->GetCountWithAncestors();
-    if (counta == countb) {
-        return CompareTxMemPoolEntryByScore()(*i, *j);
-    }
-    return counta < countb;
+    return DepthAndScoreComparator()(i, j);
 }
-
-namespace {
-class DepthAndScoreComparator {
-public:
-    bool
-    operator()(const CTxMemPool::indexed_transaction_set::const_iterator &a,
-               const CTxMemPool::indexed_transaction_set::const_iterator &b) {
-        uint64_t counta = a->GetCountWithAncestors();
-        uint64_t countb = b->GetCountWithAncestors();
-        if (counta == countb) {
-            return CompareTxMemPoolEntryByScore()(*a, *b);
-        }
-        return counta < countb;
-    }
-};
-} // namespace
 
 std::vector<CTxMemPool::indexed_transaction_set::const_iterator>
 CTxMemPool::getSortedDepthAndScoreNL() const {
@@ -2204,3 +2207,137 @@ bool CTxMemPool::ExistsNL(const COutPoint &outpoint) const {
 SaltedTxidHasher::SaltedTxidHasher()
     : k0(GetRand(std::numeric_limits<uint64_t>::max())),
       k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
+
+
+CTxMemPool::Snapshot::Snapshot(Contents&& contents,
+                               CachedTxIdsRef&& relevantTxIds)
+    : mValid(true),
+      mContents(std::move(contents)),
+      mRelevantTxIds(std::move(relevantTxIds))
+{}
+
+CTxMemPool::Snapshot::const_iterator CTxMemPool::Snapshot::find(const uint256& hash) const
+{
+    if (mValid) {
+        CreateIndex();
+        const auto iter = mIndex.find(hash);
+        if (iter != mIndex.end()) {
+            return iter->second;
+        }
+    }
+    return cend();
+}
+
+bool CTxMemPool::Snapshot::TxIdExists(const uint256& hash) const
+{
+    if (mValid) {
+        CreateIndex();
+        return (1 == mIndex.count(hash));
+    }
+    return false;
+}
+
+void CTxMemPool::Snapshot::CreateIndex() const
+{
+    std::call_once(
+        mCreateIndexOnce,
+        [this]() {
+            assert(IsValid());
+            assert(mIndex.empty());
+
+            // Build the transaction index from the slice contents and
+            // additional relevant transaction IDs.
+            mIndex.reserve(mContents.size()
+                           + (mRelevantTxIds ? mRelevantTxIds->size() : 0));
+            for (auto it = cbegin(); it != cend(); ++it) {
+                mIndex.emplace(it->GetTx().GetId(), it);
+            }
+            if (mRelevantTxIds) {
+                for (const auto& txid : *mRelevantTxIds) {
+                    mIndex.emplace(txid, cend());
+                }
+            }
+        });
+}
+
+CTxMemPool::Snapshot CTxMemPool::GetSnapshot() const
+{
+    std::shared_lock lock(smtx);
+
+    Snapshot::Contents contents;
+    contents.reserve(mapTx.size());
+    for (const auto& entry : mapTx) {
+        contents.emplace_back(entry);
+    }
+    return Snapshot(std::move(contents), nullptr);
+}
+
+CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const
+{
+    std::shared_lock lock(smtx);
+
+    const auto baseTx = mapTx.find(hash);
+    if (baseTx == mapTx.end()) {
+        return Snapshot();
+    }
+
+    Snapshot::Contents contents;
+    auto relevantTxIds = std::make_unique<Snapshot::CachedTxIds>();
+    // This closure is essentially a local function that stores
+    // information about a single transaction and its inputs.
+    const auto recordTransaction =
+        [this, &contents, &relevantTxIds](const CTxMemPoolEntry& entry)
+        {
+            contents.emplace_back(entry);
+            for (const auto& input : entry.GetTx().vin) {
+                const auto& id = input.prevout.GetTxId();
+                if (ExistsNL(id)) {
+                    relevantTxIds->emplace_back(id);
+                }
+            }
+        };
+
+    if (kind == TxSnapshotKind::SINGLE)
+    {
+        // Store the single transaction of the snapshot.
+        recordTransaction(*baseTx);
+    }
+    else if (kind == TxSnapshotKind::TX_WITH_ANCESTORS
+             || kind == TxSnapshotKind::ONLY_ANCESTORS
+             || kind == TxSnapshotKind::TX_WITH_DESCENDANTS
+             || kind == TxSnapshotKind::ONLY_DESCENDANTS)
+    {
+        // Find other related transactions, depending on the invocation mode.
+        setEntries related;
+        if (kind == TxSnapshotKind::TX_WITH_DESCENDANTS
+            || kind == TxSnapshotKind::ONLY_DESCENDANTS) {
+            CalculateDescendantsNL(baseTx, related);
+        }
+        else {
+            static constexpr auto noLimit = std::numeric_limits<uint64_t>::max();
+            std::string dummyErrorString;
+            CalculateMemPoolAncestorsNL(*baseTx, related,
+                                        noLimit, noLimit, noLimit, noLimit,
+                                        dummyErrorString, false);
+        }
+        // Quirks mode: CalculateDescendants() and CalculateMemPoolAncestors()
+        // are not symmetric, the former includes the base transaction in the
+        // results, but the latter does not.
+        if (kind == TxSnapshotKind::TX_WITH_ANCESTORS) {
+            recordTransaction(*baseTx);
+        }
+        else if (kind == TxSnapshotKind::ONLY_DESCENDANTS) {
+            related.erase(baseTx);
+        }
+        for (const auto& iter : related) {
+            recordTransaction(*iter);
+        }
+    }
+    else
+    {
+        // Oops. Someone changed the enum without updating this function.
+        assert(!"CTxMemPool::GetTxSnapshot(): invalid 'kind'");
+    }
+
+    return Snapshot(std::move(contents), std::move(relevantTxIds));
+}

@@ -99,6 +99,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	locked_ref_tests.cpp
 	m_candidates_tests.cpp
 	main_tests.cpp
+	mempool_snapshot_tests.cpp
 	mempool_tests.cpp
 	merkle_tests.cpp
 	merkletreefile_readwrite_tests.cpp

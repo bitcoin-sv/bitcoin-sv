@@ -31,6 +31,7 @@
 #include <vector>
 #include <mutex>
 #include <shared_mutex>
+#include <unordered_map>
 
 class CAutoFile;
 class CBlockIndex;
@@ -803,12 +804,12 @@ public:
      * anything already in it.  */
     void CalculateDescendants(
             txiter it,
-            setEntries &setDescendants);
+            setEntries &setDescendants) const;
     // A non-locking version of CalculateDescendants
     // DEPRECATED - this will become private and ultimately changed or removed
     void CalculateDescendantsNL(
             txiter it,
-            setEntries &setDescendants);
+            setEntries &setDescendants) const;
 
     /**
      * The minimum fee to get into the mempool, which may itself not be enough
@@ -880,6 +881,120 @@ public:
 
     void ClearPrioritisation(const uint256 &hash);
     void ClearPrioritisation(const std::vector<TxId>& vTxIds);
+
+public:
+    /** \class CTxMemPool::Snapshot
+     *
+     * CTxMemPool::Snapshot contains a read-only snapshot-in-time of the (partial)
+     * contents of the mempool.
+     *
+     * The snapshot contains two things: a copy of a number of mempool entries,
+     * and a set of additional relevant transaction IDs. Which transaction IDs
+     * are relevant depends on how the snapshot was created (for example, see
+     * CTxMemPool::GetTxSnapshot()).
+     *
+     * @note This class is non-moveable and non-copyable.
+     */
+    class Snapshot final
+    {
+        // Only CTxMemPool is allowed to call the constructor.
+        friend class CTxMemPool;
+
+        using Contents = std::vector<CTxMemPoolEntry>;
+        using CachedTxIds = std::vector<TxId>;
+        using CachedTxIdsRef = std::unique_ptr<CachedTxIds>;
+
+        /**
+         * The default constructor returns an invalid snapshot:
+         * IsValid() will return @c false.
+         */
+        explicit Snapshot() = default;
+
+        /**
+         * Creates a copy of the mempool with the given @a contents and an
+         * optional set of transaction IDs that will be used for TxIdExists()
+         * checks.
+         */
+        explicit Snapshot(Contents&& contents,
+                          CachedTxIdsRef&& relevantTxIds);
+
+        Snapshot(Snapshot&&) = delete;
+        Snapshot(const Snapshot&) = delete;
+
+    public:
+        using size_type = Contents::size_type;
+        using value_type = Contents::value_type;
+        using const_iterator = Contents::const_iterator;
+
+        bool empty() const noexcept { return mContents.empty(); }
+        size_type size() const noexcept { return mContents.size(); }
+
+        const_iterator begin() const noexcept { return mContents.begin(); }
+        const_iterator cbegin() const noexcept { return begin(); }
+
+        const_iterator end() const noexcept { return mContents.end(); }
+        const_iterator cend() const noexcept { return end(); }
+
+        /// Returns an immutable iterator to a mempool entry in the snapshot
+        /// contents, or cend() if no such entry exists.
+        const_iterator find(const uint256& hash) const;
+
+        /// Checks if @a hash exists in the snapshot, even if the mempool entry
+        /// for that hash is not actually in the snapshot contents. May return
+        /// @c true when find() for the same hash returns cend().
+        bool TxIdExists(const uint256& hash) const;
+
+        /// Checks whether the contents are valid.
+        bool IsValid() const noexcept { return mValid; };
+        operator bool() const noexcept { return IsValid(); }
+
+    private:
+        const bool mValid {false};
+        const Contents mContents;
+        const CachedTxIdsRef mRelevantTxIds;
+
+        // The transaction lookup index.
+        using TxIdIndex = std::unordered_map<uint256, Snapshot::const_iterator>;
+        mutable TxIdIndex mIndex;
+        mutable std::once_flag mCreateIndexOnce;
+        void CreateIndex() const;
+    };
+
+    /**
+     * Returns a read-only snapshot of the mempool contents. This will copy all
+     * the mempool entries.
+     */
+    Snapshot GetSnapshot() const;
+    
+    /**
+     * Retreival modes for GetTxSnapshot().
+     */
+    enum class TxSnapshotKind
+    {
+        /// Retreive only one transaction.
+        SINGLE,
+        /// Retreive the transaction and all its ancestors.
+        TX_WITH_ANCESTORS,
+        /// Retreive only the transaction's ancestors.
+        ONLY_ANCESTORS,
+        /// Retreive the transaction and all its descendants.
+        TX_WITH_DESCENDANTS,
+        /// Retreive only the transaction's descendants.
+        ONLY_DESCENDANTS
+    };
+
+    /**
+     * Returns a read-only snapshot of the mempool for one entry, identified by
+     * @a hash, and/or optionally its ancestors or descendants, selected by
+     * @a kind. This will also fill the transaction ID cache with the inputs of
+     * the copied mempool entries (Snapshot#TxIdExists() will return @c true for
+     * the hashes of those input transactions even if the entries are not in the
+     * snapshot).
+     *
+     * If a transaction with the given @a hash does not exist, the returned
+     * snapshot will be invalid, that is: Snapshot#IsValid() will return @c false.
+     */
+    Snapshot GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const;
 
 private:
 
