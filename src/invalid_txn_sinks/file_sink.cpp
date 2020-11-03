@@ -186,11 +186,11 @@ void CInvalidTxnFileSink::Publish(const InvalidTxnInfo& invalidTxnInfo)
 int64_t CInvalidTxnFileSink::ClearStored()
 {
     std::lock_guard<std::mutex> lock(guard);
-    int64_t startingSize = cumulativeFilesSize;
     if(!isInitialized)
     {
         Initialize();
     }
+    int64_t startingSize = cumulativeFilesSize;
     ShrinkToSize(0);
-    return cumulativeFilesSize - startingSize;
+    return startingSize - cumulativeFilesSize;
 }

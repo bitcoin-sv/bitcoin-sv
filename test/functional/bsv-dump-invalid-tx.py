@@ -276,8 +276,11 @@ class InvalidTx(BitcoinTestFramework):
                                       rejectionFlags=["isInvalid", "isMempoolConflictDetected"], rejectionReason="txn-mempool-conflict",
                                       collidedTx=valid_tx_2, has_hex=True)
 
-            conn.rpc.clearinvalidtransactions()
+            freed_size = conn.rpc.clearinvalidtransactions()
+            assert freed_size > 0, "Freed size must be greater than zero"
             self.assert_number_of_files(0)
+            freed_size = conn.rpc.clearinvalidtransactions()
+            assert freed_size == 0, "Nothing to free."
 
 
 
@@ -296,7 +299,8 @@ class InvalidTx(BitcoinTestFramework):
                                              ],
                                             1) as (conn, ):
             self.zmqSubSocket.connect(self.ip_address)
-            conn.rpc.clearinvalidtransactions()
+            freed_size = conn.rpc.clearinvalidtransactions()
+            assert freed_size == 0, "Freed size must zero, dumped transactions are deleted in last test."
 
             invalid_tx1 = make_large_invalid_tx(invalid_coinbases[0], 0)
             conn.send_message(msg_tx(invalid_tx1))
@@ -336,7 +340,8 @@ class InvalidTx(BitcoinTestFramework):
                                              ],
                                             1) as (conn, ):
             self.zmqSubSocket.connect(self.ip_address)
-            conn.rpc.clearinvalidtransactions()
+            freed_size = conn.rpc.clearinvalidtransactions()
+            assert freed_size > 0, "Freed size must be larger than zero."
 
             invalid_tx1 = make_large_invalid_tx(invalid_coinbases[0], 0)
             conn.send_message(msg_tx(invalid_tx1))
