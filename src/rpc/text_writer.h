@@ -73,7 +73,7 @@ public:
 
     ~CHttpTextWriter() override
     {
-        Flush();
+        FlushNonVirtual();
     }
 
     void Write(char val) override
@@ -94,11 +94,7 @@ public:
 
     void Flush() override
     {
-        if (!strBuffer.empty())
-        {
-            _request.WriteReplyChunk(strBuffer);
-            strBuffer.clear();
-        }
+        FlushNonVirtual();
     }
 
     void ReserveAdditional(size_t size) override {}
@@ -112,7 +108,7 @@ private:
     {
         if (jsonText.size() > BUFFER_SIZE)
         {
-            Flush();
+            FlushNonVirtual();
             _request.WriteReplyChunk(jsonText);
             return;
         }
@@ -120,7 +116,7 @@ private:
         strBuffer.append(jsonText);
         if (strBuffer.size() > BUFFER_SIZE)
         {
-            Flush();
+            FlushNonVirtual();
         }
     }
 
@@ -129,10 +125,17 @@ private:
         strBuffer.push_back(jsonText);
         if (strBuffer.size() > BUFFER_SIZE)
         {
-            Flush();
+            FlushNonVirtual();
         }
     }
-
+    void FlushNonVirtual()
+    {
+        if (!strBuffer.empty())
+        {
+            _request.WriteReplyChunk(strBuffer);
+            strBuffer.clear();
+        }
+    }
 };
 
 class CFileTextWriter : public CTextWriter
@@ -142,6 +145,11 @@ public:
     {
         file.open(path, std::ios::out | std::ios::trunc);
         CheckForError();
+    }
+
+    ~CFileTextWriter () override
+    {
+        FlushNonVirtual();
     }
 
     void Write(char val) override
@@ -171,13 +179,10 @@ public:
         }
     }
 
+
     void Flush() override
     {
-        if (error.empty())
-        {
-            file.flush();
-            CheckForError();
-        }
+        FlushNonVirtual();
     }
 
     void ReserveAdditional(size_t size) override {}
@@ -194,6 +199,14 @@ private:
         if(file.fail())
         {
             error =  "Failed to write to file: " + std::generic_category().message(errno);
+        }
+    }
+    void FlushNonVirtual()
+    {
+        if (error.empty())
+        {
+            file.flush();
+            CheckForError();
         }
     }
 
