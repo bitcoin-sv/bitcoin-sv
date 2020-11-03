@@ -39,7 +39,7 @@ class StreamPolicy
                               const AssociationIDPtr& assocID) = 0;
 
     // Fetch the next message for processing
-    virtual bool GetNextMessage(StreamMap& streams, std::list<CNetMessage>& msg) = 0;
+    virtual std::pair<Stream::QueuedNetMessage, bool> GetNextMessage(StreamMap& streams) = 0;
 
     // Service the sockets of the streams
     virtual void ServiceSockets(StreamMap& streams, fd_set& setRecv, fd_set& setSend,
@@ -105,7 +105,7 @@ class DefaultStreamPolicy : public BasicStreamPolicy
     {}
 
     // Fetch the next message for processing
-    bool GetNextMessage(StreamMap& streams, std::list<CNetMessage>& msg) override;
+    std::pair<Stream::QueuedNetMessage, bool> GetNextMessage(StreamMap& streams) override;
 
     // Queue an outgoing message on the appropriate stream
     uint64_t PushMessage(StreamMap& streams, StreamType streamType,
@@ -147,7 +147,7 @@ class BlockPriorityStreamPolicy : public BasicStreamPolicy
                       const AssociationIDPtr& assocID) override;
 
     // Fetch the next message for processing
-    bool GetNextMessage(StreamMap& streams, std::list<CNetMessage>& msg) override;
+    std::pair<Stream::QueuedNetMessage, bool> GetNextMessage(StreamMap& streams) override;
 
     // Queue an outgoing message on the appropriate stream
     uint64_t PushMessage(StreamMap& streams, StreamType streamType,

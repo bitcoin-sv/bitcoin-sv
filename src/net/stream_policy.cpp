@@ -88,15 +88,15 @@ uint64_t BasicStreamPolicy::PushMessageCommon(StreamMap& streams, StreamType str
 /** The DefaultStreamPolicy **/
 /*****************************/
 
-bool DefaultStreamPolicy::GetNextMessage(StreamMap& streams, std::list<CNetMessage>& msg)
+std::pair<Stream::QueuedNetMessage, bool> DefaultStreamPolicy::GetNextMessage(StreamMap& streams)
 {
     // Check we have a stream available (if we do we will have the GENERAL stream)
     if(streams.size() > 0)
     {
-        return streams[StreamType::GENERAL]->GetNextMessage(msg);
+        return streams[StreamType::GENERAL]->GetNextMessage();
     }
 
-    return false;
+    return { nullptr, false };
 }
 
 uint64_t DefaultStreamPolicy::PushMessage(StreamMap& streams, StreamType streamType,
@@ -129,26 +129,26 @@ void BlockPriorityStreamPolicy::SetupStreams(CConnman& connman, const CAddress& 
     connman.QueueNewStream(peerAddr, StreamType::DATA1, assocID, GetPolicyName());
 }
 
-bool BlockPriorityStreamPolicy::GetNextMessage(StreamMap& streams, std::list<CNetMessage>& msg)
+std::pair<Stream::QueuedNetMessage, bool> BlockPriorityStreamPolicy::GetNextMessage(StreamMap& streams)
 {
     // Look for messages from streams in order of priority
     if(streams.count(StreamType::DATA1) == 1)
     {
         // Check highest priority DATA1 stream
-        bool moreMsgs { streams[StreamType::DATA1]->GetNextMessage(msg) };
-        if(msg.size() > 0)
+        auto msg { streams[StreamType::DATA1]->GetNextMessage() };
+        if(msg.first != nullptr)
         {
-            return moreMsgs;
+            return msg;
         }
     }
 
     if(streams.count(StreamType::GENERAL) == 1)
     {
         // Check lowest priority GENERAL stream
-        return streams[StreamType::GENERAL]->GetNextMessage(msg);
+        return streams[StreamType::GENERAL]->GetNextMessage();
     }
 
-    return false;
+    return { nullptr, false };
 }
 
 uint64_t BlockPriorityStreamPolicy::PushMessage(StreamMap& streams, StreamType streamType,

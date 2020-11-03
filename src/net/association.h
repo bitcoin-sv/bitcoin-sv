@@ -74,7 +74,7 @@ class Association
     bool SetSocketsForSelect(fd_set& setRecv, fd_set& setSend, fd_set& setError, SOCKET& socketMax) const;
 
     // Fetch the next message for processing
-    bool GetNextMessage(std::list<CNetMessage>& msg);
+    std::pair<Stream::QueuedNetMessage, bool> GetNextMessage();
 
     // Service all sockets that are ready
     void ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, CConnman& connman,
