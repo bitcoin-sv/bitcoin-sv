@@ -45,7 +45,7 @@ CZMQNotificationInterface *CZMQNotificationInterface::Create() {
         CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
     factories["pubinvalidtx"] =
         CZMQAbstractNotifier::Create<CZMQPublishTextNotifier>;
-    factories["pubremovedfrommempool"] =
+    factories["pubdiscardedfrommempool"] =
         CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolNotifier>;
     factories["pubremovedfrommempoolblock"] =
         CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolBlockNotifier>;

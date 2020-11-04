@@ -16,7 +16,7 @@ reasons when transactions gets removed from mempool.
 Some reasons we can get from -zmqpubremovedfrommempoolblock notifier are:
  - included-in-block (when tx gets included in block)
  - reorg (when reorg is happening and tx tries to spend immature coin)
-Some reason we can get from -zmqpubremovedfrommempool notifier is:
+Some reason we can get from -zmqpubdiscardedfrommempool notifier is:
  - collision-in-block-tx (when we have two tx1, tx2 using same input on two different nodes,
                          and then tx2 gets mined in block, when the block is propagated
                          the other tx1 will be removed from mempool.)
@@ -67,11 +67,11 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
         self.zmqSubSocket.set(zmq.RCVTIMEO, 60000)
-        self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"removedfrommempool")
+        self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"discardedfrommempool")
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"removedfrommempoolblock")
         ip_address = "tcp://127.0.0.1:28332"
         self.zmqSubSocket.connect(ip_address)
-        self.extra_args = [["-zmqpubremovedfrommempool=%s" % ip_address,
+        self.extra_args = [["-zmqpubdiscardedfrommempool=%s" % ip_address,
                             "-zmqpubremovedfrommempoolblock=%s" % ip_address], []]
         self.add_nodes(self.num_nodes, self.extra_args)
         self.start_nodes()
@@ -182,7 +182,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         sync_blocks(self.nodes)
 
         msg = self.zmqSubSocket.recv_multipart()
-        assert_equal(msg[0], b"removedfrommempool")
+        assert_equal(msg[0], b"discardedfrommempool")
         body = json.loads(msg[1])
         assert_equal(body["reason"], "collision-in-block-tx")
         assert_equal(body["txid"], tx1.hash)
@@ -223,7 +223,7 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         tx2 = FromHex(CTransaction(), tx_hex)
         tx2.rehash()
         self.nodes[1].sendrawtransaction(tx_hex, True)
-        self.nodes[1].generate(1)
+        blockhash_tx2 = self.nodes[1].generate(1)[0]
 
         tx1 = CTransaction()
         tx_outs = [CTxOut(4300000000, CScript([OP_TRUE]))]
@@ -246,12 +246,13 @@ class ZMQRemovedFromMempool(BitcoinTestFramework):
         sync_blocks(self.nodes)
 
         msg = self.zmqSubSocket.recv_multipart()
-        assert_equal(msg[0], b"removedfrommempool")
+        assert_equal(msg[0], b"discardedfrommempool")
         body = json.loads(msg[1])
         assert_equal(body["reason"], "collision-in-block-tx")
         assert_equal(body["txid"], tx1.hash)
         assert_equal(body["collidedWith"]["txid"], tx2.hash)
         assert_equal(body["collidedWith"]["size"], tx2_size)
+        assert_equal(body["blockhash"], blockhash_tx2)
 
 
 if __name__ == '__main__':
