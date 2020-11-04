@@ -292,7 +292,11 @@ uint64_t GlobalConfig::GetMinConsolidationFactor() const
 
 bool GlobalConfig::SetMaxConsolidationInputScriptSize(uint64_t maxConsolidationInputScriptSizeIn, std::string* err)
 {
-    if (maxConsolidationInputScriptSizeIn == 0) {
+    if (LessThanZero(maxConsolidationInputScriptSizeIn, err, "Maximum length for a scriptSig input in a consolidation txn must not be less than zero."))
+    {
+        return false;
+    }
+    else if (maxConsolidationInputScriptSizeIn == 0) {
         maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     } else {
         maxConsolidationInputScriptSize = maxConsolidationInputScriptSizeIn;
