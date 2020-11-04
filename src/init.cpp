@@ -983,9 +983,14 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                      DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE));
 
     strUsage +=
-            HelpMessageOpt("-minconsolidationinputmaturity=<n>",
+            HelpMessageOpt("-minconfconsolidationinput=<n>",
                            strprintf(_("Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
-                                     DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY));
+                                     DEFAULT_MIN_CONF_CONSOLIDATION_INPUT));
+
+    strUsage +=
+            HelpMessageOpt("-minconsolidationinputmaturity=<n>",
+                           strprintf(_("(DEPRECATED: This option will be removed, use -minconfconsolidationinput instead) Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
+                                     DEFAULT_MIN_CONF_CONSOLIDATION_INPUT));
 
     strUsage +=
             HelpMessageOpt("-acceptnonstdconsolidationinput=<n>",
@@ -1959,12 +1964,22 @@ bool AppInitParameterInteraction(Config &config) {
     }
 
     // configure minimum number of confirmations needed by transactions spent in a consolidatin transaction
-    if (gArgs.IsArgSet("-minconsolidationinputmaturity"))
-    {
-        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY);
-        if (std::string err; !config.SetMinConsolidationInputMaturity(param, &err)) {
+    if (gArgs.IsArgSet("-minconfconsolidationinput") && gArgs.IsArgSet("-minconsolidationinputmaturity")) {
+        return InitError(
+            _("Cannot use both -minconfconsolidationinput and -minconsolidationinputmaturity (deprecated) at the same time"));
+    }
+    if (gArgs.IsArgSet("-minconfconsolidationinput")) {
+        uint64_t param = gArgs.GetArg("-minconfconsolidationinput", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
             return InitError(err);
         }
+    }
+    if (gArgs.IsArgSet("-minconsolidationinputmaturity")) {
+        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
+            return InitError(err);
+        }
+        LogPrintf("Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead.\n");
     }
 
     // configure if non standard inputs for consolidation transactions are allowed

@@ -1302,7 +1302,7 @@ CTxnValResult TxnValidation(
     // Note that consolidation transactions paying a voluntary fee will
     // be treated with higher priority. The higher the fee the higher
     // the priority
-    bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height() + 1);
+    bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height());
     if (skipFeeTest) {
         double priority = 0;
         const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
