@@ -88,12 +88,7 @@ static bool vfLimited[NET_MAX] = {};
 std::atomic_size_t CSendQueueBytes::nTotalSendQueuesBytes = 0;
 
 CCriticalSection cs_invQueries;
-limitedmap<uint256, int64_t> mapAlreadyAskedFor(CInv::estimateMaxInvElements(MAX_PROTOCOL_SEND_PAYLOAD_LENGTH));
-
-/** The maximum number of entries in mapAskFor */
-static const size_t MAPASKFOR_MAX_SIZE = CInv::estimateMaxInvElements(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
-/** The maximum number of entries in indexAskFor (larger due to getdata latency)*/
-static const size_t INDEXASKFOR_MAX_SIZE = MAPASKFOR_MAX_SIZE * 4;
+std::unique_ptr<limitedmap<uint256, int64_t>> mapAlreadyAskedFor;
 
 // Signals for message handling
 static CNodeSignals g_signals;
@@ -2960,11 +2955,14 @@ CNode::~CNode()
     LogPrint(BCLog::NET, "Removing peer=%d\n", id);
 }
 
-void CNode::AskFor(const CInv &inv) {
+void CNode::AskFor(const CInv &inv, const Config &config) {
     LOCK(cs_invQueries);
     // if mapAskFor is too large, we will never ask for it (it becomes lost)
+    constexpr unsigned IDINDEXSIZE_FACTOR {4};
+    const size_t mapAskForMaxSize { CInv::estimateMaxInvElements(config.GetMaxProtocolRecvPayloadLength() * config.GetRecvInvQueueFactor()) };
+    const size_t idIndexMaxSize { mapAskForMaxSize * IDINDEXSIZE_FACTOR };
     auto& idIndex { indexAskFor.get<TagTxnID>() };
-    if (mapAskFor.size() > MAPASKFOR_MAX_SIZE || idIndex.size() > INDEXASKFOR_MAX_SIZE) {
+    if(mapAskFor.size() > mapAskForMaxSize || idIndex.size() > idIndexMaxSize) {
         return;
     }
 
@@ -2978,8 +2976,8 @@ void CNode::AskFor(const CInv &inv) {
     // the request can be sent.
     int64_t nRequestTime;
     limitedmap<uint256, int64_t>::const_iterator it =
-        mapAlreadyAskedFor.find(inv.hash);
-    if (it != mapAlreadyAskedFor.end()) {
+        mapAlreadyAskedFor->find(inv.hash);
+    if (it != mapAlreadyAskedFor->end()) {
         nRequestTime = it->second;
     } else {
         nRequestTime = 0;
@@ -2997,10 +2995,10 @@ void CNode::AskFor(const CInv &inv) {
 
     // Each retry is 1 minute after the last
     nRequestTime = std::max(nRequestTime + TXN_REREQUEST_INTERVAL, nNow);
-    if (it != mapAlreadyAskedFor.end()) {
-        mapAlreadyAskedFor.update(it, nRequestTime);
+    if (it != mapAlreadyAskedFor->end()) {
+        mapAlreadyAskedFor->update(it, nRequestTime);
     } else {
-        mapAlreadyAskedFor.insert(std::make_pair(inv.hash, nRequestTime));
+        mapAlreadyAskedFor->insert(std::make_pair(inv.hash, nRequestTime));
     }
     mapAskFor.insert(std::make_pair(nRequestTime, inv));
 

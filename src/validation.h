@@ -768,7 +768,8 @@ void ProcessValidatedTxn(
     CTxMemPool& pool,
     CTxnValResult& txStatus,
     CTxnHandlers& handlers,
-    bool fLimitMempoolSize);
+    bool fLimitMempoolSize,
+    const Config &config);
 
 /**
  * Create a tx reject message.

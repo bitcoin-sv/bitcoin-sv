@@ -1250,7 +1250,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE / ONE_MEGABYTE));
 #endif
 
+      strUsage += HelpMessageOpt(
+        "-maxprotocolrecvpayloadlength=<n>",
+        strprintf("Set maximum protocol recv payload length you are willing to accept in bytes (default %d). Value should be bigger than legacy protocol payload length: %d B "
+                  "and smaller than: %d B.", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, ONE_GIGABYTE));
 
+      strUsage += HelpMessageOpt(
+        "-recvinvqueuefactor=<n>",
+        strprintf("Set maximum number of full size inventory messages that we can store for each peer. Inventory message size can be set with -maxprotocolrecvpayloadlength (default %d)."
+          "Value should be an integer between %d and %d )", DEFAULT_RECV_INV_QUEUE_FACTOR, MIN_RECV_INV_QUEUE_FACTOR, MAX_RECV_INV_QUEUE_FACTOR)); 
     return strUsage;
 }
 
@@ -2336,6 +2344,20 @@ bool AppInitParameterInteraction(Config &config) {
         {
             return InitError(err);
         }
+    }
+
+    const uint64_t value = gArgs.GetArg("-maxprotocolrecvpayloadlength", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
+    if (std::string err; !config.SetMaxProtocolRecvPayloadLength(value, &err))
+    {
+        return InitError(err);
+    }
+    mapAlreadyAskedFor = std::make_unique<limitedmap<uint256, int64_t>>(CInv::estimateMaxInvElements(config.GetMaxProtocolSendPayloadLength()));
+
+
+    const uint64_t recvInvQueueFactorArg = gArgs.GetArg("-recvinvqueuefactor", DEFAULT_RECV_INV_QUEUE_FACTOR);
+    if (std::string err; !config.SetRecvInvQueueFactor(recvInvQueueFactorArg, &err))
+    {
+        return InitError(err);
     }
 
     return true;

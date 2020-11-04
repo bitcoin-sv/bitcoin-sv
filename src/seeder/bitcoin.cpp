@@ -204,11 +204,6 @@ class CSeederNode {
                                           vRecv.begin() + nHeaderSize);
             CMessageHeader hdr(netMagic);
             vRecv >> hdr;
-            if (!hdr.IsValidWithoutConfig(netMagic)) {
-                // printf("%s: BAD (invalid header)\n", ToString(you).c_str());
-                ban = 100000;
-                return true;
-            }
             std::string strCommand = hdr.GetCommand();
             unsigned int nPayloadLength = hdr.nPayloadLength;
             if (nPayloadLength > MAX_SIZE) {

@@ -836,7 +836,7 @@ extern bool fListen;
 extern bool fRelayTxes;
 
 extern CCriticalSection cs_invQueries;
-extern limitedmap<uint256, int64_t> mapAlreadyAskedFor;
+extern std::unique_ptr<limitedmap<uint256, int64_t>> mapAlreadyAskedFor;
 
 struct LocalServiceInfo {
     int nScore;
@@ -1119,7 +1119,7 @@ public:
         vBlockHashesToAnnounce.push_back(hash);
     }
 
-    void AskFor(const CInv &inv);
+    void AskFor(const CInv &inv, const Config &config);
 
     void CloseSocketDisconnect();
 

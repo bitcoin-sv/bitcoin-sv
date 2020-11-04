@@ -201,6 +201,12 @@ public:
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
 #endif
 
+    virtual bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) = 0;
+    virtual bool SetRecvInvQueueFactor(uint64_t value, std::string* err) = 0;
+    virtual unsigned int GetMaxProtocolRecvPayloadLength() const = 0;
+    virtual unsigned int GetMaxProtocolSendPayloadLength() const = 0;
+    virtual unsigned int GetRecvInvQueueFactor() const = 0;
+
 protected:
     ~Config() = default;
 };
@@ -384,6 +390,12 @@ public:
     int64_t GetInvalidTxZMQMaxMessageSize() const override;
 #endif
 
+    bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) override;
+    bool SetRecvInvQueueFactor(uint64_t value, std::string* err) override;
+    unsigned int GetMaxProtocolRecvPayloadLength() const override;
+    unsigned int GetMaxProtocolSendPayloadLength() const override;
+    unsigned int GetRecvInvQueueFactor() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -463,6 +475,7 @@ private:
     bool mIsSetPromiscuousMempoolFlags;
 
     std::set<uint256> mInvalidBlocks;
+
     std::set<std::string> mBannedUAClients;
     uint64_t maxMerkleTreeDiskSpace;
     uint64_t preferredMerkleTreeFileSize;
@@ -476,10 +489,13 @@ private:
 
     // P2P parameters
     int64_t p2pHandshakeTimeout;
-
+    unsigned int maxProtocolRecvPayloadLength;
+    unsigned int maxProtocolSendPayloadLength;
+    unsigned int recvInvQueueFactor;
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
 #endif
+
 };
 
 // Dummy for subclassing in unittests
@@ -796,6 +812,12 @@ public:
     {
         return mBannedUAClients.find(uaClient) != mBannedUAClients.end();
     }
+
+    bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) override { return true; }
+    bool SetRecvInvQueueFactor(uint64_t value, std::string* err) override { return true; }
+    unsigned int GetMaxProtocolRecvPayloadLength() const override { return DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH; }
+    unsigned int GetMaxProtocolSendPayloadLength() const override { return DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH*MAX_PROTOCOL_SEND_PAYLOAD_FACTOR; }
+    unsigned int GetRecvInvQueueFactor() const override { return DEFAULT_RECV_INV_QUEUE_FACTOR; }
 
     bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) override { return true; };
     std::set<std::string> GetInvalidTxSinks() const override { return {"NONE"}; };

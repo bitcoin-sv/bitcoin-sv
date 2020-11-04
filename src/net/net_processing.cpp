@@ -280,16 +280,16 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
     }
 }
 
-void PushProtoconf(const CNodePtr& pnode, CConnman& connman)
+void PushProtoconf(const CNodePtr& pnode, CConnman& connman, const Config &config)
 {
     std::string streamPolicies { connman.GetStreamPolicyFactory().GetSupportedPolicyNamesStr() };
     connman.PushMessage(
         pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::PROTOCONF,
-            CProtoconf(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, streamPolicies)
+            CProtoconf(config.GetMaxProtocolRecvPayloadLength(), streamPolicies)
     ));
 
     LogPrint(BCLog::NET, "send protoconf message: max size %d, stream policies %s, number of fields %d\n",
-        MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, streamPolicies, 2);
+        config.GetMaxProtocolRecvPayloadLength(), streamPolicies, 2);
 }
 
 static void PushCreateStream(const CNodePtr& pnode, CConnman& connman, StreamType streamType,
@@ -1970,7 +1970,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::VERACK));
 
     // Announce our protocol configuration immediately after we send VERACK.
-    PushProtoconf(pfrom, connman);
+    PushProtoconf(pfrom, connman, config);
 
     pfrom->nServices = nServices;
     pfrom->GetAssociation().SetPeerAddrLocal(addrMe);
@@ -2276,7 +2276,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                               const CNetMsgMaker& msgMaker,
                               const std::atomic<bool>& interruptMsgProc,
                               CDataStream& vRecv,
-                              CConnman& connman)
+                              CConnman& connman,
+                              const Config &config)
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
@@ -2329,7 +2330,7 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                          inv.hash.ToString(), pfrom->id);
             }
             else if(!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload()) {
-                pfrom->AskFor(inv);
+                pfrom->AskFor(inv, config);
             }
         }
 
@@ -2608,7 +2609,7 @@ static void ProcessTxMessage(const Config& config,
     {
         LOCK(cs_invQueries);
         pfrom->indexAskFor.get<CNode::TagTxnID>().erase(inv.hash);
-        mapAlreadyAskedFor.erase(inv.hash);
+        mapAlreadyAskedFor->erase(inv.hash);
     }
     // Enqueue txn for validation if it is not known
     if (!IsTxnKnown(inv)) {
@@ -3563,7 +3564,7 @@ static void ProcessFeeFilterMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 * Process protoconf message.
 */
 static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, CConnman& connman,
-    const std::string& strCommand)
+                                    const std::string& strCommand, const Config &config)
 {
     if (pfrom->protoconfReceived) {
         pfrom->fDisconnect = true;
@@ -3593,9 +3594,9 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
             return false;
         }
 
-        // Limit the amount of data we are willing to send to MAX_PROTOCOL_SEND_PAYLOAD_LENGTH if a peer (or an attacker)
+        // Limit the amount of data we are willing to send if a peer (or an attacker)
         // that is running a newer version sends us large size, that we are not prepared to handle. 
-        pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, protoconf.maxRecvPayloadLength));
+        pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(config.GetMaxProtocolSendPayloadLength(), protoconf.maxRecvPayloadLength));
 
         // Parse supported stream policies if we have them
         if(protoconf.numberOfFields >= 2) {
@@ -3605,7 +3606,7 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
         LogPrint(BCLog::NET, "Protoconf received \"%s\" from peer=%d; peer's proposed max message size: %d," 
             "absolute maximal allowed message size: %d, calculated maximal number of Inv elements in a message = %d, "
             "their stream policies: %s, common stream policies: %s\n",
-            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, pfrom->maxInvElements,
+            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, config.GetMaxProtocolSendPayloadLength(), pfrom->maxInvElements,
             protoconf.streamPolicies, pfrom->GetCommonStreamPoliciesStr());
     }
 
@@ -3698,7 +3699,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::INV) {
-        ProcessInvMessage(pfrom, msgMaker, interruptMsgProc, vRecv, connman);
+        ProcessInvMessage(pfrom, msgMaker, interruptMsgProc, vRecv, connman, config);
     }
 
     else if (strCommand == NetMsgType::GETDATA) {
@@ -3777,7 +3778,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::PROTOCONF) {
-        return ProcessProtoconfMessage(pfrom, vRecv, connman, strCommand);
+        return ProcessProtoconfMessage(pfrom, vRecv, connman, strCommand, config);
     }
 
     else if (strCommand == NetMsgType::NOTFOUND) {

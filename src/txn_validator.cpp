@@ -534,7 +534,7 @@ CTxnValResult CTxnValidator::executeTxnValidationNL(
             mpTxnDoubleSpendDetector,
             fUseLimits);
     // Process validated results for the given txn
-    ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize);
+    ProcessValidatedTxn(mMempool, result, handlers, fLimitMempoolSize, mConfig);
     return result;
 }
 

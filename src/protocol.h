@@ -10,6 +10,7 @@
 #ifndef BITCOIN_PROTOCOL_H
 #define BITCOIN_PROTOCOL_H
 
+#include "consensus/consensus.h"
 #include "net/netaddress.h"
 #include "net/net_types.h"
 #include "serialize.h"
@@ -23,10 +24,11 @@
 class Config;
 
 /**
- * Maximum length of incoming protocol messages (Currently 2MiB).
+ * Default maximum length of incoming protocol messages set to 2MiB.
+ * It is used if 'maxprotocolrecvpayloadlength' parameter is not provided.
  * NB: Messages propagating block content are not subject to this limit.
  */
-static const unsigned int MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
+static const unsigned int DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
 
 /**
  * By default, size of messages to other peers are limited by this default value.
@@ -36,11 +38,27 @@ static const unsigned int MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
 static const unsigned int LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH = 1 * 1024 * 1024;
 
 /**
- * Maximum size of message that can be send to peer.
- * If a peer sends Protoconf message with maxRecvPayloadLength larger than MAX_PROTOCOL_SEND_PAYLOAD_LENGTH,
- * this peer's maxRecvPayloadLength is set to this value.
+ * Maximal protocol recv payload length allowed to set by 'maxprotocolrecvpayloadlength' parameter
+ */
+static const uint64_t MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = ONE_GIGABYTE;
+
+/**
+ * We limit maximum size of message that can be send to peer to be MAX_PROTOCOL_SEND_PAYLOAD_FACTOR times
+ * the size of the maximum size of message that we can recieve (DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH or set by maxprotocolrecvpayloadlength parameter).
 **/
-static const unsigned int MAX_PROTOCOL_SEND_PAYLOAD_LENGTH = 2 * MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+static const unsigned int MAX_PROTOCOL_SEND_PAYLOAD_FACTOR = 4;
+
+/**
+ * Maximum number of received full size inventory messages to be queued at once.
+ * Maximum size of received inventory messages is set by 'maxprotocolrecvpayloadlength' parameter
+ */
+static const unsigned int DEFAULT_RECV_INV_QUEUE_FACTOR = 3;
+
+/**
+ * Maximal and minimal factors of full size inventory messages allowed to be stored.
+ */
+static const unsigned int MAX_RECV_INV_QUEUE_FACTOR = 10;
+static const unsigned int MIN_RECV_INV_QUEUE_FACTOR = 1;
 
 /**
  * Message header.
@@ -70,7 +88,6 @@ public:
 
     std::string GetCommand() const;
     bool IsValid(const Config &config) const;
-    bool IsValidWithoutConfig(const MessageMagic &magic) const;
     bool IsOversized(const Config &config) const;
 
     ADD_SERIALIZE_METHODS;
