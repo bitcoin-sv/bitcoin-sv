@@ -499,8 +499,8 @@ public:
              int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
     // Needed for unit testing.
     void ClearBanned();
-    bool IsBanned(CNetAddr ip);
-    bool IsBanned(CSubNet subnet);
+    bool IsBanned(const CNetAddr &ip);
+    bool IsBanned(const CSubNet &subnet);
     bool Unban(const CNetAddr &ip);
     bool Unban(const CSubNet &ip);
     void GetBanned(banmap_t &banmap);
