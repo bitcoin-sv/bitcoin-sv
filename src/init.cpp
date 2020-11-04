@@ -158,7 +158,7 @@ void Shutdown() {
     /// locked. Be sure that anything that writes files or flushes caches only
     /// does this if the respective module was initialized.
 
-    RenameThread("bitcoin-shutoff");
+    RenameThread("shutoff");
     mempool.AddTransactionsUpdated(1);
 
     StopHTTPRPC();
@@ -1368,7 +1368,7 @@ void CleanupBlockRevFiles() {
  * "import_files" thread can have longer life span than shutdownToken presented with a reference.
  */
 void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, const task::CCancellationToken shutdownToken) {
-    RenameThread("bitcoin-loadblk");
+    RenameThread("loadblk");
 
     {
         CImportingNow imp;

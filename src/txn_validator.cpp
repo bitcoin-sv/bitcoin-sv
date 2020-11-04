@@ -318,7 +318,7 @@ CTxnValidator::RejectedTxns CTxnValidator::processValidation(
 /** Thread entry point for new transaction queue handling */
 void CTxnValidator::threadNewTxnHandler() noexcept {
     try {
-        RenameThread("bitcoin-txnvalidator");
+        RenameThread("txnvalidator");
         LogPrint(BCLog::TXNVAL, "New transaction handling thread. Starting validator.\n");
         // Get a number of High and Low priority threads.
         size_t nNumStdTxValidationThreads {
