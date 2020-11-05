@@ -101,6 +101,26 @@ public:
 };
 
 /**
+ * Hasher objects for std::unordered_set and similar hash-based containers.
+ */
+
+class SaltedOutpointHasher
+{
+  private:
+    // The salt does not change during the lifetime of the hasher object, but
+    // it's not const so that container copy construction and assignment work.
+    uint64_t k0, k1;
+
+  public:
+    SaltedOutpointHasher();
+
+    size_t operator()(const COutPoint& outpoint) const
+    {
+        return SipHashUint256Extra(k0, k1, outpoint.GetTxId(), outpoint.GetN());
+    }
+};
+
+/**
  * An input of a transaction. It contains the location of the previous
  * transaction's output that it claims and a signature that matches the output's
  * public key.
