@@ -52,17 +52,15 @@ CJournalChangeSet::~CJournalChangeSet()
 void CJournalChangeSet::addOperation(Operation op, CJournalEntry&& txn)
 {
     std::unique_lock<std::mutex> lock { mMtx };
-    TxId txid = txn.GetTxId();
     mChangeSet.emplace_back(op, std::move(txn));
-    addOperationCommonNL(op, txid);
-   
+    addOperationCommon(op);
 }
 
 void CJournalChangeSet::addOperation(Operation op, const CJournalEntry& txn)
 {
     std::unique_lock<std::mutex> lock { mMtx };
     mChangeSet.emplace_back(op, txn);
-    addOperationCommonNL(op, txn.GetTxId());
+    addOperationCommon(op);
 }
 
 // Is our reason for the update a basic one? By "basic", we mean a change that
@@ -93,7 +91,7 @@ void CJournalChangeSet::apply()
 void CJournalChangeSet::clear()
 {
     std::unique_lock<std::mutex> lock { mMtx };
-    clearNL();
+    mChangeSet.clear();
 }
 
 
@@ -181,50 +179,18 @@ void CJournalChangeSet::applyNL()
         mBuilder.applyChangeSet(*this);
 
         // Make sure we don't get applied again if we are later called by the destructor
-        clearNL();
+        mChangeSet.clear();
     }
 }
 
-void mining::CJournalChangeSet::clearNL()
-{
-    mChangeSet.clear();
-    mAddedTransactions.clear();
-    mRemovedTransactions.clear();
-}
-
-bool CJournalChangeSet::checkTxnAdded(const TxId& txid) const
-{
-    std::unique_lock<std::mutex> lock { mMtx };
-    return mAddedTransactions.find(txid) != mAddedTransactions.end();
-}
-
-bool CJournalChangeSet::checkTxnRemoved(const TxId& txid) const
-{
-    std::unique_lock<std::mutex> lock { mMtx };
-    return mRemovedTransactions.find(txid) != mRemovedTransactions.end();
-}
-
-
 
 // Common post operation addition steps - caller holds mutex
-void CJournalChangeSet::addOperationCommonNL(Operation op, const TxId& txid)
+void CJournalChangeSet::addOperationCommon(Operation op)
 {
     // If this was a remove operation then we're no longer a simply appending
     if(op != Operation::ADD)
     {
         mTailAppendOnly = false;
-    }
-
-    // update sets of the added or removed transactions
-    if (op == Operation::ADD)
-    {
-        mAddedTransactions.insert(txid);
-        mRemovedTransactions.erase(txid);
-    }
-    else
-    {
-        mAddedTransactions.erase(txid);
-        mRemovedTransactions.insert(txid);
     }
 
     // If it's safe to do so, immediately apply this change to the journal

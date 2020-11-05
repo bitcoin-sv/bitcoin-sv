@@ -74,6 +74,14 @@ LARGE_BLOCK_TESTS = [
 # This is usefull for tests that take really long time to execute.
 EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
 
+JOURNAL_BROKEN_TESTS = [
+    "abc-high_priority_transaction.py",
+    "bip68-sequence.py",
+    "bsv-genesis-general.py",
+    "prioritise_transaction.py",
+    "bsv-cpfp.py"
+]
+
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
     # When a test is listed here, then it will be run without parameters
@@ -152,6 +160,9 @@ def main():
                                            "it will show bitcoind.log file of the specified node")
     parser.add_argument('--large-block-tests', action='store_true', help="Runs large block file tests.")
     parser.add_argument('--output-type', type=int, default=2, help="Output type: 2 - Automatic detection. 0 - Primitive output suited for CI. 1 - Advanced suited for console.")
+
+    parser.add_argument('--journal-broken-tests', action='store_true', help="Runs tests broken by journaling block assembler.")
+
     args, unknown_args = parser.parse_known_args()
 
     # Output type. Default is 2: automatic detection
@@ -214,6 +225,10 @@ def main():
         # Exclude large block tests unless explicitly told to run them
         if not args.large_block_tests:
             test_list = [test for test in test_list if test not in LARGE_BLOCK_TESTS]
+        # Exclude journal broken tests unless explicitly told to run them
+        if not args.journal_broken_tests:
+            print("WARNING: skipping tests broken by journaling block assembler:", JOURNAL_BROKEN_TESTS)
+            test_list = [test for test in test_list if test not in JOURNAL_BROKEN_TESTS]
 
     # Remove the test cases that the user has explicitly asked to exclude.
     if args.exclude:

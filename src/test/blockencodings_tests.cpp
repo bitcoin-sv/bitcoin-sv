@@ -67,7 +67,6 @@ static CBlock BuildBlockTestCase() {
 
 BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
     CTxMemPool pool;
-    pool.SetBlockMinTxFee(CFeeRate());
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
@@ -187,7 +186,6 @@ public:
 
 BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
     CTxMemPool pool;
-    pool.SetBlockMinTxFee(CFeeRate());
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
@@ -279,7 +277,6 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
 
 BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
     CTxMemPool pool;
-    pool.SetBlockMinTxFee(CFeeRate());
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 

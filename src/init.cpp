@@ -1023,8 +1023,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-blockprioritypercentage=<n>",
         strprintf(_("Set maximum percentage of a block reserved to "
-                    "high-priority/low-fee transactions (default: %d). NOTE: This is supported only by the legacy block assembler which"
-                    " is not default block assembler any more and will be removed in the upcoming release."),
+                    "high-priority/low-fee transactions (default: %d)"),
                   DEFAULT_BLOCK_PRIORITY_PERCENTAGE));
     strUsage += HelpMessageOpt(
         "-blockmintxfee=<amt>",
