@@ -703,38 +703,38 @@ void CTxMemPool::AddUncheckedNL(
     // a valid mempoolTxDB for the following checks.
     OpenMempoolTxDB();
 
-    auto newit = mapTx.insert(originalEntry).first;
+    // Copy the entry because we'll modify it before insertion.
+    auto entry {originalEntry};
 
     // During reorg, we could be re-adding an entry whose transaction was
     // previously moved to disk, in which case we must make sure that the entry
     // belongs to the same mempool.
     const auto thisTxDB = mempoolTxDB->GetDatabase();
-    assert(newit->tx->HasDatabase(nullTxDB) || newit->tx->HasDatabase(thisTxDB));
+    assert(entry.tx->HasDatabase(nullTxDB) || entry.tx->HasDatabase(thisTxDB));
 
-    mapLinks.insert(make_pair(newit, TxLinks()));
-    mapTx.modify(newit, [this, &txStorage, &thisTxDB](CTxMemPoolEntry& entry) {
-        // Update insertion order indes for this entry.
-        entry.SetInsertionIndex(insertionIndex.GetNext());
+    // Update the insertion order index for this entry.
+    entry.SetInsertionIndex(insertionIndex.GetNext());
 
-        // Update the wrapper. This should not affect the mapTx index.
-        if (txStorage == TxStorage::memory) {
-            entry.tx = std::make_shared<CTransactionWrapper>(entry.GetSharedTx(), thisTxDB);
-        }
-        else {
-            entry.tx = std::make_shared<CTransactionWrapper>(entry.GetTxId(), thisTxDB);
-        }
-    });
+    // Update the transaction wrapper.
+    if (txStorage == TxStorage::memory) {
+        entry.tx = std::make_shared<CTransactionWrapper>(entry.GetSharedTx(), thisTxDB);
+    }
+    else {
+        entry.tx = std::make_shared<CTransactionWrapper>(entry.GetTxId(), thisTxDB);
+    }
 
-    // Update transaction for any feeDelta created by PrioritiseTransaction
-    // TODO: refactor so that the fee delta is calculated before inserting into
-    // mapTx.
-    auto pos = mapDeltas.find(hash);
+    // Update transaction for any feeDelta created by PrioritiseTransaction.
+    const auto pos = mapDeltas.find(hash);
     if (pos != mapDeltas.end()) {
-        const std::pair<double, Amount> &deltas = pos->second;
-        if (deltas.second != Amount(0)) {
-            mapTx.modify(newit, update_fee_delta(deltas.second));
+        const auto& amount = pos->second.second;
+        if (amount != Amount(0)) {
+            entry.UpdateFeeDelta(amount);
         }
     }
+
+    // Insert the new entry
+    const auto newit = mapTx.insert(entry).first;
+    mapLinks.insert(make_pair(newit, TxLinks()));
 
     // Update cachedInnerUsage to include contained transaction's usage.
     // (When we update the entry for in-mempool parents, memory usage will be
