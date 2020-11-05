@@ -952,6 +952,8 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     const CDiskBlockPos& pos, bool calculateDiskBlockMetadata=false);
+std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader( // Same as above except that pos is obtained from pindex and some additional checks are performed
+    const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata=false);
 std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
     CBlockIndex& index,
     int networkVersion);
