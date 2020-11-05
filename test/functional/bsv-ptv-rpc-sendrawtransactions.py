@@ -396,6 +396,8 @@ class RPCSendRawTransactions(ComparisonTestFramework):
         chain_length = 10
         # Node's config
         args = ['-txnvalidationasynchrunfreq=10000',
+                '-maxstdtxnsperthreadratio=0', # Do not take any std txs for processing (from the ptv queues).
+                '-maxnonstdtxnsperthreadratio=0', # Do not take any non-std txs for processing (from the ptv queues).
                 '-checkmempool=0',
                 '-persistmempool=0']
         with self.run_node_with_connections('TS7: {} chains of length {}. Reject known transactions'.format(num_of_chains, chain_length),
