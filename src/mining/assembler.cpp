@@ -9,7 +9,7 @@
 #include <validation.h>
 #include <versionbits.h>
 
-using mining::BlockAssembler;
+namespace mining {
 
 BlockAssembler::BlockAssembler(const Config& config)
 : mConfig{config}
@@ -72,4 +72,27 @@ void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex
     block->nBits = GetNextWorkRequired(pindex, block.get(), mConfig);
     block->nNonce = 0;
 }
+
+int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
+                   const CBlockIndex *pindexPrev) {
+    int64_t nOldTime = pblock->nTime;
+    int64_t nNewTime =
+        std::max(pindexPrev->GetMedianTimePast() + 1, GetAdjustedTime());
+
+    if (nOldTime < nNewTime) {
+        pblock->nTime = nNewTime;
+    }
+
+    const Consensus::Params &consensusParams =
+        config.GetChainParams().GetConsensus();
+
+    // Updating time can change work required on testnet:
+    if (consensusParams.fPowAllowMinDifficultyBlocks) {
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, config);
+    }
+
+    return nNewTime - nOldTime;
+}
+
+} // namespace mining
 

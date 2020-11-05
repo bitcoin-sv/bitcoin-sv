@@ -7,6 +7,8 @@
 
 class CRPCTable;
 class JSONRPCRequest;
+// Needed even with !ENABLE_WALLET, to pass (ignored) pointers around
+class CWallet;
 
 void RegisterWalletRPCCommands(CRPCTable &t);
 

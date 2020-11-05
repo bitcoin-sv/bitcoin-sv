@@ -17,6 +17,7 @@
 #include "net/net_processing.h"
 #include "pubkey.h"
 #include "random.h"
+#include "rpc/mining.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "script/scriptcache.h"

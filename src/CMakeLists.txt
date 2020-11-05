@@ -249,7 +249,6 @@ add_library(server
 	mining/journal_builder.cpp
 	mining/journal_change_set.cpp
 	mining/journaling_block_assembler.cpp
-    mining/legacy.cpp
     net/association.cpp
     net/association_id.cpp
 	net/net.cpp

@@ -363,8 +363,8 @@ public:
 class CompareTxMemPoolEntryByAncestorFee {
 public:
     bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const {
-        double aFees = double(a.GetModFeesWithAncestors().GetSatoshis());
-        double aSize = a.GetSizeWithAncestors();
+        double aFees = double(a.GetModFeesWithAncestors().GetSatoshis()); // MARK: also used by legacy
+        double aSize = a.GetSizeWithAncestors(); // MARK: also used by legacy
 
         double bFees = double(b.GetModFeesWithAncestors().GetSatoshis());
         double bSize = b.GetSizeWithAncestors();
@@ -1227,9 +1227,9 @@ private:
 };
 
 // We want to sort transactions by coin age priority
-typedef std::pair<double, CTxMemPool::txiter> TxCoinAgePriority;
+typedef std::pair<double, CTxMemPool::txiter> TxCoinAgePriority; // MARK: only used by legacy
 
-struct TxCoinAgePriorityCompare {
+struct TxCoinAgePriorityCompare { // MARK: only used by legacy
     bool operator()(const TxCoinAgePriority &a, const TxCoinAgePriority &b) {
         if (a.first == b.first) {
             // Reverse order to make sort less than

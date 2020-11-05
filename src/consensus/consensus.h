@@ -63,6 +63,9 @@ static const uint64_t MAX_SCRIPT_NUM_LENGTH_BEFORE_GENESIS = 4;
 // Maximum script number length after Genesis
 static const uint64_t MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS = 750 * ONE_KILOBYTE; 
 
+// Maximum coinbase scriptSig size
+static const uint64_t MAX_COINBASE_SCRIPTSIG_SIZE = 100;
+
 /**
  * Coinbase transaction outputs can only be spent after this number of new
  * blocks (network rule).

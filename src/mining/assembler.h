@@ -70,5 +70,9 @@ protected:
 
 using BlockAssemblerRef = std::shared_ptr<BlockAssembler>;
 
+int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
+                   const CBlockIndex *pindexPrev);
+
+
 }
 

@@ -36,14 +36,6 @@ namespace
 {
     mining::CJournalChangeSetPtr nullChangeSet {nullptr};
     
-    class LegacyTestingSetup : public TestingSetup
-    {
-    public:
-        LegacyTestingSetup()
-            : TestingSetup(CBaseChainParams::MAIN, mining::CMiningFactory::BlockAssemblerType::LEGACY)
-        {}
-    };
-
     class JournalingTestingSetup : public TestingSetup
     {
     public:
@@ -128,137 +120,6 @@ static bool transactionInBlock(const CBlockTemplate& pBlockTemplate, const TxId&
         }
     }
     return false;
-}
-
-// Test suite for ancestor feerate transaction selection.
-// Implemented as an additional function, rather than a separate test case, to
-// allow reusing the blockchain created in CreateNewBlock_validity.
-// Note that this test assumes blockprioritypercentage is 0.
-void TestPackageSelection(Config &config, CScript scriptPubKey,
-                          std::vector<CTransactionRef> &txFirst) {
-    // Test the ancestor feerate transaction selection.
-    TestMemPoolEntryHelper entry;
-
-    // these 3 tests assume blockprioritypercentage is 0.
-    config.SetBlockPriorityPercentage(0);
-
-    mining::CMiningFactory miningFactory { config };
-
-    // Test that paying transactions get selected in arrival order
-    CMutableTransaction tx;
-    tx.vin.resize(1);
-    tx.vin[0].scriptSig = CScript() << OP_1;
-    tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
-    tx.vout.resize(1);
-    tx.vout[0].nValue = Amount(5000000000LL - 1000);
-    // This tx has a low fee: 1000 satoshis.
-    // Save this txid for later use.
-    TxId parentTxId = tx.GetId();
-    mempool.AddUnchecked(parentTxId,
-                         entry.Fee(Amount(1000))
-                             .Time(GetTime())
-                             .SpendsCoinbase(true)
-                             .FromTx(tx),
-                         nullChangeSet);
-
-    // This tx has a medium fee: 10000 satoshis.
-    tx.vin[0].prevout = COutPoint(txFirst[1]->GetId(), 0);
-    tx.vout[0].nValue = Amount(5000000000LL - 10000);
-    TxId mediumFeeTxId = tx.GetId();
-    mempool.AddUnchecked(mediumFeeTxId,
-                         entry.Fee(Amount(10000))
-                             .Time(GetTime())
-                             .SpendsCoinbase(true)
-                             .FromTx(tx),
-                         nullChangeSet);
-
-    // This tx has a high fee, but depends on the first transaction.
-    tx.vin[0].prevout = COutPoint(parentTxId, 0);
-    // 50k satoshi fee.
-    tx.vout[0].nValue = Amount(5000000000LL - 1000 - 50000);
-    TxId highFeeTxId = tx.GetId();
-    mempool.AddUnchecked(highFeeTxId,
-                         entry.Fee(Amount(50000))
-                             .Time(GetTime())
-                             .SpendsCoinbase(false)
-                             .FromTx(tx),
-                         nullChangeSet);
-
-    CBlockIndex* pindexPrev {nullptr};
-    std::unique_ptr<CBlockTemplate> pblocktemplate =
-        miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
-    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[1]->GetId() == parentTxId);
-    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[2]->GetId() == highFeeTxId);
-    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[3]->GetId() == mediumFeeTxId);
-
-    // Test that a package below the block min tx fee doesn't get included
-    tx.vin[0].prevout = COutPoint(highFeeTxId, 0);
-    // 0 fee.
-    tx.vout[0].nValue = Amount(5000000000LL - 1000 - 50000);
-    TxId freeTxId = tx.GetId();
-    mempool.AddUnchecked(freeTxId, entry.Fee(Amount(0)).FromTx(tx), nullChangeSet);
-    size_t freeTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-
-    // Calculate a fee on child transaction that will put the package just
-    // below the block min tx fee (assuming 1 child tx of the same size).
-    Amount feeToUse = blockMinFeeRate.GetFee(2 * freeTxSize) - Amount(1);
-
-    tx.vin[0].prevout = COutPoint(freeTxId, 0);
-    tx.vout[0].nValue = Amount(5000000000LL - 1000 - 50000) - feeToUse;
-    TxId lowFeeTxId = tx.GetId();
-    mempool.AddUnchecked(lowFeeTxId, entry.Fee(feeToUse).FromTx(tx), nullChangeSet);
-    pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
-    // Verify that the free tx and the low fee tx didn't get selected.
-    BOOST_CHECK(!transactionInBlock(*pblocktemplate, freeTxId));
-    BOOST_CHECK(!transactionInBlock(*pblocktemplate, lowFeeTxId));
-
-    // Test that packages above the min relay fee do get included, even if one
-    // of the transactions is below the min relay fee. Remove the low fee
-    // transaction and replace with a higher fee transaction
-    mempool.RemoveRecursive(CTransaction(tx), nullChangeSet);
-    // Now we should be just over the min relay fee.
-    tx.vout[0].nValue -= Amount(2);
-    lowFeeTxId = tx.GetId();
-    mempool.AddUnchecked(lowFeeTxId,
-                         entry.Fee(feeToUse + Amount(2)).FromTx(tx), nullChangeSet);
-    pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
-    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[4]->GetId() == freeTxId);
-    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[5]->GetId() == lowFeeTxId);
-
-    // Test that transaction selection properly updates ancestor fee
-    // calculations as ancestor transactions get included in a block. Add a
-    // 0-fee transaction that has 2 outputs.
-    tx.vin[0].prevout = COutPoint(txFirst[2]->GetId(), 0);
-    tx.vout.resize(2);
-    tx.vout[0].nValue = Amount(5000000000LL - 100000000);
-    // 1BCC output.
-    tx.vout[1].nValue = Amount(100000000);
-    TxId freeTxId2 = tx.GetId();
-    mempool.AddUnchecked(freeTxId2,
-                         entry.Fee(Amount(0)).SpendsCoinbase(true).FromTx(tx), nullChangeSet);
-
-    // This tx can't be mined by itself.
-    tx.vin[0].prevout = COutPoint(freeTxId2, 0);
-    tx.vout.resize(1);
-    feeToUse = blockMinFeeRate.GetFee(freeTxSize);
-    tx.vout[0].nValue = Amount(5000000000LL) - Amount(100000000) - feeToUse;
-    TxId lowFeeTxId2 = tx.GetId();
-    mempool.AddUnchecked(lowFeeTxId2,
-                         entry.Fee(feeToUse).SpendsCoinbase(false).FromTx(tx), nullChangeSet);
-    pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
-
-    // Verify that this tx isn't selected.
-    BOOST_CHECK(!transactionInBlock(*pblocktemplate, freeTxId2));
-    BOOST_CHECK(!transactionInBlock(*pblocktemplate, lowFeeTxId2));
-
-    // This tx will be mineable, and should cause lowFeeTxId2 to be selected as
-    // well.
-    tx.vin[0].prevout = COutPoint(freeTxId2, 1);
-    // 10k satoshi fee.
-    tx.vout[0].nValue = Amount(100000000 - 10000);
-    mempool.AddUnchecked(tx.GetId(), entry.Fee(Amount(10000)).FromTx(tx), nullChangeSet);
-    pblocktemplate = miningFactory.GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev);
-    BOOST_CHECK(pblocktemplate->GetBlockRef()->vtx[8]->GetId() == lowFeeTxId2);
 }
 
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!
@@ -775,11 +636,6 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     SetMockTime(0);
     mempool.Clear();
 
-    if(testingSetup.testConfig.GetMiningCandidateBuilder() == mining::CMiningFactory::BlockAssemblerType::LEGACY)
-    {
-        TestPackageSelection(testingSetup.testConfig, scriptPubKey, txFirst);
-    }
-
     fCheckpointsEnabled = true;
 }
 
@@ -1011,24 +867,6 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
     BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     BOOST_CHECK_EQUAL(pblocktemplate->GetBlockRef()->vtx.size(), NUM_TXNS + 1);
 }
-
-
-BOOST_FIXTURE_TEST_SUITE(miner_tests_legacy, LegacyTestingSetup)
-
-BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
-{
-    Test_CreateNewBlock_validity(*this);
-}
-BOOST_AUTO_TEST_CASE(BlockAssembler_construction)
-{
-    Test_BlockAssembler_construction(*this);
-}
-BOOST_AUTO_TEST_CASE(BlockAssembler_construction_activate_new_blocksize)
-{
-    Test_BlockAssembler_construction_activate_new_blocksize(*this);
-}
-BOOST_AUTO_TEST_SUITE_END()
-
 
 
 BOOST_FIXTURE_TEST_SUITE(miner_tests_journal, JournalingTestingSetup)
