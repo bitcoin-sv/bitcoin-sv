@@ -627,11 +627,11 @@ static UniValue getnetworkinfo(const Config &config,
     UniValue localAddresses(UniValue::VARR);
     {
         LOCK(cs_mapLocalHost);
-        for (const std::pair<CNetAddr, LocalServiceInfo> &item : mapLocalHost) {
+        for (auto const & [address, info] : mapLocalHost) {
             UniValue rec(UniValue::VOBJ);
-            rec.push_back(Pair("address", item.first.ToString()));
-            rec.push_back(Pair("port", item.second.nPort));
-            rec.push_back(Pair("score", item.second.nScore));
+            rec.push_back(Pair("address", address.ToString()));
+            rec.push_back(Pair("port", info.nPort));
+            rec.push_back(Pair("score", info.nScore));
             localAddresses.push_back(rec);
         }
     }
