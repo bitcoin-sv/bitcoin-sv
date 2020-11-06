@@ -2039,11 +2039,11 @@ bool AppInitParameterInteraction(Config &config) {
 
     if (zmqSinkSpecified && !zmqIpDefined)
     {
-        InitError("The 'zmqpubinvalidtx' parameter should be specified when 'invalidtxsink' is set to ZMQ.");
+        return InitError("The 'zmqpubinvalidtx' parameter should be specified when 'invalidtxsink' is set to ZMQ.");
     }
     if (!zmqSinkSpecified && zmqIpDefined)
     {
-        InitError("The 'invalidtxsink' parameter should be set to ZMQ when 'zmqpubinvalidtx' is defined.");
+        return InitError("The 'invalidtxsink' parameter should be set to ZMQ when 'zmqpubinvalidtx' is defined.");
     }
 #endif
 
