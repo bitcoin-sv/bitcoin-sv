@@ -89,7 +89,7 @@ class InvalidTx(BitcoinTestFramework):
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
         self.zmqSubSocket.set(zmq.RCVTIMEO, 60000)
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"invalidtx")
-        self.ip_address = f"tcp://127.0.0.1:{zmq_port(0)}"
+        self.address = f"tcp://127.0.0.1:{zmq_port(0)}"
 
         self.add_nodes(self.num_nodes)
 
@@ -203,9 +203,9 @@ class InvalidTx(BitcoinTestFramework):
                                              "-banscore=100000",
                                              "-invalidtxsink=ZMQ",
                                              "-invalidtxsink=FILE",
-                                             f"-zmqpubinvalidtx={self.ip_address}"],
+                                             f"-zmqpubinvalidtx={self.address}"],
                                             1) as (conn, ):
-            self.zmqSubSocket.connect(self.ip_address)
+            self.zmqSubSocket.connect(self.address)
             invalid_tx1 = make_invalid_tx(invalid_coinbases[0], 0)
             _, block = new_block(conn, [invalid_tx1], wait_for_confirmation=False)
             conn.cb.sync_with_ping()
@@ -295,11 +295,11 @@ class InvalidTx(BitcoinTestFramework):
                                              "-invalidtxfilemaxdiskusage=5",
                                              "-invalidtxfileevictionpolicy=IGNORE_NEW",
                                              "-invalidtxsink=ZMQ",
-                                             f"-zmqpubinvalidtx={self.ip_address}",
+                                             f"-zmqpubinvalidtx={self.address}",
                                              "-invalidtxzmqmaxmessagesize=1",
                                              ],
                                             1) as (conn, ):
-            self.zmqSubSocket.connect(self.ip_address)
+            self.zmqSubSocket.connect(self.address)
             freed_size = conn.rpc.clearinvalidtransactions()
             assert freed_size == 0, "Freed size must zero, dumped transactions are deleted in last test."
 
@@ -336,11 +336,11 @@ class InvalidTx(BitcoinTestFramework):
                                              "-invalidtxfilemaxdiskusage=5",
                                              "-invalidtxfileevictionpolicy=DELETE_OLD",
                                              "-invalidtxsink=ZMQ",
-                                             f"-zmqpubinvalidtx={self.ip_address}",
+                                             f"-zmqpubinvalidtx={self.address}",
                                              "-invalidtxzmqmaxmessagesize=0",
                                              ],
                                             1) as (conn, ):
-            self.zmqSubSocket.connect(self.ip_address)
+            self.zmqSubSocket.connect(self.address)
             freed_size = conn.rpc.clearinvalidtransactions()
             assert freed_size > 0, "Freed size must be larger than zero."
 
