@@ -340,6 +340,7 @@ void CTxMemPool::AddUnchecked(
             entry,
             txStorage,
             changeSet,
+            std::nullopt,
             pnMempoolSize,
             pnDynamicMemoryUsage);
     }
@@ -694,6 +695,7 @@ void CTxMemPool::AddUncheckedNL(
     const CTxMemPoolEntry &originalEntry,
     const TxStorage txStorage,
     const CJournalChangeSetPtr& changeSet,
+    SpentOutputs spentOutputs,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage)
 {
@@ -741,12 +743,23 @@ void CTxMemPool::AddUncheckedNL(
     // further updated.)
     cachedInnerUsage += newit->DynamicMemoryUsage();
 
-    const auto sharedTx = newit->GetSharedTx();
     std::set<uint256> setParentTransactions;
-
-    for (const CTxIn &in : sharedTx->vin) {
-        mapNextTx.insert(OutpointTxPair{in.prevout, newit});
-        setParentTransactions.insert(in.prevout.GetTxId());
+    if (spentOutputs.has_value())
+    {
+        for (const auto& prevout: spentOutputs->get())
+        {
+            mapNextTx.insert(OutpointTxPair{prevout, newit});
+            setParentTransactions.insert(prevout.GetTxId());
+        }
+    }
+    else
+    {
+        const auto sharedTx = newit->GetSharedTx();
+        for (const auto& in : sharedTx->vin)
+        {
+            mapNextTx.insert(OutpointTxPair{in.prevout, newit});
+            setParentTransactions.insert(in.prevout.GetTxId());
+        }
     }
     // Don't bother worrying about child transactions of this one. Normal case
     // of a new transaction arriving is that there can't be any children,
@@ -1474,12 +1487,9 @@ mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
         CoinsDBView coinsView{ *pcoinsTip };
         std::shared_lock lock(smtx);
 
-        // back-up txs currently in the mempool and clear the mempool
-        auto oldMapTx = std::move(mapTx);
-        clearNL();
-
+        auto resubmitContext = PrepareResubmitContextAndClearNL(changeSet);
         // submit backed-up transactions
-        ResubmitEntriesToMempoolNL(oldMapTx, changeSet);
+        ResubmitEntriesToMempoolNL(resubmitContext, changeSet);
         
         CheckMempoolNL(coinsView, changeSet);
     }
@@ -1916,10 +1926,32 @@ std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx
     return conflictsWith;
 }
 
-void CTxMemPool::ResubmitEntriesToMempoolNL(CTxMemPool::indexed_transaction_set& oldMapTx, const CJournalChangeSetPtr& changeSet)
+CTxMemPool::ResubmitContext CTxMemPool::PrepareResubmitContextAndClearNL(const CJournalChangeSetPtr &changeSet)
 {
-    auto& tempMapTxSequenced = oldMapTx.get<insertion_order>();
-    for (auto itTemp = tempMapTxSequenced.begin(); itTemp != tempMapTxSequenced.end();) 
+    ResubmitContext resubmitContext;
+    // we are about to delete journal, changes in the changeSet no sense now
+    if(changeSet)
+    {
+        changeSet->clear();
+    }
+
+    for (auto iter = mapTx.begin(); iter != mapTx.end(); ++iter)
+    {
+        if(!iter->IsInMemory())
+        {
+            resubmitContext.outpointsSpentByStored.emplace(iter->GetTxId(), GetOutpointsSpentByNL(iter));
+        }
+    }
+
+    std::swap(resubmitContext.oldMapTx, mapTx);
+    clearNL(true);          // Do not clear the transaction database
+    return resubmitContext;
+}
+
+void CTxMemPool::ResubmitEntriesToMempoolNL(CTxMemPool::ResubmitContext& resubmitContext, const CJournalChangeSetPtr& changeSet)
+{
+    auto& tempMapTxSequenced = resubmitContext.oldMapTx.get<insertion_order>();
+    for (auto itTemp = tempMapTxSequenced.begin(); itTemp != tempMapTxSequenced.end();)
     {
         tempMapTxSequenced.modify(
             itTemp,
@@ -1927,9 +1959,16 @@ void CTxMemPool::ResubmitEntriesToMempoolNL(CTxMemPool::indexed_transaction_set&
             {
                 entry.groupingData = std::nullopt;
                 entry.group.reset();
-            }   
+            }
         );
-        AddUncheckedNL(itTemp->GetTxId(), *itTemp, itTemp->GetTxStorage(), changeSet);
+
+        SpentOutputs spentOutputs;
+        if (auto foundOutpoints = resubmitContext.outpointsSpentByStored.find(itTemp->GetTxId());
+            foundOutpoints != resubmitContext.outpointsSpentByStored.end())
+        {
+            spentOutputs = foundOutpoints->second;
+        }
+        AddUncheckedNL(itTemp->GetTxId(), *itTemp, itTemp->GetTxStorage(), changeSet, spentOutputs);
         tempMapTxSequenced.erase(itTemp++);
     }
 }
@@ -1968,19 +2007,12 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
 
     disconnectpool.queuedTx.clear();
 
-    // we are about to delete journal, changes in the changeSet make no sense now
-    if(changeSet)
-    {
-        changeSet->clear();
-    }
-
-    // Clear the mempool, but save the current index, entries and the
+    // Clear the mempool, but save the current index, mapNextTx, entries and the
     // transaction database, since we'll re-add the entries later.
-    indexed_transaction_set tempMapTx;
+    ResubmitContext resubmitContext;
     {
         std::unique_lock lock{smtx};
-        std::swap(tempMapTx, mapTx);
-        clearNL(true);          // Do not clear the transaction database
+        resubmitContext = PrepareResubmitContextAndClearNL(changeSet);
     }
 
     // Validate the set of transactions from the disconnectpool and add them to the mempool
@@ -1991,7 +2023,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         std::unique_lock lock {smtx};
 
         // now put all transactions that were in the mempool before
-        ResubmitEntriesToMempoolNL(tempMapTx, changeSet);
+        ResubmitEntriesToMempoolNL(resubmitContext, changeSet);
 
         // Disconnectpool related updates
         for (const auto& txInputData : vTxInputData) {

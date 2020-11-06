@@ -671,8 +671,14 @@ private:
     setEntriesTopoSorted RemoveFromPrimaryMempoolNL(setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, 
         bool putDummyGroupingData = false, const setEntries* entriesToIgnore = nullptr);
 
+    struct ResubmitContext {
+        indexed_transaction_set oldMapTx {};
+        std::unordered_map<TxId, std::vector<COutPoint>, SaltedTxidHasher> outpointsSpentByStored {};
+    };
+    // prepare resubmit context
+    ResubmitContext PrepareResubmitContextAndClearNL(const mining::CJournalChangeSetPtr& changeSet);
     // in AddToMempoolForReorg and RebuildMempool we need to submit transactions that already were in the mempool
-    void ResubmitEntriesToMempoolNL(indexed_transaction_set& oldMapTx, const mining::CJournalChangeSetPtr& changeSet);
+    void ResubmitEntriesToMempoolNL(ResubmitContext& resubmitContext, const mining::CJournalChangeSetPtr& changeSet);
 
     // walks recursively through all descedants of the items in the set and updates theirs ancestorsCouunt
     void UpdateAncestorsCountNL(setEntriesTopoSorted entries);
@@ -1100,11 +1106,13 @@ private:
     // A non-locking version of AddUnchecked
     // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
     // It needs to be called explicitly by a user if AddUncheckedNL is used.
+    using SpentOutputs = std::optional<std::reference_wrapper<const std::vector<COutPoint>>>;
     void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
             const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
+            SpentOutputs spentOutputs = std::nullopt,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 

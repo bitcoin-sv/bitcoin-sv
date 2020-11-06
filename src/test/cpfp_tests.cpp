@@ -157,7 +157,7 @@ mining::CJournalPtr CheckMempoolRebuild(CTxMemPoolTestAccess& testAccess)
 
     auto newMapTx = testAccess.mapTx();
 
-    BOOST_CHECK(oldMapTx.size() == newMapTx.size());
+    BOOST_TEST(oldMapTx.size() == newMapTx.size());
     const auto& oldAccess = oldMapTx.get<insertion_order>();
     const auto& newAccess = newMapTx.get<insertion_order>();
     for(auto it1 = oldAccess.begin(),it2 =  newAccess.begin(); it1 != oldAccess.end(); it1++, it2++)

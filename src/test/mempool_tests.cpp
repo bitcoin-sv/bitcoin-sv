@@ -3,10 +3,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "config.h"
 #include "mining/journal_change_set.h"
 #include "policy/policy.h"
 #include "txmempool.h"
 #include "util.h"
+#include "validation.h"
 
 #include "mempool_test_access.h"
 
@@ -20,6 +22,22 @@
 namespace
 {
     mining::CJournalChangeSetPtr nullChangeSet {nullptr};
+
+    std::vector<CTxMemPoolEntry> GetABunchOfEntries(int howMany, int baseValue)
+    {
+        TestMemPoolEntryHelper entry;
+        std::vector<CTxMemPoolEntry> result;
+        for (int i = 0; i < howMany; i++) {
+            CMutableTransaction mtx;
+            mtx.vin.resize(1);
+            mtx.vin[0].scriptSig = CScript() << OP_11;
+            mtx.vout.resize(1);
+            mtx.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+            mtx.vout[0].nValue = Amount(baseValue + i);
+            result.emplace_back(entry.FromTx(mtx));
+        }
+        return result;
+    }
 }
 
 BOOST_FIXTURE_TEST_SUITE(mempool_tests, TestingSetup)
@@ -57,7 +75,7 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     }
 
     CTxMemPool testPool;
-    CTxMemPoolTestAccess testPoolAccess(testPool);
+    CTxMemPoolTestAccess testPoolAccess{testPool};
 
     // Nothing in pool, remove should do nothing:
     unsigned int poolSize = testPool.Size();
@@ -125,7 +143,7 @@ BOOST_AUTO_TEST_CASE(MempoolClearTest) {
     }
 
     CTxMemPool testPool;
-    CTxMemPoolTestAccess testPoolAccess(testPool);
+    CTxMemPoolTestAccess testPoolAccess{testPool};
 
     // Nothing in pool, clear should do nothing:
     testPool.Clear();
@@ -157,7 +175,7 @@ void CheckSort(CTxMemPool &pool, std::vector<std::string> &sortedOrder) {
 
 BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     CTxMemPool pool;
-    CTxMemPoolTestAccess testPoolAccess(pool);
+    CTxMemPoolTestAccess testPoolAccess{pool};
     TestMemPoolEntryHelper entry;
 
     /* 3rd highest fee */
@@ -437,7 +455,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
     }
 
     CTxMemPool testPool;
-    CTxMemPoolTestAccess testPoolAccess(testPool);
+    CTxMemPoolTestAccess testPoolAccess{testPool};
     const TxId& txid = txParent.GetId();
     // A lambda-helper to add a txn to the empty testPool and to do basic checks.
     const auto add_txn_to_testpool = [&testPool, &testPoolAccess](
@@ -518,7 +536,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
 
 BOOST_AUTO_TEST_CASE(SecondaryMempoolDecisionTest) {
     CTxMemPool pool;
-    CTxMemPoolTestAccess testPoolAccess(pool);
+    CTxMemPoolTestAccess testPoolAccess{pool};
     TestMemPoolEntryHelper entry;
 
     testPoolAccess.SetBlockMinTxFee({Amount(100), 1});
@@ -548,7 +566,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolDecisionTest) {
 
 BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     CTxMemPool pool;
-    CTxMemPoolTestAccess testPoolAccess(pool);
+    CTxMemPoolTestAccess testPoolAccess{pool};
     TestMemPoolEntryHelper entry;
 
     testPoolAccess.SetBlockMinTxFee({Amount(100), 1});
@@ -620,7 +638,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     //               tx5    <-- paying transaction
 
     CTxMemPool pool;
-    CTxMemPoolTestAccess testPoolAccess(pool);
+    CTxMemPoolTestAccess testPoolAccess{pool};
     TestMemPoolEntryHelper entry;
 
     CMutableTransaction tx1 = CMutableTransaction();
@@ -711,6 +729,57 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
     BOOST_CHECK(tx3it->IsInPrimaryMempool());
     BOOST_CHECK(tx4it->IsInPrimaryMempool());
     BOOST_CHECK(!group4data.has_value());
+}
+
+BOOST_AUTO_TEST_CASE(ReorgWithTransactionsOnDisk)
+{
+    CTxMemPool testPool;
+    CTxMemPoolTestAccess testPoolAccess{testPool};
+
+    const auto beforeCount = 31;
+    uint64_t beforeSize = 0;
+    const auto afterCount = 29;
+
+    const auto before = GetABunchOfEntries(beforeCount, 33000);
+    const auto after = GetABunchOfEntries(afterCount, 34000);
+
+    // Fill the mempool
+    for (auto& e : before)
+    {
+        testPool.AddUnchecked(e.GetTxId(), e, TxStorage::memory, nullChangeSet);
+        beforeSize += e.GetTxSize();
+    }
+    for (auto& e : after)
+    {
+        testPool.AddUnchecked(e.GetTxId(), e, TxStorage::memory, nullChangeSet);
+    }
+
+    testPoolAccess.SyncWithMempoolTxDB();
+    BOOST_CHECK_EQUAL(testPool.Size(), beforeCount + afterCount);
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
+
+    // Write half of the pool to disk
+    testPool.SaveTxsToDisk(beforeSize);
+    testPoolAccess.SyncWithMempoolTxDB();
+    BOOST_CHECK_EQUAL(testPool.Size(), beforeCount + afterCount);
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), beforeSize);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), beforeCount);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
+
+    // Fake, no-op reorg. The shape of the mempool shouldn't change.
+    {
+        DisconnectedBlockTransactions disconnectPool;
+        auto changeSet = testPool.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::REORG);
+        LOCK(cs_main);
+        testPool.AddToMempoolForReorg(testConfig, disconnectPool, changeSet);
+    }
+    testPoolAccess.SyncWithMempoolTxDB();
+    BOOST_CHECK_EQUAL(testPool.Size(), beforeCount + afterCount);
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), beforeSize);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), beforeCount);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
