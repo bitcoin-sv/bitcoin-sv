@@ -579,7 +579,7 @@ private:
     void TrackEntryRemoved(const TxId& txId, const setEntries& immediateParents);
     void TrackEntryModified(CTxMemPool::txiter entry);
 
-    std::vector<COutPoint> GetOutpointsSpentByNL(CTxMemPool::txiter entry);
+    std::vector<COutPoint> GetOutpointsSpentByNL(CTxMemPool::txiter entry) const;
 
 
 public:

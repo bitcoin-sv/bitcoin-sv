@@ -2179,7 +2179,7 @@ void CTxMemPool::TrackEntryModified(CTxMemPool::txiter entry)
     }
 }
 
-std::vector<COutPoint> CTxMemPool::GetOutpointsSpentByNL(CTxMemPool::txiter entry)
+std::vector<COutPoint> CTxMemPool::GetOutpointsSpentByNL(CTxMemPool::txiter entry) const
 {
     std::vector<COutPoint> toReturn;
     for(auto [it, itEnd] = mapNextTx.get<by_txiter>().equal_range(entry); it != itEnd; it++)
@@ -2407,12 +2407,11 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
     // This closure is essentially a local function that stores
     // information about a single transaction and its inputs.
     const auto recordTransaction =
-        [this, &contents, &relevantTxIds](const CTxMemPoolEntry& entry)
+        [this, &contents, &relevantTxIds](txiter entry)
         {
-            contents.emplace_back(entry);
-            const auto tx = entry.GetSharedTx();
-            for (const auto& input : tx->vin) {
-                const auto& id = input.prevout.GetTxId();
+            contents.emplace_back(*entry);
+            for (const auto& prevout : GetOutpointsSpentByNL(entry)) {
+                const auto& id = prevout.GetTxId();
                 if (ExistsNL(id)) {
                     relevantTxIds->emplace_back(id);
                 }
@@ -2422,7 +2421,7 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
     if (kind == TxSnapshotKind::SINGLE)
     {
         // Store the single transaction of the snapshot.
-        recordTransaction(*baseTx);
+        recordTransaction(baseTx);
     }
     else if (kind == TxSnapshotKind::TX_WITH_ANCESTORS
              || kind == TxSnapshotKind::ONLY_ANCESTORS
@@ -2442,13 +2441,13 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
         // are not symmetric, the former includes the base transaction in the
         // results, but the latter does not.
         if (kind == TxSnapshotKind::TX_WITH_ANCESTORS) {
-            recordTransaction(*baseTx);
+            recordTransaction(baseTx);
         }
         else if (kind == TxSnapshotKind::ONLY_DESCENDANTS) {
             related.erase(baseTx);
         }
         for (const auto& iter : related) {
-            recordTransaction(*iter);
+            recordTransaction(iter);
         }
     }
     else
