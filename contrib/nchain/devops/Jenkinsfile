@@ -86,7 +86,6 @@ pipeline {
             bitbucketStatusNotify(buildState: 'SUCCESSFUL')        
             archiveArtifacts 'release-notes.txt \
                              , src/bitcoin-cli \
-                             , src/bitcoin-seeder \
                              , src/bitcoin-miner \
                              , src/bitcoin-txt \
                              , src/bitcoind \

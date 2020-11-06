@@ -97,9 +97,6 @@ test\functional\test_runner.py --buildconfig RelWithDebInfo
 
 ### Limitations
 
--   bitcoin seeder is not included in the build, since it uses APIs, that are
-    not cross platform
-
 -   64 bit MSVC compiler does not support 128 bit integers or inline assembly.
     Therefore, secp2561k is build with scalar and field implementation that
     might exhibit different performance characteristics compared to Linux buid.
