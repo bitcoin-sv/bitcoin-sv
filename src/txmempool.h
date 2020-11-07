@@ -73,18 +73,17 @@ class CTxMemPool;
 /**
  * Shared ancestor/descendant count information.
  */
-struct AncestorDescendantCounts
+struct AncestorCounts
 {
-    AncestorDescendantCounts(uint64_t ancestors, uint64_t descendants)
-    : nCountWithAncestors{ancestors}, nCountWithDescendants{descendants}
+    AncestorCounts(uint64_t ancestors)
+        : nCountWithAncestors{ancestors}
     {}
 
     // These don't actually need to be atomic currently, but there's no cost
     // if they are and we might want to access them across threads in the future.
     std::atomic_uint64_t nCountWithAncestors   {0};
-    std::atomic_uint64_t nCountWithDescendants {0};
 };
-using AncestorDescendantCountsPtr = std::shared_ptr<AncestorDescendantCounts>;
+using AncestorCountsPtr = std::shared_ptr<AncestorCounts>;
 
 /** \class CTxPrioritizer
  *
@@ -152,17 +151,8 @@ private:
     //!< Track the height and time at which tx was final
     LockPoints lockPoints;
 
-    // Information about descendants of this transaction that are in the
-    // mempool; if we remove this transaction we must remove all of these
-    // descendants as well.  if nCountWithDescendants is 0, treat this entry as
-    // dirty, and nSizeWithDescendants and nModFeesWithDescendants will not be
-    // correct.
-    //!< number of descendant transactions
-    AncestorDescendantCountsPtr ancestorDescendantCounts;
-    //!< ... and size
-    uint64_t nSizeWithDescendants;
-    //!< ... and total fees (all including us)
-    Amount nModFeesWithDescendants;
+    //!< number of ancestor transactions
+    AncestorCountsPtr ancestorCounts;
 
     // Analogous statistics for ancestor transactions
     uint64_t nSizeWithAncestors;
@@ -199,9 +189,6 @@ public:
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints &GetLockPoints() const { return lockPoints; }
 
-    // Adjusts the descendant state, if this entry is not dirty.
-    void UpdateDescendantState(int64_t modifySize, Amount modifyFee,
-                               int64_t modifyCount);
     // Adjusts the ancestor state
     void UpdateAncestorState(int64_t modifySize, Amount modifyFee,
                              int64_t modifyCount, int modifySigOps);
@@ -211,14 +198,11 @@ public:
     // Update the LockPoints after a reorg
     void UpdateLockPoints(const LockPoints &lp);
 
-    const AncestorDescendantCountsPtr& GetAncestorDescendantCounts() const { return ancestorDescendantCounts; }
-    uint64_t GetCountWithDescendants() const { return ancestorDescendantCounts->nCountWithDescendants; }
-    uint64_t GetSizeWithDescendants() const { return nSizeWithDescendants; }
-    Amount GetModFeesWithDescendants() const { return nModFeesWithDescendants; }
+    const AncestorCountsPtr& GetAncestorCounts() const { return ancestorCounts; }
 
     bool GetSpendsCoinbase() const { return spendsCoinbase; }
 
-    uint64_t GetCountWithAncestors() const { return ancestorDescendantCounts->nCountWithAncestors; }
+    uint64_t GetCountWithAncestors() const { return ancestorCounts->nCountWithAncestors; }
     uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
     Amount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
     int64_t GetSigOpCountWithAncestors() const {
@@ -227,23 +211,6 @@ public:
 
     //!< Index in mempool's vTxHashes
     mutable size_t vTxHashesIdx;
-};
-
-// Helpers for modifying CTxMemPool::mapTx, which is a boost multi_index.
-struct update_descendant_state {
-    update_descendant_state(int64_t _modifySize, Amount _modifyFee,
-                            int64_t _modifyCount)
-        : modifySize(_modifySize), modifyFee(_modifyFee),
-          modifyCount(_modifyCount) {}
-
-    void operator()(CTxMemPoolEntry &e) {
-        e.UpdateDescendantState(modifySize, modifyFee, modifyCount);
-    }
-
-private:
-    int64_t modifySize;
-    Amount modifyFee;
-    int64_t modifyCount;
 };
 
 struct update_ancestor_state {
@@ -294,49 +261,6 @@ struct mempoolentry_txid {
     }
 };
 
-/** \class CompareTxMemPoolEntryByDescendantScore
- *
- *  Sort an entry by max(score/size of entry's tx, score/size with all
- * descendants).
- */
-class CompareTxMemPoolEntryByDescendantScore {
-public:
-    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const {
-        bool fUseADescendants = UseDescendantScore(a);
-        bool fUseBDescendants = UseDescendantScore(b);
-
-        double aModFee = (fUseADescendants ? a.GetModFeesWithDescendants()
-                                           : a.GetModifiedFee())
-                             .GetSatoshis();
-        double aSize =
-            fUseADescendants ? a.GetSizeWithDescendants() : a.GetTxSize();
-
-        double bModFee = (fUseBDescendants ? b.GetModFeesWithDescendants()
-                                           : b.GetModifiedFee())
-                             .GetSatoshis();
-        double bSize =
-            fUseBDescendants ? b.GetSizeWithDescendants() : b.GetTxSize();
-
-        // Avoid division by rewriting (a/b > c/d) as (a*d > c*b).
-        double f1 = aModFee * bSize;
-        double f2 = aSize * bModFee;
-
-        if (f1 == f2) {
-            return a.GetTime() >= b.GetTime();
-        }
-        return f1 < f2;
-    }
-
-    // Calculate which score to use for an entry (avoiding division).
-    bool UseDescendantScore(const CTxMemPoolEntry &a) const {
-        double f1 = double(a.GetSizeWithDescendants() *
-                           a.GetModifiedFee().GetSatoshis());
-        double f2 =
-            double(a.GetTxSize() * a.GetModFeesWithDescendants().GetSatoshis());
-        return f2 > f1;
-    }
-};
-
 /** \class CompareTxMemPoolEntryByScore
  *
  *  Sort by score of entry ((fee+delta)/size) in descending order
@@ -360,31 +284,8 @@ public:
     }
 };
 
-class CompareTxMemPoolEntryByAncestorFee {
-public:
-    bool operator()(const CTxMemPoolEntry &a, const CTxMemPoolEntry &b) const {
-        double aFees = double(a.GetModFeesWithAncestors().GetSatoshis()); // MARK: also used by legacy
-        double aSize = a.GetSizeWithAncestors(); // MARK: also used by legacy
-
-        double bFees = double(b.GetModFeesWithAncestors().GetSatoshis());
-        double bSize = b.GetSizeWithAncestors();
-
-        // Avoid division by rewriting (a/b > c/d) as (a*d > c*b).
-        double f1 = aFees * bSize;
-        double f2 = aSize * bFees;
-
-        if (f1 == f2) {
-            return a.GetTx().GetId() < b.GetTx().GetId();
-        }
-
-        return f1 > f2;
-    }
-};
-
 // Multi_index tag names
-struct descendant_score {};
 struct entry_time {};
-struct ancestor_score {};
 
 
 /**
@@ -544,21 +445,11 @@ public:
                              // sorted by txid
                              boost::multi_index::hashed_unique<
                                  mempoolentry_txid, SaltedTxidHasher>,
-                             // sorted by fee rate
-                             boost::multi_index::ordered_non_unique<
-                                 boost::multi_index::tag<descendant_score>,
-                                 boost::multi_index::identity<CTxMemPoolEntry>,
-                                 CompareTxMemPoolEntryByDescendantScore>,
                              // sorted by entry time
                              boost::multi_index::ordered_non_unique<
                                  boost::multi_index::tag<entry_time>,
                                  boost::multi_index::identity<CTxMemPoolEntry>,
-                                 CompareTxMemPoolEntryByEntryTime>,
-                             // sorted by fee rate with ancestors
-                             boost::multi_index::ordered_non_unique<
-                                 boost::multi_index::tag<ancestor_score>,
-                                 boost::multi_index::identity<CTxMemPoolEntry>,
-                                 CompareTxMemPoolEntryByAncestorFee>>>
+                                 CompareTxMemPoolEntryByEntryTime>>>
         indexed_transaction_set;
 
     // DEPRECATED - this will become private and ultimately changed or removed

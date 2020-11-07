@@ -55,9 +55,6 @@ class MempoolPackagesTest(BitcoinTestFramework):
         # count and fees should look correct
         mempool = self.nodes[0].getrawmempool(True)
         assert_equal(len(mempool), MAX_ANCESTORS)
-        descendant_count = 1
-        descendant_fees = 0
-        descendant_size = 0
 
         descendants = []
         ancestors = list(chain)
@@ -67,13 +64,7 @@ class MempoolPackagesTest(BitcoinTestFramework):
             assert_equal(entry, mempool[x])
 
             # Check that the descendant calculations are correct
-            assert_equal(mempool[x]['descendantcount'], descendant_count)
-            descendant_fees += mempool[x]['fee']
             assert_equal(mempool[x]['modifiedfee'], mempool[x]['fee'])
-            assert_equal(mempool[x]['descendantfees'], descendant_fees * COIN)
-            descendant_size += mempool[x]['size']
-            assert_equal(mempool[x]['descendantsize'], descendant_size)
-            descendant_count += 1
 
             # Check that getmempooldescendants is correct
             assert_equal(sorted(descendants), sorted(
@@ -111,17 +102,6 @@ class MempoolPackagesTest(BitcoinTestFramework):
         # Undo the prioritisetransaction for later tests
         self.nodes[0].prioritisetransaction(chain[0], 0, -1000)
 
-        # Check that descendant modified fees includes fee deltas from
-        # prioritisetransaction
-        self.nodes[0].prioritisetransaction(chain[-1], 0, 1000)
-        mempool = self.nodes[0].getrawmempool(True)
-
-        descendant_fees = 0
-        for x in reversed(chain):
-            descendant_fees += mempool[x]['fee']
-            assert_equal(mempool[x]['descendantfees'],
-                         descendant_fees * COIN + 1000)
-
         # Adding one more transaction on to the chain should fail.
         assert_raises_rpc_error(-26, "too-long-mempool-chain",
                                 self.chain_transaction, self.nodes[0], txid, vout, value, fee, 1)
@@ -141,14 +121,10 @@ class MempoolPackagesTest(BitcoinTestFramework):
         # Now check that the transaction is in the mempool, with the right modified fee
         mempool = self.nodes[0].getrawmempool(True)
 
-        descendant_fees = 0
         for x in reversed(chain):
-            descendant_fees += mempool[x]['fee']
             if (x == chain[-1]):
                 assert_equal(mempool[x]['modifiedfee'],
                              mempool[x]['fee'] + satoshi_round(0.00002))
-            assert_equal(mempool[x]['descendantfees'],
-                         descendant_fees * COIN + 2000)
 
         # TODO: check that node1's mempool is as expected
 
@@ -176,10 +152,6 @@ class MempoolPackagesTest(BitcoinTestFramework):
             for j in range(10):
                 transaction_package.append(
                     {'txid': txid, 'vout': j, 'amount': sent_value})
-
-        mempool = self.nodes[0].getrawmempool(True)
-        assert_equal(mempool[parent_transaction]
-                     ['descendantcount'], MAX_DESCENDANTS)
 
         # Sending one more chained transaction will fail
         utxo = transaction_package.pop(0)

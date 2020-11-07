@@ -125,9 +125,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
     nModSize = tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(tx);
 
-    ancestorDescendantCounts = std::make_shared<AncestorDescendantCounts>(1, 1);
-    nSizeWithDescendants = GetTxSize();
-    nModFeesWithDescendants = nFee;
+    ancestorCounts = std::make_shared<AncestorCounts>(1);
     Amount nValueIn = tx->GetValueOut() + nFee;
     assert(inChainInputValue <= nValueIn);
 
@@ -151,7 +149,6 @@ double CTxMemPoolEntry::GetPriority(int32_t currentHeight) const {
 }
 
 void CTxMemPoolEntry::UpdateFeeDelta(Amount newFeeDelta) {
-    nModFeesWithDescendants += newFeeDelta - feeDelta;
     nModFeesWithAncestors += newFeeDelta - feeDelta;
     feeDelta = newFeeDelta;
 }
@@ -206,8 +203,6 @@ void CTxMemPool::updateForDescendantsNL(txiter updateIt,
                                                updateIt->GetSigOpCount()));
         }
     }
-    mapTx.modify(updateIt,
-                 update_descendant_state(modifySize, modifyFee, modifyCount));
 }
 
 // vHashesToUpdate is the set of transaction hashes from a disconnected block
@@ -329,21 +324,6 @@ bool CTxMemPool::CalculateMemPoolAncestorsNL(
         parentHashes.erase(stageit);
         totalSizeWithAncestors += stageit->GetTxSize();
 
-        if (stageit->GetSizeWithDescendants() + entry.GetTxSize() >
-            limitDescendantSize) {
-            errString = strprintf(
-                "exceeds descendant size limit for tx %s [limit: %u]",
-                stageit->GetTx().GetId().ToString(), limitDescendantSize);
-            return false;
-        }
-
-        if (stageit->GetCountWithDescendants() + 1 > limitDescendantCount) {
-            errString = strprintf("too many descendants for tx %s [limit: %u]",
-                                  stageit->GetTx().GetId().ToString(),
-                                  limitDescendantCount);
-            return false;
-        }
-
         if (totalSizeWithAncestors > limitAncestorSize) {
             errString = strprintf("exceeds ancestor size limit [limit: %u]",
                                   limitAncestorSize);
@@ -376,13 +356,6 @@ void CTxMemPool::updateAncestorsOfNL(bool add,
     // add or remove this tx as a child of each parent
     for (txiter piter : parentIters) {
         updateChildNL(piter, it, add);
-    }
-    const int64_t updateCount = (add ? 1 : -1);
-    const int64_t updateSize = updateCount * it->GetTxSize();
-    const Amount updateFee = updateCount * it->GetModifiedFee();
-    for (txiter ancestorIt : setAncestors) {
-        mapTx.modify(ancestorIt, update_descendant_state(updateSize, updateFee,
-                                                         updateCount));
     }
 }
 
@@ -476,24 +449,14 @@ void CTxMemPool::updateForRemoveFromMempoolNL(const setEntries &entriesToRemove,
     }
 }
 
-void CTxMemPoolEntry::UpdateDescendantState(int64_t modifySize,
-                                            Amount modifyFee,
-                                            int64_t modifyCount) {
-    nSizeWithDescendants += modifySize;
-    assert(int64_t(nSizeWithDescendants) > 0);
-    nModFeesWithDescendants += modifyFee;
-    ancestorDescendantCounts->nCountWithDescendants += modifyCount;
-    assert(int64_t(ancestorDescendantCounts->nCountWithDescendants) > 0);
-}
-
 void CTxMemPoolEntry::UpdateAncestorState(int64_t modifySize, Amount modifyFee,
                                           int64_t modifyCount,
                                           int modifySigOps) {
     nSizeWithAncestors += modifySize;
     assert(int64_t(nSizeWithAncestors) > 0);
     nModFeesWithAncestors += modifyFee;
-    ancestorDescendantCounts->nCountWithAncestors += modifyCount;
-    assert(int64_t(ancestorDescendantCounts->nCountWithAncestors) > 0);
+    ancestorCounts->nCountWithAncestors += modifyCount;
+    assert(int64_t(ancestorCounts->nCountWithAncestors) > 0);
     nSigOpCountWithAncestors += modifySigOps;
     assert(int(nSigOpCountWithAncestors) >= 0);
 }
@@ -1067,10 +1030,6 @@ void CTxMemPool::CheckMempoolImplNL(
             }
         }
         assert(setChildrenCheck == GetMemPoolChildrenNL(it)); // MARK: also used by legacy
-        // Also check to make sure size is greater than sum with immediate
-        // children. Just a sanity check, not definitive that this calc is
-        // correct...
-        assert(it->GetSizeWithDescendants() >= childSizes + it->GetTxSize());
 
         if (fDependsWait) {
             waitingOnDependants.push_back(&(*it));
@@ -1210,8 +1169,9 @@ void CTxMemPool::RebuildJournal() const
         std::stable_sort(entries.begin(), entries.end(),
                          [](const CTxMemPoolEntry& entry1, const CTxMemPoolEntry& entry2)
                          {
-            const auto& count1 = entry1.GetAncestorDescendantCounts();
-            const auto& count2 = entry2.GetAncestorDescendantCounts();
+
+            const auto& count1 = entry1.GetAncestorCounts();
+            const auto& count2 = entry2.GetAncestorCounts();
             return (count1->nCountWithAncestors < count2->nCountWithAncestors);
         });
         for(const auto& entry : entries)
@@ -1437,10 +1397,6 @@ void CTxMemPool::prioritiseTransactionNL(
             nNoLimit,
             dummy,
             false);
-        for (txiter ancestorIt : setAncestors) {
-            mapTx.modify(ancestorIt,
-                         update_descendant_state(0, nFeeDelta, 0));
-        }
 
         // Now update all descendants' modified fees with ancestors
         setEntries setDescendants;
@@ -1850,68 +1806,72 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     const mining::CJournalChangeSetPtr& changeSet,
     std::vector<COutPoint>* pvNoSpendsRemaining) {
 
-    std::unique_lock lock(smtx);
+    // FIXME: Disabled to remove references on mempool descendant score.
+    // TODO: CORE-130
 
-    unsigned nTxnRemoved = 0;
-    CFeeRate maxFeeRateRemoved(Amount(0));
-    std::vector<TxId> vRemovedTxIds {};
-    while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
-        indexed_transaction_set::index<descendant_score>::type::iterator it =
-            mapTx.get<descendant_score>().begin();
+    // std::unique_lock lock(smtx);
 
-        // We set the new mempool min fee to the feerate of the removed set,
-        // plus the "minimum reasonable fee rate" (ie some value under which we
-        // consider txn to have 0 fee). This way, we don't allow txn to enter
-        // mempool with feerate equal to txn which were removed with no block in
-        // between.
-        CFeeRate removed(it->GetModFeesWithDescendants(),
-                         it->GetSizeWithDescendants());
-        removed += MEMPOOL_FULL_FEE_INCREMENT;
+    // unsigned nTxnRemoved = 0;
+    // CFeeRate maxFeeRateRemoved(Amount(0));
+    // std::vector<TxId> vRemovedTxIds {};
+    // while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
+    //     indexed_transaction_set::index<descendant_score>::type::iterator it =
+    //         mapTx.get<descendant_score>().begin();
 
-        trackPackageRemovedNL(removed);
-        maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
+    //     // We set the new mempool min fee to the feerate of the removed set,
+    //     // plus the "minimum reasonable fee rate" (ie some value under which we
+    //     // consider txn to have 0 fee). This way, we don't allow txn to enter
+    //     // mempool with feerate equal to txn which were removed with no block in
+    //     // between.
+    //     CFeeRate removed(it->GetModFeesWithDescendants(),
+    //                      it->GetSizeWithDescendants());
+    //     removed += MEMPOOL_FULL_FEE_INCREMENT;
 
-        setEntries stage;
-        CalculateDescendantsNL(mapTx.project<0>(it), stage);
-        nTxnRemoved += stage.size();
+    //     trackPackageRemovedNL(removed);
+    //     maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
-        std::vector<CTransaction> txn;
-        if (pvNoSpendsRemaining) {
-            txn.reserve(stage.size());
-            for (txiter iter : stage) {
-                txn.push_back(iter->GetTx());
-                vRemovedTxIds.emplace_back(iter->GetTx().GetId());
-            }
-        }
-        removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::SIZELIMIT);
-        if (pvNoSpendsRemaining) {
-            for (const CTransaction &tx : txn) {
-                for (const CTxIn &txin : tx.vin) {
-                    if (ExistsNL(txin.prevout.GetTxId())) {
-                        continue;
-                    }
-                    if (!mapNextTx.count(txin.prevout)) {
-                        pvNoSpendsRemaining->push_back(txin.prevout);
-                    }
-                }
-            }
-        }
-    }
+    //     setEntries stage;
+    //     CalculateDescendantsNL(mapTx.project<0>(it), stage);
+    //     nTxnRemoved += stage.size();
 
-    if (maxFeeRateRemoved > CFeeRate(Amount(0))) {
-        LogPrint(BCLog::MEMPOOL,
-                 "Removed %u txn, rolling minimum fee bumped to %s\n",
-                 nTxnRemoved, maxFeeRateRemoved.ToString());
-    }
-    return vRemovedTxIds;
+    //     std::vector<CTransaction> txn;
+    //     if (pvNoSpendsRemaining) {
+    //         txn.reserve(stage.size());
+    //         for (txiter iter : stage) {
+    //             txn.push_back(iter->GetTx());
+    //             vRemovedTxIds.emplace_back(iter->GetTx().GetId());
+    //         }
+    //     }
+    //     removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::SIZELIMIT);
+    //     if (pvNoSpendsRemaining) {
+    //         for (const CTransaction &tx : txn) {
+    //             for (const CTxIn &txin : tx.vin) {
+    //                 if (ExistsNL(txin.prevout.GetTxId())) {
+    //                     continue;
+    //                 }
+    //                 if (!mapNextTx.count(txin.prevout)) {
+    //                     pvNoSpendsRemaining->push_back(txin.prevout);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // if (maxFeeRateRemoved > CFeeRate(Amount(0))) {
+    //     LogPrint(BCLog::MEMPOOL,
+    //              "Removed %u txn, rolling minimum fee bumped to %s\n",
+    //              nTxnRemoved, maxFeeRateRemoved.ToString());
+    // }
+    // return vRemovedTxIds;
+
+    return std::vector<TxId>();
 }
 
 bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
                                              size_t chainLimit) const {
     std::shared_lock lock(smtx);
     auto it = mapTx.find(txid);
-    return it == mapTx.end() || (it->GetCountWithAncestors() < chainLimit &&
-                                 it->GetCountWithDescendants() < chainLimit);
+    return it == mapTx.end() || (it->GetCountWithAncestors() < chainLimit);
 }
 
 unsigned long CTxMemPool::Size() {

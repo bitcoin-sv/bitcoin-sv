@@ -152,6 +152,7 @@ void CheckSort(CTxMemPool &pool, std::vector<std::string> &sortedOrder) {
     }
 }
 
+#if 0   // FIXME: Disabled for CORE-130
 BOOST_AUTO_TEST_CASE(MempoolIndexingTest) {
     CTxMemPool pool;
     TestMemPoolEntryHelper entry;
@@ -339,7 +340,9 @@ BOOST_AUTO_TEST_CASE(MempoolIndexingTest) {
     pool.RemoveRecursive(pool.mapTx.find(tx9.GetId())->GetTx(), nullChangeSet);
     pool.RemoveRecursive(pool.mapTx.find(tx8.GetId())->GetTx(), nullChangeSet);
 }
+#endif  // FIXME: Disabled for CORE-130
 
+#if 0   // FIXME: Disabled for CORE-130
 BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest) {
     CTxMemPool pool;
     TestMemPoolEntryHelper entry;
@@ -454,7 +457,9 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest) {
     sortedOrder.insert(sortedOrder.begin(), tx7.GetId().ToString());
     CheckSort<ancestor_score>(pool, sortedOrder);
 }
+#endif  // FIXME: Disabled for CORE-130
 
+#if 0   // FIXME: Disabled for CORE-130
 BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     CTxMemPool pool;
     TestMemPoolEntryHelper entry;
@@ -629,6 +634,7 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
 
     SetMockTime(0);
 }
+#endif  // FIXME: Disabled for CORE-130
 
 BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
     // Create a transaction
