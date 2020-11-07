@@ -40,7 +40,8 @@ uint64_t BlockAssembler::ComputeMaxGeneratedBlockSize(const CBlockIndex* pindexP
 }
 
 // Fill in header fields for a new block template
-void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex, const CScript& scriptPubKeyIn) const
+void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex,
+                                     const CScript& scriptPubKeyIn, const Amount& blockFees) const
 {
     const CChainParams& chainparams { mConfig.GetChainParams() };
 
@@ -51,7 +52,7 @@ void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex
     coinbaseTx.vin[0].prevout = COutPoint{};
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
-    coinbaseTx.vout[0].nValue = mBlockFees + GetBlockSubsidy(blockHeight, chainparams.GetConsensus());
+    coinbaseTx.vout[0].nValue = blockFees + GetBlockSubsidy(blockHeight, chainparams.GetConsensus());
     // BIP34 only requires that the block height is available as a CScriptNum, but generally
     // miner software which reads the coinbase tx will not support SCriptNum.
     // Adding the extra 00 byte makes it look like a int32.
