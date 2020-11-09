@@ -629,6 +629,7 @@ public:
     void SetSanityCheck(double dFrequency = 1.0);
 
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
+    CFeeRate GetBlockMinTxFee() { return blockMinTxfee; };
 
     /** Rebuild the journal contents so they match the mempool */
     void RebuildJournal() const;
