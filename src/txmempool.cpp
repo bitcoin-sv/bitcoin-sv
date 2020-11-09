@@ -599,9 +599,6 @@ void CTxMemPool::AddUncheckedNL(
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();
 
-    vTxHashes.emplace_back(tx.GetHash(), newit);
-    newit->vTxHashesIdx = vTxHashes.size() - 1;
-
     // If it is required calculate mempool size & dynamic memory usage.
     if (pnMempoolSize) {
         *pnMempoolSize = mapTx.size();
@@ -622,17 +619,6 @@ void CTxMemPool::removeUncheckedNL(
     NotifyEntryRemoved(txn, reason);
     for (const CTxIn &txin : txn->vin) {
         mapNextTx.erase(txin.prevout);
-    }
-
-    if (vTxHashes.size() > 1) {
-        vTxHashes[it->vTxHashesIdx] = std::move(vTxHashes.back());
-        vTxHashes[it->vTxHashesIdx].second->vTxHashesIdx = it->vTxHashesIdx;
-        vTxHashes.pop_back();
-        if (vTxHashes.size() * 2 < vTxHashes.capacity()) {
-            vTxHashes.shrink_to_fit();
-        }
-    } else {
-        vTxHashes.clear();
     }
 
     // Apply to the current journal, either via the passed in change set or directly ourselves
@@ -876,7 +862,6 @@ void CTxMemPool::clearNL() {
     mapLinks.clear();
     mapTx.clear();
     mapNextTx.clear();
-    vTxHashes.clear();
     totalTxSize = 0;
     cachedInnerUsage = 0;
     lastRollingFeeUpdate = GetTime();
@@ -1517,8 +1502,7 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
                mapTx.size() +
            memusage::DynamicUsage(mapNextTx) +
            memusage::DynamicUsage(mapDeltas) +
-           memusage::DynamicUsage(mapLinks) +
-           memusage::DynamicUsage(vTxHashes) + cachedInnerUsage;
+           memusage::DynamicUsage(mapLinks) + cachedInnerUsage;
 }
 
 void CTxMemPool::removeStagedNL(
@@ -1999,4 +1983,17 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
     }
 
     return Snapshot(std::move(contents), std::move(relevantTxIds));
+}
+
+
+std::vector<CTransactionRef> CTxMemPool::GetTransactions() const
+{
+    std::shared_lock lock(smtx);
+
+    std::vector<CTransactionRef> result;
+    result.reserve(mapTx.size());
+    for (const auto& entry : mapTx) {
+        result.emplace_back(entry.GetSharedTx());
+    }
+    return result;
 }

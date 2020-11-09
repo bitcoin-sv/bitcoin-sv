@@ -223,8 +223,6 @@ public:
         return nSigOpCountWithAncestors;
     }
 
-    //!< Index in mempool's vTxHashes
-    mutable size_t vTxHashesIdx;
 };
 
 struct update_ancestor_state {
@@ -470,13 +468,10 @@ public:
     mutable std::shared_mutex smtx;
     // DEPRECATED - this will become private and ultimately changed or removed
     indexed_transaction_set mapTx;
-    // DEPRECATED - this will become private and ultimately changed or removed
-    using txiter = indexed_transaction_set::nth_index<0>::type::const_iterator;
-    //!< All tx hashes/entries in mapTx, in random order
-    // DEPRECATED - this will become private and ultimately changed or removed
-    std::vector<std::pair<uint256, txiter>> vTxHashes;
 
 private:
+    using  txiter = indexed_transaction_set::nth_index<0>::type::const_iterator;
+
     struct CompareIteratorByHash {
         bool operator()(const txiter &a, const txiter &b) const {
             return a->GetTx().GetId() < b->GetTx().GetId();
@@ -502,10 +497,10 @@ private:
 
     std::vector<indexed_transaction_set::const_iterator>
     getSortedDepthAndScoreNL() const;
-
-public:
     // DEPRECATED - this will become private and ultimately changed or removed
     indirectmap<COutPoint, const CTransaction *> mapNextTx;
+
+public:
     // DEPRECATED - this will become private and ultimately changed or removed
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
@@ -903,6 +898,15 @@ public:
      * snapshot will be invalid, that is: Snapshot#IsValid() will return @c false.
      */
     Snapshot GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const;
+
+
+    /**
+     * Returns shared references to all the transactions in the mempool, without
+     * the mempool entries. The transactions are not indexed and are returned in
+     * an unpredictable order.
+     */
+    std::vector<CTransactionRef> GetTransactions() const;
+
 
     /**
      * Make mempool consistent after a reorg, by re-adding
