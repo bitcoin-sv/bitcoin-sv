@@ -535,11 +535,6 @@ public:
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
-    void RemoveRecursive(
-        const CTransaction &tx,
-        const mining::CJournalChangeSetPtr& changeSet,
-        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
-
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             int32_t nBlockHeight,
@@ -952,6 +947,10 @@ public:
         const std::vector<CTransactionRef> &vtx);
 
 private:
+    void RemoveRecursive(
+        const CTransaction &tx,
+        const mining::CJournalChangeSetPtr& changeSet,
+        MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     // A non-locking version of CheckMempool
     void CheckMempoolNL(
