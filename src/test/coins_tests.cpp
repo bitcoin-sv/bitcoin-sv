@@ -421,6 +421,7 @@ void CheckAddCoinBase(Amount base_value, Amount cache_value,
     try {
         CTxOut output;
         output.nValue = modify_value;
+        test.cache->GetCoin( OUTPOINT ); // make sure that coin is preloaded if it already exists
         test.cache->AddCoin(OUTPOINT, CoinWithScript::MakeOwning(std::move(output), 1, coinbase),
                            coinbase, GlobalConfig::GetConfig().GetGenesisActivationHeight());
         test.cache->SelfTest();

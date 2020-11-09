@@ -84,9 +84,16 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, CoinWithScript&& coin,
         return;
     }
 
-    // Call GetCoin before adding coin since in case the coin is present in
-    // underlying coins view and not in mCache we would get wrong behavior.
-    GetCoin(outpoint, 0);
+#ifdef DEBUG
+    if (!mCache.FetchCoin(outpoint).has_value())
+    {
+        // Make sure that coin is not present in underlying view if we haven't
+        // found it in our cache as that would mean that the external code
+        // didn't honor the precondition of loading it before calling this
+        // function.
+        assert( !GetCoin(outpoint, 0).has_value() );
+    }
+#endif
 
     mCache.AddCoin(outpoint, std::move(coin), possible_overwrite, genesisActivationHeight);
 }
@@ -280,6 +287,9 @@ void CoinsStore::AddCoin(
                            std::forward_as_tuple(outpoint), std::tuple<>());
     bool fresh = false;
     if (!possible_overwrite) {
+        // For chain validation (VerifyDB) we remove a block and then add it
+        // again so we need to make an exception that spent coins can be
+        // treated as nonexistent.
         if (!it->second.GetCoin().IsSpent()) {
             throw std::logic_error(
                 "Adding new coin that replaces non-pruned entry");
