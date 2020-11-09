@@ -395,7 +395,6 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
         double priority = 10.0;
         int32_t height = 1;
         bool spendsCoinbase = false;
-        unsigned int sigOpCost = 4;
         LockPoints lp;
         mining::CJournalChangeSetPtr nullChangeSet{nullptr};
         auto& tx = *txnsData[doubleSpendIdx]->GetTxnPtr();
@@ -409,7 +408,6 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
                 height,
                 tx.GetValueOut(),
                 spendsCoinbase,
-                sigOpCost,
                 lp},
             nullChangeSet);
 

@@ -61,7 +61,7 @@ CTxMemPoolEntry MakeEntry(
     }
 
     auto txRef = MakeTransactionRef(tx);
-    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, 0, totalInChainInput, false, 0, LockPoints());
+    CTxMemPoolEntry entry {txRef, totalFee, int64_t(0), false, 0, totalInChainInput, false, LockPoints()};
     return entry;
 }
 

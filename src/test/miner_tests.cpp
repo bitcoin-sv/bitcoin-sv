@@ -219,27 +219,6 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     
     mempool.Clear();
 
-    tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
-    tx.vout[0].nValue = BLOCKSUBSIDY;
-    for (unsigned int i = 0; i < 1001; ++i) {
-        tx.vout[0].nValue -= LOWFEE;
-        hash = tx.GetId();
-        // Only first tx spends coinbase.
-        bool spendsCoinbase = (i == 0) ? true : false;
-        // If we do set the # of sig ops in the CTxMemPoolEntry, template
-        // creation passes.
-        mempool.AddUnchecked(hash,
-                             entry.Fee(LOWFEE)
-                                 .Time(GetTime())
-                                 .SpendsCoinbase(spendsCoinbase)
-                                 .SigOpsCost(80)
-                                 .FromTx(tx),
-                             nullChangeSet);
-        tx.vin[0].prevout = COutPoint(hash, 0);
-    }
-    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
-    mempool.Clear();
-
     // block size > limit
     tx.vin[0].scriptSig = CScript();
     // 18 * (520char + DROP) + OP_1 = 9433 bytes
@@ -852,7 +831,6 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
                              entry.Fee(LOWFEE)
                                  .Time(GetTime())
                                  .SpendsCoinbase(spendsCoinbase)
-                                 .SigOpsCost(1)
                                  .FromTx(tx),
                              nullChangeSet);
         tx.vin[0].prevout = COutPoint(hash, 0);
