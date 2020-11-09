@@ -8,6 +8,8 @@
 #include "consensus/merkle.h"
 #include "random.h"
 
+#include "mempool_test_access.h"
+
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
@@ -67,6 +69,7 @@ static CBlock BuildBlockTestCase() {
 
 BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
     CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
@@ -97,7 +100,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
             SHARED_TX_OFFSET + 1);
 
         size_t poolSize = pool.Size();
-        pool.RemoveRecursive(*block.vtx[2], nullChangeSet);
+        testPoolAccess.RemoveRecursive(*block.vtx[2], nullChangeSet);
         BOOST_CHECK_EQUAL(pool.Size(), poolSize - 1);
 
         CBlock block2;
@@ -186,6 +189,7 @@ public:
 
 BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
     CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
@@ -277,6 +281,7 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
 
 BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
     CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
     TestMemPoolEntryHelper entry;
     CBlock block(BuildBlockTestCase());
 
@@ -343,6 +348,7 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
 
 BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
     CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
     CMutableTransaction coinbase;
     coinbase.vin.resize(1);
     coinbase.vin[0].scriptSig.resize(10);

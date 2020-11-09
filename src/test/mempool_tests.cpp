@@ -8,6 +8,8 @@
 #include "txmempool.h"
 #include "util.h"
 
+#include "mempool_test_access.h"
+
 #include "test/test_bitcoin.h"
 #include "mempool_test_access.h"
 
@@ -59,13 +61,13 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
 
     // Nothing in pool, remove should do nothing:
     unsigned int poolSize = testPool.Size();
-    testPool.RemoveRecursive(CTransaction(txParent), nullChangeSet);
+    testPoolAccess.RemoveRecursive(CTransaction(txParent), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize);
 
     // Just the parent:
     testPool.AddUnchecked(txParent.GetId(), entry.FromTx(txParent), nullChangeSet);
     poolSize = testPool.Size();
-    testPool.RemoveRecursive(CTransaction(txParent), nullChangeSet);
+    testPoolAccess.RemoveRecursive(CTransaction(txParent), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize - 1);
 
     // Parent, children, grandchildren:
@@ -77,18 +79,18 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     }
     // Remove Child[0], GrandChild[0] should be removed:
     poolSize = testPool.Size();
-    testPool.RemoveRecursive(CTransaction(txChild[0]), nullChangeSet);
+    testPoolAccess.RemoveRecursive(CTransaction(txChild[0]), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize - 2);
     // ... make sure grandchild and child are gone:
     poolSize = testPool.Size();
-    testPool.RemoveRecursive(CTransaction(txGrandChild[0]), nullChangeSet);
+    testPoolAccess.RemoveRecursive(CTransaction(txGrandChild[0]), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize);
     poolSize = testPool.Size();
-    testPool.RemoveRecursive(CTransaction(txChild[0]), nullChangeSet);
+    testPoolAccess.RemoveRecursive(CTransaction(txChild[0]), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize);
     // Remove parent, all children/grandchildren should go:
     poolSize = testPool.Size();
-    testPool.RemoveRecursive(CTransaction(txParent), nullChangeSet);
+    testPoolAccess.RemoveRecursive(CTransaction(txParent), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize - 5);
     BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
 
@@ -103,7 +105,7 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     // Now remove the parent, as might happen if a block-re-org occurs but the
     // parent cannot be put into the mempool (maybe because it is non-standard):
     poolSize = testPool.Size();
-    testPool.RemoveRecursive(CTransaction(txParent), nullChangeSet);
+    testPoolAccess.RemoveRecursive(CTransaction(txParent), nullChangeSet);
     BOOST_CHECK_EQUAL(testPool.Size(), poolSize - 6);
     BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
 }

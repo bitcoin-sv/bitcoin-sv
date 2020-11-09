@@ -22,6 +22,8 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 
+#include "mempool_test_access.h"
+
 #include "test/test_bitcoin.h"
 
 #include <memory>
