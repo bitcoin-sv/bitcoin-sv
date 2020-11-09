@@ -9,19 +9,12 @@
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
-SaltedTxidHasher::SaltedTxidHasher()
-    : k0(GetRand(std::numeric_limits<uint64_t>::max())),
-      k1(GetRand(std::numeric_limits<uint64_t>::max()))
-{}
+const uint64_t StaticHasherSalt::k0{GetRand(std::numeric_limits<uint64_t>::max())};
+const uint64_t StaticHasherSalt::k1{GetRand(std::numeric_limits<uint64_t>::max())};
 
 std::string COutPoint::ToString() const {
     return strprintf("COutPoint(%s, %u)", txid.ToString().substr(0, 10), n);
 }
-
-SaltedOutpointHasher::SaltedOutpointHasher()
-    : k0{GetRand(std::numeric_limits<uint64_t>::max())},
-      k1{GetRand(std::numeric_limits<uint64_t>::max())}
-{}
 
 std::string CTxIn::ToString() const {
     std::string str;
