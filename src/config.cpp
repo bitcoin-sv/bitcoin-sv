@@ -478,10 +478,16 @@ uint64_t GlobalConfig::GetGenesisGracefulPeriod() const
     return genesisGracefulPeriod;
 }
 
-GlobalConfig& GlobalConfig::GetConfig()
+Config& GlobalConfig::GetConfig()
 {
     static GlobalConfig config {};
     return config;
+}
+
+ConfigInit& GlobalConfig::GetModifiableGlobalConfig() 
+{
+    static Config& config = GlobalConfig::GetConfig();
+    return static_cast<ConfigInit&>(config);
 }
 
 void GlobalConfig::SetTestBlockCandidateValidity(bool test) {
@@ -1197,6 +1203,8 @@ int DummyConfig::GetPerBlockScriptValidationMaxBatchSize() const
 {
     return DEFAULT_SCRIPT_CHECK_MAX_BATCH_SIZE;
 }
+
+void DummyConfig::Reset() {}
 
 void GlobalConfig::SetMinFeePerKB(CFeeRate fee) {
     feePerKB = fee;

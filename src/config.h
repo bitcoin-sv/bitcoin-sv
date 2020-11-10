@@ -32,188 +32,156 @@ struct DefaultBlockSizeParams;
 
 class Config : public boost::noncopyable, public CScriptConfig {
 public:
-    // used to specify default block size related parameters
-    virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams &params) = 0;
-    
-    virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxBlockSize() const = 0;
-    
-    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
+    virtual bool SetMaxBlockSize(uint64_t maxBlockSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxGeneratedBlockSize() const = 0;
     virtual uint64_t GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const = 0;
+    virtual bool SetMaxGeneratedBlockSize(uint64_t maxGeneratedBlockSize, std::string* err = nullptr) = 0;
     virtual bool MaxGeneratedBlockSizeOverridden() const = 0;
-
-    virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
-
     virtual const CChainParams &GetChainParams() const = 0;
-
-    virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) const = 0;
-
-    virtual bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMinConsolidationFactor() const = 0;
-
-    virtual bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxConsolidationInputScriptSize() const = 0;
-
-    virtual bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMinConfConsolidationInput() const = 0;
-
-    virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
     virtual bool GetAcceptNonStdConsolidationInput() const = 0;
-
-    virtual void SetMinFeePerKB(CFeeRate amt) = 0;
     virtual CFeeRate GetMinFeePerKB() const = 0;
-
-    virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
     virtual CFeeRate GetBlockMinFeePerKB() const = 0;
-
-    virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
     virtual uint64_t GetPreferredBlockFileSize() const = 0;
-
-    virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
-
-    virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
     virtual uint64_t GetLimitAncestorCount() const = 0;
-
-    virtual bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetLimitSecondaryMempoolAncestorCount() const = 0;
-
-    virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual bool GetTestBlockCandidateValidity() const = 0;
-
-    virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
     virtual uint64_t GetFactorMaxSendQueuesBytes() const = 0;
     virtual uint64_t GetMaxSendQueuesBytes() const = 0; // calculated based on factorMaxSendQueuesBytes
-
-    virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
     virtual mining::CMiningFactory::BlockAssemblerType GetMiningCandidateBuilder() const = 0;
-
-    virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
     virtual int32_t GetGenesisActivationHeight() const = 0;
-
-    virtual bool SetMaxConcurrentAsyncTasksPerNode(
-        int maxConcurrentAsyncTasksPerNode,
-        std::string* error = nullptr) = 0;
     virtual int GetMaxConcurrentAsyncTasksPerNode() const = 0;
-
-    virtual bool SetBlockScriptValidatorsParams(
-        int maxParallelBlocks,
-        int perValidatorThreadsCount,
-        int perValidatorThreadMaxBatchSize,
-        std::string* error = nullptr) = 0;
     virtual int GetMaxParallelBlocks() const = 0;
     virtual int GetPerBlockScriptValidatorThreadsCount() const = 0;
     virtual int GetPerBlockScriptValidationMaxBatchSize() const = 0;
-
-    virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
-
-    /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
-    virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxTxSigOpsCountConsensusBeforeGenesis() const = 0;
     virtual uint64_t GetMaxTxSigOpsCountPolicy(bool isGenesisEnabled) const = 0;
-
     virtual uint64_t GetMaxBlockSigOpsConsensusBeforeGenesis(uint64_t blockSize) const = 0;
-
-    virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
-
-    virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxStdTxnValidationDuration() const = 0;
-
-    virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
     virtual std::chrono::milliseconds GetMaxNonStdTxnValidationDuration() const = 0;
-
-    virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
-
-    virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
-
-    virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
-
-    virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
     virtual uint64_t GetGenesisGracefulPeriod() const = 0;
-
-    virtual void SetAcceptNonStandardOutput(bool accept) = 0;
     virtual bool GetAcceptNonStandardOutput(bool isGenesisEnabled) const = 0;
-
-    virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
     virtual uint64_t GetMaxCoinsViewCacheSize() const = 0;
-
-    virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
     virtual uint64_t GetMaxCoinsProviderCacheSize() const = 0;
-
-    virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
-    virtual uint64_t GetMaxCoinsDbOpenFiles() const = 0;
-
-    virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
     virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
     virtual bool IsBlockInvalidated(const uint256& hash) const = 0;
-
-    virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
     virtual bool IsClientUABanned(const std::string uaClient) const = 0;
-    virtual bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxMerkleTreeDiskSpace() const = 0;
-    virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetPreferredMerkleTreeFileSize() const = 0;
-    virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxMerkleTreeMemoryCacheSize() const = 0;
-
-    virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
     virtual uint64_t GetMaxMempool() const = 0;
-
-    virtual bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) = 0;
-    virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
-
-    virtual bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) = 0;
-    virtual uint64_t GetMempoolMaxPercentCPFP() const = 0;
-
-    virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
     virtual uint64_t GetMemPoolExpiry() const = 0;
-
-    virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
     virtual uint64_t GetMaxOrphanTxSize() const = 0;
-
-    virtual bool SetStopAtHeight(int32_t StopAtHeight, std::string* err) = 0;
     virtual int32_t GetStopAtHeight() const = 0;
-
-    virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
     virtual uint64_t GetPromiscuousMempoolFlags() const = 0;
     virtual bool IsSetPromiscuousMempoolFlags() const = 0;
-
-    virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
     virtual std::set<std::string> GetInvalidTxSinks() const = 0;
     virtual std::set<std::string> GetAvailableInvalidTxSinks() const = 0;
-
-    virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
     virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
-
-    virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
     virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
-
     // P2P parameters
-    virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
 
-    virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
-    virtual bool GetDisableBIP30Checks() const = 0;
-
 #if ENABLE_ZMQ
-    virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
 #endif
 
-    virtual bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) = 0;
-    virtual bool SetRecvInvQueueFactor(uint64_t value, std::string* err) = 0;
     virtual unsigned int GetMaxProtocolRecvPayloadLength() const = 0;
     virtual unsigned int GetMaxProtocolSendPayloadLength() const = 0;
     virtual unsigned int GetRecvInvQueueFactor() const = 0;
+    virtual uint64_t GetMaxCoinsDbOpenFiles() const = 0;
+    virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
+    virtual uint64_t GetMempoolMaxPercentCPFP() const = 0;
+    virtual bool GetDisableBIP30Checks() const = 0;
 
 protected:
     ~Config() = default;
 };
 
-class GlobalConfig final : public Config {
+class ConfigInit : public Config {
+public:
+    // used to specify default block size related parameters
+    virtual void SetDefaultBlockSizeParams(const DefaultBlockSizeParams& params) = 0;
+    virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
+    virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetMinConsolidationFactor(int64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetMaxConsolidationInputScriptSize(int64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetMinConfConsolidationInput(int64_t value, std::string* err = nullptr) = 0;
+    virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
+    virtual void SetMinFeePerKB(CFeeRate amt) = 0;
+    virtual void SetBlockMinFeePerKB(CFeeRate amt) = 0;
+    virtual void SetPreferredBlockFileSize(uint64_t preferredBlockFileSize) = 0;
+    virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
+    virtual bool SetLimitAncestorCount(int64_t limitAncestorCount, std::string* err = nullptr) = 0;
+    virtual void SetTestBlockCandidateValidity(bool test) = 0;
+    virtual void SetFactorMaxSendQueuesBytes(uint64_t factorMaxSendQueuesBytes) = 0;
+    virtual void SetMiningCandidateBuilder(mining::CMiningFactory::BlockAssemblerType type) = 0;
+    virtual bool SetGenesisActivationHeight(int32_t genesisActivationHeightIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxConcurrentAsyncTasksPerNode(
+        int maxConcurrentAsyncTasksPerNode,
+        std::string* error = nullptr) = 0;
+    virtual bool SetBlockScriptValidatorsParams(
+        int maxParallelBlocks,
+        int perValidatorThreadsCount,
+        int perValidatorThreadMaxBatchSize,
+        std::string* error = nullptr) = 0;
+    virtual bool SetMaxOpsPerScriptPolicy(int64_t maxOpsPerScriptPolicyIn, std::string* error) = 0;
+    /** Sets the maximum policy number of sigops we're willing to relay/mine in a single tx */
+    virtual bool SetMaxTxSigOpsCountPolicy(int64_t maxTxSigOpsCountIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxPubKeysPerMultiSigPolicy(int64_t maxPubKeysPerMultiSigIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual bool SetMaxNonStdTxnValidationDuration(int ms, std::string* err = nullptr) = 0;
+    virtual bool SetMaxStackMemoryUsage(int64_t maxStackMemoryUsageConsensusIn, int64_t maxStackMemoryUsagePolicyIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxScriptSizePolicy(int64_t maxScriptSizePolicyIn, std::string* err = nullptr) = 0;
+    virtual bool SetMaxScriptNumLengthPolicy(int64_t maxScriptNumLengthIn, std::string* err = nullptr) = 0;
+    virtual bool SetGenesisGracefulPeriod(int64_t genesisGracefulPeriodIn, std::string* err = nullptr) = 0;
+    virtual void SetAcceptNonStandardOutput(bool accept) = 0;
+    virtual bool SetMaxCoinsViewCacheSize(int64_t max, std::string* err) = 0;
+    virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
+    virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
+    virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
+    virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
+    virtual bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) = 0;
+    virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
+    virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
+    virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
+    virtual bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) = 0;
+    virtual bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) = 0;
+    virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
+    virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
+    virtual bool SetStopAtHeight(int32_t StopAtHeight, std::string* err) = 0;
+    virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
+    virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
+    virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
+    virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
+    // P2P parameters
+    virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
+    virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
+
+#if ENABLE_ZMQ
+    virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
+#endif
+
+    virtual bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) = 0;
+    virtual bool SetRecvInvQueueFactor(uint64_t value, std::string* err) = 0;
+    virtual bool SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err = nullptr) = 0;
+
+    // Reset state of this object to match a newly constructed one.
+    // Used in constructor and for unit testing to always start with a clean
+    // state
+    virtual void Reset() = 0;
+
+protected:
+    ~ConfigInit() = default;
+};
+
+class GlobalConfig final : public ConfigInit {
 public:
     GlobalConfig();
 
@@ -401,8 +369,12 @@ public:
 
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
-    void Reset(); 
-    static GlobalConfig& GetConfig();
+    void Reset() override;
+
+    // GetConfig() is used where read-only access to global configuration is needed.
+    static Config& GetConfig();
+    // GetModifiableGlobalConfig() should only be used in initialization and unit tests.
+    static ConfigInit& GetModifiableGlobalConfig();
 
 private:
     // All fileds are initialized in Reset()    
@@ -506,7 +478,7 @@ private:
 };
 
 // Dummy for subclassing in unittests
-class DummyConfig : public Config {
+class DummyConfig : public ConfigInit {
 public:
     DummyConfig();
     DummyConfig(std::string net);
@@ -890,6 +862,8 @@ public:
     {
         return true;
     }
+
+    void Reset() override;
 
 private:
     std::unique_ptr<CChainParams> chainParams;

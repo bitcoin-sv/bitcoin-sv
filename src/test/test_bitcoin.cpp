@@ -48,7 +48,7 @@ FastRandomContext insecure_rand_ctx(insecure_rand_seed);
 
 extern void noui_connect();
 
-BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetConfig()) {
+BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(GlobalConfig::GetModifiableGlobalConfig()) {
     SHA256AutoDetect();
     RandomInit();
     SetupEnvironment();

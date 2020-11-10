@@ -46,14 +46,14 @@ static inline bool InsecureRandBool() {
 static inline std::vector<uint8_t> InsecureRandBytes(size_t len) {
     return insecure_rand_ctx.randbytes(len);
 }
-class GlobalConfig;
+class ConfigInit;
 
 /**
  * Basic testing setup.
  * This just configures logging and chain parameters.
  */
 struct BasicTestingSetup {
-    GlobalConfig& testConfig;
+    ConfigInit& testConfig;
     fs::path pathTemp;
 
     BasicTestingSetup(const std::string &chainName = CBaseChainParams::MAIN);

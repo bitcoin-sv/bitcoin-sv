@@ -82,7 +82,7 @@ namespace {
                                         const CCoinsViewCache& tipView)
     {
         //DummyConfig config(CBaseChainParams::MAIN);
-        auto& config = GlobalConfig::GetConfig();
+        auto& config = GlobalConfig::GetModifiableGlobalConfig();
         auto genesisActivationHeight = config.GetGenesisActivationHeight();
         const CTransaction tx(mutableTx);
         PrecomputedTransactionData txdata(tx);
@@ -295,7 +295,7 @@ BOOST_AUTO_TEST_CASE(checkinputs_test) {
     const CTransaction spend_tx(mutableSpend_tx);
 
     LOCK(cs_main);
-    auto& config = GlobalConfig::GetConfig();
+    auto& config = GlobalConfig::GetModifiableGlobalConfig();
     config.SetGenesisActivationHeight(102);
 
 
