@@ -4151,6 +4151,7 @@ static int64_t nTimeConnectTotal = 0;
 static int64_t nTimeFlush = 0;
 static int64_t nTimeChainState = 0;
 static int64_t nTimePostConnect = 0;
+static int64_t nTimeRemoveFromMempool = 0;
 
 struct PerBlockConnectTrace {
     CBlockIndex *pindex = nullptr;
@@ -4351,8 +4352,14 @@ static bool ConnectTip(
     nTimeChainState += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
-    // Remove conflicting transactions from the mempool.;
+
+    // Remove transactions from the mempool.;
     mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
+    int64_t nTimeRemoveForBlock = GetTimeMicros() - nTime5;
+    nTimeRemoveFromMempool += nTimeRemoveForBlock;
+    LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
+             nTimeRemoveForBlock * 0.001, nTimeRemoveFromMempool * 0.000001);
+    
     if(g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
