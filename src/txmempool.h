@@ -448,9 +448,6 @@ private:
     CTimeLockedMempool mTimeLockedPool {};
 
 public:
-    // public only for testing
-    static constexpr int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
-
     // DEPRECATED - this will become private and ultimately changed or removed
     typedef boost::multi_index_container<
         CTxMemPoolEntry, boost::multi_index::indexed_by<
@@ -470,6 +467,8 @@ public:
     indexed_transaction_set mapTx;
 
 private:
+    static constexpr int ROLLING_FEE_HALFLIFE = 60 * 60 * 12;
+
     using  txiter = indexed_transaction_set::nth_index<0>::type::const_iterator;
 
     struct CompareIteratorByHash {
@@ -499,7 +498,6 @@ private:
     indirectmap<COutPoint, const CTransaction *> mapNextTx;
 
 public:
-    // DEPRECATED - this will become private and ultimately changed or removed
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
     /** Create a new CTxMemPool.
