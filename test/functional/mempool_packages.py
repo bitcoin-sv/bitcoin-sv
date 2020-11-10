@@ -89,19 +89,6 @@ class MempoolPackagesTest(BitcoinTestFramework):
             assert_equal(mempool[x], v_descendants[x])
         assert(chain[0] not in v_descendants.keys())
 
-        # Check that ancestor modified fees includes fee deltas from
-        # prioritisetransaction
-        self.nodes[0].prioritisetransaction(chain[0], 0, 1000)
-        mempool = self.nodes[0].getrawmempool(True)
-        ancestor_fees = 0
-        for x in chain:
-            ancestor_fees += mempool[x]['fee']
-            assert_equal(mempool[x]['ancestorfees'],
-                         ancestor_fees * COIN + 1000)
-
-        # Undo the prioritisetransaction for later tests
-        self.nodes[0].prioritisetransaction(chain[0], 0, -1000)
-
         # Adding one more transaction on to the chain should fail.
         assert_raises_rpc_error(-26, "too-long-mempool-chain",
                                 self.chain_transaction, self.nodes[0], txid, vout, value, fee, 1)

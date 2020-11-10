@@ -891,26 +891,19 @@ static bool CheckLimitFreeTx(
     return true;
 }
 
-static bool CalculateMempoolAncestors(
-    const CTxMemPool &pool,
-    const CTxMemPoolEntry& pMempoolEntry,
-    CTxMemPool::setEntries& setAncestors,
-    std::string& errString) {
-    // Calculate in-mempool ancestors, up to a limit.
-    size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-    size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
-    size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
-    size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
-    if (!pool.CalculateMemPoolAncestors(pMempoolEntry,
-                setAncestors,
-                nLimitAncestors,
-                nLimitAncestorSize,
-                nLimitDescendants,
-                nLimitDescendantSize,
-                errString)) {
-        return false;
-    }
-    return true;
+static bool CheckAncestorLimits(const CTxMemPool& pool,
+                                const CTxMemPoolEntry& entry,
+                                std::string& errString) {
+    const auto limitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
+    const auto limitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
+    const auto limitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
+    const auto limitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
+    return pool.CheckAncestorLimits(entry,
+                                    limitAncestors,
+                                    limitAncestorSize,
+                                    limitDescendants,
+                                    limitDescendantSize,
+                                    std::ref(errString));
 }
 
 static uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) {
@@ -981,7 +974,7 @@ std::vector<TxId> LimitMempoolSize(
 void CommitTxToMempool(
     const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& pMempoolEntry,
-    CTxMemPool::setEntries& setAncestors,
+    // FIXME: (CORE-130) CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
     CValidationState& state,
     const CJournalChangeSetPtr& changeSet,
@@ -1006,7 +999,7 @@ void CommitTxToMempool(
     pool.AddUnchecked(
             txid,
             pMempoolEntry,
-            setAncestors,
+            // FIXME: (CORE-130) setAncestors,
             changeSet,
             pnMempoolSize,
             pnDynamicMemoryUsage);
@@ -1367,9 +1360,10 @@ CTxnValResult TxnValidation(
         }
     }
     // Calculate in-mempool ancestors, up to a limit.
-    CTxMemPool::setEntries setAncestors;
+    // FIXME: (CORE-130) See comment at CommitTxToMempool in validation.h
+    // regarding validation performance.
     std::string errString;
-    if (!CalculateMempoolAncestors(pool, *pMempoolEntry, setAncestors, errString)) {
+    if (!CheckAncestorLimits(pool, *pMempoolEntry, errString)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-mempool-chain",
                   errString);
@@ -1509,11 +1503,11 @@ CTxnValResult TxnValidation(
     // the node is not behind and it is not dependent on any other
     // transactions in the Mempool.
     // Transaction is validated successfully. Return valid results.
+
     return Result{state,
                   pTxInputData,
                   vCoinsToUncache,
-                  std::move(pMempoolEntry),
-                  std::move(setAncestors)};
+                  std::move(pMempoolEntry)};
 }
 
 CValidationState HandleTxnProcessingException(
@@ -1771,7 +1765,7 @@ void ProcessValidatedTxn(
         CommitTxToMempool(
             txStatus.mTxInputData,
             *(txStatus.mpEntry),
-            txStatus.mSetAncestors,
+            // FIXME: (CORE-130) txStatus.mSetAncestors,
             pool,
             state,
             handlers.mJournalChangeSet,
@@ -7438,14 +7432,7 @@ void DumpMempool(void) {
 
     std::map<uint256, Amount> mapDeltas;
     std::vector<TxMempoolInfo> vinfo;
-
-    {
-        std::shared_lock lock(mempool.smtx);
-        for (const auto &i : mempool.mapDeltas) {
-            mapDeltas[i.first] = i.second.second;
-        }
-        vinfo = mempool.InfoAllNL();
-    }
+    mempool.GetDeltasAndInfo(mapDeltas, vinfo);
 
     int64_t mid = GetTimeMicros();
 
