@@ -42,7 +42,7 @@ Implementation details
   * Use wNAF notation for point multiplicands.
   * Use a much larger window for multiples of G, using precomputed multiples.
   * Use Shamir's trick to do the multiplication with the public key and the generator simultaneously.
-  * Optionally (off by default) use secp256k1's efficiently-computable endomorphism to split the P multiplicand into 2 half-sized ones.
+  * Optionally (on by default) use secp256k1's efficiently-computable endomorphism to split the P multiplicand into 2 half-sized ones.
 * Point multiplication for signing
   * Use a precomputed table of multiples of powers of 16 multiplied with the generator, so general multiplication becomes a series of additions.
   * Access the table with branch-free conditional moves so memory access is uniform.
@@ -59,3 +59,5 @@ libsecp256k1 is built using autotools:
     $ make
     $ ./tests
     $ sudo make install  # optional
+
+Warning: Do not use gcc version 9.3.0 due to memcmp bug (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=95189)
