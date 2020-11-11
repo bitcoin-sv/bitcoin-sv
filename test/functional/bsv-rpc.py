@@ -8,8 +8,7 @@ class BSV_RPC_MaxBlockSize_Test (BitcoinTestFramework):
         self.num_nodes = 1
         self.tip = None
         self.setup_clean_chain = True
-        self.extra_args = [['-norelaypriority',
-                            '-whitelist=127.0.0.1']]
+        self.extra_args = [['-whitelist=127.0.0.1']]
 
     def get_block_max_size(self):
         info = self.nodes[0].getinfo()

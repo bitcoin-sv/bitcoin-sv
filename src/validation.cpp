@@ -839,22 +839,6 @@ static bool CheckMempoolMinFee(
     return true;
 }
 
-static bool CheckTxRelayPriority(
-    const Amount& nModifiedFees,
-    const CFeeRate& minRelayTxFee,
-    const CTxMemPoolEntry& pMempoolEntry,
-    unsigned int nTxSize) {
-    // Check txn relay priority
-    if (gArgs.GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) &&
-        nModifiedFees < minRelayTxFee.GetFee(nTxSize) &&
-        !AllowFree(pMempoolEntry.GetPriority(chainActive.Height() + 1))) {
-        // Require that free transactions have sufficient priority to be
-        // mined in the next block.
-        return false;
-    }
-    return true;
-}
-
 static bool CheckAncestorLimits(const CTxMemPool& pool,
                                 const CTxMemPoolEntry& entry,
                                 std::string& errString) {
@@ -1339,7 +1323,7 @@ CTxnValResult TxnValidation(
     if (!skipFeeTest) {
         // Check tx's priority based on relaypriority flag and relay fee.
         const CFeeRate minRelayTxFee = config.GetMinFeePerKB();
-        if (!CheckTxRelayPriority(nModifiedFees, minRelayTxFee, *pMempoolEntry, nTxSize)) {
+        if ( nModifiedFees < minRelayTxFee.GetFee(nTxSize)) {
             // Require that free transactions have sufficient priority to be
             // mined in the next block.
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
