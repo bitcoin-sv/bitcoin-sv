@@ -855,42 +855,6 @@ static bool CheckTxRelayPriority(
     return true;
 }
 
-static bool CheckLimitFreeTx(
-    const Config& config,
-    bool fLimitFree,
-    const Amount& nModifiedFees,
-    const CFeeRate& minRelayTxFee,
-    unsigned int nTxSize) {
-    // Continuously rate-limit free (really, very-low-fee) transactions.
-    // This mitigates 'penny-flooding' -- sending thousands of free
-    // transactions just to be annoying or make others' transactions take
-    // longer to confirm.
-    if (!(fLimitFree && nModifiedFees < minRelayTxFee.GetFee(nTxSize))) {
-        return true;
-    }
-    static CCriticalSection csFreeLimiter;
-    static double dFreeCount;
-    static int64_t nLastTime;
-    int64_t nNow = GetTime();
-
-    LOCK(csFreeLimiter);
-
-    // Use an exponentially decaying ~10-minute window:
-    dFreeCount *= pow(1.0 - 1.0 / 600.0, double(nNow - nLastTime));
-    nLastTime = nNow;
-    // -limitfreerelay unit is thousand-bytes-per-minute
-    // At default rate it would take over a month to fill 1GB
-    if (dFreeCount + nTxSize >=
-        config.GetLimitFreeRelay() * 10) {
-        return false;
-    }
-
-    LogPrint(BCLog::MEMPOOL, "Rate limit dFreeCount: %g => %g\n",
-             dFreeCount, dFreeCount + nTxSize);
-    dFreeCount += nTxSize;
-    return true;
-}
-
 static bool CheckAncestorLimits(const CTxMemPool& pool,
                                 const CTxMemPoolEntry& entry,
                                 std::string& errString) {
@@ -1093,7 +1057,6 @@ CTxnValResult TxnValidation(
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
-    const bool fLimitFree = pTxInputData->IsLimitFree();
     const int64_t nAcceptTime = pTxInputData->GetAcceptTime();
     const Amount nAbsurdFee = pTxInputData->GetAbsurdFee();
 
@@ -1381,15 +1344,6 @@ CTxnValResult TxnValidation(
             // mined in the next block.
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                       "insufficient priority");
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
-        // Continuously rate-limit free (really, very-low-fee) transactions.
-        // This mitigates 'penny-flooding' -- sending thousands of free
-        // transactions just to be annoying or make others' transactions take
-        // longer to confirm.
-    	if (!CheckLimitFreeTx(config, fLimitFree, nModifiedFees, minRelayTxFee, nTxSize)){
-            state.DoS(0, false, REJECT_INSUFFICIENTFEE,
-                      "rate limited free transaction");
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }

@@ -169,9 +169,6 @@ public:
     virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
     virtual uint64_t GetMemPoolExpiry() const = 0;
 
-    virtual bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) = 0;
-    virtual uint64_t GetLimitFreeRelay() const = 0;
-
     virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
     virtual uint64_t GetMaxOrphanTxSize() const = 0;
 
@@ -352,9 +349,6 @@ public:
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override;
     uint64_t GetMemPoolExpiry() const override;
 
-    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override;
-    uint64_t GetLimitFreeRelay() const override;
-
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override;
     uint64_t GetMaxOrphanTxSize() const override;
 
@@ -456,7 +450,6 @@ private:
     uint64_t mMaxMempoolSizeDisk;
     uint64_t mMempoolMaxPercentCPFP;
     uint64_t mMemPoolExpiry;
-    uint64_t mLimitFreeRelay;
     uint64_t mMaxOrphanTxSize;
     int32_t mStopAtHeight;
     uint64_t mPromiscuousMempoolFlags;
@@ -750,14 +743,6 @@ public:
         return true;
     }
     uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR; }
-
-    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override
-    {
-        SetErrorMsg(err);
-
-        return true;
-    }
-    uint64_t GetLimitFreeRelay() const override { return DEFAULT_LIMITFREERELAY * ONE_KILOBYTE; }
 
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override
     {

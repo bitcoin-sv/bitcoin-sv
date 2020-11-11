@@ -4582,7 +4582,6 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
             TxValidationPriority::normal, // tx validation priority
             TxStorage::memory, // tx storage
             GetTime(),    // nAcceptTime
-            true,         // fLimitFree
             nAbsurdFee),  // nAbsurdFee
         changeSet, // an instance of the mempool journal
         true); // fLimitMempoolSize

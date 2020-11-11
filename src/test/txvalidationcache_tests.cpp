@@ -38,8 +38,7 @@ namespace {
                     TxSource::rpc,            // tx source
                     TxValidationPriority::normal,   // tx validation priority
                     TxStorage::memory,        // tx storage
-                    GetTime(),                // nAcceptTime
-                    false)                    // fLimitFree
+                    GetTime())                // nAcceptTime
             };
             // Mempool Journal ChangeSet
             mining::CJournalChangeSetPtr changeSet {nullptr};

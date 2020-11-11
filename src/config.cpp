@@ -73,7 +73,6 @@ void GlobalConfig::Reset()
     mMaxMempoolSizeDisk = mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
     mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
-    mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
     mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
     mStopAtHeight = DEFAULT_STOPATHEIGHT;
     mPromiscuousMempoolFlags = 0;
@@ -1223,21 +1222,6 @@ bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
 
 uint64_t GlobalConfig::GetMemPoolExpiry() const {
     return mMemPoolExpiry;
-}
-
-bool GlobalConfig::SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) {
-    if (LessThanZero(limitFreeRelay, err, "Policy value for rate-limit free transactions must not be less than 0."))
-    {
-        return false;
-    }
-
-    mLimitFreeRelay = static_cast<uint64_t>(limitFreeRelay);
-
-    return true;
-}
-
-uint64_t GlobalConfig::GetLimitFreeRelay() const {
-    return mLimitFreeRelay;
 }
 
 bool GlobalConfig::SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) {

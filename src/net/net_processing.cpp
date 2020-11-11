@@ -2623,7 +2623,6 @@ static void ProcessTxMessage(const Config& config,
                 TxValidationPriority::high,  // tx validation priority
                 TxStorage::memory, // tx storage
                 GetTime(),      // nAcceptTime
-                true,           // fLimitFree
                 Amount(0),      // nAbsurdFee
                 pfrom));        // pNode
     } else {
@@ -4621,12 +4620,9 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
                 CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
             static FeeFilterRounder filterRounder(default_feerate);
             Amount filterToSend = filterRounder.round(currentFilter);
-            // If we don't allow free transactions, then we always have a fee
+            // We don't allow free transactions, we always have a fee
             // filter of at least minRelayTxFee
-            if (config.GetLimitFreeRelay() <= 0) {
-                filterToSend = std::max(filterToSend,
-                                        config.GetMinFeePerKB().GetFeePerK());
-            }
+            filterToSend = std::max(filterToSend, config.GetMinFeePerKB().GetFeePerK());
 
             if (filterToSend != pto->lastSentFeeFilter) {
                 connman.PushMessage(

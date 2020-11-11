@@ -240,7 +240,6 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                 TxValidationPriority::normal, // tx validation priority
                 TxStorage::memory, // tx storage
                 GetTime(),     // nAcceptTime
-                false,      // mfLimitFree
                 Amount(0),     // nAbsurdFee
                 nodes[i]));    // pNode
     }
@@ -276,7 +275,6 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                 TxValidationPriority::normal, // tx validation priority
                 TxStorage::memory, // tx storage
                 GetTime(),     // nAcceptTime
-                false, // mfLimitFree
                 Amount(0),     // nAbsurdFee
                 pRndTxInputData->GetNodePtr())); // pNode
     }
@@ -317,7 +315,6 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans) {
                 TxValidationPriority::normal, // tx validation priority
                 TxStorage::memory, // tx storage
                 GetTime(),     // nAcceptTime
-                false,         // mfLimitFree
                 Amount(0),     // nAbsurdFee
                 pRndTxInputData->GetNodePtr()) // pNode
         };

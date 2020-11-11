@@ -43,7 +43,6 @@ CTxInputData::CTxInputData(
     TxValidationPriority txValidationPriority,
     TxStorage txStorage,
     int64_t nAcceptTime,
-    bool fLimitFree,
     Amount nAbsurdFee,
     std::weak_ptr<CNode> pNode,
     bool fOrphan)
@@ -55,7 +54,6 @@ CTxInputData::CTxInputData(
   mnAcceptTime(nAcceptTime),
   mTxSource(txSource),
   mTxValidationPriority(txValidationPriority),
-  mfLimitFree(fLimitFree),
   mfOrphan(fOrphan)
 {
     // Due to orphan transaction life-cycle we skip insert operation into the tracker, because:

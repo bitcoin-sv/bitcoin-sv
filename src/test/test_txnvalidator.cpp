@@ -105,7 +105,6 @@ namespace {
                    TxValidationPriority::normal, // tx validation priority
                    TxStorage::memory, // tx storage
                    GetTime(),// nAcceptTime
-                   false,    // mfLimitFree
                    Amount(0), // nAbsurdFee
                    pNode);   // pNode
     }
@@ -126,7 +125,6 @@ namespace {
                         TxValidationPriority::normal, // tx validation priority
                         TxStorage::memory, // tx storage
                         GetTime(),// nAcceptTime
-                        false,    // mfLimitFree
                         Amount(0), // nAbsurdFee
                         pNode));   // pNode
         }
@@ -332,7 +330,6 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
             TxValidationPriority::normal,
             TxStorage::memory,
             GetTime(),// nAcceptTime
-            false,    // mfLimitFree
             Amount(0), // nAbsurdFee
             std::weak_ptr<CNode>{});
     auto& primaryTx = *txnsData[doubleSpendIdx]->GetTxnPtr();

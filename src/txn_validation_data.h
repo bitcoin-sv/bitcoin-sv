@@ -54,7 +54,6 @@ public:
         TxValidationPriority txValidationPriority,
         TxStorage txStorage=TxStorage::memory,
         int64_t nAcceptTime=0,
-        bool fLimitFree=false,
         Amount nAbsurdFee=Amount(0),
         std::weak_ptr<CNode> pNode={},
         bool fOrphan=false);
@@ -110,10 +109,6 @@ public:
     const TxValidationPriority& GetTxValidationPriority() const {
         return mTxValidationPriority;
     }
-    // IsLimitFree
-    bool IsLimitFree() const {
-        return mfLimitFree;
-    }
     // IsOrphanTxn
     bool IsOrphanTxn() const {
         return mfOrphan;
@@ -158,7 +153,6 @@ private:
     int64_t mnAcceptTime {0};
     TxSource mTxSource {TxSource::unknown};
     TxValidationPriority mTxValidationPriority {TxValidationPriority::normal};
-    bool mfLimitFree {false};
     bool mfOrphan {false};
     bool mfTxIdStored {false};
 };

@@ -834,11 +834,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt(
             "-blocksizeactivationtime=<n>",
             "Change time that specifies when new defaults for -blockmaxsize are used");
-        strUsage += HelpMessageOpt(
-            "-limitfreerelay=<n>",
-            strprintf("Continuously rate-limit free transactions to <n> "
-                      "kilobytes per minute (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                      DEFAULT_LIMITFREERELAY));
         strUsage +=
             HelpMessageOpt("-relaypriority",
                            strprintf("Require high priority for relaying free "
@@ -1842,13 +1837,6 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(err);
     }
     
-    // Configure free transactions limit 
-    if (std::string err; !config.SetLimitFreeRelay(
-        gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, ONE_KILOBYTE), &err))
-    {
-        return InitError(err);
-    }
-
     // Configure max orphant Tx size
     if (std::string err; !config.SetMaxOrphanTxSize(
         gArgs.GetArgAsBytes("-maxorphantxsize", 

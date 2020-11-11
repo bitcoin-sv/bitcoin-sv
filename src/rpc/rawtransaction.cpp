@@ -1247,7 +1247,6 @@ static UniValue sendrawtransaction(const Config &config,
             TxValidationPriority::normal,   // tx validation priority
             TxStorage::memory,              // tx storage
             GetTime(),                      // nAcceptTime
-            false,                          // fLimitFree
             nMaxRawTxFee);                 // nAbsurdFee
     // Check if transaction is already received through p2p interface,
     // and thus, couldn't be added to the TxIdTracker.
@@ -1532,8 +1531,7 @@ static UniValue sendrawtransactions(const Config &config,
                 TxSource::rpc,                  // tx source
                 TxValidationPriority::normal,   // tx validation priority
                 TxStorage::memory,              // tx storage
-                GetTime(),                      // nAcceptTime
-                false,                          // fLimitFree
+                GetTime(),                      // fLimitFree
                 nMaxRawTxFee);                 // nAbsurdFee
         // Check if transaction is already known
         // - received through p2p interface or present in the mempools
