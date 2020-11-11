@@ -354,10 +354,6 @@ public:
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
-    // Compute modified tx size for priority calculation (optionally given tx
-    // size)
-    unsigned int CalculateModifiedSize(unsigned int nTxSize = 0) const;
-
     /**
      * Get the total transaction size in bytes.
      * @return Total transaction size in bytes

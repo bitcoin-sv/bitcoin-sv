@@ -125,7 +125,6 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
       spendsCoinbase{_spendsCoinbase}
 {
     nTxSize = _tx->GetTotalSize();
-    nModSize = _tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(_tx);
 
 
