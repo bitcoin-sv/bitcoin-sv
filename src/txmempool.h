@@ -112,6 +112,19 @@ public:
 };
 
 /**
+ * Current totals of not enough paying ancestors including self
+ */
+struct CPFPGroupEvaluationData
+{
+    Amount fee {0};
+    Amount feeDelta {0};
+    size_t size {0};
+};
+
+struct CPFPGroup;
+
+
+/**
  * \class GroupID
  *
  * GroupID identifies consecutive transactions in the journal that belong to
@@ -221,6 +234,11 @@ public:
         return nSigOpCountWithAncestors;
     }
 
+    std::shared_ptr<CPFPGroup> group {};
+    std::optional<CPFPGroupEvaluationData> groupingData {};
+
+    bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
+    bool IsCPFPGroupMember() const { return group != nullptr; }
 };
 
 struct update_ancestor_state {
@@ -436,6 +454,8 @@ private:
 
     // Sub-pool for time locked txns
     CTimeLockedMempool mTimeLockedPool {};
+
+    friend struct CPFPGroup;
 
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
@@ -1229,6 +1249,13 @@ public:
         cachedInnerUsage = 0;
         queuedTx.clear();
     }
+};
+
+struct CPFPGroup
+{
+    CPFPGroupEvaluationData evaluationParams {};
+    std::vector<CTxMemPool::txiter> transactions; // topologicaly sorted
+    CTxMemPool::txiter PayingTransaction() { return transactions.back(); }
 };
 
 #endif // BITCOIN_TXMEMPOOL_H
