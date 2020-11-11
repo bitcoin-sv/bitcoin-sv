@@ -202,7 +202,7 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn,
     // not at all.
     Amount inChainValue =
         pool && pool->HasNoInputsOf(txn) ? txn.GetValueOut() : Amount(0);
-    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, dPriority,
+    return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, 
                            nHeight, inChainValue, spendsCoinbase, lp);
 }
 

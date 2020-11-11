@@ -3048,8 +3048,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     if (gArgs.GetBoolArg("-walletrejectlongchains",
                          DEFAULT_WALLET_REJECT_LONG_CHAINS)) {
         // Lastly, ensure this tx will pass the mempool's chain limits.
-        LockPoints lp;
-        CTxMemPoolEntry entry {wtxNew.tx, Amount{0}, 0, 0, 0, Amount{0}, false, lp};
+        CTxMemPoolEntry entry {wtxNew.tx, Amount{0}, 0, 0, Amount{0}, false, LockPoints{}};
         size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
         size_t nLimitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
 

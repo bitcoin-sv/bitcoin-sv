@@ -316,12 +316,7 @@ static UniValue prioritisetransaction(const Config &config,
             "priority\n"
             "\nArguments:\n"
             "1. \"txid\"       (string, required) The transaction id.\n"
-            "2. priority_delta (numeric, required) The priority to add or "
-            "subtract.\n"
-            "                  The transaction selection algorithm considers "
-            "the tx as it would have a higher priority.\n"
-            "                  (priority of a transaction is calculated: "
-            "coinage * value_in_satoshis / txsize) \n"
+            "2. dummy (numeric, required) Unused, must be set to zero.\n"
             "3. fee_delta      (numeric, required) The fee value (in satoshis) "
             "to add (or subtract, if negative).\n"
             "                  The fee is not actually paid, only the "
@@ -338,10 +333,13 @@ static UniValue prioritisetransaction(const Config &config,
     LOCK(cs_main);
 
     uint256 hash = ParseHashStr(request.params[0].get_str(), "txid");
+    if(request.params[1].get_real() != 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Dummy parameter must be set to zero.");
+    }
     Amount nAmount(request.params[2].get_int64());
 
-    mempool.PrioritiseTransaction(hash, request.params[0].get_str(),
-                                  request.params[1].get_real(), nAmount);
+    mempool.PrioritiseTransaction(hash, request.params[0].get_str(), nAmount);
     return true;
 }
 

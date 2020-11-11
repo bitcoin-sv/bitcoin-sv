@@ -877,12 +877,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-printtoconsole",
         _("Send trace/debug info to console instead of bitcoind.log file"));
-    if (showDebug) {
-        strUsage += HelpMessageOpt(
-            "-printpriority", strprintf("Log transaction priority and fee per "
-                                        "kB when mining blocks (default: %d)",
-                                        DEFAULT_PRINTPRIORITY));
-    }
     strUsage += HelpMessageOpt("-shrinkdebugfile",
                                _("Shrink bitcoind.log file on client startup "
                                  "(default: 1 when no -debug)"));

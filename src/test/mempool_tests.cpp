@@ -184,7 +184,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx1.vout[0].nValue = 10 * COIN;
     pool.AddUnchecked(tx1.GetId(),
-                      entry.Fee(Amount(10000LL)).Priority(10.0).FromTx(tx1), TxStorage::memory, nullChangeSet);
+                      entry.Fee(Amount(10000LL)).FromTx(tx1), TxStorage::memory, nullChangeSet);
 
     /* highest fee */
     CMutableTransaction tx2 = CMutableTransaction();
@@ -192,7 +192,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx2.vout[0].nValue = 2 * COIN;
     pool.AddUnchecked(tx2.GetId(),
-                      entry.Fee(Amount(20000LL)).Priority(9.0).FromTx(tx2), TxStorage::memory, nullChangeSet);
+                      entry.Fee(Amount(20000LL)).FromTx(tx2), TxStorage::memory, nullChangeSet);
 
     /* lowest fee */
     CMutableTransaction tx3 = CMutableTransaction();
@@ -200,7 +200,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx3.vout[0].nValue = 5 * COIN;
     pool.AddUnchecked(tx3.GetId(),
-                      entry.Fee(Amount(1000LL)).Priority(100.0).FromTx(tx3), TxStorage::memory, nullChangeSet);
+                      entry.Fee(Amount(1000LL)).FromTx(tx3), TxStorage::memory, nullChangeSet);
 
     /* 2nd highest fee */
     CMutableTransaction tx4 = CMutableTransaction();
@@ -208,7 +208,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx4.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx4.vout[0].nValue = 6 * COIN;
     pool.AddUnchecked(tx4.GetId(),
-                      entry.Fee(Amount(15000LL)).Priority(1.0).FromTx(tx4), TxStorage::memory, nullChangeSet);
+                      entry.Fee(Amount(15000LL)).FromTx(tx4), TxStorage::memory, nullChangeSet);
 
     /* equal fee rate to tx1, but newer */
     CMutableTransaction tx5 = CMutableTransaction();
@@ -216,7 +216,6 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx5.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx5.vout[0].nValue = 11 * COIN;
     entry.nTime = 1;
-    entry.dPriority = 10.0;
     pool.AddUnchecked(tx5.GetId(), entry.Fee(Amount(10000LL)).FromTx(tx5), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 5UL);
     BOOST_CHECK_EQUAL(pool.Size(), 5UL);
@@ -272,7 +271,6 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
 BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     CTxMemPool pool;
     TestMemPoolEntryHelper entry;
-    entry.dPriority = 10.0;
     Amount feeIncrement = MEMPOOL_FULL_FEE_INCREMENT.GetFeePerK();
 
     CMutableTransaction tx1 = CMutableTransaction();
@@ -468,10 +466,10 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         BOOST_CHECK(!testPoolAccess.mapDeltas().count(txid));
     };
     // A lambda-helper to check if an entry was added to the mapDeltas.
-    const auto check_entry_added_to_mapdeltas = [&testPoolAccess](const TxId& txid) {
+    const auto check_entry_added_to_mapdeltas = [&testPoolAccess](const TxId& txid)
+    {
         BOOST_CHECK(testPoolAccess.mapDeltas().count(txid));
-        BOOST_CHECK_EQUAL(testPoolAccess.mapDeltas()[txid].first, 0UL);
-        BOOST_CHECK_EQUAL(testPoolAccess.mapDeltas()[txid].second, MAX_MONEY);
+        BOOST_CHECK_EQUAL(testPoolAccess.mapDeltas()[txid], MAX_MONEY);
     };
     // Case 1.
     // Instantiate txPrioritizer to prioritise a single txn.

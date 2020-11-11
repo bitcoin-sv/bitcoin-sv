@@ -15,13 +15,12 @@ namespace
 static void AddTx(const CTransaction &tx, const Amount &nFee,
                   CTxMemPool &pool) {
     int64_t nTime = 0;
-    double dPriority = 10.0;
     int32_t nHeight = 1;
     bool spendsCoinbase = false;
     LockPoints lp;
     pool.AddUnchecked(tx.GetId(),
                       CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime,
-                                      dPriority, nHeight, tx.GetValueOut(),
+                                      nHeight, tx.GetValueOut(),
                                       spendsCoinbase, lp),
                       TxStorage::memory, nullChangeSet);
 }

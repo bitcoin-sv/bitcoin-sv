@@ -107,7 +107,6 @@ struct TestMemPoolEntryHelper {
     // Default values
     Amount nFee {0};
     int64_t nTime {0};
-    double dPriority {0.0};
     unsigned int nHeight {1};
     bool spendsCoinbase {false};
     LockPoints lp;
@@ -131,10 +130,6 @@ struct TestMemPoolEntryHelper {
     }
     TestMemPoolEntryHelper &Time(int64_t _time) {
         nTime = _time;
-        return *this;
-    }
-    TestMemPoolEntryHelper &Priority(double _priority) {
-        dPriority = _priority;
         return *this;
     }
     TestMemPoolEntryHelper &Height(unsigned int _height) {

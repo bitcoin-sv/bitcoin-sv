@@ -1335,15 +1335,13 @@ CTxnValResult TxnValidation(
     // the priority
     bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height() + 1);
     if (skipFeeTest) {
-        double priority = 0;
         const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
-        pool.PrioritiseTransaction(txid, txid.ToString(), priority, consolidationDelta);
+        pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);
         LogPrint(BCLog::TXNVAL,"free consolidation transaction detected, txid:=%s\n", tx.GetId().ToString());
     }
 
-    double nPriorityDummy = 0;
-    pool.ApplyDeltas(txid, nPriorityDummy, nModifiedFees);
+    pool.ApplyDeltas(txid, nModifiedFees);
 
     Amount inChainInputValue;
     double dPriority =
@@ -1371,7 +1369,6 @@ CTxnValResult TxnValidation(
             ptx,
             nFees,
             nAcceptTime,
-            dPriority,
             uiChainActiveHeight,
             inChainInputValue,
             fSpendsCoinbase,

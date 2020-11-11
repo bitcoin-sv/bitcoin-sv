@@ -197,7 +197,7 @@ private:
     
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
-                    int64_t _nTime, double _entryPriority,
+                    int64_t _nTime,
                     int32_t _entryHeight, Amount _inChainInputValue,
                     bool spendsCoinbase, LockPoints lp);
 
@@ -553,7 +553,7 @@ private:
 
     MapNextTx mapNextTx;
 
-    std::map<uint256, std::pair<double, Amount>> mapDeltas;
+    std::map<uint256, Amount> mapDeltas;
 
     class InsertionIndex
     {
@@ -737,16 +737,13 @@ public:
     void PrioritiseTransaction(
             const uint256& hash,
             const std::string& strHash,
-            double dPriorityDelta,
             const Amount nFeeDelta);
     void PrioritiseTransaction(
             const std::vector<TxId>& vTxToPrioritise,
-            double dPriorityDelta,
             const Amount nFeeDelta);
 
     void ApplyDeltas(
             const uint256& hash,
-            double &dPriorityDelta,
             Amount &nFeeDelta) const;
 
     // Get a reference to the journal builder
@@ -1149,7 +1146,6 @@ private:
     // A non-locking version of ApplyDeltas
     void ApplyDeltasNL(
         const uint256& hash,
-        double &dPriorityDelta,
         Amount &nFeeDelta) const;
 
     /**
@@ -1189,7 +1185,6 @@ private:
 
     void prioritiseTransactionNL(
             const uint256& hash,
-            double dPriorityDelta,
             const Amount nFeeDelta);
 
     void clearPrioritisationNL(const uint256& hash);
