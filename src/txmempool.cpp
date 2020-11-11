@@ -115,13 +115,11 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  const Amount _nFee,
                                  int64_t _nTime,
                                  int32_t _entryHeight,
-                                 Amount _inChainInputValue,
                                  bool _spendsCoinbase,
                                  LockPoints lp)
     : tx{std::make_shared<CTransactionWrapper>(_tx, nullptr)},
       nFee{_nFee},
       nTime{_nTime},
-      inChainInputValue{_inChainInputValue},
       lockPoints{lp},
       entryHeight{_entryHeight},
       spendsCoinbase{_spendsCoinbase}
@@ -130,8 +128,6 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
     nModSize = _tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(_tx);
 
-    Amount nValueIn = _tx->GetValueOut() + nFee;
-    assert(inChainInputValue <= nValueIn);
 
     feeDelta = Amount {0};
 }

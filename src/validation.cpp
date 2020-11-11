@@ -1317,7 +1317,6 @@ CTxnValResult TxnValidation(
             nFees,
             nAcceptTime,
             uiChainActiveHeight,
-            inChainInputValue,
             fSpendsCoinbase,
             lp) };
     if (!skipFeeTest) {

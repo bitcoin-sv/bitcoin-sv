@@ -161,8 +161,6 @@ private:
     size_t nUsageSize;
     //!< Local time when entering the mempool
     int64_t nTime;
-    //!< Sum of all txin values that are already in blockchain
-    Amount inChainInputValue;
     //!< Used for determining the priority of the transaction for mining in a
     //! block
     Amount feeDelta;
@@ -187,7 +185,7 @@ private:
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime,
-                    int32_t _entryHeight, Amount _inChainInputValue,
+                    int32_t _entryHeight,
                     bool spendsCoinbase, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;

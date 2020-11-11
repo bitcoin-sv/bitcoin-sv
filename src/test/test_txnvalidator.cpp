@@ -404,7 +404,6 @@ BOOST_AUTO_TEST_CASE(double_spend_detector)
                 fee,
                 time,
                 height,
-                tx.GetValueOut(),
                 spendsCoinbase,
                 lp},
             TxStorage::memory,

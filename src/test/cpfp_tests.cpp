@@ -26,13 +26,11 @@ CTxMemPoolEntry MakeEntry(
 {
     CMutableTransaction tx;
     Amount totalInput;
-    Amount totalInChainInput;
     for(const auto& input: inChainInputs)
     {
         auto[id, ndx, amount] = input;
         tx.vin.push_back(CTxIn(id, ndx, CScript()));
         totalInput += amount;
-        totalInChainInput += amount;
     }
 
     for(const auto& input: inMempoolInputs)
@@ -70,7 +68,7 @@ CTxMemPoolEntry MakeEntry(
     }
 
     auto txRef = MakeTransactionRef(tx);
-    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, totalInChainInput, false, LockPoints());
+    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, false, LockPoints());
     return entry;
 }
 
