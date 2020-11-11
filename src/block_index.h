@@ -215,26 +215,26 @@ public:
 
     //! pointer to the hash of the block, if any. Memory is owned by this
     //! CBlockIndex
-    const uint256 *phashBlock;
+    const uint256* phashBlock{ nullptr };
 
     //! pointer to the index of the predecessor of this block
-    CBlockIndex *pprev;
+    CBlockIndex* pprev{ nullptr };
 
     //! pointer to the index of some further predecessor of this block
-    CBlockIndex *pskip;
+    CBlockIndex* pskip{ nullptr };
 
     //! height of the entry in the chain. The genesis block has height 0
-    int32_t nHeight;
+    int32_t nHeight{ 0 };
 
     //! Which # file this block is stored in (blk?????.dat)
-    int nFile;
+    int nFile{ 0 };
 
     //! Byte offset within blk?????.dat where this block's data is stored
-    unsigned int nDataPos;
+    unsigned int nDataPos{ 0 };
 
 private:
     //! Byte offset within rev?????.dat where this block's undo data is stored
-    unsigned int nUndoPos;
+    unsigned int nUndoPos{ 0 };;
 
 public:
     //! (memory only) Total amount of work (expected number of hashes) in the
@@ -244,80 +244,49 @@ public:
     //! Number of transactions in this block.
     //! Note: in a potential headers-first mode, this number cannot be relied
     //! upon
-    unsigned int nTx;
+    unsigned int nTx{ 0 };
 
     //! (memory only) Number of transactions in the chain up to and including
     //! this block.
     //! This value will be non-zero only if and only if transactions for this
     //! block and all its parents are available. Change to 64-bit type when
     //! necessary; won't happen before 2030
-    unsigned int nChainTx;
+    unsigned int nChainTx{ 0 };
 
     //! Verification status of this block. See enum BlockStatus
     BlockStatus nStatus;
 
     //! block header
-    int32_t nVersion;
+    int32_t nVersion{ 0 };
     uint256 hashMerkleRoot;
-    uint32_t nTime;
-    uint32_t nBits;
-    uint32_t nNonce;
+    uint32_t nTime{ 0 };
+    uint32_t nBits{ 0 };
+    uint32_t nNonce{ 0 };
 
     //! (memory only) Sequential id assigned to distinguish order in which
     //! blocks are received.
-    int32_t nSequenceId;
+    int32_t nSequenceId{ 0 };
 
     //! (memory only) block header metadata
-    uint64_t nTimeReceived;
+    uint64_t nTimeReceived{};
 
     //! (memory only) Maximum nTime in the chain upto and including this block.
-    unsigned int nTimeMax;
+    unsigned int nTimeMax{ 0 };
 
-    void SetNull() {
-        phashBlock = nullptr;
-        pprev = nullptr;
-        pskip = nullptr;
-        nHeight = 0;
-        nFile = 0;
-        nDataPos = 0;
-        nUndoPos = 0;
-        nChainWork = arith_uint256();
-        nTx = 0;
-        nChainTx = 0;
-        nStatus = BlockStatus();
-        nSequenceId = 0;
-        nTimeMax = 0;
+    CBlockIndex() = default;
 
-        nVersion = 0;
-        hashMerkleRoot = uint256();
-        nTime = 0;
-        nTimeReceived = 0;
-        nBits = 0;
-        nNonce = 0;
-        mDiskBlockMetaData = {};
-        nSoftRejected = -1; // not soft rejected
-
-        // set to maximum time by default to indicate that validation has not
-        // yet been completed
-        mValidationCompletionTime = SteadyClockTimePoint::max();
-    }
-
-    CBlockIndex() { SetNull(); }
-
-    CBlockIndex(const CBlockHeader &block) {
-        SetNull();
-
-        nVersion = block.nVersion;
-        hashMerkleRoot = block.hashMerkleRoot;
-        nTime = block.nTime;
+    CBlockIndex(const CBlockHeader &block)
+        : nVersion{ block.nVersion }
+        , hashMerkleRoot{ block.hashMerkleRoot }
+        , nTime{ block.nTime }
+        , nBits{ block.nBits }
+        , nNonce{ block.nNonce }
         // Default to block time if nTimeReceived is never set, which
         // in effect assumes that this block is honestly mined.
         // Note that nTimeReceived isn't written to disk, so blocks read from
         // disk will be assumed to be honestly mined.
-        nTimeReceived = block.nTime;
-        nBits = block.nBits;
-        nNonce = block.nNonce;
-    }
+        , nTimeReceived{ block.nTime }
+    {}
 
     void LoadFromPersistentData(const CBlockIndex& other, CBlockIndex* previous)
     {
@@ -628,7 +597,7 @@ protected:
      * This value is used in best chain selection algorithm. Chains whose tip is soft rejected,
      * are not considered when selecting best chain.
      */
-    std::int32_t nSoftRejected;
+    std::int32_t nSoftRejected { -1 };
 
     using SteadyClockTimePoint =
         std::chrono::time_point<std::chrono::steady_clock>;
@@ -637,7 +606,10 @@ protected:
     // SteadyClockTimePoint::min() (best possible candidate value) since after
     // the validation we only care that best tip is valid and not which that
     // best tip is (it's a race condition during validation anyway).
-    SteadyClockTimePoint mValidationCompletionTime;
+    //
+    // Set to maximum time by default to indicate that validation has not
+    // yet been completed.
+    SteadyClockTimePoint mValidationCompletionTime{ SteadyClockTimePoint::max() };
 
 private:
     bool ValidityChangeRequiresValidationTimeSetting(BlockValidity nUpTo) const
