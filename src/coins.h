@@ -545,14 +545,6 @@ public:
     std::optional<bool> HaveInputsLimited(const CTransaction &tx, size_t maxCachedCoinsUsage) const;
 
     /**
-     * Return priority of tx at height nHeight. Also calculate the sum of the
-     * values of the inputs that are already in the chain. These are the inputs
-     * that will age and increase priority as new blocks are added to the chain.
-     */
-    double GetPriority(const CTransaction &tx, int32_t nHeight,
-                       Amount &inChainInputValue) const;
-
-    /**
      * Detach provider - this function expects that view won't be used until
      * it is re-attached by calling TryReattach().
      *

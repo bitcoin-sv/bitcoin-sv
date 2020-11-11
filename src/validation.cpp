@@ -1290,9 +1290,6 @@ CTxnValResult TxnValidation(
 
     pool.ApplyDeltas(txid, nModifiedFees);
 
-    Amount inChainInputValue;
-    double dPriority =
-        view.GetPriority(tx, chainActive.Height(), inChainInputValue);
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
     const bool fSpendsCoinbase = CheckTxSpendsCoinbase(tx, view);

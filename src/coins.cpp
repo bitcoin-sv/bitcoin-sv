@@ -202,30 +202,6 @@ std::optional<bool> CCoinsViewCache::HaveInputsLimited(
     return true;
 }
 
-double CCoinsViewCache::GetPriority(const CTransaction &tx, int32_t nHeight,
-                                    Amount &inChainInputValue) const {
-    assert(mThreadId == std::this_thread::get_id());
-    inChainInputValue = Amount(0);
-    if (tx.IsCoinBase()) {
-        return 0.0;
-    }
-    double dResult = 0.0;
-
-    for (const CTxIn &txin : tx.vin) {
-        auto coin = GetCoin(txin.prevout, 0);
-        if (!coin.has_value() || coin->IsSpent()) {
-            continue;
-        }
-        if (int64_t(coin->GetHeight()) <= nHeight) {
-            dResult += double(coin->GetTxOut().nValue.GetSatoshis()) *
-                       (nHeight - coin->GetHeight());
-            inChainInputValue += coin->GetTxOut().nValue;
-        }
-    }
-
-    return tx.ComputePriority(dResult);
-}
-
 size_t CoinsStore::DynamicMemoryUsage() const
 {
     return memusage::DynamicUsage(cacheCoins) + cachedCoinsUsage;
