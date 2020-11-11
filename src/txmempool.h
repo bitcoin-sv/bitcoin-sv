@@ -161,8 +161,6 @@ private:
     size_t nUsageSize;
     //!< Local time when entering the mempool
     int64_t nTime;
-    //!< Priority when entering the mempool
-    double entryPriority;
     //!< Sum of all txin values that are already in blockchain
     Amount inChainInputValue;
     //!< Used for determining the priority of the transaction for mining in a
@@ -200,11 +198,6 @@ public:
     CTransactionRef GetSharedTx() const { return tx->GetTx(); }
     const TxId& GetTxId() const { return tx->GetId(); }
 
-    /**
-     * Fast calculation of lower bound of current priority as update from entry
-     * priority. Only inputs that were originally in-chain will age.
-     */
-    double GetPriority(int32_t currentHeight) const;
     Amount GetFee() const { return nFee; }
     Amount GetFeeDelta() const { return feeDelta; }
     size_t GetTxSize() const { return nTxSize; }

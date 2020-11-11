@@ -137,7 +137,6 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
 }
 
 // CPFP group, if any that this transaction belongs to.
-
 GroupID CTxMemPoolEntry::GetCPFPGroupId() const 
 { 
     if(group)
@@ -145,18 +144,6 @@ GroupID CTxMemPoolEntry::GetCPFPGroupId() const
         return GroupID{ group->PayingTransaction()->GetTxId() };
     }
     return std::nullopt; 
-}
-
-double CTxMemPoolEntry::GetPriority(int32_t currentHeight) const {
-    double deltaPriority = double((currentHeight - entryHeight) *
-                                  inChainInputValue.GetSatoshis()) /
-                           nModSize;
-    double dResult = entryPriority + deltaPriority;
-    // This should only happen if it was called with a height below entry height
-    if (dResult < 0) {
-        dResult = 0;
-    }
-    return dResult;
 }
 
 void CTxMemPoolEntry::UpdateFeeDelta(Amount newFeeDelta) {
