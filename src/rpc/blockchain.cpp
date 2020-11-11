@@ -284,10 +284,6 @@ std::string EntryDescriptionString() {
            "entered pool in seconds since 1 Jan 1970 GMT\n"
            "    \"height\" : n,           (numeric) block height when "
            "transaction entered pool\n"
-           "    \"startingpriority\" : n, (numeric) DEPRECATED. Priority when "
-           "transaction entered pool\n"
-           "    \"currentpriority\" : n,  (numeric) DEPRECATED. Transaction "
-           "priority now\n"
            "    \"depends\" : [           (array) unconfirmed transactions "
            "used as inputs for this transaction\n"
            "        \"transactionid\",    (string) parent transaction id\n"
@@ -312,8 +308,6 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
     jWriter.pushKV("modifiedfee", e.GetModifiedFee());
     jWriter.pushKV("time", e.GetTime());
     jWriter.pushKV("height", static_cast<uint64_t>(e.GetHeight()));
-    jWriter.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
-    jWriter.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
     std::set<std::string> deps;
     const auto tx = e.GetSharedTx();
     for (const CTxIn &txin : tx->vin)

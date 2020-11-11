@@ -47,9 +47,6 @@ class GetRawMempoolTest(BitcoinTestFramework):
         assert 'time' in mempoolEntry
         assert 'height' in mempoolEntry
         assert_equal(self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'], mempoolEntry['height'])
-
-        assert 'startingpriority' in mempoolEntry
-        assert 'currentpriority' in mempoolEntry
         assert 'depends' in mempoolEntry
 
     def check_getRawMempool(self, mempool, transactions):
