@@ -2147,7 +2147,7 @@ bool AppInitParameterInteraction(Config &config) {
     if (gArgs.IsArgSet("-minrelaytxfee")) {
         Amount n(0);
         auto parsed = ParseMoney(gArgs.GetArg("-minrelaytxfee", ""), n);
-        if (!parsed || Amount(0) == n)
+        if (!parsed)
             return InitError(AmountErrMsg("minrelaytxfee",
                                           gArgs.GetArg("-minrelaytxfee", "")));
         // High fee check is done afterward in CWallet::ParameterInteraction()
