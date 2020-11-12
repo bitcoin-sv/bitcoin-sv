@@ -4339,6 +4339,21 @@ static bool ConnectTip(
         auto flushed = pCoinsTipSpan.TryFlush();
         assert(flushed == CoinsDBSpan::WriteState::ok);
     }
+
+    auto asyncRemoveForBlock = std::async(std::launch::async, 
+        [&blockConnecting, &pindexNew, &changeSet]()
+        {
+            RenameThread("Async RemoveForBlock");
+            int64_t nTimeRemoveForBlock = GetTimeMicros();
+            // Remove transactions from the mempool.;
+            mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
+            nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
+            nTimeRemoveFromMempool += nTimeRemoveForBlock;
+            LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
+                    nTimeRemoveForBlock * 0.001, nTimeRemoveFromMempool * 0.000001);
+        }
+    );
+
     int64_t nTime4 = GetTimeMicros();
     nTimeFlush += nTime4 - nTime3;
     LogPrint(BCLog::BENCH, "  - Flush: %.2fms [%.2fs]\n",
@@ -4346,6 +4361,7 @@ static bool ConnectTip(
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(config.GetChainParams(), state,
                           FLUSH_STATE_IF_NEEDED)) {
+        asyncRemoveForBlock.wait();
         return false;
     }
     int64_t nTime5 = GetTimeMicros();
@@ -4353,18 +4369,13 @@ static bool ConnectTip(
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
 
-    // Remove transactions from the mempool.;
-    mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
-    int64_t nTimeRemoveForBlock = GetTimeMicros() - nTime5;
-    nTimeRemoveFromMempool += nTimeRemoveForBlock;
-    LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
-             nTimeRemoveForBlock * 0.001, nTimeRemoveFromMempool * 0.000001);
-    
     if(g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
     }
     disconnectpool.removeForBlock(blockConnecting.vtx);
+
+    asyncRemoveForBlock.wait();
     // Update chainActive & related variables.
     UpdateTip(config, pindexNew);
 
