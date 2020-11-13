@@ -431,7 +431,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
     CTxMemPoolTestAccess testPoolAccess(testPool);
     const TxId& txid = txParent.GetId();
     // A lambda-helper to add a txn to the empty testPool and to do basic checks.
-    const auto& add_txn_to_testpool = [&testPool, &testPoolAccess](
+    const auto add_txn_to_testpool = [&testPool, &testPoolAccess](
         const CMutableTransaction& txParent,
         const TxId& txid) {
         BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
@@ -440,7 +440,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         BOOST_CHECK(!testPoolAccess.mapDeltas().count(txid));
     };
     // A lambda-helper to check if an entry was added to the mapDeltas.
-    const auto& check_entry_added_to_mapdeltas = [&testPoolAccess](
+    const auto check_entry_added_to_mapdeltas = [&testPoolAccess](
         const TxId& txid) {
         BOOST_CHECK(testPoolAccess.mapDeltas().count(txid));
         BOOST_CHECK_EQUAL(testPoolAccess.mapDeltas()[txid].first, 0UL);
