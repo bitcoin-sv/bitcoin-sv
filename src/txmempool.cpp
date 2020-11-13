@@ -1634,7 +1634,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
 
         // Disconnectpool related updates
         for (const auto& txInputData : vTxInputData) {
-            auto const& txid = txInputData->GetTxnPtr()->GetId();
+            auto const txid = txInputData->GetTxnPtr()->GetId();
             if (!ExistsNL(txid)) {
                 // If the transaction doesn't make it in to the mempool, remove any
                 // transactions that depend on it (which would now be orphans).
