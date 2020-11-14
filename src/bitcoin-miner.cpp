@@ -19,8 +19,8 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include <boost/thread.hpp>
-#include <cstdlib>
-#include <stdio.h>
+#include <random>
+#include <limits>
 #include <event2/http.h>
 #include <univalue.h>
 
@@ -198,9 +198,10 @@ void Add_space_for_extra_nonce(vector<unsigned char>& coinbase_bytes, size_t off
 }
 
 // WARNING: This methods "splits" coinbaseBytes and inserts space for an extra-nonce.
-static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coinbaseBytes, const std::vector<uint256> &merkleproof)
+static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coinbaseBytes, const std::vector<uint256> &merkleproof
+                                        , uniform_int_distribution<uint32_t> & dist, std::mt19937 & mt)
 {
-    extra_nonce_type nExtraNonce = std::rand();
+    extra_nonce_type nExtraNonce = dist(mt);
     uint32_t nNonce = pblock->nNonce;
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
     bool found = false;
@@ -297,7 +298,8 @@ static double GetDifficulty(uint64_t nBits)
     return dDiff;
 }
 
-static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found)
+static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found
+                             , uniform_int_distribution<uint32_t> & dist, std::mt19937 & mt)
 {
     UniValue tmp(UniValue::VOBJ);
     UniValue ret(UniValue::VARR);
@@ -330,7 +332,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         header.nVersion = blockversion;
     }
 
-    uint32_t startNonce = header.nNonce = std::rand();
+    uint32_t startNonce = header.nNonce = dist(mt);
     std::string candidateId = params["id"].get_str();
 
     printf("Mining: id: %s parent: %s bits: %x difficulty: %.8e time: %d\n", candidateId.c_str(),
@@ -346,7 +348,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         // request a new block).
         // header.nTime = (header.nTime < GetTime()) ? GetTime() : header.nTime;
 
-        found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof);
+        found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof, dist, mt);
     }
 
     // Leave if not found:
@@ -410,7 +412,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
     return reply;
 }
 
-int CpuMiner(void)
+int CpuMiner(uniform_int_distribution<uint32_t> & dist, std::mt19937 & mt)
 {
     int searchDuration = gArgs.GetArg("-duration", 30);
     int nblocks = gArgs.GetArg("-nblocks", -1); //-1 mine forever
@@ -534,7 +536,7 @@ int CpuMiner(void)
             else
             {
                 found = false;
-                mineresult = CpuMineBlock(searchDuration, result, found);
+                mineresult = CpuMineBlock(searchDuration, result, found, dist, mt);
                 if (!found)
                 {
                     // printf("Mining did not succeed\n");
@@ -547,25 +549,6 @@ int CpuMiner(void)
         }
     }
     return 0;
-}
-
-void static MinerThread()
-{
-    while (1)
-    {
-        try
-        {
-            CpuMiner();
-        }
-        catch (const std::exception &e)
-        {
-            PrintExceptionContinue(&e, "CommandLineRPC()");
-        }
-        catch (...)
-        {
-            PrintExceptionContinue(NULL, "CommandLineRPC()");
-        }
-    }
 }
 
 int main(int argc, char *argv[])
@@ -596,15 +579,38 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    int nThreads = gArgs.GetArg("-cpus", 1);
+    int64_t nThreads {gArgs.GetArg("-cpus", 1)};
+
+    auto minerThread = []()  {
+        const uint32_t distributionMax = std::numeric_limits<uint32_t>::max();
+        std::uniform_int_distribution <uint32_t> dist{0, distributionMax};
+        std::random_device rd{};
+        std::mt19937 mt{rd()};
+        while (1) {
+            try {
+                CpuMiner(dist, mt);
+            }
+            catch (const std::exception &e) {
+                PrintExceptionContinue(&e, "CommandLineRPC()");
+            }
+            catch (...) {
+                PrintExceptionContinue(NULL, "CommandLineRPC()");
+            }
+        }
+    };
+
     boost::thread_group minerThreads;
-    for (int i = 0; i < nThreads - 1; i++)
-        minerThreads.create_thread(MinerThread);
+    for (int64_t i = 0; i < nThreads - 1; ++i)
+        minerThreads.create_thread(minerThread);
 
     int ret = EXIT_FAILURE;
     try
     {
-        ret = CpuMiner();
+        const uint32_t distributionMax = std::numeric_limits<uint32_t>::max();
+        std::uniform_int_distribution <uint32_t> dist{0, distributionMax};
+        std::random_device rd{};
+        std::mt19937 mt{rd()};
+        ret = CpuMiner(dist,mt);
     }
     catch (const std::exception &e)
     {
