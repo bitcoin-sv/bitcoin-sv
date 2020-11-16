@@ -404,35 +404,17 @@ public:
         ssKey << key;
         leveldb::Slice slKey(ssKey.data(), ssKey.size());
 
-        // Read value from leveldb using an iterator.
-        // NOTE: Iterator is used instead of DB::Get() because we do not want the value to be
-        //       immediately copied into a std::string resulting in two copies (one in DB cache
-        //       and another in std::string), which is inefficient for large values.
-        std::unique_ptr<leveldb::Iterator> it(pdb->NewIterator(readoptions));
-        it->Seek(slKey);
-
-        {
-            // Check for errors
-            leveldb::Status status = it->status();
-            if(!status.ok())
-            {
-                // An error occurred
-                LogPrintf("LevelDB read failure: %s\n", status.ToString());
-                dbwrapper_private::HandleError(status);
-            }
+        std::string strValue;
+        leveldb::Status status = pdb->Get(readoptions, slKey, &strValue);
+        if (!status.ok()) {
+            if (status.IsNotFound()) return false;
+            LogPrintf("LevelDB read failure: %s\n", status.ToString());
+            dbwrapper_private::HandleError(status);
         }
-
-        if(!it->Valid() || !(it->key() == slKey))
-        {
-            // Key was not found
-            return false;
-        }
-
         try {
             // Create data stream optimized for reading and unserialize the value
-            leveldb::Slice slValue = it->value();
             static_assert(std::is_base_of<dbwrapper_private::CDataStreamInput, TStream<dbwrapper_private::CDataStreamInput>>::value, "TStream must be a class template derived from TBase!");
-            TStream<dbwrapper_private::CDataStreamInput> ssValue( std::string_view(slValue.data(), slValue.size()),
+            TStream<dbwrapper_private::CDataStreamInput> ssValue( strValue,
                                                                   obfuscate_key,
                                                                   std::forward<Args>(args)... );
             ssValue >> value;
