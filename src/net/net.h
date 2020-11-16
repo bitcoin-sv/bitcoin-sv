@@ -760,7 +760,6 @@ private:
     std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
 
     CAsyncTaskPool mAsyncTaskPool;
-    uint8_t mNodeAsyncTaskLimit;
 
     /** Invalid transaction publisher*/
     CInvalidTxnPublisher mInvalidTxnPublisher;
