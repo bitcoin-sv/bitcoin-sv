@@ -104,7 +104,7 @@ void ScriptToAsmStr(const CScript& script,
     {
         if (pc != script.begin()) 
         {
-            textWriter.Write(" ");
+            textWriter.Write(' ');
         }
 
         if (!script.GetOp(pc, opcode, vch))
