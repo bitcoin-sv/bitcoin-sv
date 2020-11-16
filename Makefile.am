@@ -21,7 +21,6 @@ endif
 
 BITCOIND_BIN=$(top_builddir)/src/$(BITCOIN_DAEMON_NAME)$(EXEEXT)
 BITCOIN_CLI_BIN=$(top_builddir)/src/$(BITCOIN_CLI_NAME)$(EXEEXT)
-BITCOIN_SEEDER_BIN=$(top_builddir)/src/$(BITCOIN_SEEDER_NAME)$(EXEEXT)
 BITCOIN_WIN_INSTALLER=$(PACKAGE)-$(PACKAGE_VERSION)-win$(WINDOWS_BITS)-setup$(EXEEXT)
 
 empty :=
@@ -72,9 +71,6 @@ $(BITCOIND_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
 $(BITCOIN_CLI_BIN): FORCE
-	$(MAKE) -C src $(@F)
-
-$(BITCOIN_SEEDER_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
 if USE_LCOV
