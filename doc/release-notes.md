@@ -9,7 +9,7 @@
 * Insecure function (sprintf) no longer used.
 * Make ZMQ interface thread safe.
 * RPC to provide Merkle proofs for transaction inclusion in blocks.
-* Invalid transactions stored in repository.
+* Invalid transactions can now be published to ZMQ or stored to disk.
 * Ensure the fallback path for packages (bitcoinsv.io) in the Gitian build contains all required packages.
 * Fix to Gitian build.
 * Fix: Accessing memory after std::move.
@@ -23,6 +23,9 @@
 * Fix: CheckTxInputExists should not be used.
 * Remove assert and fix shutdown after unsuccessful startup.
 * Unconditionally log P2P stall messages if denugp2pthreadstalls is specified.
+* Fix: clearinvalidtransactions RPC returned the number of bytes freed as zero.
+* Fix: #include <limits> added to script_num.cpp to fix build issues with later compilers.
+* Rename ZMQ topic zmqpubremovedfrommempool to zmqpubdiscardedfrommempool.
 * November 2020 STN reset.
 
 ## Scaling Test Network (STN) Reset
