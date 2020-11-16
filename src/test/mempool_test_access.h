@@ -34,6 +34,9 @@ public:
     auto& mapNextTx() { return mempool.mapNextTx; }
     auto& mapDeltas() { return mempool.mapDeltas; }
 
+    using txiter = CTxMemPool::txiter;
+    using TxLinks = CTxMemPool::TxLinks;
+    using txlinksMap = CTxMemPool::txlinksMap;
     using setEntries = CTxMemPool::setEntries;
 
     template<typename... Args>

@@ -279,6 +279,7 @@ add_library(server
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+	txmempoolevictioncandidates.cpp
     tx_mempool_info.cpp
 	txn_double_spend_detector.cpp
 	txn_propagator.cpp
