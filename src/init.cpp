@@ -1006,11 +1006,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter / ONE_MEGABYTE
                     ));
     strUsage += HelpMessageOpt(
-        "-blockprioritypercentage=<n>",
-        strprintf(_("Set maximum percentage of a block reserved to "
-                    "high-priority/low-fee transactions (default: %d)"),
-                  DEFAULT_BLOCK_PRIORITY_PERCENTAGE));
-    strUsage += HelpMessageOpt(
         "-blockmintxfee=<amt>",
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
                     "included in block creation. (default: %s)"),
@@ -1649,14 +1644,6 @@ bool AppInitParameterInteraction(Config &config) {
     if (gArgs.GetArg("-prune", 0)) {
         if (gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX))
             return InitError(_("Prune mode is incompatible with -txindex."));
-    }
-
-    // if space reserved for high priority transactions is misconfigured
-    // stop program execution and warn the user with a proper error message
-    const int64_t blkprio = gArgs.GetArg("-blockprioritypercentage",
-                                         DEFAULT_BLOCK_PRIORITY_PERCENTAGE);
-    if (std::string err; !config.SetBlockPriorityPercentage(blkprio, &err)) {
-        return InitError(err);
     }
 
     // Make sure enough file descriptors are available

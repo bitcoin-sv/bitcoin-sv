@@ -59,9 +59,6 @@ static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEG
 static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
 
 
-/** Default for -blockprioritypercentage, define the amount of block space
- * reserved to high priority transactions **/
-static const uint64_t DEFAULT_BLOCK_PRIORITY_PERCENTAGE = 5;
 /** Default for -blockmintxfee, which sets the minimum feerate for a transaction
  * in blocks created by mining code **/
 static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500);

@@ -45,8 +45,6 @@ public:
     virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
 
-    virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) = 0;
-    virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
 
     virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
@@ -220,8 +218,6 @@ public:
     bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override;
     int64_t GetBlockSizeActivationTime() const override;
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override;
-    uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
@@ -387,7 +383,6 @@ private:
     // All fileds are initialized in Reset()    
     CFeeRate feePerKB;
     CFeeRate blockMinFeePerKB;
-    uint64_t blockPriorityPercentage;
     uint64_t preferredBlockFileSize;
     uint64_t factorMaxSendQueuesBytes;
 
@@ -502,12 +497,6 @@ public:
         return false; 
     }
     int64_t GetBlockSizeActivationTime() const override { return 0; }
-
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override {
-        SetErrorMsg(err);
-        return false;
-    }
-    uint8_t GetBlockPriorityPercentage() const override { return 0; }
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
     {

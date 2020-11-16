@@ -18,7 +18,6 @@ void GlobalConfig::Reset()
 {
     feePerKB = CFeeRate {};
     blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
-    blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
 
@@ -211,21 +210,6 @@ int64_t GlobalConfig::GetBlockSizeActivationTime() const {
     CheckSetDefaultCalled();
     return blockSizeActivationTime;
 };
-
-bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage, std::string* err) {
-    // blockPriorityPercentage has to belong to [0..100]
-    if ((percentage < 0) || (percentage > 100)) {
-        if (err)
-            *err = _("Block priority percentage has to belong to the [0..100] interval.");
-        return false;
-    }
-    blockPriorityPercentage = percentage;
-    return true;
-}
-
-uint8_t GlobalConfig::GetBlockPriorityPercentage() const {
-    return blockPriorityPercentage;
-}
 
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
 {
