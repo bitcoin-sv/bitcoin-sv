@@ -193,7 +193,7 @@ void Shutdown() {
     UnregisterNodeSignals(GetNodeSignals());
     if (fDumpMempoolLater &&
         gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
-        DumpMempool();
+        mempool.DumpMempool();
     }
 
     {
@@ -1419,7 +1419,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         }
     } // End scope of CImportingNow
     if (gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
-        LoadMempool(config, shutdownToken);
+        mempool.LoadMempool(config, shutdownToken);
         fDumpMempoolLater = !shutdownToken.IsCanceled();
     }
 }
