@@ -76,8 +76,6 @@ EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
 
 # FIXME: (CORE-130) Tests broken by the journaling block assembler.
 JOURNAL_BROKEN_TESTS = frozenset((
-    "abc-high_priority_transaction.py",
-    "prioritise_transaction.py",
 ))
 
 TEST_PARAMS = {
