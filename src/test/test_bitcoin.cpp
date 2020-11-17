@@ -201,8 +201,7 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CTransaction &txn,
         pool && pool->HasNoInputsOf(txn) ? txn.GetValueOut() : Amount(0);
 
     return CTxMemPoolEntry(MakeTransactionRef(txn), nFee, nTime, dPriority,
-                           nHeight, inChainValue, spendsCoinbase, sigOpCost,
-                           lp);
+                           nHeight, inChainValue, spendsCoinbase, lp);
 }
 
 namespace {

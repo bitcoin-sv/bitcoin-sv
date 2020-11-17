@@ -303,7 +303,6 @@ JournalingBlockAssembler::GroupCheckpoint::GroupCheckpoint(JournalingBlockAssemb
 , mAssemblerStateCheckpoint {assembler.mState}
 , mBlockTxnsCheckpoint {assembler.mBlockTxns}
 , mTxFeesCheckpoint {assembler.mTxFees}
-, mTxSigOpsCountCheckpoint {assembler.mTxSigOpsCount}
 {
 }
 
@@ -316,7 +315,6 @@ void JournalingBlockAssembler::GroupCheckpoint::rollback()
     mAssembler.mState = mAssemblerStateCheckpoint;
     mBlockTxnsCheckpoint.trimToSize();
     mTxFeesCheckpoint.trimToSize();
-    mTxSigOpsCountCheckpoint.trimToSize();
 }
 
 // Test whether we can add another transaction to the next block, and if
@@ -335,21 +333,6 @@ size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
         return 0;
     }
 
-    uint64_t txnSigOps{ static_cast<uint64_t>(entry.getSigOpsCount()) };
-    uint64_t blockSigOpsWithTx{ mState.mBlockSigOps + txnSigOps };
-
-    // After Genesis we don't count sigops anymore
-    if (!IsGenesisEnabled(mConfig, pindex->nHeight + 1))
-    {
-        // Check sig ops count
-        uint64_t maxBlockSigOps = mConfig.GetMaxBlockSigOpsConsensusBeforeGenesis(blockSizeWithTx);
-     
-        if (blockSigOpsWithTx >= maxBlockSigOps)
-        {
-            return 0;
-        }
-    }
-
     // Must check that lock times are still valid
     if(pindex)
     {
@@ -363,11 +346,9 @@ size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
     // Append next txn to the block template
     mBlockTxns.emplace_back(txn);
     mTxFees.emplace_back(entry.getFee());
-    mTxSigOpsCount.emplace_back(entry.getSigOpsCount());
 
     // Update block accounting details
     mState.mBlockSize = blockSizeWithTx;
-    mState.mBlockSigOps = blockSigOpsWithTx;
     mState.mBlockFees += entry.getFee();
 
     // Move to the next item in the journal

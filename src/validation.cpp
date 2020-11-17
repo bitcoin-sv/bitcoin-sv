@@ -1337,7 +1337,6 @@ CTxnValResult TxnValidation(
             uiChainActiveHeight,
             inChainInputValue,
             fSpendsCoinbase,
-            nSigOpsCount,
             lp) };
     if (!skipFeeTest) {
         // Check tx's priority based on relaypriority flag and relay fee.

@@ -155,15 +155,13 @@ bool CJournalChangeSet::CheckTopoSort() const
                 return change.second.getTxn()->GetHash() == prevTxId;
             });
             size_t prevTxIdx = std::distance(mChangeSet.cbegin(), prevTx);
-            LogPrintf("=x== ChangeSet[%d] %s input %d ancestor depth %d"
-                      " references a later ChangeSet[%d] %s ancestor depth %d\n",
+            LogPrintf("=x== ChangeSet[%d] %s input %d"
+                      " references a later ChangeSet[%d] %s\n",
                       (std::distance(mChangeSet.cbegin(), i)),
                       txn->GetHash().GetHex(),
                       std::distance(txn->vin.cbegin(), unsorted),
-                      i->second.getAncestorCount()->nCountWithAncestors,
                       prevTxIdx,
-                      prevTxId.GetHex(),
-                      prevTx->second.getAncestorCount()->nCountWithAncestors
+                      prevTxId.GetHex()
                       );
         }
     }

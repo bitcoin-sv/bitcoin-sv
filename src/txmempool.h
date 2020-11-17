@@ -166,21 +166,11 @@ private:
     double entryPriority;
     //!< Sum of all txin values that are already in blockchain
     Amount inChainInputValue;
-    //!< Total sigop plus P2SH sigops count
-    int64_t sigOpCount;
     //!< Used for determining the priority of the transaction for mining in a
     //! block
     Amount feeDelta;
     //!< Track the height and time at which tx was final
     LockPoints lockPoints;
-
-    //!< number of ancestor transactions
-    AncestorCountsPtr ancestorCounts;
-
-    // Statistics for ancestor transactions
-    uint64_t nSizeWithAncestors;
-    Amount nModFeesWithAncestors;
-    int64_t nSigOpCountWithAncestors;
 
     //!< Chain height when entering the mempool
     int32_t entryHeight;
@@ -191,7 +181,7 @@ public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime, double _entryPriority,
                     int32_t _entryHeight, Amount _inChainInputValue,
-                    bool spendsCoinbase, int64_t nSigOpsCost, LockPoints lp);
+                    bool spendsCoinbase, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
@@ -211,56 +201,23 @@ public:
     size_t GetTxSize() const { return nTxSize; }
     int64_t GetTime() const { return nTime; }
     int32_t GetHeight() const { return entryHeight; }
-    int64_t GetSigOpCount() const { return sigOpCount; }
     Amount GetModifiedFee() const { return nFee + feeDelta; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints &GetLockPoints() const { return lockPoints; }
 
-    // Adjusts the ancestor state
-    void UpdateAncestorState(int64_t modifySize, Amount modifyFee,
-                             int64_t modifyCount, int modifySigOps);
-    // Removes all ancestor data
-    void ResetAncestorState();
     // Updates the fee delta used for mining priority score, and the
     // modified fees with descendants.
     void UpdateFeeDelta(Amount feeDelta);
     // Update the LockPoints after a reorg
     void UpdateLockPoints(const LockPoints &lp);
 
-    const AncestorCountsPtr& GetAncestorCounts() const { return ancestorCounts; }
-
     bool GetSpendsCoinbase() const { return spendsCoinbase; }
-
-    uint64_t GetCountWithAncestors() const { return ancestorCounts->nCountWithAncestors; }
-    uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
-    Amount GetModFeesWithAncestors() const { return nModFeesWithAncestors; }
-    int64_t GetSigOpCountWithAncestors() const {
-        return nSigOpCountWithAncestors;
-    }
 
     std::shared_ptr<CPFPGroup> group {};
     std::optional<CPFPGroupEvaluationData> groupingData {};
 
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     bool IsCPFPGroupMember() const { return group != nullptr; }
-};
-
-struct update_ancestor_state {
-    update_ancestor_state(int64_t _modifySize, Amount _modifyFee,
-                          int64_t _modifyCount, int64_t _modifySigOpsCost)
-        : modifySize(_modifySize), modifyFee(_modifyFee),
-          modifyCount(_modifyCount), modifySigOpsCost(_modifySigOpsCost) {}
-
-    void operator()(CTxMemPoolEntry &e) {
-        e.UpdateAncestorState(modifySize, modifyFee, modifyCount,
-                              modifySigOpsCost);
-    }
-
-private:
-    int64_t modifySize;
-    Amount modifyFee;
-    int64_t modifyCount;
-    int64_t modifySigOpsCost;
 };
 
 struct update_fee_delta {
@@ -989,7 +946,6 @@ private:
     void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
-            setEntries &setAncestors,
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
@@ -1011,13 +967,6 @@ private:
     void updateAncestorsOfNL(
             bool add,
             txiter hash);
-
-    /**
-     * Set ancestor state for an entry
-     */
-    void updateEntryForAncestorsNL(
-            txiter it,
-            const setEntries &setAncestors);
 
     /**
      * For each transaction being removed, update ancestors and any direct

@@ -10,30 +10,24 @@ namespace mining
 
 /**
 * What we actually store for each journal entry.
-* Contains a pointer to the transaction itself, ancestor count information,
-* and fee/sigops accounting details.
+* Contains a pointer to the transaction itself, group id and fee accounting details.
 */
 class CJournalEntry
 {
   public:
 
     // Constructors
-    CJournalEntry(const CTransactionRef& txn, const AncestorCountsPtr& count,
-                  const Amount& fee, int64_t sigOps, GroupID groupId)
-    : mTxn{txn}, mAncestorCount{count}, mFee{fee}, mSigOpsCount{sigOps}
-    , mGroupId(groupId)
+    CJournalEntry(const CTransactionRef& txn, const Amount& fee, GroupID groupId)
+    : mTxn{txn}, mFee{fee}, mGroupId{groupId}
     {}
 
     CJournalEntry(const CTxMemPoolEntry& entry)
-    : CJournalEntry{entry.GetSharedTx(), entry.GetAncestorCounts(), entry.GetFee(),
-                    entry.GetSigOpCount(), entry.GetCPFPGroupId()}
+    : CJournalEntry{entry.GetSharedTx(), entry.GetFee(), entry.GetCPFPGroupId()}
     {}
 
     // Accessors
     const CTransactionRef& getTxn() const { return mTxn; }
-    const AncestorCountsPtr& getAncestorCount() const { return mAncestorCount; }
     const Amount& getFee() const { return mFee; }
-    int64_t getSigOpsCount() const { return mSigOpsCount; }
 
     // Which group of transactions if any does this entry belong to
     const GroupID& getGroupId() const { return mGroupId; }
@@ -43,13 +37,10 @@ class CJournalEntry
     // Shared pointer to the transaction itself
     CTransactionRef mTxn {};
 
-    // Shared pointer to the ancestor count information
-    AncestorCountsPtr mAncestorCount {};
-
-    // Fee and sig ops count for the transaction
+    // Fee for the transaction
     Amount mFee {0};
-    int64_t mSigOpsCount {0};
 
+    // Group id for the transaction
     GroupID mGroupId {};
 };
 
