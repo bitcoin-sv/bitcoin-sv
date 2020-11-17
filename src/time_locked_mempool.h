@@ -57,7 +57,7 @@ class CTimeLockedMempool final
 
     // Check the given transaction doesn't try to double spend any of
     // our locked UTXOs.
-    bool checkForDoubleSpend(const CTransactionRef& txn) const;
+    std::set<CTransactionRef> checkForDoubleSpend(const CTransactionRef& txn) const;
 
     // Is the given txn ID for one currently held?
     bool exists(const uint256& id) const;

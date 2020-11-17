@@ -663,7 +663,8 @@ public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             unsigned int nBlockHeight,
-            const mining::CJournalChangeSetPtr& changeSet);
+            const mining::CJournalChangeSetPtr& changeSet,
+            const uint256& blockhash);
 
     void Clear();
 
@@ -681,6 +682,9 @@ public:
     // A non-locking version of IsSpent
     // DEPRECATED - this will become private and ultimately changed or removed
     bool IsSpentNL(const COutPoint &outpoint);
+    // Returns const pointer to transaction that spends outpoint.
+    // Pointer is valid and transaction will not change as long as mempool smtx lock is held
+    const CTransaction* IsSpentByNL(const COutPoint &outpoint);
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
     /**
@@ -826,7 +830,7 @@ public:
      * @param tx A reference to the given txn
      * @param nonFinal A flag to indicate if tx is a non-final transaction
      */
-    bool CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const;
+    std::set<CTransactionRef> CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const;
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
@@ -942,11 +946,14 @@ private:
     void removeUncheckedNL(
             txiter entry,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+            MemPoolRemovalReason reason,
+            const CTransaction* conflictedWith,
+            const uint256* blockhash = nullptr);
 
     void removeConflictsNL(
             const CTransaction &tx,
-            const mining::CJournalChangeSetPtr& changeSet);
+            const mining::CJournalChangeSetPtr& changeSet,
+            const uint256& blockhash);
 
     void clearNL();
 
@@ -964,7 +971,9 @@ private:
             bool updateDescendants,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            bool updateJournal = true);
+            bool updateJournal = true,
+            const CTransaction* conflictedwith = nullptr,
+            const uint256* blockhash = nullptr);
 
     void prioritiseTransactionNL(
             const uint256& hash,
@@ -977,7 +986,9 @@ private:
     void removeRecursiveNL(
             const CTransaction &tx,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
+            const CTransaction* conflictedWith = nullptr,
+            const uint256* blockhash = nullptr);
 
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;

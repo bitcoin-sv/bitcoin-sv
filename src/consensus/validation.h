@@ -6,7 +6,9 @@
 #ifndef BITCOIN_CONSENSUS_VALIDATION_H
 #define BITCOIN_CONSENSUS_VALIDATION_H
 
+#include <set>
 #include <string>
+#include "primitives/transaction.h"
 
 /** "reject" message codes */
 static const uint8_t REJECT_MALFORMED = 0x01;
@@ -40,14 +42,16 @@ private:
     bool fStandardTx {false};
     bool fResubmitTx {false};
 
+    // Set of transactions with which the inputs collisions were detected either
+    // by fDoubleSpendDetected or fMempoolConflictDetected.
+    std::set<CTransactionRef> mCollidedWithTx;
+
 public:
     bool DoS(int level, bool ret = false, unsigned int chRejectCodeIn = 0,
              const std::string &strRejectReasonIn = "",
-             bool corruptionIn = false,
              const std::string &strDebugMessageIn = "") {
         chRejectCode = chRejectCodeIn;
         strRejectReason = strRejectReasonIn;
-        corruptionPossible = corruptionIn;
         strDebugMessage = strDebugMessageIn;
         if (mode == MODE_ERROR) {
             return ret;
@@ -57,11 +61,19 @@ public:
         return ret;
     }
 
+    bool CorruptionOrDoS(
+        const std::string &strRejectReasonIn,
+        const std::string &strDebugMessageIn)
+    {
+        corruptionPossible = true;
+
+        return DoS(100, false, REJECT_INVALID, strRejectReasonIn, strDebugMessageIn);
+    }
+
     bool Invalid(bool ret = false, unsigned int _chRejectCode = 0,
                  const std::string &_strRejectReason = "",
                  const std::string &_strDebugMessage = "") {
-        return DoS(0, ret, _chRejectCode, _strRejectReason, false,
-                   _strDebugMessage);
+        return DoS(0, ret, _chRejectCode, _strRejectReason, _strDebugMessage);
     }
     bool Error(const std::string &strRejectReasonIn) {
         if (mode == MODE_VALID) {
@@ -92,10 +104,17 @@ public:
     bool IsStandardTx() const { return fStandardTx; };
     bool IsResubmittedTx() const { return fResubmitTx; };
 
-    void SetCorruptionPossible() { corruptionPossible = true; }
     void SetMissingInputs() { fMissingInputs = true; }
-    void SetDoubleSpendDetected() { fDoubleSpendDetected = true; }
-    void SetMempoolConflictDetected() { fMempoolConflictDetected = true; }
+    void SetDoubleSpendDetected(std::set<CTransactionRef>&& collidedWithTx)
+    {
+        mCollidedWithTx.merge( collidedWithTx );
+        fDoubleSpendDetected = true;
+    }
+    void SetMempoolConflictDetected(std::set<CTransactionRef>&& collidedWithTx)
+    {
+        mCollidedWithTx.merge( collidedWithTx );
+        fMempoolConflictDetected = true;
+    }
     void SetNonFinal(bool nf = true) { nonFinal = nf; }
     void SetValidationTimeoutExceeded() { fValidationTimeoutExceeded = true; };
     void SetStandardTx() { fStandardTx = true; };
@@ -105,6 +124,11 @@ public:
     unsigned int GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
     std::string GetDebugMessage() const { return strDebugMessage; }
+    const std::set<CTransactionRef>& GetCollidedWithTx() const { return mCollidedWithTx; }
+
+    // Intended for use where we no longer wish to use up the memory required
+    // to hold the transaction info
+    void ClearCollidedWithTx() { mCollidedWithTx.clear(); }
 };
 
 #endif // BITCOIN_CONSENSUS_VALIDATION_H

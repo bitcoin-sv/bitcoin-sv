@@ -7,11 +7,25 @@
 #define BITCOIN_INIT_H
 
 #include <string>
+
+#include "sync.h"
 #include "taskcancellation.h"
+#if ENABLE_ZMQ
+#include "zmq/zmqnotificationinterface.h"
+#endif
 
 class Config;
 class CScheduler;
 class CWallet;
+
+#if ENABLE_ZMQ
+/**
+* cs_zmqNotificationInterface is used to protect pzmqNotificationInterface. One of the race conditions can occur
+* at shutdown when pzmqNotificationInterface gets deleted while RPC thread might still be using it.
+*/
+extern CCriticalSection cs_zmqNotificationInterface;
+extern CZMQNotificationInterface *pzmqNotificationInterface;
+#endif
 
 namespace boost {
 class thread_group;
@@ -59,7 +73,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
 enum HelpMessageMode { HMM_BITCOIND };
 
 /** Help for options shared between UI and daemon (for -help) */
-std::string HelpMessage(HelpMessageMode mode);
+std::string HelpMessage(HelpMessageMode mode, const Config& config);
 /** Returns licensing information (for -version) */
 std::string LicenseInfo();
 

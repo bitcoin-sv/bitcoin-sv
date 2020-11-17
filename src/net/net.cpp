@@ -25,6 +25,10 @@
 #include "txn_validator.h"
 #include "ui_interface.h"
 #include "utilstrencodings.h"
+#include "invalid_txn_publisher.h"
+
+#include "invalid_txn_sinks/file_sink.h"
+#include "invalid_txn_sinks/zmq_sink.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -2009,8 +2013,7 @@ namespace
 
                 if(processingDuration > mDebugP2PTheadStallsThreshold)
                 {
-                    LogPrint(
-                        BCLog::NET,
+                    LogPrintf(
                         "CConnman request processing took %s ms to complete "
                         "processing '%s' request!\n",
                         std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -2301,6 +2304,30 @@ CConnman::CConnman(
          static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
     , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
     , mAsyncTaskPool{configIn}
+    , mInvalidTxnPublisher{
+            [&configIn]
+            {
+                std::vector<std::unique_ptr<InvalidTxnPublisher::CInvalidTxnSink>> sinks;
+                auto sinkNames = configIn.GetInvalidTxSinks();
+
+                if (sinkNames.find( "FILE" ) != sinkNames.end())
+                {
+                    sinks.push_back(
+                        std::make_unique<InvalidTxnPublisher::CInvalidTxnFileSink>(
+                            configIn.GetInvalidTxFileSinkMaxDiskUsage(),
+                            configIn.GetInvalidTxFileSinkEvictionPolicy()));
+                }
+#if ENABLE_ZMQ
+                if (sinkNames.find( "ZMQ" ) != sinkNames.end())
+                {
+                    sinks.push_back(
+                        std::make_unique<InvalidTxnPublisher::CInvalidTxnZmqSink>(
+                            configIn.GetInvalidTxZMQMaxMessageSize()));
+                }
+#endif
+
+                return sinks;
+            }()}
 {
     fNetworkActive = true;
     setBannedIsDirty = false;
@@ -2463,7 +2490,6 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
     // Schedule average bandwidth measurements
     scheduler.scheduleEvery(std::bind(&CConnman::PeerAvgBandwithCalc, this),
                             PEER_AVG_BANDWIDTH_CALC_FREQUENCY_SECS * 1000);
-
 
     return true;
 }
@@ -2924,6 +2950,11 @@ const TxIdTrackerSPtr& CConnman::GetTxIdTracker() {
 
 std::shared_ptr<CTxnValidator> CConnman::getTxnValidator() {
 	return mTxnValidator;
+}
+
+CInvalidTxnPublisher& CConnman::getInvalidTxnPublisher()
+{
+    return mInvalidTxnPublisher;
 }
 
 /** Enqueue a new transaction for validation */

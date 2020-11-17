@@ -3,14 +3,13 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the ZMQ API."""
-import configparser
-import os
+
 import struct
 
 from test_framework.test_framework import BitcoinTestFramework, SkipTest
 from test_framework.util import (assert_equal,
                                  bytes_to_hex_str,
-                                 hash256,
+                                 hash256, check_zmq_test_requirements
                                  )
 
 
@@ -20,21 +19,11 @@ class ZMQTest (BitcoinTestFramework):
 
     def setup_nodes(self):
 
-        # Check that bitcoin has been built with ZMQ enabled
-        config = configparser.ConfigParser()
-        if not self.options.configfile:
-            self.options.configfile = os.path.dirname(
-                __file__) + "/../config.ini"
-        config.read_file(open(self.options.configfile))
-
-        if not config["components"].getboolean("ENABLE_ZMQ"):
-            raise SkipTest("bitcoind has not been built with zmq enabled.")
-
-        # if we built bitcoind with ZMQ enabled, then we need zmq package to test its functionality
-        try:
-            import zmq
-        except ImportError:
-            raise Exception("python3-zmq module not available.")
+        # Check that bitcoin has been built with ZMQ enabled and we have python zmq package installed.
+        check_zmq_test_requirements(self.options.configfile,
+                                    SkipTest("bitcoind has not been built with zmq enabled."))
+        # import zmq when we know we have the requirements for test with zmq.
+        import zmq
 
         self.zmqContext = zmq.Context()
         self.zmqSubSocket = self.zmqContext.socket(zmq.SUB)
@@ -52,11 +41,25 @@ class ZMQTest (BitcoinTestFramework):
 
     def run_test(self):
         try:
+            self.test_activenotifications()
             self._zmq_test()
         finally:
             # Destroy the zmq context
             self.log.debug("Destroying zmq context")
             self.zmqContext.destroy(linger=None)
+
+    def test_activenotifications(self):
+        active_notifications = self.nodes[0].activezmqnotifications()
+
+        assert_equal({'notification': 'pubhashblock',
+                      'address': 'tcp://127.0.0.1:28332'} in active_notifications, True)
+        assert_equal({'notification': 'pubhashtx',
+                      'address': 'tcp://127.0.0.1:28332'} in active_notifications, True)
+        assert_equal({'notification': 'pubrawblock',
+                      'address': 'tcp://127.0.0.1:28332'} in active_notifications, True)
+        assert_equal({'notification': 'pubrawtx',
+                      'address': 'tcp://127.0.0.1:28332'} in active_notifications, True)
+
 
     def _zmq_test(self):
         genhashes = self.nodes[0].generate(1)

@@ -7,6 +7,7 @@
 #include "consensus/consensus.h"
 #include "validation.h"
 #include "util.h"
+#include "consensus/merkle.h"
 #include <boost/algorithm/string.hpp>
 
 GlobalConfig::GlobalConfig() {
@@ -77,6 +78,15 @@ void GlobalConfig::Reset()
     mPromiscuousMempoolFlags = 0;
     mIsSetPromiscuousMempoolFlags = false;
 
+    invalidTxFileSinkSize = CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE;
+    invalidTxFileSinkEvictionPolicy = CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY;
+#if ENABLE_ZMQ
+    invalidTxZMQMaxMessageSize = CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE;
+#endif
+
+    maxMerkleTreeDiskSpace = MIN_DISK_SPACE_FOR_MERKLETREE_FILES;
+    preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
+    maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -852,6 +862,153 @@ bool GlobalConfig::IsClientUABanned(const std::string uaClient) const
         }
     }
     return false;
+}
+
+bool GlobalConfig::SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err)
+{
+    if (LessThanZero(maxDiskSpace, err, "Maximum disk space taken by merkle tree files cannot be configured with a negative value."))
+    {
+        return false;
+    }
+    uint64_t setMaxDiskSpace = static_cast<uint64_t>(maxDiskSpace);
+    if (setMaxDiskSpace < MIN_DISK_SPACE_FOR_MERKLETREE_FILES)
+    {
+        if (err)
+        {
+            *err = _("Maximum disk space used by merkle tree files cannot be below the minimum of ") + 
+                std::to_string(MIN_DISK_SPACE_FOR_MERKLETREE_FILES / ONE_MEBIBYTE) + _(" MiB.");
+        }
+        return false;
+    }
+    maxMerkleTreeDiskSpace = setMaxDiskSpace;
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxMerkleTreeDiskSpace() const
+{
+    return maxMerkleTreeDiskSpace;
+}
+
+bool GlobalConfig::SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err)
+{
+    if (LessThanZero(preferredFileSize, err, "Merkle tree file size cannot be configured with a negative value."))
+    {
+        return false;
+    }
+    preferredMerkleTreeFileSize = static_cast<uint64_t>(preferredFileSize);
+    return true;
+}
+
+uint64_t GlobalConfig::GetPreferredMerkleTreeFileSize() const
+{
+    return preferredMerkleTreeFileSize;
+}
+
+bool GlobalConfig::AddInvalidTxSink(const std::string& sink, std::string* err)
+{
+    auto availableSinks = GetAvailableInvalidTxSinks();
+    if (availableSinks.find(sink) == availableSinks.end())
+    {
+        if (err)
+        {
+            *err =sink + " is not valid transaction sink. Valid transactions sinks are: ";
+            *err += StringJoin(", ", availableSinks.begin(), availableSinks.end());
+        }
+        return false;
+    }
+
+    invalidTxSinks.insert(sink);
+    return true;
+}
+
+std::set<std::string> GlobalConfig::GetInvalidTxSinks() const
+{
+    return invalidTxSinks;
+}
+
+std::set<std::string> GlobalConfig::GetAvailableInvalidTxSinks() const
+{
+#if ENABLE_ZMQ
+    return {"FILE", "ZMQ"};
+#else
+    return {"FILE"};
+#endif
+}
+
+bool GlobalConfig::SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err)
+{
+    if (LessThanZero(max, err, "Invalid transaction file usage can not be negative."))
+    {
+        return false;
+    }
+
+    invalidTxFileSinkSize = (max == 0 ? std::numeric_limits<int64_t>::max() : max);
+    return true;
+}
+
+int64_t GlobalConfig::GetInvalidTxFileSinkMaxDiskUsage() const
+{
+    return invalidTxFileSinkSize;
+}
+
+bool GlobalConfig::SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err)
+{
+    if(policy == "IGNORE_NEW")
+    {
+        invalidTxFileSinkEvictionPolicy = InvalidTxEvictionPolicy::IGNORE_NEW;
+        return true;
+    }
+    else if (policy == "DELETE_OLD")
+    {
+        invalidTxFileSinkEvictionPolicy = InvalidTxEvictionPolicy::DELETE_OLD;
+        return true;
+    }
+
+    if (err)
+    {
+        *err = "Invalid value for invalid transactions eviction policy. Available policies are IGNORE_NEW and DELETE_OLD. Got " + policy;
+    }
+
+    return false;
+}
+
+InvalidTxEvictionPolicy GlobalConfig::GetInvalidTxFileSinkEvictionPolicy() const
+{
+    return invalidTxFileSinkEvictionPolicy;
+}
+
+#if ENABLE_ZMQ
+bool GlobalConfig::SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err)
+{
+    if (LessThanZero(max, err, "Invalid transaction ZMQ max message size can not be negative."))
+    {
+        return false;
+    }
+
+    invalidTxZMQMaxMessageSize = (max == 0 ? std::numeric_limits<int64_t>::max() : max);
+    return true;
+}
+
+int64_t GlobalConfig::GetInvalidTxZMQMaxMessageSize() const
+{
+    return invalidTxZMQMaxMessageSize;
+}
+#endif
+
+bool GlobalConfig::SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err)
+{
+    if (LessThanZero(maxMemoryCacheSize, err, "Maximum merkle tree memory cache size cannot be configured with a negative value."))
+    {
+        return false;
+    }
+
+    maxMerkleTreeMemoryCacheSize = static_cast<uint64_t>(maxMemoryCacheSize);
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxMerkleTreeMemoryCacheSize() const
+{
+    return maxMerkleTreeMemoryCacheSize;
 }
 
 DummyConfig::DummyConfig()

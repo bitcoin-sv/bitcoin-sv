@@ -39,6 +39,7 @@
 #include "validation.h"
 #include "protocol.h"
 #include "validationinterface.h"
+#include "invalid_txn_publisher.h"
 
 #include <boost/range/adaptor/reversed.hpp>
 #include <boost/thread.hpp>
@@ -2702,6 +2703,11 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
     if(fBlockRead) {
         bool fNewBlock = false;
         auto source = task::CCancellationSource::Make();
+        auto scopedBlockOriginReg = std::make_shared<CScopedBlockOriginRegistry>(
+            pblock->GetHash(),
+            "ProcessBlockTxnMessage",
+            pfrom->GetAddrName(),
+            pfrom->GetId());
         // Since we requested this block (it was in mapBlocksInFlight),
         // force it to be processed, even if it would not be a candidate for
         // new tip (missing previous block, chain not long enough, etc)
@@ -2715,9 +2721,9 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
         }
 
         pfrom->RunAsyncProcessing(
-            [fNewBlock, bestChainActivation]
+            [fNewBlock, bestChainActivation, pblock, scopedBlockOriginReg]
             (std::weak_ptr<CNode> weakFrom)
-            {
+            {   
                 bestChainActivation();
 
                 if(fNewBlock)
@@ -2976,13 +2982,18 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
 
         bool fNewBlock = false;
         auto source = task::CCancellationSource::Make();
+        auto scopedBlockOriginReg = std::make_shared<CScopedBlockOriginRegistry>(
+            pblock->GetHash(),
+            "ProcessCompactBlock",
+            pfrom->GetAddrName(),
+            pfrom->GetId());
         auto bestChainActivation =
             ProcessNewBlockWithAsyncBestChainActivation(
                 task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, true, &fNewBlock);
         if(bestChainActivation)
         {
             pfrom->RunAsyncProcessing(
-                [pindex, pblock, fNewBlock, bestChainActivation]
+                [pindex, pblock, fNewBlock, bestChainActivation, scopedBlockOriginReg]
                 (std::weak_ptr<CNode> weakFrom)
                 {
                     bestChainActivation();
@@ -3019,7 +3030,8 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
 /**
 * Process block message.
 */
-static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDataStream& vRecv)
+static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDataStream& vRecv,
+    CConnman& connman)
 {
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     vRecv >> *pblock;
@@ -3045,6 +3057,11 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
 
     bool fNewBlock = false;
     auto source = task::CCancellationSource::Make();
+    auto scopedBlockOriginReg = std::make_shared<CScopedBlockOriginRegistry>(
+            pblock->GetHash(),
+            "ProcessBlockMessage",
+            pfrom->GetAddrName(),
+            pfrom->GetId());
     auto bestChainActivation =
         ProcessNewBlockWithAsyncBestChainActivation(
             task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, pblock, forceProcessing, &fNewBlock);
@@ -3055,7 +3072,7 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
     }
 
     pfrom->RunAsyncProcessing(
-        [pblock, fNewBlock, bestChainActivation]
+        [pblock, fNewBlock, bestChainActivation, scopedBlockOriginReg]
         (std::weak_ptr<CNode> weakFrom)
         {
             bestChainActivation();
@@ -3468,7 +3485,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     // Ignore blocks received while importing
     else if (strCommand == NetMsgType::BLOCK && !fImporting && !fReindex) {
-        ProcessBlockMessage(config, pfrom, vRecv);
+        ProcessBlockMessage(config, pfrom, vRecv, connman);
     }
 
     else if (strCommand == NetMsgType::GETADDR) {

@@ -234,8 +234,13 @@ add_library(server
 	httprpc.cpp
 	httpserver.cpp
 	init.cpp
+	invalid_txn_publisher.cpp
+    invalid_txn_sinks/file_sink.cpp
+    invalid_txn_sinks/zmq_sink.cpp
 	dbwrapper.cpp
 	merkleblock.cpp
+	merkletreedb.cpp
+	merkletreestore.cpp
 	mining/assembler.cpp
 	mining/candidates.cpp
 	mining/factory.cpp
@@ -328,7 +333,13 @@ if(BUILD_BITCOIN_ZMQ)
 endif()
 
 # RPC client support
-add_library(rpcclient rpc/client.cpp)
+add_library(rpcclient
+    rpc/client.cpp
+    rpc/client_config.cpp
+    rpc/client_utils.cpp
+    rpc/http_request.cpp
+    rpc/http_response.cpp
+)
 target_link_libraries(rpcclient univalue util)
 
 # bitcoin-seeder

@@ -21,6 +21,7 @@
 #include "fs.h"
 #include "httprpc.h"
 #include "httpserver.h"
+#include "invalid_txn_publisher.h"
 #include "key.h"
 #include "mining/journal_builder.h"
 #include "mining/journaling_block_assembler.h"
@@ -29,6 +30,7 @@
 #include "net/net_processing.h"
 #include "net/netbase.h"
 #include "policy/policy.h"
+#include "rpc/client_config.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
 #include "scheduler.h"
@@ -48,6 +50,7 @@
 #include "validation.h"
 #include "validationinterface.h"
 #include "vmtouch.h"
+#include "merkletreestore.h"
 
 #ifdef ENABLE_WALLET
 #include "wallet/rpcdump.h"
@@ -70,13 +73,10 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
 
-#if ENABLE_ZMQ
-#include "zmq/zmqnotificationinterface.h"
-#endif
 
 static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
@@ -87,7 +87,8 @@ std::unique_ptr<CConnman> g_connman;
 std::unique_ptr<PeerLogicValidation> peerLogic;
 
 #if ENABLE_ZMQ
-static CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
+CCriticalSection cs_zmqNotificationInterface;
+CZMQNotificationInterface *pzmqNotificationInterface = nullptr;
 #endif
 
 #ifdef WIN32
@@ -193,6 +194,7 @@ void Shutdown() {
     /// part of the way, for example if the data directory was found to be
     /// locked. Be sure that anything that writes files or flushes caches only
     /// does this if the respective module was initialized.
+
     RenameThread("bitcoin-shutoff");
     mempool.AddTransactionsUpdated(1);
 
@@ -250,10 +252,13 @@ void Shutdown() {
 #endif
 
 #if ENABLE_ZMQ
-    if (pzmqNotificationInterface) {
-        UnregisterValidationInterface(pzmqNotificationInterface);
-        delete pzmqNotificationInterface;
-        pzmqNotificationInterface = nullptr;
+    {
+        LOCK(cs_zmqNotificationInterface);
+        if (pzmqNotificationInterface) {
+            UnregisterValidationInterface(pzmqNotificationInterface);
+            delete pzmqNotificationInterface;
+            pzmqNotificationInterface = nullptr;
+        }
     }
 #endif
 
@@ -317,7 +322,7 @@ void OnRPCPreCommand(const CRPCCommand &cmd) {
                            std::string("Safe mode: ") + strWarning);
 }
 
-std::string HelpMessage(HelpMessageMode mode) {
+std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     const auto defaultBaseParams =
         CreateBaseChainParams(CBaseChainParams::MAIN);
     const auto testnetBaseParams =
@@ -511,6 +516,22 @@ std::string HelpMessage(HelpMessageMode mode) {
         "-txindex", strprintf(_("Maintain a full transaction index, used by "
                                 "the getrawtransaction rpc call (default: %d)"),
                               DEFAULT_TXINDEX));
+    strUsage += HelpMessageOpt(
+        "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
+        "can be taken by stored merkle trees. This size should not be less than default size "
+        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        MIN_DISK_SPACE_FOR_MERKLETREE_FILES));
+    strUsage += HelpMessageOpt(
+        "-preferredmerkletreefilesize", strprintf(_("Preferred size of a single datafile containing "
+        "merkle trees. When size is reached, new datafile is created. If preferred size is less than "
+        "size of a single merkle tree, it will still be stored, meaning datafile size can be larger than "
+        "preferred size. (default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE));
+    strUsage += HelpMessageOpt(
+        "-maxmerkletreememcachesize", strprintf(_("Maximum merkle trees memory cache size in bytes. For "
+        "faster responses, requested merkle trees are stored into a memory cache. "
+        "(default: %u bytes). The value may be given in bytes or with unit (B, kiB, MiB, GiB)."),
+        DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE));
     strUsage += HelpMessageGroup(_("Connection options:"));
     strUsage += HelpMessageOpt(
         "-addnode=<ip>",
@@ -706,6 +727,13 @@ std::string HelpMessage(HelpMessageMode mode) {
     strUsage +=
         HelpMessageOpt("-zmqpubrawtx=<address>",
                        _("Enable publish raw transaction in <address>"));
+    strUsage +=
+        HelpMessageOpt("-zmqpubinvalidtx=<address>",
+                       _("Enable publish invalid transaction in <address>. -invalidtxsink=ZMQ should be specified."));
+    strUsage += HelpMessageOpt("-zmqpubdiscardedfrommempool=<address>",
+                               _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
+    strUsage += HelpMessageOpt("-zmqpubremovedfrommempoolblock=<address>",
+                               _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
 #endif
 
     strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
@@ -900,7 +928,7 @@ std::string HelpMessage(HelpMessageMode mode) {
             strprintf(
                 "Relay and mine transactions that create or consume non standard"
                 " outputs after Genesis is activated. (default: %u)",
-                GlobalConfig::GetConfig().GetAcceptNonStandardOutput(true)));
+                config.GetAcceptNonStandardOutput(true)));
         strUsage += HelpMessageOpt(
             "-dustrelayfee=<amt>",
             strprintf("Fee rate (in %s/kB) used to defined dust, the value of "
@@ -1053,13 +1081,13 @@ std::string HelpMessage(HelpMessageMode mode) {
         strprintf(_("Set the type of block assembler to use for mining. Supported options are "
                     "LEGACY or JOURNALING. (default: %s)"),
                   enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
-    strUsage += HelpMessageOpt( 
+    strUsage += HelpMessageOpt(
         "-jbamaxtxnbatch=<max batch size>",
         strprintf(_("Set the maximum number of transactions processed in a batch by the journaling block assembler "
                 "(default: %d)"), mining::JournalingBlockAssembler::DEFAULT_MAX_SLOT_TRANSACTIONS)
     );
     if (showDebug) {
-        strUsage += HelpMessageOpt( 
+        strUsage += HelpMessageOpt(
             "-jbafillafternewblock",
             strprintf(_("After a new block has been found it can take a short while for the journaling block assembler "
                         "to catch up and return a new candidate containing every transaction in the mempool. "
@@ -1205,6 +1233,35 @@ std::string HelpMessage(HelpMessageMode mode) {
                     "Seting 0 will disable Genesis graceful period. Genesis graceful period range :"
                     "(GENESIS_ACTIVATION_HEIGHT - n |...| GENESIS_ACTIVATION_HEIGHT |...| GENESIS_ACTIVATION_HEIGHT + n)"),
             DEFAULT_GENESIS_GRACEFULL_ACTIVATION_PERIOD));
+
+    strUsage += HelpMessageGroup(_("Invalid transactions sink options:"));
+    std::string availableSinks = StringJoin(", ", config.GetAvailableInvalidTxSinks());
+    strUsage += HelpMessageOpt(
+        "-invalidtxsink=<sink>",
+        strprintf(_("Set destination for dumping invalid transactions. Specify separately for every sink you want to include. Available sinks:%s, (no sink by default)"),
+            availableSinks));
+
+    strUsage += HelpMessageOpt(
+        "-invalidtxfilemaxdiskusage=<n>",
+        strprintf(_("Set maximal disk usage for dumping invalid transactions when using FILE for the sink."
+            " In megabytes. (default: %dMB)"
+            " The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE / ONE_MEGABYTE));
+
+    // The message below assumes that default policy is IGNORE_NEW
+    static_assert(CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY == InvalidTxEvictionPolicy::IGNORE_NEW);
+    strUsage += HelpMessageOpt(
+        "-invalidtxfileevictionpolicy=<policy>",
+        strprintf(_("Set policy which is applied when disk usage limits are reached when using FILE for the sink. IGNORE_NEW or DELETE_OLD (default: IGNORE_NEW)")));
+
+#if ENABLE_ZMQ
+    strUsage += HelpMessageOpt(
+        "-invalidtxzmqmaxmessagesize=<n>",
+        strprintf(_("Set maximal message size for publishing invalid transactions using ZMQ, in megabytes. (default: %dMB)"
+            " The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+            CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE / ONE_MEGABYTE));
+#endif
+
 
     return strUsage;
 }
@@ -1758,8 +1815,8 @@ bool AppInitParameterInteraction(Config &config) {
         LogPrintf("Warning: nMinimumChainWork set below default value of %s\n",
                   chainparams.GetConsensus().nMinimumChainWork.GetHex());
     }
-    
-    // mempool limits  
+
+    // mempool limits
     if (std::string err; !config.SetMaxMempool(
         gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE), &err))
     {
@@ -1789,8 +1846,8 @@ bool AppInitParameterInteraction(Config &config) {
     {
         return InitError(err);
     }
-    
-    // Configure free transactions limit 
+
+    // Configure free transactions limit
     if (std::string err; !config.SetLimitFreeRelay(
         gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, ONE_KILOBYTE), &err))
     {
@@ -1799,7 +1856,7 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure max orphant Tx size
     if (std::string err; !config.SetMaxOrphanTxSize(
-        gArgs.GetArgAsBytes("-maxorphantxsize", 
+        gArgs.GetArgAsBytes("-maxorphantxsize",
             COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE, ONE_MEGABYTE), &err))
     {
         return InitError(err);
@@ -1964,6 +2021,69 @@ bool AppInitParameterInteraction(Config &config) {
         }
     }
 
+
+    if (gArgs.IsArgSet("-invalidtxsink"))
+    {
+        for (const std::string &sink : gArgs.GetArgs("-invalidtxsink"))
+        {
+            if (std::string err; !config.AddInvalidTxSink(sink, &err))
+            {
+                return InitError(err);
+            }
+        }
+    }
+
+#if ENABLE_ZMQ
+    bool zmqSinkSpecified = (config.GetInvalidTxSinks().count("ZMQ") != 0);
+    bool zmqIpDefined = gArgs.IsArgSet("-zmqpubinvalidtx");
+
+    if (zmqSinkSpecified && !zmqIpDefined)
+    {
+        return InitError("The 'zmqpubinvalidtx' parameter should be specified when 'invalidtxsink' is set to ZMQ.");
+    }
+    if (!zmqSinkSpecified && zmqIpDefined)
+    {
+        return InitError("The 'invalidtxsink' parameter should be set to ZMQ when 'zmqpubinvalidtx' is defined.");
+    }
+#endif
+
+    if (gArgs.IsArgSet("-invalidtxfilemaxdiskusage"))
+    {
+        auto maxInvalidTxDumpFileSize =
+            gArgs.GetArgAsBytes(
+                "-invalidtxfilemaxdiskusage",
+                CInvalidTxnPublisher::DEFAULT_FILE_SINK_DISK_USAGE,
+                ONE_MEGABYTE);
+        if (std::string err; !config.SetInvalidTxFileSinkMaxDiskUsage(maxInvalidTxDumpFileSize, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+    if (gArgs.IsArgSet("-invalidtxfileevictionpolicy"))
+    {
+        assert(CInvalidTxnPublisher::DEFAULT_FILE_SINK_EVICTION_POLICY == InvalidTxEvictionPolicy::IGNORE_NEW);
+        auto evictionPolicy = gArgs.GetArg("-invalidtxfileevictionpolicy", "IGNORE_NEW");
+        if (std::string err; !config.SetInvalidTxFileSinkEvictionPolicy(evictionPolicy, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+#if ENABLE_ZMQ
+    if (gArgs.IsArgSet("-invalidtxzmqmaxmessagesize"))
+    {
+        auto zmqMessageSize =
+            gArgs.GetArgAsBytes(
+                "-invalidtxzmqmaxmessagesize",
+                CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE,
+                ONE_MEGABYTE);
+        if (std::string err; !config.SetInvalidTxZMQMaxMessageSize(zmqMessageSize, &err))
+        {
+            return InitError(err);
+        }
+    }
+#endif
 
     // block pruning; get the amount of disk space (in MiB) to allot for block &
     // undo files
@@ -2175,6 +2295,36 @@ bool AppInitParameterInteraction(Config &config) {
         config.SetBanClientUA(invalidUAClients);
     }
 
+    // Configure maximum disk space that can be taken by Merkle Tree data files.
+    {
+        int64_t maxMerkleTreeDiskspaceArg = gArgs.GetArgAsBytes("-maxmerkletreediskspace", MIN_DISK_SPACE_FOR_MERKLETREE_FILES);
+        std::string err;
+        if (!config.SetMaxMerkleTreeDiskSpace(maxMerkleTreeDiskspaceArg, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+    // Configure preferred size of a single Merkle Tree data file.
+    {
+        int64_t merkleTreeFileSizeArg = gArgs.GetArgAsBytes("-preferredmerkletreefilesize", DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE);
+        std::string err;
+        if (!config.SetPreferredMerkleTreeFileSize(merkleTreeFileSizeArg, &err))
+        {
+            return InitError(err);
+        }
+    }
+
+    // Configure size of Merkle Trees memory cache.
+    {
+        int64_t maxMerkleTreeMemCacheSizeArg = gArgs.GetArgAsBytes("-maxmerkletreememcachesize", DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE);
+        std::string err;
+        if (!config.SetMaxMerkleTreeMemoryCacheSize(maxMerkleTreeMemCacheSizeArg, &err))
+        {
+            return InitError(err);
+        }
+    }
+
     return true;
 }
 
@@ -2291,6 +2441,17 @@ void preloadChainState(boost::thread_group &threadGroup)
     {
         LogPrintf("Unknown value of -preload. No preloading will be done\n");
     }
+}
+
+static size_t GetMaxNumberOfMerkleTreeThreads()
+{
+    // Use 1/4 of all threads for Merkle tree calculations
+    size_t numberOfMerkleTreeCalculationThreads = static_cast<size_t>(std::thread::hardware_concurrency() * 0.25);
+    if (!numberOfMerkleTreeCalculationThreads)
+    {
+        numberOfMerkleTreeCalculationThreads = 1;
+    }
+    return numberOfMerkleTreeCalculationThreads;
 }
 
 bool AppInitMain(Config &config, boost::thread_group &threadGroup,
@@ -2550,10 +2711,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     }
 
 #if ENABLE_ZMQ
-    pzmqNotificationInterface = CZMQNotificationInterface::Create();
-
-    if (pzmqNotificationInterface) {
-        RegisterValidationInterface(pzmqNotificationInterface);
+    {
+        LOCK(cs_zmqNotificationInterface);
+        pzmqNotificationInterface = CZMQNotificationInterface::Create();
+        if (pzmqNotificationInterface) {
+            RegisterValidationInterface(pzmqNotificationInterface);
+        }
     }
 #endif
     // unlimited unless -maxuploadtarget is set
@@ -2589,12 +2752,17 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     // cap total coins db cache
     nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20);
     nTotalCache -= nCoinDBCache;
+    // calculate cache for Merkle Tree database
+    int64_t nMerkleTreeIndexDBCache = nBlockTreeDBCache / 4;
+    nTotalCache -= nMerkleTreeIndexDBCache;
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
     int64_t nMempoolSizeMax = config.GetMaxMempool();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
+    LogPrintf("* Using %.1fMiB for Merkle Tree index database\n",
+              nMerkleTreeIndexDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for chain state database\n",
               nCoinDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
@@ -2623,7 +2791,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                 pcoinsdbview = new CCoinsViewDB(nCoinDBCache, false,
                                                 fReindex || fReindexChainState);
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
-
+                pMerkleTreeFactory = std::make_unique<CMerkleTreeFactory>(GetDataDir() / "merkle", static_cast<size_t>(nMerkleTreeIndexDBCache), GetMaxNumberOfMerkleTreeThreads());
+                
                 if (fReindex) {
                     pblocktree->WriteReindexing(true);
                     // If we're reindexing in prune mode, wipe away unusable
@@ -2783,7 +2952,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     CheckSafeModeParametersForAllForksOnStartup();
 
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
-  
+
 
 
 // Step 8: load wallet
@@ -2879,7 +3048,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     connOptions.nMaxFeeler = 1;
     connOptions.nBestHeight = chainActive.Height();
     connOptions.uiInterface = &uiInterface;
-    connOptions.nSendBufferMaxSize = 
+    connOptions.nSendBufferMaxSize =
         gArgs.GetArgAsBytes("-maxsendbuffer", DEFAULT_MAXSENDBUFFER, ONE_KILOBYTE);
     connOptions.nReceiveFloodSize =
         gArgs.GetArgAsBytes("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER, ONE_KILOBYTE);

@@ -17,9 +17,10 @@ base_blob<BITS>::base_blob(const std::vector<uint8_t> &vch) {
 }
 
 template <unsigned int BITS> std::string base_blob<BITS>::GetHex() const {
-    char psz[sizeof(data) * 2 + 1];
-    for (unsigned int i = 0; i < sizeof(data); i++)
-        sprintf(psz + i * 2, "%02x", data[sizeof(data) - i - 1]);
+    constexpr auto buf_len{sizeof(data) * 2 + 1};
+    char psz[buf_len];
+    for(unsigned int i = 0; i < sizeof(data); i++)
+        snprintf(psz + i * 2, buf_len, "%02x", data[sizeof(data) - i - 1]);
     return std::string(psz, psz + sizeof(data) * 2);
 }
 

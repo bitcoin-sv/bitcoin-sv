@@ -27,6 +27,7 @@
 #include "version.h"
 #include "versionbits.h"
 #include "utilstrencodings.h"
+#include "invalid_txn_publisher.h"
 #include <iomanip>
 #include <limits>
 #include <queue>
@@ -353,6 +354,7 @@ UniValue submitminingsolution(const Config& config, const JSONRPCRequest& reques
 
         auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr) 
         {
+            CScopedBlockOriginRegistry reg(blockptr->GetHash(), "submitminingsolution");
             return ProcessNewBlock(config, blockptr, true, nullptr);
         };
         submitted = processBlock(config, block, submitBlock); // returns string on failure

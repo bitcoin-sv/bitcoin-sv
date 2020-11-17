@@ -443,7 +443,8 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest) {
     /* after tx6 is mined, tx7 should move up in the sort */
     std::vector<CTransactionRef> vtx;
     vtx.push_back(MakeTransactionRef(tx6));
-    pool.RemoveForBlock(vtx, 1, nullChangeSet);
+    uint256 dummyBlockHash;
+    pool.RemoveForBlock(vtx, 1, nullChangeSet, dummyBlockHash);
 
     sortedOrder.erase(sortedOrder.begin() + 1);
     // Ties are broken by hash
@@ -606,7 +607,8 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       maxFeeRateRemoved.GetFeePerK() + feeIncrement);
     // ... we should keep the same min fee until we get a block
-    pool.RemoveForBlock(vtx, 1, nullChangeSet);
+    uint256 dummyBlockHash;
+    pool.RemoveForBlock(vtx, 1, nullChangeSet, dummyBlockHash);
     SetMockTime(42 + 2 * CTxMemPool::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 2);

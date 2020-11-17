@@ -3,13 +3,19 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "zmqpublishnotifier.h"
+
 #include "config.h"
+#include "core_io.h"
 #include "rpc/server.h"
+#include "rpc/jsonwriter.h"
+#include "rpc/text_writer.h"
 #include "streams.h"
 #include "util.h"
 #include "validation.h"
+#include "zmq_publisher.h"
 
 #include <cstdarg>
+
 
 static std::multimap<std::string, CZMQAbstractPublishNotifier *>
     mapPublishNotifiers;
@@ -18,46 +24,17 @@ static const char *MSG_HASHBLOCK = "hashblock";
 static const char *MSG_HASHTX = "hashtx";
 static const char *MSG_RAWBLOCK = "rawblock";
 static const char *MSG_RAWTX = "rawtx";
+/*
+ * using slightly different topic prefix to avoid being subscribed to RemovedFromMempool and RemovedFromMempoolBlock
+ * at same time.
+*/
+static const char *MSG_DISCARDEDFROMMEMPOOL = "discardedfrommempool";
+static const char *MSG_REMOVEDFROMMEMPOOLBLOCK = "removedfrommempoolblock";
 
-// Internal function to send multipart message
-static int zmq_send_multipart(void *sock, const void *data, size_t size, ...) {
-    va_list args;
-    auto closeVaList = [](va_list* args) {va_end(*args);};
-    va_start(args, size);
-    std::unique_ptr<va_list, decltype(closeVaList)> guard{&args, closeVaList};
 
-    while (1) {
-        zmq_msg_t msg;
-
-        int rc = zmq_msg_init_size(&msg, size);
-        if (rc != 0) {
-            zmqError("Unable to initialize ZMQ msg");
-            return -1;
-        }
-
-        void *buf = zmq_msg_data(&msg);
-        memcpy(buf, data, size);
-
-        data = va_arg(args, const void *);
-
-        rc = zmq_msg_send(&msg, sock, data ? ZMQ_SNDMORE : 0);
-        if (rc == -1) {
-            zmqError("Unable to send ZMQ msg");
-            zmq_msg_close(&msg);
-            return -1;
-        }
-
-        zmq_msg_close(&msg);
-
-        if (!data) break;
-
-        size = va_arg(args, size_t);
-    }
-    return 0;
-}
-
-bool CZMQAbstractPublishNotifier::Initialize(void *pcontext) {
+bool CZMQAbstractPublishNotifier::Initialize(void *pcontext, std::shared_ptr<CZMQPublisher> tspublisher) {
     assert(!psocket);
+    zmqPublisher = tspublisher;
 
     // check if address is being used by other publish notifier
     std::multimap<std::string, CZMQAbstractPublishNotifier *>::iterator i =
@@ -92,8 +69,6 @@ bool CZMQAbstractPublishNotifier::Initialize(void *pcontext) {
 }
 
 void CZMQAbstractPublishNotifier::Shutdown() {
-    assert(psocket);
-
     int count = mapPublishNotifiers.count(address);
 
     // remove this notifier from the list of publishers using this address
@@ -109,7 +84,10 @@ void CZMQAbstractPublishNotifier::Shutdown() {
         }
     }
 
-    if (count == 1) {
+    // release reference to threadSafePublisher
+    zmqPublisher = nullptr;
+
+    if (count == 1 && psocket) {
         LogPrint(BCLog::ZMQ, "Close socket at address %s\n", address);
         int linger = 0;
         zmq_setsockopt(psocket, ZMQ_LINGER, &linger, sizeof(linger));
@@ -122,13 +100,10 @@ void CZMQAbstractPublishNotifier::Shutdown() {
 bool CZMQAbstractPublishNotifier::SendZMQMessage(const char *command,
                                               const void *data, size_t size) {
     assert(psocket);
+    assert(zmqPublisher);
 
-    /* send three parts, command & data & a LE 4byte sequence number */
-    uint8_t msgseq[sizeof(uint32_t)];
-    WriteLE32(&msgseq[0], nSequence);
-    int rc = zmq_send_multipart(psocket, command, strlen(command), data, size,
-                                msgseq, (size_t)sizeof(uint32_t), (void *)0);
-    if (rc == -1) return false;
+    bool rc = zmqPublisher->SendZMQMessage(psocket, command, data, size, nSequence);
+    if (rc == false) return false;
 
     /* increment memory only sequence number after sending */
     nSequence++;
@@ -153,6 +128,94 @@ bool CZMQPublishHashTransactionNotifier::NotifyTransaction(
     for (unsigned int i = 0; i < 32; i++)
         data[31 - i] = txid.begin()[i];
     return SendZMQMessage(MSG_HASHTX, data, 32);
+}
+
+bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint256& txid,
+                                                                     MemPoolRemovalReason reason,
+                                                                     const CTransaction* conflictedWith,
+                                                                     const uint256* blockhash)
+{
+
+    CStringWriter tw;
+    CJSONWriter jw(tw, false);
+
+    jw.writeBeginObject();
+    jw.pushKV("txid", txid.GetHex(), true);
+
+    switch (reason)
+    {
+        case MemPoolRemovalReason::EXPIRY:
+            jw.pushKV("reason", "expired", false);
+            break;
+        case MemPoolRemovalReason::SIZELIMIT:
+            jw.pushKV("reason", "mempool-sizelimit-exceeded", false);
+            break;
+        case MemPoolRemovalReason::CONFLICT:
+            if (conflictedWith != nullptr)
+            {
+                jw.pushKV("reason", "collision-in-block-tx");
+                jw.writeBeginObject("collidedWith");
+                jw.pushKV("txid", conflictedWith->GetId().GetHex(), true);
+                jw.pushKV("size", int64_t(conflictedWith->GetTotalSize()), true);
+                jw.pushK("hex");
+                jw.pushQuote(true, false);
+                EncodeHexTx(*conflictedWith, jw.getWriter(), 0);
+                jw.pushQuote(true, false);
+                // push hash of block in which transaction we "collided with" arrived.
+                if (blockhash != nullptr)
+                {  
+                    jw.writeEndObject(true);
+                    jw.pushKV("blockhash", blockhash->GetHex(), false);
+                }
+                else
+                {
+                    jw.writeEndObject(false);
+                } 
+            }
+            else
+            {
+                jw.pushKV("reason", "collision-in-block-tx", false);
+            }
+            break;
+        default:
+            jw.pushKV("reason", "unknown-reason", false);
+    }
+
+    jw.writeEndObject(false);
+
+    std::string message = tw.MoveOutString();
+
+    return SendZMQMessage(MSG_DISCARDEDFROMMEMPOOL, message.data(), message.size());
+}
+
+bool CZMQPublishRemovedFromMempoolBlockNotifier::NotifyRemovedFromMempoolBlock(const uint256& txid,
+                                                                               MemPoolRemovalReason reason)
+{
+
+    CStringWriter tw;
+    CJSONWriter jw(tw, false);
+
+    jw.writeBeginObject();
+
+    switch (reason)
+    {
+        case MemPoolRemovalReason::REORG:
+            jw.pushKV("reason", "reorg");
+            break;
+        case MemPoolRemovalReason::BLOCK:
+            jw.pushKV("reason", "included-in-block");
+            break;
+        default:
+            jw.pushKV("reason", "unknown-reason");
+    }
+    
+    jw.pushK("txid");
+    jw.pushV(txid.GetHex(), false);
+    jw.writeEndObject(false);
+
+    std::string message = tw.MoveOutString();
+
+    return SendZMQMessage(MSG_REMOVEDFROMMEMPOOLBLOCK, message.data(), message.size());
 }
 
 bool CZMQPublishRawBlockNotifier::NotifyBlock(const CBlockIndex *pindex) {
@@ -182,4 +245,10 @@ bool CZMQPublishRawTransactionNotifier::NotifyTransaction(
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION | RPCSerializationFlags());
     ss << transaction;
     return SendZMQMessage(MSG_RAWTX, &(*ss.begin()), ss.size());
+}
+
+bool CZMQPublishTextNotifier::NotifyTextMessage(const std::string& topic, std::string_view message)
+{
+    LogPrint(BCLog::ZMQ, "zmq: Publish text with topic: %s\n", topic.c_str());
+    return SendZMQMessage(topic.c_str(), message.data(), message.size());
 }

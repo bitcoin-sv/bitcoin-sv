@@ -26,6 +26,7 @@
 #include "utilstrencodings.h"
 #include "validation.h"
 #include "validationinterface.h"
+#include "invalid_txn_publisher.h"
 
 #include <univalue.h>
 
@@ -835,6 +836,7 @@ static UniValue submitblock(const Config &config,
 
     auto submitBlock = [](const Config& config , const std::shared_ptr<CBlock>& blockptr)
     {
+        CScopedBlockOriginRegistry reg(blockptr->GetHash(), "submitblock");
         return ProcessNewBlock(config, blockptr, true, nullptr);
     };
     return processBlock(config, blockptr, submitBlock);

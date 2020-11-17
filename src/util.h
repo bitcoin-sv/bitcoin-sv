@@ -85,6 +85,30 @@ fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
 void runCommand(const std::string &strCommand);
 
+template <typename ITER>
+std::string StringJoin(const std::string& separator, ITER begin, ITER end)
+{
+    std::ostringstream result;
+    if (begin != end)
+    {
+        result << *begin;
+        begin++;
+
+        while (begin != end)
+        {
+            result << separator << *begin;
+            begin++;
+        }
+    }
+    return result.str();
+}
+
+template <typename CONTAINER>
+std::string StringJoin(const std::string& separator, const CONTAINER& cont)
+{
+    return StringJoin(separator, cont.cbegin(), cont.cend());
+}
+
 inline bool IsSwitchChar(char c) {
 #ifdef WIN32
     return c == '-' || c == '/';

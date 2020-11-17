@@ -14,6 +14,8 @@ private:
     //!< upcounting per message sequence number
     uint32_t nSequence;
 
+    std::shared_ptr<CZMQPublisher> zmqPublisher;
+
 public:
     /* send zmq multipart message
        parts:
@@ -23,7 +25,7 @@ public:
     */
     bool SendZMQMessage(const char *command, const void *data, size_t size);
 
-    bool Initialize(void *pcontext) override;
+    bool Initialize(void *pcontext, std::shared_ptr<CZMQPublisher>) override;
     void Shutdown() override;
 };
 
@@ -37,6 +39,19 @@ public:
     bool NotifyTransaction(const CTransaction &transaction) override;
 };
 
+class CZMQPublishRemovedFromMempoolNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyRemovedFromMempool(const uint256& txid, const MemPoolRemovalReason reason,
+                                  const CTransaction* conflictedWith, const uint256* blockhash) override;
+};
+
+class CZMQPublishRemovedFromMempoolBlockNotifier : public CZMQAbstractPublishNotifier
+{
+public:
+    bool NotifyRemovedFromMempoolBlock(const uint256& txid, const MemPoolRemovalReason reason) override;
+};
+
 class CZMQPublishRawBlockNotifier : public CZMQAbstractPublishNotifier {
 public:
     bool NotifyBlock(const CBlockIndex *pindex) override;
@@ -45,6 +60,11 @@ public:
 class CZMQPublishRawTransactionNotifier : public CZMQAbstractPublishNotifier {
 public:
     bool NotifyTransaction(const CTransaction &transaction) override;
+};
+
+class CZMQPublishTextNotifier : public CZMQAbstractPublishNotifier {
+public:
+    bool NotifyTextMessage(const std::string& topic, std::string_view message) override;
 };
 
 #endif // BITCOIN_ZMQ_ZMQPUBLISHNOTIFIER_H

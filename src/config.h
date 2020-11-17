@@ -16,6 +16,7 @@ static_assert(sizeof(void*) >= 8, "32 bit systems are not supported");
 #include "txn_validation_config.h"
 #include "validation.h"
 #include "script_config.h"
+#include "invalid_txn_publisher.h"
 
 #include <boost/noncopyable.hpp>
 
@@ -152,6 +153,12 @@ public:
 
     virtual void SetBanClientUA(const std::set<std::string> uaClients) = 0;
     virtual bool IsClientUABanned(const std::string uaClient) const = 0;
+    virtual bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxMerkleTreeDiskSpace() const = 0;
+    virtual bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) = 0;
+    virtual uint64_t GetPreferredMerkleTreeFileSize() const = 0;
+    virtual bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMaxMerkleTreeMemoryCacheSize() const = 0;
 
     virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
     virtual uint64_t GetMaxMempool() const = 0;
@@ -171,6 +178,21 @@ public:
     virtual bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) = 0;
     virtual uint64_t GetPromiscuousMempoolFlags() const = 0;
     virtual bool IsSetPromiscuousMempoolFlags() const = 0;
+
+    virtual bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) = 0;
+    virtual std::set<std::string> GetInvalidTxSinks() const = 0;
+    virtual std::set<std::string> GetAvailableInvalidTxSinks() const = 0;
+
+    virtual bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) = 0;
+    virtual int64_t GetInvalidTxFileSinkMaxDiskUsage() const = 0;
+
+    virtual bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) = 0;
+    virtual InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const = 0;
+
+#if ENABLE_ZMQ
+    virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
+    virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
+#endif
 
 protected:
     ~Config() = default;
@@ -307,6 +329,12 @@ public:
 
     void SetBanClientUA(const std::set<std::string> uaClients) override;
     bool IsClientUABanned(const std::string uaClient) const override;
+    bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) override;
+    uint64_t GetMaxMerkleTreeDiskSpace() const override;
+    bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) override;
+    uint64_t GetPreferredMerkleTreeFileSize() const override;
+    bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) override;
+    uint64_t GetMaxMerkleTreeMemoryCacheSize() const override;
 
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override;
     uint64_t GetMaxMempool() const override;
@@ -326,6 +354,21 @@ public:
     bool SetPromiscuousMempoolFlags(int64_t promiscuousMempoolFlags, std::string* err) override;
     uint64_t GetPromiscuousMempoolFlags() const override;
     bool IsSetPromiscuousMempoolFlags() const override;
+
+    bool AddInvalidTxSink(const std::string& sink, std::string* err) override;
+    std::set<std::string> GetInvalidTxSinks() const override;
+    std::set<std::string> GetAvailableInvalidTxSinks() const override;
+
+    bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err) override;
+    int64_t GetInvalidTxFileSinkMaxDiskUsage() const override;
+
+    bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override;
+    InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override;
+
+#if ENABLE_ZMQ
+    bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override;
+    int64_t GetInvalidTxZMQMaxMessageSize() const override;
+#endif
 
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
@@ -406,9 +449,18 @@ private:
 
     std::set<uint256> mInvalidBlocks;
     std::set<std::string> mBannedUAClients;
+    uint64_t maxMerkleTreeDiskSpace;
+    uint64_t preferredMerkleTreeFileSize;
+    uint64_t maxMerkleTreeMemoryCacheSize;
 
     bool LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage);
 
+    std::set<std::string> invalidTxSinks;
+    int64_t invalidTxFileSinkSize;
+    InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
+#if ENABLE_ZMQ
+    int64_t invalidTxZMQMaxMessageSize;
+#endif
 };
 
 // Dummy for subclassing in unittests
@@ -718,6 +770,50 @@ public:
         return mBannedUAClients.find(uaClient) != mBannedUAClients.end();
     }
 
+    bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) override { return true; };
+    std::set<std::string> GetInvalidTxSinks() const override { return {"NONE"}; };
+    std::set<std::string> GetAvailableInvalidTxSinks() const override { return {"NONE"}; };
+
+    bool SetInvalidTxFileSinkMaxDiskUsage(int64_t max, std::string* err = nullptr) override { return true; };
+    int64_t GetInvalidTxFileSinkMaxDiskUsage() const override { return 300* ONE_MEGABYTE; };
+
+    bool SetInvalidTxFileSinkEvictionPolicy(std::string policy, std::string* err = nullptr) override { return true; };
+    InvalidTxEvictionPolicy GetInvalidTxFileSinkEvictionPolicy() const override { return InvalidTxEvictionPolicy::IGNORE_NEW; };
+
+#if ENABLE_ZMQ
+    bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override { return true; };
+    int64_t GetInvalidTxZMQMaxMessageSize() const override { return 10 * ONE_MEGABYTE; };
+#endif
+
+    bool SetMaxMerkleTreeDiskSpace(int64_t maxDiskSpace, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    uint64_t GetMaxMerkleTreeDiskSpace() const override
+    {
+        return 0;
+    }
+
+    bool SetPreferredMerkleTreeFileSize(int64_t preferredFileSize, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    uint64_t GetPreferredMerkleTreeFileSize() const override
+    {
+        return 0;
+    }
+
+    bool SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    uint64_t GetMaxMerkleTreeMemoryCacheSize() const override
+    {
+        return 0;
+    }
 
 private:
     std::unique_ptr<CChainParams> chainParams;

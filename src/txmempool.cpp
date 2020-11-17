@@ -17,6 +17,7 @@
 #include "utilmoneystr.h"
 #include "utiltime.h"
 #include "validation.h"
+#include "validationinterface.h"
 #include "version.h"
 #include <boost/range/adaptor/reversed.hpp>
 #include <config.h>
@@ -490,6 +491,15 @@ bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) {
     return mapNextTx.count(outpoint);
 }
 
+const CTransaction* CTxMemPool::IsSpentByNL(const COutPoint &outpoint) {
+    auto it = mapNextTx.find(outpoint);
+    if (it == mapNextTx.end())
+    {
+        return nullptr;
+    }
+    return it->second;
+}
+
 unsigned int CTxMemPool::GetTransactionsUpdated() const {
     return nTransactionsUpdated;
 }
@@ -624,7 +634,10 @@ void CTxMemPool::AddUncheckedNL(
 void CTxMemPool::removeUncheckedNL(
     txiter it,
     const CJournalChangeSetPtr& changeSet,
-    MemPoolRemovalReason reason) {
+    MemPoolRemovalReason reason,
+    const CTransaction* conflictedWith,
+    const uint256* blockhash) {
+
 
     CTransactionRef txn { it->GetSharedTx() };
     NotifyEntryRemoved(txn, reason);
@@ -653,6 +666,16 @@ void CTxMemPool::removeUncheckedNL(
                         memusage::DynamicUsage(mapLinks[it].children);
     mapLinks.erase(it);
     mapTx.erase(it);
+
+    if (reason == MemPoolRemovalReason::BLOCK || reason == MemPoolRemovalReason::REORG)
+    {
+        GetMainSignals().TransactionRemovedFromMempoolBlock(txn->GetId(), reason);
+    }
+    else
+    {   
+        GetMainSignals().TransactionRemovedFromMempool(txn->GetId(), reason, conflictedWith, blockhash);
+    }
+
     nTransactionsUpdated++;
 }
 
@@ -709,7 +732,9 @@ void CTxMemPool::RemoveRecursive(
 void CTxMemPool::removeRecursiveNL(
     const CTransaction &origTx,
     const CJournalChangeSetPtr& changeSet,
-    MemPoolRemovalReason reason) {
+    MemPoolRemovalReason reason,
+    const CTransaction* conflictedWith,
+    const uint256* blockhash) {
 
     setEntries txToRemove;
     txiter origit = mapTx.find(origTx.GetId());
@@ -737,7 +762,7 @@ void CTxMemPool::removeRecursiveNL(
         CalculateDescendantsNL(it, setAllRemoves);
     }
 
-    removeStagedNL(setAllRemoves, false, changeSet, reason);
+    removeStagedNL(setAllRemoves, false, changeSet, reason, true, conflictedWith, blockhash);
 }
 
 void CTxMemPool::RemoveForReorg(
@@ -813,7 +838,8 @@ void CTxMemPool::RemoveForReorg(
 
 void CTxMemPool::removeConflictsNL(
     const CTransaction &tx,
-    const CJournalChangeSetPtr& changeSet) {
+    const CJournalChangeSetPtr& changeSet,
+    const uint256& blockhash) {
 
     // Remove transactions which depend on inputs of tx, recursively
     for (const CTxIn &txin : tx.vin) {
@@ -822,7 +848,7 @@ void CTxMemPool::removeConflictsNL(
             const CTransaction &txConflict = *it->second;
             if (txConflict != tx) {
                 clearPrioritisationNL(txConflict.GetId());
-                removeRecursiveNL(txConflict, changeSet, MemPoolRemovalReason::CONFLICT);
+                removeRecursiveNL(txConflict, changeSet, MemPoolRemovalReason::CONFLICT, &tx, &blockhash);
             }
         }
     }
@@ -834,7 +860,8 @@ void CTxMemPool::removeConflictsNL(
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     unsigned int nBlockHeight,
-    const CJournalChangeSetPtr& changeSet) {
+    const CJournalChangeSetPtr& changeSet,
+    const uint256& blockhash) {
 
     std::unique_lock lock(smtx);
     std::vector<const CTxMemPoolEntry *> entries;
@@ -881,7 +908,7 @@ void CTxMemPool::RemoveForBlock(
     checkJournalAcceptanceNL(affectedStillInMempool, nonNullChangeSet.Get());
 
     for (const auto &tx : vtx) {
-        removeConflictsNL(*tx, changeSet);
+        removeConflictsNL(*tx, changeSet, blockhash);
         clearPrioritisationNL(tx->GetId());
     }
 
@@ -1754,7 +1781,9 @@ void CTxMemPool::removeStagedNL(
     bool updateDescendants,
     const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason,
-    bool updateJournal) {
+    bool updateJournal,
+    const CTransaction* conflictedWith,
+    const uint256* blockhash) {
 
     updateForRemoveFromMempoolNL(stage, updateDescendants);
 
@@ -1764,7 +1793,7 @@ void CTxMemPool::removeStagedNL(
         setEntries affectedStillInMempool = getConnectedNL(stage);
 
         for (const txiter &it : stage) {
-            removeUncheckedNL(it, changeSet, reason);
+            removeUncheckedNL(it, changeSet, reason, conflictedWith, blockhash);
         }
     
         CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
@@ -1773,7 +1802,7 @@ void CTxMemPool::removeStagedNL(
     else
     {
         for (const txiter &it : stage) {
-            removeUncheckedNL(it, changeSet, reason);
+            removeUncheckedNL(it, changeSet, reason, conflictedWith, blockhash);
         }
     }
 }
@@ -1798,25 +1827,30 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
     return stage.size();
 }
 
-bool CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
- {
+std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
+{
     std::shared_lock lock(smtx);
+    std::set<CTransactionRef> conflictsWith;
 
     // Check our locked UTXOs
     for (const CTxIn &txin : tx->vin) {
-        if (mapNextTx.find(txin.prevout) != mapNextTx.end()) {
-            return true;
+        if (auto it = mapNextTx.find(txin.prevout); it != mapNextTx.end()) {
+            conflictsWith.insert(GetNL(it->second->GetId()));
         }
     }
 
     if(isFinal)
     {
         // Check non-final pool locked UTXOs
-        return mTimeLockedPool.checkForDoubleSpend(tx) &&
-            !mTimeLockedPool.finalisesExistingTransaction(tx);
+        auto tlConflictsWith = mTimeLockedPool.checkForDoubleSpend(tx);
+
+        if(!tlConflictsWith.empty() && !mTimeLockedPool.finalisesExistingTransaction(tx))
+        {
+            conflictsWith.merge( std::move(tlConflictsWith) );
+        }
     }
 
-    return false;
+    return conflictsWith;
 }
 
 void CTxMemPool::AddUnchecked(
