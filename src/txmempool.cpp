@@ -2338,8 +2338,9 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     return vRemovedTxIds;
 }
 
-bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
-                                             size_t chainLimit) const {
+bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid, int64_t maxAncestorCount, 
+                                             int64_t maxSecondaryMempoolAncestorCount) const 
+{
     std::shared_lock lock(smtx);
     auto it = mapTx.find(txid);
     if(it == mapTx.end())
@@ -2347,7 +2348,13 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
         return true;
     }
 
-    return it->ancestorsCount < chainLimit;
+    if(it->IsInPrimaryMempool())
+    {
+        return static_cast<int64_t>(it->ancestorsCount) < maxAncestorCount; 
+    }
+
+    return (static_cast<int64_t>(it->ancestorsCount) < maxAncestorCount) &&
+           (static_cast<int64_t>(it->groupingData->ancestorsCount) < maxSecondaryMempoolAncestorCount);
 }
 
 unsigned long CTxMemPool::Size() {

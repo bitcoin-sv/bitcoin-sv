@@ -814,9 +814,8 @@ public:
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
-    bool TransactionWithinChainLimit(
-            const uint256 &txid,
-            size_t chainLimit) const;
+    bool TransactionWithinChainLimit(const uint256 &txid, int64_t maxAncestorCount, 
+                                     int64_t maxSecondaryMempoolAncestorCount) const;
 
     unsigned long Size();
 
