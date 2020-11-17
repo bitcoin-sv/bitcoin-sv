@@ -661,7 +661,8 @@ public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             int32_t nBlockHeight,
-            const mining::CJournalChangeSetPtr& changeSet);
+            const mining::CJournalChangeSetPtr& changeSet,
+            const uint256& blockhash);
 
     void Clear();
 
@@ -1130,11 +1131,13 @@ private:
             txiter entry,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason,
-            const CTransaction* conflictedWith);
+            const CTransaction* conflictedWith,
+            const uint256* blockhash = nullptr);
 
     void removeConflictsNL(
             const CTransaction &tx,
-            const mining::CJournalChangeSetPtr& changeSet);
+            const mining::CJournalChangeSetPtr& changeSet,
+            const uint256& blockhash);
 
     void clearNL();
 
@@ -1153,7 +1156,8 @@ private:
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             bool updateJournal = true,
-            const CTransaction* conflictedwith = nullptr);
+            const CTransaction* conflictedwith = nullptr,
+            const uint256* blockhash = nullptr);
 
     void prioritiseTransactionNL(
             const uint256& hash,
@@ -1167,7 +1171,8 @@ private:
             const CTransaction &tx,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            const CTransaction* conflictedWith = nullptr);
+            const CTransaction* conflictedWith = nullptr,
+            const uint256* blockhash = nullptr);
 
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;

@@ -248,10 +248,12 @@ void getrawtransaction(const Config& config,
  * block index represented with "requestedBlockHash" parameter.
  * Note that this function assumes all transactions in setTxIds are in the same block unless requestedBlockHash was provided.
  * In this case exception is thrown if at least one transaction in setTxIds was not found in the related block.
+ * verifyTxIds can be set to false to prevent loading the block, but this will not check if all provided transactions are in the block.
  */
 static CBlockIndex* GetBlockIndex(const Config& config,
                                   const uint256& requestedBlockHash,
-                                  const std::set<TxId>& setTxIds)
+                                  const std::set<TxId>& setTxIds,
+                                  bool verifyTxIds = true)
 {
     CBlockIndex* pblockindex = nullptr;
 
@@ -265,29 +267,32 @@ static CBlockIndex* GetBlockIndex(const Config& config,
         }
         pblockindex = mapBlockIndex[requestedBlockHash];
 
-        // Check if all provided transactions are in the block 
-        CBlock block;
-        bool allTxIdsFound = false;
-        if (ReadBlockFromDisk(block, pblockindex, config))
+        if (verifyTxIds)
         {
-            int numberOfTxIdsFound = 0;
-            for (const auto &tx : block.vtx)
+            // Check if all provided transactions are in the block 
+            CBlock block;
+            bool allTxIdsFound = false;
+            if (ReadBlockFromDisk(block, pblockindex, config))
             {
-                if (setTxIds.find(tx->GetId()) != setTxIds.end())
+                int numberOfTxIdsFound = 0;
+                for (const auto &tx : block.vtx)
                 {
-                    ++numberOfTxIdsFound;
-                }
-                if (numberOfTxIdsFound == setTxIds.size())
-                {
-                    // All txIds found, no need to check further
-                    allTxIdsFound = true;
-                    break;
+                    if (setTxIds.find(tx->GetId()) != setTxIds.end())
+                    {
+                        ++numberOfTxIdsFound;
+                    }
+                    if (numberOfTxIdsFound == setTxIds.size())
+                    {
+                        // All txIds found, no need to check further
+                        allTxIdsFound = true;
+                        break;
+                    }
                 }
             }
-        }
-        if (!allTxIdsFound)
-        {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
+            if (!allTxIdsFound)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
+            }
         }
     }
     else
@@ -1690,7 +1695,7 @@ static UniValue getmerkleproof(const Config& config,
     {
         requestedBlockHash = uint256S(request.params[1].get_str());
     }
-    CBlockIndex* blockIndex = GetBlockIndex(config, requestedBlockHash, setTxIds);
+    CBlockIndex* blockIndex = GetBlockIndex(config, requestedBlockHash, setTxIds, false);
 
     if (blockIndex == nullptr)
     {
@@ -1710,9 +1715,14 @@ static UniValue getmerkleproof(const Config& config,
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
     }
 
+    CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(transactionId, true);
+    if (proof.merkleTreeHashes.size() == 0)
+    {
+        // The requested transaction was not found in the block/merkle tree
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
+    }
     // Result in JSON format
     UniValue merkleProofArray(UniValue::VARR);
-    CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(transactionId, true);
     for (const uint256& node : proof.merkleTreeHashes)
     {
         if (node.IsNull())

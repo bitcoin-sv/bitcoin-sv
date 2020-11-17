@@ -413,6 +413,8 @@ private:
     static void reconnect_cb(evutil_socket_t fd, short what, void *arg);
 };
 
+using namespace boost::placeholders;
+
 TorController::TorController(struct event_base *_base,
                              const std::string &_target)
     : base(_base), target(_target), conn(base), reconnect(true),

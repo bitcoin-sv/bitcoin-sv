@@ -61,7 +61,7 @@ Currently, the following notifications are supported:
     -zmqpubrawblock=address
     -zmqpubrawtx=address
     -zmqpubinvalidtx=address
-    -zmqpubremovedfrommempool=address
+    -zmqpubdiscardedfrommempool=address
     -zmqpubremovedfrommempoolblock=address
 
 The socket type is PUB and the address must be a valid ZeroMQ socket
@@ -80,15 +80,16 @@ notification `-zmqpubhashtx` the topic is `hashtx` (no null
 terminator) and the body is the hexadecimal transaction hash (32
 bytes).
 
-`-zmqpubremovedfrommempool` and `-zmqpubremovedfrommempoolblock` notification body
+`-zmqpubdiscardedfrommempool` and `-zmqpubremovedfrommempoolblock` notification body
 is in json format:
 
-`{"txid": hexstring, "reason": string, "collidedWith": {txid: hexstring, size: integer, hex: hexstring}}`.
+`{"txid": hexstring, "reason": string, "collidedWith": {txid: hexstring, size: integer, hex: hexstring}, "blockhash": hexstring}`.
 
-The collidedWith field gives information about transaction which uses same inputs as removed transaction.
-This field is only present when the reason for removal is `collision-in-block-tx`.
+The collidedWith field gives information about transaction which uses same inputs as removed transaction, and field blockhash
+gives information in which block transaction we "collided with" arrived.
+The fields collidedWith and blockhash are only present when the reason for removal is `collision-in-block-tx`.
 
-`-zmqpubremovedfrommempool` notification will contain one of the folllowing reasons:
+`-zmqpubdiscardedfrommempool` notification will contain one of the following reasons:
 - expired, mempool-sizelimit-exceeded, collision-in-block-tx
 
 we get `collision-in-block-tx` when we switch to longer chain and there is a
