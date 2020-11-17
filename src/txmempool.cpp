@@ -2260,7 +2260,18 @@ std::vector<TxId> CTxMemPool::TrimToSize(
             });
     }
 
+    auto getFeeRate = [](txiter entry)
+    {
+        if(entry->IsCPFPGroupMember())
+        {
+            auto groupParams = entry->GetCPFPGroup()->evaluationParams;
+            return CFeeRate(groupParams.fee + groupParams.feeDelta, groupParams.size);
+        }
+        return CFeeRate(entry->GetModifiedFee(), entry->GetTxSize());
+    };
+
     CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+    bool weHaveEvictedSomething = false;
     while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
         const auto it = evictionTracker->GetMostWorthles();
 
@@ -2270,11 +2281,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
         // mempool with feerate equal to txn which were removed with no block in
         // between.
 
-        // TODO: CORE-130: Account for CPFP groups?
-        CFeeRate removed(it->GetModifiedFee(), it->GetTxSize());
-        removed += MEMPOOL_FULL_FEE_INCREMENT;
-
-        trackPackageRemovedNL(removed);
+        CFeeRate removed = getFeeRate(it);
         maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
         setEntries stage;
@@ -2303,9 +2310,18 @@ std::vector<TxId> CTxMemPool::TrimToSize(
                 }
             }
         }
+        weHaveEvictedSomething = true;
     }
 
-    if (maxFeeRateRemoved > CFeeRate(Amount(0))) {
+    if (weHaveEvictedSomething) 
+    {
+        if(mapTx.size() != 0)
+        {
+            maxFeeRateRemoved = std::max(maxFeeRateRemoved, getFeeRate(evictionTracker->GetMostWorthles()));
+        }
+        maxFeeRateRemoved += MEMPOOL_FULL_FEE_INCREMENT;
+        trackPackageRemovedNL(maxFeeRateRemoved);
+
         LogPrint(BCLog::MEMPOOL,
                  "Removed %u txn, rolling minimum fee bumped to %s\n",
                  nTxnRemoved, maxFeeRateRemoved.ToString());
