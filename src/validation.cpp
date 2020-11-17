@@ -4601,13 +4601,14 @@ static bool ActivateBestChainStep(
 
             // If any blocks were disconnected, disconnectpool may be non empty. Add
             // any disconnected transactions back to the mempool.
+            // This will also check the mempool and apply the changeSet
             mempool.AddToMempoolForReorg(config, disconnectpool, changeSet);
-        }
-
-        mempool.CheckMempool(*pcoinsTip, changeSet);
-        if(changeSet)
-        {
-            changeSet->apply();
+        } else {
+            mempool.CheckMempool(*pcoinsTip, changeSet);
+            if(changeSet)
+            {
+                changeSet->apply();
+            }
         }
     }
     catch(...) {
