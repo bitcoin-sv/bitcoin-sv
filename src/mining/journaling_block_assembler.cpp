@@ -111,19 +111,8 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
     // Build template
     std::unique_ptr<CBlockTemplate> blockTemplate { std::make_unique<CBlockTemplate>(block) };
     blockTemplate->vTxFees = mTxFees;
-    blockTemplate->vTxSigOpsCount = mTxSigOpsCount;
     blockTemplate->vTxFees[0] = -1 * mState.mBlockFees;
 
-    int64_t txSigOpCount = static_cast<int64_t>(GetSigOpCountWithoutP2SH(*block->vtx[0], isGenesisEnabled, sigOpCountError));
-    // This can happen if supplied coinbase scriptPubKeyIn contains multisig with too many public keys
-    if (sigOpCountError)
-    {
-        blockTemplate = nullptr;
-    }
-    else
-    {
-        blockTemplate->vTxSigOpsCount[0] = txSigOpCount;
-    }
     // Can now update callers pindexPrev
     pindexPrev = pindexPrevNew;
     mRecentlyUpdated = false;
@@ -259,7 +248,6 @@ void JournalingBlockAssembler::newBlock()
     // Reset transaction list
     mBlockTxns.clear();
     mTxFees.clear();
-    mTxSigOpsCount.clear();
 
     // Reset other accounting information
     mState.mBlockFees = Amount{0};
@@ -269,7 +257,6 @@ void JournalingBlockAssembler::newBlock()
     // Add dummy coinbase as first transaction
     mBlockTxns.emplace_back();
     mTxFees.emplace_back(Amount{-1});
-    mTxSigOpsCount.emplace_back(-1);
 
     // Set updated flag
     mRecentlyUpdated = true;

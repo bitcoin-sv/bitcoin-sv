@@ -435,10 +435,6 @@ void getblocktemplate(const Config& config,
             "collected block fees (ie, not including the block subsidy); if "
             "key is not present, fee is unknown and clients MUST NOT assume "
             "there isn't one\n"
-            "         \"sigops\" : n,                (numeric) total SigOps "
-            "cost, as counted for purposes of block limits; if key is not "
-            "present, sigop cost is unknown and clients MUST NOT assume it is "
-            "zero\n"
             "         \"required\" : true|false      (boolean) if provided and "
             "true, this transaction must be in the final block\n"
             "      }\n"
@@ -467,8 +463,6 @@ void getblocktemplate(const Config& config,
             "  ],\n"
             "  \"noncerange\" : \"00000000ffffffff\",(string) A range of valid "
             "nonces\n"
-            "  \"sigoplimit\" : n,                 (numeric) limit of sigops "
-            "in blocks\n"
             "  \"sizelimit\" : n,                  (numeric) limit of block "
             "size\n"
             "  \"curtime\" : ttt,                  (numeric) current timestamp "
@@ -740,8 +734,6 @@ void getblocktemplate(const Config& config,
 
             unsigned int index_in_template = i - 1;
             jWriter.pushKV("fee", pblocktemplate->vTxFees[index_in_template].GetSatoshis());
-            int64_t nTxSigOps = pblocktemplate->vTxSigOpsCount[index_in_template];
-            jWriter.pushKV("sigops", nTxSigOps);
 
             jWriter.writeEndObject();
         }
@@ -768,8 +760,6 @@ void getblocktemplate(const Config& config,
         jWriter.writeEndArray();
 
         jWriter.pushKV("noncerange", "00000000ffffffff");
-        // FIXME: Allow for mining block greater than 1M.
-        jWriter.pushKV("sigoplimit", INT64_MAX);
 
         int64_t defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
         jWriter.pushKV("sizelimit", defaultmaxBlockSize);

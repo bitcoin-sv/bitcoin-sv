@@ -24,7 +24,6 @@ public:
     CBlockRef GetBlockRef() const { return mBlock; }
 
     std::vector<Amount> vTxFees;
-    std::vector<int64_t> vTxSigOpsCount;
 };
 
 
