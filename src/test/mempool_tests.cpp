@@ -507,4 +507,94 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
     BOOST_CHECK(testPoolAccess.mapDeltas().empty());
 }
 
+BOOST_AUTO_TEST_CASE(SecondaryMempoolDecisionTest) {
+    CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry;
+
+    testPoolAccess.rollingMinimumFeeRate() = 100000;
+
+    /* Fee highe enough to enter the primary mempool. */
+    CMutableTransaction tx1 = CMutableTransaction();
+    tx1.vout.resize(1);
+    tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx1.vout[0].nValue = 10 * COIN;
+    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount(10000LL)).FromTx(tx1), nullChangeSet);
+    const auto tx1it = testPoolAccess.mapTx().find(tx1.GetId());
+    BOOST_CHECK(tx1it != testPoolAccess.mapTx().end());
+
+    /* Fee too low to enter the primary mempool. */
+    CMutableTransaction tx2 = CMutableTransaction();
+    tx2.vout.resize(1);
+    tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx2.vout[0].nValue = 2 * COIN;
+    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(100LL)).FromTx(tx2), nullChangeSet);
+    const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
+    BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
+
+    BOOST_CHECK_EQUAL(pool.Size(), 1UL);
+    BOOST_CHECK(tx1it->IsInPrimaryMempool());
+    BOOST_CHECK(!tx2it->IsInPrimaryMempool());
+}
+
+BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
+    CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry;
+
+    testPoolAccess.rollingMinimumFeeRate() = 100000;
+
+    CMutableTransaction tx1 = CMutableTransaction();
+    tx1.vout.resize(1);
+    tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx1.vout[0].nValue = 5 * COIN;
+    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount(200LL)).FromTx(tx1), nullChangeSet);
+    const auto tx1it = testPoolAccess.mapTx().find(tx1.GetId());
+    BOOST_CHECK(tx1it != testPoolAccess.mapTx().end());
+
+    CMutableTransaction tx2 = CMutableTransaction();
+    tx2.vout.resize(1);
+    tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx2.vout[0].nValue = 10 * COIN;
+    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(100LL)).FromTx(tx2), nullChangeSet);
+    const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
+    BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
+
+    CMutableTransaction tx3 = CMutableTransaction();
+    tx3.vin.resize(2);
+    tx3.vin[0].prevout = COutPoint(tx1.GetId(), 0);
+    tx3.vin[0].scriptSig = CScript() << OP_5;
+    tx3.vin[1].prevout = COutPoint(tx2.GetId(), 0);
+    tx3.vin[1].scriptSig = CScript() << OP_5;
+    tx3.vout.resize(1);
+    tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx3.vout[0].nValue = 15 * COIN;
+    pool.AddUnchecked(tx3.GetId(), entry.Fee(Amount(300LL)).FromTx(tx3), nullChangeSet);
+    const auto tx3it = testPoolAccess.mapTx().find(tx3.GetId());
+    BOOST_CHECK(tx3it != testPoolAccess.mapTx().end());
+
+    BOOST_CHECK_EQUAL(pool.Size(), 0UL);
+
+    CTestTxMemPoolEntry testTx1(const_cast<CTxMemPoolEntry&>(*tx1it));
+    BOOST_CHECK(!tx1it->IsInPrimaryMempool());
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->fee, tx1it->GetFee());
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->feeDelta, tx1it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->size, tx1it->GetTxSize());
+    BOOST_CHECK_EQUAL(testTx1.groupingData()->ancestorsCount, 0);
+
+    CTestTxMemPoolEntry testTx2(const_cast<CTxMemPoolEntry&>(*tx2it));
+    BOOST_CHECK(!tx2it->IsInPrimaryMempool());
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->fee, tx2it->GetFee());
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->feeDelta, tx2it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->size, tx2it->GetTxSize());
+    BOOST_CHECK_EQUAL(testTx2.groupingData()->ancestorsCount, 0);
+
+    CTestTxMemPoolEntry testTx3(const_cast<CTxMemPoolEntry&>(*tx3it));
+    BOOST_CHECK(!tx3it->IsInPrimaryMempool());
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->fee, tx1it->GetFee() + tx2it->GetFee() + tx3it->GetFee());
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->feeDelta, tx1it->GetFeeDelta() + tx2it->GetFeeDelta() + tx3it->GetFeeDelta());
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->size, tx1it->GetTxSize() + tx2it->GetTxSize() + tx3it->GetTxSize());
+    BOOST_CHECK_EQUAL(testTx3.groupingData()->ancestorsCount, 2);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

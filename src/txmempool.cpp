@@ -186,8 +186,7 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
     : tx{_tx, mempoolIn.GetMempoolTxDB()},
       nFee{_nFee}, nTime{_nTime}, entryPriority{_entryPriority},
       inChainInputValue{_inChainInputValue},
-      lockPoints{lp}, entryHeight{_entryHeight}, spendsCoinbase{_spendsCoinbase},
-      group{nullptr}, groupingData{std::nullopt}
+      lockPoints{lp}, entryHeight{_entryHeight}, spendsCoinbase{_spendsCoinbase}
 {
     nTxSize = _tx->GetTotalSize();
     nModSize = _tx->CalculateModifiedSize(GetTxSize());
@@ -509,12 +508,48 @@ void CTxMemPool::AddUncheckedNL(
     }
     updateAncestorsOfNL(true, newit);
 
+    // Calculate CPFP statistics.
+    SecondaryMempoolEntryData groupingData{
+        newit->GetFee(), newit->GetFeeDelta(), newit->GetTxSize(), 0};
+    for (const auto& input : tx->vin) {
+        auto parent = mapTx.find(input.prevout.GetTxId());
+        if (parent != mapTx.end() && !parent->IsInPrimaryMempool()) {
+            groupingData.fee += parent->groupingData->fee;
+            groupingData.feeDelta += parent->groupingData->feeDelta;
+            groupingData.size += parent->groupingData->size;
+            groupingData.ancestorsCount += parent->groupingData->ancestorsCount + 1;
+        }
+    }
+
+    if (groupingData.fee + groupingData.feeDelta
+        >= GetPrimaryMempoolMinFeeNL().GetFee(groupingData.size)) {
+        // This transaction will go directly into the primary mempool.
+        if (groupingData.ancestorsCount > 0) {
+            // TODO: Construct the CPFP group and move it from the secondary to
+            // the priomary mempool. Currently this should never happen given
+            // how GetPrimaryMempoolMinFeeNL() is implemented.
+            assert(!"Construct CPFP group");
+        }
+    }
+    else {
+        // This transaction is not paying enough, it goes into the secondary mempool.
+        // NOTE: We use modify() here because it returns a mutable reference to
+        //       the entry in the index, whereas dereferencing the iterator
+        //       returns an immutable reference, which would require a
+        //       const_cast<> and also would not update the index. Not that we
+        //       expect any of the index keys to change here.
+        mapTx.modify(newit, [&groupingData](CTxMemPoolEntry& entry) {
+                                entry.groupingData.emplace(groupingData);
+                            });
+        ++secondaryMempoolSize;
+    }
+
     nTransactionsUpdated++;
     totalTxSize += entry.GetTxSize();
 
     // If it is required calculate mempool size & dynamic memory usage.
     if (pnMempoolSize) {
-        *pnMempoolSize = mapTx.size();
+        *pnMempoolSize = PrimaryMempoolSizeNL();
     }
     if (pnDynamicMemoryUsage) {
         *pnDynamicMemoryUsage = DynamicMemoryUsageNL();
@@ -785,6 +820,7 @@ void CTxMemPool::clearNL() {
     mapTx.clear();
     mapNextTx.clear();
     totalTxSize = 0;
+    secondaryMempoolSize = 0;
     cachedInnerUsage = 0;
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = false;
@@ -852,7 +888,7 @@ void CTxMemPool::CheckMempoolImplNL(
 
     LogPrint(BCLog::MEMPOOL,
              "Checking mempool with %u transactions and %u inputs\n",
-             (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
+             (unsigned int)PrimaryMempoolSizeNL(), (unsigned int)mapNextTx.size());
 
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;
@@ -1740,6 +1776,33 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
     return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
 }
 
+// FIXME: Currently this implementation is just a non-locking copy of GetMinFee().
+// TODO: CORE-130
+CFeeRate CTxMemPool::GetPrimaryMempoolMinFeeNL() const {
+    if (!blockSinceLastRollingFeeBump || rollingMinimumFeeRate == 0) {
+        return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
+    }
+
+    int64_t time = GetTime();
+    if (time > lastRollingFeeUpdate + 10) {
+        // FIXME: Size limit is calculated as per estimateFee().
+        const auto sizelimit =
+            gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * ONE_MEGABYTE;
+        double halflife = ROLLING_FEE_HALFLIFE;
+        if (DynamicMemoryUsageNL() < sizelimit / 4) {
+            halflife /= 4;
+        } else if (DynamicMemoryUsageNL() < sizelimit / 2) {
+            halflife /= 2;
+        }
+
+        rollingMinimumFeeRate =
+            rollingMinimumFeeRate /
+            pow(2.0, (time - lastRollingFeeUpdate) / halflife);
+        lastRollingFeeUpdate = time;
+    }
+    return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
+}
+
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     const mining::CJournalChangeSetPtr& changeSet,
@@ -1816,7 +1879,11 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
 
 unsigned long CTxMemPool::Size() {
     std::shared_lock lock(smtx);
-    return mapTx.size();
+    return PrimaryMempoolSizeNL();
+}
+
+unsigned long CTxMemPool::PrimaryMempoolSizeNL() const {
+    return mapTx.size() - secondaryMempoolSize;
 }
 
 uint64_t CTxMemPool::GetTotalTxSize() {

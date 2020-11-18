@@ -13,7 +13,6 @@
 
 
 
-
 CTxMemPoolEntry MakeEntry(
     CTxMemPoolBase &pool,
     double feerate, 
@@ -110,7 +109,7 @@ public:
         CTxMemPoolTestAccess::txiter lastIt;
         for(auto& entry: entries)
         {
-            entry.group = group;
+            CTestTxMemPoolEntry(entry).group() = group;
             group->evaluationParams.fee += entry.GetFee();
             group->evaluationParams.size += entry.GetTxSize();
             auto it = AddTx(entry);
@@ -133,11 +132,11 @@ public:
         auto parents = linksIter->second.parents;
         auto txId = entry->GetTxId();
 
-        if(entry->group)
+        if(entry->IsCPFPGroupMember())
         {
-            for(auto it: entry->group->transactions)
+            for(auto it: entry->GetCPFPGroup()->transactions)
             {
-                const_cast<CTxMemPoolEntry&>(*it).group.reset();
+                CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).group().reset();
             }
         }
 
@@ -168,7 +167,7 @@ public:
                 [](CTxMemPoolTestAccess::txiter entry)
                 {
                     int64_t score = entry->GetFee().GetSatoshis() * 100000 / entry->GetTxSize();
-                    if(entry->groupingData.has_value())
+                    if(!entry->IsInPrimaryMempool())
                     {
                         score += std::numeric_limits<int64_t>::min();
                     }
@@ -280,7 +279,8 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
         auto newEntry = MakeEntry(mempool, 100 + (i * 0.1), {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
         if(i % 2 == 0)
         {
-            newEntry.groupingData = CPFPGroupEvaluationData{newEntry.GetFee(), Amount(), newEntry.GetTxSize()};
+            CTestTxMemPoolEntry(newEntry).groupingData() =
+                SecondaryMempoolEntryData{newEntry.GetFee(), Amount(), newEntry.GetTxSize(), 0};
         }
         mempool.AddTx(newEntry);
     }
@@ -293,7 +293,7 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
     {
         auto txToRemove = mempool.tracker->GetMostWorthles();
         double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
-        bool fromSecondary = txToRemove->groupingData.has_value();
+        bool fromSecondary = !txToRemove->IsInPrimaryMempool();
         mempool.RemoveMostWorthless();
         if(fromSecondary)
         {

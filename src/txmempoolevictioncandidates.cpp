@@ -82,9 +82,9 @@ bool CEvictionCandidateTracker::HasChildren(const CPFPGroup& group) const
 
 bool CEvictionCandidateTracker::HasChildren(CTxMemPool::txiter entry) const
 {
-    if (entry->group)
+    if (entry->IsCPFPGroupMember())
     {
-        return HasChildren(*(entry->group));
+        return HasChildren(*(entry->GetCPFPGroup()));
     }
     return !GetChildrenNoGroup(entry).empty();
 }
@@ -102,7 +102,7 @@ CEvictionCandidateTracker::CEvictionCandidateTracker(CTxMemPool::txlinksMap& _li
             continue;
         }
 
-        if (entry->group && HasChildren(*(entry->group)))
+        if (entry->IsCPFPGroupMember() && HasChildren(*(entry->GetCPFPGroup())))
         {
             continue;
         }
@@ -119,9 +119,9 @@ void CEvictionCandidateTracker::EntryAdded(CTxMemPool::txiter entry)
 {
     for (const auto& parent : GetParentsNoGroup(entry))
     {
-        if(parent->group)
+        if(parent->IsCPFPGroupMember())
         {
-            ExpireEntry(parent->group->PayingTransaction()->GetTxId());
+            ExpireEntry(parent->GetCPFPGroup()->PayingTransaction()->GetTxId());
         }
         else
         {
@@ -144,9 +144,9 @@ void CEvictionCandidateTracker::EntryRemoved(const TxId& txId, const CTxMemPool:
         {
             continue;
         }
-        if(parent->group)
+        if(parent->IsCPFPGroupMember())
         {
-            InsertEntry(parent->group->PayingTransaction());
+            InsertEntry(parent->GetCPFPGroup()->PayingTransaction());
         }
         else
         {

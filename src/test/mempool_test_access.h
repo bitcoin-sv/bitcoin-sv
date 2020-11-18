@@ -33,6 +33,7 @@ public:
     auto& mapTx() { return mempool.mapTx; }
     auto& mapNextTx() { return mempool.mapNextTx; }
     auto& mapDeltas() { return mempool.mapDeltas; }
+    auto& rollingMinimumFeeRate() { return mempool.rollingMinimumFeeRate; }
 
     using txiter = CTxMemPool::txiter;
     using TxLinks = CTxMemPool::TxLinks;
@@ -52,5 +53,23 @@ public:
 };
 
 using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>;
+
+namespace {
+    struct UnitTestAccessTag;
+}
+
+template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
+{
+    CTxMemPoolEntry& entry;
+    UnitTestAccess(CTxMemPoolEntry& _entry) : entry(_entry) {}
+    
+    auto& nFee() {return entry.nFee;};
+    auto& feeDelta() {return entry.feeDelta;};
+    auto& nTxSize() {return entry.nTxSize;};
+    auto& group() {return entry.group;};
+    auto& groupingData() {return entry.groupingData;};
+};
+
+using CTestTxMemPoolEntry = CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>;
 
 #endif // BITCOIN_TEST_MEMPOOL_TEST_ACCESS_H
