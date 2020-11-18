@@ -475,7 +475,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-txindex", strprintf(_("Maintain a full transaction index, used by "
                                 "the getrawtransaction rpc call (default: %d)"),
-                              DEFAULT_TXINDEX)); 
+                              DEFAULT_TXINDEX));
     strUsage += HelpMessageOpt(
         "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
         "can be taken by stored merkle trees. This size should not be less than default size "
@@ -709,7 +709,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage +=
         HelpMessageOpt("-zmqpubinvalidtx=<address>",
                        _("Enable publish invalid transaction in <address>. -invalidtxsink=ZMQ should be specified."));
-    strUsage += HelpMessageOpt("-zmqpubremovedfrommempool=<address>",
+    strUsage += HelpMessageOpt("-zmqpubdiscardedfrommempool=<address>",
                                _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
     strUsage += HelpMessageOpt("-zmqpubremovedfrommempoolblock=<address>",
                                _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
@@ -1065,13 +1065,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set the type of block assembler to use for mining. Supported options are "
                     "LEGACY or JOURNALING. (default: %s)"),
                   enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
-    strUsage += HelpMessageOpt( 
+    strUsage += HelpMessageOpt(
         "-jbamaxtxnbatch=<max batch size>",
         strprintf(_("Set the maximum number of transactions processed in a batch by the journaling block assembler "
                 "(default: %d)"), mining::JournalingBlockAssembler::DEFAULT_MAX_SLOT_TRANSACTIONS)
     );
     if (showDebug) {
-        strUsage += HelpMessageOpt( 
+        strUsage += HelpMessageOpt(
             "-jbafillafternewblock",
             strprintf(_("After a new block has been found it can take a short while for the journaling block assembler "
                         "to catch up and return a new candidate containing every transaction in the mempool. "
@@ -1815,8 +1815,8 @@ bool AppInitParameterInteraction(Config &config) {
         LogPrintf("Warning: nMinimumChainWork set below default value of %s\n",
                   chainparams.GetConsensus().nMinimumChainWork.GetHex());
     }
-    
-    // mempool limits  
+
+    // mempool limits
     if (std::string err; !config.SetMaxMempool(
         gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE), &err))
     {
@@ -1846,8 +1846,8 @@ bool AppInitParameterInteraction(Config &config) {
     {
         return InitError(err);
     }
-    
-    // Configure free transactions limit 
+
+    // Configure free transactions limit
     if (std::string err; !config.SetLimitFreeRelay(
         gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, ONE_KILOBYTE), &err))
     {
@@ -1856,7 +1856,7 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure max orphant Tx size
     if (std::string err; !config.SetMaxOrphanTxSize(
-        gArgs.GetArgAsBytes("-maxorphantxsize", 
+        gArgs.GetArgAsBytes("-maxorphantxsize",
             COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE, ONE_MEGABYTE), &err))
     {
         return InitError(err);
@@ -2054,11 +2054,11 @@ bool AppInitParameterInteraction(Config &config) {
 
     if (zmqSinkSpecified && !zmqIpDefined)
     {
-        InitError("The 'zmqpubinvalidtx' parameter should be specified when 'invalidtxsink' is set to ZMQ.");
+        return InitError("The 'zmqpubinvalidtx' parameter should be specified when 'invalidtxsink' is set to ZMQ.");
     }
     if (!zmqSinkSpecified && zmqIpDefined)
     {
-        InitError("The 'invalidtxsink' parameter should be set to ZMQ when 'zmqpubinvalidtx' is defined.");
+        return InitError("The 'invalidtxsink' parameter should be set to ZMQ when 'zmqpubinvalidtx' is defined.");
     }
 #endif
 
@@ -2990,7 +2990,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     CheckSafeModeParametersForAllForksOnStartup();
 
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
-  
+
 
 
 // Step 8: load wallet
@@ -3086,7 +3086,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     connOptions.nMaxFeeler = 1;
     connOptions.nBestHeight = chainActive.Height();
     connOptions.uiInterface = &uiInterface;
-    connOptions.nSendBufferMaxSize = 
+    connOptions.nSendBufferMaxSize =
         gArgs.GetArgAsBytes("-maxsendbuffer", DEFAULT_MAXSENDBUFFER, ONE_KILOBYTE);
     connOptions.nReceiveFloodSize =
         gArgs.GetArgAsBytes("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER, ONE_KILOBYTE);

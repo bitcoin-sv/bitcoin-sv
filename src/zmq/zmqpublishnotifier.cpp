@@ -22,7 +22,11 @@ static const char *MSG_HASHBLOCK = "hashblock";
 static const char *MSG_HASHTX = "hashtx";
 static const char *MSG_RAWBLOCK = "rawblock";
 static const char *MSG_RAWTX = "rawtx";
-static const char *MSG_REMOVEDFROMMEMPOOL = "removedfrommempool";
+/*
+ * using slightly different topic prefix to avoid being subscribed to RemovedFromMempool and RemovedFromMempoolBlock
+ * at same time.
+*/
+static const char *MSG_DISCARDEDFROMMEMPOOL = "discardedfrommempool";
 static const char *MSG_REMOVEDFROMMEMPOOLBLOCK = "removedfrommempoolblock";
 
 
@@ -126,7 +130,8 @@ bool CZMQPublishHashTransactionNotifier::NotifyTransaction(
 
 bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint256& txid,
                                                                      MemPoolRemovalReason reason,
-                                                                     const CTransaction* conflictedWith)
+                                                                     const CTransaction* conflictedWith,
+                                                                     const uint256* blockhash)
 {
 
     CStringWriter tw;
@@ -154,7 +159,16 @@ bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint2
                 jw.pushQuote();
                 EncodeHexTx(*conflictedWith, jw.getWriter(), 0);
                 jw.pushQuote();
-                jw.writeEndObject();
+                // push hash of block in which transaction we "collided with" arrived.
+                if (blockhash != nullptr)
+                {  
+                    jw.writeEndObject();
+                    jw.pushKV("blockhash", blockhash->GetHex());
+                }
+                else
+                {
+                    jw.writeEndObject();
+                } 
             }
             else
             {
@@ -169,7 +183,7 @@ bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint2
 
     std::string message = tw.MoveOutString();
 
-    return SendZMQMessage(MSG_REMOVEDFROMMEMPOOL, message.data(), message.size());
+    return SendZMQMessage(MSG_DISCARDEDFROMMEMPOOL, message.data(), message.size());
 }
 
 bool CZMQPublishRemovedFromMempoolBlockNotifier::NotifyRemovedFromMempoolBlock(const uint256& txid,
