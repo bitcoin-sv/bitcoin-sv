@@ -11,8 +11,6 @@ CMainSignals &GetMainSignals() {
     return g_signals;
 }
 
-using namespace boost::placeholders;
-
 void RegisterValidationInterface(CValidationInterface *pwalletIn) {
     using namespace boost::placeholders;
     g_signals.UpdatedBlockTip.connect(boost::bind( &CValidationInterface::UpdatedBlockTip, pwalletIn, _1, _2, _3));
