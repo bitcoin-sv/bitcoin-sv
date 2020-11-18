@@ -10,6 +10,7 @@
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
+#include <optional>
 
 struct TxId;
 /**
@@ -25,8 +26,10 @@ namespace std
  * differentiated for type safety.
  */
 struct TxId : public uint256 {
-    TxId() {}
-    explicit TxId(const uint256 &b) : uint256(b) {}
+    TxId() = default;
+    explicit TxId(const uint256 &b) : uint256{b} {}
+    TxId(const TxId& b) = default;
+    TxId& operator=(const TxId& b) = default;
 };
 
 /**
@@ -382,6 +385,7 @@ public:
         return a.GetId() == b.GetId();
     }
 };
+
 
 typedef std::shared_ptr<const CTransaction> CTransactionRef;
 static inline CTransactionRef MakeTransactionRef() {

@@ -165,7 +165,7 @@ BOOST_AUTO_TEST_CASE(PoolSnapshotTest)
 
     // Check that all hashes are unique.
     for (const auto& entry : slice) {
-        const auto key = entry.GetTx().GetId();
+        const auto key = entry.GetTxId();
         BOOST_CHECK_EQUAL(1, hashes.count(key));
         BOOST_CHECK_NO_THROW(hashes.erase(key));
     }

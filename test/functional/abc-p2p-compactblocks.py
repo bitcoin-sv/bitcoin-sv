@@ -67,6 +67,7 @@ class FullBlockTest(ComparisonTestFramework):
                             '-limitdescendantcount=999999',
                             '-limitdescendantsize=999999',
                             '-maxmempool=99999',
+                            '-maxmempoolsizedisk=0',
                             "-excessiveblocksize=%d"
                             % self.excessive_block_size]]
 

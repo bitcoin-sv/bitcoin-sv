@@ -22,6 +22,7 @@ add_executable(bench_bitcoin
         interpreter.cpp
         lockedpool.cpp
         mempool_eviction.cpp
+        mempooltxdb.cpp
         perf.cpp
         rollingbloom.cpp
         data/block413567.raw.h)

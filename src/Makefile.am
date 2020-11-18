@@ -130,6 +130,7 @@ BITCOIN_CORE_H = \
   locked_ref.h \
   logging.h \
   memusage.h \
+  mempooltxdb.h \
   merkleblock.h \
   merkletreedb.h \
   merkletreestore.h \
@@ -269,6 +270,7 @@ libbitcoin_server_a_SOURCES = \
   invalid_txn_sinks/file_sink.cpp \
   invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
+  mempooltxdb.cpp \
   merkleblock.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \

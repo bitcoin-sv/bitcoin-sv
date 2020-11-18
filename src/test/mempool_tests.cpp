@@ -151,7 +151,7 @@ void CheckSort(CTxMemPool &pool, std::vector<std::string> &sortedOrder) {
         it = pool.mapTx.get<name>().begin();
     int count = 0;
     for (; it != pool.mapTx.get<name>().end(); ++it, ++count) {
-        BOOST_CHECK_EQUAL(it->GetTx().GetId().ToString(), sortedOrder[count]);
+        BOOST_CHECK_EQUAL(it->GetTxId().ToString(), sortedOrder[count]);
     }
 }
 

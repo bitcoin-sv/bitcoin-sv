@@ -239,6 +239,7 @@ add_library(server
     invalid_txn_sinks/file_sink.cpp
     invalid_txn_sinks/zmq_sink.cpp
 	dbwrapper.cpp
+	mempooltxdb.cpp
 	merkleblock.cpp
 	merkletreedb.cpp
 	merkletreestore.cpp

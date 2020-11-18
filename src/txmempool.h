@@ -40,6 +40,7 @@ class CBlockIndex;
 class Config;
 class CoinsDB;
 class CoinsDBView;
+class CMempoolTxDB;
 
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
@@ -71,6 +72,14 @@ struct LockPoints {
 };
 
 class CTxMemPool;
+
+class CTxMemPoolBase {
+public:
+    virtual ~CTxMemPoolBase() {}
+
+    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() = 0;
+};
+
 
 /**
  * Shared ancestor/descendant count information.
@@ -134,6 +143,28 @@ struct CPFPGroup;
  */
 using GroupID = std::optional<uint64_t>;
 
+class CTransactionRefWrapper {
+private:
+    mutable CTransactionRef tx {};
+    // Transaction Id
+    TxId txid {};
+    // Mempool Transaction database
+    std::shared_ptr<CMempoolTxDB> mempoolTxDB {};
+
+    CTransactionRef GetTxFromDB() const;
+
+public:
+    CTransactionRefWrapper();
+    CTransactionRefWrapper(const CTransactionRef &tx, const std::shared_ptr<CMempoolTxDB>& txDB);
+
+    CTransactionRef GetTx() const;
+    const TxId& GetId() const;
+
+    void MoveTxToDisk() const;
+    void UpdateMoveTxToDisk() const;
+    bool IsInMemory() const;
+};
+
 /** \class CTxMemPoolEntry
  *
  * CTxMemPoolEntry stores data about the corresponding transaction.
@@ -151,7 +182,7 @@ using GroupID = std::optional<uint64_t>;
 
 class CTxMemPoolEntry {
 private:
-    CTransactionRef tx;
+    CTransactionRefWrapper tx;
     //!< Cached to avoid expensive parent-transaction lookups
     Amount nFee;
     //!< ... and avoid recomputing tx size
@@ -181,16 +212,16 @@ public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime, double _entryPriority,
                     int32_t _entryHeight, Amount _inChainInputValue,
-                    bool spendsCoinbase, LockPoints lp);
+                    bool spendsCoinbase, LockPoints lp,
+                    CTxMemPoolBase &mempoolIn);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
     // CPFP group, if any that this transaction belongs to.
     GroupID GetCPFPGroupId() const { return std::nullopt; }
-    const CTransaction &GetTx() const { return *this->tx; }
-    CTransactionRef GetSharedTx() const { return this->tx; }
-    TxId GetTxId() const { return this->tx->GetId(); }
+    CTransactionRef GetSharedTx() const { return tx.GetTx(); }
+    const TxId& GetTxId() const { return tx.GetId(); }
 
     /**
      * Fast calculation of lower bound of current priority as update from entry
@@ -218,6 +249,10 @@ public:
 
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     bool IsCPFPGroupMember() const { return group != nullptr; }
+
+    void MoveTxToDisk() const;
+    void UpdateMoveTxToDisk() const;
+    bool IsInMemory() const;
 };
 
 struct update_fee_delta {
@@ -242,7 +277,7 @@ private:
 struct mempoolentry_txid {
     typedef uint256 result_type;
     result_type operator()(const CTxMemPoolEntry &entry) const {
-        return entry.GetTx().GetId();
+        return entry.GetTxId();
     }
 
     result_type operator()(const CTransactionRef &tx) const {
@@ -261,7 +296,7 @@ public:
         double f1 = double(b.GetTxSize() * a.GetModifiedFee().GetSatoshis());
         double f2 = double(a.GetTxSize() * b.GetModifiedFee().GetSatoshis());
         if (f1 == f2) {
-            return b.GetTx().GetId() < a.GetTx().GetId();
+            return b.GetTxId() < a.GetTxId();
         }
         return f1 > f2;
     }
@@ -393,11 +428,14 @@ struct DisconnectedBlockTransactions;
  * entry as "dirty", and set the feerate for sorting purposes to be equal the
  * feerate of the transaction without any descendants.
  */
-class CTxMemPool {
+class CTxMemPool : public CTxMemPoolBase {
 private:
     //!< Value n means that n times in 2^32 we check.
-    std::atomic_uint32_t nCheckFrequency;
-    std::atomic_uint nTransactionsUpdated;
+    // Sanity checks off by default for performance, because otherwise accepting
+    // transactions becomes O(N^2) where N is the number of transactions in the
+    // pool
+    std::atomic_uint32_t nCheckFrequency {0};
+    std::atomic_uint nTransactionsUpdated {0};
 
     CFeeRate blockMinTxfee {DEFAULT_BLOCK_MIN_TX_FEE};
 
@@ -420,6 +458,11 @@ private:
 
     friend class CEvictionCandidateTracker;
     friend struct CPFPGroup;
+
+    // Mempool transaction database
+    std::shared_ptr<CMempoolTxDB> mempoolTxDB {nullptr};
+
+    std::once_flag db_initialized {};
 
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
@@ -450,7 +493,7 @@ private:
 
     struct CompareIteratorByHash {
         bool operator()(const txiter &a, const txiter &b) const {
-            return a->GetTx().GetId() < b->GetTx().GetId();
+            return a->GetTxId() < b->GetTxId();
         }
     };
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
@@ -565,6 +608,16 @@ public:
         const CoinsDBView& tip,
         const std::vector<COutPoint>& outpoints,
         const std::function<void(const CoinWithScript&, size_t)>& callback) const;
+
+    void InitMempoolTxDB();
+    // Get MempoolTxDB
+    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() override;
+
+    uint64_t GetDiskUsage();
+
+    void SaveTxsToDisk(uint64_t required_size);
+    void UpdateMoveTxsToDisk(std::vector<const CTxMemPoolEntry*> toBeUpdated);
+    void SaveTxsToDiskBatch(uint64_t requiredSize);
 
 public:
     /**
