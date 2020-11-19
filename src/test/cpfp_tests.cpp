@@ -78,6 +78,22 @@ std::vector<std::tuple<TxId, int, Amount>> MakeConfirmedInputs(size_t count, Amo
     return inputs;
 }
 
+bool checkGroupContinuity(const mining::CJournalChangeSetPtr& changeSet)
+{
+    std::unordered_set<GroupID> seenGroups;
+    const auto& changes = changeSet->getChangeSet();
+    const auto disjoint = std::adjacent_find(changes.cbegin(), changes.cend(),
+                                             [&seenGroups](const auto& aChange, const auto&bChange) {
+        // adjacent_find returns iterator where condition is true
+        auto a = aChange.second.getGroupId();
+        auto b = bChange.second.getGroupId();
+        return (a != b                                 // we are at a boundary
+                && a                                   // ending sequence was a group
+                && !seenGroups.insert(a).second);      // that we have already seen
+    });
+    return disjoint == changes.cend();
+}
+
 CFeeRate DefaultFeeRate()
 {
     return CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
@@ -93,6 +109,37 @@ CTxMemPoolTestAccess::txiter AddToMempool(CTxMemPoolEntry& entry)
 }
 
 BOOST_FIXTURE_TEST_SUITE(cpfp_tests, TestingSetup)
+
+mining::CJournalPtr CheckMempoolRebuild(CTxMemPoolTestAccess& testAccess)
+{
+    auto oldJournal = testAccess.getJournalBuilder().getCurrentJournal();
+    auto contentsBefore = mining::CJournalTester(oldJournal).getContents();
+    auto oldMapTx = testAccess.mapTx();
+
+    auto changeSet = mempool.RebuildMempool();
+    
+    BOOST_CHECK(checkGroupContinuity(changeSet));
+    BOOST_CHECK(changeSet->CheckTopoSort());
+    changeSet->apply();
+
+    auto newJournal = testAccess.getJournalBuilder().getCurrentJournal();
+    auto contentsAfter = mining::CJournalTester(newJournal).getContents();
+    BOOST_CHECK(contentsBefore == contentsAfter);
+
+    auto newMapTx = testAccess.mapTx();
+
+    BOOST_CHECK(oldMapTx.size() == newMapTx.size());
+    const auto& oldAccess = oldMapTx.get<insertion_order>();
+    const auto& newAccess = newMapTx.get<insertion_order>();
+    for(auto it1 = oldAccess.begin(),it2 =  newAccess.begin(); it1 != oldAccess.end(); it1++, it2++)
+    {
+        BOOST_CHECK(it1->GetTxId() == it2->GetTxId());
+        BOOST_CHECK(it1->IsCPFPGroupMember() == it2->IsCPFPGroupMember());
+        BOOST_CHECK(it1->IsInPrimaryMempool() == it2->IsInPrimaryMempool());
+    }
+
+    return newJournal;
+}
 
 BOOST_AUTO_TEST_CASE(group_forming_and_disbanding) 
 {
@@ -112,6 +159,8 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     //  entries in group2 (entering primary mempool): entryNotPaying3, entryNotPaying4 and entryPayingFor3And4
     //  entry still in secondary: entryNotPaying2
 
+    mempool.SetSanityCheck(0);
+
     auto entryNotPaying = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
     
     auto entryPayForItself = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryNotPaying.GetSharedTx(), 0)}, 3);
@@ -130,7 +179,6 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     auto feeSoFar = entryNotPaying.GetModifiedFee() + entryPayForItself.GetModifiedFee();
     auto entryPayForGroup = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryPayForItself.GetSharedTx(), 0)}, 1, sizeSoFar, feeSoFar);
 
-    
     CTxMemPoolTestAccess testAccess(mempool);
     auto journal = testAccess.getJournalBuilder().getCurrentJournal();
 
@@ -262,6 +310,8 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
         BOOST_ASSERT(entryIt->IsInPrimaryMempool());
         BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
     }
+
+    CheckMempoolRebuild(testAccess);
 };
 
 BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
@@ -282,6 +332,8 @@ BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
     //
     // after: 1. entryPaysFor2 forms a group (got rid of the entryNotPaying1 debt)
     //        2  entryPaysFor3 group is disbanded, and entryPaysForItself and entryPaysFor3 are accepted as standalone
+
+    mempool.SetSanityCheck(0);
 
     auto entryNotPaying1 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
     auto entryNotPaying2 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryNotPaying1.GetSharedTx(), 0)}, 1);
@@ -326,6 +378,63 @@ BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
         BOOST_ASSERT(entryIt->IsInPrimaryMempool());
         BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
     }
+    
+    CheckMempoolRebuild(testAccess);
+};
+
+BOOST_AUTO_TEST_CASE(mempool_rebuild)
+{
+    // 
+    //  entry1    + -------------- entryGroup1Tx1
+    //       |    |                       |
+    //  entryGroup2Tx1 ----- + --- entryGroup1Tx2
+    //       |               |            |
+    //  entryGroup2Tx2    entry2   entryNonPaying1
+    //                                    |
+    //                             entryNonPaying2
+
+    mempool.SetSanityCheck(0);
+
+    auto entry1 = MakeEntry(mempool, DefaultFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1);
+    auto entryGroup1Tx1 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 2);
+    auto entryGroup1Tx2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryGroup1Tx1.GetSharedTx(), 1)}, 2, entryGroup1Tx1.GetSharedTx()->GetTotalSize());
+    auto entryGroup2Tx1 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entry1.GetSharedTx(), 0), std::make_tuple(entryGroup1Tx1.GetSharedTx(), 0)}, 2);
+    auto entryGroup2Tx2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryGroup2Tx1.GetSharedTx(), 0)}, 5, entryGroup2Tx1.GetSharedTx()->GetTotalSize());
+    auto entryNonPaying1 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryGroup1Tx2.GetSharedTx(), 1)}, 1);
+    auto entryNonPaying2 = MakeEntry(mempool, CFeeRate(), {}, {std::make_tuple(entryNonPaying1.GetSharedTx(), 0)}, 1);
+    auto entry2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryGroup2Tx1.GetSharedTx(), 1), std::make_tuple(entryGroup1Tx2.GetSharedTx(), 0)}, 3);
+    
+    auto tx1 = AddToMempool(entry1);
+    auto tx2 = AddToMempool(entryGroup1Tx1);
+    auto tx3 = AddToMempool(entryGroup1Tx2);
+    auto tx4 = AddToMempool(entryGroup2Tx1);
+    auto tx5 = AddToMempool(entryGroup2Tx2);
+    auto tx6 = AddToMempool(entryNonPaying1);
+    auto tx7 = AddToMempool(entryNonPaying2);
+    auto tx8 = AddToMempool(entry2);
+
+    CTxMemPoolTestAccess testAccess(mempool);
+    mempool.SetSanityCheck(0);// CheckMempool checks coins also. we do not have coins in this tests
+    auto journal = testAccess.getJournalBuilder().getCurrentJournal();
+
+    for(auto entryIt: {tx1, tx2, tx3, tx4, tx5, tx8})
+    {
+        BOOST_ASSERT(entryIt->IsInPrimaryMempool());
+        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+    }
+
+    for(auto entryIt: {tx6, tx7})
+    {
+        BOOST_ASSERT(!entryIt->IsInPrimaryMempool());
+        BOOST_ASSERT(!mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+    }
+
+    for(auto entryIt: {tx2, tx3, tx4, tx5})
+    {
+        BOOST_ASSERT(entryIt->IsCPFPGroupMember());
+    }
+
+    CheckMempoolRebuild(testAccess);
 
 };
 

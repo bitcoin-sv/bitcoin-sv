@@ -599,8 +599,9 @@ public:
 
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
 
-    /** Rebuild the journal contents so they match the mempool */
-    void RebuildJournal() const;
+    /** Rebuilds the mempool by reseting it and then resubmitting transactions that were inside before.
+        As consequence the journal is rebuilt. The caller must apply the changeset. */
+    mining::CJournalChangeSetPtr RebuildMempool();
 
     // AddUnchecked must update the state for all ancestors of a given
     // transaction, to track size/count of descendant transactions.
@@ -658,6 +659,10 @@ private:
     //   -one can set which entries can be ignored when disbanding groups by setting variable "entriesToIgnore"
     setEntriesTopoSorted RemoveFromPrimaryMempoolNL(setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, 
         bool putDummyGroupingData = false, const setEntries* entriesToIgnore = nullptr);
+
+    // in AddToMempoolForReorg and RebuildMempool we need to submit transactions that already were in the mempool
+    void ResubmitEntriesToMempoolNL(indexed_transaction_set& oldMapTx, const mining::CJournalChangeSetPtr& changeSet);
+
 
 public:
     void RemoveForBlock(

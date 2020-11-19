@@ -1401,26 +1401,25 @@ std::string CTxMemPool::checkJournalNL() const
 }
 
 // Rebuild the journal contents so they match the mempool
-void CTxMemPool::RebuildJournal() const
+mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
 {
     LogPrint(BCLog::JOURNAL, "Rebuilding journal\n");
 
     CJournalChangeSetPtr changeSet { mJournalBuilder.getNewChangeSet(JournalUpdateReason::RESET) };
-
     {
         std::shared_lock lock(smtx);
         CoinsDBView coinsView{ *pcoinsTip };
 
-        for (const auto& entry: mapTx.get<insertion_order>())
-        {
-            changeSet->addOperation(CJournalChangeSet::Operation::ADD, { entry });
-        }
+        // back-up txs currently in the mempool and clear the mempool
+        auto oldMapTx = std::move(mapTx);
+        clearNL();
 
+        // submit backed-up transactions
+        ResubmitEntriesToMempoolNL(oldMapTx, changeSet);
+        
         CheckMempoolNL(coinsView, changeSet);
     }
-
-    // Apply the changes
-    changeSet->apply();
+    return changeSet;
 }
 
 void CTxMemPool::SetSanityCheck(double dFrequency) {
@@ -1941,6 +1940,24 @@ std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx
     return conflictsWith;
 }
 
+void CTxMemPool::ResubmitEntriesToMempoolNL(CTxMemPool::indexed_transaction_set& oldMapTx, const CJournalChangeSetPtr& changeSet)
+{
+    auto& tempMapTxSequenced = oldMapTx.get<insertion_order>();
+    for (auto itTemp = tempMapTxSequenced.begin(); itTemp != tempMapTxSequenced.end();) 
+    {
+        tempMapTxSequenced.modify(
+            itTemp,
+            [](CTxMemPoolEntry& entry)
+            {
+                entry.groupingData = std::nullopt;
+                entry.group.reset();
+            }   
+        );
+        AddUncheckedNL(itTemp->GetTxId(), *itTemp, changeSet);
+        tempMapTxSequenced.erase(itTemp++);
+    }
+}
+
 void CTxMemPool::AddToMempoolForReorg(const Config &config,
     DisconnectedBlockTransactions &disconnectpool,
     const CJournalChangeSetPtr& changeSet)
@@ -1997,20 +2014,9 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
     // Add original mempool contents on top to preserve toposort
     {
         std::unique_lock lock {smtx};
-        auto& tempMapTxSequenced = tempMapTx.get<insertion_order>();
-        for (auto itTemp = tempMapTxSequenced.begin(); itTemp != tempMapTxSequenced.end();) 
-        {
-            tempMapTxSequenced.modify(
-                itTemp,
-                [](CTxMemPoolEntry& entry)
-                {
-                    entry.groupingData = std::nullopt;
-                    entry.group.reset();
-                }   
-            );
-            AddUncheckedNL(itTemp->GetTxId(), *itTemp, changeSet);
-            tempMapTxSequenced.erase(itTemp++);
-        }
+
+        // now put all transactions that were in the mempool before
+        ResubmitEntriesToMempoolNL(tempMapTx, changeSet);
 
         // Disconnectpool related updates
         for (const auto& txInputData : vTxInputData) {

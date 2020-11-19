@@ -3035,15 +3035,17 @@ UniValue rebuildjournal(const Config &config, const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() != 0) {
         throw std::runtime_error(
             "rebuildjournal\n"
-            "\nForces the block assembly journal to be rebuilt to make it "
-            "consistent with the TX mempool.\n"
+            "\nForces the block assembly journal and the TX mempool to be rebuilt to make them "
+            "consistent with each other.\n"
             "\nResult:\n"
             "\nExamples:\n" +
             HelpExampleCli("rebuildjournal", "") +
             HelpExampleRpc("rebuildjournal", ""));
     }
 
-    mempool.RebuildJournal();
+    auto changeSet = mempool.RebuildMempool();
+    changeSet->apply();
+
     return NullUniValue;
 }
 
