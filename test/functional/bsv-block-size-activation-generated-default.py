@@ -44,7 +44,10 @@ class BSVGeneratedBlockSizeActivation(BitcoinTestFramework):
             self.activation_time = self.options.blocksizeactivationtime
             self.extra_args[0].append("-blocksizeactivationtime=%d" % self.options.blocksizeactivationtime)
 
-        super().setup_nodes()
+        self.add_nodes(self.num_nodes, self.extra_args)
+        # increase rpc_timeout to avoid getting timeout on generate for block that is hard to validate
+        self.nodes[0].rpc_timeout = 300
+        self.start_nodes()
 
 
     # Create an empty block with given block time. Used to move median past time around
