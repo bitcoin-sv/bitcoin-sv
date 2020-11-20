@@ -120,7 +120,7 @@ class CThreadSafeQueue
             return false;
         }
 
-        theQueue.push_back(std::forward<TT>(value));
+        theQueue.emplace_back(std::forward<TT>(value));
         currentSize += objectSize;
 
         onPush.notify_one();
@@ -145,7 +145,7 @@ class CThreadSafeQueue
             return false; // no room in the queue
         }
 
-        theQueue.push_back(std::forward<TT>(value));
+        theQueue.emplace_back(std::forward<TT>(value));
         currentSize += objectSize;
 
         onPush.notify_one();
@@ -153,6 +153,75 @@ class CThreadSafeQueue
         return true;
     }
 
+  private:
+    // Atomically appends a sequence of new values to the queue, optionally clearing it first.
+    // Will block until there is enough space in the queue or the queue is closed.
+    // If the queue is closed will not push anything and will return false immediately.
+    template <typename C>
+    bool FillOrReplaceWait(C&& value_sequence, bool replace)
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+
+        if (isClosed)
+        {
+            return false;
+        }
+
+        size_t listSize = 0;
+        for (const auto& value : value_sequence)
+        {
+            listSize += sizeCalculator(value);
+        }
+
+        if (listSize > maximalSize)
+        {
+            return false; // the list is too big for this queue
+        }
+
+        if (replace)
+        {
+            theQueue.clear();
+            currentSize = 0;
+            onPop.notify_all();
+        }
+        else
+        {
+            onPop.wait(lock, [&]() { return isClosed || (currentSize + listSize <= maximalSize); });
+
+            if (isClosed)
+            {
+                return false;
+            }
+        }
+
+        for (auto&& value : value_sequence)
+        {
+            theQueue.emplace_back(std::move(value));
+        }
+        currentSize += listSize;
+
+        onPush.notify_all();
+
+        return true;
+    }
+
+  public:
+    // Atomically appends a sequence of new values to the queue.
+    // Will block until there is enough space in the queue or the queue is closed.
+    // If the queue is closed will not push anything and will return false immediately.
+    template <typename C>
+    bool FillWait(C&& value_sequence)
+    {
+        return FillOrReplaceWait(std::forward<C>(value_sequence), false);
+    }
+
+    // Atomically replace the contents of the queue with a sequence of new values.
+    // If the queue is closed will not push anything and will return false immediately.
+    template <typename C>
+    bool ReplaceWait(C&& value_sequence)
+    {
+        return FillOrReplaceWait(std::forward<C>(value_sequence), true);
+    }
 
     // Pops from the front of the queue. If the queue is empty this function
     // will block until something is pushed to the queue or the queue is closed.
@@ -202,4 +271,45 @@ class CThreadSafeQueue
         return {std::move(out)};
     }
 
+    // Returns the whole queue. If the queue is empty this function
+    // will block until something is pushed to the queue or the queue is closed.
+    // If there is nothing to pop and the queue is closed, this function will return std::nullopt.
+    std::optional<std::deque<T>> PopAllWait()
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+
+        onPush.wait(lock, [&]() { return !theQueue.empty() || isClosed; });
+
+        if(theQueue.empty())
+        {
+            return {};
+        }
+
+        currentSize = 0;
+        onPop.notify_all();
+
+        return {std::move(theQueue)};
+    }
+
+    // Non blocking implementation of the PopAllWait(). Will not wait until
+    // there is something in the queue.
+    // If the queue is empty but not closed, returns an empty queue.
+    // If the queue is closed, returns std::nullopt.
+    std::optional<std::deque<T>> PopAllNoWait()
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+
+        if (isClosed && theQueue.empty())
+        {
+            return {};
+        }
+
+        if (!theQueue.empty())
+        {
+            currentSize = 0;
+            onPop.notify_all();
+        }
+
+        return {std::move(theQueue)};
+    }
 };

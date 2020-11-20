@@ -7,6 +7,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <future>
+#include <initializer_list>
 #include <vector>
 
 
@@ -132,14 +133,11 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
     BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 0));
 
     // take all values from queue, there should be 6 different integers
-    while(true)
+    const auto contents = theQueue.PopAllWait();
+    BOOST_REQUIRE(contents.has_value());
+    for (const auto& v : contents.value())
     {
-        auto maybeInt = theQueue.PopWait();
-        if(!maybeInt.has_value())
-        {
-            break;
-        }
-        outValues.insert(maybeInt.value());
+        outValues.insert(v);
     }
     BOOST_CHECK(outValues.size() == 6);
     
@@ -147,14 +145,106 @@ BOOST_AUTO_TEST_CASE(multiple_inputs_full_queue) {
     BOOST_CHECK(get_Size(theQueue) == 0);
 }
 
+BOOST_AUTO_TEST_CASE(fill_replace)
+{
+    CThreadSafeQueue<int> theQueue(5, 1);
+
+    // Fill the queue
+    BOOST_CHECK(theQueue.FillWait(std::initializer_list<int>{0, 1, 2, 3, 4}));
+    BOOST_CHECK(get_Size(theQueue) == 5);
+    BOOST_CHECK(!theQueue.PushNoWait(99));
+
+    // Replace the contents of the queue
+    BOOST_CHECK(theQueue.ReplaceWait(std::initializer_list<int>{5, 6, 7, 8, 9}));
+    BOOST_CHECK(get_Size(theQueue) == 5);
+    BOOST_CHECK(!theQueue.PushNoWait(99));
+
+    // Check that fill is atomic
+    std::vector<std::future<void>> pushers;
+    pushers.push_back(
+        std::async(std::launch::async,
+                   [&theQueue]()
+                   {
+                       theQueue.FillWait(std::initializer_list<int>{10, 11, 12});
+                   }));
+    BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 1));
+    BOOST_CHECK(get_Size(theQueue) == 5);
+
+    // ... pop values and check that the queue fills up as soon as there's space
+    BOOST_CHECK(theQueue.PopWait());
+    BOOST_CHECK(get_Size(theQueue) == 4);
+    BOOST_CHECK(theQueue.PopWait());
+    BOOST_CHECK(get_Size(theQueue) == 3);
+    BOOST_CHECK(theQueue.PopWait());
+    {
+        // ... give the pusher time to wake up and acquire the lock
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(100ms);
+    }
+    BOOST_CHECK(get_Size(theQueue) == 5);
+    BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 0));
+
+    // Close the queue and that we can stil get all the values out
+    theQueue.Close();
+    BOOST_CHECK(theQueue.IsClosed());
+    const auto contents = theQueue.PopAllNoWait();
+    BOOST_REQUIRE(contents.has_value());
+    BOOST_CHECK(contents.value().size() == 5);
+}
+
+BOOST_AUTO_TEST_CASE(fill_replace_dynamic)
+{
+    CThreadSafeQueue<int> theQueue(10, [](const int& i) { return static_cast<size_t>(i); });
+
+    // Fill the queue
+    BOOST_CHECK(theQueue.FillWait(std::initializer_list<int>{0, 1, 2, 3, 4}));
+    BOOST_CHECK(get_Count(theQueue) == 5);
+    BOOST_CHECK(get_Size(theQueue) == 10);
+    BOOST_CHECK(!theQueue.PushNoWait(99));
+
+    // Replace the contents of the queue
+    BOOST_CHECK(theQueue.ReplaceWait(std::initializer_list<int>{7, 3}));
+    BOOST_CHECK(get_Count(theQueue) == 2);
+    BOOST_CHECK(get_Size(theQueue) == 10);
+    BOOST_CHECK(!theQueue.PushNoWait(99));
+
+    // Check that fill is atomic
+    std::vector<std::future<void>> pushers;
+    pushers.push_back(
+        std::async(std::launch::async,
+                   [&theQueue]()
+                   {
+                       theQueue.FillWait(std::initializer_list<int>{2, 3, 5});
+                   }));
+    BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 1));
+    BOOST_CHECK(get_Size(theQueue) == 10);
+
+    // ... pop values and check that the queue fills up as soon as there's space
+    BOOST_CHECK(theQueue.PopWait());
+    BOOST_CHECK(get_Count(theQueue) == 1);
+    BOOST_CHECK(get_Size(theQueue) == 3);
+    BOOST_CHECK(theQueue.PopWait());
+    {
+        // ... give the pusher time to wake up and acquire the lock
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(100ms);
+    }
+    BOOST_CHECK(get_Count(theQueue) == 3);
+    BOOST_CHECK(get_Size(theQueue) == 10);
+
+    // Close the queue and that we can stil get all the values out
+    theQueue.Close();
+    BOOST_CHECK(theQueue.IsClosed());
+    const auto contents = theQueue.PopAllNoWait();
+    BOOST_REQUIRE(contents.has_value());
+    BOOST_CHECK(contents.value().size() == 3);
+}
+
 BOOST_AUTO_TEST_CASE(multiple_outputs) {
     
     CThreadSafeQueue<int> theQueue(5, 1);
 
-    for(int i = 0; i < 5; i++)
-    {
-        theQueue.PushWait(i);
-    }
+    theQueue.ReplaceWait(std::initializer_list<int>{0, 1, 2, 3, 4});
     BOOST_CHECK(get_Size(theQueue) == 5);
 
 
@@ -317,9 +407,10 @@ BOOST_AUTO_TEST_CASE(nowait) {
 
     // can pop three values
     BOOST_CHECK(theQueue.PopNoWait().has_value());
-    BOOST_CHECK(theQueue.PopNoWait().has_value());
-    BOOST_CHECK(theQueue.PopNoWait().has_value());
-    
+    const auto contents = theQueue.PopAllNoWait();
+    BOOST_CHECK(contents.has_value());
+    BOOST_CHECK(contents.value().size() == 2);
+
     // nothing to pop, doesn't have value
     BOOST_CHECK(!theQueue.PopNoWait().has_value());
 

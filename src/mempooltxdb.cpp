@@ -5,9 +5,11 @@
 #include "txmempool.h"
 #include "mempooltxdb.h"
 #include "util.h"
+#include "thread_safe_queue.h"
 
-#include <new>
 #include <future>
+#include <new>
+#include <variant>
 
 CMempoolTxDB::CMempoolTxDB(size_t nCacheSize_, bool fMemory_, bool fWipe)
     : dbPath{GetDataDir() / "mempoolTxDB"},
@@ -268,66 +270,121 @@ uint64_t CMempoolTxDB::GetWriteCount()
 }
 
 
-void CAsyncMempoolTxDB::EnqueueNL(std::initializer_list<Task>&& tasks, bool clearList)
-{
-    if (clearList)
+// Task queue managment for CAsyncMempoolTxDB
+namespace {
+    struct SyncTask
     {
-        taskList.clear();
-    }
-    for (auto&& task : tasks)
-    {
-        taskList.emplace(taskList.begin(), std::move(task));
-    }
-}
+        std::promise<void>* sync;
+    };
 
-void CAsyncMempoolTxDB::Enqueue(std::initializer_list<Task>&& tasks, bool clearList)
-{
-    std::unique_lock<std::mutex> taskLock{taskListGuard};
-    EnqueueNL(std::move(tasks), clearList);
-    taskListSignal.notify_all();
-}
+    struct ClearTask {};
 
-void CAsyncMempoolTxDB::Synchronize(std::initializer_list<Task>&& tasks, bool clearList)
-{
-    std::promise<void> sync;
+    struct InvokeTask
     {
-        std::unique_lock<std::mutex> taskLock{taskListGuard};
-        EnqueueNL(std::move(tasks), clearList);
-        EnqueueNL({SyncTask{&sync}}, false);
-        taskListSignal.notify_all();
+        std::function<void(CMempoolTxDB&)> function;
+    };
+
+    struct AddTask
+    {
+        std::vector<CTransactionWrapperRef> transactions;
+    };
+
+    struct RemoveTask
+    {
+        std::vector<CMempoolTxDB::TxData> transactions;
+    };
+
+    struct TaskSizeCalculator
+    {
+        size_t operator()(const SyncTask&) const noexcept { return 0; }
+        size_t operator()(const ClearTask&) const noexcept { return 0; }
+        size_t operator()(const InvokeTask&) const noexcept { return 0; }
+        size_t operator()(const AddTask& task) const noexcept
+        {
+            return task.transactions.capacity() * sizeof(decltype(task.transactions)::value_type);
+        }
+        size_t operator()(const RemoveTask& task) const noexcept
+        {
+            return task.transactions.capacity() * sizeof(decltype(task.transactions)::value_type);
+        }
+    };
+
+    using Task = std::variant<ClearTask, SyncTask, InvokeTask, AddTask, RemoveTask>;
+} // anonymous namespace
+
+class CAsyncMempoolTxDB::TaskQueue : CThreadSafeQueue<Task>
+{
+    // Calculate the actual size of a given task.
+    static size_t CalculateTaskSize(const Task& task) noexcept
+    {
+        static const TaskSizeCalculator calculator;
+        return sizeof(task) + std::visit(calculator, task);
     }
-    sync.get_future().get();
-}
+
+public:
+    explicit TaskQueue(size_t maxSize)
+        : CThreadSafeQueue<Task>{maxSize, CalculateTaskSize}
+    {}
+
+    using CThreadSafeQueue<Task>::Close;
+    using CThreadSafeQueue<Task>::PushWait;
+    using CThreadSafeQueue<Task>::PopAllWait;
+
+    // Atomically push a set of tasks to the task queue and wait until the tasks
+    // have been processed.
+    void Synchronize(std::initializer_list<Task>&& tasks = {}, bool clearList = false)
+    {
+        std::promise<void> sync;
+        bool success;
+        if (!clearList && tasks.size() == 0)
+        {
+            success = PushWait(Task{SyncTask{&sync}});
+        }
+        else
+        {
+            std::vector<Task> temp{std::move(tasks)};
+            temp.emplace_back(SyncTask{&sync});
+            success = (clearList ? ReplaceWait(std::move(temp))
+                                 : FillWait(std::move(temp)));
+        }
+        assert(success && "Push to task queue failed");
+        sync.get_future().get();
+    }
+};
 
 CAsyncMempoolTxDB::CAsyncMempoolTxDB(size_t nCacheSize)
-    : txdb{std::make_shared<CMempoolTxDB>(nCacheSize)},
+    // FIXME: CORE-130: Add parameter for limiting the task queue size.
+    : queue{new TaskQueue{std::numeric_limits<size_t>::max()}},
+      txdb{std::make_shared<CMempoolTxDB>(nCacheSize)},
       worker{[this](){ Work(); }}
 {}
 
 CAsyncMempoolTxDB::~CAsyncMempoolTxDB()
 {
-    Enqueue({StopTask{}}, true);
+    queue->Close(true);
     worker.join();
 }
 
 void CAsyncMempoolTxDB::Sync()
 {
-    Synchronize({});
+    queue->Synchronize();
 }
 
 void CAsyncMempoolTxDB::Clear()
 {
-    Synchronize({ClearTask{}}, true);
+    queue->Synchronize({ClearTask{}}, true);
 }
 
 void CAsyncMempoolTxDB::Add(std::vector<CTransactionWrapperRef>&& transactionsToAdd)
 {
-    Enqueue({AddTask{std::move(transactionsToAdd)}});
+    const auto success = queue->PushWait(Task{AddTask{std::move(transactionsToAdd)}});
+    assert(success && "Push to task queue failed");
 }
 
 void CAsyncMempoolTxDB::Remove(std::vector<CMempoolTxDB::TxData>&& transactionsToRemove)
 {
-    Enqueue({RemoveTask{std::move(transactionsToRemove)}});
+    const auto success = queue->PushWait(Task{RemoveTask{std::move(transactionsToRemove)}});
+    assert(success && "Push to task queue failed");
 }
 
 std::shared_ptr<CMempoolTxDBReader> CAsyncMempoolTxDB::GetDatabase()
@@ -348,7 +405,7 @@ bool CAsyncMempoolTxDB::SetXrefKey(const CMempoolTxDB::XrefKey& xrefKey)
         result = txdb.SetXrefKey(xrefKey);
     };
 
-    Synchronize({InvokeTask{function}});
+    queue->Synchronize({InvokeTask{function}});
     return result;
 }
 
@@ -360,7 +417,7 @@ bool CAsyncMempoolTxDB::GetXrefKey(CMempoolTxDB::XrefKey& xrefKey)
         result = txdb.GetXrefKey(xrefKey);
     };
 
-    Synchronize({InvokeTask{function}});
+    queue->Synchronize({InvokeTask{function}});
     return result;
 }
 
@@ -372,7 +429,7 @@ bool CAsyncMempoolTxDB::RemoveXrefKey()
         result = txdb.RemoveXrefKey();
     };
 
-    Synchronize({InvokeTask{function}});
+    queue->Synchronize({InvokeTask{function}});
     return result;
 }
 
@@ -389,13 +446,6 @@ void CAsyncMempoolTxDB::Work()
     const auto name = strprintf("mempooldb-%x", uintptr_t(static_cast<void*>(this)));
     RenameThread(name.c_str());
     LogPrint(BCLog::MEMPOOL, "Entering mempool TxDB worker thread.\n");
-
-    // Stop the background thread.
-    bool running = true;
-    const auto stop = [&running](const StopTask&)
-    {
-        running = false;
-    };
 
     // Commit the adds and removes to the database.
     CMempoolTxDB::Batch batch;
@@ -422,6 +472,13 @@ void CAsyncMempoolTxDB::Work()
         txdb->ClearDatabase();
     };
 
+    // Invoke a function on the database.
+    const auto invoke = [this, &commit](const InvokeTask& task)
+    {
+        commit();
+        task.function(*txdb);
+    };
+
     // Add transactions to the database and update the wrappers.
     const auto add = [&batch](const AddTask& task)
     {
@@ -446,31 +503,18 @@ void CAsyncMempoolTxDB::Work()
         }
     };
 
-    // Invoke a function on the database.
-    const auto invoke = [this, &commit](const InvokeTask& task)
+    const auto dispatcher {dispatch{sync, clear, invoke, add, remove}};
+    for (;;)
     {
-        commit();
-        task.function(*txdb);
-    };
-
-    const auto dispatcher {dispatch{stop, sync, clear, add, remove, invoke}};
-    while (running)
-    {
-        std::deque<Task> tasks;
+        const auto tasks {queue->PopAllWait()};
+        if (!tasks.has_value())
         {
-            std::unique_lock<std::mutex> taskLock{taskListGuard};
-            while (taskList.size() == 0)
-            {
-                taskListSignal.wait(taskLock);
-            }
-
-            tasks = std::move(taskList);
+            break;
         }
 
-        while (running && !tasks.empty())
+        for (const auto& task : tasks.value())
         {
-            std::visit(dispatcher, tasks.back());
-            tasks.pop_back();
+            std::visit(dispatcher, task);
         }
         commit();
     }
