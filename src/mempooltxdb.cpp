@@ -2,12 +2,16 @@
 // Distributed under the Open BSV software license, see the accompanying file
 // LICENSE.
 
+#include "config.h"
+#include "logging.h"
 #include "txmempool.h"
 #include "mempooltxdb.h"
 #include "util.h"
 #include "thread_safe_queue.h"
+#include "consensus/consensus.h"
 
 #include <future>
+#include <limits>
 #include <new>
 #include <variant>
 
@@ -310,6 +314,32 @@ namespace {
     };
 
     using Task = std::variant<ClearTask, SyncTask, InvokeTask, AddTask, RemoveTask>;
+
+    // Estimate the maximum size of the task queue based on the
+    // ancestor limit parameters.
+    size_t EstimateTaskQueueSize(const Config& config)
+    {
+        // The size of a single transaction data element.
+        static constexpr size_t maxTxDataSize {
+            std::max(sizeof(decltype(AddTask::transactions)::value_type),
+                     sizeof(decltype(RemoveTask::transactions)::value_type))};
+
+        // Additional factor to account for:
+        //   - vector capacity being larger than the number of elements;
+        //   - more space in the queue for better parallelization.
+        static constexpr size_t sizeFactor {53}; // A nice round prime number
+
+        // Use the larger of ancestor limits to estimate the maximum
+        // number of transactions in an add or remove task.
+        const auto maxTxCount = std::max(config.GetLimitAncestorCount(),
+                                         config.GetLimitSecondaryMempoolAncestorCount());
+        assert(maxTxCount < std::numeric_limits<size_t>::max() / maxTxDataSize);
+
+        // Finally, calculate the queue size, checking for overflow.
+        const auto maxTaskSize = static_cast<size_t>(maxTxCount * maxTxDataSize);
+        assert(maxTaskSize < std::numeric_limits<size_t>::max() / sizeFactor);
+        return sizeFactor * maxTaskSize;
+    }
 } // anonymous namespace
 
 class CAsyncMempoolTxDB::TaskQueue : CThreadSafeQueue<Task>
@@ -327,6 +357,7 @@ public:
     {}
 
     using CThreadSafeQueue<Task>::Close;
+    using CThreadSafeQueue<Task>::MaximalSize;
     using CThreadSafeQueue<Task>::PushWait;
     using CThreadSafeQueue<Task>::PopAllWait;
 
@@ -353,11 +384,14 @@ public:
 };
 
 CAsyncMempoolTxDB::CAsyncMempoolTxDB(size_t nCacheSize)
-    // FIXME: CORE-130: Add parameter for limiting the task queue size.
-    : queue{new TaskQueue{std::numeric_limits<size_t>::max()}},
+    : queue{new TaskQueue{EstimateTaskQueueSize(GlobalConfig::GetConfig())}},
       txdb{std::make_shared<CMempoolTxDB>(nCacheSize)},
       worker{[this](){ Work(); }}
-{}
+{
+    LogPrint(BCLog::MEMPOOL,
+             "Using %.0f KiB for the mempool transaction database work queue\n",
+             queue->MaximalSize() * (1.0 / ONE_KIBIBYTE));
+}
 
 CAsyncMempoolTxDB::~CAsyncMempoolTxDB()
 {
