@@ -27,7 +27,8 @@ bench_bench_bitcoin_SOURCES = \
   bench/perf.cpp \
   bench/perf.h \
   bench/cscript.cpp \
-  bench/interpreter.cpp
+  bench/interpreter.cpp \
+  bench/thread_safe_queue.cpp
 
 bench_bench_bitcoin_SOURCES += bench/data/hexhdr.py
 
