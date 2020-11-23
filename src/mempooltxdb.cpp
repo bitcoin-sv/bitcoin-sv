@@ -353,7 +353,12 @@ class CAsyncMempoolTxDB::TaskQueue : CThreadSafeQueue<Task>
 
 public:
     explicit TaskQueue(size_t maxSize)
-        : CThreadSafeQueue<Task>{maxSize, CalculateTaskSize}
+        : CThreadSafeQueue<Task>{maxSize, CalculateTaskSize,
+            [](const char* method){
+                LogPrint(BCLog::MEMPOOL,
+                         "Mempool TxDB work queue producer blocked (%s).\n",
+                         method);
+            }}
     {}
 
     using CThreadSafeQueue<Task>::Close;
@@ -388,9 +393,19 @@ CAsyncMempoolTxDB::CAsyncMempoolTxDB(size_t nCacheSize)
       txdb{std::make_shared<CMempoolTxDB>(nCacheSize)},
       worker{[this](){ Work(); }}
 {
-    LogPrint(BCLog::MEMPOOL,
-             "Using %.0f KiB for the mempool transaction database work queue\n",
-             queue->MaximalSize() * (1.0 / ONE_KIBIBYTE));
+    const auto maxSize = queue->MaximalSize();
+    if (maxSize > 5 * ONE_MEBIBYTE)
+    {
+        LogPrint(BCLog::MEMPOOL,
+                 "Using %.1f MiB for the mempool transaction database work queue\n",
+                 maxSize * (1.0 / ONE_MEBIBYTE));
+    }
+    else
+    {
+        LogPrint(BCLog::MEMPOOL,
+                 "Using %.0f KiB for the mempool transaction database work queue\n",
+                 maxSize * (1.0 / ONE_KIBIBYTE));
+    }
 }
 
 CAsyncMempoolTxDB::~CAsyncMempoolTxDB()
@@ -487,7 +502,7 @@ void CAsyncMempoolTxDB::Work()
     {
         if (!txdb->Commit(batch))
         {
-            LogPrint(BCLog::MEMPOOL, "Mempool TxDB Batch Commit failed.");
+            LogPrint(BCLog::MEMPOOL, "Mempool TxDB batch commit failed.\n");
         }
         batch.Clear();
     };

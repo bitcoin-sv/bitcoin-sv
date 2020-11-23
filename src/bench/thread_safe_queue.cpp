@@ -9,8 +9,12 @@
 
 #include <array>
 #include <cstdint>
+#include <iostream>
+#include <memory>
 #include <thread>
+#include <unordered_map>
 
+//#define LOGBLOCK
 
 namespace {
     constexpr auto NUMBER_OF_WRITERS = 5;
@@ -19,6 +23,42 @@ namespace {
     constexpr auto DATA_END_MARKER = std::uint64_t(-1);
 
     using Queue = CThreadSafeQueue<std::uint64_t>;
+
+    struct BlockedLogger
+    {
+        using Cnt = std::unordered_map<const char*, int>;
+        std::unordered_map<std::string, Cnt> thread_counters;
+        ~BlockedLogger()
+        {
+            for (const auto& [thread_name, counters] : thread_counters)
+            {
+                for (const auto& [method, count] : counters)
+                    std::cout << "Blocked in " << method << " " << count
+                              << " times in " << thread_name << std::endl;
+            }
+        }
+
+        void log(const char* method)
+        {
+            const auto thread_name = GetThreadName();
+            const auto tciter = thread_counters.emplace(thread_name, Cnt{}).first;
+            const auto iter = tciter->second.emplace(method, 0).first;
+            ++iter->second;
+        }
+    };
+
+    Queue::BlockedLogger logblock()
+    {
+#ifdef LOGBLOCK
+        auto logger = std::make_shared<BlockedLogger>();
+        return [logger](const char* method)
+        {
+            logger->log(method);
+        };
+#else
+        return nullptr;
+#endif
+    }
 
     void FillQueueOneByOne(Queue& queue, const char* name)
     {
@@ -77,10 +117,11 @@ namespace {
 
     void ThreadSafeQueue_SingleSingle(benchmark::State& state)
     {
+        const auto logger = logblock();
+        Queue queue{QUEUE_SIZE_LIMIT, logger, logger};
+
         while (state.KeepRunning())
         {
-            Queue queue{QUEUE_SIZE_LIMIT};
-
             std::thread reader {std::bind(PopQueueOneByOne, std::ref(queue), "reader")};
             std::array<std::thread, NUMBER_OF_WRITERS> writers {
                 std::thread{std::bind(FillQueueOneByOne, std::ref(queue), "writer 1")},
@@ -102,10 +143,11 @@ namespace {
 
     void ThreadSafeQueue_MultiMulti(benchmark::State& state)
     {
+        const auto logger = logblock();
+        Queue queue{QUEUE_SIZE_LIMIT, logger, logger};
+
         while (state.KeepRunning())
         {
-            Queue queue{QUEUE_SIZE_LIMIT};
-
             std::thread reader {std::bind(PopQueueAllAtOnce, std::ref(queue), "reader")};
             std::array<std::thread, NUMBER_OF_WRITERS> writers {
                 std::thread{std::bind(FillQueueAllAtOnce, std::ref(queue), "writer 1")},
@@ -127,10 +169,11 @@ namespace {
 
     void ThreadSafeQueue_SingleMulti(benchmark::State& state)
     {
+        const auto logger = logblock();
+        Queue queue{QUEUE_SIZE_LIMIT, logger, logger};
+
         while (state.KeepRunning())
         {
-            Queue queue{QUEUE_SIZE_LIMIT};
-
             std::thread reader {std::bind(PopQueueAllAtOnce, std::ref(queue), "reader")};
             std::array<std::thread, NUMBER_OF_WRITERS> writers {
                 std::thread{std::bind(FillQueueOneByOne, std::ref(queue), "writer 1")},
@@ -152,10 +195,11 @@ namespace {
 
     void ThreadSafeQueue_MultiSingle(benchmark::State& state)
     {
+        const auto logger = logblock();
+        Queue queue{QUEUE_SIZE_LIMIT, logger, logger};
+
         while (state.KeepRunning())
         {
-            Queue queue{QUEUE_SIZE_LIMIT};
-
             std::thread reader {std::bind(PopQueueOneByOne, std::ref(queue), "reader")};
             std::array<std::thread, NUMBER_OF_WRITERS> writers {
                 std::thread{std::bind(FillQueueAllAtOnce, std::ref(queue), "writer 1")},

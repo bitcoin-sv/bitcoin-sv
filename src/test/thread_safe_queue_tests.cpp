@@ -378,19 +378,44 @@ BOOST_AUTO_TEST_CASE(multiple_outputs) {
 
 BOOST_AUTO_TEST_CASE(stress_test_fixed_element_size)
 {
-    CThreadSafeQueue<int> theQueue(100, 1);
+    unsigned long blockedOnPush = 0;
+    const auto logBlockedPush = [&blockedOnPush](const char*) {
+        ++blockedOnPush;
+    };
+
+    unsigned long blockedOnPop = 0;
+    const auto logBlockedPop = [&blockedOnPop](const char*) {
+        ++blockedOnPop;
+    };
+
+    CThreadSafeQueue<int> theQueue(100, 1, logBlockedPush, logBlockedPop);
     StressTest(theQueue);
+    BOOST_TEST_MESSAGE("Blocked in fixed-size stress test:"
+                       " push " << blockedOnPush << " pop " << blockedOnPop);
 }
 
 BOOST_AUTO_TEST_CASE(stress_test_dynamic_element_size)
 {
     // testing with dynamic element size also because of slightly
     // different way of notifying condition variables
-    auto sizeCalculator = [](const int& value){
+    const auto sizeCalculator = [](const int& value){
         return size_t(value % 70 + 1);
     };
-    CThreadSafeQueue<int> theQueue(100, sizeCalculator);
+
+    unsigned long blockedOnPush = 0;
+    const auto logBlockedPush = [&blockedOnPush](const char*) {
+        ++blockedOnPush;
+    };
+
+    unsigned long blockedOnPop = 0;
+    const auto logBlockedPop = [&blockedOnPop](const char*) {
+        ++blockedOnPop;
+    };
+
+    CThreadSafeQueue<int> theQueue(100, sizeCalculator, logBlockedPush, logBlockedPop);
     StressTest(theQueue);
+    BOOST_TEST_MESSAGE("Blocked in dynamic-size stress test:"
+                       " push " << blockedOnPush << " pop " << blockedOnPop);
 }
 
 BOOST_AUTO_TEST_CASE(nowait) {

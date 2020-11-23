@@ -13,16 +13,23 @@
 template <typename T> 
 class CThreadSafeQueue
 {
+public:
+    using value_type = T;
+    using SizeCalculator = std::function<size_t(const T&)>;
+    using BlockedLogger = std::function<void(const char* method)>;
+
   private:
     std::deque<T> theQueue;
     std::mutex mtx;
     std::condition_variable onPush;
     std::condition_variable onPop;
     std::atomic_bool isClosed = false;
-    const std::function<size_t(const T&)> sizeCalculator;
+    const SizeCalculator sizeCalculator;
     const bool variableSizeObjects;
     size_t currentSize = 0;
     const size_t maximalSize;
+    const BlockedLogger blockedPushLogger;
+    const BlockedLogger blockedPopLogger;
 
     void PostPopNotify()
     {
@@ -41,25 +48,107 @@ class CThreadSafeQueue
         }
     }
 
+    // Wait for enough space to become available in the queue to insert
+    // insertSize data. Optionally notify when actually blocked.
+    void WaitForPush(std::unique_lock<std::mutex>& lock,
+                     size_t insertSize, const char* method)
+    {
+        const auto predicate = [this, insertSize]() -> bool
+        {
+            return isClosed || (currentSize + insertSize <= maximalSize);
+        };
+
+        if (blockedPushLogger == nullptr)
+        {
+            onPop.wait(lock, predicate);
+        }
+        else
+        {
+            bool checked = false;
+            bool blocked = false;
+            onPop.wait(lock, [&]() {
+                if (!checked && blocked && !isClosed)
+                {
+                    blockedPushLogger(method);
+                    checked = true;
+                }
+                blocked = true;
+                return predicate();
+            });
+        }
+    }
+
+    // Wait for data to become available to extract from the queue.
+    // Optionally notify when actually blocked.
+    void WaitForPop(std::unique_lock<std::mutex>& lock, const char* method)
+    {
+        const auto predicate = [this]() -> bool
+        {
+            return !theQueue.empty() || isClosed;
+        };
+
+        if (blockedPopLogger == nullptr)
+        {
+            onPush.wait(lock, predicate);
+        }
+        else
+        {
+            bool checked = false;
+            bool blocked = false;
+            onPush.wait(lock, [&]() {
+                if (!checked && blocked && !isClosed)
+                {
+                    blockedPopLogger(method);
+                    checked = true;
+                }
+                blocked = true;
+                return predicate();
+            });
+        }
+    }
+
   public:
     // Constructor for the fixed size objects
-    // If one wants to limit this queue by number of elements set the objectSize to 1
-    explicit CThreadSafeQueue(size_t maxSize = std::numeric_limits<size_t>::max(), size_t objectSize = sizeof(T))
-        :sizeCalculator([objectSize](const T&){ return objectSize;})
+    // logBlockedPush will be called if a blocking push would actually block
+    // logBlockedPop will be called if a blocking pop would actually block
+    explicit CThreadSafeQueue(size_t maxSize = std::numeric_limits<size_t>::max(),
+                              const BlockedLogger& logBlockedPush = nullptr,
+                              const BlockedLogger& logBlockedPop = nullptr)
+        :sizeCalculator([](const T&){ return sizeof(T); })
         ,variableSizeObjects(false)
         ,maximalSize(maxSize)
-    {    
-    }
+        ,blockedPushLogger{logBlockedPush}
+        ,blockedPopLogger{logBlockedPop}
+    {}
+
+    // Constructor for the fixed size objects that are not sizeof(value_type)
+    // If one wants to limit this queue by number of elements set the objectSize to 1
+    // logBlockedPush will be called if a blocking push would actually block
+    // logBlockedPop will be called if a blocking pop would actually block
+    explicit CThreadSafeQueue(size_t maxSize, size_t objectSize,
+                              const BlockedLogger& logBlockedPush = nullptr,
+                              const BlockedLogger& logBlockedPop = nullptr)
+        :sizeCalculator([objectSize](const T&){ return objectSize; })
+        ,variableSizeObjects(false)
+        ,maximalSize(maxSize)
+        ,blockedPushLogger{logBlockedPush}
+        ,blockedPopLogger{logBlockedPop}
+    {}
 
     // Constructor for the object that do not have fixed size
     // Useful for complex and dynamically allocated objects
     // Warning: sizeCalc should always return same value for the same object. Undefined behavior otherwise
-    explicit CThreadSafeQueue(size_t maxSize, std::function<size_t(const T&)> sizeCalc)
+    // logBlockedPush will be called if a blocking push would actually block
+    // logBlockedPop will be called if a blocking pop would actually block
+    explicit CThreadSafeQueue(size_t maxSize, const SizeCalculator& sizeCalc,
+                              const BlockedLogger& logBlockedPush = nullptr,
+                              const BlockedLogger& logBlockedPop = nullptr)
         :sizeCalculator(sizeCalc)
         ,variableSizeObjects(true)
         ,maximalSize(maxSize)
-    {
-    }
+        ,blockedPushLogger{logBlockedPush}
+        ,blockedPopLogger{logBlockedPush}
+    {}
 
     ~CThreadSafeQueue() = default;
 
@@ -113,7 +202,7 @@ class CThreadSafeQueue
             return false; // object is too big for this queue
         }
 
-        onPop.wait(lock, [&]() { return isClosed || (currentSize + objectSize <= maximalSize); });
+        WaitForPush(lock, objectSize, "PushWait");
 
         if (isClosed)
         {
@@ -158,7 +247,7 @@ class CThreadSafeQueue
     // Will block until there is enough space in the queue or the queue is closed.
     // If the queue is closed will not push anything and will return false immediately.
     template <typename C>
-    bool FillOrReplaceWait(C&& value_sequence, bool replace)
+    bool FillOrReplaceWait(C&& value_sequence, bool replace, const char* method)
     {
         std::unique_lock<std::mutex> lock(mtx);
 
@@ -186,7 +275,7 @@ class CThreadSafeQueue
         }
         else
         {
-            onPop.wait(lock, [&]() { return isClosed || (currentSize + listSize <= maximalSize); });
+            WaitForPush(lock, listSize, method);
 
             if (isClosed)
             {
@@ -212,7 +301,7 @@ class CThreadSafeQueue
     template <typename C>
     bool FillWait(C&& value_sequence)
     {
-        return FillOrReplaceWait(std::forward<C>(value_sequence), false);
+        return FillOrReplaceWait(std::forward<C>(value_sequence), false, "FillWait");
     }
 
     // Atomically replace the contents of the queue with a sequence of new values.
@@ -220,7 +309,7 @@ class CThreadSafeQueue
     template <typename C>
     bool ReplaceWait(C&& value_sequence)
     {
-        return FillOrReplaceWait(std::forward<C>(value_sequence), true);
+        return FillOrReplaceWait(std::forward<C>(value_sequence), true, "ReplaceWait");
     }
 
     // Pops from the front of the queue. If the queue is empty this function
@@ -230,7 +319,7 @@ class CThreadSafeQueue
     {
         std::unique_lock<std::mutex> lock(mtx);
 
-        onPush.wait(lock, [&]() { return !theQueue.empty() || isClosed; });
+        WaitForPop(lock, "PopWait");
 
         if(theQueue.empty())
         {
@@ -278,7 +367,7 @@ class CThreadSafeQueue
     {
         std::unique_lock<std::mutex> lock(mtx);
 
-        onPush.wait(lock, [&]() { return !theQueue.empty() || isClosed; });
+        WaitForPop(lock, "PopAllWait");
 
         if(theQueue.empty())
         {
