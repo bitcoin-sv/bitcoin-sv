@@ -16,8 +16,8 @@ CTransactionWrapper::CTransactionWrapper(const CTransactionRef &_tx,
 
 CTransactionWrapper::CTransactionWrapper(const TxId &_txid,
                                          const std::shared_ptr<CMempoolTxDBReader>& txdb)
-    : txid(_txid),
-      mempoolTxDB(txdb)
+    : txid{_txid},
+      mempoolTxDB{txdb}
 {}
 
 CTransactionRef CTransactionWrapper::GetTxFromDB() const

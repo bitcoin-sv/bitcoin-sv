@@ -697,7 +697,7 @@ void CTxMemPool::AddUncheckedNL(
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage)
 {
-    static const auto nullTxDB = std::shared_ptr<CMempoolTxDBReader>(nullptr);
+    static const auto nullTxDB = std::shared_ptr<CMempoolTxDBReader>{nullptr};
 
     // Make sure the transaction database is initialized so that we have
     // a valid mempoolTxDB for the following checks.
@@ -1524,7 +1524,7 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
     std::vector<CTransactionWrapperRef> toBeMoved;
 
     {
-        std::shared_lock lock(smtx);
+        std::shared_lock lock{smtx};
         for (auto mi = mapTx.get<entry_time>().begin();
              mi != mapTx.get<entry_time>().end() && movedToDiskSize < requiredSize;
              ++mi) {
@@ -1981,7 +1981,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
     // transaction database, since we'll re-add the entries later.
     indexed_transaction_set tempMapTx;
     {
-        std::unique_lock lock(smtx);
+        std::unique_lock lock{smtx};
         std::swap(tempMapTx, mapTx);
         clearNL(true);          // Do not clear the transaction database
     }
@@ -2515,9 +2515,9 @@ void CTxMemPool::InitMempoolTxDB()
     {
         uint64_t version;
         DumpFileID instanceId;
-        CAutoFile file(OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION);
+        CAutoFile file{OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION};
 
-        std::unique_lock lock(smtx);
+        std::unique_lock lock{smtx};
         if (file.IsNull())
         {
             LogPrint(BCLog::MEMPOOL,
@@ -2562,7 +2562,7 @@ void CTxMemPool::InitMempoolTxDB()
 FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
 {
     FILE* filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
-    CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+    CAutoFile file{filestr, SER_DISK, CLIENT_VERSION};
     if (file.IsNull())
     {
         throw std::runtime_error("Failed to open mempool file from disk");
@@ -2615,7 +2615,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
 
         uint64_t version;
         DumpFileID instanceId;
-        CAutoFile file(OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION);
+        CAutoFile file{OpenDumpFile(version, instanceId), SER_DISK, CLIENT_VERSION};
 
         int64_t count = 0;
         int64_t skipped = 0;
@@ -2630,7 +2630,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
         const auto txdb = mempoolTxDB->GetDatabase();
         std::vector<CMempoolTxDB::TxData> transactionsToRemove;
         while (num--) {
-            bool txFromMemory {true};
+            bool txFromMemory = true;
             CTransactionRef tx;
             int64_t nTime;
             int64_t nFeeDelta;
@@ -2653,11 +2653,10 @@ bool CTxMemPool::LoadMempool(const Config &config,
             }
             file >> nTime;
             file >> nFeeDelta;
-            Amount amountdelta(nFeeDelta);
-            if (amountdelta != Amount(0)) {
-                PrioritiseTransaction(tx->GetId(),
-                                              tx->GetId().ToString(),
-                                              prioritydummy, amountdelta);
+            if (nFeeDelta != 0) {
+                const auto& txid = tx->GetId();
+                PrioritiseTransaction(txid, txid.ToString(),
+                                      prioritydummy, Amount{nFeeDelta});
             }
             if (nTime + nExpiryTimeout > nNow) {
                 // Mempool Journal ChangeSet
@@ -2707,11 +2706,11 @@ bool CTxMemPool::LoadMempool(const Config &config,
 
         for (const auto &i : mapDeltas) {
             PrioritiseTransaction(i.first, i.first.ToString(),
-                                          prioritydummy, i.second);
+                                  prioritydummy, i.second);
         }
 
         // Check that the mempool and the database are in sync.
-        std::shared_lock lock(smtx);
+        std::shared_lock lock{smtx};
         if (!CheckMempoolTxDBNL(false)) {
             throw std::runtime_error("Mempool and transaction database contents do not match");
         }
@@ -2751,7 +2750,7 @@ void CTxMemPool::DumpMempool(uint64_t version) {
             return;
         }
 
-        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
+        CAutoFile file{filestr, SER_DISK, CLIENT_VERSION};
 
         file << version;
         if (version >= MEMPOOL_DUMP_HAS_INSTANCE_ID) {
@@ -2779,8 +2778,8 @@ void CTxMemPool::DumpMempool(uint64_t version) {
             else {
                 file << *i.GetTx();
             }
-            file << (int64_t)i.nTime;
-            file << (int64_t)i.nFeeDelta.GetSatoshis();
+            file << static_cast<int64_t>(i.nTime);
+            file << static_cast<int64_t>(i.nFeeDelta.GetSatoshis());
             mapDeltas.erase(i.GetTxId());
             ++count;
         }

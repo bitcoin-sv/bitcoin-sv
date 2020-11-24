@@ -45,7 +45,7 @@ bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef> &txs)
     const auto prevDiskUsage = diskUsage.fetch_add(diskUsageAdded);
     const auto prevTxCount = txCount.fetch_add(txCountAdded);
 
-    CDBBatch batch{*mempoolTxDB};
+    auto batch = CDBBatch{*mempoolTxDB};
     for (const auto& tx : txs)
     {
         batch.Write(std::make_pair(DB_TRANSACTIONS, tx->GetId()), tx);
@@ -98,7 +98,7 @@ bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& transactionsToR
     const auto prevDiskUsage = diskUsage.fetch_sub(diskUsageRemoved);
     const auto prevTxCount = txCount.fetch_sub(txCountRemoved);
 
-    CDBBatch batch{*mempoolTxDB};
+    auto batch = CDBBatch{*mempoolTxDB};
     for (const auto& td : transactionsToRemove) {
         batch.Erase(std::make_pair(DB_TRANSACTIONS, td.txid));
     }
@@ -128,7 +128,7 @@ uint64_t CMempoolTxDB::GetTxCount()
 
 CMempoolTxDB::TxIdSet CMempoolTxDB::GetKeys()
 {
-    static const auto initialKey = std::make_pair(DB_TRANSACTIONS, uint256());
+    static const auto initialKey = std::make_pair(DB_TRANSACTIONS, uint256{});
 
     std::unique_ptr<CDBIterator> iter {mempoolTxDB->NewIterator()};
     iter->Seek(initialKey);
@@ -145,7 +145,7 @@ CMempoolTxDB::TxIdSet CMempoolTxDB::GetKeys()
 
 bool CMempoolTxDB::SetXrefKey(const XrefKey& xrefKey)
 {
-    CDBBatch batch{*mempoolTxDB};
+    auto batch = CDBBatch{*mempoolTxDB};
     batch.Write(DB_MEMPOOL_XREF, xrefKey);
     ++dbWriteCount;
     return mempoolTxDB->WriteBatch(batch, true);
@@ -165,7 +165,7 @@ bool CMempoolTxDB::GetXrefKey(XrefKey& xrefKey)
 
 bool CMempoolTxDB::RemoveXrefKey()
 {
-    CDBBatch batch{*mempoolTxDB};
+    auto batch = CDBBatch{*mempoolTxDB};
     batch.Erase(DB_MEMPOOL_XREF);
     ++dbWriteCount;
     return mempoolTxDB->WriteBatch(batch, true);
@@ -224,7 +224,7 @@ bool CMempoolTxDB::Commit(const Batch& batch)
     const auto prevDiskUsage = diskUsage.fetch_add(diskUsageDiff);
     const auto prevTxCount = txCount.fetch_add(txCountDiff);
 
-    CDBBatch coalesced {*mempoolTxDB};
+    auto coalesced = CDBBatch{*mempoolTxDB};
     for (const auto& e : batch.adds)
     {
         coalesced.Write(std::make_pair(DB_TRANSACTIONS, e.first), e.second.tx);
@@ -454,7 +454,7 @@ void CAsyncMempoolTxDB::Work()
     {
         std::deque<Task> tasks;
         {
-            std::unique_lock<std::mutex> taskLock(taskListGuard);
+            std::unique_lock<std::mutex> taskLock{taskListGuard};
             while (taskList.size() == 0)
             {
                 taskListSignal.wait(taskLock);
