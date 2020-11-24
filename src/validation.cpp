@@ -2295,8 +2295,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     const CDiskBlockPos& pos, bool calculateDiskBlockMetadata)
 {
-    std::unique_ptr<FILE, CCloseFile> file{
-        CDiskFiles::OpenBlockFile(pos, true)};
+    UniqueCFile file{ CDiskFiles::OpenBlockFile(pos, true) };
 
     if (!file)
     {
@@ -2392,8 +2391,7 @@ std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
 {
     AssertLockHeld(cs_main);
 
-    std::unique_ptr<FILE, CCloseFile> file{
-        CDiskFiles::OpenBlockFile(index.GetBlockPos(), true)};
+    UniqueCFile file{ CDiskFiles::OpenBlockFile(index.GetBlockPos(), true) };
 
     if (!file)
     {
@@ -2425,8 +2423,7 @@ std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& ind
 {
     AssertLockHeld(cs_main);
 
-    std::unique_ptr<FILE, CCloseFile> file{
-        CDiskFiles::OpenBlockFile(index.GetBlockPos(), true)};
+    UniqueCFile file{ CDiskFiles::OpenBlockFile(index.GetBlockPos(), true) };
 
     if (!file)
     {

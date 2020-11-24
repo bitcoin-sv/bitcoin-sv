@@ -6,6 +6,7 @@
 #ifndef BITCOIN_STREAMS_H
 #define BITCOIN_STREAMS_H
 
+#include "cfile_util.h"
 #include "serialize.h"
 #include "support/allocators/zeroafterfree.h"
 
@@ -410,28 +411,33 @@ public:
  */
 class CAutoFile {
 private:
-    // Disallow copies
-    CAutoFile(const CAutoFile &);
-    CAutoFile &operator=(const CAutoFile &);
+    int nType;
+    int nVersion;
 
-    const int nType;
-    const int nVersion;
-
-    FILE *file;
+    UniqueCFile file;
 
 public:
-    CAutoFile(FILE *filenew, int nTypeIn, int nVersionIn)
-        : nType(nTypeIn), nVersion(nVersionIn) {
-        file = filenew;
-    }
+    CAutoFile(UniqueCFile filenew, int nTypeIn, int nVersionIn)
+        : nType(nTypeIn)
+        , nVersion(nVersionIn)
+        , file{ std::move(filenew) }
+    {}
 
-    ~CAutoFile() { fclose(); }
+    CAutoFile(FILE *filenew, int nTypeIn, int nVersionIn)
+        : nType(nTypeIn)
+        , nVersion(nVersionIn)
+        , file{ filenew }
+    {}
+
+    CAutoFile(CAutoFile&&) = default;
+    CAutoFile& operator=(CAutoFile&&) = default;
+
+    // Disallow copies
+    CAutoFile(const CAutoFile &) = delete;
+    CAutoFile &operator=(const CAutoFile &) = delete;
 
     void fclose() {
-        if (file) {
-            ::fclose(file);
-            file = nullptr;
-        }
+        file.reset();
     }
 
     /**
@@ -440,18 +446,14 @@ public:
      * responsibility of the caller of this function to clean up the returned
      * FILE*.
      */
-    FILE *release() {
-        FILE *ret = file;
-        file = nullptr;
-        return ret;
-    }
+    FILE *release() { return file.release(); }
 
     /**
      * Get wrapped FILE* without transfer of ownership.
      * @note Ownership of the FILE* will remain with this class. Use this only
      * if the scope of the CAutoFile outlives use of the passed pointer.
      */
-    FILE *Get() const { return file; }
+    FILE *Get() const { return file.get(); }
 
     /** Return true if the wrapped FILE* is nullptr, false otherwise. */
     bool IsNull() const { return (file == nullptr); }
@@ -466,8 +468,8 @@ public:
         if (!file)
             throw std::ios_base::failure(
                 "CAutoFile::read: file handle is nullptr");
-        if (fread(pch, 1, nSize, file) != nSize)
-            throw std::ios_base::failure(feof(file)
+        if (fread(pch, 1, nSize, file.get()) != nSize)
+            throw std::ios_base::failure(feof(file.get())
                                              ? "CAutoFile::read: end of file"
                                              : "CAutoFile::read: fread failed");
     }
@@ -479,9 +481,9 @@ public:
         uint8_t data[4096];
         while (nSize > 0) {
             size_t nNow = std::min<size_t>(nSize, sizeof(data));
-            if (fread(data, 1, nNow, file) != nNow)
+            if (fread(data, 1, nNow, file.get()) != nNow)
                 throw std::ios_base::failure(
-                    feof(file) ? "CAutoFile::ignore: end of file"
+                    feof(file.get()) ? "CAutoFile::ignore: end of file"
                                : "CAutoFile::read: fread failed");
             nSize -= nNow;
         }
@@ -491,7 +493,7 @@ public:
         if (!file)
             throw std::ios_base::failure(
                 "CAutoFile::write: file handle is nullptr");
-        if (fwrite(pch, 1, nSize, file) != nSize)
+        if (fwrite(pch, 1, nSize, file.get()) != nSize)
             throw std::ios_base::failure("CAutoFile::write: write failed");
     }
 
@@ -528,11 +530,8 @@ private:
     CBufferedFile(const CBufferedFile &);
     CBufferedFile &operator=(const CBufferedFile &);
 
-    const int nType;
-    const int nVersion;
-
     // source file
-    FILE *src;
+    CAutoFile src;
     // how many bytes have been read from source
     uint64_t nSrcPos;
     // how many bytes have been read from this
@@ -552,10 +551,10 @@ protected:
         unsigned int nAvail = vchBuf.size() - (nSrcPos - nReadPos) - nRewind;
         if (nAvail < readNow) readNow = nAvail;
         if (readNow == 0) return false;
-        size_t read = fread((void *)&vchBuf[pos], 1, readNow, src);
+        size_t read = fread((void *)&vchBuf[pos], 1, readNow, src.Get());
         if (read == 0) {
             throw std::ios_base::failure(
-                feof(src) ? "CBufferedFile::Fill: end of file"
+                feof(src.Get()) ? "CBufferedFile::Fill: end of file"
                           : "CBufferedFile::Fill: fread failed");
         } else {
             nSrcPos += read;
@@ -564,27 +563,32 @@ protected:
     }
 
 public:
+    CBufferedFile( CAutoFile&& fileIn, uint64_t nBufSize, uint64_t nRewindIn )
+        : src{ std::move(fileIn) }
+        , nSrcPos(0)
+        , nReadPos(0)
+        , nReadLimit((uint64_t)(-1))
+        , nRewind(nRewindIn)
+        , vchBuf(nBufSize, 0)
+    {}
+
     CBufferedFile(FILE *fileIn, uint64_t nBufSize, uint64_t nRewindIn,
                   int nTypeIn, int nVersionIn)
-        : nType(nTypeIn), nVersion(nVersionIn), nSrcPos(0), nReadPos(0),
-          nReadLimit((uint64_t)(-1)), nRewind(nRewindIn), vchBuf(nBufSize, 0) {
-        src = fileIn;
-    }
+        : src{ fileIn, nTypeIn, nVersionIn }
+        , nSrcPos(0)
+        , nReadPos(0)
+        , nReadLimit((uint64_t)(-1))
+        , nRewind(nRewindIn)
+        , vchBuf(nBufSize, 0)
+    {}
 
-    ~CBufferedFile() { fclose(); }
+    int GetVersion() const { return src.GetVersion(); }
+    int GetType() const { return src.GetType(); }
 
-    int GetVersion() const { return nVersion; }
-    int GetType() const { return nType; }
-
-    void fclose() {
-        if (src) {
-            ::fclose(src);
-            src = nullptr;
-        }
-    }
+    void fclose() { src.fclose(); }
 
     // check whether we're at the end of the source file
-    bool eof() const { return nReadPos == nSrcPos && feof(src); }
+    bool eof() const { return nReadPos == nSrcPos && feof(src.Get()); }
 
     // read a number of bytes
     void read(char *pch, size_t nSize) {
@@ -716,12 +720,6 @@ public:
     virtual CSpan ReadAsync(size_t maxSize) = 0;
 };
 
-// helper function for use with std::unique_ptr to enable RAII file closing
-struct CCloseFile
-{
-    void operator()(FILE* file) { ::fclose(file); }
-};
-
 /**
  * RAII file reader for use with streams that want to take ownership of the
  * underlying FILE pointer. File pointer is closed once the CFileReader instance
@@ -730,7 +728,7 @@ struct CCloseFile
 class CFileReader
 {
 public:
-    CFileReader(std::unique_ptr<FILE, CCloseFile>&& file)
+    CFileReader(UniqueCFile file)
         : mFile{std::move(file)}
     {
         assert(mFile);
@@ -760,7 +758,7 @@ public:
     }
 
 private:
-    std::unique_ptr<FILE, CCloseFile> mFile;
+    UniqueCFile mFile;
 };
 
 /**

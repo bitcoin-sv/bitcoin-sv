@@ -32,7 +32,7 @@
     class CAsyncFileReader
     {
     public:
-        CAsyncFileReader(std::unique_ptr<FILE, CCloseFile>&& file)
+        CAsyncFileReader(UniqueCFile file)
             : mFile{std::move(file)}
         {
             assert(mFile);
@@ -152,7 +152,7 @@
             return aio_error(&controllBlock) != EINPROGRESS;
         }
 
-        std::unique_ptr<FILE, CCloseFile> mFile;
+        UniqueCFile mFile;
         int mFileId;
         size_t mOffset;
 #if !defined(__clang__) && defined(__GNUC__)
