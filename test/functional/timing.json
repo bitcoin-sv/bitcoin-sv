@@ -168,10 +168,6 @@
   "time": 9
  },
  {
-  "name": "mempool_packages.py",
-  "time": 10
- },
- {
   "name": "mempool_persist.py",
   "time": 19
  },

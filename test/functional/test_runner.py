@@ -86,8 +86,6 @@ MEMPOOL_BROKEN_TESTS = frozenset((
     "wallet.py",
     # Caused by removal of ancestor stats checks:
     "bsv-mempool_ancestorsizelimit.py",
-    # Caused by removed descendant stats checks:
-    "mempool_packages.py",      # no exception at tx insert above descendant limits
     # Caused by disabled CTxMemPool::TrimToSize():
     "rawtransactions.py",       # mempool not trimmed to expected size
     "mempool_limit.py",         # tx not evicted for mempool size limit
