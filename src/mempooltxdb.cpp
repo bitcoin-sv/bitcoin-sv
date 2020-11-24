@@ -34,34 +34,35 @@ void CMempoolTxDB::ClearDatabase()
     mempoolTxDB = std::make_unique<CDBWrapper>(dbPath, nCacheSize, fMemory, true);
 }
 
-bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef> &txs)
+bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef>& txs)
 {
-    uint64_t diskUsageAdded = 0;
-    for (const auto& tx : txs)
-    {
-        diskUsageAdded += tx->GetTotalSize();
-    }
     const uint64_t txCountAdded = txs.size();
-    const auto prevDiskUsage = diskUsage.fetch_add(diskUsageAdded);
-    const auto prevTxCount = txCount.fetch_add(txCountAdded);
+    const uint64_t diskUsageAdded = [&txs]() {
+        auto accumulator = decltype(txs[0]->GetTotalSize()){0};
+        for (const auto& tx : txs)
+        {
+            accumulator += tx->GetTotalSize();
+        }
+        return accumulator;
+    }();
 
     auto batch = CDBBatch{*mempoolTxDB};
     for (const auto& tx : txs)
     {
         batch.Write(std::make_pair(DB_TRANSACTIONS, tx->GetId()), tx);
     }
-    batch.Write(DB_DISK_USAGE, prevDiskUsage + diskUsageAdded);
-    batch.Write(DB_TX_COUNT, prevTxCount + txCountAdded);
+    batch.Write(DB_DISK_USAGE, diskUsage.load() + diskUsageAdded);
+    batch.Write(DB_TX_COUNT, txCount.load() + txCountAdded);
     batch.Erase(DB_MEMPOOL_XREF);
 
     ++dbWriteCount;
-    if (!mempoolTxDB->WriteBatch(batch, true))
+    if (mempoolTxDB->WriteBatch(batch, true))
     {
-        diskUsage.fetch_sub(diskUsageAdded);
-        txCount.fetch_sub(txCountAdded);
-        return false;
+        diskUsage.fetch_add(diskUsageAdded);
+        txCount.fetch_add(txCountAdded);
+        return true;
     }
-    return true;
+    return false;
 }
 
 bool CMempoolTxDB::GetTransaction(const uint256 &txid, CTransactionRef &tx)
@@ -85,35 +86,33 @@ bool CMempoolTxDB::TransactionExists(const uint256 &txid)
 }
 
 
-bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& transactionsToRemove)
+bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& txData)
 {
-    const uint64_t txCountRemoved = transactionsToRemove.size();
-    const uint64_t diskUsageRemoved = [&transactionsToRemove]() {
-        auto accumulator = decltype(transactionsToRemove[0].size)(0);
-        for (const auto& td : transactionsToRemove) {
+    const uint64_t txCountRemoved = txData.size();
+    const uint64_t diskUsageRemoved = [&txData]() {
+        auto accumulator = decltype(txData[0].size){0};
+        for (const auto& td : txData) {
             accumulator += td.size;
         }
         return accumulator;
     }();
-    const auto prevDiskUsage = diskUsage.fetch_sub(diskUsageRemoved);
-    const auto prevTxCount = txCount.fetch_sub(txCountRemoved);
 
     auto batch = CDBBatch{*mempoolTxDB};
-    for (const auto& td : transactionsToRemove) {
+    for (const auto& td : txData) {
         batch.Erase(std::make_pair(DB_TRANSACTIONS, td.txid));
     }
-    batch.Write(DB_DISK_USAGE, prevDiskUsage - diskUsageRemoved);
-    batch.Write(DB_TX_COUNT, prevTxCount - txCountRemoved);
+    batch.Write(DB_DISK_USAGE, diskUsage.load() - diskUsageRemoved);
+    batch.Write(DB_TX_COUNT, txCount.load() - txCountRemoved);
     batch.Erase(DB_MEMPOOL_XREF);
 
     ++dbWriteCount;
-    if (!mempoolTxDB->WriteBatch(batch, true))
+    if (mempoolTxDB->WriteBatch(batch, true))
     {
-        diskUsage.fetch_add(diskUsageRemoved);
-        txCount.fetch_add(txCountRemoved);
-        return false;
+        diskUsage.fetch_sub(diskUsageRemoved);
+        txCount.fetch_sub(txCountRemoved);
+        return true;
     }
-    return true;
+    return false;
 }
 
 uint64_t CMempoolTxDB::GetDiskUsage()
