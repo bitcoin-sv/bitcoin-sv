@@ -23,7 +23,12 @@
 #include <variant>
 #include <vector>
 
-/** Read-only access to transactions in the database. */
+/**
+ * Read-only access to transactions in the database.
+ *
+ * The methods exposed by this class are safe to use from multiple threads
+ * without synchronization.
+ */
 class CMempoolTxDBReader {
 public:
     virtual ~CMempoolTxDBReader() = default;
@@ -31,7 +36,16 @@ public:
     virtual bool TransactionExists(const uint256 &txid) = 0;
 };
 
-/** Access to the mempool transaction database (mempoolTxs/) */
+/**
+ * Access to the mempool transaction database (mempoolTxDB).
+ *
+ * Objects of this class should be used in a single-threaded context, otherwise
+ * internal accounting will not be consistent. The exceptions to this rule are:
+ * <ul>
+ *  <li>Methods from the base @ref CMempoolTxDBReader that are implemented here;</li>
+ *  <li>GetDiskUsage(), GetTxCount() and GetWriteCount().</li>
+ * </ul>
+ */
 class CMempoolTxDB : public CMempoolTxDBReader {
 private:
     // Prefix to store map of Transaction values with txid as a key
