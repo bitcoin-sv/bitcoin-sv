@@ -644,13 +644,15 @@ private:
             && mValidationCompletionTime == SteadyClockTimePoint::max();
     }
 
-    CDiskBlockPos GetUndoPos() const
+    CDiskBlockPos GetUndoPosNL() const
     {
        if (nStatus.hasUndo()) {
             return { nFile, nUndoPos };
         }
         return {};
     }
+
+    mutable std::mutex blockIndexMutex;
 };
 
 /**

@@ -126,8 +126,10 @@ const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
 
 std::optional<CBlockUndo> CBlockIndex::GetBlockUndo() const
 {
+    std::lock_guard lock{ blockIndexMutex };
+
     std::optional<CBlockUndo> blockUndo{ CBlockUndo{} };
-    CDiskBlockPos pos = GetUndoPos();
+    CDiskBlockPos pos = GetUndoPosNL();
 
     if (pos.IsNull())
     {
@@ -149,9 +151,10 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
                             bool fCheckForPruning, const Config &config,
                             std::set<CBlockIndex *, CBlockIndexWorkComparator> &setBlockIndexCandidates)
 {
-    if (GetUndoPos().IsNull() ||
+    std::lock_guard lock{ blockIndexMutex };
+    if (GetUndoPosNL().IsNull() ||
         !IsValid(BlockValidity::SCRIPTS)) {
-        if (GetUndoPos().IsNull()) {
+        if (GetUndoPosNL().IsNull()) {
             CDiskBlockPos _pos;
             if (!pBlockFileInfoStore->FindUndoPos(
                     state, nFile, _pos,
@@ -185,8 +188,9 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
 
 bool CBlockIndex::verifyUndoValidity()
 {
+    std::lock_guard lock{ blockIndexMutex };
     CBlockUndo undo;
-    CDiskBlockPos pos = GetUndoPos();
+    CDiskBlockPos pos = GetUndoPosNL();
     if (!pos.IsNull()) {
         if (!BlockFileAccess::UndoReadFromDisk(undo, pos,
                               pprev->GetBlockHash())) {
@@ -202,6 +206,7 @@ bool CBlockIndex::verifyUndoValidity()
 bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
                        const Config &config) const
 {
+    std::lock_guard lock{ blockIndexMutex };
     if (!BlockFileAccess::ReadBlockFromDisk(block, GetBlockPos(), config))
     {
         return false;

@@ -99,12 +99,13 @@ static struct {
     {2, 0xbbbeb305}, {2, 0xfe1c810a},
 };
 
-CBlockIndex CreateBlockIndex(int32_t nHeight) {
-    CBlockIndex index;
-    index.nHeight = nHeight;
-    index.pprev = chainActive.Tip();
+static std::unique_ptr<CBlockIndex> CreateBlockIndex(int32_t nHeight) {
+    auto index = std::make_unique<CBlockIndex>();
+    index->nHeight = nHeight;
+    index->pprev = chainActive.Tip();
     return index;
 }
+
 
 bool TestSequenceLocks(const CTransaction &tx, const Config& config, int flags) {
     CoinsDBView view{ *pcoinsTip };
@@ -442,7 +443,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     // Sequence locks pass on 2nd block.
     BOOST_CHECK(
         SequenceLocks(CTransaction(tx), flags, &prevheights,
-                      CreateBlockIndex(chainActive.Tip()->nHeight + 2)));
+                      *CreateBlockIndex(chainActive.Tip()->nHeight + 2)));
 
     // Relative time locked.
     tx.vin[0].prevout = COutPoint(txFirst[1]->GetId(), 0);
@@ -480,7 +481,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     // Sequence locks pass 512 seconds later.
     BOOST_CHECK(
         SequenceLocks(CTransaction(tx), flags, &prevheights,
-                      CreateBlockIndex(chainActive.Tip()->nHeight + 1)));
+                      *CreateBlockIndex(chainActive.Tip()->nHeight + 1)));
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Undo tricked MTP.
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime -=
