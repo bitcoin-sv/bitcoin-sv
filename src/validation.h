@@ -957,9 +957,6 @@ public:
     const CTransaction* GetTransaction() const { return ptxTo; }
 };
 
-/** Functions for disk access for blocks */
-bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
-                       const Config &config);
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata=false);
 std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(

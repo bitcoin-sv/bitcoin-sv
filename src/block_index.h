@@ -12,10 +12,15 @@
 #include "primitives/block.h"
 #include "uint256.h"
 #include "logging.h"
+#include "undo.h"
+#include "protocol.h"
+#include "streams.h"
 #include <chrono>
 #include <shared_mutex>
 #include <unordered_map>
 #include <vector>
+
+struct CBlockIndexWorkComparator;
 
 /**
  * Maximum amount of time that a block timestamp is allowed to exceed the
@@ -206,6 +211,8 @@ arith_uint256 GetBlockProof(const CBlockIndex &block);
  */
 class CBlockIndex {
 public:
+    template<typename T> struct UnitTestAccess;
+
     //! pointer to the hash of the block, if any. Memory is owned by this
     //! CBlockIndex
     const uint256 *phashBlock;
@@ -595,6 +602,17 @@ public:
     CBlockIndex *GetAncestor(int32_t height);
     const CBlockIndex *GetAncestor(int32_t height) const;
 
+    std::optional<CBlockUndo> GetBlockUndo() const;
+
+    bool writeUndoToDisk(CValidationState &state, const CBlockUndo &blockundo,
+                            bool fCheckForPruning, const Config &config,
+                            std::set<CBlockIndex *, CBlockIndexWorkComparator> &setBlockIndexCandidates);
+
+    bool verifyUndoValidity();
+
+    bool ReadBlockFromDisk(CBlock &block,
+                            const Config &config) const;
+
 protected:
     CDiskBlockMetaData mDiskBlockMetaData;
 
@@ -805,5 +823,8 @@ struct CBlockIndexWorkComparator {
         return false;
     }
 };
+
+/** Dirty block index entries. */
+extern std::set<CBlockIndex *> setDirtyBlockIndex;
 
 #endif

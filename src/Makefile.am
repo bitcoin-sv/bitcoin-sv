@@ -74,6 +74,7 @@ endif
 .PHONY: FORCE check-symbols check-security
 # bitcoin core #
 BITCOIN_CORE_H = \
+  abort_node.h \
   addrdb.h \
   addrman.h \
   async_file_reader.h \
@@ -255,6 +256,7 @@ libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
+  abort_node.cpp \
   addrman.cpp \
   addrdb.cpp \
   bloom.cpp \
@@ -301,6 +303,7 @@ libbitcoin_server_a_SOURCES = \
   policy/fees.cpp \
   policy/policy.cpp \
   pow.cpp \
+  processing_block_index.cpp \
   rest.cpp \
   rpc/abc.cpp \
   rpc/blockchain.cpp \

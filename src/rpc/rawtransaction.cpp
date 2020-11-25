@@ -280,7 +280,7 @@ static CBlockIndex* GetBlockIndex(const Config& config,
             // Check if all provided transactions are in the block
             CBlock block;
             bool allTxIdsFound = false;
-            if (ReadBlockFromDisk(block, pblockindex, config))
+            if (pblockindex->ReadBlockFromDisk(block, config))
             {
                 auto numberOfTxIdsFound = decltype(setTxIds.size()){0};
                 for (const auto &tx : block.vtx)

@@ -5,6 +5,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "validation.h"
+#include "abort_node.h"
 #include "arith_uint256.h"
 #include "async_file_reader.h"
 #include "blockstreams.h"
@@ -27,6 +28,7 @@
 #include "pow.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
+#include "processing_block_index.h"
 #include "script/scriptcache.h"
 #include "script/sigcache.h"
 #include "script/standard.h"
@@ -180,9 +182,6 @@ int32_t nBlockSequenceId = 1;
 int32_t nBlockReverseSequenceId = -1;
 /** chainwork for the last block that preciousblock has been applied to. */
 arith_uint256 nLastPreciousChainwork = 0;
-
-/** Dirty block index entries. */
-std::set<CBlockIndex *> setDirtyBlockIndex;
 
 } // namespace
 
@@ -2147,22 +2146,6 @@ void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData me
     }
 }
 
-bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
-                       const Config &config) {
-    if (!BlockFileAccess::ReadBlockFromDisk(block, pindex->GetBlockPos(), config))
-    {
-        return false;
-    }
-
-    if (block.GetHash() != pindex->GetBlockHash()) {
-        return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() "
-                     "doesn't match index for %s at %s",
-                     pindex->ToString(), pindex->GetBlockPos().ToString());
-    }
-
-    return true;
-}
-
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata)
 {
@@ -2992,30 +2975,6 @@ std::optional<bool> CheckInputs(
     return true;
 }
 
-namespace {
-
-/** Abort with a message */
-bool AbortNode(const std::string &strMessage,
-               const std::string &userMessage = "") {
-    SetMiscWarning(strMessage);
-    LogPrintf("*** %s\n", strMessage);
-    uiInterface.ThreadSafeMessageBox(
-        userMessage.empty() ? _("Error: A fatal internal error occurred, see "
-                                "bitcoind.log for details")
-                            : userMessage,
-        "", CClientUIInterface::MSG_ERROR);
-    StartShutdown();
-    return false;
-}
-
-bool AbortNode(CValidationState &state, const std::string &strMessage,
-               const std::string &userMessage = "") {
-    AbortNode(strMessage, userMessage);
-    return state.Error(strMessage);
-}
-
-} // namespace
-
 /** Restore the UTXO in a Coin at a given COutPoint. */
 DisconnectResult UndoCoinSpend(const CoinWithScript &undo, CCoinsViewCache &view,
                                const COutPoint &out, const Config &config) {
@@ -3031,99 +2990,6 @@ DisconnectResult UndoCoinSpend(const CoinWithScript &undo, CCoinsViewCache &view
     // we have queried for that above using HaveCoin, we don't need to guess.
     // When fClean is false, a coin already existed and it is an overwrite.
     view.AddCoin(out, undo.MakeOwning(), !fClean, config.GetGenesisActivationHeight());
-
-    return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
-}
-
-/**
- * Undo the effects of this block (with given index) on the UTXO set represented
- * by coins. When FAILED is returned, view is left in an indeterminate state.
- */
-static DisconnectResult DisconnectBlock(const CBlock &block,
-                                        const CBlockIndex *pindex,
-                                        CCoinsViewCache &view,
-                                        const task::CCancellationToken& shutdownToken) {
-    CBlockUndo blockUndo;
-    CDiskBlockPos pos = pindex->GetUndoPos();
-    if (pos.IsNull()) {
-        error("DisconnectBlock(): no undo data available");
-        return DISCONNECT_FAILED;
-    }
-
-    if (!BlockFileAccess::UndoReadFromDisk(blockUndo, pos, pindex->pprev->GetBlockHash()))
-    {
-        error("DisconnectBlock(): failure reading undo data");
-        return DISCONNECT_FAILED;
-    }
-
-    return ApplyBlockUndo(blockUndo, block, pindex, view, shutdownToken);
-}
-
-DisconnectResult ApplyBlockUndo(const CBlockUndo &blockUndo,
-                                const CBlock &block, const CBlockIndex *pindex,
-                                CCoinsViewCache &view,
-                                const task::CCancellationToken& shutdownToken) {
-    bool fClean = true;
-
-    if (blockUndo.vtxundo.size() + 1 != block.vtx.size()) {
-        error("DisconnectBlock(): block and undo data inconsistent");
-        return DISCONNECT_FAILED;
-    }
-
-    // Undo transactions in reverse order.
-    size_t i = block.vtx.size();
-    while (i-- > 0) {
-
-        if (shutdownToken.IsCanceled())
-        {
-            return DISCONNECT_FAILED;
-        }
-
-        const CTransaction &tx = *(block.vtx[i]);
-        uint256 txid = tx.GetId();
-
-        Config &config = GlobalConfig::GetConfig();
-        // Check that all outputs are available and match the outputs in the
-        // block itself exactly.
-        for (size_t o = 0; o < tx.vout.size(); o++) {
-            if (tx.vout[o].scriptPubKey.IsUnspendable(IsGenesisEnabled(config, pindex->nHeight))) {
-                continue;
-            }
-
-            COutPoint out(txid, o);
-            CoinWithScript coin;
-            bool is_spent = view.SpendCoin(out, &coin);
-            if (!is_spent || tx.vout[o] != coin.GetTxOut()) {
-                // transaction output mismatch
-                fClean = false;
-            }
-        }
-
-        // Restore inputs.
-        if (i < 1) {
-            // Skip the coinbase.
-            continue;
-        }
-
-        const CTxUndo &txundo = blockUndo.vtxundo[i - 1];
-        if (txundo.vprevout.size() != tx.vin.size()) {
-            error("DisconnectBlock(): transaction and undo data inconsistent");
-            return DISCONNECT_FAILED;
-        }
-
-        for (size_t j = tx.vin.size(); j-- > 0;) {
-            const COutPoint &out = tx.vin[j].prevout;
-            const CoinWithScript &undo = txundo.vprevout[j];
-            DisconnectResult res = UndoCoinSpend(undo, view, out, config);
-            if (res == DISCONNECT_FAILED) {
-                return DISCONNECT_FAILED;
-            }
-            fClean = fClean && res != DISCONNECT_UNCLEAN;
-        }
-    }
-
-    // Move best block pointer to previous block.
-    view.SetBestBlock(block.hashPrevBlock);
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
@@ -3640,33 +3506,10 @@ static bool ConnectBlock(
     }
 
     // Write undo information to disk
-    if (pindex->GetUndoPos().IsNull() ||
-        !pindex->IsValid(BlockValidity::SCRIPTS)) {
-        if (pindex->GetUndoPos().IsNull()) {
-            CDiskBlockPos _pos;
-            if (!pBlockFileInfoStore->FindUndoPos(
-                    state, pindex->nFile, _pos,
-                    ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) +
-                        40, fCheckForPruning)) {
-                return error("ConnectBlock(): FindUndoPos failed");
-            }
-            if (!BlockFileAccess::UndoWriteToDisk(blockundo, _pos, pindex->pprev->GetBlockHash(),
-                                 config.GetChainParams().DiskMagic())) {
-                return AbortNode(state, "Failed to write undo data");
-            }
-
-            // update nUndoPos in block index
-            pindex->nUndoPos = _pos.Pos();
-            pindex->nStatus = pindex->nStatus.withUndo();
-        }
-
-        // since we are changing validation time we need to update
-        // setBlockIndexCandidates as well - it sorts by that time
-        setBlockIndexCandidates.erase(pindex);
-        pindex->RaiseValidity(BlockValidity::SCRIPTS);
-        setBlockIndexCandidates.insert(pindex);
-
-        setDirtyBlockIndex.insert(pindex);
+    if (!pindex->writeUndoToDisk(state, blockundo, fCheckForPruning, config, setBlockIndexCandidates))
+    {
+        // Failed to write undo data.
+        return false;
     }
 
     if (fTxIndex && !pblocktree->WriteTxIndex(vPos)) {
@@ -3953,7 +3796,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     // Read block from disk.
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     CBlock &block = *pblock;
-    if (!ReadBlockFromDisk(block, pindexDelete, config)) {
+    if (!pindexDelete->ReadBlockFromDisk(block, config)) {
         return AbortNode(state, "Failed to read block");
     }
 
@@ -3962,7 +3805,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     {
         CoinsDBSpan pCoinsTipSpan{ *pcoinsTip };
         assert(pCoinsTipSpan.GetBestBlock() == pindexDelete->GetBlockHash());
-        if (DisconnectBlock(block, pindexDelete, pCoinsTipSpan, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
+        if (ProcessingBlockIndex(const_cast<CBlockIndex&>(*pindexDelete)).DisconnectBlock(block, pCoinsTipSpan, task::CCancellationSource::Make()->GetToken()) != DISCONNECT_OK) {
             return error("DisconnectTip(): DisconnectBlock %s failed",
                          pindexDelete->GetBlockHash().ToString());
         }
@@ -4132,7 +3975,7 @@ static bool ConnectTip(
     std::shared_ptr<const CBlock> pthisBlock;
     if (!pblock) {
         std::shared_ptr<CBlock> pblockNew = std::make_shared<CBlock>();
-        if (!ReadBlockFromDisk(*pblockNew, pindexNew, config)) {
+        if (!pindexNew->ReadBlockFromDisk(*pblockNew, config)) {
             return AbortNode(state, "Failed to read block");
         }
         pthisBlock = pblockNew;
@@ -6520,7 +6363,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
         CBlock block;
 
         // check level 0: read from disk
-        if (!ReadBlockFromDisk(block, pindex, config)) {
+        if (!pindex->ReadBlockFromDisk(block, config)) {
             return error(
                 "VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s",
                 pindex->nHeight, pindex->GetBlockHash().ToString());
@@ -6546,15 +6389,9 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
 
         // check level 2: verify undo validity
         if (nCheckLevel >= 2 && pindex) {
-            CBlockUndo undo;
-            CDiskBlockPos pos = pindex->GetUndoPos();
-            if (!pos.IsNull()) {
-                if (!BlockFileAccess::UndoReadFromDisk(undo, pos,
-                                      pindex->pprev->GetBlockHash())) {
-                    return error(
-                        "VerifyDB(): *** found bad undo data at %d, hash=%s\n",
-                        pindex->nHeight, pindex->GetBlockHash().ToString());
-                }
+            if (!pindex->verifyUndoValidity())
+            {
+                return false;
             }
         }
 
@@ -6569,7 +6406,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
             (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <=
                 nCoinCacheUsage) {
             assert(coins.GetBestBlock() == pindex->GetBlockHash());
-            DisconnectResult res = DisconnectBlock(block, pindex, coins, shutdownToken);
+            DisconnectResult res = ProcessingBlockIndex(*pindex).DisconnectBlock(block, coins, shutdownToken);
             if (res == DISCONNECT_FAILED && !shutdownToken.IsCanceled()) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in "
                              "block data at %d, hash=%s",
@@ -6610,7 +6447,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                                               (double)nCheckDepth * 50))));
             pindex = chainActive.Next(pindex);
             CBlock block;
-            if (!ReadBlockFromDisk(block, pindex, config)) {
+            if (!pindex->ReadBlockFromDisk(block, config)) {
                 return error(
                     "VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s",
                     pindex->nHeight, pindex->GetBlockHash().ToString());
@@ -6711,7 +6548,7 @@ bool ReplayBlocks(const Config &config, CoinsDB& view) {
         if (pindexOld->nHeight > 0) {
             // Never disconnect the genesis block.
             CBlock block;
-            if (!ReadBlockFromDisk(block, pindexOld, config)) {
+            if (!pindexOld->ReadBlockFromDisk(block, config)) {
                 return error("RollbackBlock(): ReadBlockFromDisk() failed at "
                              "%d, hash=%s",
                              pindexOld->nHeight,
@@ -6720,7 +6557,7 @@ bool ReplayBlocks(const Config &config, CoinsDB& view) {
             LogPrintf("Rolling back %s (%i)\n",
                       pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
             // Use new private CancellationSource that can not be cancelled
-            DisconnectResult res = DisconnectBlock(block, pindexOld, cache, task::CCancellationSource::Make()->GetToken());
+            DisconnectResult res = ProcessingBlockIndex(const_cast<CBlockIndex&>(*pindexOld)).DisconnectBlock(block, cache, task::CCancellationSource::Make()->GetToken());
             if (res == DISCONNECT_FAILED) {
                 return error(
                     "RollbackBlock(): DisconnectBlock failed at %d, hash=%s",

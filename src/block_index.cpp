@@ -3,6 +3,15 @@
 
 #include "block_index.h"
 
+#include "block_file_access.h"
+#include "blockfileinfostore.h"
+#include "config.h"
+#include "clientversion.h"
+#include "warnings.h"
+#include "abort_node.h"
+
+std::set<CBlockIndex *> setDirtyBlockIndex;
+
 /** Turn the lowest '1' bit in the binary representation of a number into a '0'.
  */
 static inline int InvertLowestOne(int n) {
@@ -113,4 +122,118 @@ const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
     // Eventually all chain branches meet at the genesis block.
     assert(pa == pb);
     return pa;
+}
+
+static std::optional<CBlockUndo> GetBlockUndo(const CBlockIndex *pindex)
+{
+
+    std::optional<CBlockUndo> blockUndo{ CBlockUndo{} };
+    CDiskBlockPos pos = pindex->GetUndoPos();
+
+    if (pos.IsNull())
+    {
+        error("DisconnectBlock(): no undo data available");
+        return std::nullopt;
+    }
+
+    if (!BlockFileAccess::UndoReadFromDisk(blockUndo.value(), pos, pindex->pprev->GetBlockHash()))
+    {
+        error("DisconnectBlock(): failure reading undo data");
+        return std::nullopt;
+    }
+
+    return blockUndo;
+}
+
+std::optional<CBlockUndo> CBlockIndex::GetBlockUndo() const
+{
+    return ::GetBlockUndo(this);
+}
+
+static bool writeUndoToDisk(CBlockIndex *pindex, CValidationState &state, const CBlockUndo &blockundo,
+                            bool fCheckForPruning, const Config &config,
+                            std::set<CBlockIndex *, CBlockIndexWorkComparator> &setBlockIndexCandidates)
+{
+    if (pindex->GetUndoPos().IsNull() ||
+        !pindex->IsValid(BlockValidity::SCRIPTS)) {
+        if (pindex->GetUndoPos().IsNull()) {
+            CDiskBlockPos _pos;
+            if (!pBlockFileInfoStore->FindUndoPos(
+                    state, pindex->nFile, _pos,
+                    ::GetSerializeSize(blockundo, SER_DISK, CLIENT_VERSION) +
+                        40, fCheckForPruning)) {
+                return error("CBlockIndex: FindUndoPos failed");
+            }
+            if (!BlockFileAccess::UndoWriteToDisk(blockundo, _pos, pindex->pprev->GetBlockHash(),
+                                 config.GetChainParams().DiskMagic())) {
+                return AbortNode(state, "Failed to write undo data");
+            }
+
+            // update nUndoPos in block index
+            pindex->nUndoPos = _pos.Pos();
+            pindex->nStatus = pindex->nStatus.withUndo();
+        }
+
+        // since we are changing validation time we need to update
+        // setBlockIndexCandidates as well - it sorts by that time
+        setBlockIndexCandidates.erase(pindex);
+
+        pindex->RaiseValidity(BlockValidity::SCRIPTS);
+        setBlockIndexCandidates.insert(pindex);
+
+        setDirtyBlockIndex.insert(pindex);
+    }
+
+    return true;
+}
+
+bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blockundo,
+                            bool fCheckForPruning, const Config &config,
+                            std::set<CBlockIndex *, CBlockIndexWorkComparator> &setBlockIndexCandidates)
+{
+    return ::writeUndoToDisk(this, state, blockundo, fCheckForPruning, config, setBlockIndexCandidates);
+}
+
+static bool verifyUndoValidity(CBlockIndex *pindex)
+{
+    CBlockUndo undo;
+    CDiskBlockPos pos = pindex->GetUndoPos();
+    if (!pos.IsNull()) {
+        if (!BlockFileAccess::UndoReadFromDisk(undo, pos,
+                              pindex->pprev->GetBlockHash())) {
+            return error(
+                "VerifyDB(): *** found bad undo data at %d, hash=%s\n",
+                pindex->nHeight, pindex->GetBlockHash().ToString());
+        }
+    }
+
+    return true;
+}
+
+bool CBlockIndex::verifyUndoValidity()
+{
+    return ::verifyUndoValidity(this);
+}
+
+static bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
+                       const Config &config)
+{
+    if (!BlockFileAccess::ReadBlockFromDisk(block, pindex->GetBlockPos(), config))
+    {
+        return false;
+    }
+
+    if (block.GetHash() != pindex->GetBlockHash()) {
+        return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() "
+                     "doesn't match index for %s at %s",
+                     pindex->ToString(), pindex->GetBlockPos().ToString());
+    }
+
+    return true;
+}
+
+bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
+                       const Config &config) const
+{
+    return ::ReadBlockFromDisk(block, this, config);
 }
