@@ -129,7 +129,7 @@ class JournalReorg(BitcoinTestFramework):
             self.mine_big_txns(node)
 
         # Reconnect nodes
-        connect_nodes(self.nodes[0], 1)
+        connect_nodes(self.nodes, 0, 1)
 
         # Force a reorg
         self.nodes[0].generate(1)

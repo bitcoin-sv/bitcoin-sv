@@ -61,7 +61,7 @@ class P2PConnections(BitcoinTestFramework):
         # Remake disconnected connections
         for node1, disconnects in self.disconnections.items():
             for node2 in disconnects:
-                connect_nodes(self.nodes[node1], node2)
+                connect_nodes(self.nodes, node1, node2)
 
         # Reset map of disconnections to empty
         self.clear_disconnections()

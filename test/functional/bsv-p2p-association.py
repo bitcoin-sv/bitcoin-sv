@@ -8,8 +8,9 @@ Test association and stream handling within P2P.
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.mininode import (create_association_id, msg_createstream, mininode_lock,
-    NetworkThread, NodeConn, NodeConnCB, wait_until, StreamType)
+    NetworkThread, NodeConn, NodeConnCB, wait_until)
 from test_framework.util import assert_equal, connect_nodes, p2p_port
+from test_framework.streams import StreamType
 import time
 
 class TestNode(NodeConnCB):
@@ -420,7 +421,7 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
 
         # Connect 2 nodes and check they establish the expected streams
-        connect_nodes(self.nodes[0], 1)
+        connect_nodes(self.nodes, 0, 1)
         expected0 = [
                 {
                     'id'           : 0,                                 # oldStyleConn
@@ -459,7 +460,7 @@ class P2PAssociation(BitcoinTestFramework):
         wait_until(lambda: self.check_peer_info(self.nodes[1], expected1), timeout=5)
 
         # Connect 2 nodes, one of which has streams disabled, and check they establish the expected streams
-        connect_nodes(self.nodes[0], 2)
+        connect_nodes(self.nodes, 0, 2)
         expected0 = [
                 {
                     'id'           : 0,                                 # oldStyleConn
@@ -532,7 +533,7 @@ class P2PAssociation(BitcoinTestFramework):
         assert_equal(self.nodes[3].getnetworkinfo()["streampolicies"], "Default")
 
         # Connect the new node to one of the existing nodes and check that they establish a Default association
-        connect_nodes(self.nodes[1], 3)
+        connect_nodes(self.nodes, 1, 3)
         expected1 = [
                 {
                     'id'           : 0,                                 # An association to node0
