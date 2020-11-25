@@ -117,46 +117,6 @@ public:
     };
 };
 
-struct CBlockIndexWorkComparator {
-    bool operator()(const CBlockIndex *pa, const CBlockIndex *pb) const {
-        // First sort by most total work, ...
-        if (pa->nChainWork > pb->nChainWork) {
-            return false;
-        }
-        if (pa->nChainWork < pb->nChainWork) {
-            return true;
-        }
-
-        // ... then by when block was completely validated, ...
-        if (pa->GetValidationCompletionTime() < pb->GetValidationCompletionTime()) {
-            return false;
-        }
-        if (pa->GetValidationCompletionTime() > pb->GetValidationCompletionTime()) {
-            return true;
-        }
-
-        // ... then by earliest time received, ...
-        if (pa->nSequenceId < pb->nSequenceId) {
-            return false;
-        }
-        if (pa->nSequenceId > pb->nSequenceId) {
-            return true;
-        }
-
-        // Use pointer address as tie breaker (should only happen with blocks
-        // loaded from disk, as those all have id 0 and validation time 0).
-        if (pa < pb) {
-            return false;
-        }
-        if (pa > pb) {
-            return true;
-        }
-
-        // Identical blocks.
-        return false;
-    }
-};
-
 /**
  * Class for counting the amount of blocks being processed.
  */

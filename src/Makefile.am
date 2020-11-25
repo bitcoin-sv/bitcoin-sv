@@ -79,6 +79,7 @@ BITCOIN_CORE_H = \
   async_file_reader.h \
   base58.h \
   bloom.h \
+  block_index.h \
   blockencodings.h \
   blockfileinfostore.h \
   block_file_access.h \
@@ -257,6 +258,7 @@ libbitcoin_server_a_SOURCES = \
   addrman.cpp \
   addrdb.cpp \
   bloom.cpp \
+  block_index.cpp \
   blockencodings.cpp \
   block_file_info.cpp \
   blockfileinfostore.cpp \

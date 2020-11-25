@@ -366,6 +366,7 @@ add_library(server
 	block_file_access.cpp
 	block_file_access.h
 	block_file_info.cpp
+	block_index.cpp
 	blockencodings.cpp
 	blockencodings.h
 	blockfileinfostore.cpp
