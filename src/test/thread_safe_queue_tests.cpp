@@ -150,12 +150,12 @@ BOOST_AUTO_TEST_CASE(fill_replace)
     CThreadSafeQueue<int> theQueue(5, 1);
 
     // Fill the queue
-    BOOST_CHECK(theQueue.FillWait(std::initializer_list<int>{0, 1, 2, 3, 4}));
+    BOOST_CHECK(theQueue.PushManyWait(std::initializer_list<int>{0, 1, 2, 3, 4}));
     BOOST_CHECK(get_Size(theQueue) == 5);
     BOOST_CHECK(!theQueue.PushNoWait(99));
 
     // Replace the contents of the queue
-    BOOST_CHECK(theQueue.ReplaceWait(std::initializer_list<int>{5, 6, 7, 8, 9}));
+    BOOST_CHECK(theQueue.ReplaceContent(std::initializer_list<int>{5, 6, 7, 8, 9}));
     BOOST_CHECK(get_Size(theQueue) == 5);
     BOOST_CHECK(!theQueue.PushNoWait(99));
 
@@ -165,7 +165,7 @@ BOOST_AUTO_TEST_CASE(fill_replace)
         std::async(std::launch::async,
                    [&theQueue]()
                    {
-                       theQueue.FillWait(std::initializer_list<int>{10, 11, 12});
+                       theQueue.PushManyWait(std::initializer_list<int>{10, 11, 12});
                    }));
     BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 1));
     BOOST_CHECK(get_Size(theQueue) == 5);
@@ -197,13 +197,13 @@ BOOST_AUTO_TEST_CASE(fill_replace_dynamic)
     CThreadSafeQueue<int> theQueue(10, [](const int& i) { return static_cast<size_t>(i); });
 
     // Fill the queue
-    BOOST_CHECK(theQueue.FillWait(std::initializer_list<int>{0, 1, 2, 3, 4}));
+    BOOST_CHECK(theQueue.PushManyWait(std::initializer_list<int>{0, 1, 2, 3, 4}));
     BOOST_CHECK(get_Count(theQueue) == 5);
     BOOST_CHECK(get_Size(theQueue) == 10);
     BOOST_CHECK(!theQueue.PushNoWait(99));
 
     // Replace the contents of the queue
-    BOOST_CHECK(theQueue.ReplaceWait(std::initializer_list<int>{7, 3}));
+    BOOST_CHECK(theQueue.ReplaceContent(std::initializer_list<int>{7, 3}));
     BOOST_CHECK(get_Count(theQueue) == 2);
     BOOST_CHECK(get_Size(theQueue) == 10);
     BOOST_CHECK(!theQueue.PushNoWait(99));
@@ -214,7 +214,7 @@ BOOST_AUTO_TEST_CASE(fill_replace_dynamic)
         std::async(std::launch::async,
                    [&theQueue]()
                    {
-                       theQueue.FillWait(std::initializer_list<int>{2, 3, 5});
+                       theQueue.PushManyWait(std::initializer_list<int>{2, 3, 5});
                    }));
     BOOST_CHECK(CheckNumberOfRunningThreads(pushers, 1));
     BOOST_CHECK(get_Size(theQueue) == 10);
@@ -244,7 +244,7 @@ BOOST_AUTO_TEST_CASE(multiple_outputs) {
     
     CThreadSafeQueue<int> theQueue(5, 1);
 
-    theQueue.ReplaceWait(std::initializer_list<int>{0, 1, 2, 3, 4});
+    theQueue.ReplaceContent(std::initializer_list<int>{0, 1, 2, 3, 4});
     BOOST_CHECK(get_Size(theQueue) == 5);
 
 
@@ -379,16 +379,19 @@ BOOST_AUTO_TEST_CASE(multiple_outputs) {
 BOOST_AUTO_TEST_CASE(stress_test_fixed_element_size)
 {
     unsigned long blockedOnPush = 0;
-    const auto logBlockedPush = [&blockedOnPush](const char*) {
+    const auto logBlockedPush = [&blockedOnPush](const char*, size_t, size_t) {
         ++blockedOnPush;
     };
 
     unsigned long blockedOnPop = 0;
-    const auto logBlockedPop = [&blockedOnPop](const char*) {
+    const auto logBlockedPop = [&blockedOnPop](const char*, size_t, size_t) {
         ++blockedOnPop;
     };
 
-    CThreadSafeQueue<int> theQueue(100, 1, logBlockedPush, logBlockedPop);
+    CThreadSafeQueue<int> theQueue(100, 1);
+    theQueue.SetOnPopBlockedNotifier(logBlockedPop);
+    theQueue.SetOnPushBlockedNotifier(logBlockedPush);
+    
     StressTest(theQueue);
     BOOST_TEST_MESSAGE("Blocked in fixed-size stress test:"
                        " push " << blockedOnPush << " pop " << blockedOnPop);
@@ -403,16 +406,19 @@ BOOST_AUTO_TEST_CASE(stress_test_dynamic_element_size)
     };
 
     unsigned long blockedOnPush = 0;
-    const auto logBlockedPush = [&blockedOnPush](const char*) {
+    const auto logBlockedPush = [&blockedOnPush](const char*, size_t, size_t) {
         ++blockedOnPush;
     };
 
     unsigned long blockedOnPop = 0;
-    const auto logBlockedPop = [&blockedOnPop](const char*) {
+    const auto logBlockedPop = [&blockedOnPop](const char*, size_t, size_t) {
         ++blockedOnPop;
     };
 
-    CThreadSafeQueue<int> theQueue(100, sizeCalculator, logBlockedPush, logBlockedPop);
+    CThreadSafeQueue<int> theQueue(100, sizeCalculator);
+    theQueue.SetOnPopBlockedNotifier(logBlockedPop);
+    theQueue.SetOnPushBlockedNotifier(logBlockedPush);
+
     StressTest(theQueue);
     BOOST_TEST_MESSAGE("Blocked in dynamic-size stress test:"
                        " push " << blockedOnPush << " pop " << blockedOnPop);

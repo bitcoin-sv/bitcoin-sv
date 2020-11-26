@@ -47,11 +47,11 @@ namespace {
         }
     };
 
-    Queue::BlockedLogger logblock()
+    Queue::OnBlockedCallback logblock()
     {
 #ifdef LOGBLOCK
         auto logger = std::make_shared<BlockedLogger>();
-        return [logger](const char* method)
+        return [logger](const char* method, size_t, size_t)
         {
             logger->log(method);
         };
@@ -99,7 +99,7 @@ namespace {
         };
 
         auto tmp {values};
-        assert(queue.FillWait(std::move(tmp)));
+        assert(queue.PushManyWait(std::move(tmp)));
     }
 
     void PopQueueAllAtOnce(Queue& queue, const char* name)
@@ -118,7 +118,9 @@ namespace {
     void ThreadSafeQueue_SingleSingle(benchmark::State& state)
     {
         const auto logger = logblock();
-        Queue queue{QUEUE_SIZE_LIMIT, logger, logger};
+        Queue queue{QUEUE_SIZE_LIMIT};
+        queue.SetOnPushBlockedNotifier(logger);
+        queue.SetOnPopBlockedNotifier(logger);
 
         while (state.KeepRunning())
         {
@@ -144,7 +146,9 @@ namespace {
     void ThreadSafeQueue_MultiMulti(benchmark::State& state)
     {
         const auto logger = logblock();
-        Queue queue{QUEUE_SIZE_LIMIT, logger, logger};
+        Queue queue{QUEUE_SIZE_LIMIT};
+        queue.SetOnPushBlockedNotifier(logger);
+        queue.SetOnPopBlockedNotifier(logger);
 
         while (state.KeepRunning())
         {
@@ -170,7 +174,9 @@ namespace {
     void ThreadSafeQueue_SingleMulti(benchmark::State& state)
     {
         const auto logger = logblock();
-        Queue queue{QUEUE_SIZE_LIMIT, logger, logger};
+        Queue queue{QUEUE_SIZE_LIMIT};
+        queue.SetOnPushBlockedNotifier(logger);
+        queue.SetOnPopBlockedNotifier(logger);
 
         while (state.KeepRunning())
         {
@@ -196,7 +202,9 @@ namespace {
     void ThreadSafeQueue_MultiSingle(benchmark::State& state)
     {
         const auto logger = logblock();
-        Queue queue{QUEUE_SIZE_LIMIT, logger, logger};
+        Queue queue{QUEUE_SIZE_LIMIT};
+        queue.SetOnPushBlockedNotifier(logger);
+        queue.SetOnPopBlockedNotifier(logger);
 
         while (state.KeepRunning())
         {

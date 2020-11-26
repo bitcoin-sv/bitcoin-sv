@@ -16,7 +16,7 @@ class CThreadSafeQueue
 public:
     using value_type = T;
     using SizeCalculator = std::function<size_t(const T&)>;
-    using BlockedLogger = std::function<void(const char* method)>;
+    using OnBlockedCallback = std::function<void(const char* method, size_t requiredSize, size_t availableSize)>;
 
   private:
     std::deque<T> theQueue;
@@ -28,8 +28,8 @@ public:
     const bool variableSizeObjects;
     size_t currentSize = 0;
     const size_t maximalSize;
-    const BlockedLogger blockedPushLogger;
-    const BlockedLogger blockedPopLogger;
+    OnBlockedCallback blockedPushNotifier{nullptr};
+    OnBlockedCallback blockedPopNotifier{nullptr};
 
     void PostPopNotify()
     {
@@ -48,109 +48,127 @@ public:
         }
     }
 
-    // Wait for enough space to become available in the queue to insert
-    // insertSize data. Optionally notify when actually blocked.
-    void WaitForPush(std::unique_lock<std::mutex>& lock,
-                     size_t insertSize, const char* method)
+    template <typename PREDICATE, typename NOTIFIER>
+    auto WaitAndNotifyOnFirstFail( std::condition_variable& condVar, std::unique_lock<std::mutex>& lock, 
+        PREDICATE& predicate, NOTIFIER& notifier, bool shouldNotify)
     {
-        const auto predicate = [this, insertSize]() -> bool
+        if(!shouldNotify)
         {
-            return isClosed || (currentSize + insertSize <= maximalSize);
-        };
+            condVar.wait(lock, predicate);
+            return;
+        }
 
-        if (blockedPushLogger == nullptr)
+        bool alreadyNotified = false;
+        condVar.wait(lock, [&]() 
         {
-            onPop.wait(lock, predicate);
-        }
-        else
-        {
-            bool checked = false;
-            bool blocked = false;
-            onPop.wait(lock, [&]() {
-                if (!checked && blocked && !isClosed)
-                {
-                    blockedPushLogger(method);
-                    checked = true;
-                }
-                blocked = true;
-                return predicate();
-            });
-        }
+            if(predicate())
+            {
+                return true;
+            }
+            if(!alreadyNotified)
+            {
+                notifier();
+            }
+            alreadyNotified = true;
+            return false;
+        });
     }
 
-    // Wait for data to become available to extract from the queue.
-    // Optionally notify when actually blocked.
-    void WaitForPop(std::unique_lock<std::mutex>& lock, const char* method)
+    // waits until there is required amount of space on the queue
+    // if the required size is too big or the queue gets closed it returns false
+    bool WaitForSpaceInQueue(std::unique_lock<std::mutex>& lock, size_t requiredSpace, const char* method)
     {
-        const auto predicate = [this]() -> bool
+        if(requiredSpace > maximalSize)
         {
-            return !theQueue.empty() || isClosed;
-        };
+            return false;
+        }
 
-        if (blockedPopLogger == nullptr)
+        auto predicate = [&](){ return isClosed || (currentSize + requiredSpace) <= maximalSize; };
+        auto notifyBlocked = [&](){ return blockedPushNotifier(method, requiredSpace, currentSize); };
+
+        // wait until something is popped or the queue is closed
+        WaitAndNotifyOnFirstFail(onPop, lock, predicate, notifyBlocked, blockedPushNotifier != nullptr);
+        
+        return !isClosed;
+    }
+
+    // waits until the queue is not empty to the queue or the queue gets closed
+    bool WaitForDataInQueue(std::unique_lock<std::mutex>& lock, const char* method)
+    {
+        auto predicate = [&](){ return isClosed || !theQueue.empty(); };
+        auto notifyBlocked = [&](){ return blockedPopNotifier(method, 0, 0); };
+
+        // wait until something is pushed or the queue is closed
+        WaitAndNotifyOnFirstFail(onPush, lock, predicate, notifyBlocked, blockedPopNotifier != nullptr);
+
+        return !theQueue.empty();
+    }
+
+    // calculate the size for the sequence
+    template <typename C>
+    size_t SizeNeededForSequence(C&& value_sequence)
+    {
+        size_t totalSize = 0;
+        for (const auto& value : value_sequence)
         {
-            onPush.wait(lock, predicate);
+            totalSize += sizeCalculator(value);
+        }
+        return totalSize;
+    }
+
+    // appends the sequence to the end of the queue, 
+    // moving out if we got r-value reference container, copying otherwise
+    template <typename C>
+    void AppendSequence(C&& value_sequence)
+    {
+        if(std::is_rvalue_reference<C&&>::value)
+        {
+            for(auto&& value: value_sequence)
+            {
+                theQueue.emplace_back(std::move(value));
+            }
         }
         else
         {
-            bool checked = false;
-            bool blocked = false;
-            onPush.wait(lock, [&]() {
-                if (!checked && blocked && !isClosed)
-                {
-                    blockedPopLogger(method);
-                    checked = true;
-                }
-                blocked = true;
-                return predicate();
-            });
+            for(const auto& value: value_sequence)
+            {
+                theQueue.emplace_back(value);
+            }
         }
     }
 
   public:
-    // Constructor for the fixed size objects
-    // logBlockedPush will be called if a blocking push would actually block
-    // logBlockedPop will be called if a blocking pop would actually block
-    explicit CThreadSafeQueue(size_t maxSize = std::numeric_limits<size_t>::max(),
-                              const BlockedLogger& logBlockedPush = nullptr,
-                              const BlockedLogger& logBlockedPop = nullptr)
-        :sizeCalculator([](const T&){ return sizeof(T); })
-        ,variableSizeObjects(false)
-        ,maximalSize(maxSize)
-        ,blockedPushLogger{logBlockedPush}
-        ,blockedPopLogger{logBlockedPop}
-    {}
 
     // Constructor for the fixed size objects that are not sizeof(value_type)
     // If one wants to limit this queue by number of elements set the objectSize to 1
-    // logBlockedPush will be called if a blocking push would actually block
-    // logBlockedPop will be called if a blocking pop would actually block
-    explicit CThreadSafeQueue(size_t maxSize, size_t objectSize,
-                              const BlockedLogger& logBlockedPush = nullptr,
-                              const BlockedLogger& logBlockedPop = nullptr)
+    explicit CThreadSafeQueue(size_t maxSize = std::numeric_limits<size_t>::max(), size_t objectSize = sizeof(T))
         :sizeCalculator([objectSize](const T&){ return objectSize; })
         ,variableSizeObjects(false)
         ,maximalSize(maxSize)
-        ,blockedPushLogger{logBlockedPush}
-        ,blockedPopLogger{logBlockedPop}
     {}
 
     // Constructor for the object that do not have fixed size
     // Useful for complex and dynamically allocated objects
     // Warning: sizeCalc should always return same value for the same object. Undefined behavior otherwise
-    // logBlockedPush will be called if a blocking push would actually block
-    // logBlockedPop will be called if a blocking pop would actually block
-    explicit CThreadSafeQueue(size_t maxSize, const SizeCalculator& sizeCalc,
-                              const BlockedLogger& logBlockedPush = nullptr,
-                              const BlockedLogger& logBlockedPop = nullptr)
+    explicit CThreadSafeQueue(size_t maxSize, const SizeCalculator& sizeCalc)
         :sizeCalculator(sizeCalc)
         ,variableSizeObjects(true)
         ,maximalSize(maxSize)
-        ,blockedPushLogger{logBlockedPush}
-        ,blockedPopLogger{logBlockedPop}
     {}
 
-    ~CThreadSafeQueue() = default;
+    // will be called if a blocking push would actually block
+    void SetOnPushBlockedNotifier(const OnBlockedCallback& onBlockedPush)
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        blockedPushNotifier = onBlockedPush;
+    }
+
+    // will be called if a blocking pop would actually block
+    void SetOnPopBlockedNotifier(const OnBlockedCallback& onBlockedPop)
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        blockedPopNotifier = onBlockedPop;
+    }
 
     // struct for unit test purposes
     template<typename TT> struct UnitTestAccess;
@@ -188,23 +206,10 @@ public:
     template <typename TT> // This is needed in order to treat value as forwarding reference
     bool PushWait(TT&& value)
     {
+        auto objectSize = sizeCalculator(value);
+
         std::unique_lock<std::mutex> lock(mtx);
-
-        if (isClosed)
-        {
-            return false;
-        }
-
-        size_t objectSize = sizeCalculator(value);
-        
-        if (objectSize > maximalSize)
-        {
-            return false; // object is too big for this queue
-        }
-
-        WaitForPush(lock, objectSize, "PushWait");
-
-        if (isClosed)
+        if(!WaitForSpaceInQueue(lock, objectSize, "PushWait"))
         {
             return false;
         }
@@ -242,74 +247,78 @@ public:
         return true;
     }
 
-  private:
-    // Atomically appends a sequence of new values to the queue, optionally clearing it first.
+    // Atomically appends a sequence of new values to the queue.
     // Will block until there is enough space in the queue or the queue is closed.
-    // If the queue is closed will not push anything and will return false immediately.
+    // If the queue is closed or cumulative size of objects in the sequence is too big
+    // will not push anything and will return false immediately.
     template <typename C>
-    bool FillOrReplaceWait(C&& value_sequence, bool replace, const char* method)
+    bool PushManyWait(C&& value_sequence)
     {
+
+        auto sizeNeeded = SizeNeededForSequence(value_sequence);
+    
         std::unique_lock<std::mutex> lock(mtx);
 
-        if (isClosed)
+        if(!WaitForSpaceInQueue(lock, sizeNeeded, "PushManyWait"))
         {
             return false;
         }
 
-        size_t listSize = 0;
-        for (const auto& value : value_sequence)
-        {
-            listSize += sizeCalculator(value);
-        }
+        AppendSequence(std::forward<C>(value_sequence));
+        currentSize += sizeNeeded;
 
-        if (listSize > maximalSize)
-        {
-            return false; // the list is too big for this queue
-        }
-
-        if (replace)
-        {
-            theQueue.clear();
-            currentSize = 0;
-            onPop.notify_all();
-        }
-        else
-        {
-            WaitForPush(lock, listSize, method);
-
-            if (isClosed)
-            {
-                return false;
-            }
-        }
-
-        for (auto&& value : value_sequence)
-        {
-            theQueue.emplace_back(std::move(value));
-        }
-        currentSize += listSize;
-
-        onPush.notify_all();
-
+        onPush.notify_all();        
+        
         return true;
     }
 
-  public:
     // Atomically appends a sequence of new values to the queue.
-    // Will block until there is enough space in the queue or the queue is closed.
+    // Will not block until there is enough space in the queue.
     // If the queue is closed will not push anything and will return false immediately.
     template <typename C>
-    bool FillWait(C&& value_sequence)
+    bool PushManyNoWait(C&& value_sequence)
     {
-        return FillOrReplaceWait(std::forward<C>(value_sequence), false, "FillWait");
+
+        auto sizeNeeded = SizeNeededForSequence(value_sequence);
+    
+        std::unique_lock<std::mutex> lock(mtx);
+
+        if(isClosed || (currentSize + sizeNeeded) > maximalSize)
+        {
+            return false;
+        }
+
+        AppendSequence(std::forward<C>(value_sequence));
+        currentSize += sizeNeeded;
+
+        onPush.notify_all();        
+        
+        return true;
     }
 
     // Atomically replace the contents of the queue with a sequence of new values.
     // If the queue is closed will not push anything and will return false immediately.
+    // If any thread is waiting to push it will be notified to try to push after we finish pushing to the queue
     template <typename C>
-    bool ReplaceWait(C&& value_sequence)
+    bool ReplaceContent(C&& value_sequence)
     {
-        return FillOrReplaceWait(std::forward<C>(value_sequence), true, "ReplaceWait");
+        auto sizeNeeded = SizeNeededForSequence(value_sequence);
+    
+        std::unique_lock<std::mutex> lock(mtx);
+
+        if(isClosed || sizeNeeded > maximalSize)
+        {
+            return false;
+        }
+
+        theQueue.clear();
+        AppendSequence(std::forward<C>(value_sequence));
+        currentSize = sizeNeeded;
+
+        onPush.notify_all();
+        onPop.notify_all();
+
+        return true;
     }
 
     // Pops from the front of the queue. If the queue is empty this function
@@ -319,9 +328,7 @@ public:
     {
         std::unique_lock<std::mutex> lock(mtx);
 
-        WaitForPop(lock, "PopWait");
-
-        if(theQueue.empty())
+        if(!WaitForDataInQueue(lock, "PopWait"))
         {
             return {};
         }
@@ -367,9 +374,7 @@ public:
     {
         std::unique_lock<std::mutex> lock(mtx);
 
-        WaitForPop(lock, "PopAllWait");
-
-        if(theQueue.empty())
+        if(!WaitForDataInQueue(lock, "PopAllWait"))
         {
             return {};
         }
@@ -381,23 +386,18 @@ public:
     }
 
     // Non blocking implementation of the PopAllWait(). Will not wait until
-    // there is something in the queue.
-    // If the queue is empty but not closed, returns an empty queue.
-    // If the queue is closed, returns std::nullopt.
+    // there is something in the queue. If the queue is empty will return std::nullopt.
     std::optional<std::deque<T>> PopAllNoWait()
     {
         std::unique_lock<std::mutex> lock(mtx);
 
-        if (isClosed && theQueue.empty())
+        if (theQueue.empty())
         {
             return {};
         }
 
-        if (!theQueue.empty())
-        {
-            currentSize = 0;
-            onPop.notify_all();
-        }
+        currentSize = 0;
+        onPop.notify_all();
 
         return {std::move(theQueue)};
     }

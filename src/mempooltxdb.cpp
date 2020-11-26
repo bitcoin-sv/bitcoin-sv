@@ -353,13 +353,18 @@ class CAsyncMempoolTxDB::TaskQueue : CThreadSafeQueue<Task>
 
 public:
     explicit TaskQueue(size_t maxSize)
-        : CThreadSafeQueue<Task>{maxSize, CalculateTaskSize,
-            [](const char* method){
+        : CThreadSafeQueue<Task>{maxSize, CalculateTaskSize}
+    {
+        SetOnPushBlockedNotifier(
+            [](const char* method, size_t requiredSize, size_t availableSize)
+            {
                 LogPrint(BCLog::MEMPOOL,
-                         "Mempool TxDB work queue producer blocked (%s).\n",
-                         method);
-            }}
-    {}
+                         "Mempool TxDB work queue producer blocked"
+                         " (%s needs %zu space but has %zu available).\n",
+                         method, requiredSize, availableSize);
+            }
+        );
+    }
 
     using CThreadSafeQueue<Task>::Close;
     using CThreadSafeQueue<Task>::MaximalSize;
@@ -380,8 +385,8 @@ public:
         {
             std::vector<Task> temp{std::move(tasks)};
             temp.emplace_back(SyncTask{&sync});
-            success = (clearList ? ReplaceWait(std::move(temp))
-                                 : FillWait(std::move(temp)));
+            success = (clearList ? ReplaceContent(std::move(temp))
+                                 : PushManyWait(std::move(temp)));
         }
         assert(success && "Push to task queue failed");
         sync.get_future().get();
