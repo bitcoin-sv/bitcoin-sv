@@ -1257,7 +1257,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
       strUsage += HelpMessageOpt(
         "-recvinvqueuefactor=<n>",
-        strprintf("Set maximum number of full size inventory messages that we can store for each peer. Inventory message size can be set with -maxprotocolrecvpayloadlength (default %d)."
+        strprintf("Set maximum number of full size inventory messages that we can store for each peer (default %d). Inventory message size can be set with -maxprotocolrecvpayloadlength."
           "Value should be an integer between %d and %d )", DEFAULT_RECV_INV_QUEUE_FACTOR, MIN_RECV_INV_QUEUE_FACTOR, MAX_RECV_INV_QUEUE_FACTOR)); 
     return strUsage;
 }
