@@ -198,6 +198,17 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
     feeDelta = Amount {0};
 }
 
+// CPFP group, if any that this transaction belongs to.
+
+GroupID CTxMemPoolEntry::GetCPFPGroupId() const 
+{ 
+    if(group)
+    {
+        return GroupID{ group->PayingTransaction()->GetTxId() };
+    }
+    return std::nullopt; 
+}
+
 double CTxMemPoolEntry::GetPriority(int32_t currentHeight) const {
     double deltaPriority = double((currentHeight - entryHeight) *
                                   inChainInputValue.GetSatoshis()) /
@@ -481,19 +492,23 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
     auto groupingData = FillGroupingDataNL(groupMembers);
     auto group = std::make_shared<CPFPGroup>();
     group->evaluationParams = groupingData;
+    group->transactions = {groupMembers.begin(), groupMembers.end()};
 
+    // assemble the group
     for(auto entry: groupMembers)
     {
-        // put txs in the group object and in the journal
-        group->transactions.push_back(entry);
-        changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry});
-        secondaryMempoolSize--; // moving from secondary mempool to the primary
         mapTx.modify(entry, [&group](CTxMemPoolEntry& entry) {
                                 entry.group = group;
                                 entry.groupingData = std::nullopt;
                             });
+        secondaryMempoolSize--; // moving from secondary mempool to the primary
     }
 
+    // submit the group
+    for(auto entry: groupMembers)
+    {
+        changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry});
+    }
 }
 
 bool CTxMemPool::IsPayingEnough(const SecondaryMempoolEntryData& groupingData) const

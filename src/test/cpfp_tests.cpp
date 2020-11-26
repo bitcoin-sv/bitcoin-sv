@@ -4,21 +4,26 @@
 #include <boost/test/unit_test.hpp>
 
 #include "validation.h"
+#include "config.h"
+#include "script/instruction.h"
+#include "script/instruction_iterator.h"
 #include "mining/journal.h"
 #include "mining/journal_builder.h"
 #include "mining/journal_change_set.h"
+#include "mining/assembler.h"
 
 #include "test/test_bitcoin.h"
 #include "test/mempool_test_access.h"
 
-
+namespace{
 
 CTxMemPoolEntry MakeEntry(
     CTxMemPoolBase &pool,
     CFeeRate feerate, 
     std::vector<std::tuple<TxId, int, Amount>> inChainInputs, 
     std::vector<std::tuple<CTransactionRef, int>> inMempoolInputs,
-    size_t nOutputs, size_t additionalSize=0, Amount feeAlreadyPaid=Amount(0))
+    size_t nOutputs, size_t additionalSize=0, Amount feeAlreadyPaid=Amount(0),
+    size_t opReturnSize=0)
 {
     CMutableTransaction tx;
     Amount totalInput;
@@ -45,13 +50,24 @@ CTxMemPoolEntry MakeEntry(
         tx.vout.push_back(CTxOut(Amount(), script));
     }
     
+    if(opReturnSize != 0)
+    {
+        CScript script;
+        script << OP_FALSE << OP_RETURN;
+        script << std::vector<uint8_t>(opReturnSize);
+        tx.vout.push_back(CTxOut(Amount(), script));
+    }
+
     auto txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) + additionalSize;
     auto totalFee = feerate.GetFee(txSize);
-    auto perOputput = (totalInput - totalFee) / int64_t(nOutputs);
+    auto perOputput = (totalInput - totalFee) / int64_t(nOutputs) + Amount(1);
 
     for(auto& output: tx.vout)
     {
-        output.nValue = perOputput;
+        if(output.scriptPubKey.begin_instructions()->opcode() != OP_FALSE)
+        {
+            output.nValue = perOputput;
+        }
     }
 
     auto txRef = MakeTransactionRef(tx);
@@ -107,6 +123,20 @@ CTxMemPoolTestAccess::txiter AddToMempool(CTxMemPoolEntry& entry)
     BOOST_ASSERT(it != testAccess.mapTx().end());
     return it;
 }
+
+std::unique_ptr<mining::CBlockTemplate> CreateBlock()
+{
+    CBlockIndex* pindexPrev {nullptr};
+    std::unique_ptr<mining::CBlockTemplate> pblocktemplate;
+    CScript scriptPubKey =
+    CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909"
+                            "a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112"
+                            "de5c384df7ba0b8d578a4c702b6bf11d5f")
+                << OP_CHECKSIG;
+    BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
+    return pblocktemplate;
+}
+};
 
 BOOST_FIXTURE_TEST_SUITE(cpfp_tests, TestingSetup)
 
@@ -438,4 +468,58 @@ BOOST_AUTO_TEST_CASE(mempool_rebuild)
 
 };
 
+BOOST_AUTO_TEST_CASE(journal_groups)
+{
+    // 
+    //  entry1     entryGroup1Tx1
+    //                   |
+    //             entryGroup1Tx1
+    //
+    //
+    
+    CTxMemPoolTestAccess testAccess(mempool);
+
+    mempool.SetSanityCheck(0);
+    testConfig.SetMaxGeneratedBlockSize(250000);
+    CheckMempoolRebuild(testAccess);
+
+    auto journal = testAccess.getJournalBuilder().getCurrentJournal();
+
+    auto entry1 = MakeEntry(mempool, DefaultFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 1, 0, Amount{0}, 100000);
+    auto entryGroup1Tx1 = MakeEntry(mempool, CFeeRate(), MakeConfirmedInputs(1, Amount(1000000)), {}, 2, 0, Amount{0}, 100000);
+    auto entryGroup1Tx2 = MakeEntry(mempool, DefaultFeeRate(), {}, {std::make_tuple(entryGroup1Tx1.GetSharedTx(), 1)}, 2, entryGroup1Tx1.GetSharedTx()->GetTotalSize(), Amount{0}, 100000);
+    
+    auto tx1 = AddToMempool(entry1);
+    auto tx2 = AddToMempool(entryGroup1Tx1);
+    auto tx3 = AddToMempool(entryGroup1Tx2);
+
+    BOOST_CHECK(tx2->GetCPFPGroupId() == tx3->GetCPFPGroupId());
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    for(auto entryIt: {tx1, tx2, tx3})
+    {
+        BOOST_CHECK(entryIt->IsInPrimaryMempool());
+        BOOST_CHECK(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+    }
+
+    for(auto entryIt: {tx2, tx3})
+    {
+        BOOST_CHECK(entryIt->IsCPFPGroupMember());
+    }
+
+    auto blockTemplatePtr = CreateBlock();
+    auto vtx = blockTemplatePtr->GetBlockRef()->vtx;
+    BOOST_CHECK(vtx.size() == 2);
+    BOOST_CHECK(entry1.GetTxId() == vtx[1]->GetId());
+
+    testAccess.RemoveRecursive(*entry1.GetSharedTx(), {nullptr});
+
+    blockTemplatePtr = CreateBlock();
+    vtx = blockTemplatePtr->GetBlockRef()->vtx;
+    BOOST_CHECK(vtx.size() == 3);
+    BOOST_CHECK(entryGroup1Tx1.GetTxId() == vtx[1]->GetId());
+    BOOST_CHECK(entryGroup1Tx2.GetTxId() == vtx[2]->GetId());
+
+};
 BOOST_AUTO_TEST_SUITE_END()

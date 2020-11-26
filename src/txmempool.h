@@ -144,7 +144,7 @@ struct CPFPGroup;
  *
  * The block assembler should not accept a partial group into the block template.
  */
-using GroupID = std::optional<uint64_t>;
+using GroupID = std::optional<TxId>;
 
 class CTransactionRefWrapper {
 private:
@@ -231,7 +231,7 @@ public:
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
     // CPFP group, if any that this transaction belongs to.
-    GroupID GetCPFPGroupId() const { return std::nullopt; }
+    GroupID GetCPFPGroupId() const;
     CTransactionRef GetSharedTx() const { return tx.GetTx(); }
     const TxId& GetTxId() const { return tx.GetId(); }
 
