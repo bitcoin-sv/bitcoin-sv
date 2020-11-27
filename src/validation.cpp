@@ -2359,6 +2359,11 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
         return {};
     }
 
+    if (!blockStreamReader)
+    {
+        return {};
+    }
+
     if (!CheckProofOfWork(blockStreamReader->GetBlockHeader().GetHash(), blockStreamReader->GetBlockHeader().nBits, config))
     {
         error("GetDiskBlockStreamReader(CBlockIndex*): Errors in block header at %s",
