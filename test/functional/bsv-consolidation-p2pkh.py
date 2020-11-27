@@ -12,7 +12,7 @@ allows applying this test to standard p2pkh transactions.
 
 import glob
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, hashToHex, sync_blocks
+from test_framework.util import assert_raises_rpc_error, connect_nodes_bi, disconnect_nodes_bi, satoshi_round, assert_equal, hashToHex, sync_blocks
 from test_framework.mininode import FromHex, CTransaction, COIN
 from decimal import Decimal
 
@@ -91,7 +91,13 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
             self.log.info ("minimum input confirmations: {}".format(self.minConfirmations))
 
+            # Disconnect nodes before each generate RPC. On a busy environment generate
+            # RPC might not create the provided number of blocks. While nodes are communicating
+            # P2P messages can cause generateBlocks function to skip a block. Check the comment 
+            # in generateBlocks function for details.
+            disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(300)
+            connect_nodes_bi(self.nodes, 0, 1)
 
             # test ratio between size of input script and size of output script
             tx_hex = self.create_and_sign_tx (node, 1, min_confirmations = 1)
@@ -123,6 +129,9 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             confirmations = tx.get('confirmations', 0)
             assert_equal (confirmations, 1)
             self.log.info ("test 3: PASS")
+            # Blocks must be synced because we do not want to start generating new blocks on node1 in the next loop iteration 
+            # before node1 has received all blocks generated on node0 and all pending P2P block requests have completed.
+            sync_blocks(self.nodes)
 
         # Verify deprecated -minconsolidationinputmaturity is an alias to -minconfconsolidationinput
         self.log.info("Restarting nodes to test config options...")
