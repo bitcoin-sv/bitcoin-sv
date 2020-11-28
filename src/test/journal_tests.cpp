@@ -20,18 +20,22 @@ namespace
         static uint32_t lockTime {0};
         CMutableTransaction txn {};
         txn.nLockTime = lockTime++;
-        return { MakeTransactionRef(std::move(txn)), Amount{0}, std::nullopt };
+        const auto tx = MakeTransactionRef(std::move(txn));
+        return { std::make_shared<CTransactionWrapper>(tx, nullptr),
+                 tx->GetTotalSize(), Amount{0}, std::nullopt };
     }
     // Generate a new random transaction that depends on another
-    CJournalEntry NewTxn(std::initializer_list<CTransactionRef> other)
+    CJournalEntry NewTxn(std::initializer_list<CTransactionWrapperRef> other)
     {
         static uint32_t lockTime {0}; // separate counter is OK as we have an input
         CMutableTransaction txn {};
         for (auto prev: other) {
-            txn.vin.emplace_back(CTxIn{COutPoint(prev->GetHash(), 0), CScript()});
+            txn.vin.emplace_back(CTxIn{COutPoint(prev->GetId(), 0), CScript()});
         }
         txn.nLockTime = lockTime++;
-        return { MakeTransactionRef(std::move(txn)), Amount{0}, std::nullopt };
+        const auto tx = MakeTransactionRef(std::move(txn));
+        return { std::make_shared<CTransactionWrapper>(tx, nullptr),
+                 tx->GetTotalSize(), Amount{0}, std::nullopt };
     }
 
     CJournalChangeSetPtr changeSet(CJournalBuilder* builder, JournalUpdateReason reason, std::initializer_list<std::pair<CJournalChangeSet::Operation, CJournalEntry>> ops)

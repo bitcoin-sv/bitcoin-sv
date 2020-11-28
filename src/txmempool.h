@@ -8,6 +8,7 @@
 
 #include "amount.h"
 #include "coins.h"
+#include "mining/journal_entry.h"
 #include "mining/journal_builder.h"
 #include "primitives/transaction.h"
 #include "sync.h"
@@ -121,16 +122,6 @@ public:
     CTxPrioritizer& operator=(CTxPrioritizer&&) = delete;
 };
 
-/**
- * \class GroupID
- *
- * GroupID identifies consecutive transactions in the journal that belong to
- * the same CPFP group that should all be mined in the same block.
- *
- * The block assembler should not accept a partial group into the block template.
- */
-using GroupID = std::optional<TxId>;
-
 /** \class CTxMemPoolEntry
  *
  * CTxMemPoolEntry stores data about the corresponding transaction.
@@ -150,6 +141,8 @@ private:
     CTransactionWrapperRef tx;
     // The mempool info constructor needs access to the wrapper reference.
     friend TxMempoolInfo::TxMempoolInfo(const CTxMemPoolEntry&);
+    // So does the journal etnry constructor.
+    friend mining::CJournalEntry::CJournalEntry(const CTxMemPoolEntry&);
 
     //!< Cached to avoid expensive parent-transaction lookups
     Amount nFee;
@@ -190,7 +183,7 @@ public:
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
     // CPFP group, if any that this transaction belongs to.
-    GroupID GetCPFPGroupId() const;
+    mining::GroupID GetCPFPGroupId() const;
     CTransactionRef GetSharedTx() const { return tx->GetTx(); }
     const TxId& GetTxId() const { return tx->GetId(); }
 

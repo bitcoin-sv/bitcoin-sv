@@ -310,14 +310,21 @@ void JournalingBlockAssembler::GroupCheckpoint::rollback()
 size_t JournalingBlockAssembler::addTransaction(const CBlockIndex* pindex)
 {
     const CJournalEntry& entry { mState.mJournalPos.at() };
-    const CTransactionRef& txn { entry.getTxn() };
 
     // Check for block being full
     uint64_t maxBlockSize { ComputeMaxGeneratedBlockSize(pindex) };
-    uint64_t txnSize { txn->GetTotalSize() };
+    uint64_t txnSize { entry.getTxnSize() };
     uint64_t blockSizeWithTx { mState.mBlockSize + txnSize };
     if(blockSizeWithTx >= maxBlockSize)
     {
+        return 0;
+    }
+
+    // FIXME: We may read the transaction from disk and then throw
+    //        it away if the contextual check fails.
+    const auto txn = entry.getTxn()->GetTx();
+    if (txn == nullptr) {
+        LogPrint(BCLog::JOURNAL, "JournalingBlockAssembler found stale wrapper in the journal. need to start over.\n");
         return 0;
     }
 

@@ -27,7 +27,9 @@ namespace
         std::vector<uint8_t> stuff;
         stuff.resize(txnSize - 32); // make serialized transaction 500 bytes
         txn.vout[0].scriptPubKey = CScript() << stuff << OP_DROP << unique++ << OP_DROP;
-        return { MakeTransactionRef(std::move(txn)), Amount{0}, groupId };
+        const auto tx = MakeTransactionRef(std::move(txn));
+        return { std::make_shared<CTransactionWrapper>(tx, nullptr),
+                 tx->GetTotalSize(), Amount{0}, groupId };
     }
     void NewChangeSet(CJournalBuilder &builder, size_t groupSize, GroupID groupId)
     {
@@ -85,7 +87,9 @@ namespace
              ++iter, --transactionsToDrop)
         {
             auto txn = *iter;
-            CJournalEntry entry { MakeTransactionRef(*txn), Amount{0}, std::nullopt };
+            const auto tx = MakeTransactionRef(*txn);
+            CJournalEntry entry { std::make_shared<CTransactionWrapper>(tx, nullptr),
+                                  tx->GetTotalSize(), Amount{0}, std::nullopt };
             changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, entry);
         }
         changeSet->apply();

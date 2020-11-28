@@ -132,11 +132,11 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
 }
 
 // CPFP group, if any that this transaction belongs to.
-GroupID CTxMemPoolEntry::GetCPFPGroupId() const 
+mining::GroupID CTxMemPoolEntry::GetCPFPGroupId() const
 { 
     if(group)
     {
-        return GroupID{ group->PayingTransaction()->GetTxId() };
+        return mining::GroupID{ group->PayingTransaction()->GetTxId() };
     }
     return std::nullopt; 
 }
@@ -390,7 +390,7 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
     // submit the group
     for(auto entry: groupMembers)
     {
-        changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry});
+        changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, CJournalEntry{*entry});
     }
 }
 
@@ -513,7 +513,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
             case ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_STANDALONE:
             {
                 // accept it to primary mempool
-                changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry} );
+                changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, CJournalEntry{*entry});
                 secondaryMempoolStats.Remove(entry);
                 // enqueue children to update
                 for(auto child: GetMemPoolChildrenNL(entry))
@@ -562,7 +562,7 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
         {
             // accept it to primary mempool as standalone tx
             SetGroupingData(entry, std::nullopt);
-            changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry} );
+            changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, CJournalEntry{*entry});
             secondaryMempoolStats.Remove(entry);
         }
         else
@@ -621,7 +621,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
         else
         {
             // add to change set, removin them from journal
-            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, {*entry});
+            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, CJournalEntry{*entry});
             // removing from primary to secondary mempool
             secondaryMempoolStats.Add(entry);
             // add to set of removed
@@ -822,7 +822,7 @@ void CTxMemPool::removeUncheckedNL(
         // Apply to the current journal, but only if it is in the journal (primary mempool) already
         if(entry->IsInPrimaryMempool())
         {
-            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, { *entry });
+            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, CJournalEntry{*entry});
         }
         else
         {
@@ -1457,7 +1457,10 @@ std::string CTxMemPool::checkJournalNL() const
 
         if(it->IsInPrimaryMempool())
         {
-            for(const CTxIn& txin : tx.getTxn()->vin)
+            // FIXME: CheckJournal is called from RPC, we should really avoid
+            // reading the transaction from disk like this, use mapNextTx here?
+            auto txn = tx.getTxn()->GetTx();
+            for(const CTxIn& txin : txn->vin)
             {
                 auto prevoutit { mapTx.find(txin.prevout.GetTxId()) };
                 if(prevoutit != mapTx.end())
