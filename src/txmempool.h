@@ -141,7 +141,7 @@ private:
     CTransactionWrapperRef tx;
     // The mempool info constructor needs access to the wrapper reference.
     friend TxMempoolInfo::TxMempoolInfo(const CTxMemPoolEntry&);
-    // So does the journal etnry constructor.
+    // So does the journal entry constructor.
     friend mining::CJournalEntry::CJournalEntry(const CTxMemPoolEntry&);
 
     //!< Cached to avoid expensive parent-transaction lookups
