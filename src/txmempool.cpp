@@ -1350,7 +1350,8 @@ void CTxMemPool::CheckMempoolImplNL(
     assert(totalTxSize == checkTotal);
     assert(innerUsage == cachedInnerUsage);
 
-    /* Journal checking */
+    /* Journal checking. */
+    // NOTE: Verify mapNextTx first because checkJournalNL() relies on it.
     if(changeSet)
     {
         // Check that the change set respects the toposort
@@ -1444,43 +1445,53 @@ std::string CTxMemPool::checkJournalNL() const
     for(txiter it = mapTx.begin(); it != mapTx.end(); ++it)
     {
         // Check this mempool txn also appears in the journal
-        const CJournalEntry tx { *it };
-        if(it->IsInPrimaryMempool() && !tester.checkTxnExists(tx))
+        const CJournalEntry entry { *it };
+        const auto txid = entry.getTxn()->GetId().ToString();
+
+        if(it->IsInPrimaryMempool() && !tester.checkTxnExists(entry))
         {
-            res << "Txn " << tx.getTxn()->GetId().ToString() << " is in the primary mempool but not the journal" << std::endl;
+            res << "Txn " << txid << " is in the primary mempool but not the journal\n";
         }
 
-        if(!it->IsInPrimaryMempool() && tester.checkTxnExists(tx))
+        if(!it->IsInPrimaryMempool() && tester.checkTxnExists(entry))
         {
-            res << "Txn " << tx.getTxn()->GetId().ToString() << " is not in the primary mempool but it is in the journal" << std::endl;
+            res << "Txn " << txid << " is not in the primary mempool but it is in the journal\n";
         }
 
         if(it->IsInPrimaryMempool())
         {
-            // FIXME: CheckJournal is called from RPC, we should really avoid
-            // reading the transaction from disk like this, use mapNextTx here?
-            auto txn = tx.getTxn()->GetTx();
-            for(const CTxIn& txin : txn->vin)
+            size_t countInputs = 0;
+            for (auto [outpair, end] = mapNextTx.get<by_txiter>().equal_range(it);
+                 outpair != end; ++outpair)
             {
-                auto prevoutit { mapTx.find(txin.prevout.GetTxId()) };
-                if(prevoutit != mapTx.end())
+                ++countInputs;
+                if (const auto prevoutit = mapTx.find(outpair->outpoint.GetTxId());
+                    prevoutit != mapTx.end())
                 {
                     // Check this in mempool ancestor appears before its descendent in the journal
                     const CJournalEntry prevout { *prevoutit };
-                    CJournalTester::TxnOrder order { tester.checkTxnOrdering(prevout, tx) };
+                    CJournalTester::TxnOrder order { tester.checkTxnOrdering(prevout, entry) };
                     if(order != CJournalTester::TxnOrder::BEFORE)
                     {
-                        res << "Ancestor " << prevout.getTxn()->GetId().ToString() << " of "
-                            << tx.getTxn()->GetId().ToString() << " appears "
-                            << enum_cast<std::string>(order) << " in the journal" << std::endl;
+                        res << "Ancestor " << prevout.getTxn()->GetId().ToString()
+                            << " of " << txid << " appears "
+                            << enum_cast<std::string>(order) << " in the journal\n";
                     }
                 }
+            }
+
+            if (countInputs == 0)
+            {
+                res << "Txn " << txid << " seems to have no inputs\n";
             }
         }
     }
 
-    LogPrint(BCLog::JOURNAL, "Result of journal check: %s\n", res.str().empty()? "Ok" : res.str().c_str());
-    return res.str();
+    const auto result = res.str();
+    LogPrint(BCLog::JOURNAL, "Result of journal check:%s\n%s",
+             (result.empty() ? " Ok" : ""),
+             (result.empty() ? "" : result.c_str()));
+    return result;
 }
 
 // Rebuild the journal contents so they match the mempool
