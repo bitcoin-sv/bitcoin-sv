@@ -147,7 +147,7 @@ public:
         ,variableSizeObjects(true)
         ,maximalSize(maxSize)
         ,blockedPushLogger{logBlockedPush}
-        ,blockedPopLogger{logBlockedPush}
+        ,blockedPopLogger{logBlockedPop}
     {}
 
     ~CThreadSafeQueue() = default;
