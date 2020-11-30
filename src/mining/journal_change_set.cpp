@@ -192,7 +192,7 @@ void CJournalChangeSet::addOperationCommon(Operation op)
     }
 
     // If it's safe to do so, immediately apply this change to the journal
-    if(isUpdateReasonBasic())
+    if(isUpdateReasonBasic() && mChangeSet.back().second.isPaying())
     {
         applyNL();
     }

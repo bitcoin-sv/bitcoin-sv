@@ -143,13 +143,17 @@ BOOST_AUTO_TEST_CASE(TestJournalAddGroup)
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);
 
     // add a group that will fit in the block
-    NewChangeSet(builder, maxUserTxns - 4, 1111);
+    TxId txid1;
+    txid1.SetHex("1");
+    NewChangeSet(builder, maxUserTxns - 4, txid1);
     block = CreateBlock();
     BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns - 4);
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1 + maxUserTxns - 4);
 
     // add a group that will just fit in the block
-    NewChangeSet(builder, 3, 2222);
+    TxId txid2;
+    txid2.SetHex("2");
+    NewChangeSet(builder, 3, txid2);
     block = CreateBlock();
     BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns - 4 + 3);
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1 + maxUserTxns - 4 + 3);
@@ -161,7 +165,9 @@ BOOST_AUTO_TEST_CASE(TestJournalAddGroup)
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);
 
     // add a group that will just not fit in the block
-    NewChangeSet(builder, maxUserTxns, 3333);
+    TxId txid3;
+    txid3.SetHex("3");
+    NewChangeSet(builder, maxUserTxns, txid3);
     block = CreateBlock();
     BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns);
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);

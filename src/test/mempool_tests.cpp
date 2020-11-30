@@ -27,7 +27,7 @@ BOOST_FIXTURE_TEST_SUITE(mempool_tests, TestingSetup)
 BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
     // Test CTxMemPool::remove functionality
 
-    TestMemPoolEntryHelper entry;
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     // Parent transaction with three children, and three grand-children:
     CMutableTransaction txParent;
     txParent.vin.resize(1);
@@ -113,7 +113,7 @@ BOOST_AUTO_TEST_CASE(MempoolRemoveTest) {
 BOOST_AUTO_TEST_CASE(MempoolClearTest) {
     // Test CTxMemPool::clear functionality
 
-    TestMemPoolEntryHelper entry;
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     // Create a transaction
     CMutableTransaction txParent;
     txParent.vin.resize(1);
@@ -182,7 +182,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx3.vout[0].nValue = 5 * COIN;
     pool.AddUnchecked(tx3.GetId(),
-                      entry.Fee(Amount(0LL)).Priority(100.0).FromTx(tx3), nullChangeSet);
+                      entry.Fee(Amount(1000LL)).Priority(100.0).FromTx(tx3), nullChangeSet);
 
     /* 2nd highest fee */
     CMutableTransaction tx4 = CMutableTransaction();
@@ -200,16 +200,17 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     entry.nTime = 1;
     entry.dPriority = 10.0;
     pool.AddUnchecked(tx5.GetId(), entry.Fee(Amount(10000LL)).FromTx(tx5), nullChangeSet);
-    BOOST_CHECK_EQUAL(pool.Size(), 5UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 5UL);
 
-    /* low fee but with high fee child */
+    /* low fee but with high fee child, will go into secondary mempool */
     /* tx6 -> tx7 -> tx8, tx9 -> tx10 */
     CMutableTransaction tx6 = CMutableTransaction();
     tx6.vout.resize(1);
     tx6.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx6.vout[0].nValue = 20 * COIN;
     pool.AddUnchecked(tx6.GetId(), entry.Fee(Amount(0LL)).FromTx(tx6), nullChangeSet);
-    BOOST_CHECK_EQUAL(pool.Size(), 6UL);
+    /* primary mempool size did not change */
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 5UL);
 
     CTxMemPoolTestAccess::setEntries setAncestors;
     setAncestors.insert(pool.mapTx.find(tx6.GetId()));
@@ -235,8 +236,9 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     }
     BOOST_CHECK(setAncestorsCalculated == setAncestors);
 
+    /* will pull tx6 into the primary pool with tx7, whose fee was set above */
     pool.AddUnchecked(tx7.GetId(), entry.FromTx(tx7), nullChangeSet);
-    BOOST_CHECK_EQUAL(pool.Size(), 7UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 7UL);
 }
 
 #if 0   // FIXME: Disabled for CORE-130
@@ -435,7 +437,7 @@ BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
         const CMutableTransaction& txParent,
         const TxId& txid) {
         BOOST_CHECK_EQUAL(testPool.Size(), 0UL);
-        testPool.AddUnchecked(txid, TestMemPoolEntryHelper{}.FromTx(txParent), nullChangeSet);
+        testPool.AddUnchecked(txid, TestMemPoolEntryHelper{DEFAULT_TEST_TX_FEE}.FromTx(txParent), nullChangeSet);
         BOOST_CHECK_EQUAL(testPool.Size(), 1UL);
         BOOST_CHECK(!testPoolAccess.mapDeltas().count(txid));
     };
@@ -512,7 +514,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolDecisionTest) {
     CTxMemPoolTestAccess testPoolAccess(pool);
     TestMemPoolEntryHelper entry;
 
-    testPoolAccess.rollingMinimumFeeRate() = 100000;
+    testPoolAccess.SetBlockMinTxFee({Amount(100), 1});
 
     /* Fee highe enough to enter the primary mempool. */
     CMutableTransaction tx1 = CMutableTransaction();
@@ -528,11 +530,11 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolDecisionTest) {
     tx2.vout.resize(1);
     tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx2.vout[0].nValue = 2 * COIN;
-    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(100LL)).FromTx(tx2), nullChangeSet);
+    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(1LL)).FromTx(tx2), nullChangeSet);
     const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
     BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
 
-    BOOST_CHECK_EQUAL(pool.Size(), 1UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 1UL);
     BOOST_CHECK(tx1it->IsInPrimaryMempool());
     BOOST_CHECK(!tx2it->IsInPrimaryMempool());
 }
@@ -542,13 +544,13 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     CTxMemPoolTestAccess testPoolAccess(pool);
     TestMemPoolEntryHelper entry;
 
-    testPoolAccess.rollingMinimumFeeRate() = 100000;
+    testPoolAccess.SetBlockMinTxFee({Amount(100), 1});
 
     CMutableTransaction tx1 = CMutableTransaction();
     tx1.vout.resize(1);
     tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx1.vout[0].nValue = 5 * COIN;
-    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount(200LL)).FromTx(tx1), nullChangeSet);
+    pool.AddUnchecked(tx1.GetId(), entry.Fee(Amount(2LL)).FromTx(tx1), nullChangeSet);
     const auto tx1it = testPoolAccess.mapTx().find(tx1.GetId());
     BOOST_CHECK(tx1it != testPoolAccess.mapTx().end());
 
@@ -556,7 +558,7 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     tx2.vout.resize(1);
     tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx2.vout[0].nValue = 10 * COIN;
-    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(100LL)).FromTx(tx2), nullChangeSet);
+    pool.AddUnchecked(tx2.GetId(), entry.Fee(Amount(1LL)).FromTx(tx2), nullChangeSet);
     const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
     BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
 
@@ -569,11 +571,11 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     tx3.vout.resize(1);
     tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx3.vout[0].nValue = 15 * COIN;
-    pool.AddUnchecked(tx3.GetId(), entry.Fee(Amount(300LL)).FromTx(tx3), nullChangeSet);
+    pool.AddUnchecked(tx3.GetId(), entry.Fee(Amount(3LL)).FromTx(tx3), nullChangeSet);
     const auto tx3it = testPoolAccess.mapTx().find(tx3.GetId());
     BOOST_CHECK(tx3it != testPoolAccess.mapTx().end());
 
-    BOOST_CHECK_EQUAL(pool.Size(), 0UL);
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 0UL);
 
     CTestTxMemPoolEntry testTx1(const_cast<CTxMemPoolEntry&>(*tx1it));
     BOOST_CHECK(!tx1it->IsInPrimaryMempool());

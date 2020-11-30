@@ -76,6 +76,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	compress_tests.cpp
 	config_tests.cpp
 	core_io_tests.cpp
+	cpfp_tests.cpp
 	crypto_tests.cpp
 	cscript_tests.cpp
 	cuckoocache_tests.cpp

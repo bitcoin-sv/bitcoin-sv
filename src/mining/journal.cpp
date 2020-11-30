@@ -296,6 +296,16 @@ void CJournalTester::dumpJournalContents(std::ostream& str) const
     }
 }
 
+std::set<TxId> mining::CJournalTester::getContents() const
+{
+    std::set<TxId> contents;
+    for(const auto& entry: mTransactions)
+    {
+        contents.insert(entry.getTxn()->GetId());
+    }
+    return contents;
+}
+
 const enumTableT<CJournalTester::TxnOrder>& mining::enumTable(CJournalTester::TxnOrder)
 {   
     static enumTableT<CJournalTester::TxnOrder> table

@@ -101,17 +101,23 @@ struct TestChain100Setup : public TestingSetup {
 class CTxMemPoolEntry;
 class CTxMemPool;
 
+static constexpr Amount DEFAULT_TEST_TX_FEE{10000};
+
 struct TestMemPoolEntryHelper {
     // Default values
-    Amount nFee;
-    int64_t nTime;
-    double dPriority;
-    unsigned int nHeight;
-    bool spendsCoinbase;
+    Amount nFee {0};
+    int64_t nTime {0};
+    double dPriority {0.0};
+    unsigned int nHeight {1};
+    bool spendsCoinbase {false};
     LockPoints lp;
 
-    TestMemPoolEntryHelper()
-        : nFee{0}, nTime{0}, dPriority{0.0}, nHeight{1}, spendsCoinbase{false}
+    // Default constructor just uses the default values
+    TestMemPoolEntryHelper() = default;
+
+    // Set the default fee to something other than 0
+    explicit TestMemPoolEntryHelper(const Amount& fee)
+        : nFee{fee}
     {}
 
     CTxMemPoolEntry FromTx(const CMutableTransaction &tx,

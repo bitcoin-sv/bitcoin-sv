@@ -32,6 +32,8 @@ class CJournalEntry
     // Which group of transactions if any does this entry belong to
     const GroupID& getGroupId() const { return mGroupId; }
 
+    bool isPaying() const { return !mGroupId || mGroupId == mTxn->GetId(); }
+
   private:
 
     // Shared pointer to the transaction itself

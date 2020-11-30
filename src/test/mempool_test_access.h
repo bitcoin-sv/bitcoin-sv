@@ -33,7 +33,6 @@ public:
     auto& mapTx() { return mempool.mapTx; }
     auto& mapNextTx() { return mempool.mapNextTx; }
     auto& mapDeltas() { return mempool.mapDeltas; }
-    auto& rollingMinimumFeeRate() { return mempool.rollingMinimumFeeRate; }
 
     using txiter = CTxMemPool::txiter;
     using TxLinks = CTxMemPool::TxLinks;
@@ -43,6 +42,11 @@ public:
     template<typename... Args>
     bool CalculateMemPoolAncestorsNL(Args... args) { return mempool.CalculateMemPoolAncestorsNL(args...); };
 
+    void SetBlockMinTxFee(const CFeeRate& feeRate)
+    {
+        mempool.SetBlockMinTxFee(feeRate);
+    }
+
     void RemoveRecursive(
         const CTransaction &tx,
         const mining::CJournalChangeSetPtr& changeSet,
@@ -50,6 +54,21 @@ public:
     {
         mempool.RemoveRecursive(tx, changeSet, reason);
     }
+  
+    mining::CJournalBuilder& getJournalBuilder()
+    {
+        return mempool.getJournalBuilder();
+    }
+
+    unsigned long PrimaryMempoolSizeNL() const 
+    {
+        return mempool.PrimaryMempoolSizeNL();
+    }
+    
+    void removeStagedNL(setEntries& stage, mining::CJournalChangeSet& changeSet, MemPoolRemovalReason reason)
+    {
+        return mempool.removeStagedNL(stage, changeSet, reason);
+    }    
 };
 
 using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>;

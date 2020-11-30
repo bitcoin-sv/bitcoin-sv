@@ -77,8 +77,6 @@ EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
 # FIXME: (CORE-130) Tests broken by the journaling block assembler.
 JOURNAL_BROKEN_TESTS = frozenset((
     "abc-high_priority_transaction.py",
-    "bip68-sequence.py",
-    "bsv-genesis-general.py",
     "prioritise_transaction.py",
 ))
 
@@ -88,12 +86,10 @@ MEMPOOL_BROKEN_TESTS = frozenset((
     "wallet.py",
     # Caused by removal of ancestor stats checks:
     "bsv-mempool_ancestorsizelimit.py",
-    # Caused by removed descendant stats checks:
-    "mempool_packages.py",      # no exception at tx insert above descendant limits
     # Caused by disabled CTxMemPool::TrimToSize():
     "rawtransactions.py",       # mempool not trimmed to expected size
     "mempool_limit.py",         # tx not evicted for mempool size limit
-    "bsv-cpfp.py",              # mempool does not handle cpfp yet
+    "bsv-mempool_ancestorsizelimit.py", #limiting ancestor size not implemented
 ))
 
 TEST_PARAMS = {

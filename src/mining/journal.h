@@ -193,6 +193,9 @@ class CJournalTester final
     // Dump out the contents of the journal
     void dumpJournalContents(std::ostream& str) const;
 
+    // Get journal content
+    std::set<TxId> getContents() const;
+
   private:
 
     // For speed of checking we need to rebuild the journal using a random access

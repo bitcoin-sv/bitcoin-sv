@@ -112,7 +112,7 @@ namespace
             Tx9.vout[0].nValue = GetAmount();
 
             // Now insert everyting into the mempool.
-            TestMemPoolEntryHelper entry;
+            TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
             for (auto tx : allTxs) {
                 testPool.AddUnchecked(tx->GetId(), entry.FromTx(*tx),
                                       mining::CJournalChangeSetPtr{nullptr});
