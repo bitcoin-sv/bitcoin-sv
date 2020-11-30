@@ -38,7 +38,7 @@ BOOST_AUTO_TEST_CASE(WriteToTxDB)
 {
     const auto entries = GetABunchOfEntries(11);
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -64,7 +64,7 @@ BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
 {
     const auto entries = GetABunchOfEntries(13);
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -105,7 +105,7 @@ BOOST_AUTO_TEST_CASE(DeleteFromTxDB)
 {
     const auto entries = GetABunchOfEntries(17);
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -137,7 +137,7 @@ BOOST_AUTO_TEST_CASE(BatchDeleteFromTxDB)
 {
     const auto entries = GetABunchOfEntries(19);
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -166,7 +166,7 @@ BOOST_AUTO_TEST_CASE(BatchDeleteFromTxDB)
 
 BOOST_AUTO_TEST_CASE(BadDeleteFromTxDB)
 {
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -185,7 +185,7 @@ BOOST_AUTO_TEST_CASE(ClearTxDB)
 {
     const auto entries = GetABunchOfEntries(23);
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -214,7 +214,7 @@ BOOST_AUTO_TEST_CASE(GetContentsOfTxDB)
 {
     const auto entries = GetABunchOfEntries(29);
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(GetSetXrefKey)
     auto xref = decltype(uuid)();
     BOOST_CHECK_NE(to_string(uuid), to_string(xref));
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
@@ -264,7 +264,7 @@ BOOST_AUTO_TEST_CASE(RemoveXrefKey)
     const auto uuid = gen();
     auto xref = decltype(uuid)();
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
@@ -280,7 +280,7 @@ BOOST_AUTO_TEST_CASE(AutoRemoveXrefKey)
     const auto entries = GetABunchOfEntries(1);
     const auto& e = entries[0];
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE(BatchWriteWrite)
     const auto entries = GetABunchOfEntries(1);
     const auto& entry = entries[0];
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -323,7 +323,7 @@ BOOST_AUTO_TEST_CASE(BatchWriteRemove)
     const auto entries = GetABunchOfEntries(1);
     const auto& entry = entries[0];
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -347,7 +347,7 @@ BOOST_AUTO_TEST_CASE(BatchWriteRemoveWrite)
     const auto entries = GetABunchOfEntries(1);
     const auto& entry = entries[0];
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -372,7 +372,7 @@ BOOST_AUTO_TEST_CASE(Write_BatchRemoveWrite)
     const auto entries = GetABunchOfEntries(1);
     const auto& entry = entries[0];
 
-    CMempoolTxDB txdb(10000);
+    CMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -399,7 +399,7 @@ BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
 {
     const auto entries = GetABunchOfEntries(11);
 
-    CAsyncMempoolTxDB txdb(10000);
+    CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -430,7 +430,7 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
 {
     const auto entries = GetABunchOfEntries(13);
 
-    CAsyncMempoolTxDB txdb(10000);
+    CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -461,7 +461,7 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
 {
     const auto entries = GetABunchOfEntries(17);
 
-    CAsyncMempoolTxDB txdb(10000);
+    CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -489,7 +489,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteCoalesce)
 {
     const auto entries = GetABunchOfEntries(1223);
 
-    CAsyncMempoolTxDB txdb(10000);
+    CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -520,7 +520,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
     auto entries = GetABunchOfEntries(541);
     const auto middle = entries.begin() + entries.size() / 2;
 
-    CAsyncMempoolTxDB txdb(10000);
+    CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
@@ -567,7 +567,7 @@ BOOST_AUTO_TEST_CASE(AsyncGetSetXrefKey)
     auto xref = decltype(uuid)();
     BOOST_CHECK_NE(to_string(uuid), to_string(xref));
 
-    CAsyncMempoolTxDB txdb(10000);
+    CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
@@ -580,7 +580,7 @@ BOOST_AUTO_TEST_CASE(AsyncRemoveXrefKey)
     const auto uuid = gen();
     auto xref = decltype(uuid)();
 
-    CAsyncMempoolTxDB txdb(10000);
+    CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
@@ -596,7 +596,7 @@ BOOST_AUTO_TEST_CASE(AsyncAutoRemoveXrefKey)
     auto entries = GetABunchOfEntries(1);
     auto& e = entries[0];
 
-    CAsyncMempoolTxDB txdb(10000);
+    CAsyncMempoolTxDB txdb{GetDataDir() / "test-txdb", 10000, true};
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));

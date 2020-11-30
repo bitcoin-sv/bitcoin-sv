@@ -29,6 +29,7 @@
 #include "validation.h"
 
 #include "test/testutil.h"
+#include "test/mempool_test_access.h"
 
 #include <atomic>
 #include <chrono>
@@ -64,9 +65,17 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName) : testConfig(
     testConfig.Reset(); // make sure that we start every test with a clean config
     testConfig.SetDefaultBlockSizeParams(Params().GetDefaultBlockSizeParams());
 
+    // Use a temporary datadir that we don't inadvertently create the default one.
+    ClearDatadirCache();
+    pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
+                                         (unsigned long)GetTime(),
+                                         (int)(InsecureRandRange(100000)));
+    fs::create_directories(pathTemp);
+    gArgs.ForceSetArg("-datadir", pathTemp.string());
+
     mempool.SuspendSanityCheck();
     mempool.getNonFinalPool().loadConfig();
-    mempool.InitMempoolTxDB();
+    CTxMemPoolTestAccess{mempool}.InitInMemoryMempoolTxDB();
     mempool.ResumeSanityCheck();
 }
 
@@ -83,6 +92,8 @@ BasicTestingSetup::~BasicTestingSetup() {
         g_connman->Stop();
         g_connman.reset();
     }
+
+    fs::remove_all(pathTemp);
 }
 
 TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory::BlockAssemblerType assemblerType)
@@ -92,12 +103,6 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
     // Ideally we'd move all the RPC tests to the functional testing framework
     // instead of unit tests, but for now we need these here.
     RegisterAllRPCCommands(tableRPC);
-    ClearDatadirCache();
-    pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i",
-                                         (unsigned long)GetTime(),
-                                         (int)(InsecureRandRange(100000)));
-    fs::create_directories(pathTemp);
-    gArgs.ForceSetArg("-datadir", pathTemp.string());
     mempool.SetSanityCheck(1.0);
     pblocktree = new CBlockTreeDB(1 << 20, true);
     pcoinsTip =
@@ -138,7 +143,6 @@ TestingSetup::~TestingSetup() {
     UnloadBlockIndex();
     pcoinsTip.release();
     delete pblocktree;
-    fs::remove_all(pathTemp);
 }
 
 TestChain100Setup::TestChain100Setup()

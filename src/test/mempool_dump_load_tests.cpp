@@ -76,14 +76,16 @@ namespace {
     }
 
     uint64_t PrepareMempoolDat(const std::vector<CTxMemPoolEntry>& entries,
-                               const uint64_t version, const bool save)
+                               const uint64_t version, const bool save,
+                               int* uniqueTxdbSuffix)
     {
         uint64_t count = 0;
         CTxMemPool testPool;
         CTxMemPoolTestAccess testPoolAccess(testPool);
 
         // Add transactions:
-        testPool.InitMempoolTxDB();
+        testPoolAccess.InitUniqueMempoolTxDB();
+        *uniqueTxdbSuffix = testPoolAccess.GetMempoolTxDBUniqueSuffix();
         for (auto& entry : entries) {
             testPool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);
         }
@@ -111,13 +113,15 @@ namespace {
     }
 
     void LoadMempoolDat(const std::vector<CTxMemPoolEntry>& entries, Config& testConfig,
-                        const uint64_t count, const bool expired)
+                        const uint64_t count, const bool expired,
+                        int uniqueTxdbSuffix)
     {
         CTxMemPool testPool;
         CTxMemPoolTestAccess testPoolAccess(testPool);
 
         testPool.SuspendSanityCheck();
-        testPool.InitMempoolTxDB();
+        testPoolAccess.SetMempoolTxDBUniqueSuffix(uniqueTxdbSuffix);
+        testPoolAccess.InitUniqueMempoolTxDB();
         BOOST_CHECK(LoadMempool(testPoolAccess, testConfig));
         testPool.ResumeSanityCheck();
 
@@ -146,82 +150,91 @@ namespace {
 BOOST_FIXTURE_TEST_SUITE(mempool_dump_load_tests, TestingSetup)
 BOOST_AUTO_TEST_CASE(DumpLoadFormat1)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(6);
-    const auto count = PrepareMempoolDat(entries, 1, false);
+    const auto count = PrepareMempoolDat(entries, 1, false, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, 0);
-    LoadMempoolDat(entries, testConfig, count, false);
+    LoadMempoolDat(entries, testConfig, count, false, uniqueSuffix);
 }
 
 BOOST_AUTO_TEST_CASE(DumpLoadFormat1Empty)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(0);
-    const auto count = PrepareMempoolDat(entries, 1, false);
+    const auto count = PrepareMempoolDat(entries, 1, false, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, 0);
-    LoadMempoolDat(entries, testConfig, count, false);
+    LoadMempoolDat(entries, testConfig, count, false, uniqueSuffix);
 }
 
 BOOST_AUTO_TEST_CASE(DumpLoadFormat1WithOnDiskTxs)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(6);
-    const auto count = PrepareMempoolDat(entries, 1, true);
+    const auto count = PrepareMempoolDat(entries, 1, true, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, entries.size() / 2);
-    LoadMempoolDat(entries, testConfig, 0, false);
+    LoadMempoolDat(entries, testConfig, 0, false, uniqueSuffix);
 }
 
 BOOST_AUTO_TEST_CASE(DumpLoadFormat1Expired)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(6, true);
-    const auto count = PrepareMempoolDat(entries, 1, false);
+    const auto count = PrepareMempoolDat(entries, 1, false, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, 0);
-    LoadMempoolDat(entries, testConfig, 0, true);
+    LoadMempoolDat(entries, testConfig, 0, true, uniqueSuffix);
 }
 
 BOOST_AUTO_TEST_CASE(DumpLoadFormat2)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(6);
-    const auto count = PrepareMempoolDat(entries, 2, false);
+    const auto count = PrepareMempoolDat(entries, 2, false, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, 0);
-    LoadMempoolDat(entries, testConfig, count, false);
+    LoadMempoolDat(entries, testConfig, count, false, uniqueSuffix);
 }
 
 BOOST_AUTO_TEST_CASE(DumpLoadFormat2Empty)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(0);
-    const auto count = PrepareMempoolDat(entries, 2, false);
+    const auto count = PrepareMempoolDat(entries, 2, false, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, 0);
-    LoadMempoolDat(entries, testConfig, count, false);
+    LoadMempoolDat(entries, testConfig, count, false, uniqueSuffix);
 }
 
 BOOST_AUTO_TEST_CASE(DumpLoadFormat2WithOnDiskTxs)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(6);
-    const auto count = PrepareMempoolDat(entries, 2, true);
+    const auto count = PrepareMempoolDat(entries, 2, true, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, entries.size() / 2);
-    LoadMempoolDat(entries, testConfig, count, false);
+    LoadMempoolDat(entries, testConfig, count, false, uniqueSuffix);
 }
 
 BOOST_AUTO_TEST_CASE(DumpLoadFormat2Expired)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(6, true);
-    const auto count = PrepareMempoolDat(entries, 2, false);
+    const auto count = PrepareMempoolDat(entries, 2, false, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, 0);
-    LoadMempoolDat(entries, testConfig, 0, true);
+    LoadMempoolDat(entries, testConfig, 0, true, uniqueSuffix);
 }
 
 BOOST_AUTO_TEST_CASE(DumpLoadFormat2WithOnDiskTxsExpired)
 {
+    int uniqueSuffix = -1;
     gArgs.ForceSetBoolArg("-persistmempool", true);
     const auto entries = GetABunchOfEntries(6, true);
-    const auto count = PrepareMempoolDat(entries, 2, true);
+    const auto count = PrepareMempoolDat(entries, 2, true, &uniqueSuffix);
     BOOST_CHECK_EQUAL(count, entries.size() / 2);
-    LoadMempoolDat(entries, testConfig, 0, true);
+    LoadMempoolDat(entries, testConfig, 0, true, uniqueSuffix);
 }
 BOOST_AUTO_TEST_SUITE_END()

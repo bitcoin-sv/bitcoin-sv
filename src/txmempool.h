@@ -419,10 +419,6 @@ private:
     // The group definition needs access to the mempool index iterator type.
     friend struct CPFPGroup;
 
-    // Mempool transaction database
-    std::once_flag db_initialized {};
-    std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
-
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
     typedef boost::multi_index_container<
@@ -735,7 +731,34 @@ public:
         const std::function<void(const CoinWithScript&, size_t)>& callback) const;
 
 private:
+    // Mempool transaction database
+    std::once_flag db_initialized {};
+    std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
+
+    static std::atomic_int mempoolTxDB_uniqueInit;
+    int mempoolTxDB_uniqueSuffix {mempoolTxDB_uniqueInit.fetch_add(1)};
+
+    // Safely opens the transaction database
     void OpenMempoolTxDB(const bool clearDatabase = false);
+
+    // This is the workhorse behind InitMempoolTxDB() and friends.
+    void DoInitMempoolTxDB();
+
+    // These are the default properties of a mempool that are used by
+    // OpenMempoolTxDB() without a prior call to one of the InitMempoolTxDB()
+    // variants, which is most of the time during tests:
+
+    //   - use an in-memory transaction database
+    bool mempoolTxDB_inMemory {true};
+
+    //   - use a uniquified name for the transaction database
+    bool mempoolTxDB_unique {true};
+
+    // Like InitMempoolTxDB(), but uses a unique name for the on-disk database.
+    void InitUniqueMempoolTxDB();
+
+    // Like InitMempoolTxDB(), but uses an in-memory database.
+    void InitInMemoryMempoolTxDB();
 
 public:
     // Called at process init, opens the transaction database and checks its

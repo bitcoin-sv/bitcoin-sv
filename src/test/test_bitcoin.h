@@ -55,6 +55,7 @@ class GlobalConfig;
 struct BasicTestingSetup {
     ECCVerifyHandle globalVerifyHandle;
     GlobalConfig& testConfig;
+    fs::path pathTemp;
 
     BasicTestingSetup(const std::string &chainName = CBaseChainParams::MAIN);
     ~BasicTestingSetup();
@@ -65,7 +66,6 @@ struct BasicTestingSetup {
  */
 class CConnman;
 struct TestingSetup : public BasicTestingSetup {
-    fs::path pathTemp;
     boost::thread_group threadGroup;
     CConnman *connman;
 

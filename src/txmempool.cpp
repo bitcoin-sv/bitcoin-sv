@@ -1517,15 +1517,24 @@ void CTxMemPool::SetSanityCheck(double dFrequency) {
     nCheckFrequency = dFrequency * 4294967295.0;
 }
 
+std::atomic_int CTxMemPool::mempoolTxDB_uniqueInit {0};
+
 void CTxMemPool::OpenMempoolTxDB(const bool clearDatabase) {
     static constexpr auto cacheSize = 1 << 20; /*TODO: remove constant*/
-    std::call_once(db_initialized,
-                   [this, clearDatabase] {
-                       mempoolTxDB = std::make_shared<CAsyncMempoolTxDB>(cacheSize);
-                       if (clearDatabase) {
-                           mempoolTxDB->Clear();
-                       }
-                   });
+    static constexpr auto hexDigits = int(2 * sizeof(mempoolTxDB_uniqueSuffix));
+    std::call_once(
+        db_initialized,
+        [this, clearDatabase] {
+            const auto dbName =
+                (mempoolTxDB_unique
+                 ? strprintf("mempoolTxDB-%0*X", hexDigits, mempoolTxDB_uniqueSuffix)
+                 : std::string{"mempoolTxDB"});
+            mempoolTxDB = std::make_shared<CAsyncMempoolTxDB>(
+                GetDataDir() / dbName, cacheSize, mempoolTxDB_inMemory);
+            if (clearDatabase) {
+                mempoolTxDB->Clear();
+            }
+        });
 }
 
 void CTxMemPool::RemoveTxFromDisk(const CTransactionRef& transaction) {
@@ -2576,7 +2585,7 @@ namespace {
     const uint64_t MEMPOOL_DUMP_HAS_ON_DISK_TXS = 2;
 } // namespace
 
-void CTxMemPool::InitMempoolTxDB()
+void CTxMemPool::DoInitMempoolTxDB()
 {
     if (!gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
@@ -2634,6 +2643,28 @@ void CTxMemPool::InitMempoolTxDB()
         Clear();
     }
 }
+
+void CTxMemPool::InitUniqueMempoolTxDB()
+{
+    mempoolTxDB_inMemory = false;
+    mempoolTxDB_unique = true;
+    DoInitMempoolTxDB();
+}
+
+void CTxMemPool::InitInMemoryMempoolTxDB()
+{
+    mempoolTxDB_inMemory = true;
+    mempoolTxDB_unique = true;
+    DoInitMempoolTxDB();
+}
+
+void CTxMemPool::InitMempoolTxDB()
+{
+    mempoolTxDB_inMemory = false;
+    mempoolTxDB_unique = false;
+    DoInitMempoolTxDB();
+}
+
 
 FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
 {

@@ -74,6 +74,26 @@ public:
         mempool.OpenMempoolTxDB();
     }
 
+    void InitUniqueMempoolTxDB()
+    {
+        mempool.InitUniqueMempoolTxDB();
+    }
+
+    int GetMempoolTxDBUniqueSuffix()
+    {
+        return mempool.mempoolTxDB_uniqueSuffix;
+    }
+
+    void SetMempoolTxDBUniqueSuffix(int uniqueSuffix)
+    {
+        mempool.mempoolTxDB_uniqueSuffix = uniqueSuffix;
+    }
+
+    void InitInMemoryMempoolTxDB()
+    {
+        mempool.InitInMemoryMempoolTxDB();
+    }
+
     bool CheckMempoolTxDB()
     {
         std::shared_lock lock(mempool.smtx);
