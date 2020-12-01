@@ -560,17 +560,28 @@ void CAsyncMempoolTxDB::Work()
     const auto dispatcher {dispatch{sync, clear, invoke, add, remove}};
     for (;;)
     {
-        const auto tasks {queue->PopAllWait()};
-        if (!tasks.has_value())
+        try
         {
+            const auto tasks {queue->PopAllWait()};
+            if (!tasks.has_value())
+            {
+                break;
+            }
+
+            for (const auto& task : tasks.value())
+            {
+                std::visit(dispatcher, task);
+            }
+            commit();
+        }
+        catch (...)
+        {
+            // There's really nothing we can do here to recover except terminate
+            // the thread and close the queue so that producers will also fail.
+            LogPrint(BCLog::MEMPOOL, "Unexpected exception in mempool TxDB worker thread.\n");
+            queue->Close();
             break;
         }
-
-        for (const auto& task : tasks.value())
-        {
-            std::visit(dispatcher, task);
-        }
-        commit();
     }
 
     LogPrint(BCLog::MEMPOOL, "Exiting mempool TxDB worker thread.\n");
