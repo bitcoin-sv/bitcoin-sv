@@ -1520,10 +1520,10 @@ uint64_t CTxMemPool::GetDiskTxCount() {
 };
 
 void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
+    OpenMempoolTxDB();
     uint64_t movedToDiskSize = 0;
-    std::vector<CTransactionWrapperRef> toBeMoved;
-
     {
+        std::vector<CTransactionWrapperRef> toBeMoved;
         std::shared_lock lock{smtx};
         for (auto mi = mapTx.get<entry_time>().begin();
              mi != mapTx.get<entry_time>().end() && movedToDiskSize < requiredSize;
@@ -1533,10 +1533,8 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
                 movedToDiskSize += mi->GetTxSize();
             }
         }
+        mempoolTxDB->Add(std::move(toBeMoved));
     }
-
-    OpenMempoolTxDB();
-    mempoolTxDB->Add(std::move(toBeMoved));
 
     if (movedToDiskSize < requiredSize)
     {

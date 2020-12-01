@@ -3,7 +3,8 @@
 // LICENSE.
 
 #include "txmempool.h"
-#include "mempoolTxDB.h"
+#include "mempooltxdb.h"
+#include "util.h"
 
 #include <new>
 #include <future>
@@ -135,7 +136,7 @@ CMempoolTxDB::TxIdSet CMempoolTxDB::GetKeys()
     TxIdSet result;
     for (; iter->Valid(); iter->Next())
     {
-        auto key {decltype(initialKey){}};
+        auto key = decltype(initialKey){};
         iter->GetKey(key);
         result.emplace(key.second);
     }
@@ -385,6 +386,10 @@ namespace {
 
 void CAsyncMempoolTxDB::Work()
 {
+    const auto name = strprintf("mempooldb-%x", uintptr_t(static_cast<void*>(this)));
+    RenameThread(name.c_str());
+    LogPrint(BCLog::MEMPOOL, "Entering mempool TxDB worker thread.\n");
+
     // Stop the background thread.
     bool running = true;
     const auto stop = [&running](const StopTask&)
@@ -469,4 +474,6 @@ void CAsyncMempoolTxDB::Work()
         }
         commit();
     }
+
+    LogPrint(BCLog::MEMPOOL, "Exiting mempool TxDB worker thread.\n");
 }
