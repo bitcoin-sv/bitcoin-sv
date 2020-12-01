@@ -168,7 +168,7 @@ void CEvictionCandidateTracker::EntryModified(CTxMemPool::txiter entry)
     InsertEntry(entry);
 }
 
-CTxMemPool::txiter CEvictionCandidateTracker::GetMostWorthles() const
+CTxMemPool::txiter CEvictionCandidateTracker::GetMostWorthless() const
 {
     assert(entries.size() != 0);
     return heap.front().Entry();

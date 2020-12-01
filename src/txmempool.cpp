@@ -2209,7 +2209,7 @@ int64_t CTxMemPool::evaluateEvictionCandidateNL(txiter entry)
     int64_t score = entry->GetFee().GetSatoshis() * 1000 / entry->GetTxSize();
     if(!entry->IsInPrimaryMempool())
     {
-        // tx is secondary mempool, decremet its score
+        // tx is secondary mempool, decrement its score
         score += std::numeric_limits<int64_t>::min();
     }
     return score;
@@ -2243,12 +2243,12 @@ void CTxMemPool::TrackEntryModified(CTxMemPool::txiter entry)
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     const mining::CJournalChangeSetPtr& changeSet,
-    std::vector<COutPoint>* pvNoSpendsRemaining) {
-
-    std::unique_lock lock(smtx);
+    std::vector<COutPoint>* pvNoSpendsRemaining)
+{
+    std::unique_lock lock{smtx};
 
     unsigned nTxnRemoved = 0;
-    CFeeRate maxFeeRateRemoved(Amount(0));
+    CFeeRate maxFeeRateRemoved{Amount{0}};
     std::vector<TxId> vRemovedTxIds {};
 
     if (!evictionTracker) {
@@ -2273,7 +2273,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
     bool weHaveEvictedSomething = false;
     while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
-        const auto it = evictionTracker->GetMostWorthles();
+        const auto it = evictionTracker->GetMostWorthless();
 
         // We set the new mempool min fee to the feerate of the removed set,
         // plus the "minimum reasonable fee rate" (ie some value under which we
@@ -2317,7 +2317,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     {
         if(mapTx.size() != 0)
         {
-            maxFeeRateRemoved = std::max(maxFeeRateRemoved, getFeeRate(evictionTracker->GetMostWorthles()));
+            maxFeeRateRemoved = std::max(maxFeeRateRemoved, getFeeRate(evictionTracker->GetMostWorthless()));
         }
         maxFeeRateRemoved += MEMPOOL_FULL_FEE_INCREMENT;
         trackPackageRemovedNL(maxFeeRateRemoved);
