@@ -312,4 +312,27 @@ BOOST_AUTO_TEST_CASE(p2p_config)
     BOOST_CHECK(!config.SetP2PHandshakeTimeout(-1, &err));
 }
 
+BOOST_AUTO_TEST_CASE(disable_BIP30)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    SelectParams(CBaseChainParams::MAIN);
+    BOOST_CHECK(config.SetDisableBIP30Checks(true, &err) == false);
+    BOOST_CHECK(err == "Can not change disabling of BIP30 checks on " + config.GetChainParams().NetworkIDString() + " network.");
+    BOOST_CHECK(config.GetDisableBIP30Checks() == false);
+
+    for(const auto& networkType: {CBaseChainParams::TESTNET, CBaseChainParams::REGTEST, CBaseChainParams::STN})
+    {
+        config.Reset();
+        SelectParams(networkType);
+        BOOST_CHECK(config.GetDisableBIP30Checks() == false);
+        BOOST_CHECK(config.SetDisableBIP30Checks(true, &err) == true);
+        BOOST_CHECK(config.GetDisableBIP30Checks() == true);
+        BOOST_CHECK(config.SetDisableBIP30Checks(false, &err) == true);
+        BOOST_CHECK(config.GetDisableBIP30Checks() == false);
+    }
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()

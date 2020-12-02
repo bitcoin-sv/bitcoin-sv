@@ -3499,6 +3499,11 @@ static bool ConnectBlock(
         (!pindexBIP34height ||
          !(pindexBIP34height->GetBlockHash() == consensusParams.BIP34Hash));
 
+    if(config.GetDisableBIP30Checks())
+    {
+        fEnforceBIP30 = false;
+    }
+
     if (fEnforceBIP30) {
         for (const auto &tx : block.vtx) {
             for (size_t o = 0; o < tx->vout.size(); o++) {

@@ -1031,6 +1031,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             HelpMessageOpt("-blockcandidatevaliditytest",
                            strprintf(_("Perform validity test on block candidates. Defaults: "
                            "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
+        strUsage +=
+            HelpMessageOpt("-disablebip30checks",
+                           "Disable BIP30 checks when connecting a block. "
+                           "This flag can not be set on the mainnet.");
     }
 
     /** Block assembler */
@@ -1884,6 +1888,15 @@ bool AppInitParameterInteraction(Config &config) {
     // Configure whether to run extra block candidate validity checks
     config.SetTestBlockCandidateValidity(
         gArgs.GetBoolArg("-blockcandidatevaliditytest", chainparams.TestBlockCandidateValidity()));
+
+    // Configure whether to performe BIP30 checks
+    if(gArgs.IsArgSet("-disablebip30checks"))
+    {
+        bool doDisable = gArgs.GetBoolArg("-disablebip30checks", chainparams.DisableBIP30Checks());
+        if (std::string err; !config.SetDisableBIP30Checks(doDisable)){
+            return InitError(err);
+        }
+    }
 
     // Configure mining block assembler
     if(gArgs.IsArgSet("-blockassembler")) {

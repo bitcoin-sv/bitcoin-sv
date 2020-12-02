@@ -191,6 +191,9 @@ public:
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
 
+    virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
+    virtual bool GetDisableBIP30Checks() const = 0;
+
 #if ENABLE_ZMQ
     virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
@@ -369,6 +372,9 @@ public:
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
     int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
 
+    bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
+    bool GetDisableBIP30Checks() const override;
+
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override;
     int64_t GetInvalidTxZMQMaxMessageSize() const override;
@@ -464,6 +470,8 @@ private:
 
     // P2P parameters
     int64_t p2pHandshakeTimeout;
+
+    std::optional<bool> mDisableBIP30Checks;
 
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
@@ -830,6 +838,16 @@ public:
     uint64_t GetMaxMerkleTreeMemoryCacheSize() const override
     {
         return 0;
+    }
+
+    bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    bool GetDisableBIP30Checks() const override
+    {
+        return true;
     }
 
 private:
