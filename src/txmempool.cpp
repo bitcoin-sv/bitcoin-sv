@@ -4,6 +4,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "txmempool.h"
+#include "txmempoolevictioncandidates.h"
 #include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
@@ -473,7 +474,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::GetSecondaryMempoolAncestorsNL(CTxM
 
 SecondaryMempoolEntryData CTxMemPool::FillGroupingDataNL(const CTxMemPool::setEntriesTopoSorted& groupMembers) const
 {
-    SecondaryMempoolEntryData data{Amount(0),Amount(0),0,0};
+    SecondaryMempoolEntryData data;
     data.ancestorsCount = groupMembers.size();
 
     // precisely calculate groups data
@@ -502,6 +503,7 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
                                 entry.groupingData = std::nullopt;
                             });
         secondaryMempoolSize--; // moving from secondary mempool to the primary
+        TrackEntryModified(entry);
     }
 
     // submit the group
@@ -519,8 +521,8 @@ bool CTxMemPool::IsPayingEnough(const SecondaryMempoolEntryData& groupingData) c
 SecondaryMempoolEntryData CTxMemPool::CalculateSecondaryMempoolData(txiter entryIt) const
 {
     SecondaryMempoolEntryData groupingData({
-            entryIt->GetFee(), entryIt->GetFeeDelta(), entryIt->GetTxSize(), 0});
-    
+            entryIt->GetFee(), entryIt->GetFeeDelta(), entryIt->GetTxSize()});
+
     for (txiter parent : GetMemPoolParentsNL(entryIt)) {
         if (!parent->IsInPrimaryMempool()) {
             groupingData.fee += parent->groupingData->fee;
@@ -624,6 +626,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
                     }
                 }
                 countOfVisitedTxs += groupMembers.size();
+                TrackEntryModified(entry);
                 break;
             }
             case ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_STANDALONE:
@@ -637,6 +640,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
                     toUpdate.insert(child);
                 }
                 countOfVisitedTxs += 1;
+                TrackEntryModified(entry);
                 break;
             }
             case ResultOfUpdateEntryGroupingDataNL::GROUPING_DATA_MODIFIED:
@@ -647,6 +651,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
                     toUpdate.insert(child);
                 }
                 countOfVisitedTxs += 1;
+                TrackEntryModified(entry);
                 break;
             }
             case ResultOfUpdateEntryGroupingDataNL::NOTHING:  
@@ -757,6 +762,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
                 SecondaryMempoolEntryData groupingData = CalculateSecondaryMempoolData(entry);
                 SetGroupingData(entry, groupingData);
             }
+            TrackEntryModified(entry);
         }
     }
     return removed;
@@ -830,6 +836,9 @@ void CTxMemPool::AddUncheckedNL(
     if (pnDynamicMemoryUsage) {
         *pnDynamicMemoryUsage = DynamicMemoryUsageNL();
     }
+
+    // Update the eviction candidate tracker.
+    TrackEntryAdded(newit);
 }
 
 void CTxMemPool::removeUncheckedNL(
@@ -860,6 +869,13 @@ void CTxMemPool::removeUncheckedNL(
     // FIXME: we are not implemented IncrementalDynamicMemoryUsage for unordered set. see: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
     //    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
     //                        memusage::DynamicUsage(mapLinks[it].children);
+
+    setEntries parents;
+    TxId txid;
+    if (evictionTracker) {
+        txid = it->GetTxId();
+        parents = std::move(mapLinks.at(it).parents);
+    }
     mapLinks.erase(it);
     mapTx.erase(it);
 
@@ -873,6 +889,8 @@ void CTxMemPool::removeUncheckedNL(
     }
 
     nTransactionsUpdated++;
+    
+    TrackEntryRemoved(txid, parents);
 }
 
 // Calculates descendants of entry that are not already in setDescendants, and
@@ -1036,6 +1054,8 @@ void CTxMemPool::RemoveForBlock(
 
     std::unique_lock lock(smtx);
 
+    evictionTracker.reset();
+
     setEntries toRemove; // entries which should be removed
     setEntriesTopoSorted childrenOfToRemoveGroupMembers; // immediate children of entries we will remove that are members of the cpfp group, need to be updated after removal
     setEntriesTopoSorted childrenOfToRemoveSecondaryMempool; // immediate children of entries we will remove that are in the secondary mempool, need to be updated after removal
@@ -1129,6 +1149,7 @@ void CTxMemPool::RemoveForBlock(
 
 
 void CTxMemPool::clearNL() {
+    evictionTracker.reset();
     mapLinks.clear();
     mapTx.clear();
     mapNextTx.clear();
@@ -2177,70 +2198,135 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
     return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
 }
 
+int64_t CTxMemPool::evaluateEvictionCandidateNL(txiter entry)
+{
+    if(entry->IsCPFPGroupMember())
+    {
+        const auto& evalParams = entry->GetCPFPGroup()->evaluationParams;
+        return (evalParams.fee + evalParams.feeDelta).GetSatoshis() * 1000 / entry->GetTxSize();
+    }
+    
+    int64_t score = entry->GetFee().GetSatoshis() * 1000 / entry->GetTxSize();
+    if(!entry->IsInPrimaryMempool())
+    {
+        // tx is secondary mempool, decrement its score
+        score += std::numeric_limits<int64_t>::min();
+    }
+    return score;
+
+}
+
+void CTxMemPool::TrackEntryAdded(CTxMemPool::txiter entry)
+{
+    if (evictionTracker)
+    {
+        evictionTracker->EntryAdded(entry);
+    }
+}
+
+void CTxMemPool::TrackEntryRemoved(const TxId& txId, const setEntries& immediateParents)
+{
+    if (evictionTracker)
+    {
+        evictionTracker->EntryRemoved(txId, immediateParents);
+    }
+}
+
+void CTxMemPool::TrackEntryModified(CTxMemPool::txiter entry)
+{
+    if (evictionTracker)
+    {
+        evictionTracker->EntryModified(entry);
+    }
+}
+
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     const mining::CJournalChangeSetPtr& changeSet,
-    std::vector<COutPoint>* pvNoSpendsRemaining) {
+    std::vector<COutPoint>* pvNoSpendsRemaining)
+{
+    std::unique_lock lock{smtx};
 
-    // FIXME: Disabled to remove references on mempool descendant score.
-    // TODO: CORE-130
+    unsigned nTxnRemoved = 0;
+    CFeeRate maxFeeRateRemoved{Amount{0}};
+    std::vector<TxId> vRemovedTxIds {};
 
-    // std::unique_lock lock(smtx);
+    if (!evictionTracker) {
+        evictionTracker = std::make_shared<CEvictionCandidateTracker>(
+            mapLinks,
+            [](txiter entry)
+            {
+                return evaluateEvictionCandidateNL(entry);
+            });
+    }
 
-    // unsigned nTxnRemoved = 0;
-    // CFeeRate maxFeeRateRemoved(Amount(0));
-    // std::vector<TxId> vRemovedTxIds {};
-    // while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
-    //     indexed_transaction_set::index<descendant_score>::type::iterator it =
-    //         mapTx.get<descendant_score>().begin();
+    auto getFeeRate = [](txiter entry)
+    {
+        if(entry->IsCPFPGroupMember())
+        {
+            auto groupParams = entry->GetCPFPGroup()->evaluationParams;
+            return CFeeRate(groupParams.fee + groupParams.feeDelta, groupParams.size);
+        }
+        return CFeeRate(entry->GetModifiedFee(), entry->GetTxSize());
+    };
 
-    //     // We set the new mempool min fee to the feerate of the removed set,
-    //     // plus the "minimum reasonable fee rate" (ie some value under which we
-    //     // consider txn to have 0 fee). This way, we don't allow txn to enter
-    //     // mempool with feerate equal to txn which were removed with no block in
-    //     // between.
-    //     CFeeRate removed(it->GetModFeesWithDescendants(),
-    //                      it->GetSizeWithDescendants());
-    //     removed += MEMPOOL_FULL_FEE_INCREMENT;
+    CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
+    bool weHaveEvictedSomething = false;
+    while (!mapTx.empty() && DynamicMemoryUsageNL() > sizelimit) {
+        const auto it = evictionTracker->GetMostWorthless();
 
-    //     trackPackageRemovedNL(removed);
-    //     maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
+        // We set the new mempool min fee to the feerate of the removed set,
+        // plus the "minimum reasonable fee rate" (ie some value under which we
+        // consider txn to have 0 fee). This way, we don't allow txn to enter
+        // mempool with feerate equal to txn which were removed with no block in
+        // between.
 
-    //     setEntries stage;
-    //     GetDescendantsNL(mapTx.project<transaction_id>(it), stage);
-    //     nTxnRemoved += stage.size();
+        CFeeRate removed = getFeeRate(it);
+        maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
-    //     std::vector<CTransaction> txn;
-    //     if (pvNoSpendsRemaining) {
-    //         txn.reserve(stage.size());
-    //         for (txiter iter : stage) {
-    //             txn.push_back(iter->GetTx());
-    //             vRemovedTxIds.emplace_back(iter->GetTx().GetId());
-    //         }
-    //     }
-    //     removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::SIZELIMIT);
-    //     if (pvNoSpendsRemaining) {
-    //         for (const CTransaction &tx : txn) {
-    //             for (const CTxIn &txin : tx.vin) {
-    //                 if (ExistsNL(txin.prevout.GetTxId())) {
-    //                     continue;
-    //                 }
-    //                 if (!mapNextTx.count(txin.prevout)) {
-    //                     pvNoSpendsRemaining->push_back(txin.prevout);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+        setEntries stage;
+        GetDescendantsNL(mapTx.project<0>(it), stage);
+        nTxnRemoved += stage.size();
 
-    // if (maxFeeRateRemoved > CFeeRate(Amount(0))) {
-    //     LogPrint(BCLog::MEMPOOL,
-    //              "Removed %u txn, rolling minimum fee bumped to %s\n",
-    //              nTxnRemoved, maxFeeRateRemoved.ToString());
-    // }
-    // return vRemovedTxIds;
+        std::vector<CTransactionRef> txn;
+        if (pvNoSpendsRemaining) {
+            txn.reserve(stage.size());
+            for (txiter iter : stage) {
+                auto txref = iter->GetSharedTx();
+                txn.push_back(txref);
+                vRemovedTxIds.emplace_back(txref->GetId());
+            }
+        }
+        removeStagedNL(stage, nonNullChangeSet.Get(), MemPoolRemovalReason::SIZELIMIT);
+        if (pvNoSpendsRemaining) {
+            for (const auto& txref : txn) {
+                for (const auto& txin : txref->vin) {
+                    if (ExistsNL(txin.prevout.GetTxId())) {
+                        continue;
+                    }
+                    if (!mapNextTx.count(txin.prevout)) {
+                        pvNoSpendsRemaining->push_back(txin.prevout);
+                    }
+                }
+            }
+        }
+        weHaveEvictedSomething = true;
+    }
 
-    return std::vector<TxId>();
+    if (weHaveEvictedSomething) 
+    {
+        if(mapTx.size() != 0)
+        {
+            maxFeeRateRemoved = std::max(maxFeeRateRemoved, getFeeRate(evictionTracker->GetMostWorthless()));
+        }
+        maxFeeRateRemoved += MEMPOOL_FULL_FEE_INCREMENT;
+        trackPackageRemovedNL(maxFeeRateRemoved);
+
+        LogPrint(BCLog::MEMPOOL,
+                 "Removed %u txn, rolling minimum fee bumped to %s\n",
+                 nTxnRemoved, maxFeeRateRemoved.ToString());
+    }
+    return vRemovedTxIds;
 }
 
 bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid,
@@ -2285,10 +2371,6 @@ bool CTxMemPool::ExistsNL(const COutPoint &outpoint) const {
 }
 
 SaltedTxidHasher::SaltedTxidHasher()
-    : k0(GetRand(std::numeric_limits<uint64_t>::max())),
-      k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
-
-CTxMemPool::SaltedTxiterHasher::SaltedTxiterHasher()
     : k0(GetRand(std::numeric_limits<uint64_t>::max())),
       k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
 

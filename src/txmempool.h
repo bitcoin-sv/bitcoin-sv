@@ -37,6 +37,7 @@
 
 class CAutoFile;
 class CBlockIndex;
+class CEvictionCandidateTracker;
 class Config;
 class CoinsDB;
 class CoinsDBView;
@@ -90,17 +91,19 @@ struct SecondaryMempoolEntryData
     Amount feeDelta {0};
     size_t size {0};
 
-    // We only count ancestors in the secondary mempool.
+    // We only count ancestors and chain length in the secondary mempool.
     size_t ancestorsCount {0};
-
-    bool operator == (const SecondaryMempoolEntryData& other) const
-    {
-        return (fee == other.fee) && 
-               (feeDelta == other.feeDelta) &&
-               (size == other.size) &&
-               (ancestorsCount == other.ancestorsCount);
-    }
 };
+
+inline bool operator==(const SecondaryMempoolEntryData& a,
+                       const SecondaryMempoolEntryData& b)
+{
+    return ((&a == &b) || ((a.fee == b.fee) &&
+                           (a.feeDelta == b.feeDelta) &&
+                           (a.size == b.size) &&
+                           (a.ancestorsCount == b.ancestorsCount)));
+}
+
 
 class CTxMemPoolBase {
 public:
@@ -353,7 +356,8 @@ enum class MemPoolRemovalReason {
 
 class SaltedTxidHasher {
 private:
-    /** Salt */
+    // The salt does not change during the lifetime of the hasher object,
+    // but it's not const so that copy construction and assignment work.
     uint64_t k0, k1;
 
 public:
@@ -479,8 +483,6 @@ private:
     // Sub-pool for time locked txns
     CTimeLockedMempool mTimeLockedPool {};
 
-    friend class CEvictionCandidateTracker;
-
     // The group definition needs access to the mempool index iterator type.
     friend struct CPFPGroup;
 
@@ -523,16 +525,10 @@ private:
         }
     };
 
-    class SaltedTxiterHasher {
-    private:
-        /** Salt */
-        const uint64_t k0, k1;
-
+    class SaltedTxiterHasher : private SaltedTxidHasher {
     public:
-        SaltedTxiterHasher();
-
         size_t operator()(const txiter& entry) const {
-            return SipHashUint256(k0, k1, entry->GetTxId());
+            return SaltedTxidHasher::operator()(entry->GetTxId());
         }
     };
 
@@ -577,6 +573,18 @@ private:
             return nextIndex++;
         }
     } insertionIndex;
+
+    // The eviction tracker must be declared after mapLinks because it refers to
+    // it and must be destroyed first.
+    friend class CEvictionCandidateTracker;
+    std::shared_ptr<CEvictionCandidateTracker> evictionTracker;
+    static int64_t evaluateEvictionCandidateNL(txiter entry);
+
+    // Shortcuts for eviction tracking. Must be called with the mempool locked.
+    void TrackEntryAdded(CTxMemPool::txiter entry);
+    void TrackEntryRemoved(const TxId& txId, const setEntries& immediateParents);
+    void TrackEntryModified(CTxMemPool::txiter entry);
+
 
 public:
     /** Create a new CTxMemPool. */

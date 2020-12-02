@@ -108,7 +108,7 @@ static void MempoolEviction(benchmark::State &state) {
     CTransaction t4(tx4);
     CTransaction t5(tx5);
     CTransaction t6(tx6);
-    CTransaction t7(tx1);
+    CTransaction t7(tx7);
 
     while (state.KeepRunning()) {
         AddTx(t1, Amount(10000LL), pool);

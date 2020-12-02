@@ -241,7 +241,6 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorSetTest) {
     BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 7UL);
 }
 
-#if 0   // FIXME: Disabled for CORE-130
 BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     CTxMemPool pool;
     TestMemPoolEntryHelper entry;
@@ -299,9 +298,8 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
     BOOST_CHECK(!pool.Exists(tx2.GetId()));
     BOOST_CHECK(!pool.Exists(tx3.GetId()));
 
-    CFeeRate maxFeeRateRemoved(Amount(25000),
-                               CTransaction(tx3).GetTotalSize() +
-                                   CTransaction(tx2).GetTotalSize());
+    CFeeRate maxFeeRateRemoved(Amount(20000),
+                               CTransaction(tx3).GetTotalSize());
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       maxFeeRateRemoved.GetFeePerK() + feeIncrement);
 
@@ -389,26 +387,26 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
 
     std::vector<CTransactionRef> vtx;
     SetMockTime(42);
-    SetMockTime(42 + CTestTxMemPool::ROLLING_FEE_HALFLIFE);
+    SetMockTime(42 + CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       maxFeeRateRemoved.GetFeePerK() + feeIncrement);
     // ... we should keep the same min fee until we get a block
     pool.RemoveForBlock(vtx, 1, nullChangeSet);
-    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE);
+    SetMockTime(42 + 2 * CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE);
     BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(),
                       (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 2);
     // ... then feerate should drop 1/2 each halflife
 
-    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE +
-                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 2);
+    SetMockTime(42 + 2 * CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE +
+                CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE / 2);
     BOOST_CHECK_EQUAL(
         pool.GetMinFee(pool.DynamicMemoryUsage() * 5 / 2).GetFeePerK(),
         (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 4);
     // ... with a 1/2 halflife when mempool is < 1/2 its target size
 
-    SetMockTime(42 + 2 * CTestTxMemPool::ROLLING_FEE_HALFLIFE +
-                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 2 +
-                CTestTxMemPool::ROLLING_FEE_HALFLIFE / 4);
+    SetMockTime(42 + 2 * CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE +
+                CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE / 2 +
+                CTxMemPoolTestAccess::ROLLING_FEE_HALFLIFE / 4);
     BOOST_CHECK_EQUAL(
         pool.GetMinFee(pool.DynamicMemoryUsage() * 9 / 2).GetFeePerK(),
         (maxFeeRateRemoved.GetFeePerK() + feeIncrement) / 8);
@@ -416,7 +414,6 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest) {
 
     SetMockTime(0);
 }
-#endif  // FIXME: Disabled for CORE-130
 
 BOOST_AUTO_TEST_CASE(CTxPrioritizerTest) {
     // Create a transaction
@@ -597,6 +594,113 @@ BOOST_AUTO_TEST_CASE(SecondaryMempoolStatsTest) {
     BOOST_CHECK_EQUAL(testTx3.groupingData()->feeDelta, tx1it->GetFeeDelta() + tx2it->GetFeeDelta() + tx3it->GetFeeDelta());
     BOOST_CHECK_EQUAL(testTx3.groupingData()->size, tx1it->GetTxSize() + tx2it->GetTxSize() + tx3it->GetTxSize());
     BOOST_CHECK_EQUAL(testTx3.groupingData()->ancestorsCount, 2);
+}
+
+BOOST_AUTO_TEST_CASE(SecondaryMempoolComplexChainTest) {
+    //               tx1
+    //                |
+    //          +-----+-----+
+    //          |     |     |
+    //         tx2   tx3    |
+    //          |     |     |
+    //          +-----+-----+
+    //                |
+    //               tx4
+    //                |
+    //               tx5    <-- paying transaction
+
+    CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry;
+
+    CMutableTransaction tx1 = CMutableTransaction();
+    tx1.vout.resize(3);
+    for (int i = 0; i < 3; ++i) {
+        tx1.vout[i].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+        tx1.vout[i].nValue = (5 + i) * COIN;
+    }
+    pool.AddUnchecked(tx1.GetId(), entry.FromTx(tx1), nullChangeSet);
+    const auto tx1it = testPoolAccess.mapTx().find(tx1.GetId());
+    BOOST_CHECK(tx1it != testPoolAccess.mapTx().end());
+    BOOST_CHECK(!tx1it->IsInPrimaryMempool());
+    CTestTxMemPoolEntry entry1access(const_cast<CTxMemPoolEntry&>(*tx1it));
+    const auto& group1data = entry1access.groupingData();
+    BOOST_REQUIRE(group1data.has_value());
+    BOOST_CHECK_EQUAL(group1data->ancestorsCount, 0); // exact
+
+    CMutableTransaction tx2 = CMutableTransaction();
+    tx2.vin.resize(1);
+    tx2.vin[0].prevout = COutPoint(tx1.GetId(), 0);
+    tx2.vin[0].scriptSig = CScript() << OP_5;
+    tx2.vout.resize(1);
+    tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx2.vout[0].nValue = 1 * COIN;
+    pool.AddUnchecked(tx2.GetId(), entry.FromTx(tx2), nullChangeSet);
+    const auto tx2it = testPoolAccess.mapTx().find(tx2.GetId());
+    BOOST_CHECK(tx2it != testPoolAccess.mapTx().end());
+    BOOST_CHECK(!tx2it->IsInPrimaryMempool());
+    CTestTxMemPoolEntry entry2access(const_cast<CTxMemPoolEntry&>(*tx2it));
+    const auto& group2data = entry2access.groupingData();
+    BOOST_REQUIRE(group2data.has_value());
+    BOOST_CHECK_EQUAL(group2data->ancestorsCount, 1); // exact
+
+    CMutableTransaction tx3 = CMutableTransaction();
+    tx3.vin.resize(1);
+    tx3.vin[0].prevout = COutPoint(tx1.GetId(), 0);
+    tx3.vin[0].scriptSig = CScript() << OP_5;
+    tx3.vout.resize(1);
+    tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx3.vout[0].nValue = 2 * COIN;
+    pool.AddUnchecked(tx3.GetId(), entry.FromTx(tx3), nullChangeSet);
+    const auto tx3it = testPoolAccess.mapTx().find(tx3.GetId());
+    BOOST_CHECK(tx3it != testPoolAccess.mapTx().end());
+    BOOST_CHECK(!tx3it->IsInPrimaryMempool());
+    CTestTxMemPoolEntry entry3access(const_cast<CTxMemPoolEntry&>(*tx3it));
+    const auto& group3data = entry3access.groupingData();
+    BOOST_REQUIRE(group3data.has_value());
+    BOOST_CHECK_EQUAL(group3data->ancestorsCount, 1); // exact
+
+    CMutableTransaction tx4 = CMutableTransaction();
+    tx4.vin.resize(3);
+    tx4.vin[0].prevout = COutPoint(tx2.GetId(), 0);
+    tx4.vin[0].scriptSig = CScript() << OP_5;
+    tx4.vin[1].prevout = COutPoint(tx3.GetId(), 0);
+    tx4.vin[1].scriptSig = CScript() << OP_5;
+    tx4.vin[2].prevout = COutPoint(tx1.GetId(), 0);
+    tx4.vin[2].scriptSig = CScript() << OP_5;
+    tx4.vout.resize(1);
+    tx4.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx4.vout[0].nValue = 3 * COIN;
+    pool.AddUnchecked(tx4.GetId(), entry.FromTx(tx4), nullChangeSet);
+    const auto tx4it = testPoolAccess.mapTx().find(tx4.GetId());
+    BOOST_CHECK(tx4it != testPoolAccess.mapTx().end());
+    BOOST_CHECK(!tx4it->IsInPrimaryMempool());
+
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 0UL);
+    BOOST_CHECK_EQUAL(pool.Size(), 4UL);
+
+    CTestTxMemPoolEntry entry4access(const_cast<CTxMemPoolEntry&>(*tx4it));
+    const auto& group4data = entry4access.groupingData();
+    BOOST_REQUIRE(group4data.has_value());
+    BOOST_CHECK_EQUAL(group4data->ancestorsCount, 5); // not exact
+
+    // Pull everything into the primary mempool as a group.
+    CMutableTransaction tx5 = CMutableTransaction();
+    tx5.vin.resize(1);
+    tx5.vin[0].prevout = COutPoint(tx4.GetId(), 0);
+    tx5.vin[0].scriptSig = CScript() << OP_5;
+    tx5.vout.resize(1);
+    tx5.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
+    tx5.vout[0].nValue = 4 * COIN;
+    pool.AddUnchecked(tx5.GetId(), entry.Fee(Amount(100000)).FromTx(tx5), nullChangeSet);
+
+    BOOST_CHECK_EQUAL(testPoolAccess.PrimaryMempoolSizeNL(), 5UL);
+    BOOST_CHECK_EQUAL(pool.Size(), 5UL);
+    BOOST_CHECK(tx1it->IsInPrimaryMempool());
+    BOOST_CHECK(tx2it->IsInPrimaryMempool());
+    BOOST_CHECK(tx3it->IsInPrimaryMempool());
+    BOOST_CHECK(tx4it->IsInPrimaryMempool());
+    BOOST_CHECK(!group4data.has_value());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

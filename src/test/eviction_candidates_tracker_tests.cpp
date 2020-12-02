@@ -178,7 +178,7 @@ public:
     
     void RemoveMostWorthless()
     {
-        auto iter = tracker->GetMostWorthles();
+        auto iter = tracker->GetMostWorthless();
         RemoveTx(iter);
     }
 };
@@ -216,7 +216,7 @@ BOOST_AUTO_TEST_CASE(single_long_chain) {
         std::deque<uint256> removedTransactions;
         for(int i = 0; i < 100; i++)
         {
-            auto txToRemove = mempool.tracker->GetMostWorthles();
+            auto txToRemove = mempool.tracker->GetMostWorthless();
             auto txId = txToRemove->GetSharedTx()->GetId();
             removedTransactions.push_front(txId);
             mempool.RemoveTx(txToRemove);
@@ -257,7 +257,7 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
         for(size_t i = 0; i < 100; i++)
         {
             BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == (100-i));
-            auto txToRemove = mempool.tracker->GetMostWorthles();
+            auto txToRemove = mempool.tracker->GetMostWorthless();
             double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
             mempool.RemoveTx(txToRemove);
             BOOST_ASSERT(feeRate >= lastRemovedFeeRate);
@@ -291,7 +291,7 @@ BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
     bool lastFromSecondary = true;
     for(int i = 0; i < 100; i++)
     {
-        auto txToRemove = mempool.tracker->GetMostWorthles();
+        auto txToRemove = mempool.tracker->GetMostWorthless();
         double feeRate = double(txToRemove->GetFee().GetSatoshis()) / txToRemove->GetTxSize();
         bool fromSecondary = !txToRemove->IsInPrimaryMempool();
         mempool.RemoveMostWorthless();

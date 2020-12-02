@@ -138,7 +138,7 @@ public:
     // returns most worthless transaction which does not have children, if the transaction
     // is the paying transaction of the group and any group member has non-group child, paying transaction 
     // will not be considered
-    CTxMemPool::txiter GetMostWorthles() const;
+    CTxMemPool::txiter GetMostWorthless() const;
 
     // returns all transactions that could be evicted
     CTxMemPool::setEntries GetAllCandidates() const;

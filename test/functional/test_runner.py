@@ -88,7 +88,6 @@ MEMPOOL_BROKEN_TESTS = frozenset((
     "bsv-mempool_ancestorsizelimit.py",
     # Caused by disabled CTxMemPool::TrimToSize():
     "rawtransactions.py",       # mempool not trimmed to expected size
-    "mempool_limit.py",         # tx not evicted for mempool size limit
     "bsv-mempool_ancestorsizelimit.py", #limiting ancestor size not implemented
 ))
 
