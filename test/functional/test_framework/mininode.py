@@ -1643,7 +1643,7 @@ class NodeConnCB():
         conn.nServices = message.nServices
 
     def send_protoconf(self, conn):
-        conn.send_message(msg_protoconf(CProtoconf(2, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, b"Default")))
+        conn.send_message(msg_protoconf(CProtoconf(2, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, b"BlockPriority,Default")))
 
     # Connection helper methods
 
@@ -1694,6 +1694,10 @@ class NodeConnCB():
 
     def wait_for_protoconf(self, timeout=60):
         def test_function(): return self.message_count["protoconf"]
+        wait_until(test_function, timeout=timeout, lock=mininode_lock)
+
+    def wait_for_streamack(self, timeout=60):
+        def test_function(): return self.message_count["streamack"]
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     # Message sending helper functions

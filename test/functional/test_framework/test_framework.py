@@ -18,7 +18,7 @@ import traceback
 import contextlib
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import NetworkThread, StopNetworkThread
-from .associations import Association
+from .associations import Association, AssociationCB
 
 from .authproxy import JSONRPCException
 from . import coverage
@@ -347,7 +347,7 @@ class BitcoinTestFramework():
     # It also creates (and handles closing of) some number of associations (desribed by their stream policies)
     # to bitcoind node with index 'node_index'.
     @contextlib.contextmanager
-    def run_node_with_associations(self, title, node_index, args, stream_policies, ip='127.0.0.1', strSubVer=None):
+    def run_node_with_associations(self, title, node_index, args, stream_policies, cb_class=AssociationCB, ip='127.0.0.1', strSubVer=None):
         logger.debug("setup %s", title)
 
         self.start_node(node_index, args)
@@ -355,7 +355,7 @@ class BitcoinTestFramework():
         # Create associations and their connections to the node
         associations = []
         for stream_policy in stream_policies:
-            association = Association(stream_policy)
+            association = Association(stream_policy, cb_class)
             association.create_streams(self.nodes[node_index], ip, strSubVer)
             associations.append(association)
 
