@@ -760,6 +760,7 @@ static UniValue getreceivedbyaddress(const Config &config,
     // Tally
     Amount nAmount(0);
     for (const auto &[hash_dummy, wtx] : pwallet->mapWallet) {
+        (void)hash_dummy;
         CValidationState state;
         if (wtx.IsCoinBase() ||
             !ContextualCheckTransactionForCurrentBlock(

@@ -2962,7 +2962,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         if(bestChainActivation)
         {
             pfrom->RunAsyncProcessing(
-                [pindex, pblock, fNewBlock, bestChainActivation, scopedBlockOriginReg]
+                [pblock, fNewBlock, bestChainActivation, scopedBlockOriginReg]
                 (std::weak_ptr<CNode> weakFrom)
                 {
                     bestChainActivation();
