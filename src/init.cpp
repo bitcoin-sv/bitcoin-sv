@@ -1416,6 +1416,7 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
     } // End scope of CImportingNow
     if (gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
         mempool.LoadMempool(config, shutdownToken);
+        mempool.ResumeSanityCheck();
         fDumpMempoolLater = !shutdownToken.IsCanceled();
     }
 }
@@ -2495,8 +2496,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     InitScriptCheckQueues(config, threadGroup);
 
     // Late configuration for globaly constructed objects
+    mempool.SuspendSanityCheck();
     mempool.getNonFinalPool().loadConfig();
     mempool.InitMempoolTxDB();
+    if (!gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
+        mempool.ResumeSanityCheck();
+    }
 
     // Start the lightweight task scheduler thread
     scheduler.startServiceThread(threadGroup);

@@ -16,7 +16,7 @@
 #include <shared_mutex>
 
 #include <boost/multi_index_container.hpp>
-#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 
 class CScheduler;
@@ -138,7 +138,7 @@ class CTimeLockedMempool final
         using result_type = uint256;
         result_type operator()(const TxMempoolInfo& info) const
         {
-            return info.tx->GetId();
+            return info.GetTxId();
         }
     };
 
@@ -152,7 +152,7 @@ class CTimeLockedMempool final
             // By TxID
             boost::multi_index::ordered_unique<
                 boost::multi_index::tag<TagTxID>,
-                boost::multi_index::member<TxMempoolInfo, CTransactionRef, &TxMempoolInfo::tx>,
+                boost::multi_index::const_mem_fun<TxMempoolInfo,const CTransactionRef&,&TxMempoolInfo::GetTx>,
                 CompareTxnID
             >,
             // By raw TxID
@@ -163,7 +163,7 @@ class CTimeLockedMempool final
             // By unlocking time
             boost::multi_index::ordered_non_unique<
                 boost::multi_index::tag<TagUnlockingTime>,
-                boost::multi_index::member<TxMempoolInfo, CTransactionRef, &TxMempoolInfo::tx>,
+                boost::multi_index::const_mem_fun<TxMempoolInfo,const CTransactionRef&,&TxMempoolInfo::GetTx>,
                 CompareTxnUnlockingTime
             >
         >

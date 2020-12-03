@@ -126,7 +126,7 @@ void WalletTxToJSON(const CWalletTx &wtx, UniValue &entry) {
     entry.push_back(Pair("time", wtx.GetTxTime()));
     entry.push_back(Pair("timereceived", (int64_t)wtx.nTimeReceived));
 
-    for (const std::pair<std::string, std::string> &item : wtx.mapValue) {
+    for (const auto& item : wtx.mapValue) {
         entry.push_back(Pair(item.first, item.second));
     }
 }
@@ -419,7 +419,7 @@ static UniValue getaddressesbyaccount(const Config &config,
 
     // Find all addresses that have the given account
     UniValue ret(UniValue::VARR);
-    for (const std::pair<CTxDestination, CAddressBookData> &item :
+    for (const auto& item :
          pwallet->mapAddressBook) {
         const CTxDestination &dest = item.first;
         const std::string &strName = item.second.name;
@@ -762,7 +762,7 @@ static UniValue getreceivedbyaddress(const Config &config,
 
     // Tally
     Amount nAmount(0);
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         const CWalletTx &wtx = pairWtx.second;
 
         CValidationState state;
@@ -837,7 +837,7 @@ static UniValue getreceivedbyaccount(const Config &config,
 
     // Tally
     Amount nAmount(0);
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         const CWalletTx &wtx = pairWtx.second;
         CValidationState state;
         if (wtx.IsCoinBase() ||
@@ -1415,7 +1415,7 @@ static UniValue ListReceived(
 
     // Tally
     std::map<CTxDestination, tallyitem> mapTally;
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         const CWalletTx &wtx = pairWtx.second;
 
         CValidationState state;
@@ -1458,7 +1458,7 @@ static UniValue ListReceived(
     // Reply
     UniValue ret(UniValue::VARR);
     std::map<std::string, tallyitem> mapAccountTally;
-    for (const std::pair<CTxDestination, CAddressBookData> &item :
+    for (const auto& item :
          pwallet->mapAddressBook) {
         const CTxDestination &dest = item.first;
         const std::string &strAccount = item.second.name;
@@ -1981,7 +1981,7 @@ static UniValue listaccounts(const Config &config,
     }
 
     std::map<std::string, Amount> mapAccountBalances;
-    for (const std::pair<CTxDestination, CAddressBookData> &entry :
+    for (const auto& entry :
          pwallet->mapAddressBook) {
         // This address belongs to me
         if (IsMine(*pwallet, entry.first) & includeWatchonly) {
@@ -1989,7 +1989,7 @@ static UniValue listaccounts(const Config &config,
         }
     }
 
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         const CWalletTx &wtx = pairWtx.second;
         Amount nFee;
         std::string strSentAccount;
@@ -2023,7 +2023,7 @@ static UniValue listaccounts(const Config &config,
     }
 
     UniValue ret(UniValue::VOBJ);
-    for (const std::pair<std::string, Amount> &accountBalance :
+    for (const auto& accountBalance :
          mapAccountBalances) {
         ret.push_back(
             Pair(accountBalance.first, ValueFromAmount(accountBalance.second)));
@@ -2157,7 +2157,7 @@ static UniValue listsinceblock(const Config &config,
 
     UniValue transactions(UniValue::VARR);
 
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         CWalletTx tx = pairWtx.second;
 
         if (depth == -1 || tx.GetDepthInMainChain() < depth) {

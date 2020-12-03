@@ -3049,8 +3049,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                          DEFAULT_WALLET_REJECT_LONG_CHAINS)) {
         // Lastly, ensure this tx will pass the mempool's chain limits.
         LockPoints lp;
-        CTxMemPoolEntry entry {wtxNew.tx, Amount(0), 0, 0, 0, Amount(0), false,
-            lp, mempool};
+        CTxMemPoolEntry entry {wtxNew.tx, Amount{0}, 0, 0, 0, Amount{0}, false, lp};
         size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
         size_t nLimitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
 
@@ -3280,7 +3279,7 @@ bool CWallet::DelAddressBook(const CTxDestination &address) {
         LOCK(cs_wallet);
 
         // Delete destdata tuples associated with address.
-        for (const std::pair<std::string, std::string> &item :
+        for (const auto& item :
              mapAddressBook[address].destdata) {
             CWalletDB(*dbw).EraseDestData(address, item.first);
         }
@@ -3694,7 +3693,7 @@ std::set<CTxDestination>
 CWallet::GetAccountAddresses(const std::string &strAccount) const {
     LOCK(cs_wallet);
     std::set<CTxDestination> result;
-    for (const std::pair<CTxDestination, CAddressBookData> &item :
+    for (const auto& item :
          mapAddressBook) {
         const CTxDestination &address = item.first;
         const std::string &strName = item.second.name;
@@ -4582,6 +4581,7 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
             tx,           // a pointer to the tx
             TxSource::wallet, // tx source
             TxValidationPriority::normal, // tx validation priority
+            TxStorage::memory, // tx storage
             GetTime(),    // nAcceptTime
             true,         // fLimitFree
             nAbsurdFee),  // nAbsurdFee

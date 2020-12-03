@@ -976,7 +976,7 @@ std::vector<TxId> LimitMempoolSize(
     size_t usageMemory = usageTotal - usageDisk;
     if (usageMemory > limitMemory) {
         size_t toWriteOut = usageMemory - limitMemory;
-        pool.SaveTxsToDiskBatch(toWriteOut);
+        pool.SaveTxsToDisk(toWriteOut);
     }
     pcoinsTip->Uncache(vNoSpendsRemaining);
     return vRemovedTxIds;
@@ -985,7 +985,7 @@ std::vector<TxId> LimitMempoolSize(
 void CommitTxToMempool(
     const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& pMempoolEntry,
-    // FIXME: (CORE-130) CTxMemPool::setEntries& setAncestors,
+    TxStorage txStorage,
     CTxMemPool& pool,
     CValidationState& state,
     const CJournalChangeSetPtr& changeSet,
@@ -1000,6 +1000,13 @@ void CommitTxToMempool(
     // Post-genesis, non-final txns have their own mempool
     if(state.IsNonFinal() || pool.getNonFinalPool().finalisesExistingTransaction(ptx))
     {
+        if (txStorage != TxStorage::memory)
+        {
+            // Remove the transaction from disk because the non-final memppool
+            // does not use the txdb.
+            pool.RemoveTxFromDisk(ptx);
+        }
+
         // Post-genesis, non-final txns have their own mempool
         TxMempoolInfo info { pMempoolEntry };
         pool.getNonFinalPool().addOrUpdateTransaction(info, pTxInputData, state);
@@ -1010,7 +1017,7 @@ void CommitTxToMempool(
     pool.AddUnchecked(
             txid,
             pMempoolEntry,
-            // FIXME: (CORE-130) setAncestors,
+            txStorage,
             changeSet,
             pnMempoolSize,
             pnDynamicMemoryUsage);
@@ -1349,8 +1356,7 @@ CTxnValResult TxnValidation(
             uiChainActiveHeight,
             inChainInputValue,
             fSpendsCoinbase,
-            lp,
-            pool) };
+            lp) };
     if (!skipFeeTest) {
         // Check tx's priority based on relaypriority flag and relay fee.
         const CFeeRate minRelayTxFee = config.GetMinFeePerKB();
@@ -1733,6 +1739,7 @@ void ProcessValidatedTxn(
     CValidationState& state = txStatus.mState;
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
+    const TxStorage txStorage = txStatus.mTxInputData->GetTxStorage();
     /**
      * 1. Txn validation has failed
      *    - Handle an invalid state for p2p txn
@@ -1777,7 +1784,7 @@ void ProcessValidatedTxn(
         CommitTxToMempool(
             txStatus.mTxInputData,
             *(txStatus.mpEntry),
-            // FIXME: (CORE-130) txStatus.mSetAncestors,
+            txStorage,
             pool,
             state,
             handlers.mJournalChangeSet,

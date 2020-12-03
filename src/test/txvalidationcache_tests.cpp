@@ -37,6 +37,7 @@ namespace {
                     MakeTransactionRef(tx),   // a pointer to the tx
                     TxSource::rpc,            // tx source
                     TxValidationPriority::normal,   // tx validation priority
+                    TxStorage::memory,        // tx storage
                     GetTime(),                // nAcceptTime
                     false)                    // fLimitFree
             };

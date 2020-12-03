@@ -29,11 +29,6 @@ namespace
         txn.vout[0].scriptPubKey = CScript() << stuff << OP_DROP << unique++ << OP_DROP;
         return { MakeTransactionRef(std::move(txn)), Amount{0}, groupId };
     }
-    // Generate a new random transaction group
-    CJournalEntry NewTxn()
-    {
-        return NewTxn(std::nullopt);
-    }
     void NewChangeSet(CJournalBuilder &builder, size_t groupSize, GroupID groupId)
     {
         auto changeSet = builder.getNewChangeSet(JournalUpdateReason::NEW_TXN);
@@ -112,7 +107,6 @@ BOOST_AUTO_TEST_CASE(TestJournalAddGroup)
 
     Config &config = GlobalConfig::GetConfig();
     const size_t maxUserTxns = 10;
-    const size_t coinbase = 1;
     config.SetMaxGeneratedBlockSize(1000 + maxUserTxns * txnSize + 1);
 
     CJournalPtr journal { builder.getCurrentJournal() };

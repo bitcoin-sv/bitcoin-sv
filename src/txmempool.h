@@ -10,10 +10,10 @@
 #include "coins.h"
 #include "mining/journal_builder.h"
 #include "primitives/transaction.h"
-#include "random.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
 #include "tx_mempool_info.h"
+#include "txn_validation_data.h"
 #include "policy/policy.h"
 
 #include <boost/multi_index/hashed_index.hpp>
@@ -22,6 +22,7 @@
 #include <boost/multi_index_container.hpp>
 
 #include <boost/signals2/signal.hpp>
+#include <boost/uuid/uuid.hpp>
 
 #include <functional>
 #include <map>
@@ -41,7 +42,7 @@ class CEvictionCandidateTracker;
 class Config;
 class CoinsDB;
 class CoinsDBView;
-class CMempoolTxDB;
+class CAsyncMempoolTxDB;
 
 inline double AllowFreeThreshold() {
     return COIN.GetSatoshis() * 144 / 250;
@@ -104,14 +105,6 @@ inline bool operator==(const SecondaryMempoolEntryData& a,
                            (a.ancestorsCount == b.ancestorsCount)));
 }
 
-
-class CTxMemPoolBase {
-public:
-    virtual ~CTxMemPoolBase() {}
-
-    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() = 0;
-};
-
 /** \class CTxPrioritizer
  *
  * The aim of this class is to support txn prioritisation and cleanup
@@ -136,9 +129,6 @@ public:
     CTxPrioritizer& operator=(CTxPrioritizer&&) = delete;
 };
 
-struct CPFPGroup;
-
-
 /**
  * \class GroupID
  *
@@ -148,29 +138,6 @@ struct CPFPGroup;
  * The block assembler should not accept a partial group into the block template.
  */
 using GroupID = std::optional<TxId>;
-
-class CTransactionRefWrapper {
-private:
-    mutable CTransactionRef tx {};
-    // Transaction Id
-    TxId txid {};
-    // Mempool Transaction database
-    std::shared_ptr<CMempoolTxDB> mempoolTxDB {};
-
-    CTransactionRef GetTxFromDB() const;
-
-public:
-    CTransactionRefWrapper();
-    CTransactionRefWrapper(const CTransactionRef &tx, const std::shared_ptr<CMempoolTxDB>& txDB);
-
-    CTransactionRef GetTx() const;
-    const TxId& GetId() const;
-
-    void MoveTxToDisk() const;
-    void UpdateMoveTxToDisk() const;
-
-    bool IsInMemory() const;
-};
 
 /** \class CTxMemPoolEntry
  *
@@ -188,7 +155,10 @@ public:
  */
 class CTxMemPoolEntry {
 private:
-    CTransactionRefWrapper tx;
+    CTransactionWrapperRef tx;
+    // The mempool info constructor needs access to the wrapper reference.
+    friend TxMempoolInfo::TxMempoolInfo(const CTxMemPoolEntry&);
+
     //!< Cached to avoid expensive parent-transaction lookups
     Amount nFee;
     //!< ... and avoid recomputing tx size
@@ -228,16 +198,15 @@ public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
                     int64_t _nTime, double _entryPriority,
                     int32_t _entryHeight, Amount _inChainInputValue,
-                    bool spendsCoinbase, LockPoints lp,
-                    CTxMemPoolBase &mempoolIn);
+                    bool spendsCoinbase, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
     // CPFP group, if any that this transaction belongs to.
     GroupID GetCPFPGroupId() const;
-    CTransactionRef GetSharedTx() const { return tx.GetTx(); }
-    const TxId& GetTxId() const { return tx.GetId(); }
+    CTransactionRef GetSharedTx() const { return tx->GetTx(); }
+    const TxId& GetTxId() const { return tx->GetId(); }
 
     /**
      * Fast calculation of lower bound of current priority as update from entry
@@ -265,9 +234,8 @@ public:
     bool IsInPrimaryMempool() const { return !groupingData.has_value(); }
     std::shared_ptr<const CPFPGroup> GetCPFPGroup() const { return group; }
 
-    void MoveTxToDisk() const;
-    void UpdateMoveTxToDisk() const;
-    bool IsInMemory() const;
+    bool IsInMemory() const noexcept { return tx->IsInMemory(); }
+    TxStorage GetTxStorage() const noexcept { return tx->GetTxStorage(); }
 
     template<typename X> struct UnitTestAccess;
 
@@ -355,20 +323,6 @@ enum class MemPoolRemovalReason {
     REPLACED
 };
 
-class SaltedTxidHasher {
-private:
-    // The salt does not change during the lifetime of the hasher object,
-    // but it's not const so that copy construction and assignment work.
-    uint64_t k0, k1;
-
-public:
-    SaltedTxidHasher();
-
-    size_t operator()(const uint256 &txid) const {
-        return SipHashUint256(k0, k1, txid);
-    }
-};
-
 struct DisconnectedBlockTransactions;
 
 /**
@@ -449,7 +403,7 @@ struct DisconnectedBlockTransactions;
  * entry as "dirty", and set the feerate for sorting purposes to be equal the
  * feerate of the transaction without any descendants.
  */
-class CTxMemPool : public CTxMemPoolBase {
+class CTxMemPool {
 private:
     static constexpr int MAX_NUMBER_OF_TX_TO_VISIT_IN_ONE_GO = 1000;
 
@@ -458,6 +412,10 @@ private:
     // transactions becomes O(N^2) where N is the number of transactions in the
     // pool
     std::atomic_uint32_t nCheckFrequency {0};
+
+    // Flag to temporarily suspend sanity checking
+    std::atomic_bool suspendSanityCheck {false};
+
     std::atomic_uint nTransactionsUpdated {0};
 
     // fee that a transaction or a group needs to pay to enter the primary mempool
@@ -488,9 +446,8 @@ private:
     friend struct CPFPGroup;
 
     // Mempool transaction database
-    std::shared_ptr<CMempoolTxDB> mempoolTxDB {nullptr};
-
     std::once_flag db_initialized {};
+    std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
 
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
@@ -561,8 +518,7 @@ private:
     void updateParentNL(txiter entry, txiter parent, bool add);
     void updateChildNL(txiter entry, txiter child, bool add);
 
-    std::vector<txiter> getSortedDepthAndScoreNL() const;
-    std::map<COutPoint, const CTransactionRefWrapper*> mapNextTx;
+    std::map<COutPoint, const CTransactionWrapperRef> mapNextTx;
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
     class InsertionIndex
@@ -605,6 +561,8 @@ public:
     std::string CheckJournal() const;
 
     void SetSanityCheck(double dFrequency = 1.0);
+    void SuspendSanityCheck() { suspendSanityCheck.store(true); }
+    void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
 
@@ -617,11 +575,16 @@ public:
     void AddUnchecked(
             const uint256 &hash,
             const CTxMemPoolEntry &entry,
+            const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
 private:
+    // Check the contents of the mempool transaction database against the mempool.
+    // hardErrors=true means the implementation will assert() on error.
+    bool CheckMempoolTxDBNL(bool hardErrors = true) const;
+
     // walks through ancestors and collect all that are still in the secondary mempool
     // payingTx will be includes in this set also
     setEntriesTopoSorted GetSecondaryMempoolAncestorsNL(CTxMemPool::txiter payingTx) const;
@@ -683,10 +646,6 @@ public:
 
     void Clear();
 
-    bool CompareDepthAndScore(
-            const uint256 &hasha,
-            const uint256 &hashb);
-
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
     CTransactionRef IsSpentBy(const COutPoint &outpoint) const;
@@ -732,17 +691,21 @@ public:
         const std::vector<COutPoint>& outpoints,
         const std::function<void(const CoinWithScript&, size_t)>& callback) const;
 
-    void InitMempoolTxDB();
-    // Get MempoolTxDB
-    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() override;
-
-    uint64_t GetDiskUsage();
-
-    void SaveTxsToDisk(uint64_t required_size);
-    void UpdateMoveTxsToDisk(std::vector<const CTxMemPoolEntry*> toBeUpdated);
-    void SaveTxsToDiskBatch(uint64_t requiredSize);
+private:
+    void OpenMempoolTxDB(const bool clearDatabase = false);
 
 public:
+    // Called at process init, opens the transaction database and checks its
+    // cross-reference with mempool.dat.
+    void InitMempoolTxDB();
+    uint64_t GetDiskUsage();
+    uint64_t GetDiskTxCount();
+    void SaveTxsToDisk(uint64_t requiredSize);
+
+    // May be called during validation.
+    // The transaction must not exist in the mempool.
+    void RemoveTxFromDisk(const CTransactionRef& transaction);
+
     /**
      * Remove a set of transactions from the mempool. If a transaction is in
      * this set, then all in-mempool descendants must also be in the set, unless
@@ -851,6 +814,7 @@ public:
     void ClearPrioritisation(const uint256 &hash);
     void ClearPrioritisation(const std::vector<TxId>& vTxIds);
 
+private:
     /**
      * Retreive mempool data needed by DumpMempool().
      */
@@ -1100,14 +1064,10 @@ private:
     void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
+            const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
-
-    // A non-locking version of CompareDepthAndScore
-    bool CompareDepthAndScoreNL(
-        const uint256 &hasha,
-        const uint256 &hashb);
 
     // A non-locking version of ApplyDeltas
     void ApplyDeltasNL(
@@ -1131,12 +1091,12 @@ private:
      * in a chain before we've updated all the state for the removal.
      */
     void removeUncheckedNL(
-            txiter entry,
+            const setEntries& entries,
             mining::CJournalChangeSet& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedWith = nullptr);
 
-    void clearNL();
+    void clearNL(bool skipTransactionDatabase = false);
 
     void trackPackageRemovedNL(const CFeeRate &rate);
 
@@ -1169,6 +1129,20 @@ private:
 
     // A non-locking version of DynamicMemoryUsage.
     size_t DynamicMemoryUsageNL() const;
+
+    // Dumping and loading the mempool.
+    using DumpFileID = boost::uuids::uuid;
+    FILE* OpenDumpFile(uint64_t& version, DumpFileID& instanceId);
+
+    // Mempool dump and load for testing different file formats
+    // and custion validation.
+    void DumpMempool(uint64_t version);
+    bool LoadMempool(const Config &config,
+                     const task::CCancellationToken& shutdownToken,
+                     const std::function<CValidationState(
+                         const TxInputDataSPtr& txInputData,
+                         const mining::CJournalChangeSetPtr& changeSet,
+                         bool limitMempoolSize)>& processValidation);
 
 public:
     // Allow access to some mempool internals from unit tests.

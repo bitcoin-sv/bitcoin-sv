@@ -208,6 +208,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
                                  .Time(GetTime())
                                  .SpendsCoinbase(spendsCoinbase)
                                  .FromTx(tx),
+                             TxStorage::memory,
                              nullChangeSet);
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
@@ -240,6 +241,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
                                  .Time(GetTime())
                                  .SpendsCoinbase(spendsCoinbase)
                                  .FromTx(tx),
+                             TxStorage::memory,
                              nullChangeSet);
         tx.vin[0].prevout = COutPoint(hash, 0);
     }
@@ -248,7 +250,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
     // Orphan in mempool, template creation fails.
     hash = tx.GetId();
-    mempool.AddUnchecked(hash, entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(hash, entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx), TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
@@ -264,7 +266,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
-        nullChangeSet);
+        TxStorage::memory, nullChangeSet);
     tx.vin[0].prevout = COutPoint(hash, 0);
     tx.vin.resize(2);
     tx.vin[1].scriptSig = CScript() << OP_1;
@@ -275,7 +277,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHERFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
-        nullChangeSet);
+        TxStorage::memory, nullChangeSet);
     BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     mempool.Clear();
 
@@ -289,7 +291,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.AddUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx),
-        nullChangeSet);
+        TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
@@ -317,7 +319,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.AddUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
-        nullChangeSet);
+        TxStorage::memory, nullChangeSet);
     tx.vin[0].prevout = COutPoint(hash, 0);
     tx.vin[0].scriptSig = CScript()
                           << std::vector<uint8_t>(script.begin(), script.end());
@@ -326,7 +328,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.AddUnchecked(
         hash,
         entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx),
-        nullChangeSet);
+        TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
@@ -348,13 +350,13 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
-        nullChangeSet);
+        TxStorage::memory, nullChangeSet);
     tx.vout[0].scriptPubKey = CScript() << OP_2;
     hash = tx.GetId();
     mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
-        nullChangeSet);
+        TxStorage::memory, nullChangeSet);
     testingSetup.testConfig.SetTestBlockCandidateValidity(false);
     BOOST_CHECK_NO_THROW(mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     testingSetup.testConfig.SetTestBlockCandidateValidity(true);
@@ -431,7 +433,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.AddUnchecked(
         hash,
         entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx),
-        nullChangeSet);
+        TxStorage::memory, nullChangeSet);
 
     {
         // Locktime passes.
@@ -463,7 +465,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
                            1);
     prevheights[0] = baseheight + 2;
     hash = tx.GetId();
-    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), TxStorage::memory, nullChangeSet);
 
     {
         // Locktime passes.
@@ -502,7 +504,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     prevheights[0] = baseheight + 3;
     tx.nLockTime = chainActive.Tip()->nHeight + 1;
     hash = tx.GetId();
-    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), TxStorage::memory, nullChangeSet);
 
     {
         // Locktime fails.
@@ -535,7 +537,7 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     prevheights.resize(1);
     prevheights[0] = baseheight + 4;
     hash = tx.GetId();
-    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), nullChangeSet);
+    mempool.AddUnchecked(hash, entry.Time(GetTime()).FromTx(tx), TxStorage::memory, nullChangeSet);
 
     {
         // Locktime fails.
@@ -832,6 +834,7 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
                                  .Time(GetTime())
                                  .SpendsCoinbase(spendsCoinbase)
                                  .FromTx(tx),
+                             TxStorage::memory,
                              nullChangeSet);
         tx.vin[0].prevout = COutPoint(hash, 0);
     }

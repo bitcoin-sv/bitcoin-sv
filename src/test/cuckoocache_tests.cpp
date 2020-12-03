@@ -33,9 +33,12 @@ BOOST_AUTO_TEST_SUITE(cuckoocache_tests);
  * insecure_GetRandHash fills in a uint256 from local_rand_ctx
  */
 void insecure_GetRandHash(uint256 &t) {
-    uint32_t *ptr = (uint32_t *)t.begin();
-    for (uint8_t j = 0; j < 8; ++j)
-        *(ptr++) = local_rand_ctx.rand32();
+    const auto begin = reinterpret_cast<uint32_t*>(t.begin());
+    const auto end = reinterpret_cast<uint32_t*>(t.end());
+    for (auto ptr = begin; ptr < end; ++ptr)
+    {
+        *ptr = local_rand_ctx.rand32();
+    }
 }
 
 /**
@@ -71,9 +74,7 @@ template <typename Cache> double test_cache(size_t megabytes, double load) {
     uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
-        uint32_t *ptr = (uint32_t *)hashes[i].begin();
-        for (uint8_t j = 0; j < 8; ++j)
-            *(ptr++) = local_rand_ctx.rand32();
+        insecure_GetRandHash(hashes[i]);
     }
     /**
      * We make a copy of the hashes because future optimizations of the
@@ -141,9 +142,7 @@ template <typename Cache> void test_cache_erase(size_t megabytes) {
     uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
-        uint32_t *ptr = (uint32_t *)hashes[i].begin();
-        for (uint8_t j = 0; j < 8; ++j)
-            *(ptr++) = local_rand_ctx.rand32();
+        insecure_GetRandHash(hashes[i]);
     }
     /** We make a copy of the hashes because future optimizations of the
      * cuckoocache may overwrite the inserted element, so the test is
@@ -203,9 +202,7 @@ template <typename Cache> void test_cache_erase_parallel(size_t megabytes) {
     uint32_t n_insert = static_cast<uint32_t>(load * (bytes / sizeof(uint256)));
     hashes.resize(n_insert);
     for (uint32_t i = 0; i < n_insert; ++i) {
-        uint32_t *ptr = (uint32_t *)hashes[i].begin();
-        for (uint8_t j = 0; j < 8; ++j)
-            *(ptr++) = local_rand_ctx.rand32();
+        insecure_GetRandHash(hashes[i]);
     }
     /** We make a copy of the hashes because future optimizations of the
      * cuckoocache may overwrite the inserted element, so the test is
@@ -309,9 +306,7 @@ template <typename Cache> void test_cache_generations() {
             inserts.resize(n_insert);
             reads.reserve(n_insert / 2);
             for (uint32_t i = 0; i < n_insert; ++i) {
-                uint32_t *ptr = (uint32_t *)inserts[i].begin();
-                for (uint8_t j = 0; j < 8; ++j)
-                    *(ptr++) = local_rand_ctx.rand32();
+                insecure_GetRandHash(inserts[i]);
             }
             for (uint32_t i = 0; i < n_insert / 4; ++i)
                 reads.push_back(inserts[i]);

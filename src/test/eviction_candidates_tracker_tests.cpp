@@ -14,7 +14,6 @@
 
 
 CTxMemPoolEntry MakeEntry(
-    CTxMemPoolBase &pool,
     double feerate, 
     const std::vector<std::tuple<TxId, int, Amount>>& inChainInputs, 
     const std::vector<std::tuple<CTransactionRef, int>>& inMempoolInputs,
@@ -23,14 +22,14 @@ CTxMemPoolEntry MakeEntry(
     CMutableTransaction tx;
     Amount totalInput;
     Amount totalInChainInput;
-    for(const auto[id, ndx, amount]: inChainInputs)
+    for(const auto& [id, ndx, amount]: inChainInputs)
     {
         tx.vin.push_back(CTxIn(id, ndx, CScript()));
         totalInput += amount;
         totalInChainInput += amount;
     }
 
-    for(const auto[txInput, ndx]: inMempoolInputs)
+    for(const auto& [txInput, ndx]: inMempoolInputs)
     {
         tx.vin.push_back(CTxIn(txInput->GetId(), ndx, CScript()));
         totalInput += txInput->vout[ndx].nValue;
@@ -61,20 +60,18 @@ CTxMemPoolEntry MakeEntry(
     }
 
     auto txRef = MakeTransactionRef(tx);
-    CTxMemPoolEntry entry {txRef, totalFee, int64_t(0), false, 0, totalInChainInput, false, LockPoints(), pool};
+    CTxMemPoolEntry entry {txRef, totalFee, int64_t{0}, false, 0, totalInChainInput, false, LockPoints{}};
     return entry;
 }
 
 
 
-class MempoolMockup : public CTxMemPoolBase
+class MempoolMockup
 {
 public:
     std::optional<CEvictionCandidateTracker> tracker;
     CTxMemPoolTestAccess::txlinksMap links;
     CTxMemPool::indexed_transaction_set mapTx;
-
-    virtual std::shared_ptr<CMempoolTxDB> GetMempoolTxDB() override { return nullptr; }
 
     CTxMemPoolTestAccess::txiter AddTx(CTxMemPoolEntry entry)
     {
@@ -188,7 +185,7 @@ BOOST_FIXTURE_TEST_SUITE(eviction_candidates_tracker_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(single_long_chain) {
     MempoolMockup mempool;
     auto confirmedEntry = std::make_tuple<TxId, int, Amount>(TxId(), 0, Amount(10000000));
-    auto entry = MakeEntry(mempool, 1,{confirmedEntry}, {}, 1, 0);
+    auto entry = MakeEntry(1,{confirmedEntry}, {}, 1, 0);
     mempool.AddTx(entry);
     
     
@@ -198,7 +195,7 @@ BOOST_AUTO_TEST_CASE(single_long_chain) {
         std::deque<uint256> addedTransactions;
         for(int i = 0; i < 100; i++)
         {
-            auto newEntry = MakeEntry(mempool, 1, {}, { std::make_tuple<CTransactionRef, int>(oldEntry.GetSharedTx(), 0)}, 1, 0);
+            auto newEntry = MakeEntry(1, {}, { std::make_tuple<CTransactionRef, int>(oldEntry.GetSharedTx(), 0)}, 1, 0);
             mempool.AddTx(newEntry);
             addedTransactions.push_back(newEntry.GetSharedTx()->GetId());
             oldEntry = newEntry;
@@ -232,7 +229,7 @@ BOOST_AUTO_TEST_CASE(single_long_chain) {
 BOOST_AUTO_TEST_CASE(broad_tree) {
     MempoolMockup mempool;
     auto confirmedEntry = std::make_tuple<TxId, int, Amount>(TxId(), 0, Amount(100000000));
-    auto entry = MakeEntry(mempool, 1,{confirmedEntry}, {}, 100, 0);
+    auto entry = MakeEntry(1,{confirmedEntry}, {}, 100, 0);
     mempool.AddTx(entry);
 
     for(int n = 0; n < 2; n++)
@@ -240,7 +237,7 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
         for(size_t i = 0; i < 100; i++)
         {
             auto feerate = 100 + ((i % 2 == 0) ? (i * 0.1) : (i * -0.1)); 
-            auto newEntry = MakeEntry(mempool, feerate, {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
+            auto newEntry = MakeEntry(feerate, {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
             mempool.AddTx(newEntry);
             if(mempool.tracker)
             {
@@ -271,12 +268,12 @@ BOOST_AUTO_TEST_CASE(broad_tree) {
 BOOST_AUTO_TEST_CASE(secondary_mempool_first) {
     MempoolMockup mempool;
     auto confirmedEntry = std::make_tuple<TxId, int, Amount>(TxId(), 0, Amount(10000000));
-    auto entry = MakeEntry(mempool, 1,{confirmedEntry}, {}, 100, 0);
+    auto entry = MakeEntry(1,{confirmedEntry}, {}, 100, 0);
     mempool.AddTx(entry);
 
     for(int i = 0; i < 100; i++)
     {    
-        auto newEntry = MakeEntry(mempool, 100 + (i * 0.1), {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
+        auto newEntry = MakeEntry(100 + (i * 0.1), {}, { std::make_tuple<CTransactionRef, int>(entry.GetSharedTx(), std::move(i))}, 1, 0);
         if(i % 2 == 0)
         {
             CTestTxMemPoolEntry(newEntry).groupingData() =
@@ -334,14 +331,14 @@ BOOST_AUTO_TEST_CASE(group) {
     std::vector<std::tuple<CTransactionRef, int>> inMempoolInputs;
     for(int i = 0; i < 4; i++)
     {
-        group.push_back(MakeEntry(mempool, 0,{confirmedInputs[i]}, {}, 2, 1000));
+        group.push_back(MakeEntry(0,{confirmedInputs[i]}, {}, 2, 1000));
         inMempoolInputs.push_back(std::make_tuple(group.back().GetSharedTx(), 0));
     }
-    group.push_back(MakeEntry(mempool, 10,{}, inMempoolInputs, 1, 1000));
+    group.push_back(MakeEntry(10,{}, inMempoolInputs, 1, 1000));
     mempool.AddGroup(group);
     mempool.InitializeTracker();
     BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1);
-    mempool.AddTx(MakeEntry(mempool, 1000, {}, {std::make_tuple(group[0].GetSharedTx(), 1)}, 1, 1000));
+    mempool.AddTx(MakeEntry(1000, {}, {std::make_tuple(group[0].GetSharedTx(), 1)}, 1, 1000));
     BOOST_ASSERT(mempool.tracker->GetAllCandidates().size() == 1);
     mempool.RemoveMostWorthless();
     mempool.RemoveMostWorthless();
@@ -361,7 +358,7 @@ BOOST_AUTO_TEST_CASE(performance, * boost::unit_test::disabled()) {
 
     std::deque<std::tuple<CTransactionRef, int>> inputs;
     auto input = std::make_tuple<TxId, int, Amount>(TxId(), 0, Amount(10000000000));
-    auto rootTx = MakeEntry(mempool, 0, {input}, {}, OUTPUTS_PER_TX, 300);
+    auto rootTx = MakeEntry(0, {input}, {}, OUTPUTS_PER_TX, 300);
     mempool.AddTx(rootTx);
 
     for(size_t i = 0; i < OUTPUTS_PER_TX; i++)
@@ -377,7 +374,7 @@ BOOST_AUTO_TEST_CASE(performance, * boost::unit_test::disabled()) {
             inMempoolInputs.emplace_back(inputs.front());
             inputs.pop_front();
         }
-        auto tx = MakeEntry(mempool, double(std::rand()) / double(RAND_MAX) + 0.5, {}, inMempoolInputs, OUTPUTS_PER_TX, 1);
+        auto tx = MakeEntry(double(std::rand()) / double(RAND_MAX) + 0.5, {}, inMempoolInputs, OUTPUTS_PER_TX, 1);
         for(size_t outp = 0; outp < OUTPUTS_PER_TX; outp++)
         {
             inputs.emplace_back(tx.GetSharedTx(), static_cast<int>(outp));

@@ -5,9 +5,14 @@
 
 #include "primitives/transaction.h"
 
-#include "hash.h"
+#include "random.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
+
+SaltedTxidHasher::SaltedTxidHasher()
+    : k0(GetRand(std::numeric_limits<uint64_t>::max())),
+      k1(GetRand(std::numeric_limits<uint64_t>::max()))
+{}
 
 std::string COutPoint::ToString() const {
     return strprintf("COutPoint(%s, %u)", txid.ToString().substr(0, 10), n);

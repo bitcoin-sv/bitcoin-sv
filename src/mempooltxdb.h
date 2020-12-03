@@ -6,20 +6,67 @@
 #define BITCOIN_MEMPOOLTXDB_H
 
 #include "dbwrapper.h"
-#include "primitives/transaction.h"
+#include "tx_mempool_info.h"
 
-/** Access to the mempool transaction database (mempoolTxs/) */
-class CMempoolTxDB {
+#include <boost/uuid/uuid.hpp>
+
+#include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <deque>
+#include <future>
+#include <initializer_list>
+#include <mutex>
+#include <unordered_map>
+#include <unordered_set>
+#include <thread>
+#include <variant>
+#include <vector>
+
+/**
+ * Read-only access to transactions in the database.
+ *
+ * The methods exposed by this class are safe to use from multiple threads
+ * without synchronization.
+ */
+class CMempoolTxDBReader {
+public:
+    virtual ~CMempoolTxDBReader() = default;
+    virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) = 0;
+    virtual bool TransactionExists(const uint256 &txid) = 0;
+};
+
+/**
+ * Access to the mempool transaction database (mempoolTxDB).
+ *
+ * Objects of this class should be used in a single-threaded context, otherwise
+ * internal accounting will not be consistent. The exceptions to this rule are:
+ * <ul>
+ *  <li>Methods from the base @ref CMempoolTxDBReader that are implemented here;</li>
+ *  <li>GetDiskUsage(), GetTxCount() and GetWriteCount().</li>
+ * </ul>
+ */
+class CMempoolTxDB : public CMempoolTxDBReader {
 private:
-    // Prefix to store map of Transaction values with txid as a
-    // key
+    // Prefix to store map of Transaction values with txid as a key
     static constexpr char DB_TRANSACTIONS = 'T';
     // Prefix to store disk usage
     static constexpr char DB_DISK_USAGE = 'D';
+    // Prefix to store transaaction count
+    static constexpr char DB_TX_COUNT = 'C';
+    // Prefix to store the mempool.dat cross-reference key
+    static constexpr char DB_MEMPOOL_XREF = 'X';
 
-    CDBWrapper mempoolTxDB;
+    // Saved database parameters
+    const fs::path dbPath;
+    const size_t nCacheSize;
+    const bool fMemory;
 
-    uint64_t diskUsage {0};
+    std::unique_ptr<CDBWrapper> mempoolTxDB;
+
+    std::atomic_uint64_t diskUsage {0};
+    std::atomic_uint64_t txCount {0};
+    std::atomic_uint64_t dbWriteCount {0};
 
 public:
     /**
@@ -29,31 +76,197 @@ public:
      * true it will remove all existing data in this database.
      */
     CMempoolTxDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+
     /*
-     * Used to add new transaction into the database to sync it with
-     * written data.
+     * Clear the contents of the database by recreating an empty one in place,
+     * using the same parameters as when the database object was constructed.
      */
-    bool AddTransaction(const uint256 &txid, const CTransactionRef &tx);
+    void ClearDatabase();
 
     /*
      * Used to add a batch of new transactions into the database
      */
-    bool AddTransactions(std::vector<CTransactionRef> &txs);
+    bool AddTransactions(const std::vector<CTransactionRef> &txs);
 
     /*
      * Used to retrieve transaction from the database.
      */
-    bool GetTransaction(const uint256 &txid, CTransactionRef &tx);
+    virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override;
 
     /*
-     * Used to remove all transactions from the database.
+     * Checks if the transaction key is in the database.
      */
-    bool RemoveTransactions(const std::vector<uint256> &transactionsToRemove, uint64_t diskUsageRemoved);
+    virtual bool TransactionExists(const uint256 &txid) override;
+
+    struct TxData
+    {
+        TxId txid;
+        uint64_t size;
+
+        TxData(TxId&& txid_, uint64_t size_) : txid{std::move(txid_)}, size{size_} {}
+        TxData(const TxId& txid_, uint64_t size_) : txid{txid_}, size{size_} {}
+    };
+    /*
+     * Used to remove a batch of transactions from the database.
+     */
+    bool RemoveTransactions(const std::vector<TxData>& transactionsToRemove);
 
     /**
      * Return the total size of transactions moved to disk.
      */
     uint64_t GetDiskUsage();
+
+    /*
+     * Return the number of transactions moved to disk.
+     */
+    uint64_t GetTxCount();
+
+    using TxIdSet = std::unordered_set<uint256, SaltedTxidHasher>;
+    /*
+     * Get the set of transaction keys from the database.
+     */
+    TxIdSet GetKeys();
+
+    using XrefKey = boost::uuids::uuid;
+    /*
+     * Set the mempool.dat cross-reference key. Any later change to the
+     * database (i.e., calls to ClearDatabase(), AddTransactions() or
+     * RemoveTransactions() will remove this key.
+     */
+    bool SetXrefKey(const XrefKey& xrefKey);
+
+    /*
+     * Get the mempool.dat cross-reference key.
+     */
+    bool GetXrefKey(XrefKey& xrefKey);
+
+    /*
+     * Remove the mempool.dat cross-reference key.
+     */
+    bool RemoveXrefKey();
+
+    // Interface for coalescing batch add/remove operations.
+    struct Batch
+    {
+        using Updater = std::function<void(const TxId&)>;
+
+        struct AddOp
+        {
+            CTransactionRef tx;
+            Updater update;
+        };
+        std::unordered_map<TxId, AddOp, SaltedTxidHasher> adds;
+
+        struct RmOp
+        {
+            uint64_t size;
+            Updater update;
+        };
+        std::unordered_map<TxId, RmOp, SaltedTxidHasher> removes;
+
+        void Add(const CTransactionRef& tx, const Updater& update = {nullptr});
+        void Remove(const TxId& txid, uint64_t size, const Updater& update = {nullptr});
+        void Clear() { adds.clear(); removes.clear(); }
+    };
+    bool Commit(const Batch& batch);
+
+    // Get the number of batch writes performed on the database.
+    uint64_t GetWriteCount();
 };
 
-#endif // BITCOIN_MEMPOOLDB_H
+
+/** Wrapper for CMempoolTxDB for asynchronous writes and deletes. */
+class CAsyncMempoolTxDB
+{
+public:
+    CAsyncMempoolTxDB(size_t nCacheSize);
+    ~CAsyncMempoolTxDB();
+
+    // Syncronize with the background thread after finishing pending tasks.
+    void Sync();
+
+    // Synchronously clear the database contents, skip all pending tasks.
+    // NOTE: Call this only from contexts where no reads or writes
+    //       to the database are possible.
+    void Clear();
+
+    // Asynchronously add transactions to the database.
+    void Add(std::vector<CTransactionWrapperRef>&& transactionsToAdd);
+
+    // Asynchronously remove transactions from the database.
+    void Remove(std::vector<CMempoolTxDB::TxData>&& transactionsToRemove);
+
+    // Get the size of the data in the database.
+    uint64_t GetDiskUsage()
+    {
+        return txdb->GetDiskUsage();
+    }
+
+    // Get the number of transactions in the database.
+    uint64_t GetTxCount()
+    {
+        return txdb->GetTxCount();
+    }
+
+    // Get the number of batch writes performed on the database.
+    uint64_t GetWriteCount()
+    {
+        return txdb->GetWriteCount();
+    }
+
+    // Return a read-only database reference
+    std::shared_ptr<CMempoolTxDBReader> GetDatabase();
+
+
+    // Return the keys that are currently in the database. Keys will not be read
+    // in the background thread, so for best results, no background changes
+    // should be happening at the same time (e.g., use Sync() first to clear the
+    // task queue and make sure no new transactions arrive to the mempool in the
+    // meantime).
+    CMempoolTxDB::TxIdSet GetTxKeys();
+
+
+    // The following methods are synchronous wrappers of the equivalent
+    // CMempoolTxDB methods.
+    bool SetXrefKey(const CMempoolTxDB::XrefKey& xrefKey);
+    bool GetXrefKey(CMempoolTxDB::XrefKey& xrefKey);
+    bool RemoveXrefKey();
+
+private:
+    struct StopTask{};
+    struct SyncTask
+    {
+        std::promise<void>* sync;
+    };
+    struct ClearTask{};
+    struct AddTask
+    {
+        std::vector<CTransactionWrapperRef> transactions;
+    };
+    struct RemoveTask
+    {
+        std::vector<CMempoolTxDB::TxData> transactions;
+    };
+    struct InvokeTask
+    {
+        std::function<void(CMempoolTxDB&)> function;
+    };
+    using Task = std::variant<StopTask, SyncTask, ClearTask, AddTask, RemoveTask, InvokeTask>;
+
+    // Task queue for the worker thread.
+    std::deque<Task> taskList;
+    std::mutex taskListGuard;
+    std::condition_variable taskListSignal;
+    void EnqueueNL(std::initializer_list<Task>&& tasks, bool clearList);
+    void Enqueue(std::initializer_list<Task>&& tasks, bool clearList = false);
+
+    // Thread synchronization point.
+    void Synchronize(std::initializer_list<Task>&& tasks, bool clearList = false);
+
+    // Initialize the database and worker thread after the queue and mutex.
+    std::shared_ptr<CMempoolTxDB> txdb;
+    std::thread worker;
+    void Work();
+};
+
+#endif // BITCOIN_MEMPOOLTXDB_H

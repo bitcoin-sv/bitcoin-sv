@@ -7,10 +7,10 @@
 #define BITCOIN_TEST_MEMPOOL_TEST_ACCESS_H
 
 #include "txmempool.h"
+#include "mempooltxdb.h"
 
-namespace
-{
-    struct CTxMemPoolUnitTestAccessHack {};
+namespace {
+    struct UnitTestAccessTag;
 }
 
 // Note that the template specialization itself cannot be defined in an
@@ -18,7 +18,7 @@ namespace
 // namespace in each unit test compilation unit, so we're not violating the one
 // definition rule.
 template<>
-struct CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>
+struct CTxMemPool::UnitTestAccess<UnitTestAccessTag>
 {
 public:
     CTxMemPool& mempool;
@@ -33,6 +33,7 @@ public:
     auto& mapTx() { return mempool.mapTx; }
     auto& mapNextTx() { return mempool.mapNextTx; }
     auto& mapDeltas() { return mempool.mapDeltas; }
+    auto& mempoolTxDB() { return mempool.mempoolTxDB; }
 
     using txiter = CTxMemPool::txiter;
     using TxLinks = CTxMemPool::TxLinks;
@@ -66,25 +67,54 @@ public:
     void removeStagedNL(setEntries& stage, mining::CJournalChangeSet& changeSet, MemPoolRemovalReason reason)
     {
         return mempool.removeStagedNL(stage, changeSet, reason);
-    }    
+    }
+
+    void OpenMempoolTxDB()
+    {
+        mempool.OpenMempoolTxDB();
+    }
+
+    bool CheckMempoolTxDB()
+    {
+        std::shared_lock lock(mempool.smtx);
+        return mempool.CheckMempoolTxDBNL(false);
+    }
+
+    void SyncWithMempoolTxDB()
+    {
+        mempool.mempoolTxDB->Sync();
+    }
+
+    void DumpMempool(uint64_t version)
+    {
+        mempool.DumpMempool(version);
+    }
+
+    bool LoadMempool(const Config &config,
+                     const task::CCancellationToken& shutdownToken,
+                     const std::function<CValidationState(
+                         const TxInputDataSPtr& txInputData,
+                         const mining::CJournalChangeSetPtr& changeSet,
+                         bool limitMempoolSize)>& processValidation)
+    {
+        return mempool.LoadMempool(config, shutdownToken, processValidation);
+    }
 };
 
-using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<CTxMemPoolUnitTestAccessHack>;
-
-namespace {
-    struct UnitTestAccessTag;
-}
+using CTxMemPoolTestAccess = CTxMemPool::UnitTestAccess<UnitTestAccessTag>;
 
 template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
 {
     CTxMemPoolEntry& entry;
     UnitTestAccess(CTxMemPoolEntry& _entry) : entry(_entry) {}
-    
+
     auto& nFee() {return entry.nFee;};
     auto& feeDelta() {return entry.feeDelta;};
     auto& nTxSize() {return entry.nTxSize;};
     auto& group() {return entry.group;};
     auto& groupingData() {return entry.groupingData;};
+
+    CTransactionWrapperRef& Wrapper() { return entry.tx; }
 };
 
 using CTestTxMemPoolEntry = CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>;

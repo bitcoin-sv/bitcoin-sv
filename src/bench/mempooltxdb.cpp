@@ -24,18 +24,18 @@ static void do_WriteToDBdataTx() {
     // std::vector<uint8_t> data100MB(100000000);
     // std::vector<uint8_t> data1GB(1000000000);
     // std::vector<uint8_t> data2GB(2000000000);
+    std::vector<CTransactionRef> txs;
     for (std::vector<uint8_t> data :
          {data1MB, data10MB}) //, data100MB, data1GB, data2GB})
     {
         CScript opFalseOpReturnScript = CScript()
                                         << OP_FALSE << OP_RETURN << data;
         t.vout[0].scriptPubKey = opFalseOpReturnScript;
-
-        CTransaction tx = CTransaction(t);
-        LOGSTATS(auto startTime = GetTimeMillis());
-        txdb.AddTransaction(tx.GetId(), MakeTransactionRef(tx));
-        LOGSTATS(std::cout << (GetTimeMillis() - startTime) / 1000.0 << std::endl);
+        txs.emplace_back(MakeTransactionRef(CTransaction{t}));
     }
+    LOGSTATS(auto startTime = GetTimeMillis());
+    txdb.AddTransactions(txs);
+    LOGSTATS(std::cout << (GetTimeMillis() - startTime) / 1000.0 << std::endl);
 }
 
 static void do_WriteToDBmultisig() {
@@ -75,17 +75,17 @@ static void do_WriteToDBmultisig() {
             }
         }
     }
+    std::vector<CTransactionRef> txs;
     for (i = 0; i < scriptPubKeys.size(); i++) {
         scriptPubKeys[i] << CScriptNum(keys_sizes[i]) << OP_CHECKMULTISIG;
         scriptPubKeys[i] << OP_1;
 
         t.vout[0].scriptPubKey = scriptPubKeys[i];
-
-        CTransaction tx = CTransaction(t);
-        LOGSTATS(auto startTime = GetTimeMillis());
-        txdb.AddTransaction(tx.GetId(), MakeTransactionRef(tx));
-        LOGSTATS(std::cout << (GetTimeMillis() - startTime) / 1000.0 << std::endl);
+        txs.emplace_back(MakeTransactionRef(CTransaction{t}));
     }
+    LOGSTATS(auto startTime = GetTimeMillis());
+    txdb.AddTransactions(txs);
+    LOGSTATS(std::cout << (GetTimeMillis() - startTime) / 1000.0 << std::endl);
 }
 
 static void do_WriteToFileDataTx() {

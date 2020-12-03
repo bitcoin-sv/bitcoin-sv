@@ -199,6 +199,9 @@ public:
     // Forces a arg setting, used only in testing
     void ForceSetArg(const std::string &strArg, const std::string &strValue);
 
+    // Forces a boolean arg setting, used only in testing
+    void ForceSetBoolArg(const std::string &strArg, bool fValue);
+
     // Forces a multi arg setting, used only in testing
     void ForceSetMultiArg(const std::string &strArg,
                           const std::string &strValue);
