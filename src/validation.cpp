@@ -4179,13 +4179,16 @@ static bool ActivateBestChainStep(
 static void NotifyHeaderTip() {
     bool fNotify = false;
     bool fInitialBlockDownload = false;
+    static std::mutex pindexHeaderOldMutex;
     static const CBlockIndex *pindexHeaderOld = nullptr;
     const CBlockIndex *pindexHeader = nullptr;
     {
         LOCK(cs_main);
         pindexHeader = pindexBestHeader;
 
-        if (pindexHeader != pindexHeaderOld) {
+        if (std::lock_guard lock{ pindexHeaderOldMutex };
+            pindexHeader != pindexHeaderOld)
+        {
             fNotify = true;
             fInitialBlockDownload = IsInitialBlockDownload();
             pindexHeaderOld = pindexHeader;
