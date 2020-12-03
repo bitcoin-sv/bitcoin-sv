@@ -76,17 +76,11 @@ public:
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
 
-    virtual void SetLimitAncestorSize(uint64_t limitAncestorSize) = 0;
-    virtual uint64_t GetLimitAncestorSize() const = 0;
-
-    virtual void SetLimitDescendantSize(uint64_t limitDescendantSize) = 0;
-    virtual uint64_t GetLimitDescendantSize() const = 0;
-
     virtual void SetLimitAncestorCount(uint64_t limitAncestorCount) = 0;
     virtual uint64_t GetLimitAncestorCount() const = 0;
 
-    virtual void SetLimitDescendantCount(uint64_t limitDescendantCount) = 0;
-    virtual uint64_t GetLimitDescendantCount() const = 0;
+    virtual void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) = 0;
+    virtual uint64_t GetLimitSecondaryMempoolAncestorCount() const = 0;
 
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual bool GetTestBlockCandidateValidity() const = 0;
@@ -257,18 +251,12 @@ public:
     void SetDataCarrierSize(uint64_t dataCarrierSize) override;
     uint64_t GetDataCarrierSize() const override;
 
-    void SetLimitAncestorSize(uint64_t limitAncestorSize) override;
-    uint64_t GetLimitAncestorSize() const override;
-
-    void SetLimitDescendantSize(uint64_t limitDescendantSize) override;
-    uint64_t GetLimitDescendantSize() const override;
-
     void SetLimitAncestorCount(uint64_t limitAncestorCount) override;
     uint64_t GetLimitAncestorCount() const override;
 
-    void SetLimitDescendantCount(uint64_t limitDescendantCount) override;
-    uint64_t GetLimitDescendantCount() const override;
-
+    void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) override;
+    uint64_t GetLimitSecondaryMempoolAncestorCount() const override;
+    
     void SetTestBlockCandidateValidity(bool test) override;
     bool GetTestBlockCandidateValidity() const override;
 
@@ -423,10 +411,8 @@ private:
     uint64_t minConsolidationInputMaturity;
     bool acceptNonStdConsolidationInput;
     uint64_t dataCarrierSize;
-    uint64_t limitDescendantCount;
     uint64_t limitAncestorCount;
-    uint64_t limitDescendantSize;
-    uint64_t limitAncestorSize;
+    uint64_t limitSecondaryMempoolAncestorCount;
 
     bool testBlockCandidateValidity;
     mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
@@ -578,17 +564,11 @@ public:
     uint64_t GetDataCarrierSize() const override { return dataCarrierSize; }
     void SetDataCarrierSize(uint64_t dataCarrierSizeIn) override { dataCarrierSize = dataCarrierSizeIn; }
 
-    void SetLimitAncestorSize(uint64_t limitAncestorSize) override {}
-    uint64_t GetLimitAncestorSize() const override { return 0; }
-
-    void SetLimitDescendantSize(uint64_t limitDescendantSize) override {}
-    uint64_t GetLimitDescendantSize() const override { return 0; }
-
     void SetLimitAncestorCount(uint64_t limitAncestorCount) override {}
     uint64_t GetLimitAncestorCount() const override { return 0; }
 
-    void SetLimitDescendantCount(uint64_t limitDescendantCount) override {}
-    uint64_t GetLimitDescendantCount() const override { return 0; }
+    void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) override {}
+    uint64_t GetLimitSecondaryMempoolAncestorCount() const override { return 0; }
 
     void SetTestBlockCandidateValidity(bool skip) override {}
     bool GetTestBlockCandidateValidity() const override { return false; }

@@ -2389,7 +2389,7 @@ static void ApproximateBestSubset(
 
 bool CWallet::SelectCoinsMinConf(
     const Amount nTargetValue, const int nConfMine, const int nConfTheirs,
-    const uint64_t nMaxAncestors, std::vector<COutput> vCoins,
+    const int64_t nMaxAncestors, const int64_t nMaxSecondaryMempoolAncestors, std::vector<COutput> vCoins,
     std::set<std::pair<const CWalletTx *, unsigned int>> &setCoinsRet,
     Amount &nValueRet) const {
     setCoinsRet.clear();
@@ -2418,8 +2418,10 @@ bool CWallet::SelectCoinsMinConf(
             continue;
         }
 
-        if (!mempool.TransactionWithinChainLimit(pcoin->GetId(),
-                                                 nMaxAncestors)) {
+        // check if we extend the chain we will still be inside limits
+        if (!mempool.TransactionWithinChainLimit(pcoin->GetId(), 
+            nMaxAncestors - 1, nMaxSecondaryMempoolAncestors -1)) 
+        {
             continue;
         }
 
@@ -2562,35 +2564,42 @@ bool CWallet::SelectCoins(
         }
     }
 
-    size_t nMaxChainLength = std::min(
-        gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT),
-        gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
+    int64_t nMaxChainLength = gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
+    int64_t nMaxSecondaryMempoolChainLength = gArgs.GetArg("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT);
     bool fRejectLongChains = gArgs.GetBoolArg(
         "-walletrejectlongchains", DEFAULT_WALLET_REJECT_LONG_CHAINS);
 
     bool res =
         nTargetValue <= nValueFromPresetInputs ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 6, 0,
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 6, 0, 0,
                            vCoins, setCoinsRet, nValueRet) ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, 0,
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, 0, 0,
                            vCoins, setCoinsRet, nValueRet) ||
         (bSpendZeroConfChange &&
-         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, 2,
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, 2, 0,
                             vCoins, setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            std::min((size_t)4, nMaxChainLength / 3), vCoins,
+                            std::min((int64_t)4, nMaxChainLength / 3), 0, vCoins,
                             setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            nMaxChainLength / 2, vCoins, setCoinsRet,
+                            nMaxChainLength / 2, 0, vCoins, setCoinsRet,
                             nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            nMaxChainLength, vCoins, setCoinsRet, nValueRet)) ||
+                            nMaxChainLength, 0, vCoins, setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange && !fRejectLongChains &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            std::numeric_limits<uint64_t>::max(), vCoins,
+                            std::numeric_limits<int64_t>::max(), 0, vCoins,
+                            setCoinsRet, nValueRet)) ||
+        (bSpendZeroConfChange && !fRejectLongChains &&
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
+                            std::numeric_limits<int64_t>::max(), nMaxSecondaryMempoolChainLength, vCoins,
+                            setCoinsRet, nValueRet)) ||
+        (bSpendZeroConfChange && !fRejectLongChains &&
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
+                            std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max(), vCoins,
                             setCoinsRet, nValueRet));
 
     // Because SelectCoinsMinConf clears the setCoinsRet, we now add the
@@ -3043,13 +3052,10 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         CTxMemPoolEntry entry {wtxNew.tx, Amount(0), 0, 0, 0, Amount(0), false,
             lp, mempool};
         size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-        size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
+        size_t nLimitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
 
-        size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
-        size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
         if (!mempool.CheckAncestorLimits(
-                entry, nLimitAncestors, nLimitAncestorSize,
-                nLimitDescendants, nLimitDescendantSize, std::nullopt)) {
+                entry, nLimitAncestors, nLimitSecondaryMempoolAncestors, std::nullopt)) {
             strFailReason = _("Transaction has too long of a mempool chain");
             return false;
         }

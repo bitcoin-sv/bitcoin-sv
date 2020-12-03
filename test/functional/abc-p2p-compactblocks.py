@@ -63,9 +63,6 @@ class FullBlockTest(ComparisonTestFramework):
         self.extra_args = [['-norelaypriority',
                             '-whitelist=127.0.0.1',
                             '-limitancestorcount=999999',
-                            '-limitancestorsize=999999',
-                            '-limitdescendantcount=999999',
-                            '-limitdescendantsize=999999',
                             '-maxmempool=99999',
                             '-maxmempoolsizedisk=0',
                             "-excessiveblocksize=%d"

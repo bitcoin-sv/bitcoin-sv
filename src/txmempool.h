@@ -219,9 +219,10 @@ private:
     int32_t entryHeight;
     //!< keep track of transactions that spend a coinbase
     bool spendsCoinbase;
-
     // index of insertion to mempool, entry with smaller index is inserted before the one with larger
     uint64_t insertionIndex;
+    // ancestors count
+    size_t ancestorsCount;
     
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
@@ -671,6 +672,8 @@ private:
     // in AddToMempoolForReorg and RebuildMempool we need to submit transactions that already were in the mempool
     void ResubmitEntriesToMempoolNL(indexed_transaction_set& oldMapTx, const mining::CJournalChangeSetPtr& changeSet);
 
+    // walks recursively through all descedants of the items in the set and updates theirs ancestorsCouunt
+    void UpdateAncestorsCountNL(setEntriesTopoSorted entries);
 
 public:
     void RemoveForBlock(
@@ -770,19 +773,15 @@ public:
      * Check if @a entry and its ancestors in the mempool conform to the
      * provided limits (these are all calculated including @a entry itself):
      * @param limitAncestorCount   max number of ancestors
-     * @param limitAncestorSize    max size of ancestors
-     * @param limitDescendantCount max number of descendants of any ancestor
-     * @param limitDescendantSize  max size of descendants of any ancestor
+     * @param limitSecondaryMempoolAncestorCount    max size of ancestors which are in the secondary mempool
      *
      * Returns @c true if the set of ancestors is within the limits. Otherwise,
      * if @a errString is provided, it is populated with the failure reason.
      */
     bool CheckAncestorLimits(
-        const CTxMemPoolEntry &entry,
+        const CTxMemPoolEntry& entry,
         uint64_t limitAncestorCount,
-        uint64_t limitAncestorSize,
-        uint64_t limitDescendantCount,
-        uint64_t limitDescendantSize,
+        uint64_t limitSecondaryMempoolAncestorCount,
         std::optional<std::reference_wrapper<std::string>> errString) const;
 
     /**
@@ -815,9 +814,8 @@ public:
 
     /** Returns false if the transaction is in the mempool and not within the
      * chain limit specified. */
-    bool TransactionWithinChainLimit(
-            const uint256 &txid,
-            size_t chainLimit) const;
+    bool TransactionWithinChainLimit(const uint256 &txid, int64_t maxAncestorCount, 
+                                     int64_t maxSecondaryMempoolAncestorCount) const;
 
     unsigned long Size();
 
@@ -863,51 +861,31 @@ private:
     std::vector<TxMempoolInfo> InfoAllNL() const;
 
     /**
-     * Try to calculate all in-mempool ancestors of @a entry.
-     * See CheckAncestorLimits() for the meaning of the parameters.
-     *
-     * Optionally returns the ancestors in @a setAncestors.
+     * Checks mempool chain limits by finding parents of the entry
+     * summing ancestorsCount for all of them
      *
      * Assumes that @a entry may not be in the mampool, so it searches the
      * transaction's @c vin for in-mempool parents.
      */
-    bool CalculateMemPoolAncestorsNL(
-        const CTxMemPoolEntry &entry,
-        std::optional<std::reference_wrapper<setEntries>> setAncestors,
+    bool CheckAncestorLimitsNL(
+        const CTxMemPoolEntry& entry,
         uint64_t limitAncestorCount,
-        uint64_t limitAncestorSize,
-        uint64_t limitDescendantCount,
-        uint64_t limitDescendantSize,
+        uint64_t limitSecondaryMempoolAncestorCount,
         std::optional<std::reference_wrapper<std::string>> errString) const;
+
 
     /**
      * Try to calculate all in-mempool ancestors of the entry.
-     * See CheckAncestorLimits() for the meaning of the parameters.
      *
-     * Optionally returns the ancestors in @a setAncestors.
+     * Returns the ancestors in @a setAncestors.
      *
-     * Assumes that @a entryIter is in the mampool and it can look up parents
+     * Assumes that @a entryIter is in the mempool and it can look up parents
      * from #mapLinks.
      */
-    bool GetMemPoolAncestorsNL(
+    void GetMemPoolAncestorsNL(
         const txiter& entryIter,
-        std::optional<std::reference_wrapper<setEntries>> setAncestors,
-        uint64_t limitAncestorCount,
-        uint64_t limitAncestorSize,
-        uint64_t limitDescendantCount,
-        uint64_t limitDescendantSize,
-        std::optional<std::reference_wrapper<std::string>> errString) const;
+        setEntries& setAncestors) const;
 
-    // Common implementation
-    bool GetMemPoolAncestorsNL(
-        std::optional<std::reference_wrapper<setEntries>> setAncestors,
-        setEntries& parentHashes,
-        size_t totalSizeWithAncestors,
-        uint64_t limitAncestorCount,
-        uint64_t limitAncestorSize,
-        uint64_t limitDescendantCount,
-        uint64_t limitDescendantSize,
-        std::optional<std::reference_wrapper<std::string>> errString) const;
 
     /**
      * Populate setDescendants with all in-mempool descendants of hash.
