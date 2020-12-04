@@ -305,7 +305,7 @@ bool CTxMemPool::IsSpentNL(const COutPoint &outpoint) const {
     return mapNextTx.count(outpoint);
 }
 
-CTransactionRef CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
+CTransactionWrapperRef CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
     std::shared_lock lock{ smtx };
 
     auto it = mapNextTx.find(outpoint);
@@ -313,7 +313,7 @@ CTransactionRef CTxMemPool::IsSpentBy(const COutPoint &outpoint) const {
     {
         return nullptr;
     }
-    return it->second->GetTx();
+    return it->spentBy->tx;
 }
 
 unsigned int CTxMemPool::GetTransactionsUpdated() const {
@@ -340,11 +340,12 @@ void CTxMemPool::AddUnchecked(
             entry,
             txStorage,
             changeSet,
+            std::nullopt,
             pnMempoolSize,
             pnDynamicMemoryUsage);
     }
     // Notify entry added without holding the mempool's lock
-    NotifyEntryAdded(entry.GetSharedTx());
+    NotifyEntryAdded(*entry.tx);
 }
 
 CTxMemPool::setEntriesTopoSorted CTxMemPool::GetSecondaryMempoolAncestorsNL(CTxMemPool::txiter payingTx) const
@@ -694,6 +695,7 @@ void CTxMemPool::AddUncheckedNL(
     const CTxMemPoolEntry &originalEntry,
     const TxStorage txStorage,
     const CJournalChangeSetPtr& changeSet,
+    SpentOutputs spentOutputs,
     size_t* pnMempoolSize,
     size_t* pnDynamicMemoryUsage)
 {
@@ -741,11 +743,23 @@ void CTxMemPool::AddUncheckedNL(
     // further updated.)
     cachedInnerUsage += newit->DynamicMemoryUsage();
 
-    const auto sharedTx = newit->GetSharedTx();
     std::set<uint256> setParentTransactions;
-    for (const CTxIn &in : sharedTx->vin) {
-        mapNextTx.insert(std::make_pair(in.prevout, newit->tx));
-        setParentTransactions.insert(in.prevout.GetTxId());
+    if (spentOutputs.has_value())
+    {
+        for (const auto& prevout: spentOutputs->get())
+        {
+            mapNextTx.insert(OutpointTxPair{prevout, newit});
+            setParentTransactions.insert(prevout.GetTxId());
+        }
+    }
+    else
+    {
+        const auto sharedTx = newit->GetSharedTx();
+        for (const auto& in : sharedTx->vin)
+        {
+            mapNextTx.insert(OutpointTxPair{in.prevout, newit});
+            setParentTransactions.insert(in.prevout.GetTxId());
+        }
     }
     // Don't bother worrying about child transactions of this one. Normal case
     // of a new transaction arriving is that there can't be any children,
@@ -807,11 +821,10 @@ void CTxMemPool::removeUncheckedNL(
             transactionsToRemove.emplace_back(entry->GetTxId(), entry->GetTxSize());
         }
 
-        const auto txn = entry->GetSharedTx();
-        NotifyEntryRemoved(txn, reason);
-        for (const auto& txin : txn->vin) {
-            mapNextTx.erase(txin.prevout);
-        }
+        NotifyEntryRemoved(*entry->tx, reason);
+        
+        auto [itBegin, itEnd] = mapNextTx.get<by_txiter>().equal_range(entry);
+        mapNextTx.get<by_txiter>().erase(itBegin, itEnd);
 
         // Apply to the current journal, but only if it is in the journal (primary mempool) already
         if(entry->IsInPrimaryMempool())
@@ -830,10 +843,9 @@ void CTxMemPool::removeUncheckedNL(
         //        See: CTxMemPool::updateChildNL and CTxMemPool::updateParentNL
         //    cachedInnerUsage -= memusage::DynamicUsage(mapLinks[it].parents) +
         //                        memusage::DynamicUsage(mapLinks[it].children);
+        const auto txid = entry->GetTxId();
         setEntries parents;
-        TxId txid;
         if (evictionTracker) {
-            txid = entry->GetTxId();
             parents = std::move(mapLinks.at(entry).parents);
         }
 
@@ -843,11 +855,11 @@ void CTxMemPool::removeUncheckedNL(
 
         if (reason == MemPoolRemovalReason::BLOCK || reason == MemPoolRemovalReason::REORG)
         {
-            GetMainSignals().TransactionRemovedFromMempoolBlock(txn->GetId(), reason);
+            GetMainSignals().TransactionRemovedFromMempoolBlock(txid, reason);
         }
         else
         {
-            GetMainSignals().TransactionRemovedFromMempool(txn->GetId(), reason, conflictedWith);
+            GetMainSignals().TransactionRemovedFromMempool(txid, reason, conflictedWith);
         }
 
         // Update the eviction candidate tracker.
@@ -899,34 +911,36 @@ void CTxMemPool::RemoveRecursive(
         std::unique_lock lock(smtx);
         // Remove transaction from memory pool.
         removeRecursiveNL(
-            origTx.GetId(),
+            origTx,
             changeSet,
             reason);
     }
 }
 
 void CTxMemPool::removeRecursiveNL(
-    const TxId &origTxId,
+    const CTransaction& origTx,
     const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason,
     const CTransaction* conflictedWith) {
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
     setEntries txToRemove;
-    txiter origit = mapTx.find(origTxId);
+    txiter origit = mapTx.find(origTx.GetId());
     if (origit != mapTx.end()) {
         txToRemove.insert(origit);
     } else {
-        // When recursively removing but origTxId isn't in the mempool be sure
+        // When recursively removing but origTx isn't in the mempool be sure
         // to remove any children that are in the pool. This can happen during
-        // chain re-orgs if origTxId isn't re-accepted into the mempool for any
+        // chain re-orgs if origTx isn't re-accepted into the mempool for any
         // reason.
-        for (auto it = mapNextTx.lower_bound(COutPoint(origTxId, 0));
-             it != mapNextTx.end() && it->first.GetTxId() == origTxId;
-             ++it) {
-            txiter nextit = mapTx.find(it->second->GetId());
-            assert(nextit != mapTx.end());
-            txToRemove.insert(nextit);
+        const uint32_t outputCount = origTx.vout.size();
+        for(uint32_t ndx = 0; ndx < outputCount; ndx++)
+        {
+            auto nextit = mapNextTx.find(COutPoint{origTx.GetId(), ndx});
+            if(nextit != mapNextTx.end())
+            {
+                txToRemove.insert(nextit->spentBy);
+            }
         }
     }
     setEntries setAllRemoves;
@@ -979,13 +993,13 @@ void CTxMemPool::RemoveForReorg(
             // the LockPoints.
             txToRemove.insert(it);
         } else if (it->GetSpendsCoinbase()) {
-            for (const CTxIn &txin : tx->vin) {
-                txiter it2 = mapTx.find(txin.prevout.GetTxId());
+            for (const auto& prevout: GetOutpointsSpentByNL(it)) {
+                txiter it2 = mapTx.find(prevout.GetTxId());
                 if (it2 != mapTx.end()) {
                     continue;
                 }
 
-                auto coin = tipView.GetCoin(txin.prevout);
+                auto coin = tipView.GetCoin(prevout);
                 assert( coin.has_value() );
                 if (nCheckFrequency != 0) {
                     assert(coin.has_value() && !coin->IsSpent());
@@ -1080,7 +1094,7 @@ void CTxMemPool::RemoveForBlock(
 
                     // collect all descendants of the tx which made double-spend
                     setEntries conflictedWithDescendants;
-                    GetDescendantsNL(mapTx.find(it->second->GetId()), conflictedWithDescendants);
+                    GetDescendantsNL(mapTx.find(it->spentBy->GetTxId()), conflictedWithDescendants);
 
                     for(txiter inConflict: conflictedWithDescendants)
                     {
@@ -1250,8 +1264,8 @@ void CTxMemPool::CheckMempoolImplNL(
             // Check whether its inputs are marked in mapNextTx.
             auto it3 = mapNextTx.find(txin.prevout);
             assert(it3 != mapNextTx.end());
-            assert(it3->first == txin.prevout);
-            assert(it3->second->GetId() == tx->GetId());
+            assert(it3->outpoint == txin.prevout);
+            assert(it3->spentBy->GetTxId() == tx->GetId());
             i++;
         }
         assert(setParentCheck == GetMemPoolParentsNL(it));
@@ -1273,17 +1287,14 @@ void CTxMemPool::CheckMempoolImplNL(
 
         // Check children against mapNextTx
         setEntries setChildrenCheck;
-        auto iter = mapNextTx.lower_bound(COutPoint(it->GetTxId(), 0));
 
-        int64_t childSizes = 0;
-        for (; iter != mapNextTx.end() &&
-               iter->first.GetTxId() == it->GetTxId();
-             ++iter) {
-            txiter childit = mapTx.find(iter->second->GetId());
-            // mapNextTx points to in-mempool transactions
-            assert(childit != mapTx.end());
-            if (setChildrenCheck.insert(childit).second) {
-                childSizes += childit->GetTxSize();
+        const uint32_t outputCount = tx->vout.size();
+        for(uint32_t ndx = 0; ndx < outputCount; ndx++)
+        {
+            auto nextit = mapNextTx.find(COutPoint{tx->GetId(), ndx});
+            if(nextit != mapNextTx.end())
+            {
+                setChildrenCheck.insert(nextit->spentBy);
             }
         }
         assert(setChildrenCheck == GetMemPoolChildrenNL(it));
@@ -1327,7 +1338,7 @@ void CTxMemPool::CheckMempoolImplNL(
     }
 
     for (const auto& item: mapNextTx) {
-        const auto& txid = item.second->GetId();
+        const auto& txid = item.spentBy->GetTxId();
         const auto it2 = mapTx.find(txid);
         assert(it2 != mapTx.end());
         assert(it2->GetTxId() == txid);
@@ -1476,12 +1487,9 @@ mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
         CoinsDBView coinsView{ *pcoinsTip };
         std::shared_lock lock(smtx);
 
-        // back-up txs currently in the mempool and clear the mempool
-        auto oldMapTx = std::move(mapTx);
-        clearNL();
-
+        auto resubmitContext = PrepareResubmitContextAndClearNL(changeSet);
         // submit backed-up transactions
-        ResubmitEntriesToMempoolNL(oldMapTx, changeSet);
+        ResubmitEntriesToMempoolNL(resubmitContext, changeSet);
         
         CheckMempoolNL(coinsView, changeSet);
     }
@@ -1808,7 +1816,8 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
     return mapTx.size() * memusage::MallocUsage(sizeof(CTxMemPoolEntry) +
                                                 sizeof(CTransactionWrapper) +
                                                 12 * sizeof(void *)) +
-           memusage::DynamicUsage(mapNextTx) +
+           mapNextTx.size() * memusage::MallocUsage(sizeof(OutpointTxPair) +
+                                                    12 * sizeof(void *)) +
            memusage::DynamicUsage(mapDeltas) +
            memusage::DynamicUsage(mapLinks) + cachedInnerUsage;
 }
@@ -1899,7 +1908,7 @@ std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx
     // Check our locked UTXOs
     for (const CTxIn &txin : tx->vin) {
         if (auto it = mapNextTx.find(txin.prevout); it != mapNextTx.end()) {
-            conflictsWith.insert(GetNL(it->second->GetId()));
+            conflictsWith.insert(GetNL(it->spentBy->GetTxId()));
         }
     }
 
@@ -1917,10 +1926,32 @@ std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx
     return conflictsWith;
 }
 
-void CTxMemPool::ResubmitEntriesToMempoolNL(CTxMemPool::indexed_transaction_set& oldMapTx, const CJournalChangeSetPtr& changeSet)
+CTxMemPool::ResubmitContext CTxMemPool::PrepareResubmitContextAndClearNL(const CJournalChangeSetPtr &changeSet)
 {
-    auto& tempMapTxSequenced = oldMapTx.get<insertion_order>();
-    for (auto itTemp = tempMapTxSequenced.begin(); itTemp != tempMapTxSequenced.end();) 
+    ResubmitContext resubmitContext;
+    // we are about to delete journal, changes in the changeSet no sense now
+    if(changeSet)
+    {
+        changeSet->clear();
+    }
+
+    for (auto iter = mapTx.begin(); iter != mapTx.end(); ++iter)
+    {
+        if(!iter->IsInMemory())
+        {
+            resubmitContext.outpointsSpentByStored.emplace(iter->GetTxId(), GetOutpointsSpentByNL(iter));
+        }
+    }
+
+    std::swap(resubmitContext.oldMapTx, mapTx);
+    clearNL(true);          // Do not clear the transaction database
+    return resubmitContext;
+}
+
+void CTxMemPool::ResubmitEntriesToMempoolNL(CTxMemPool::ResubmitContext& resubmitContext, const CJournalChangeSetPtr& changeSet)
+{
+    auto& tempMapTxSequenced = resubmitContext.oldMapTx.get<insertion_order>();
+    for (auto itTemp = tempMapTxSequenced.begin(); itTemp != tempMapTxSequenced.end();)
     {
         tempMapTxSequenced.modify(
             itTemp,
@@ -1928,9 +1959,16 @@ void CTxMemPool::ResubmitEntriesToMempoolNL(CTxMemPool::indexed_transaction_set&
             {
                 entry.groupingData = std::nullopt;
                 entry.group.reset();
-            }   
+            }
         );
-        AddUncheckedNL(itTemp->GetTxId(), *itTemp, itTemp->GetTxStorage(), changeSet);
+
+        SpentOutputs spentOutputs;
+        if (auto foundOutpoints = resubmitContext.outpointsSpentByStored.find(itTemp->GetTxId());
+            foundOutpoints != resubmitContext.outpointsSpentByStored.end())
+        {
+            spentOutputs = foundOutpoints->second;
+        }
+        AddUncheckedNL(itTemp->GetTxId(), *itTemp, itTemp->GetTxStorage(), changeSet, spentOutputs);
         tempMapTxSequenced.erase(itTemp++);
     }
 }
@@ -1969,19 +2007,12 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
 
     disconnectpool.queuedTx.clear();
 
-    // we are about to delete journal, changes in the changeSet make no sense now
-    if(changeSet)
-    {
-        changeSet->clear();
-    }
-
-    // Clear the mempool, but save the current index, entries and the
+    // Clear the mempool, but save the current index, mapNextTx, entries and the
     // transaction database, since we'll re-add the entries later.
-    indexed_transaction_set tempMapTx;
+    ResubmitContext resubmitContext;
     {
         std::unique_lock lock{smtx};
-        std::swap(tempMapTx, mapTx);
-        clearNL(true);          // Do not clear the transaction database
+        resubmitContext = PrepareResubmitContextAndClearNL(changeSet);
     }
 
     // Validate the set of transactions from the disconnectpool and add them to the mempool
@@ -1992,15 +2023,15 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
         std::unique_lock lock {smtx};
 
         // now put all transactions that were in the mempool before
-        ResubmitEntriesToMempoolNL(tempMapTx, changeSet);
+        ResubmitEntriesToMempoolNL(resubmitContext, changeSet);
 
         // Disconnectpool related updates
         for (const auto& txInputData : vTxInputData) {
-            auto const txid = txInputData->GetTxnPtr()->GetId();
-            if (!ExistsNL(txid)) {
+            const auto& tx = txInputData->GetTxnPtr();
+            if (!ExistsNL(tx->GetId())) {
                 // If the transaction doesn't make it in to the mempool, remove any
                 // transactions that depend on it (which would now be orphans).
-                removeRecursiveNL(txid, changeSet, MemPoolRemovalReason::REORG);
+                removeRecursiveNL(*tx, changeSet, MemPoolRemovalReason::REORG);
             }
         }
     }
@@ -2180,6 +2211,16 @@ void CTxMemPool::TrackEntryModified(CTxMemPool::txiter entry)
     }
 }
 
+std::vector<COutPoint> CTxMemPool::GetOutpointsSpentByNL(CTxMemPool::txiter entry) const
+{
+    std::vector<COutPoint> toReturn;
+    for(auto [it, itEnd] = mapNextTx.get<by_txiter>().equal_range(entry); it != itEnd; it++)
+    {
+        toReturn.push_back(it->outpoint);
+    }
+    return toReturn;
+}
+
 std::vector<TxId> CTxMemPool::TrimToSize(
     size_t sizelimit,
     const mining::CJournalChangeSetPtr& changeSet,
@@ -2225,28 +2266,28 @@ std::vector<TxId> CTxMemPool::TrimToSize(
         maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
         setEntries stage;
-        GetDescendantsNL(mapTx.project<0>(it), stage);
+        GetDescendantsNL(it, stage);
         nTxnRemoved += stage.size();
 
-        std::vector<CTransactionRef> txn;
+
+        std::vector<COutPoint> unspentOutpoints;
         if (pvNoSpendsRemaining) {
-            txn.reserve(stage.size());
             for (txiter iter : stage) {
-                auto txref = iter->GetSharedTx();
-                txn.push_back(txref);
-                vRemovedTxIds.emplace_back(txref->GetId());
+                vRemovedTxIds.emplace_back(iter->GetTxId());
+                // find and collect outpoints spent by "iter"
+                auto [itBegin, itEnd] = mapNextTx.get<by_txiter>().equal_range(iter);
+                std::transform(itBegin, itEnd, std::back_inserter(unspentOutpoints),
+                               [](const auto& value){return value.outpoint;});
             }
         }
         removeStagedNL(stage, nonNullChangeSet.Get(), MemPoolRemovalReason::SIZELIMIT);
         if (pvNoSpendsRemaining) {
-            for (const auto& txref : txn) {
-                for (const auto& txin : txref->vin) {
-                    if (ExistsNL(txin.prevout.GetTxId())) {
-                        continue;
-                    }
-                    if (!mapNextTx.count(txin.prevout)) {
-                        pvNoSpendsRemaining->push_back(txin.prevout);
-                    }
+            for (const auto& outpoint : unspentOutpoints) {
+                if (ExistsNL(outpoint.GetTxId())) {
+                    continue;
+                }
+                if (!mapNextTx.count(outpoint)) {
+                    pvNoSpendsRemaining->push_back(outpoint);
                 }
             }
         }
@@ -2398,12 +2439,11 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
     // This closure is essentially a local function that stores
     // information about a single transaction and its inputs.
     const auto recordTransaction =
-        [this, &contents, &relevantTxIds](const CTxMemPoolEntry& entry)
+        [this, &contents, &relevantTxIds](txiter entry)
         {
-            contents.emplace_back(entry);
-            const auto tx = entry.GetSharedTx();
-            for (const auto& input : tx->vin) {
-                const auto& id = input.prevout.GetTxId();
+            contents.emplace_back(*entry);
+            for (const auto& prevout : GetOutpointsSpentByNL(entry)) {
+                const auto& id = prevout.GetTxId();
                 if (ExistsNL(id)) {
                     relevantTxIds->emplace_back(id);
                 }
@@ -2413,7 +2453,7 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
     if (kind == TxSnapshotKind::SINGLE)
     {
         // Store the single transaction of the snapshot.
-        recordTransaction(*baseTx);
+        recordTransaction(baseTx);
     }
     else if (kind == TxSnapshotKind::TX_WITH_ANCESTORS
              || kind == TxSnapshotKind::ONLY_ANCESTORS
@@ -2433,13 +2473,13 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
         // are not symmetric, the former includes the base transaction in the
         // results, but the latter does not.
         if (kind == TxSnapshotKind::TX_WITH_ANCESTORS) {
-            recordTransaction(*baseTx);
+            recordTransaction(baseTx);
         }
         else if (kind == TxSnapshotKind::ONLY_DESCENDANTS) {
             related.erase(baseTx);
         }
         for (const auto& iter : related) {
-            recordTransaction(*iter);
+            recordTransaction(iter);
         }
     }
     else

@@ -4287,12 +4287,11 @@ public:
         return blocksConnected;
     }
 
-    void NotifyEntryRemoved(CTransactionRef txRemoved,
+    void NotifyEntryRemoved(const CTransactionWrapper& txRemoved,
                             MemPoolRemovalReason reason) {
         assert(!blocksConnected.back().pindex);
         if (reason == MemPoolRemovalReason::CONFLICT) {
-            blocksConnected.back().conflictedTxs->emplace_back(
-                std::move(txRemoved));
+            blocksConnected.back().conflictedTxs->emplace_back(txRemoved.GetTx());
         }
     }
 };

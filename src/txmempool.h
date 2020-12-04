@@ -20,6 +20,7 @@
 #include <boost/multi_index/sequenced_index.hpp>
 #include <boost/multi_index/random_access_index.hpp>
 #include <boost/multi_index_container.hpp>
+#include <boost/multi_index/member.hpp>
 
 #include <boost/signals2/signal.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -301,6 +302,9 @@ struct transaction_id {};
 struct entry_time {};
 struct insertion_order {};
 
+struct by_prevout {};
+struct by_txiter {};
+
 
 /**
  * Reason why a transaction was removed from the mempool, this is passed to the
@@ -512,13 +516,46 @@ private:
         setEntries children;
     };
 
-    typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
+
+    using txlinksMap = std::unordered_map<txiter, TxLinks, SaltedTxiterHasher>;
     txlinksMap mapLinks;
 
     void updateParentNL(txiter entry, txiter parent, bool add);
     void updateChildNL(txiter entry, txiter child, bool add);
 
-    std::map<COutPoint, const CTransactionWrapperRef> mapNextTx;
+    struct OutpointTxPair
+    {
+        COutPoint outpoint;
+        txiter spentBy;
+    };
+
+    using MapNextTx =
+    boost::multi_index_container<
+        OutpointTxPair,
+        boost::multi_index::indexed_by<
+            boost::multi_index::hashed_unique<
+                boost::multi_index::tag<by_prevout>,
+                boost::multi_index::member<
+                    OutpointTxPair,
+                    COutPoint,
+                    &OutpointTxPair::outpoint
+                >,
+                SaltedOutpointHasher
+            >,
+            boost::multi_index::hashed_non_unique<
+                boost::multi_index::tag<by_txiter>,
+                boost::multi_index::member<
+                    OutpointTxPair,
+                    txiter,
+                    &OutpointTxPair::spentBy
+                >,
+                SaltedTxiterHasher
+            >
+        >
+    >;
+
+    MapNextTx mapNextTx;
+
     std::map<uint256, std::pair<double, Amount>> mapDeltas;
 
     class InsertionIndex
@@ -541,6 +578,8 @@ private:
     void TrackEntryAdded(CTxMemPool::txiter entry);
     void TrackEntryRemoved(const TxId& txId, const setEntries& immediateParents);
     void TrackEntryModified(CTxMemPool::txiter entry);
+
+    std::vector<COutPoint> GetOutpointsSpentByNL(CTxMemPool::txiter entry) const;
 
 
 public:
@@ -632,8 +671,14 @@ private:
     setEntriesTopoSorted RemoveFromPrimaryMempoolNL(setEntriesTopoSorted toRemove, mining::CJournalChangeSet& changeSet, 
         bool putDummyGroupingData = false, const setEntries* entriesToIgnore = nullptr);
 
+    struct ResubmitContext {
+        indexed_transaction_set oldMapTx {};
+        std::unordered_map<TxId, std::vector<COutPoint>, SaltedTxidHasher> outpointsSpentByStored {};
+    };
+    // prepare resubmit context
+    ResubmitContext PrepareResubmitContextAndClearNL(const mining::CJournalChangeSetPtr& changeSet);
     // in AddToMempoolForReorg and RebuildMempool we need to submit transactions that already were in the mempool
-    void ResubmitEntriesToMempoolNL(indexed_transaction_set& oldMapTx, const mining::CJournalChangeSetPtr& changeSet);
+    void ResubmitEntriesToMempoolNL(ResubmitContext& resubmitContext, const mining::CJournalChangeSetPtr& changeSet);
 
     // walks recursively through all descedants of the items in the set and updates theirs ancestorsCouunt
     void UpdateAncestorsCountNL(setEntriesTopoSorted entries);
@@ -648,7 +693,7 @@ public:
 
     void QueryHashes(std::vector<uint256> &vtxid);
     bool IsSpent(const COutPoint &outpoint);
-    CTransactionRef IsSpentBy(const COutPoint &outpoint) const;
+    CTransactionWrapperRef IsSpentBy(const COutPoint &outpoint) const;
 
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
@@ -807,8 +852,8 @@ public:
 
     CFeeRate estimateFee() const;
 
-    boost::signals2::signal<void(CTransactionRef)> NotifyEntryAdded;
-    boost::signals2::signal<void(CTransactionRef, MemPoolRemovalReason)>
+    boost::signals2::signal<void(const CTransactionWrapper&)> NotifyEntryAdded;
+    boost::signals2::signal<void(const CTransactionWrapper&, MemPoolRemovalReason)>
         NotifyEntryRemoved;
 
     void ClearPrioritisation(const uint256 &hash);
@@ -1061,11 +1106,13 @@ private:
     // A non-locking version of AddUnchecked
     // A signal NotifyEntryAdded is decoupled from AddUncheckedNL.
     // It needs to be called explicitly by a user if AddUncheckedNL is used.
+    using SpentOutputs = std::optional<std::reference_wrapper<const std::vector<COutPoint>>>;
     void AddUncheckedNL(
             const uint256& hash,
             const CTxMemPoolEntry &entry,
             const TxStorage txStorage,
             const mining::CJournalChangeSetPtr& changeSet,
+            SpentOutputs spentOutputs = std::nullopt,
             size_t* pnMempoolSize = nullptr,
             size_t* pnDynamicMemoryUsage = nullptr);
 
@@ -1119,7 +1166,7 @@ private:
 
     // A non-locking version of RemoveRecursive
     void removeRecursiveNL(
-            const TxId &txid,
+            const CTransaction& origTx,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
             const CTransaction* conflictedWith = nullptr);
