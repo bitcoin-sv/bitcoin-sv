@@ -191,7 +191,7 @@ bool CTxMemPool::CheckAncestorLimits(
     uint64_t limitSecondaryMempoolAncestorCount,
     std::optional<std::reference_wrapper<std::string>> errString) const
 {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return CheckAncestorLimitsNL(entry,
                                  limitAncestorCount,
                                  limitSecondaryMempoolAncestorCount,
@@ -297,7 +297,7 @@ CTxMemPool::~CTxMemPool() {
 }
 
 bool CTxMemPool::IsSpent(const COutPoint &outpoint) {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return IsSpentNL(outpoint);
 }
 
@@ -334,7 +334,7 @@ void CTxMemPool::AddUnchecked(
     size_t* pnDynamicMemoryUsage) {
 
     {
-        std::unique_lock lock(smtx);
+        std::unique_lock lock{smtx};
         
         AddUncheckedNL(
             hash,
@@ -919,7 +919,7 @@ void CTxMemPool::RemoveRecursive(
     MemPoolRemovalReason reason) {
 
     {
-        std::unique_lock lock(smtx);
+        std::unique_lock lock{smtx};
         // Remove transaction from memory pool.
         removeRecursiveNL(
             origTx,
@@ -973,7 +973,7 @@ void CTxMemPool::RemoveForReorg(
     const int nMedianTimePast = tip.GetMedianTimePast();
     // Remove transactions spending a coinbase which are now immature and
     // no-longer-final transactions.
-    std::unique_lock lock(smtx);
+    std::unique_lock lock{smtx};
     setEntries txToRemove;
     for (txiter it = mapTx.begin(); it != mapTx.end(); it++) {
         const auto tx = it->GetSharedTx();
@@ -1045,7 +1045,7 @@ void CTxMemPool::RemoveForBlock(
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
-    std::unique_lock lock(smtx);
+    std::unique_lock lock{smtx};
 
     evictionTracker.reset();
 
@@ -1170,7 +1170,7 @@ void CTxMemPool::trackPackageRemovedNL(const CFeeRate &rate) {
 }
 
 void CTxMemPool::Clear() {
-    std::unique_lock lock(smtx);
+    std::unique_lock lock{smtx};
     clearNL();
 }
 
@@ -1182,7 +1182,7 @@ void CTxMemPool::CheckMempool(
     if (ShouldCheckMempool())
     {
         CoinsDBView view{ db };
-        std::shared_lock lock(smtx);
+        std::shared_lock lock{smtx};
         CheckMempoolImplNL(view, changeSet);
     }
 }
@@ -1432,12 +1432,12 @@ bool CTxMemPool::CheckMempoolTxDBNL(bool hardErrors) const
 }
 
 std::string CTxMemPool::CheckJournal() const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return checkJournalNL();
 }
 
 void CTxMemPool::ClearPrioritisation(const uint256 &hash) {
-    std::unique_lock lock(smtx);
+    std::unique_lock lock{smtx};
     clearPrioritisationNL(hash);
 }
 
@@ -1445,7 +1445,7 @@ void CTxMemPool::ClearPrioritisation(const std::vector<TxId>& vTxIds) {
     if (vTxIds.empty()) {
         return;
     }
-    std::unique_lock lock(smtx);
+    std::unique_lock lock{smtx};
     for (const TxId& txid: vTxIds) {
         if (!ExistsNL(txid)) {
             clearPrioritisationNL(txid);
@@ -1508,7 +1508,7 @@ mining::CJournalChangeSetPtr CTxMemPool::RebuildMempool()
     CJournalChangeSetPtr changeSet { mJournalBuilder.getNewChangeSet(JournalUpdateReason::RESET) };
     {
         CoinsDBView coinsView{ *pcoinsTip };
-        std::shared_lock lock(smtx);
+        std::shared_lock lock{smtx};
 
         auto resubmitContext = PrepareResubmitContextAndClearNL(changeSet);
         // submit backed-up transactions
@@ -1576,7 +1576,7 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
 }
 
 void CTxMemPool::QueryHashes(std::vector<uint256> &vtxid) {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
 
     vtxid.clear();
     vtxid.reserve(mapTx.size());
@@ -1587,7 +1587,7 @@ void CTxMemPool::QueryHashes(std::vector<uint256> &vtxid) {
 }
 
 std::vector<TxMempoolInfo> CTxMemPool::InfoAll() const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return InfoAllNL();
 }
 
@@ -1601,7 +1601,7 @@ std::vector<TxMempoolInfo> CTxMemPool::InfoAllNL() const {
 }
 
 CTransactionRef CTxMemPool::Get(const uint256 &txid) const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return GetNL(txid);
 }
 
@@ -1614,7 +1614,7 @@ CTransactionRef CTxMemPool::GetNL(const uint256 &txid) const {
 }
 
 TxMempoolInfo CTxMemPool::Info(const uint256 &txid) const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     txiter i = mapTx.find(txid);
     if (i == mapTx.end()) {
         return TxMempoolInfo();
@@ -1640,7 +1640,7 @@ void CTxMemPool::PrioritiseTransaction(
     const Amount nFeeDelta) {
 
     {
-        std::unique_lock lock(smtx);
+        std::unique_lock lock{smtx};
         prioritiseTransactionNL(hash, dPriorityDelta, nFeeDelta);
     }
     LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash,
@@ -1656,7 +1656,7 @@ void CTxMemPool::PrioritiseTransaction(
         return;
     }
     {
-        std::unique_lock lock(smtx);
+        std::unique_lock lock{smtx};
         for(const TxId& txid: vTxToPrioritise) {
             prioritiseTransactionNL(txid, dPriorityDelta, nFeeDelta);
         }
@@ -1671,7 +1671,7 @@ void CTxMemPool::PrioritiseTransaction(
 
 void CTxMemPool::ApplyDeltas(const uint256& hash, double &dPriorityDelta,
                              Amount &nFeeDelta) const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     ApplyDeltasNL(hash, dPriorityDelta, nFeeDelta);
 }
 
@@ -1733,7 +1733,7 @@ void CTxMemPool::GetDeltasAndInfo(std::map<uint256, Amount>& deltas,
 
 
 bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     for (const CTxIn &in : tx.vin) {
         if (ExistsNL(in.prevout.GetTxId())) {
             return false;
@@ -1829,7 +1829,7 @@ std::optional<CoinImpl> CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, ui
 }
 
 size_t CTxMemPool::DynamicMemoryUsage() const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return DynamicMemoryUsageNL();
 }
 
@@ -1850,7 +1850,7 @@ size_t CTxMemPool::DynamicMemoryUsageNL() const {
 }
 
 size_t CTxMemPool::SecondaryMempoolUsage() const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return SecondaryMempoolUsageNL();
 }
 
@@ -1923,7 +1923,7 @@ void CTxMemPool::removeStagedNL(
 
 int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeSet)
 {
-    std::unique_lock lock(smtx);
+    std::unique_lock lock{smtx};
     indexed_transaction_set::index<entry_time>::type::iterator it =
         mapTx.get<entry_time>().begin();
     setEntries toremove;
@@ -1944,7 +1944,7 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
 
 std::set<CTransactionRef> CTxMemPool::CheckTxConflicts(const CTransactionRef& tx, bool isFinal) const
 {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     std::set<CTransactionRef> conflictsWith;
 
     // Check our locked UTXOs
@@ -2203,7 +2203,7 @@ CTxMemPool::GetMemPoolChildrenNL(txiter entry) const {
 }
 
 CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     if (!blockSinceLastRollingFeeBump || rollingMinimumFeeRate == 0) {
         return CFeeRate(Amount(int64_t(rollingMinimumFeeRate)));
     }
@@ -2369,7 +2369,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
 bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid, int64_t maxAncestorCount, 
                                              int64_t maxSecondaryMempoolAncestorCount) const 
 {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     auto it = mapTx.find(txid);
     if(it == mapTx.end())
     {
@@ -2386,7 +2386,7 @@ bool CTxMemPool::TransactionWithinChainLimit(const uint256 &txid, int64_t maxAnc
 }
 
 unsigned long CTxMemPool::Size() {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return mapTx.size();
 }
 
@@ -2395,12 +2395,12 @@ unsigned long CTxMemPool::PrimaryMempoolSizeNL() const {
 }
 
 uint64_t CTxMemPool::GetTotalTxSize() {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return totalTxSize;
 }
 
 bool CTxMemPool::Exists(const uint256& hash) const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return ExistsNL(hash);
 }
 
@@ -2409,7 +2409,7 @@ bool CTxMemPool::ExistsNL(const uint256& hash) const {
 }
 
 bool CTxMemPool::Exists(const COutPoint &outpoint) const {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
     return ExistsNL(outpoint);
 }
 
@@ -2471,7 +2471,7 @@ void CTxMemPool::Snapshot::CreateIndex() const
 
 CTxMemPool::Snapshot CTxMemPool::GetSnapshot() const
 {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
 
     Snapshot::Contents contents;
     contents.reserve(mapTx.size());
@@ -2483,7 +2483,7 @@ CTxMemPool::Snapshot CTxMemPool::GetSnapshot() const
 
 CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKind kind) const
 {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
 
     const auto baseTx = mapTx.find(hash);
     if (baseTx == mapTx.end()) {
@@ -2550,7 +2550,7 @@ CTxMemPool::Snapshot CTxMemPool::GetTxSnapshot(const uint256& hash, TxSnapshotKi
 
 std::vector<CTransactionRef> CTxMemPool::GetTransactions() const
 {
-    std::shared_lock lock(smtx);
+    std::shared_lock lock{smtx};
 
     std::vector<CTransactionRef> result;
     result.reserve(mapTx.size());
