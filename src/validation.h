@@ -679,30 +679,16 @@ std::vector<TxId> LimitMempoolSize(
  * @param ptx A reference to the transaction
  * @param entry A valid entry point for the given transaction
  * @param fTxValidForFeeEstimation A flag to inform if txn is valid for fee estimations.
- * @param setAncestors  A set of ancestors
  * @param pool A reference to the mempool
  * @param state A reference to a state variable
  * @param changeSet A reference to the Jorunal ChangeSet
- * @param fLimitMempoolSize A flag to limit a mempool size
  * @param pnMempoolSize If not null store mempool size after txn is commited
  * @param pnDynamicMemoryUsage If not null store dynamic memory usage after txn is commited
  */
-// FIXME: (CORE-130)
-// CTxnValResult::mSetAncestors was removed because there is no longer any
-// public API in CTxMemPool that returns the ancestor set. This means that we
-// call CTxMemPool::AddUnchecked without the ancestor set, causing it to be
-// constructed again, even though the validator has already constructed it once
-// to check the number and size of ancestors and descendants against configured
-// limits.
-//
-// This slows down the insertion of valid transactions into the mempool, but
-// it's a temporary state because the solution for CORE-130 will introduce
-// different criteria for ancestor/descendant counts and sizes.
 void CommitTxToMempool(
     const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& entry,
     bool fTxValidForFeeEstimation,
-    // FIXME: (CORE-130) CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
     CValidationState& state,
     const mining::CJournalChangeSetPtr& changeSet,

@@ -102,7 +102,6 @@ class JournalingBlockAssembler : public BlockAssembler
     };
     std::vector<CTransactionRef> mBlockTxns {};
     std::vector<Amount> mTxFees {};
-    std::vector<int64_t> mTxSigOpsCount {};    // FIXME: this is not utilized anymore. consider removing.
 
     BlockAssemblyState mState {};
     // When adding transaction group we optimize for the happy case

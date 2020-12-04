@@ -84,7 +84,6 @@ class GetBlockTemplateRPCTest(BitcoinTestFramework):
         assert 'mintime' in template
         assert 'mutable' in template
         assert 'noncerange' in template
-        assert 'sigoplimit' in template
         assert 'sizelimit' in template
         assert 'curtime' in template
         assert 'bits' in template
