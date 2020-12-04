@@ -158,7 +158,7 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: txid2 in node0.getrawmempool(), timeout=5)
 
         # Check that tx1 and tx2 were relayed to test_node
-        wait_until(lambda: sorted([txid1, txid2]) == sorted(test_node.txinvs), timeout=60)
+        wait_until(lambda: sorted([txid1, txid2]) == sorted(test_node.txinvs), lock=mininode_lock, timeout=60)
 
         # Now the feefilter is set to blockmintxfee+1;
         # tx3 is not relayed as modified fees < feefilter
@@ -172,7 +172,7 @@ class FeeFilterTest(BitcoinTestFramework):
         wait_until(lambda: txid4 in node0.getrawmempool(), timeout=5)
 
         # Check that tx3 was not relayed to test_node but tx4 was
-        wait_until(lambda: sorted([txid1, txid2, txid4]) == sorted(test_node.txinvs), timeout=60)
+        wait_until(lambda: sorted([txid1, txid2, txid4]) == sorted(test_node.txinvs), lock=mininode_lock, timeout=60)
 
 if __name__ == '__main__':
     FeeFilterTest().main()
