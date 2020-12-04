@@ -220,7 +220,12 @@ class TestManager():
             if all(node.received_ping_response(counter) for node in self.test_nodes):
                 # after we receive pong we need to check that there are no async
                 # block/transaction processes still running
-                return all(sum(c.rpc.getblockchainactivity().values()) for c in self.connections) == 0
+                for c in self.connections:
+                    res=c.rpc.getblockchainactivity()
+                    if sum(res.values())>0:
+                        # this node is still processing some block/transaction
+                        return False
+                return True
             return False
         wait_until(received_pongs, lock=mininode_lock, timeout=timeout)
 
