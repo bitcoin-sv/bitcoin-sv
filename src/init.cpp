@@ -361,17 +361,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         _("Imports blocks from external blk000??.dat file on startup"));
 
     strUsage += HelpMessageOpt("-maxmempool=<n>",
-                   strprintf(_("Keep the transaction memory pool below <n> megabytes "
+                   strprintf(_("Keep the resident size of the transaction memory pool below <n> megabytes "
                                "(default: %u%s,  must be at least %d). "
                                "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
                              DEFAULT_MAX_MEMPOOL_SIZE,
                              showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "",
                              std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
     strUsage += HelpMessageOpt("-maxmempoolsizedisk=<n>",
-                               strprintf(_("Keep the total disk usage for storing mempool transactions "
-                                           "below <n> megabytes (default: %u). "
+                               strprintf(_("Additional amount of mempool transactions to keep stored on disk "
+                                           "below <n> megabytes (default: -maxmempool x %u). Actual disk usage will "
+                                           "be larger due to leveldb compaction strategy."
                                            "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
-                                         DEFAULT_MAX_MEMPOOL_SIZE_DISK));
+                                         DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR));
+    strUsage += HelpMessageOpt("-mempoolmaxpercentcpfp=<n>",
+                               strprintf(_("Percentage of total mempool size (ram+disk) to allow for "
+                                           "low paying transactions (0..100) (default: %u)"),
+                                         DEFAULT_MEMPOOL_MAX_PERCENT_CPFP));
     strUsage +=
         HelpMessageOpt("-mempoolexpiry=<n>",
                        strprintf(_("Do not keep transactions in the mempool "
@@ -1798,15 +1803,23 @@ bool AppInitParameterInteraction(Config &config) {
         LogPrintf("Warning: nMinimumChainWork set below default value of %s\n",
                   chainparams.GetConsensus().nMinimumChainWork.GetHex());
     }
-    
-    // mempool limits  
+
+    // mempool limits
     if (std::string err; !config.SetMaxMempool(
         gArgs.GetArgAsBytes("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE, ONE_MEGABYTE), &err))
     {
         return InitError(err);
     }
+    const auto defaultMaxMempoolSizeDisk = int64_t(
+        std::ceil(1.0 * config.GetMaxMempool() * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR
+                  / ONE_MEGABYTE));
     if (std::string err; !config.SetMaxMempoolSizeDisk(
-        gArgs.GetArgAsBytes("-maxmempoolsizedisk", DEFAULT_MAX_MEMPOOL_SIZE_DISK, ONE_MEGABYTE), &err))
+        gArgs.GetArgAsBytes("-maxmempoolsizedisk", defaultMaxMempoolSizeDisk, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
+    if (std::string err; !config.SetMempoolMaxPercentCPFP(
+        gArgs.GetArg("-mempoolmaxpercentcpfp", DEFAULT_MEMPOOL_MAX_PERCENT_CPFP), &err))
     {
         return InitError(err);
     }
@@ -2750,8 +2763,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     nTotalCache -= nMerkleTreeIndexDBCache;
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
-    int64_t nMempoolSizeMax = config.GetMaxMempool();
-    int64_t nMempoolSizeDiskMax = config.GetMaxMempoolSizeDisk();
+    MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
@@ -2761,9 +2773,9 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
               nCoinDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
               "unused mempool space and %.1fMiB of disk space)\n",
-              nCoinCacheUsage * (1.0 / ONE_MEBIBYTE),
-              nMempoolSizeMax * (1.0 / ONE_MEBIBYTE),
-              nMempoolSizeDiskMax * (1.0 / ONE_MEBIBYTE));
+              nCoinCacheUsage * (1.0 / 1024 / 1024),
+              limits.Memory() * (1.0 / 1024 / 1024),
+              limits.Disk() * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
     while (!fLoaded && !shutdownToken.IsCanceled()) {

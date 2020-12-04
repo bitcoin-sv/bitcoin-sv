@@ -2289,16 +2289,18 @@ UniValue mempoolInfoToJSON(const Config& config) {
         Pair("nonfinalsize", (int64_t)mempool.getNonFinalPool().getNumTxns()));
     ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t)mempool.DynamicMemoryUsage()));
+    ret.push_back(Pair("usagedisk", (int64_t)mempool.GetDiskUsage()));
+    ret.push_back(Pair("usagecpfp", (int64_t)mempool.SecondaryMempoolUsage()));
     ret.push_back(
         Pair("nonfinalusage",
              (int64_t)mempool.getNonFinalPool().estimateMemoryUsage()));
-    size_t maxmempool = config.GetMaxMempool();
-    size_t maxmempoolsizedisk = config.GetMaxMempoolSizeDisk();
-    ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
-    ret.push_back(Pair("maxmempoolsizedisk", (int64_t)maxmempoolsizedisk));
+    MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
+    ret.push_back(Pair("maxmempool", static_cast<int64_t>(limits.Memory())));
+    ret.push_back(Pair("maxmempoolsizedisk", static_cast<int64_t>(limits.Disk())));
+    ret.push_back(Pair("maxmempoolsizecpfp", static_cast<int64_t>(limits.Secondary())));
     ret.push_back(
         Pair("mempoolminfee",
-             ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK())));
+             ValueFromAmount(mempool.GetMinFee(limits.Total()).GetFeePerK())));
 
     return ret;
 }

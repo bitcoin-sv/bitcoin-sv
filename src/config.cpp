@@ -70,7 +70,8 @@ void GlobalConfig::Reset()
     mMaxCoinsProviderCacheSize = 0;
     
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
-    mMaxMempoolSizeDisk = DEFAULT_MAX_MEMPOOL_SIZE_DISK * ONE_MEGABYTE;
+    mMaxMempoolSizeDisk = mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
+    mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
     mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
     mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
@@ -1183,6 +1184,30 @@ bool GlobalConfig::SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string
 
 uint64_t GlobalConfig::GetMaxMempoolSizeDisk() const {
     return mMaxMempoolSizeDisk;
+}
+
+bool GlobalConfig::SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) {
+    if (LessThanZero(mempoolMaxPercentCPFP, err, "Policy value for percentage of memory for low paying transactions must not be less than 0."))
+    {
+        return false;
+    }
+
+    if (mempoolMaxPercentCPFP > 100)
+    {
+        if (err)
+        {
+            *err = "Policy value for percentage of memory for low paying transactions must not be greater than 100";
+        }
+        return false;
+    }
+
+    mMempoolMaxPercentCPFP = static_cast<uint64_t>(mempoolMaxPercentCPFP);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMempoolMaxPercentCPFP() const {
+    return mMempoolMaxPercentCPFP;
 }
 
 bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {

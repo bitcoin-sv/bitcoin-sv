@@ -4610,7 +4610,11 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         !(pto->fWhitelisted &&
           gArgs.GetBoolArg("-whitelistforcerelay",
                            DEFAULT_WHITELISTFORCERELAY))) {
-        Amount currentFilter = mempool.GetMinFee(config.GetMaxMempool()).GetFeePerK();
+        MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
+        Amount currentFilter =
+            mempool
+                .GetMinFee(limits.Total())
+                .GetFeePerK();
         int64_t timeNow = GetTimeMicros();
         if (timeNow > pto->nextSendTimeFeeFilter) {
             static CFeeRate default_feerate =

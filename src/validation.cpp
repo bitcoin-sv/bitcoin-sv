@@ -946,36 +946,55 @@ size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue) {
     return numHardwareThrs - GetNumLowPriorityValidationThrs(numHardwareThrs);
 }
 
+MempoolSizeLimits MempoolSizeLimits::FromConfig() {
+    const auto limitMemory = GlobalConfig::GetConfig().GetMaxMempool();
+    const auto limitDisk = GlobalConfig::GetConfig().GetMaxMempoolSizeDisk();
+    const auto limitSecondaryRatio = GlobalConfig::GetConfig().GetMempoolMaxPercentCPFP() / 100.0;
+    const auto limitExpiry = GlobalConfig::GetConfig().GetMemPoolExpiry();
+    return MempoolSizeLimits(
+        limitMemory,
+        limitDisk,
+        limitSecondaryRatio * limitMemory,
+        limitExpiry);
+}
+
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const CJournalChangeSetPtr& changeSet,
-    size_t limitMemory,
-    size_t limitDisk,
-    unsigned long age) {
+    const MempoolSizeLimits& limits) {
 
-    size_t limitTotal = limitMemory + limitDisk;
-
-    int expired = pool.Expire(GetTime() - age, changeSet);
+    int expired = pool.Expire(GetTime() - limits.Age(), changeSet);
     if (expired != 0) {
         LogPrint(BCLog::MEMPOOL,
                  "Expired %i transactions from the memory pool\n", expired);
     }
     size_t usageTotal = pool.DynamicMemoryUsage();
+    size_t usageSecondary = pool.SecondaryMempoolUsage();
 
     std::vector<COutPoint> vNoSpendsRemaining;
     std::vector<TxId> vRemovedTxIds;
 
-    if (usageTotal > limitTotal)
+    if ((usageTotal > limits.Total()) || (usageSecondary > limits.Secondary()))
     {
-        size_t targetSize = limitTotal;
+        size_t targetSize = std::min(usageTotal, limits.Total());
+        if (usageSecondary > limits.Secondary())
+        {
+            size_t secondaryExcess = usageSecondary - limits.Secondary();
+            targetSize -= secondaryExcess;
+        }
         vRemovedTxIds =
             pool.TrimToSize(targetSize, changeSet, &vNoSpendsRemaining);
         usageTotal = pool.DynamicMemoryUsage();
     }
+
+    // Disk usage is eventually consistent with total usage.
     size_t usageDisk = pool.GetDiskUsage();
-    size_t usageMemory = usageTotal - usageDisk;
-    if (usageMemory > limitMemory) {
-        size_t toWriteOut = usageMemory - limitMemory;
+    // Clamp the difference to zero to avoid nasty surprises.
+    size_t usageMemory = std::max(usageTotal, usageDisk) - usageDisk;
+
+    // Since this is called often we'll track the limit pretty close
+    if (usageMemory > limits.Memory()) {
+        size_t toWriteOut = usageMemory - limits.Memory();
         pool.SaveTxsToDisk(toWriteOut);
     }
     pcoinsTip->Uncache(vNoSpendsRemaining);
@@ -990,7 +1009,8 @@ void CommitTxToMempool(
     CValidationState& state,
     const CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize,
-    size_t* pnMempoolSize,
+    size_t* pnPrimaryMempoolSize,
+    size_t* pnSecondaryMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
@@ -1019,7 +1039,8 @@ void CommitTxToMempool(
             pMempoolEntry,
             txStorage,
             changeSet,
-            pnMempoolSize,
+            pnPrimaryMempoolSize,
+            pnSecondaryMempoolSize,
             pnDynamicMemoryUsage);
     // Check if the mempool size needs to be limited.
     if (fLimitMempoolSize) {
@@ -1027,9 +1048,7 @@ void CommitTxToMempool(
         LimitMempoolSize(
             pool,
             changeSet,
-            GlobalConfig::GetConfig().GetMaxMempool(),
-            GlobalConfig::GetConfig().GetMaxMempoolSizeDisk(),
-            GlobalConfig::GetConfig().GetMemPoolExpiry());
+            MempoolSizeLimits::FromConfig());
         if (!pool.Exists(txid)) {
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                      "mempool full");
@@ -1661,7 +1680,8 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
 
 static void LogTxnCommitStatus(
     const CTxnValResult& txStatus,
-    const size_t& nMempoolSize,
+    const size_t& nPrimaryMempoolSize,
+    const size_t& nSecondaryMempoolSize,
     const size_t& nDynamicMemoryUsage) {
 
     const bool fOrphanTxn = txStatus.mTxInputData->IsOrphanTxn();
@@ -1689,12 +1709,14 @@ static void LogTxnCommitStatus(
         sTxnStatusMsg += FormatStateMessage(state);
     }
     LogPrint(state.IsValid() ? BCLog::MEMPOOL : BCLog::MEMPOOLREJ,
-            "%s: %s txn= %s %s (poolsz %u txn, %u kB) %s\n",
+             "%s: %s txn= %s %s (poolsz %zu txn (pri=%zu,sec=%zu), %zu kB) %s\n",
              enum_cast<std::string>(source),
              state.IsStandardTx() ? "standard" : "nonstandard",
              tx.GetId().ToString(),
              sTxnStatusMsg,
-             nMempoolSize,
+             nPrimaryMempoolSize + nSecondaryMempoolSize,
+             nPrimaryMempoolSize,
+             nSecondaryMempoolSize,
              nDynamicMemoryUsage / 1000,
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
 }
@@ -1774,7 +1796,8 @@ void ProcessValidatedTxn(
         /**
          * Send transaction to the mempool
          */
-        size_t nMempoolSize {};
+        size_t nPrimaryMempoolSize {};
+        size_t nSecondaryMempoolSize {};
         size_t nDynamicMemoryUsage {};
         // Check if required log categories are enabled
         bool fMempoolLogs = LogAcceptCategory(BCLog::MEMPOOL) || LogAcceptCategory(BCLog::MEMPOOLREJ);
@@ -1787,7 +1810,8 @@ void ProcessValidatedTxn(
             state,
             handlers.mJournalChangeSet,
             fLimitMempoolSize,
-            fMempoolLogs ? &nMempoolSize : nullptr,
+            fMempoolLogs ? &nPrimaryMempoolSize : nullptr,
+            fMempoolLogs ? &nSecondaryMempoolSize : nullptr,
             fMempoolLogs ? &nDynamicMemoryUsage : nullptr);
         // Check txn's commit status and do all required actions.
         if (TxSource::p2p == source) {
@@ -1798,7 +1822,10 @@ void ProcessValidatedTxn(
         }
         // Logging txn commit status
         if (!state.IsResubmittedTx()) {
-            LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
+            LogTxnCommitStatus(txStatus,
+                               nPrimaryMempoolSize,
+                               nSecondaryMempoolSize,
+                               nDynamicMemoryUsage);
         }
     }
     // If txn validation or commit has failed then:
