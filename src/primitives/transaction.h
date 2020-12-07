@@ -41,24 +41,6 @@ struct TxHash : public uint256 {
 };
 
 /**
- * A hasher object for std::unordered_set and similar hash-based containers.
- */
-class SaltedTxidHasher {
-  private:
-    // The salt does not change during the lifetime of the hasher object, but
-    // it's not const so that container copy construction and assignment work.
-    uint64_t k0, k1;
-
-  public:
-    SaltedTxidHasher();
-
-    size_t operator()(const uint256& txid) const
-    {
-        return SipHashUint256(k0, k1, txid);
-    }
-};
-
-/**
  * An outpoint - a combination of a transaction hash and an index n into its
  * vout.
  */
@@ -103,17 +85,24 @@ public:
 /**
  * Hasher objects for std::unordered_set and similar hash-based containers.
  */
-
-class SaltedOutpointHasher
+class StaticHasherSalt
 {
-  private:
-    // The salt does not change during the lifetime of the hasher object, but
-    // it's not const so that container copy construction and assignment work.
-    uint64_t k0, k1;
+protected:
+    static const uint64_t k0, k1;
+};
 
+class SaltedTxidHasher : private StaticHasherSalt
+{
   public:
-    SaltedOutpointHasher();
+    size_t operator()(const uint256& txid) const
+    {
+        return SipHashUint256(k0, k1, txid);
+    }
+};
 
+class SaltedOutpointHasher : private StaticHasherSalt
+{
+  public:
     size_t operator()(const COutPoint& outpoint) const
     {
         return SipHashUint256Extra(k0, k1, outpoint.GetTxId(), outpoint.GetN());

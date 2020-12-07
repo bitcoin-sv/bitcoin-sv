@@ -57,7 +57,7 @@ private:
     const size_t nCacheSize;
     const bool fMemory;
 
-    std::unique_ptr<CDBWrapper> mempoolTxDB;
+    std::unique_ptr<CDBWrapper> wrapper;
 
     std::atomic_uint64_t diskUsage {0};
     std::atomic_uint64_t txCount {0};
@@ -70,7 +70,8 @@ public:
      * memory environment will be used. fWipe is false by default. If set to
      * true it will remove all existing data in this database.
      */
-    CMempoolTxDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    CMempoolTxDB(const fs::path& dbPath, size_t nCacheSize,
+                 bool fMemory = false, bool fWipe = false);
 
     /*
      * Clear the contents of the database by recreating an empty one in place,
@@ -174,7 +175,7 @@ public:
 class CAsyncMempoolTxDB
 {
 public:
-    CAsyncMempoolTxDB(size_t nCacheSize);
+    CAsyncMempoolTxDB(const fs::path& dbPath, size_t cacheSize, bool inMemory);
     ~CAsyncMempoolTxDB();
 
     // Syncronize with the background thread after finishing pending tasks.

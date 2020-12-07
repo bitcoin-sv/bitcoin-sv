@@ -83,6 +83,8 @@ void GlobalConfig::Reset()
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
 
+    mDisableBIP30Checks = std::nullopt;
+
 #if ENABLE_ZMQ
     invalidTxZMQMaxMessageSize = CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE;
 #endif
@@ -972,6 +974,25 @@ bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
 
     p2pHandshakeTimeout = timeout;
     return true;
+}
+
+bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
+{
+    if(!GetChainParams().CanDisableBIP30Checks())
+    {
+        if(err)
+        {
+            *err = "Can not change disabling of BIP30 checks on " + GetChainParams().NetworkIDString() + " network.";
+            return false;
+        }
+    }
+    mDisableBIP30Checks = disable;
+    return true;
+}
+
+bool GlobalConfig::GetDisableBIP30Checks() const
+{
+    return mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
 }
 
 #if ENABLE_ZMQ

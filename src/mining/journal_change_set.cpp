@@ -107,7 +107,7 @@ bool CJournalChangeSet::CheckTopoSort() const
         auto selectionsEnd =boost::make_filter_iterator(predicate, mChangeSet.cend(), mChangeSet.cend());
         std::transform(selections, selectionsEnd,
                        std::inserter(transactionIds, transactionIds.begin()),
-                       [](auto& change) { return change.second.getTxn()->GetHash(); });
+                       [](auto& change) { return change.second.getTxn()->GetId(); });
         std::sort(transactionIds.begin(), transactionIds.end());
         return transactionIds;
     };
@@ -131,9 +131,10 @@ bool CJournalChangeSet::CheckTopoSort() const
         if (!isAddition(*i)) {
             continue;
         }
-        const CTransactionRef& txn = i->second.getTxn();
-        auto unsorted = std::find_if(txn->vin.cbegin(),
-                                    txn->vin.cend(),
+        // FIXME: We may read the transaction from disk, but for now
+        //        this method is only called from CheckMempool().
+        auto txn = i->second.getTxn()->GetTx();
+        auto unsorted = std::find_if(txn->vin.cbegin(), txn->vin.cend(),
                                      [&laterTransactions](const CTxIn& txInput) {
                                          return laterTransactions.count(txInput.prevout.GetTxId());
                                      });
@@ -152,7 +153,7 @@ bool CJournalChangeSet::CheckTopoSort() const
             }
             uint256 prevTxId(unsorted->prevout.GetTxId());
             const auto prevTx = std::find_if(mChangeSet.cbegin(), mChangeSet.cend(), [&prevTxId](const auto &change) {
-                return change.second.getTxn()->GetHash() == prevTxId;
+                return change.second.getTxn()->GetId() == prevTxId;
             });
             size_t prevTxIdx = std::distance(mChangeSet.cbegin(), prevTx);
             LogPrintf("=x== ChangeSet[%d] %s input %d"

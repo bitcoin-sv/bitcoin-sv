@@ -8,6 +8,7 @@
 
 #include "amount.h"
 #include "coins.h"
+#include "mining/journal_entry.h"
 #include "mining/journal_builder.h"
 #include "primitives/transaction.h"
 #include "sync.h"
@@ -121,16 +122,6 @@ public:
     CTxPrioritizer& operator=(CTxPrioritizer&&) = delete;
 };
 
-/**
- * \class GroupID
- *
- * GroupID identifies consecutive transactions in the journal that belong to
- * the same CPFP group that should all be mined in the same block.
- *
- * The block assembler should not accept a partial group into the block template.
- */
-using GroupID = std::optional<TxId>;
-
 /** \class CTxMemPoolEntry
  *
  * CTxMemPoolEntry stores data about the corresponding transaction.
@@ -150,6 +141,8 @@ private:
     CTransactionWrapperRef tx;
     // The mempool info constructor needs access to the wrapper reference.
     friend TxMempoolInfo::TxMempoolInfo(const CTxMemPoolEntry&);
+    // So does the journal entry constructor.
+    friend mining::CJournalEntry::CJournalEntry(const CTxMemPoolEntry&);
 
     //!< Cached to avoid expensive parent-transaction lookups
     Amount nFee;
@@ -190,7 +183,7 @@ public:
     CTxMemPoolEntry& operator=(const CTxMemPoolEntry&) = default;
 
     // CPFP group, if any that this transaction belongs to.
-    GroupID GetCPFPGroupId() const;
+    mining::GroupID GetCPFPGroupId() const;
     CTransactionRef GetSharedTx() const { return tx->GetTx(); }
     const TxId& GetTxId() const { return tx->GetId(); }
 
@@ -425,10 +418,6 @@ private:
 
     // The group definition needs access to the mempool index iterator type.
     friend struct CPFPGroup;
-
-    // Mempool transaction database
-    std::once_flag db_initialized {};
-    std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
 
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
@@ -742,7 +731,34 @@ public:
         const std::function<void(const CoinWithScript&, size_t)>& callback) const;
 
 private:
+    // Mempool transaction database
+    std::once_flag db_initialized {};
+    std::shared_ptr<CAsyncMempoolTxDB> mempoolTxDB {nullptr};
+
+    static std::atomic_int mempoolTxDB_uniqueInit;
+    int mempoolTxDB_uniqueSuffix {mempoolTxDB_uniqueInit.fetch_add(1)};
+
+    // Safely opens the transaction database
     void OpenMempoolTxDB(const bool clearDatabase = false);
+
+    // This is the workhorse behind InitMempoolTxDB() and friends.
+    void DoInitMempoolTxDB();
+
+    // These are the default properties of a mempool that are used by
+    // OpenMempoolTxDB() without a prior call to one of the InitMempoolTxDB()
+    // variants, which is most of the time during tests:
+
+    //   - use an in-memory transaction database
+    bool mempoolTxDB_inMemory {true};
+
+    //   - use a uniquified name for the transaction database
+    bool mempoolTxDB_unique {true};
+
+    // Like InitMempoolTxDB(), but uses a unique name for the on-disk database.
+    void InitUniqueMempoolTxDB();
+
+    // Like InitMempoolTxDB(), but uses an in-memory database.
+    void InitInMemoryMempoolTxDB();
 
 public:
     // Called at process init, opens the transaction database and checks its

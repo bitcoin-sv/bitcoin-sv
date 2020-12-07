@@ -3,10 +3,22 @@
 
 #pragma once
 
-#include <txmempool.h>
+#include "tx_mempool_info.h"
+
+class CTxMemPoolEntry;
 
 namespace mining
 {
+
+/**
+ * \class GroupID
+ *
+ * GroupID identifies consecutive transactions in the journal that belong to
+ * the same CPFP group that should all be mined in the same block.
+ *
+ * The block assembler should not accept a partial group into the block template.
+ */
+using GroupID = std::optional<TxId>;
 
 /**
 * What we actually store for each journal entry.
@@ -17,27 +29,30 @@ class CJournalEntry
   public:
 
     // Constructors
-    CJournalEntry(const CTransactionRef& txn, const Amount& fee, GroupID groupId)
-    : mTxn{txn}, mFee{fee}, mGroupId{groupId}
-    {}
+    CJournalEntry(const CTransactionWrapperRef& txn,
+                  uint64_t txnSize,
+                  const Amount& fee,
+                  GroupID groupId);
+    explicit CJournalEntry(const CTxMemPoolEntry& entry);
 
-    CJournalEntry(const CTxMemPoolEntry& entry)
-    : CJournalEntry{entry.GetSharedTx(), entry.GetFee(), entry.GetCPFPGroupId()}
-    {}
-
-    // Accessors
-    const CTransactionRef& getTxn() const { return mTxn; }
+    // accessors
+    const CTransactionWrapperRef& getTxn() const { return mTxn; }
+    uint64_t getTxnSize() const { return mTxnSize; }
     const Amount& getFee() const { return mFee; }
 
     // Which group of transactions if any does this entry belong to
     const GroupID& getGroupId() const { return mGroupId; }
 
+    // Is this the paying transaction of its group (if any)
     bool isPaying() const { return !mGroupId || mGroupId == mTxn->GetId(); }
 
   private:
 
-    // Shared pointer to the transaction itself
-    CTransactionRef mTxn {};
+    // Shared pointer to the transaction wrapper
+    CTransactionWrapperRef mTxn {};
+
+    // Transaction size.
+    uint64_t mTxnSize;
 
     // Fee for the transaction
     Amount mFee {0};

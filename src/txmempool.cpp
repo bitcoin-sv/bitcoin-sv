@@ -132,11 +132,11 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
 }
 
 // CPFP group, if any that this transaction belongs to.
-GroupID CTxMemPoolEntry::GetCPFPGroupId() const 
+mining::GroupID CTxMemPoolEntry::GetCPFPGroupId() const
 { 
     if(group)
     {
-        return GroupID{ group->PayingTransaction()->GetTxId() };
+        return mining::GroupID{ group->PayingTransaction()->GetTxId() };
     }
     return std::nullopt; 
 }
@@ -390,7 +390,7 @@ void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& gro
     // submit the group
     for(auto entry: groupMembers)
     {
-        changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry});
+        changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, CJournalEntry{*entry});
     }
 }
 
@@ -513,7 +513,7 @@ void CTxMemPool::TryAcceptToPrimaryMempoolNL(CTxMemPool::setEntriesTopoSorted to
             case ResultOfUpdateEntryGroupingDataNL::ADD_TO_PRIMARY_STANDALONE:
             {
                 // accept it to primary mempool
-                changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry} );
+                changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, CJournalEntry{*entry});
                 secondaryMempoolStats.Remove(entry);
                 // enqueue children to update
                 for(auto child: GetMemPoolChildrenNL(entry))
@@ -562,7 +562,7 @@ void CTxMemPool::TryAcceptChildlessTxToPrimaryMempoolNL(CTxMemPool::txiter entry
         {
             // accept it to primary mempool as standalone tx
             SetGroupingData(entry, std::nullopt);
-            changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, {*entry} );
+            changeSet.addOperation(mining::CJournalChangeSet::Operation::ADD, CJournalEntry{*entry});
             secondaryMempoolStats.Remove(entry);
         }
         else
@@ -621,7 +621,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
         else
         {
             // add to change set, removin them from journal
-            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, {*entry});
+            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, CJournalEntry{*entry});
             // removing from primary to secondary mempool
             secondaryMempoolStats.Add(entry);
             // add to set of removed
@@ -822,7 +822,7 @@ void CTxMemPool::removeUncheckedNL(
         // Apply to the current journal, but only if it is in the journal (primary mempool) already
         if(entry->IsInPrimaryMempool())
         {
-            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, { *entry });
+            changeSet.addOperation(CJournalChangeSet::Operation::REMOVE, CJournalEntry{*entry});
         }
         else
         {
@@ -1350,7 +1350,8 @@ void CTxMemPool::CheckMempoolImplNL(
     assert(totalTxSize == checkTotal);
     assert(innerUsage == cachedInnerUsage);
 
-    /* Journal checking */
+    /* Journal checking. */
+    // NOTE: Verify mapNextTx first because checkJournalNL() relies on it.
     if(changeSet)
     {
         // Check that the change set respects the toposort
@@ -1444,40 +1445,53 @@ std::string CTxMemPool::checkJournalNL() const
     for(txiter it = mapTx.begin(); it != mapTx.end(); ++it)
     {
         // Check this mempool txn also appears in the journal
-        const CJournalEntry tx { *it };
-        if(it->IsInPrimaryMempool() && !tester.checkTxnExists(tx))
+        const CJournalEntry entry { *it };
+        const auto txid = entry.getTxn()->GetId().ToString();
+
+        if(it->IsInPrimaryMempool() && !tester.checkTxnExists(entry))
         {
-            res << "Txn " << tx.getTxn()->GetId().ToString() << " is in the primary mempool but not the journal" << std::endl;
+            res << "Txn " << txid << " is in the primary mempool but not the journal\n";
         }
 
-        if(!it->IsInPrimaryMempool() && tester.checkTxnExists(tx))
+        if(!it->IsInPrimaryMempool() && tester.checkTxnExists(entry))
         {
-            res << "Txn " << tx.getTxn()->GetId().ToString() << " is not in the primary mempool but it is in the journal" << std::endl;
+            res << "Txn " << txid << " is not in the primary mempool but it is in the journal\n";
         }
 
         if(it->IsInPrimaryMempool())
         {
-            for(const CTxIn& txin : tx.getTxn()->vin)
+            size_t countInputs = 0;
+            for (auto [outpair, end] = mapNextTx.get<by_txiter>().equal_range(it);
+                 outpair != end; ++outpair)
             {
-                auto prevoutit { mapTx.find(txin.prevout.GetTxId()) };
-                if(prevoutit != mapTx.end())
+                ++countInputs;
+                if (const auto prevoutit = mapTx.find(outpair->outpoint.GetTxId());
+                    prevoutit != mapTx.end())
                 {
                     // Check this in mempool ancestor appears before its descendent in the journal
                     const CJournalEntry prevout { *prevoutit };
-                    CJournalTester::TxnOrder order { tester.checkTxnOrdering(prevout, tx) };
+                    CJournalTester::TxnOrder order { tester.checkTxnOrdering(prevout, entry) };
                     if(order != CJournalTester::TxnOrder::BEFORE)
                     {
-                        res << "Ancestor " << prevout.getTxn()->GetId().ToString() << " of "
-                            << tx.getTxn()->GetId().ToString() << " appears "
-                            << enum_cast<std::string>(order) << " in the journal" << std::endl;
+                        res << "Ancestor " << prevout.getTxn()->GetId().ToString()
+                            << " of " << txid << " appears "
+                            << enum_cast<std::string>(order) << " in the journal\n";
                     }
                 }
+            }
+
+            if (countInputs == 0)
+            {
+                res << "Txn " << txid << " seems to have no inputs\n";
             }
         }
     }
 
-    LogPrint(BCLog::JOURNAL, "Result of journal check: %s\n", res.str().empty()? "Ok" : res.str().c_str());
-    return res.str();
+    const auto result = res.str();
+    LogPrint(BCLog::JOURNAL, "Result of journal check:%s\n%s",
+             (result.empty() ? " Ok" : ""),
+             (result.empty() ? "" : result.c_str()));
+    return result;
 }
 
 // Rebuild the journal contents so they match the mempool
@@ -1503,15 +1517,24 @@ void CTxMemPool::SetSanityCheck(double dFrequency) {
     nCheckFrequency = dFrequency * 4294967295.0;
 }
 
+std::atomic_int CTxMemPool::mempoolTxDB_uniqueInit {0};
+
 void CTxMemPool::OpenMempoolTxDB(const bool clearDatabase) {
     static constexpr auto cacheSize = 1 << 20; /*TODO: remove constant*/
-    std::call_once(db_initialized,
-                   [this, clearDatabase] {
-                       mempoolTxDB = std::make_shared<CAsyncMempoolTxDB>(cacheSize);
-                       if (clearDatabase) {
-                           mempoolTxDB->Clear();
-                       }
-                   });
+    static constexpr auto hexDigits = int(2 * sizeof(mempoolTxDB_uniqueSuffix));
+    std::call_once(
+        db_initialized,
+        [this, clearDatabase] {
+            const auto dbName =
+                (mempoolTxDB_unique
+                 ? strprintf("mempoolTxDB-%0*X", hexDigits, mempoolTxDB_uniqueSuffix)
+                 : std::string{"mempoolTxDB"});
+            mempoolTxDB = std::make_shared<CAsyncMempoolTxDB>(
+                GetDataDir() / dbName, cacheSize, mempoolTxDB_inMemory);
+            if (clearDatabase) {
+                mempoolTxDB->Clear();
+            }
+        });
 }
 
 void CTxMemPool::RemoveTxFromDisk(const CTransactionRef& transaction) {
@@ -2562,7 +2585,7 @@ namespace {
     const uint64_t MEMPOOL_DUMP_HAS_ON_DISK_TXS = 2;
 } // namespace
 
-void CTxMemPool::InitMempoolTxDB()
+void CTxMemPool::DoInitMempoolTxDB()
 {
     if (!gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL))
     {
@@ -2620,6 +2643,28 @@ void CTxMemPool::InitMempoolTxDB()
         Clear();
     }
 }
+
+void CTxMemPool::InitUniqueMempoolTxDB()
+{
+    mempoolTxDB_inMemory = false;
+    mempoolTxDB_unique = true;
+    DoInitMempoolTxDB();
+}
+
+void CTxMemPool::InitInMemoryMempoolTxDB()
+{
+    mempoolTxDB_inMemory = true;
+    mempoolTxDB_unique = true;
+    DoInitMempoolTxDB();
+}
+
+void CTxMemPool::InitMempoolTxDB()
+{
+    mempoolTxDB_inMemory = false;
+    mempoolTxDB_unique = false;
+    DoInitMempoolTxDB();
+}
+
 
 FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
 {

@@ -12,21 +12,20 @@
 
 #include <future>
 #include <limits>
-#include <new>
 #include <variant>
 
-CMempoolTxDB::CMempoolTxDB(size_t nCacheSize_, bool fMemory_, bool fWipe)
-    : dbPath{GetDataDir() / "mempoolTxDB"},
+CMempoolTxDB::CMempoolTxDB(const fs::path& dbPath_, size_t nCacheSize_, bool fMemory_, bool fWipe)
+    : dbPath{dbPath_},
       nCacheSize{nCacheSize_},
       fMemory{fMemory_},
-      mempoolTxDB{std::make_unique<CDBWrapper>(dbPath, nCacheSize, fMemory, fWipe)}
+      wrapper{std::make_unique<CDBWrapper>(dbPath, nCacheSize, fMemory, fWipe)}
 {
     uint64_t storedValue;
-    if (mempoolTxDB->Read(DB_DISK_USAGE, storedValue))
+    if (wrapper->Read(DB_DISK_USAGE, storedValue))
     {
         diskUsage.store(storedValue);
     }
-    if (mempoolTxDB->Read(DB_TX_COUNT, storedValue))
+    if (wrapper->Read(DB_TX_COUNT, storedValue))
     {
         txCount.store(storedValue);
     }
@@ -37,8 +36,8 @@ void CMempoolTxDB::ClearDatabase()
     diskUsage.store(0);
     txCount.store(0);
     dbWriteCount.store(0);
-    mempoolTxDB.reset(); // make sure old db is closed before reopening
-    mempoolTxDB = std::make_unique<CDBWrapper>(dbPath, nCacheSize, fMemory, true);
+    wrapper.reset();   // Release the old environment before creating a new one.
+    wrapper = std::make_unique<CDBWrapper>(dbPath, nCacheSize, fMemory, true);
 }
 
 bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef>& txs)
@@ -53,7 +52,7 @@ bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef>& txs)
         return accumulator;
     }();
 
-    auto batch = CDBBatch{*mempoolTxDB};
+    auto batch = CDBBatch{*wrapper};
     for (const auto& tx : txs)
     {
         batch.Write(std::make_pair(DB_TRANSACTIONS, tx->GetId()), tx);
@@ -63,7 +62,7 @@ bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef>& txs)
     batch.Erase(DB_MEMPOOL_XREF);
 
     ++dbWriteCount;
-    if (mempoolTxDB->WriteBatch(batch, true))
+    if (wrapper->WriteBatch(batch, true))
     {
         diskUsage.fetch_add(diskUsageAdded);
         txCount.fetch_add(txCountAdded);
@@ -75,10 +74,10 @@ bool CMempoolTxDB::AddTransactions(const std::vector<CTransactionRef>& txs)
 bool CMempoolTxDB::GetTransaction(const uint256 &txid, CTransactionRef &tx)
 {
     const auto key = std::make_pair(DB_TRANSACTIONS, txid);
-    if (mempoolTxDB->Exists(key))
+    if (wrapper->Exists(key))
     {
         CMutableTransaction txm;
-        if (mempoolTxDB->Read(key, txm))
+        if (wrapper->Read(key, txm))
         {
             tx = MakeTransactionRef(std::move(txm));
             return true;
@@ -89,7 +88,7 @@ bool CMempoolTxDB::GetTransaction(const uint256 &txid, CTransactionRef &tx)
 
 bool CMempoolTxDB::TransactionExists(const uint256 &txid)
 {
-    return mempoolTxDB->Exists(std::make_pair(DB_TRANSACTIONS, txid));
+    return wrapper->Exists(std::make_pair(DB_TRANSACTIONS, txid));
 }
 
 
@@ -104,7 +103,7 @@ bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& txData)
         return accumulator;
     }();
 
-    auto batch = CDBBatch{*mempoolTxDB};
+    auto batch = CDBBatch{*wrapper};
     for (const auto& td : txData) {
         batch.Erase(std::make_pair(DB_TRANSACTIONS, td.txid));
     }
@@ -113,7 +112,7 @@ bool CMempoolTxDB::RemoveTransactions(const std::vector<TxData>& txData)
     batch.Erase(DB_MEMPOOL_XREF);
 
     ++dbWriteCount;
-    if (mempoolTxDB->WriteBatch(batch, true))
+    if (wrapper->WriteBatch(batch, true))
     {
         diskUsage.fetch_sub(diskUsageRemoved);
         txCount.fetch_sub(txCountRemoved);
@@ -136,7 +135,7 @@ CMempoolTxDB::TxIdSet CMempoolTxDB::GetKeys()
 {
     static const auto initialKey = std::make_pair(DB_TRANSACTIONS, uint256{});
 
-    std::unique_ptr<CDBIterator> iter {mempoolTxDB->NewIterator()};
+    std::unique_ptr<CDBIterator> iter {wrapper->NewIterator()};
     iter->Seek(initialKey);
 
     TxIdSet result;
@@ -151,17 +150,17 @@ CMempoolTxDB::TxIdSet CMempoolTxDB::GetKeys()
 
 bool CMempoolTxDB::SetXrefKey(const XrefKey& xrefKey)
 {
-    auto batch = CDBBatch{*mempoolTxDB};
+    auto batch = CDBBatch{*wrapper};
     batch.Write(DB_MEMPOOL_XREF, xrefKey);
     ++dbWriteCount;
-    return mempoolTxDB->WriteBatch(batch, true);
+    return wrapper->WriteBatch(batch, true);
 }
 
 bool CMempoolTxDB::GetXrefKey(XrefKey& xrefKey)
 {
-    if (mempoolTxDB->Exists(DB_MEMPOOL_XREF))
+    if (wrapper->Exists(DB_MEMPOOL_XREF))
     {
-        if (mempoolTxDB->Read(DB_MEMPOOL_XREF, xrefKey))
+        if (wrapper->Read(DB_MEMPOOL_XREF, xrefKey))
         {
             return true;
         }
@@ -171,10 +170,10 @@ bool CMempoolTxDB::GetXrefKey(XrefKey& xrefKey)
 
 bool CMempoolTxDB::RemoveXrefKey()
 {
-    auto batch = CDBBatch{*mempoolTxDB};
+    auto batch = CDBBatch{*wrapper};
     batch.Erase(DB_MEMPOOL_XREF);
     ++dbWriteCount;
-    return mempoolTxDB->WriteBatch(batch, true);
+    return wrapper->WriteBatch(batch, true);
 }
 
 // The coalescing batch operations assume that the transaction database is
@@ -230,7 +229,7 @@ bool CMempoolTxDB::Commit(const Batch& batch)
     const auto prevDiskUsage = diskUsage.fetch_add(diskUsageDiff);
     const auto prevTxCount = txCount.fetch_add(txCountDiff);
 
-    auto coalesced = CDBBatch{*mempoolTxDB};
+    auto coalesced = CDBBatch{*wrapper};
     for (const auto& e : batch.adds)
     {
         coalesced.Write(std::make_pair(DB_TRANSACTIONS, e.first), e.second.tx);
@@ -244,7 +243,7 @@ bool CMempoolTxDB::Commit(const Batch& batch)
     coalesced.Erase(DB_MEMPOOL_XREF);
 
     ++dbWriteCount;
-    if (!mempoolTxDB->WriteBatch(coalesced, true))
+    if (!wrapper->WriteBatch(coalesced, true))
     {
         diskUsage.fetch_sub(diskUsageDiff);
         txCount.fetch_sub(txCountDiff);
@@ -393,9 +392,9 @@ public:
     }
 };
 
-CAsyncMempoolTxDB::CAsyncMempoolTxDB(size_t nCacheSize)
+CAsyncMempoolTxDB::CAsyncMempoolTxDB(const fs::path& dbPath, size_t cacheSize, bool inMemory)
     : queue{new TaskQueue{EstimateTaskQueueSize(GlobalConfig::GetConfig())}},
-      txdb{std::make_shared<CMempoolTxDB>(nCacheSize)},
+      txdb{std::make_shared<CMempoolTxDB>(dbPath, cacheSize, inMemory)},
       worker{[this](){ Work(); }}
 {
     const auto maxSize = queue->MaximalSize();

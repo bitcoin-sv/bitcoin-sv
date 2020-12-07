@@ -3499,6 +3499,11 @@ static bool ConnectBlock(
         (!pindexBIP34height ||
          !(pindexBIP34height->GetBlockHash() == consensusParams.BIP34Hash));
 
+    if(config.GetDisableBIP30Checks())
+    {
+        fEnforceBIP30 = false;
+    }
+
     if (fEnforceBIP30) {
         for (const auto &tx : block.vtx) {
             for (size_t o = 0; o < tx->vout.size(); o++) {
@@ -4151,6 +4156,7 @@ static int64_t nTimeConnectTotal = 0;
 static int64_t nTimeFlush = 0;
 static int64_t nTimeChainState = 0;
 static int64_t nTimePostConnect = 0;
+static int64_t nTimeRemoveFromMempool = 0;
 
 struct PerBlockConnectTrace {
     CBlockIndex *pindex = nullptr;
@@ -4338,6 +4344,21 @@ static bool ConnectTip(
         auto flushed = pCoinsTipSpan.TryFlush();
         assert(flushed == CoinsDBSpan::WriteState::ok);
     }
+
+    auto asyncRemoveForBlock = std::async(std::launch::async, 
+        [&blockConnecting, &pindexNew, &changeSet]()
+        {
+            RenameThread("Async RemoveForBlock");
+            int64_t nTimeRemoveForBlock = GetTimeMicros();
+            // Remove transactions from the mempool.;
+            mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
+            nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
+            nTimeRemoveFromMempool += nTimeRemoveForBlock;
+            LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
+                    nTimeRemoveForBlock * 0.001, nTimeRemoveFromMempool * 0.000001);
+        }
+    );
+
     int64_t nTime4 = GetTimeMicros();
     nTimeFlush += nTime4 - nTime3;
     LogPrint(BCLog::BENCH, "  - Flush: %.2fms [%.2fs]\n",
@@ -4345,19 +4366,21 @@ static bool ConnectTip(
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(config.GetChainParams(), state,
                           FLUSH_STATE_IF_NEEDED)) {
+        asyncRemoveForBlock.wait();
         return false;
     }
     int64_t nTime5 = GetTimeMicros();
     nTimeChainState += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
-    // Remove conflicting transactions from the mempool.;
-    mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
+
     if(g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
     }
     disconnectpool.removeForBlock(blockConnecting.vtx);
+
+    asyncRemoveForBlock.wait();
     // Update chainActive & related variables.
     UpdateTip(config, pindexNew);
 

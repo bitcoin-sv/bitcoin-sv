@@ -93,7 +93,7 @@ std::vector<std::tuple<TxId, int, Amount>> MakeConfirmedInputs(size_t count, Amo
 
 bool checkGroupContinuity(const mining::CJournalChangeSetPtr& changeSet)
 {
-    std::unordered_set<GroupID> seenGroups;
+    std::unordered_set<mining::GroupID> seenGroups;
     const auto& changes = changeSet->getChangeSet();
     const auto disjoint = std::adjacent_find(changes.cbegin(), changes.cend(),
                                              [&seenGroups](const auto& aChange, const auto&bChange) {
@@ -133,14 +133,17 @@ std::unique_ptr<mining::CBlockTemplate> CreateBlock()
     BOOST_CHECK(pblocktemplate = mining::g_miningFactory->GetAssembler()->CreateNewBlock(scriptPubKey, pindexPrev));
     return pblocktemplate;
 }
-};
+
+using JournalEntry = mining::CJournalEntry;
+using JournalTester = mining::CJournalTester;
+}
 
 BOOST_FIXTURE_TEST_SUITE(cpfp_tests, TestingSetup)
 
 mining::CJournalPtr CheckMempoolRebuild(CTxMemPoolTestAccess& testAccess)
 {
     auto oldJournal = testAccess.getJournalBuilder().getCurrentJournal();
-    auto contentsBefore = mining::CJournalTester(oldJournal).getContents();
+    auto contentsBefore = JournalTester(oldJournal).getContents();
     auto oldMapTx = testAccess.mapTx();
 
     auto changeSet = mempool.RebuildMempool();
@@ -150,7 +153,7 @@ mining::CJournalPtr CheckMempoolRebuild(CTxMemPoolTestAccess& testAccess)
     changeSet->apply();
 
     auto newJournal = testAccess.getJournalBuilder().getCurrentJournal();
-    auto contentsAfter = mining::CJournalTester(newJournal).getContents();
+    auto contentsAfter = JournalTester(newJournal).getContents();
     BOOST_CHECK(contentsBefore == contentsAfter);
 
     auto newMapTx = testAccess.mapTx();
@@ -230,7 +233,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     BOOST_ASSERT(!payFor3And4It->IsInPrimaryMempool());
 
     // still nothing is accepted to primary mempool
-    BOOST_ASSERT(mining::CJournalTester(journal).journalSize() == 0);
+    BOOST_ASSERT(JournalTester(journal).journalSize() == 0);
 
     // now we will add payForGroupIt which pays enough for entryPayForItself and entryNotPaying
     // this will cause forming a group
@@ -259,18 +262,18 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     BOOST_ASSERT(!notPaying2It->IsInPrimaryMempool());
 
     // journal is no longer empty
-    BOOST_ASSERT(mining::CJournalTester(journal).journalSize() != 0);
+    BOOST_ASSERT(JournalTester(journal).journalSize() != 0);
 
     // check content of the journal
-    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*notPayingIt}));
-    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*payForItselfIt}));
-    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*payForGroupIt}));
+    BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*notPayingIt}));
+    BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*payForItselfIt}));
+    BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*payForGroupIt}));
 
-    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*payFor3And4It}));
-    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*notPaying4It}));
-    BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*notPaying3It}));
+    BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*payFor3And4It}));
+    BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*notPaying4It}));
+    BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*notPaying3It}));
 
-    BOOST_ASSERT(! mining::CJournalTester(journal).checkTxnExists({*notPaying2It}));
+    BOOST_ASSERT(! JournalTester(journal).checkTxnExists(JournalEntry{*notPaying2It}));
 
     
     // remove payFor3And4It, notPaying4It from mempool
@@ -285,20 +288,20 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     for(auto entry: {entryNotPaying4, entryPayingFor3And4})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) == testAccess.mapTx().end());
-        BOOST_ASSERT(!mining::CJournalTester(journal).checkTxnExists({entry}));
+        BOOST_ASSERT(!JournalTester(journal).checkTxnExists(JournalEntry{entry}));
     }
 
     // unaffected entries, they should stay in the mempool and journal
     for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
-        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({entry}));
+        BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{entry}));
     }
 
     // notPaying3It is still in the mempool
     BOOST_ASSERT(testAccess.mapTx().find(entryNotPaying3.GetTxId()) != testAccess.mapTx().end());
     // but not in the journal
-    BOOST_ASSERT(!mining::CJournalTester(journal).checkTxnExists({entryNotPaying3}));
+    BOOST_ASSERT(!JournalTester(journal).checkTxnExists(JournalEntry{entryNotPaying3}));
 
     
     // return removed transactions back to mempool
@@ -312,7 +315,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     for(auto entry: {entryNotPaying, entryPayForItself, entryPayForGroup, entryNotPaying3, entryNotPaying4, entryPayingFor3And4})
     {
         BOOST_ASSERT(testAccess.mapTx().find(entry.GetTxId()) != testAccess.mapTx().end());
-        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({entry}));
+        BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{entry}));
     }
 
     // now remove entryPayForGroup
@@ -321,7 +324,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     testAccess.removeStagedNL(entriesToRemove, *changeSet, MemPoolRemovalReason::UNKNOWN);
 
     // everything should be removed from journal
-    BOOST_ASSERT(mining::CJournalTester(journal).journalSize() == 0);
+    BOOST_ASSERT(JournalTester(journal).journalSize() == 0);
 
     // and nothing should stay in the primary mempool
     for(const auto& entryIt: testAccess.mapTx())
@@ -334,7 +337,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     for(const auto& entryIt: {notPayingIt, notPaying3It, notPaying4It, payForItselfIt, payFor3And4It})
     {
         BOOST_ASSERT(entryIt->IsInPrimaryMempool());
-        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+        BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
     CheckMempoolRebuild(testAccess);
@@ -381,13 +384,13 @@ BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
     for(auto entryIt: {notPaying1, notPaying2, paysFor2})
     {
         BOOST_ASSERT(!entryIt->IsInPrimaryMempool());
-        BOOST_ASSERT(!mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+        BOOST_ASSERT(!JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
     for(auto entryIt: {notPaying3, payForItself, paysFor3})
     {
         BOOST_ASSERT(entryIt->IsCPFPGroupMember());
-        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+        BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
     mempool.RemoveForBlock({entryNotPaying1.GetSharedTx(), entryNotPaying3.GetSharedTx()}, 0, {});
@@ -395,14 +398,14 @@ BOOST_AUTO_TEST_CASE(group_recalculation_when_removing_for_block)
     for(auto entryIt: {notPaying2, paysFor2})
     {
         BOOST_ASSERT(entryIt->IsInPrimaryMempool());
-        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+        BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
     for(auto entryIt: {payForItself, paysFor3})
     {
         BOOST_ASSERT(!entryIt->IsCPFPGroupMember());
         BOOST_ASSERT(entryIt->IsInPrimaryMempool());
-        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+        BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
     
     CheckMempoolRebuild(testAccess);
@@ -446,13 +449,13 @@ BOOST_AUTO_TEST_CASE(mempool_rebuild)
     for(auto entryIt: {tx1, tx2, tx3, tx4, tx5, tx8})
     {
         BOOST_ASSERT(entryIt->IsInPrimaryMempool());
-        BOOST_ASSERT(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+        BOOST_ASSERT(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
     for(auto entryIt: {tx6, tx7})
     {
         BOOST_ASSERT(!entryIt->IsInPrimaryMempool());
-        BOOST_ASSERT(!mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+        BOOST_ASSERT(!JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
     for(auto entryIt: {tx2, tx3, tx4, tx5})
@@ -496,7 +499,7 @@ BOOST_AUTO_TEST_CASE(journal_groups)
     for(auto entryIt: {tx1, tx2, tx3})
     {
         BOOST_CHECK(entryIt->IsInPrimaryMempool());
-        BOOST_CHECK(mining::CJournalTester(journal).checkTxnExists({*entryIt}));
+        BOOST_CHECK(JournalTester(journal).checkTxnExists(JournalEntry{*entryIt}));
     }
 
     for(auto entryIt: {tx2, tx3})

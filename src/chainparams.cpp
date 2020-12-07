@@ -242,6 +242,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
+        fDisbleBIP30Checks = false;
+        fCanDisbleBIP30Checks = false;
     }
 };
 
@@ -340,6 +342,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
+        fDisbleBIP30Checks = false;
+        fCanDisbleBIP30Checks = true;
     }
 };
 
@@ -460,6 +464,8 @@ public:
         };
 
         fTestBlockCandidateValidity = false;
+        fDisbleBIP30Checks = false;
+        fCanDisbleBIP30Checks = true;
     }
 };
 
@@ -564,6 +570,8 @@ public:
         };
 
         fTestBlockCandidateValidity = true;
+        fDisbleBIP30Checks = false;
+        fCanDisbleBIP30Checks = true;
     }
 };
 

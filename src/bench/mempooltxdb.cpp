@@ -10,7 +10,7 @@
 #define LOGSTATS(x) // x
 
 static void do_WriteToDBdataTx() {
-    CMempoolTxDB txdb {100000000};
+    CMempoolTxDB txdb {GetDataDir() / "benchMempoolTxDB", 100000000, false};
     LOGSTATS(std::cout << "Data tx write to db (duration in seconds)\n");
     CMutableTransaction t;
     t.vin.resize(1);
@@ -39,7 +39,7 @@ static void do_WriteToDBdataTx() {
 }
 
 static void do_WriteToDBmultisig() {
-    CMempoolTxDB txdb {100000000};
+    CMempoolTxDB txdb {GetDataDir() / "benchMempoolTxDB", 100000000, false};
     LOGSTATS(std::cout << "Multisig tx write (duration in seconds)\n");
     CMutableTransaction t;
     t.vin.resize(1);
