@@ -54,7 +54,7 @@ bool IsStandard(const Config &config, const CScript &scriptPubKey, int32_t nScri
 bool IsConsolidationTxn(const Config &config, const CTransaction &tx, const CCoinsViewCache &inputs, int32_t tipHeight)
 {
     const uint64_t factor = config.GetMinConsolidationFactor();
-    const uint64_t minConf = config.GetMinConfConsolidationInput();
+    const int32_t minConf = static_cast<int32_t>(config.GetMinConfConsolidationInput());
     const uint64_t maxSize = config.GetMaxConsolidationInputScriptSize();
     const bool stdInputOnly = !config.GetAcceptNonStdConsolidationInput();
 

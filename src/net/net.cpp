@@ -1461,7 +1461,7 @@ void CConnman::ThreadSocketHandler() {
             if (have_fds) {
                 int nErr = WSAGetLastError();
                 LogPrintf("socket select error %s\n", NetworkErrorString(nErr));
-                for (int i = 0; i <= hSocketMax; i++) {
+                for (SOCKET i = 0; i <= hSocketMax; i++) {
                     FD_SET(i, &fdsetRecv);
                 }
             }
