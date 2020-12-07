@@ -25,6 +25,7 @@ add_executable(bench_bitcoin
         mempooltxdb.cpp
         perf.cpp
         rollingbloom.cpp
+        thread_safe_queue.cpp
         data/block413567.raw.h)
 
 target_link_libraries(bench_bitcoin

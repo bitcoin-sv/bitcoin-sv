@@ -11,16 +11,11 @@
 #include <boost/uuid/uuid.hpp>
 
 #include <atomic>
-#include <condition_variable>
 #include <cstdint>
-#include <deque>
-#include <future>
-#include <initializer_list>
-#include <mutex>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <thread>
-#include <variant>
 #include <vector>
 
 /**
@@ -233,37 +228,11 @@ public:
     bool RemoveXrefKey();
 
 private:
-    struct StopTask{};
-    struct SyncTask
-    {
-        std::promise<void>* sync;
-    };
-    struct ClearTask{};
-    struct AddTask
-    {
-        std::vector<CTransactionWrapperRef> transactions;
-    };
-    struct RemoveTask
-    {
-        std::vector<CMempoolTxDB::TxData> transactions;
-    };
-    struct InvokeTask
-    {
-        std::function<void(CMempoolTxDB&)> function;
-    };
-    using Task = std::variant<StopTask, SyncTask, ClearTask, AddTask, RemoveTask, InvokeTask>;
-
     // Task queue for the worker thread.
-    std::deque<Task> taskList;
-    std::mutex taskListGuard;
-    std::condition_variable taskListSignal;
-    void EnqueueNL(std::initializer_list<Task>&& tasks, bool clearList);
-    void Enqueue(std::initializer_list<Task>&& tasks, bool clearList = false);
+    class TaskQueue;
+    std::unique_ptr<TaskQueue> queue;
 
-    // Thread synchronization point.
-    void Synchronize(std::initializer_list<Task>&& tasks, bool clearList = false);
-
-    // Initialize the database and worker thread after the queue and mutex.
+    // Initialize the database and worker thread after the queue.
     std::shared_ptr<CMempoolTxDB> txdb;
     std::thread worker;
     void Work();
