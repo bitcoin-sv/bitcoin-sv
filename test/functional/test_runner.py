@@ -80,10 +80,6 @@ JOURNAL_BROKEN_TESTS = frozenset((
     "prioritise_transaction.py",
 ))
 
-# FIXME: (CORE-130) Tests broken by intermediate mempool changes
-MEMPOOL_BROKEN_TESTS = frozenset((
-))
-
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
     # When a test is listed here, then it will be run without parameters
@@ -232,9 +228,6 @@ def main():
         if not args.journal_broken_tests:
             print("WARNING: skipping tests broken by journaling block assembler:", tuple(JOURNAL_BROKEN_TESTS))
             test_list = [test for test in test_list if test not in JOURNAL_BROKEN_TESTS]
-        # FIXME: (CORE-130): Exclude tests broken by intermediate mempool changes
-        print("WARNING: skipping tests broken by mempool changes:", tuple(MEMPOOL_BROKEN_TESTS))
-        test_list = [test for test in test_list if test not in MEMPOOL_BROKEN_TESTS]
 
     # Remove the test cases that the user has explicitly asked to exclude.
     if args.exclude:

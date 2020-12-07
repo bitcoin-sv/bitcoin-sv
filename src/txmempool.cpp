@@ -1701,6 +1701,7 @@ void CTxMemPool::prioritiseTransactionNL(
     txiter it = mapTx.find(hash);
     if (it != mapTx.end()) {
         mapTx.modify(it, update_fee_delta(deltas.second));
+        TrackEntryModified(it);
         auto changeSet = mJournalBuilder.getNewChangeSet(JournalUpdateReason::UNKNOWN); // TODO: add new update reason (PRIORITY?)
 
         setEntriesTopoSorted entries;
@@ -2233,7 +2234,7 @@ int64_t CTxMemPool::evaluateEvictionCandidateNL(txiter entry)
         return (evalParams.fee + evalParams.feeDelta).GetSatoshis() * 1000 / entry->GetTxSize();
     }
     
-    int64_t score = entry->GetFee().GetSatoshis() * 1000 / entry->GetTxSize();
+    int64_t score = entry->GetModifiedFee().GetSatoshis() * 1000 / entry->GetTxSize();
     if(!entry->IsInPrimaryMempool())
     {
         // tx is secondary mempool, decrement its score
