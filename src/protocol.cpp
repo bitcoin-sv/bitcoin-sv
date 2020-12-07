@@ -122,7 +122,15 @@ CMessageHeader::CMessageHeader(const MessageMagic &pchMessageStartIn,
     memcpy(pchMessageStart.data(), pchMessageStartIn.data(),
            MESSAGE_START_SIZE);
     memset(pchCommand, 0, sizeof(pchCommand));
+    GCC_WARNINGS_PUSH;
+    #if defined __GNUC__ && (__GNUC__ >= 8)
+        // -Wstringop-truncation was introduced in GCC 8
+        GCC_WARNINGS_IGNORE(-Wstringop-truncation);
+    #endif
+    // length of pszCommand is always smaller than COMMAND_SIZE
     strncpy(pchCommand, pszCommand, COMMAND_SIZE);
+    GCC_WARNINGS_POP;
+
     nPayloadLength = nPayloadLengthIn;
     memset(pchChecksum, 0, CHECKSUM_SIZE);
 }
