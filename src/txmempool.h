@@ -45,15 +45,6 @@ class CoinsDB;
 class CoinsDBView;
 class CAsyncMempoolTxDB;
 
-inline double AllowFreeThreshold() {
-    return COIN.GetSatoshis() * 144 / 250;
-}
-
-inline bool AllowFree(double dPriority) {
-    // Large (in bytes) low-priority (new, small-coin) transactions need a fee.
-    return dPriority > AllowFreeThreshold();
-}
-
 /**
  * Fake height value used in Coins to signify they are only in the memory
  * pool(since 0.8)
@@ -164,16 +155,10 @@ private:
     Amount nFee;
     //!< ... and avoid recomputing tx size
     size_t nTxSize;
-    //!< ... and modified size for priority
-    size_t nModSize;
     //!< ... and total memory usage
     size_t nUsageSize;
     //!< Local time when entering the mempool
     int64_t nTime;
-    //!< Priority when entering the mempool
-    double entryPriority;
-    //!< Sum of all txin values that are already in blockchain
-    Amount inChainInputValue;
     //!< Used for determining the priority of the transaction for mining in a
     //! block
     Amount feeDelta;
@@ -197,8 +182,8 @@ private:
     
 public:
     CTxMemPoolEntry(const CTransactionRef &_tx, const Amount _nFee,
-                    int64_t _nTime, double _entryPriority,
-                    int32_t _entryHeight, Amount _inChainInputValue,
+                    int64_t _nTime,
+                    int32_t _entryHeight,
                     bool spendsCoinbase, LockPoints lp);
 
     CTxMemPoolEntry(const CTxMemPoolEntry &other) = default;
@@ -209,11 +194,6 @@ public:
     CTransactionRef GetSharedTx() const { return tx->GetTx(); }
     const TxId& GetTxId() const { return tx->GetId(); }
 
-    /**
-     * Fast calculation of lower bound of current priority as update from entry
-     * priority. Only inputs that were originally in-chain will age.
-     */
-    double GetPriority(int32_t currentHeight) const;
     Amount GetFee() const { return nFee; }
     Amount GetFeeDelta() const { return feeDelta; }
     size_t GetTxSize() const { return nTxSize; }
@@ -553,7 +533,7 @@ private:
 
     MapNextTx mapNextTx;
 
-    std::map<uint256, std::pair<double, Amount>> mapDeltas;
+    std::map<uint256, Amount> mapDeltas;
 
     class InsertionIndex
     {
@@ -737,16 +717,13 @@ public:
     void PrioritiseTransaction(
             const uint256& hash,
             const std::string& strHash,
-            double dPriorityDelta,
             const Amount nFeeDelta);
     void PrioritiseTransaction(
             const std::vector<TxId>& vTxToPrioritise,
-            double dPriorityDelta,
             const Amount nFeeDelta);
 
     void ApplyDeltas(
             const uint256& hash,
-            double &dPriorityDelta,
             Amount &nFeeDelta) const;
 
     // Get a reference to the journal builder
@@ -1149,7 +1126,6 @@ private:
     // A non-locking version of ApplyDeltas
     void ApplyDeltasNL(
         const uint256& hash,
-        double &dPriorityDelta,
         Amount &nFeeDelta) const;
 
     /**
@@ -1189,7 +1165,6 @@ private:
 
     void prioritiseTransactionNL(
             const uint256& hash,
-            double dPriorityDelta,
             const Amount nFeeDelta);
 
     void clearPrioritisationNL(const uint256& hash);

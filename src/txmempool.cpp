@@ -83,7 +83,7 @@ CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, const TxId& txnToPrioritise)
     // A nulness detection.
     if (!txnToPrioritise.IsNull()) {
         mTxnsToPrioritise.push_back(txnToPrioritise);
-        mMempool.PrioritiseTransaction(mTxnsToPrioritise, 0.0, MAX_MONEY);
+        mMempool.PrioritiseTransaction(mTxnsToPrioritise, MAX_MONEY);
     }
 }
 
@@ -92,7 +92,7 @@ CTxPrioritizer::CTxPrioritizer(CTxMemPool& mempool, std::vector<TxId> txnsToPrio
 {
     // An early emptiness check.
     if (!mTxnsToPrioritise.empty()) {
-        mMempool.PrioritiseTransaction(mTxnsToPrioritise, 0.0, MAX_MONEY);
+        mMempool.PrioritiseTransaction(mTxnsToPrioritise, MAX_MONEY);
     }
 }
 
@@ -114,32 +114,24 @@ CTxPrioritizer::~CTxPrioritizer()
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  const Amount _nFee,
                                  int64_t _nTime,
-                                 double _entryPriority,
                                  int32_t _entryHeight,
-                                 Amount _inChainInputValue,
                                  bool _spendsCoinbase,
                                  LockPoints lp)
     : tx{std::make_shared<CTransactionWrapper>(_tx, nullptr)},
       nFee{_nFee},
       nTime{_nTime},
-      entryPriority{_entryPriority},
-      inChainInputValue{_inChainInputValue},
       lockPoints{lp},
       entryHeight{_entryHeight},
       spendsCoinbase{_spendsCoinbase}
 {
     nTxSize = _tx->GetTotalSize();
-    nModSize = _tx->CalculateModifiedSize(GetTxSize());
     nUsageSize = RecursiveDynamicUsage(_tx);
 
-    Amount nValueIn = _tx->GetValueOut() + nFee;
-    assert(inChainInputValue <= nValueIn);
 
     feeDelta = Amount {0};
 }
 
 // CPFP group, if any that this transaction belongs to.
-
 GroupID CTxMemPoolEntry::GetCPFPGroupId() const 
 { 
     if(group)
@@ -147,18 +139,6 @@ GroupID CTxMemPoolEntry::GetCPFPGroupId() const
         return GroupID{ group->PayingTransaction()->GetTxId() };
     }
     return std::nullopt; 
-}
-
-double CTxMemPoolEntry::GetPriority(int32_t currentHeight) const {
-    double deltaPriority = double((currentHeight - entryHeight) *
-                                  inChainInputValue.GetSatoshis()) /
-                           nModSize;
-    double dResult = entryPriority + deltaPriority;
-    // This should only happen if it was called with a height below entry height
-    if (dResult < 0) {
-        dResult = 0;
-    }
-    return dResult;
 }
 
 void CTxMemPoolEntry::UpdateFeeDelta(Amount newFeeDelta) {
@@ -732,7 +712,7 @@ void CTxMemPool::AddUncheckedNL(
     // Update transaction for any feeDelta created by PrioritiseTransaction.
     const auto pos = mapDeltas.find(hash);
     if (pos != mapDeltas.end()) {
-        const auto& amount = pos->second.second;
+        const auto& amount = pos->second;
         if (amount != Amount(0)) {
             entry.UpdateFeeDelta(amount);
         }
@@ -1636,20 +1616,17 @@ CFeeRate CTxMemPool::estimateFee() const {
 void CTxMemPool::PrioritiseTransaction(
     const uint256& hash,
     const std::string& strHash,
-    double dPriorityDelta,
     const Amount nFeeDelta) {
 
     {
         std::unique_lock lock{smtx};
-        prioritiseTransactionNL(hash, dPriorityDelta, nFeeDelta);
+        prioritiseTransactionNL(hash, nFeeDelta);
     }
-    LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash,
-        dPriorityDelta, FormatMoney(nFeeDelta));
+    LogPrintf("PrioritiseTransaction: %s fee += %d\n", strHash, FormatMoney(nFeeDelta));
 }
 
 void CTxMemPool::PrioritiseTransaction(
     const std::vector<TxId>& vTxToPrioritise,
-    double dPriorityDelta,
     const Amount nFeeDelta) {
 
     if (vTxToPrioritise.empty()) {
@@ -1658,49 +1635,43 @@ void CTxMemPool::PrioritiseTransaction(
     {
         std::unique_lock lock{smtx};
         for(const TxId& txid: vTxToPrioritise) {
-            prioritiseTransactionNL(txid, dPriorityDelta, nFeeDelta);
+            prioritiseTransactionNL(txid, nFeeDelta);
         }
     }
     for(const TxId& txid: vTxToPrioritise) {
-        LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n",
+        LogPrintf("PrioritiseTransaction: %s fee += %d\n",
             txid.ToString(),
-            dPriorityDelta,
             FormatMoney(nFeeDelta));
     }
 }
 
-void CTxMemPool::ApplyDeltas(const uint256& hash, double &dPriorityDelta,
-                             Amount &nFeeDelta) const {
+void CTxMemPool::ApplyDeltas(const uint256& hash, Amount &nFeeDelta) const 
+{
     std::shared_lock lock{smtx};
-    ApplyDeltasNL(hash, dPriorityDelta, nFeeDelta);
+    ApplyDeltasNL(hash, nFeeDelta);
 }
 
 void CTxMemPool::ApplyDeltasNL(
         const uint256& hash,
-        double &dPriorityDelta,
-        Amount &nFeeDelta) const {
+        Amount &nFeeDelta) const 
+{
 
-    std::map<uint256, std::pair<double, Amount>>::const_iterator pos =
-        mapDeltas.find(hash);
+    const auto pos = mapDeltas.find(hash);
     if (pos == mapDeltas.end()) {
         return;
     }
-    const std::pair<double, Amount> &deltas = pos->second;
-    dPriorityDelta += deltas.first;
-    nFeeDelta += deltas.second;
+    nFeeDelta += pos->second;
 }
 
 void CTxMemPool::prioritiseTransactionNL(
     const uint256& hash,
-    double dPriorityDelta,
     const Amount nFeeDelta) {
 
-    std::pair<double, Amount> &deltas = mapDeltas[hash];
-    deltas.first += dPriorityDelta;
-    deltas.second += nFeeDelta;
+    auto& delta = mapDeltas[hash];
+    delta += nFeeDelta;
     txiter it = mapTx.find(hash);
     if (it != mapTx.end()) {
-        mapTx.modify(it, update_fee_delta(deltas.second));
+        mapTx.modify(it, update_fee_delta(delta));
         TrackEntryModified(it);
         auto changeSet = mJournalBuilder.getNewChangeSet(JournalUpdateReason::UNKNOWN); // TODO: add new update reason (PRIORITY?)
 
@@ -1724,11 +1695,8 @@ void CTxMemPool::clearPrioritisationNL(const uint256& hash) {
 void CTxMemPool::GetDeltasAndInfo(std::map<uint256, Amount>& deltas,
                                   std::vector<TxMempoolInfo>& info) const
 {
-    deltas.clear();
     std::shared_lock lock {smtx};
-    for (const auto &it : mapDeltas) {
-        deltas.emplace(it.first, it.second.second);
-    }
+    deltas = mapDeltas;
     info = InfoAllNL();
 }
 
@@ -2042,8 +2010,7 @@ void CTxMemPool::AddToMempoolForReorg(const Config &config,
                     TxSource::reorg,  // tx source
                     TxValidationPriority::normal,  // tx validation priority
                     TxStorage::memory, // tx storage
-                    GetTime(),        // nAcceptTime
-                    false));          // fLimitFree
+                    GetTime()));        // nAcceptTime
         }
         ++it;
     }
@@ -2719,7 +2686,6 @@ bool CTxMemPool::LoadMempool(const Config &config,
 
         uint64_t num;
         file >> num;
-        double prioritydummy = 0;
         // A pointer to the TxIdTracker.
         const auto& pTxIdTracker = g_connman->GetTxIdTracker();
         const auto txdb = mempoolTxDB->GetDatabase();
@@ -2750,8 +2716,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
             file >> nFeeDelta;
             if (nFeeDelta != 0) {
                 const auto& txid = tx->GetId();
-                PrioritiseTransaction(txid, txid.ToString(),
-                                      prioritydummy, Amount{nFeeDelta});
+                PrioritiseTransaction(txid, txid.ToString(), Amount{nFeeDelta});
             }
             if (nTime + nExpiryTimeout > nNow) {
                 // Mempool Journal ChangeSet
@@ -2768,8 +2733,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
                             TxSource::file, // tx source
                             TxValidationPriority::normal,  // tx validation priority
                             txStorage, // tx storage
-                            nTime, // nAcceptTime
-                            true),  // fLimitFree
+                            nTime), // nAcceptTime
                         changeSet, // an instance of the mempool journal
                         true) // fLimitMempoolSize
                 };
@@ -2800,8 +2764,7 @@ bool CTxMemPool::LoadMempool(const Config &config,
         file >> mapDeltas;
 
         for (const auto &i : mapDeltas) {
-            PrioritiseTransaction(i.first, i.first.ToString(),
-                                  prioritydummy, i.second);
+            PrioritiseTransaction(i.first, i.first.ToString(), i.second);
         }
 
         // Check that the mempool and the database are in sync.

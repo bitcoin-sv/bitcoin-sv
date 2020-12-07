@@ -60,7 +60,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.setup_clean_chain = True
         # excessive_block_size needs to be > generated block size
         self.excessive_block_size = 64 * ONE_MEGABYTE
-        self.extra_args = [['-norelaypriority',
+        self.extra_args = [['-minrelaytxfee=0',
                             '-whitelist=127.0.0.1',
                             '-limitancestorcount=999999',
                             '-maxmempool=99999',

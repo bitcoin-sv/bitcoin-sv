@@ -2765,7 +2765,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 nValueToSelect += nFeeRet;
             }
 
-            double dPriority = 0;
             // vouts to the payees
             for (const auto &recipient : vecSend) {
                 CTxOut txout(recipient.nAmount, recipient.scriptPubKey);
@@ -2813,7 +2812,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             }
 
             for (const auto &pcoin : setCoins) {
-                Amount nCredit = pcoin.first->tx->vout[pcoin.second].nValue;
                 // The coin age after the next block (depth+1) is used instead
                 // of the current, reflecting an assumption the user would
                 // accept a bit more delay for a chance at a free transaction.
@@ -2822,7 +2820,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 int age = pcoin.first->GetDepthInMainChain();
                 assert(age >= 0);
                 if (age != 0) age += 1;
-                dPriority += (double)nCredit.GetSatoshis() * age;
             }
 
             const Amount nChange = nValueIn - nValueToSelect;
@@ -2933,7 +2930,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
 
             CTransaction txNewConst(txNew);
             unsigned int nBytes = txNewConst.GetTotalSize();
-            dPriority = txNewConst.ComputePriority(dPriority, nBytes);
 
             // Remove scriptSigs to eliminate the fee calculation dummy
             // signatures.
@@ -3048,8 +3044,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     if (gArgs.GetBoolArg("-walletrejectlongchains",
                          DEFAULT_WALLET_REJECT_LONG_CHAINS)) {
         // Lastly, ensure this tx will pass the mempool's chain limits.
-        LockPoints lp;
-        CTxMemPoolEntry entry {wtxNew.tx, Amount{0}, 0, 0, 0, Amount{0}, false, lp};
+        CTxMemPoolEntry entry {wtxNew.tx, Amount{0}, 0, 0, false, LockPoints{}};
         size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
         size_t nLimitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
 
@@ -4583,7 +4578,6 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
             TxValidationPriority::normal, // tx validation priority
             TxStorage::memory, // tx storage
             GetTime(),    // nAcceptTime
-            true,         // fLimitFree
             nAbsurdFee),  // nAbsurdFee
         changeSet, // an instance of the mempool journal
         true); // fLimitMempoolSize

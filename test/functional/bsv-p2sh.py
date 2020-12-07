@@ -27,7 +27,7 @@ class P2SH(ComparisonTestFramework):
          # Build the redeem script, hash it, use hash to create the p2sh script
         self.redeem_script = CScript([self.coinbase_pubkey, OP_2DUP, OP_CHECKSIGVERIFY, OP_CHECKSIG])
         self.p2sh_script = CScript([OP_HASH160, hash160(self.redeem_script), OP_EQUAL])
-        self.extra_args = [['-norelaypriority', '-acceptnonstdtxn=0', '-acceptnonstdoutputs=0', '-banscore=1000000',
+        self.extra_args = [['-acceptnonstdtxn=0', '-acceptnonstdoutputs=0', '-banscore=1000000',
                             f'-genesisactivationheight={self.genesisactivationheight}', '-maxgenesisgracefulperiod=1']]
 
     def run_test(self):

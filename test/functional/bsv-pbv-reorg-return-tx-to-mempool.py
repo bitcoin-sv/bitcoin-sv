@@ -47,8 +47,7 @@ class PBVReorg(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 1
         self.chain = ChainManager()
-        self.extra_args = [["-whitelist=127.0.0.1",
-                            "-relaypriority=0"]]
+        self.extra_args = [["-whitelist=127.0.0.1"]]
 
     def run_test(self):
         block_count = 0

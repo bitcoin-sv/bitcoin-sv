@@ -139,7 +139,6 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     uint256 hash;
     TestMemPoolEntryHelper entry;
     entry.nFee = Amount(11);
-    entry.dPriority = 111.0;
     entry.nHeight = 11;
 
     LOCK(cs_main);
@@ -773,7 +772,6 @@ void Test_CreateNewBlock_JBA_Config(TestingSetup& testingSetup)
                   << OP_CHECKSIG;
     TestMemPoolEntryHelper entry {};
     entry.nFee = Amount(11);
-    entry.dPriority = 111.0;
     entry.nHeight = 11;
 
     gArgs.ForceSetArg("-jbamaxtxnbatch", "1");

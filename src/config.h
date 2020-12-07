@@ -45,8 +45,6 @@ public:
     virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
 
-    virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) = 0;
-    virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
 
     virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
@@ -169,9 +167,6 @@ public:
     virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
     virtual uint64_t GetMemPoolExpiry() const = 0;
 
-    virtual bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) = 0;
-    virtual uint64_t GetLimitFreeRelay() const = 0;
-
     virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
     virtual uint64_t GetMaxOrphanTxSize() const = 0;
 
@@ -223,8 +218,6 @@ public:
     bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override;
     int64_t GetBlockSizeActivationTime() const override;
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override;
-    uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
@@ -352,9 +345,6 @@ public:
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override;
     uint64_t GetMemPoolExpiry() const override;
 
-    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override;
-    uint64_t GetLimitFreeRelay() const override;
-
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override;
     uint64_t GetMaxOrphanTxSize() const override;
 
@@ -393,7 +383,6 @@ private:
     // All fileds are initialized in Reset()    
     CFeeRate feePerKB;
     CFeeRate blockMinFeePerKB;
-    uint64_t blockPriorityPercentage;
     uint64_t preferredBlockFileSize;
     uint64_t factorMaxSendQueuesBytes;
 
@@ -456,7 +445,6 @@ private:
     uint64_t mMaxMempoolSizeDisk;
     uint64_t mMempoolMaxPercentCPFP;
     uint64_t mMemPoolExpiry;
-    uint64_t mLimitFreeRelay;
     uint64_t mMaxOrphanTxSize;
     int32_t mStopAtHeight;
     uint64_t mPromiscuousMempoolFlags;
@@ -509,12 +497,6 @@ public:
         return false; 
     }
     int64_t GetBlockSizeActivationTime() const override { return 0; }
-
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override {
-        SetErrorMsg(err);
-        return false;
-    }
-    uint8_t GetBlockPriorityPercentage() const override { return 0; }
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
     {
@@ -750,14 +732,6 @@ public:
         return true;
     }
     uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR; }
-
-    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override
-    {
-        SetErrorMsg(err);
-
-        return true;
-    }
-    uint64_t GetLimitFreeRelay() const override { return DEFAULT_LIMITFREERELAY * ONE_KILOBYTE; }
 
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override
     {

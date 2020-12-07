@@ -300,8 +300,7 @@ bool CTimeLockedMempool::loadMempool(const task::CCancellationToken& shutdownTok
                             TxSource::file, // tx source
                             standard ? TxValidationPriority::high : TxValidationPriority::low,
                             TxStorage::memory, // tx storage
-                            nTime, // nAcceptTime
-                            true),  // fLimitFree
+                            nTime), // nAcceptTime
                         changeSet, // an instance of the mempool journal
                         true) // fLimitMempoolSize
                 };

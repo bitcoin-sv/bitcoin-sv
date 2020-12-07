@@ -74,12 +74,6 @@ LARGE_BLOCK_TESTS = [
 # This is usefull for tests that take really long time to execute.
 EXCLUDED_TESTS = ["libevent_crashtest_on_many_rpc.py"]
 
-# FIXME: (CORE-130) Tests broken by the journaling block assembler.
-JOURNAL_BROKEN_TESTS = frozenset((
-    "abc-high_priority_transaction.py",
-    "prioritise_transaction.py",
-))
-
 TEST_PARAMS = {
     # Some test can be run with additional parameters.
     # When a test is listed here, then it will be run without parameters
@@ -224,10 +218,6 @@ def main():
         # Exclude large block tests unless explicitly told to run them
         if not args.large_block_tests:
             test_list = [test for test in test_list if test not in LARGE_BLOCK_TESTS]
-        # FIXME: (CORE-130): Exclude journal broken tests unless explicitly told to run them
-        if not args.journal_broken_tests:
-            print("WARNING: skipping tests broken by journaling block assembler:", tuple(JOURNAL_BROKEN_TESTS))
-            test_list = [test for test in test_list if test not in JOURNAL_BROKEN_TESTS]
 
     # Remove the test cases that the user has explicitly asked to exclude.
     if args.exclude:

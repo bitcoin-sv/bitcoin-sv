@@ -26,13 +26,11 @@ CTxMemPoolEntry MakeEntry(
 {
     CMutableTransaction tx;
     Amount totalInput;
-    Amount totalInChainInput;
     for(const auto& input: inChainInputs)
     {
         auto[id, ndx, amount] = input;
         tx.vin.push_back(CTxIn(id, ndx, CScript()));
         totalInput += amount;
-        totalInChainInput += amount;
     }
 
     for(const auto& input: inMempoolInputs)
@@ -70,7 +68,7 @@ CTxMemPoolEntry MakeEntry(
     }
 
     auto txRef = MakeTransactionRef(tx);
-    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, 0, totalInChainInput, false, LockPoints());
+    CTxMemPoolEntry entry(txRef, totalFee, int64_t(0), false, false, LockPoints());
     return entry;
 }
 
@@ -332,7 +330,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     }
 
     // now raise modified fee for the entryPayingFor3And4 so that it can pay for all ancestors (entryNotPaying4, entryNotPaying3, entryPaysForItself, entryNotPaying)
-    mempool.PrioritiseTransaction(entryPayingFor3And4.GetTxId(), entryPayingFor3And4.GetTxId().GetHex(), 0, Amount{10000});
+    mempool.PrioritiseTransaction(entryPayingFor3And4.GetTxId(), entryPayingFor3And4.GetTxId().GetHex(), Amount{10000});
     for(const auto& entryIt: {notPayingIt, notPaying3It, notPaying4It, payForItselfIt, payFor3And4It})
     {
         BOOST_ASSERT(entryIt->IsInPrimaryMempool());

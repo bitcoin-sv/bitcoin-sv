@@ -839,58 +839,6 @@ static bool CheckMempoolMinFee(
     return true;
 }
 
-static bool CheckTxRelayPriority(
-    const Amount& nModifiedFees,
-    const CFeeRate& minRelayTxFee,
-    const CTxMemPoolEntry& pMempoolEntry,
-    unsigned int nTxSize) {
-    // Check txn relay priority
-    if (gArgs.GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) &&
-        nModifiedFees < minRelayTxFee.GetFee(nTxSize) &&
-        !AllowFree(pMempoolEntry.GetPriority(chainActive.Height() + 1))) {
-        // Require that free transactions have sufficient priority to be
-        // mined in the next block.
-        return false;
-    }
-    return true;
-}
-
-static bool CheckLimitFreeTx(
-    const Config& config,
-    bool fLimitFree,
-    const Amount& nModifiedFees,
-    const CFeeRate& minRelayTxFee,
-    unsigned int nTxSize) {
-    // Continuously rate-limit free (really, very-low-fee) transactions.
-    // This mitigates 'penny-flooding' -- sending thousands of free
-    // transactions just to be annoying or make others' transactions take
-    // longer to confirm.
-    if (!(fLimitFree && nModifiedFees < minRelayTxFee.GetFee(nTxSize))) {
-        return true;
-    }
-    static CCriticalSection csFreeLimiter;
-    static double dFreeCount;
-    static int64_t nLastTime;
-    int64_t nNow = GetTime();
-
-    LOCK(csFreeLimiter);
-
-    // Use an exponentially decaying ~10-minute window:
-    dFreeCount *= pow(1.0 - 1.0 / 600.0, double(nNow - nLastTime));
-    nLastTime = nNow;
-    // -limitfreerelay unit is thousand-bytes-per-minute
-    // At default rate it would take over a month to fill 1GB
-    if (dFreeCount + nTxSize >=
-        config.GetLimitFreeRelay() * 10) {
-        return false;
-    }
-
-    LogPrint(BCLog::MEMPOOL, "Rate limit dFreeCount: %g => %g\n",
-             dFreeCount, dFreeCount + nTxSize);
-    dFreeCount += nTxSize;
-    return true;
-}
-
 static bool CheckAncestorLimits(const CTxMemPool& pool,
                                 const CTxMemPoolEntry& entry,
                                 std::string& errString) {
@@ -1093,7 +1041,6 @@ CTxnValResult TxnValidation(
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
-    const bool fLimitFree = pTxInputData->IsLimitFree();
     const int64_t nAcceptTime = pTxInputData->GetAcceptTime();
     const Amount nAbsurdFee = pTxInputData->GetAbsurdFee();
 
@@ -1335,19 +1282,14 @@ CTxnValResult TxnValidation(
     // the priority
     bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height() + 1);
     if (skipFeeTest) {
-        double priority = 0;
         const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
-        pool.PrioritiseTransaction(txid, txid.ToString(), priority, consolidationDelta);
+        pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);
         LogPrint(BCLog::TXNVAL,"free consolidation transaction detected, txid:=%s\n", tx.GetId().ToString());
     }
 
-    double nPriorityDummy = 0;
-    pool.ApplyDeltas(txid, nPriorityDummy, nModifiedFees);
+    pool.ApplyDeltas(txid, nModifiedFees);
 
-    Amount inChainInputValue;
-    double dPriority =
-        view.GetPriority(tx, chainActive.Height(), inChainInputValue);
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
     const bool fSpendsCoinbase = CheckTxSpendsCoinbase(tx, view);
@@ -1371,28 +1313,17 @@ CTxnValResult TxnValidation(
             ptx,
             nFees,
             nAcceptTime,
-            dPriority,
             uiChainActiveHeight,
-            inChainInputValue,
             fSpendsCoinbase,
             lp) };
     if (!skipFeeTest) {
         // Check tx's priority based on relaypriority flag and relay fee.
         const CFeeRate minRelayTxFee = config.GetMinFeePerKB();
-        if (!CheckTxRelayPriority(nModifiedFees, minRelayTxFee, *pMempoolEntry, nTxSize)) {
+        if ( nModifiedFees < minRelayTxFee.GetFee(nTxSize)) {
             // Require that free transactions have sufficient priority to be
             // mined in the next block.
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                       "insufficient priority");
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
-        // Continuously rate-limit free (really, very-low-fee) transactions.
-        // This mitigates 'penny-flooding' -- sending thousands of free
-        // transactions just to be annoying or make others' transactions take
-        // longer to confirm.
-    	if (!CheckLimitFreeTx(config, fLimitFree, nModifiedFees, minRelayTxFee, nTxSize)){
-            state.DoS(0, false, REJECT_INSUFFICIENTFEE,
-                      "rate limited free transaction");
             return Result{state, pTxInputData, vCoinsToUncache};
         }
     }
