@@ -421,6 +421,19 @@ public:
     }
 };
 
+struct CTransactionConflictData {
+    const CTransaction* const conflictedWith;
+    const uint256* const blockhash;
+    CTransactionConflictData(const CTransaction* conflictedWith_, const uint256* blockhash_)
+    : conflictedWith{conflictedWith_}
+    , blockhash{blockhash_}
+    {
+        assert(conflictedWith != nullptr);
+    }
+};
+
+using CTransactionConflict = std::optional<CTransactionConflictData>;
+
 struct DisconnectedBlockTransactions;
 
 /**
@@ -1131,8 +1144,7 @@ private:
             txiter entry,
             const mining::CJournalChangeSetPtr& changeSet,
             MemPoolRemovalReason reason,
-            const CTransaction* conflictedWith,
-            const uint256* blockhash = nullptr);
+            const CTransactionConflict& conflictedWith);
 
     void removeConflictsNL(
             const CTransaction &tx,
@@ -1154,10 +1166,9 @@ private:
             setEntries &stage,
             bool updateDescendants,
             const mining::CJournalChangeSetPtr& changeSet,
+            const CTransactionConflict& conflictedWith,
             MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            bool updateJournal = true,
-            const CTransaction* conflictedwith = nullptr,
-            const uint256* blockhash = nullptr);
+            bool updateJournal = true);
 
     void prioritiseTransactionNL(
             const uint256& hash,
@@ -1170,9 +1181,8 @@ private:
     void removeRecursiveNL(
             const CTransaction &tx,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            const CTransaction* conflictedWith = nullptr,
-            const uint256* blockhash = nullptr);
+            const CTransactionConflict& conflictedWith,
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;

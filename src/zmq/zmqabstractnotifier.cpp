@@ -25,7 +25,7 @@ bool CZMQAbstractNotifier::NotifyTextMessage(const std::string& topic, std::stri
     return true;
 }
 bool CZMQAbstractNotifier::NotifyRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason,
-                                                    const CTransaction* conflictedWith, const uint256* blockhash)
+                                                    const CTransactionConflict& conflictedWith)
 {
     return true;
 }

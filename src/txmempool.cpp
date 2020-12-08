@@ -694,8 +694,7 @@ void CTxMemPool::removeUncheckedNL(
     txiter it,
     const CJournalChangeSetPtr& changeSet,
     MemPoolRemovalReason reason,
-    const CTransaction* conflictedWith,
-    const uint256* blockhash) {
+    const CTransactionConflict& conflictedWith) {
 
 
     CTransactionRef txn { it->GetSharedTx() };
@@ -732,7 +731,7 @@ void CTxMemPool::removeUncheckedNL(
     }
     else
     {   
-        GetMainSignals().TransactionRemovedFromMempool(txn->GetId(), reason, conflictedWith, blockhash);
+        GetMainSignals().TransactionRemovedFromMempool(txn->GetId(), reason, conflictedWith);
     }
 
     nTransactionsUpdated++;
@@ -784,6 +783,7 @@ void CTxMemPool::RemoveRecursive(
         removeRecursiveNL(
             origTx,
             changeSet,
+            CTransactionConflict{},
             reason);
     }
 }
@@ -791,9 +791,9 @@ void CTxMemPool::RemoveRecursive(
 void CTxMemPool::removeRecursiveNL(
     const CTransaction &origTx,
     const CJournalChangeSetPtr& changeSet,
-    MemPoolRemovalReason reason,
-    const CTransaction* conflictedWith,
-    const uint256* blockhash) {
+    const CTransactionConflict& conflictedWith,
+    MemPoolRemovalReason reason)
+{
 
     setEntries txToRemove;
     txiter origit = mapTx.find(origTx.GetId());
@@ -820,7 +820,7 @@ void CTxMemPool::removeRecursiveNL(
         CalculateDescendantsNL(it, setAllRemoves);
     }
 
-    removeStagedNL(setAllRemoves, false, changeSet, reason, true, conflictedWith, blockhash);
+    removeStagedNL(setAllRemoves, false, changeSet, conflictedWith, reason, true);
 }
 
 void CTxMemPool::RemoveForReorg(
@@ -897,7 +897,7 @@ void CTxMemPool::RemoveForReorg(
     for (txiter it : txToRemove) {
         CalculateDescendantsNL(it, setAllRemoves);
     }
-    removeStagedNL(setAllRemoves, false, changeSet, MemPoolRemovalReason::REORG);
+    removeStagedNL(setAllRemoves, false, changeSet, CTransactionConflict{}, MemPoolRemovalReason::REORG);
 }
 
 void CTxMemPool::removeConflictsNL(
@@ -912,7 +912,7 @@ void CTxMemPool::removeConflictsNL(
             const CTransaction &txConflict = *it->second;
             if (txConflict != tx) {
                 clearPrioritisationNL(txConflict.GetId());
-                removeRecursiveNL(txConflict, changeSet, MemPoolRemovalReason::CONFLICT, &tx, &blockhash);
+                removeRecursiveNL(txConflict, changeSet, CTransactionConflict{{&tx, &blockhash}}, MemPoolRemovalReason::CONFLICT);
             }
         }
     }
@@ -964,7 +964,7 @@ void CTxMemPool::RemoveForBlock(
         if (it != mapTx.end()) {
             setEntries stage;
             stage.insert(it);
-            removeStagedNL(stage, true, changeSet, MemPoolRemovalReason::BLOCK, false);
+            removeStagedNL(stage, true, changeSet, CTransactionConflict{}, MemPoolRemovalReason::BLOCK, false);
         }
     }
 
@@ -1950,10 +1950,10 @@ void CTxMemPool::removeStagedNL(
     setEntries &stage,
     bool updateDescendants,
     const CJournalChangeSetPtr& changeSet,
+    const CTransactionConflict& conflictedWith,
     MemPoolRemovalReason reason,
-    bool updateJournal,
-    const CTransaction* conflictedWith,
-    const uint256* blockhash) {
+    bool updateJournal)
+{
 
     updateForRemoveFromMempoolNL(stage, updateDescendants);
 
@@ -1963,7 +1963,7 @@ void CTxMemPool::removeStagedNL(
         setEntries affectedStillInMempool = getConnectedNL(stage);
 
         for (const txiter &it : stage) {
-            removeUncheckedNL(it, changeSet, reason, conflictedWith, blockhash);
+            removeUncheckedNL(it, changeSet, reason, conflictedWith);
         }
     
         CEnsureNonNullChangeSet nonNullChangeSet(*this, changeSet);
@@ -1972,7 +1972,7 @@ void CTxMemPool::removeStagedNL(
     else
     {
         for (const txiter &it : stage) {
-            removeUncheckedNL(it, changeSet, reason, conflictedWith, blockhash);
+            removeUncheckedNL(it, changeSet, reason, conflictedWith);
         }
     }
 }
@@ -1993,7 +1993,7 @@ int CTxMemPool::Expire(int64_t time, const mining::CJournalChangeSetPtr& changeS
         CalculateDescendantsNL(removeit, stage);
     }
 
-    removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::EXPIRY);
+    removeStagedNL(stage, false, changeSet, CTransactionConflict{}, MemPoolRemovalReason::EXPIRY);
     return stage.size();
 }
 
@@ -2277,7 +2277,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
                 vRemovedTxIds.emplace_back(iter->GetTx().GetId());
             }
         }
-        removeStagedNL(stage, false, changeSet, MemPoolRemovalReason::SIZELIMIT);
+        removeStagedNL(stage, false, changeSet, CTransactionConflict{}, MemPoolRemovalReason::SIZELIMIT);
         if (pvNoSpendsRemaining) {
             for (const CTransaction &tx : txn) {
                 for (const CTxIn &txin : tx.vin) {
