@@ -279,7 +279,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     // remove payFor3And4It, notPaying4It from mempool
     CTxMemPoolTestAccess::setEntries entriesToRemove = {payFor3And4It, notPaying4It};
     auto changeSet = testAccess.getJournalBuilder().getNewChangeSet(mining::JournalUpdateReason::UNKNOWN);
-    testAccess.removeStagedNL(entriesToRemove, *changeSet, MemPoolRemovalReason::UNKNOWN);
+    testAccess.removeStagedNL(entriesToRemove, *changeSet, CTransactionConflict{}, MemPoolRemovalReason::UNKNOWN);
     
     changeSet->apply();
     changeSet->clear();
@@ -321,7 +321,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     // now remove entryPayForGroup
     entriesToRemove.clear();
     entriesToRemove.insert(payForGroupIt);
-    testAccess.removeStagedNL(entriesToRemove, *changeSet, MemPoolRemovalReason::UNKNOWN);
+    testAccess.removeStagedNL(entriesToRemove, *changeSet, CTransactionConflict{}, MemPoolRemovalReason::UNKNOWN);
 
     // everything should be removed from journal
     BOOST_ASSERT(JournalTester(journal).journalSize() == 0);

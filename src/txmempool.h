@@ -302,6 +302,8 @@ enum class MemPoolRemovalReason {
 
 struct DisconnectedBlockTransactions;
 
+using CTransactionConflict = std::optional<const CTransaction*>;
+
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain transactions that
  * may be included in the next block.
@@ -1162,8 +1164,8 @@ private:
     void removeUncheckedNL(
             const setEntries& entries,
             mining::CJournalChangeSet& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            const CTransaction* conflictedWith = nullptr);
+            const CTransactionConflict& conflictedWith,
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     void clearNL(bool skipTransactionDatabase = false);
 
@@ -1176,8 +1178,8 @@ private:
     void removeStagedNL(
             setEntries& stage,
             mining::CJournalChangeSet& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            const CTransaction* conflictedwith = nullptr);
+            const CTransactionConflict& conflictedwith,
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     void prioritiseTransactionNL(
             const uint256& hash,
@@ -1189,8 +1191,8 @@ private:
     void removeRecursiveNL(
             const CTransaction& origTx,
             const mining::CJournalChangeSetPtr& changeSet,
-            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN,
-            const CTransaction* conflictedWith = nullptr);
+            const CTransactionConflict& conflictedWith,
+            MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
 
     // A non-locking version of checkJournal
     std::string checkJournalNL() const;

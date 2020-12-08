@@ -64,9 +64,9 @@ public:
         return mempool.PrimaryMempoolSizeNL();
     }
     
-    void removeStagedNL(setEntries& stage, mining::CJournalChangeSet& changeSet, MemPoolRemovalReason reason)
+    void removeStagedNL(setEntries& stage, mining::CJournalChangeSet& changeSet, const CTransactionConflict& conflictedWith, MemPoolRemovalReason reason)
     {
-        return mempool.removeStagedNL(stage, changeSet, reason);
+        return mempool.removeStagedNL(stage, changeSet, conflictedWith, reason);
     }
 
     void OpenMempoolTxDB()
