@@ -23,6 +23,13 @@ class MerkleProofTest(BitcoinTestFramework):
         connect_nodes(self.nodes[0], 1)
         self.sync_all()
 
+    def setup_nodes(self):
+        self.add_nodes(self.num_nodes, self.extra_args)
+        # change rpc_timeout for node0 to avoid getting timeout on rpc generate when generating
+        # large number of blocks.
+        self.nodes[0].rpc_timeout = 300
+        self.start_nodes()
+
     def verify_merkle_proof(self, txid, blockhash, node):
         assert self.nodes[node].verifymerkleproof(self.nodes[node].getmerkleproof(txid))
         assert self.nodes[node].verifymerkleproof(self.nodes[node].getmerkleproof(txid, blockhash))

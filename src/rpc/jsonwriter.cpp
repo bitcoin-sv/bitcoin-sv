@@ -60,7 +60,7 @@ void CJSONWriter::pushV(const std::vector<std::string>& val)
 void CJSONWriter::pushK(const std::string& key)
 {
     indentStr();
-    jWriter.Write("\"");
+    jWriter.Write('\"');
     jWriter.Write(json_escape(key));
     jWriter.Write("\": ");
 }
@@ -91,7 +91,7 @@ void CJSONWriter::pushKV(const std::string& key, const ScalarValue& val)
 
 void CJSONWriter::pushQuote()
 {
-    jWriter.Write("\"");
+    jWriter.Write('\"');
 }
 
 void CJSONWriter::flush()
@@ -103,7 +103,7 @@ void CJSONWriter::indentStr()
 {
     if (!_doNotAddComma)
     {
-        jWriter.Write(",");
+        jWriter.Write(',');
     }
     else
     {

@@ -59,7 +59,9 @@ CThreadPool<QueueAdaptor>::~CThreadPool()
 template<typename QueueAdaptor>
 void CThreadPool<QueueAdaptor>::worker(size_t n, ThreadPriority thrPriority)
 {
-    std::string s = strprintf("bitcoin-worker%d-%s-%s", n, enum_cast<std::string>(thrPriority), mOwnerStr.c_str());
+    std::string s =
+        strprintf("worker%d-%s-%s", n, enum_cast<std::string>(thrPriority),
+                  mOwnerStr.c_str());
     RenameThread(s.c_str());
     LogPrintf("%s ThreadPool thread %d starting\n", mOwnerStr.c_str(), n);
     while(mRunning)

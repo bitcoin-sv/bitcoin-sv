@@ -28,7 +28,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=2",
             "-maxconsolidationinputscriptsize=151",
-            "-minconsolidationinputmaturity=5",
+            "-minconfconsolidationinput=5",
             "-acceptnonstdtxn=1",
             "-acceptnonstdconsolidationinput=1"
             ],[
@@ -59,7 +59,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         network_info = self.nodes[0].getnetworkinfo()
         assert(int(network_info['minconsolidationfactor']) == 2)
         assert(int(network_info['maxconsolidationinputscriptsize']) == 151)
-        assert(int(network_info['minconsolidationinputmaturity']) == 5)
+        assert(int(network_info['minconfconsolidationinput']) == 5)
         assert(network_info['acceptnonstdconsolidationinput'] is True)
 
     def create_utxos_value100000(self, node, utxo_count, utxo_size, min_confirmations):
@@ -196,7 +196,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                     network_info = node.getnetworkinfo()
                     self.consolidation_factor = int(network_info['minconsolidationfactor'])
                     self.scriptSigSpam = int(network_info['maxconsolidationinputscriptsize'])
-                    self.minConfirmations = int(network_info['minconsolidationinputmaturity'])
+                    self.minConfirmations = int(network_info['minconfconsolidationinput'])
                     self.acceptNonStandardInputs = network_info['acceptnonstdconsolidationinput']
                     self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
                     self.log.info ("scriptSig limit: {}".format( self.scriptSigSpam))
@@ -271,7 +271,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
                                                      )
 
                     assert_raises_rpc_error(-26, "66: insufficient priority", node.sendrawtransaction, tx_hex)
-                    self.log.info("test 2 - failing all inputs maturities > minimum maturity: PASS")
+                    self.log.info("test 2 - failing all inputs min conf > min conf: PASS")
 
                     tx_hex = self.create_and_sign_tx(node,
                                                      in_count=enough_inputs,

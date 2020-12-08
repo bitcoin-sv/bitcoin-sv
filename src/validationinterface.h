@@ -41,7 +41,7 @@ protected:
     virtual void TransactionAddedToMempool(const CTransactionRef &ptxn) {}
     virtual void TransactionRemovedFromMempool(const uint256& txid,
                                                MemPoolRemovalReason reason,
-                                               const CTransaction* conflictedWith) {}
+                                               const CTransactionConflict& conflictedWith) {}
     virtual void TransactionRemovedFromMempoolBlock(const uint256& txid, MemPoolRemovalReason reason) {}
     virtual void BlockConnected(const std::shared_ptr<const CBlock> &block,
                    const CBlockIndex *pindex,
@@ -70,7 +70,7 @@ struct CMainSignals {
     boost::signals2::signal<void(const CTransactionRef &)>
         TransactionAddedToMempool;
     /** Notifies listeners of a transaction having been removed from mempool. */
-    boost::signals2::signal<void(const uint256 &, MemPoolRemovalReason reason, const CTransaction *)>
+    boost::signals2::signal<void(const uint256 &, MemPoolRemovalReason reason, const CTransactionConflict& conflictedWith)>
         TransactionRemovedFromMempool;
     /**
      * Notifies listeners of a transaction having been removed from mempool.

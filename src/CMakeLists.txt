@@ -15,11 +15,6 @@ option(ENABLE_PROD_BUILD "Enable production build" OFF)
 option(BUILD_BITCOIN_WALLET "Activate the wallet functionality" ON)
 option(BUILD_BITCOIN_ZMQ "Activate the ZeroMQ functionalities" ON)
 
-if (NOT MSVC)
-  #bitcoin seeder can not be build with MSVC
-	option(BUILD_BITCOIN_SEEDER "Build bitcoin-seeder" ON)
-endif()
-
 option(BUILD_BITCOIN_CLI "Build bitcoin-cli" ON)
 option(BUILD_BITCOIN_TX "Build bitcoin-tx" ON)
 option(BUILD_BITCOIN_MINER "Build bitcoin-miner" ON)
@@ -115,7 +110,6 @@ add_library(util
 	sync.cpp
 	threadinterrupt.cpp
 	threadpriority.cpp
-	uint256.cpp
 	util.cpp
 	utilmoneystr.cpp
 	utilstrencodings.cpp
@@ -212,7 +206,6 @@ add_library(bitcoinconsensus
 	script/script.cpp
 	script/script_num.cpp
 	script/script_error.cpp
-	uint256.cpp
 	utilstrencodings.cpp
 )
 
@@ -347,11 +340,6 @@ add_library(rpcclient
     rpc/http_response.cpp
 )
 target_link_libraries(rpcclient univalue util)
-
-# bitcoin-seeder
-if(BUILD_BITCOIN_SEEDER)
-	add_subdirectory(seeder)
-endif()
 
 # bitcoin-cli
 if(BUILD_BITCOIN_CLI)

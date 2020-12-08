@@ -348,7 +348,8 @@ public:
     size_t DynamicMemoryUsage() const { return coin.DynamicMemoryUsage(); }
 };
 
-using CCoinsMap = std::map<COutPoint, CCoinsCacheEntry>;
+typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher>
+    CCoinsMap;
 
 /**
  * UTXO coins view interface.
@@ -515,6 +516,15 @@ public:
      * already exist.
      * genesisActivationHeight parameter is used to check if Genesis upgrade rules
      * are in effect for this coin. It is required to correctly determine if coin is unspendable.
+     *
+     * NOTE: It is possible that a coin already exists in the underlying view
+     *       therefore it is required by the caller that it has already called
+     *       GetCoin() on the same view instance beforehand. This enables
+     *       correct handling of overrides - checked more thoroughly if DEBUG
+     *       macro is enabled during compilation (enable_debug flag).
+     *       This is not performed inside the function as it causes a slow
+     *       additional access to database for every non existent coin
+     *       (something that should already be checked by external code).
      */
     void AddCoin(const COutPoint &outpoint, CoinWithScript&& coin,
                  bool potential_overwrite, int32_t genesisActivationHeight);

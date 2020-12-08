@@ -11,6 +11,9 @@
 #include <boost/assign/std/vector.hpp> // for 'operator+=()'
 #include <boost/test/unit_test.hpp>
 
+#include <random>
+#include <chrono>
+
 // Test if a string consists entirely of null characters
 bool is_null_key(const std::vector<uint8_t> &key) {
     bool isnull = true;
@@ -22,6 +25,24 @@ bool is_null_key(const std::vector<uint8_t> &key) {
 }
 
 BOOST_FIXTURE_TEST_SUITE(dbwrapper_tests, BasicTestingSetup)
+
+namespace {
+
+struct ScopedPathDeleter
+{
+    ScopedPathDeleter(fs::path& p)
+    : p(p)
+    {}
+
+    ~ScopedPathDeleter()
+    {
+        fs::remove_all(p);
+    }
+
+    fs::path& p;
+};
+
+}
 
 BOOST_AUTO_TEST_CASE(dbwrapper) {
     // Perform tests both obfuscated and non-obfuscated.
@@ -126,6 +147,7 @@ BOOST_AUTO_TEST_CASE(existing_data_no_obfuscate) {
     // We're going to share this fs::path between two wrappers
     fs::path ph = fs::temp_directory_path() / fs::unique_path();
     create_directories(ph);
+    ScopedPathDeleter ph_deleter(ph);
 
     // Set up a non-obfuscated wrapper to write some initial data.
     CDBWrapper *dbw = new CDBWrapper(ph, (1 << 10), false, false, false);
@@ -168,6 +190,7 @@ BOOST_AUTO_TEST_CASE(existing_data_reindex) {
     // We're going to share this fs::path between two wrappers
     fs::path ph = fs::temp_directory_path() / fs::unique_path();
     create_directories(ph);
+    ScopedPathDeleter ph_deleter(ph);
 
     // Set up a non-obfuscated wrapper to write some initial data.
     CDBWrapper *dbw = new CDBWrapper(ph, (1 << 10), false, false, false);
@@ -319,6 +342,81 @@ BOOST_AUTO_TEST_CASE(iterator_string_ordering) {
         }
         BOOST_CHECK(!it->Valid());
     }
+}
+
+//
+// Write large number of small records (simulating coins) directly to database
+// on disk, read them back and show elapsed time.
+//
+BOOST_AUTO_TEST_CASE(bulk_rw)
+{
+    // Create temporary directory and delete it when we're done.
+    fs::path ph = fs::temp_directory_path() / fs::unique_path();
+    ScopedPathDeleter ph_deleter(ph);
+
+    // Create a new empty database on disk in a temporary directory
+    CDBWrapper dbw(ph, (1 << 20), false, true, true); // do not use memory environment, wipe existing data and use obfuscation
+
+    // Helper to generate random 256-bit ids so that the same seed produces same ids.
+    class
+    {
+        std::mt19937 engine;
+        std::uniform_int_distribution<unsigned int> uniform_dist{0, 255};
+
+    public:
+        void ResetSeed(decltype(engine)::result_type seed)
+        {
+            this->engine.seed(seed);
+        }
+
+        uint256 GenerateRandomId()
+        {
+            uint256 txid;
+            for(auto& b: txid)
+            {
+                b = static_cast<std::uint8_t>(this->uniform_dist(this->engine));
+            }
+            return txid;
+        };
+    } rtg;
+
+    using clock = std::chrono::steady_clock;
+
+    // Number of records
+    const unsigned int N = 100000;
+
+    // Value of each record in database
+    const std::vector<uint8_t> value(100, 0xde);
+
+    // Write records
+    rtg.ResetSeed(1);
+    auto tp0=clock::now();
+    for(unsigned int i=0; i<N; ++i)
+    {
+        bool res = dbw.Write(rtg.GenerateRandomId(), value);
+        if(!res)
+        {
+            BOOST_TEST_FAIL("Error writing record "+std::to_string(i)+" to LevelDB!");
+            return;
+        }
+    }
+    BOOST_TEST_MESSAGE("Writing " + std::to_string(N) + " records to LevelDB database took: "+std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(clock::now()-tp0 ).count())+"ms" );
+
+    // Read records
+    std::vector<uint8_t> value1;
+    rtg.ResetSeed(1);
+    tp0=clock::now();
+    for(unsigned int i=0; i<N; ++i)
+    {
+        bool res = dbw.Read(rtg.GenerateRandomId(), value1);
+        if(!res)
+        {
+            BOOST_TEST_FAIL("Error reading record "+std::to_string(i)+" from LevelDB!");
+            return;
+        }
+    }
+    BOOST_TEST_MESSAGE("Reading " + std::to_string(N) + " records from LevelDB database took: "+std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(clock::now()-tp0 ).count())+"ms" );
+    BOOST_TEST(value1==value); // only check value of the last record to minimize effect on timings
 }
 
 BOOST_AUTO_TEST_SUITE_END()

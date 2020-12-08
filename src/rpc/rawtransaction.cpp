@@ -248,10 +248,12 @@ void getrawtransaction(const Config& config,
  * block index represented with "requestedBlockHash" parameter.
  * Note that this function assumes all transactions in setTxIds are in the same block unless requestedBlockHash was provided.
  * In this case exception is thrown if at least one transaction in setTxIds was not found in the related block.
+ * verifyTxIds can be set to false to prevent loading the block, but this will not check if all provided transactions are in the block.
  */
 static CBlockIndex* GetBlockIndex(const Config& config,
                                   const uint256& requestedBlockHash,
-                                  const std::set<TxId>& setTxIds)
+                                  const std::set<TxId>& setTxIds,
+                                  bool verifyTxIds = true)
 {
     CBlockIndex* pblockindex = nullptr;
 
@@ -265,29 +267,32 @@ static CBlockIndex* GetBlockIndex(const Config& config,
         }
         pblockindex = mapBlockIndex[requestedBlockHash];
 
-        // Check if all provided transactions are in the block 
-        CBlock block;
-        bool allTxIdsFound = false;
-        if (ReadBlockFromDisk(block, pblockindex, config))
+        if (verifyTxIds)
         {
-            auto numberOfTxIdsFound = decltype(setTxIds.size()){0};
-            for (const auto &tx : block.vtx)
+            // Check if all provided transactions are in the block
+            CBlock block;
+            bool allTxIdsFound = false;
+            if (ReadBlockFromDisk(block, pblockindex, config))
             {
-                if (setTxIds.find(tx->GetId()) != setTxIds.end())
+                auto numberOfTxIdsFound = decltype(setTxIds.size()){0};
+                for (const auto &tx : block.vtx)
                 {
-                    ++numberOfTxIdsFound;
-                }
-                if (numberOfTxIdsFound == setTxIds.size())
-                {
-                    // All txIds found, no need to check further
-                    allTxIdsFound = true;
-                    break;
+                    if (setTxIds.find(tx->GetId()) != setTxIds.end())
+                    {
+                        ++numberOfTxIdsFound;
+                    }
+                    if (numberOfTxIdsFound == setTxIds.size())
+                    {
+                        // All txIds found, no need to check further
+                        allTxIdsFound = true;
+                        break;
+                    }
                 }
             }
-        }
-        if (!allTxIdsFound)
-        {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
+            if (!allTxIdsFound)
+            {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
+            }
         }
     }
     else
@@ -1326,57 +1331,82 @@ static UniValue sendrawtransaction(const Config &config,
 }
 
 /**
- * Pushes a JSON object for invalid transactions to vInvalidRet.
+ * Pushes a JSON object for invalid transactions to JSON writer.
  */
-static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidTxns, UniValue &vInvalidRet) {
-    for (const auto& elem: invalidTxns) {
-        UniValue entry(UniValue::VOBJ);
-        entry.push_back(Pair("txid", elem.first.ToString()));
-        if (elem.second.IsMissingInputs()) {
-            entry.push_back(Pair("reject_code", REJECT_INVALID));
-            entry.push_back(Pair("reject_reason", "missing-inputs"));
-        } else {
-            entry.push_back(Pair("reject_code", uint64_t(elem.second.GetRejectCode())));
-            entry.push_back(Pair("reject_reason", elem.second.GetRejectReason()));
-        }
-        const std::set<CTransactionRef>& collidedWithTx = elem.second.GetCollidedWithTx();
-        if (!collidedWithTx.empty())
+static void InvalidTxnsToJSON(const CTxnValidator::InvalidTxnStateUMap& invalidTxns, CJSONWriter& writer)
+{
+    if (!invalidTxns.empty())
+    {
+        writer.writeBeginArray("invalid");
+        for (const auto& elem: invalidTxns)
         {
-            UniValue uvCollidedWith(UniValue::VARR);
-            for (const CTransactionRef& tx : collidedWithTx)
+            writer.writeBeginObject();
+            writer.pushKV("txid", elem.first.ToString());
+            if (elem.second.IsMissingInputs())
             {
-                UniValue objTx(UniValue::VOBJ);
-                objTx.pushKV("txid", tx->GetId().GetHex());
-                objTx.pushKV("size", int64_t(tx->GetTotalSize()));
-                objTx.push_back(Pair("hex", EncodeHexTx(*tx)));
-                uvCollidedWith.push_back(objTx);
+                writer.pushKV("reject_code", REJECT_INVALID);
+                writer.pushKV("reject_reason", "missing-inputs");
+            } 
+            else
+            {
+                writer.pushKV("reject_code", uint64_t(elem.second.GetRejectCode()));
+                writer.pushKV("reject_reason", elem.second.GetRejectReason());
             }
-            entry.pushKV("collidedWith", uvCollidedWith);
+            const std::set<CTransactionRef>& collidedWithTx = elem.second.GetCollidedWithTx();
+            if (!collidedWithTx.empty())
+            {
+                writer.writeBeginArray("collidedWith");
+                for (const CTransactionRef& tx : collidedWithTx)
+                {
+                    writer.writeBeginObject();
+                    writer.pushKV("txid", tx->GetId().GetHex());
+                    writer.pushKV("size", int64_t(tx->GetTotalSize()));
+                    writer.pushK("hex");
+                    writer.pushQuote();
+                    EncodeHexTx(*tx, writer.getWriter(), 0);
+                    writer.pushQuote();
+                    writer.writeEndObject();
+                }
+                writer.writeEndArray();
+            }
+            writer.writeEndObject();
         }
-        vInvalidRet.push_back(entry);
+        writer.writeEndArray();
     }
 }
 
 /**
- * Pushes insufficient fee txns to vEvictedRet.
+ * Pushes insufficient fee txns to JSON writer.
  */
-static void EvictedTxnsToJSON(const CTxnValidator::RemovedTxns& evictedTxns, UniValue &vEvictedRet) {
-    for (const auto& elem: evictedTxns) {
-        vEvictedRet.push_back(elem.ToString());
+static void EvictedTxnsToJSON(const CTxnValidator::RemovedTxns& evictedTxns, CJSONWriter& writer)
+{
+    if (!evictedTxns.empty())
+    {
+        writer.writeBeginArray("evicted");
+        for (const auto& elem: evictedTxns) {
+            writer.pushV(elem.ToString());
+        }
+        writer.writeEndArray();
     }
 }
 
 /**
- * Pushes known txns to vKnownRet.
+ * Pushes known txns to JSON writer.
  */
-static void KnownTxnsToJSON(const std::vector<TxId>& evictedTxns, UniValue &vKnownRet) {
-    for (const auto& elem: evictedTxns) {
-        vKnownRet.push_back(elem.ToString());
+static void KnownTxnsToJSON(const std::vector<TxId>& knownTxns, CJSONWriter& writer)
+{
+    if (!knownTxns.empty())
+    {
+        writer.writeBeginArray("known");
+        for (const auto& elem: knownTxns) {
+            writer.pushV(elem.ToString());
+        }
+        writer.writeEndArray();
     }
 }
 
-static UniValue sendrawtransactions(const Config &config,
-                                   const JSONRPCRequest &request) {
+void sendrawtransactions(const Config &config, const JSONRPCRequest &request,
+                         HTTPRequest& httpReq, bool processedInBatch) {
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 1) {
         throw std::runtime_error(
@@ -1466,7 +1496,7 @@ static UniValue sendrawtransactions(const Config &config,
     vTxInputData.reserve(inputs.size());
     // A vector to store transactions that need to be prioritised.
     std::vector<TxId> vTxToPrioritise {};
-    // A vector to sotre already known transactions.
+    // A vector to store already known transactions.
     std::vector<TxId> vKnownTxns {};
 
     /**
@@ -1623,27 +1653,35 @@ static UniValue sendrawtransactions(const Config &config,
      * present in the mempool.
      */
     // A result json object.
-    UniValue result(UniValue::VOBJ);
-    // Known txns array.
-    UniValue uvKnownTxns(UniValue::VARR);
-    KnownTxnsToJSON(vKnownTxns, uvKnownTxns);
-    if (!uvKnownTxns.empty()) {
-        result.push_back(Pair("known", uvKnownTxns));
-    }
-    // Rejected txns array.
-    UniValue uvInvalidTxns(UniValue::VARR);
-    InvalidTxnsToJSON(rejectedTxns.first, uvInvalidTxns);
-    if (!uvInvalidTxns.empty()) {
-        result.push_back(Pair("invalid", uvInvalidTxns));
-    }
-    // Evicted txns array.
-    UniValue uvEvictedTxns(UniValue::VARR);
-    EvictedTxnsToJSON(rejectedTxns.second, uvEvictedTxns);
-    if (!uvEvictedTxns.empty()) {
-        result.push_back(Pair("evicted", uvEvictedTxns));
+    if (!processedInBatch)
+    {
+        httpReq.WriteHeader("Content-Type", "application/json");
+        httpReq.StartWritingChunks(HTTP_OK);
     }
 
-    return result;
+    CHttpTextWriter httpWriter(httpReq);
+    CJSONWriter jWriter(httpWriter, false);
+
+    jWriter.writeBeginObject();
+    jWriter.pushKNoComma("result");
+    jWriter.writeBeginObject();
+    // Known txns array.
+    KnownTxnsToJSON(vKnownTxns, jWriter);
+    // Rejected txns array.
+    InvalidTxnsToJSON(rejectedTxns.first, jWriter);
+    // Evicted txns array.
+    EvictedTxnsToJSON(rejectedTxns.second, jWriter);
+    jWriter.writeEndObject();
+    jWriter.pushKV("error", nullptr);
+    jWriter.pushKVJSONFormatted("id", request.id.write());
+    jWriter.writeEndObject();
+    jWriter.flush();
+
+    if (!processedInBatch)
+    {
+        httpReq.StopWritingChunks();
+    }
+
 }
 
 static UniValue getmerkleproof(const Config& config,
@@ -1690,7 +1728,7 @@ static UniValue getmerkleproof(const Config& config,
     {
         requestedBlockHash = uint256S(request.params[1].get_str());
     }
-    CBlockIndex* blockIndex = GetBlockIndex(config, requestedBlockHash, setTxIds);
+    CBlockIndex* blockIndex = GetBlockIndex(config, requestedBlockHash, setTxIds, false);
 
     if (blockIndex == nullptr)
     {
@@ -1710,9 +1748,14 @@ static UniValue getmerkleproof(const Config& config,
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
     }
 
+    CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(transactionId, true);
+    if (proof.merkleTreeHashes.size() == 0)
+    {
+        // The requested transaction was not found in the block/merkle tree
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Transaction(s) not found in provided block");
+    }
     // Result in JSON format
     UniValue merkleProofArray(UniValue::VARR);
-    CMerkleTree::MerkleProof proof = merkleTree->GetMerkleProof(transactionId, true);
     for (const uint256& node : proof.merkleTreeHashes)
     {
         if (node.IsNull())

@@ -49,6 +49,7 @@ class TxnInvOrder(BitcoinTestFramework):
             connection = p2pc[0]
             connection2 = p2pc[1]
 
+            # protected by mininode_lock
             txinvs = []
 
             # Append txinv
@@ -77,7 +78,8 @@ class TxnInvOrder(BitcoinTestFramework):
             # have to wait to receive one inv message with all transactions
             wait_until(lambda: len(txinvs) > 0, timeout=60, lock=mininode_lock)
 
-            assert (invsOrderedbyTime(ids, txinvs))
+            with mininode_lock:
+                assert (invsOrderedbyTime(ids, txinvs))
 
     def run_test(self):
         # Make some coins to spend

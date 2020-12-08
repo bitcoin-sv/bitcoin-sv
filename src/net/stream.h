@@ -93,8 +93,9 @@ class Stream
                          uint64_t nPayloadLength, uint64_t nTotalSize);
 
     // Fetch the next message for processing.
-    // Returns true if there are more queued messages available, and false if not.
-    bool GetNextMessage(std::list<CNetMessage>& msg);
+    // Also returns a boolean set true if there are more queued messages available, and false if not.
+    using QueuedNetMessage = std::unique_ptr<CNetMessage>;
+    std::pair<QueuedNetMessage, bool> GetNextMessage();
 
     // Get last send/receive time
     int64_t GetLastSendTime() const { return mLastSendTime; }
@@ -143,12 +144,12 @@ class Stream
     mutable CCriticalSection cs_mSendMsgQueue {};
 
     // Receive message queue
-    std::list<CNetMessage> mRecvMsgQueue {};
+    std::list<QueuedNetMessage> mRecvMsgQueue {};
     uint64_t mTotalBytesRecv {0};
     uint64_t mRecvMsgQueueSize {0};
     std::atomic_bool mPauseRecv {false};
     mapMsgCmdSize mRecvBytesPerMsgCmd {};
-    std::list<CNetMessage> mRecvCompleteMsgQueue {};
+    std::list<QueuedNetMessage> mRecvCompleteMsgQueue {};
     mutable CCriticalSection cs_mRecvMsgQueue {};
 
     // Last time we sent or received anything

@@ -23,9 +23,6 @@ BITCOIN_INCLUDES=-I$(builddir) -I$(builddir)/obj $(BDB_CPPFLAGS) $(BOOST_CPPFLAG
 BITCOIN_INCLUDES += -I$(srcdir)/secp256k1/include
 BITCOIN_INCLUDES += $(UNIVALUE_CFLAGS)
 
-BITCOIN_SEEDER_INCLUDES = -I$(srcdir)/seeder
-BITCOIN_SEEDER_INCLUDES += $(BITCOIN_INCLUDES)
-
 LIBBITCOIN_SERVER=libbitcoin_server.a
 LIBBITCOIN_COMMON=libbitcoin_common.a
 LIBBITCOIN_CONSENSUS=libbitcoin_consensus.a
@@ -39,9 +36,6 @@ LIBBITCOIN_ZMQ=libbitcoin_zmq.a
 endif
 if BUILD_BITCOIN_LIBS
 LIBBITCOINCONSENSUS=libbitcoinconsensus.la
-endif
-if BUILD_BITCOIN_SEEDER
-LIBBITCOIN_SEEDER=libbitcoin_seeder.a
 endif
 if ENABLE_WALLET
 LIBBITCOIN_WALLET=libbitcoin_wallet.a
@@ -59,7 +53,6 @@ EXTRA_LIBRARIES += \
   $(LIBBITCOIN_CONSENSUS) \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_CLI) \
-  $(LIBBITCOIN_SEEDER) \
   $(LIBBITCOIN_WALLET) \
   $(LIBBITCOIN_ZMQ)
 
@@ -72,10 +65,6 @@ BENCHMARKS =
 
 if BUILD_BITCOIND
   bin_PROGRAMS += bitcoind
-endif
-
-if BUILD_BITCOIN_SEEDER
-  bin_PROGRAMS += bitcoin-seeder
 endif
 
 if BUILD_BITCOIN_UTILS
@@ -418,7 +407,6 @@ libbitcoin_consensus_a_SOURCES = \
   serialize.h \
   span.h \
   tinyformat.h \
-  uint256.cpp \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
@@ -470,7 +458,6 @@ libbitcoin_util_a_SOURCES = \
   sync.cpp \
   threadinterrupt.cpp \
   threadpriority.cpp \
-  uint256.cpp \
   uint256.h \
   util.cpp \
   utilmoneystr.cpp \
@@ -493,23 +480,6 @@ libbitcoin_cli_a_SOURCES = \
   rpc/http_request.cpp \
   rpc/http_response.cpp \
   $(BITCOIN_CORE_H)
-
-# seeder library
-libbitcoin_seeder_a_CPPFLAGS = $(AM_CPPFLAGS) $(PIE_FLAGS) $(BITCOIN_SEEDER_INCLUDES)
-libbitcoin_seeder_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-libbitcoin_seeder_a_SOURCES = \
-  seeder/bitcoin.cpp \
-  seeder/bitcoin.h \
-  seeder/compat.h \
-  seeder/db.cpp \
-  seeder/db.h \
-  seeder/dns.cpp \
-  seeder/dns.h \
-  seeder/strlcpy.h \
-  seeder/util.h
-
-nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
-#
 
 # bitcoind binary #
 bitcoind_SOURCES = bitcoind.cpp
@@ -564,21 +534,6 @@ bitcoin_cli_LDADD = \
 bitcoin_cli_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS) $(EVENT_LIBS)
 #
 
-# bitcoin-seeder binary #
-bitcoin_seeder_SOURCES = seeder/main.cpp
-bitcoin_seeder_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_SEEDER_INCLUDES)
-bitcoin_seeder_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-bitcoin_seeder_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
-
-bitcoin_seeder_LDADD = \
-  $(LIBBITCOIN_SEEDER) \
-  $(LIBBITCOIN_COMMON) \
-  $(LIBBITCOIN_UTIL) \
-  $(LIBBITCOIN_CRYPTO)
-
-bitcoin_seeder_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS)
-#
-
 # bitcoin-tx binary #
 bitcoin_tx_SOURCES = bitcoin-tx.cpp
 bitcoin_tx_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
@@ -604,7 +559,6 @@ bitcoin_tx_LDADD += $(BOOST_LIBS) $(OPENSSL_LIBS)
 bitcoin_miner_SOURCES = bitcoin-miner.cpp \
 arith_uint256.cpp \
 arith_uint256.h \
-uint256.cpp \
 uint256.h \
 crypto/sha512.cpp \
 crypto/sha512.h \
@@ -657,7 +611,6 @@ CLEANFILES += policy/*.gcda policy/*.gcno
 CLEANFILES += primitives/*.gcda primitives/*.gcno
 CLEANFILES += rpc/*.gcda rpc/*.gcno
 CLEANFILES += script/*.gcda script/*.gcno
-CLEANFILES += seeder/*.gcda seeder/*.gcno
 CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno
 CLEANFILES += wallet/*.gcda wallet/*.gcno

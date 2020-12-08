@@ -302,7 +302,18 @@ enum class MemPoolRemovalReason {
 
 struct DisconnectedBlockTransactions;
 
-using CTransactionConflict = std::optional<const CTransaction*>;
+struct CTransactionConflictData {
+    const CTransaction* const conflictedWith;
+    const uint256* const blockhash;
+    CTransactionConflictData(const CTransaction* conflictedWith_, const uint256* blockhash_)
+    : conflictedWith{conflictedWith_}
+    , blockhash{blockhash_}
+    {
+        assert(conflictedWith != nullptr);
+    }
+};
+
+using CTransactionConflict = std::optional<CTransactionConflictData>;
 
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain transactions that
@@ -602,6 +613,7 @@ public:
     void ResumeSanityCheck() { suspendSanityCheck.store(false); }
 
     void SetBlockMinTxFee(CFeeRate feerate) { blockMinTxfee = feerate; };
+    CFeeRate GetBlockMinTxFee() { return blockMinTxfee; };
 
     /** Rebuilds the mempool by reseting it and then resubmitting transactions that were inside before.
         As consequence the journal is rebuilt. The caller must apply the changeset. */
@@ -686,7 +698,8 @@ public:
     void RemoveForBlock(
             const std::vector<CTransactionRef> &vtx,
             int32_t nBlockHeight,
-            const mining::CJournalChangeSetPtr& changeSet);
+            const mining::CJournalChangeSetPtr& changeSet,
+            const uint256& blockhash);
 
     void Clear();
 

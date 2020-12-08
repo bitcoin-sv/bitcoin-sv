@@ -32,7 +32,7 @@ void GlobalConfig::Reset()
     maxTxSizePolicy = DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS;
     minConsolidationFactor = DEFAULT_MIN_CONSOLIDATION_FACTOR;
     maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
-    minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
+    minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
     acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
@@ -67,7 +67,12 @@ void GlobalConfig::Reset()
 
     mMaxCoinsViewCacheSize = 0;
     mMaxCoinsProviderCacheSize = 0;
-    
+
+    maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+    maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
+
+    recvInvQueueFactor = DEFAULT_RECV_INV_QUEUE_FACTOR;
+
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
     mMaxMempoolSizeDisk = mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
     mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
@@ -92,6 +97,7 @@ void GlobalConfig::Reset()
     maxMerkleTreeDiskSpace = MIN_DISK_SPACE_FOR_MERKLETREE_FILES;
     preferredMerkleTreeFileSize = DEFAULT_PREFERRED_MERKLETREE_FILE_SIZE;
     maxMerkleTreeMemoryCacheSize = DEFAULT_MAX_MERKLETREE_MEMORY_CACHE_SIZE;
+
 }
 
 void GlobalConfig::SetPreferredBlockFileSize(uint64_t preferredSize) {
@@ -277,7 +283,11 @@ uint64_t GlobalConfig::GetMinConsolidationFactor() const
 
 bool GlobalConfig::SetMaxConsolidationInputScriptSize(uint64_t maxConsolidationInputScriptSizeIn, std::string* err)
 {
-    if (maxConsolidationInputScriptSizeIn == 0) {
+    if (LessThanZero(maxConsolidationInputScriptSizeIn, err, "Maximum length for a scriptSig input in a consolidation txn must not be less than zero."))
+    {
+        return false;
+    }
+    else if (maxConsolidationInputScriptSizeIn == 0) {
         maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     } else {
         maxConsolidationInputScriptSize = maxConsolidationInputScriptSizeIn;
@@ -290,19 +300,19 @@ uint64_t GlobalConfig::GetMaxConsolidationInputScriptSize() const
     return maxConsolidationInputScriptSize;
 }
 
-bool GlobalConfig::SetMinConsolidationInputMaturity(uint64_t minconsolidationinputmaturityIn, std::string* err)
+bool GlobalConfig::SetMinConfConsolidationInput(uint64_t minconfIn, std::string* err)
 {
-    if (minconsolidationinputmaturityIn == 0) {
-        minConsolidationInputMaturity = DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY;
+    if (minconfIn == 0) {
+        minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
     } else {
-        minConsolidationInputMaturity = minconsolidationinputmaturityIn;
+        minConfConsolidationInput = minconfIn;
     }
     return true;
 }
 
-uint64_t GlobalConfig::GetMinConsolidationInputMaturity() const
+uint64_t GlobalConfig::GetMinConfConsolidationInput() const
 {
-    return minConsolidationInputMaturity;
+    return minConfConsolidationInput;
 }
 
 bool GlobalConfig::SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err)
@@ -902,7 +912,6 @@ bool GlobalConfig::AddInvalidTxSink(const std::string& sink, std::string* err)
         }
         return false;
     }
-
     invalidTxSinks.insert(sink);
     return true;
 }
@@ -1027,6 +1036,66 @@ bool GlobalConfig::SetMaxMerkleTreeMemoryCacheSize(int64_t maxMemoryCacheSize, s
 uint64_t GlobalConfig::GetMaxMerkleTreeMemoryCacheSize() const
 {
     return maxMerkleTreeMemoryCacheSize;
+}
+
+bool GlobalConfig::SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err)
+{
+    // sending maxRecvPayloadLength less than LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH is considered protocol violation
+    if (value < LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)
+    {
+        if (err)
+        {
+            *err = "MaxProtocolRecvPayloadLength should be at least: " + std::to_string(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH) + ".";
+        }
+        return false;
+    }
+    
+    if (value > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH )
+    {
+        if (err)
+        {
+            *err = "MaxProtocolRecvPayloadLength should be less than: " + std::to_string(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH ) + ".";
+        }
+        return false;
+    }
+
+    maxProtocolRecvPayloadLength = value;
+
+    // Since value is between LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH and ONE_GIGABYTE and MAX_PROTOCOL_SEND_PAYLOAD_FACTOR is set to 4
+    // this cannot overflow unsigned int
+    maxProtocolSendPayloadLength = static_cast<unsigned int>(value * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR);
+    
+    return true;
+}
+
+bool GlobalConfig::SetRecvInvQueueFactor(uint64_t value, std::string* err)
+{
+    if(value < MIN_RECV_INV_QUEUE_FACTOR || value > MAX_RECV_INV_QUEUE_FACTOR)
+    {
+        if(err)
+        {
+            *err = "RecvInvQueueFactor should not be between: " + std::to_string(MIN_RECV_INV_QUEUE_FACTOR) + " and " + 
+                   std::to_string(MAX_RECV_INV_QUEUE_FACTOR) + ".";
+        }
+        return false;
+    }
+    recvInvQueueFactor = value;
+    return true;
+}
+
+unsigned int GlobalConfig::GetMaxProtocolRecvPayloadLength() const
+{
+  return maxProtocolRecvPayloadLength;
+}
+
+unsigned int GlobalConfig::GetMaxProtocolSendPayloadLength() const
+{
+  return maxProtocolSendPayloadLength;
+}
+
+unsigned int GlobalConfig::GetRecvInvQueueFactor() const
+{
+  return recvInvQueueFactor;
 }
 
 DummyConfig::DummyConfig()

@@ -11,9 +11,8 @@ CMainSignals &GetMainSignals() {
     return g_signals;
 }
 
-using namespace boost::placeholders;
-
 void RegisterValidationInterface(CValidationInterface *pwalletIn) {
+    using namespace boost::placeholders;
     g_signals.UpdatedBlockTip.connect(boost::bind( &CValidationInterface::UpdatedBlockTip, pwalletIn, _1, _2, _3));
     g_signals.TransactionAddedToMempool.connect(boost::bind( &CValidationInterface::TransactionAddedToMempool, pwalletIn, _1));
     g_signals.TransactionRemovedFromMempool.connect(boost::bind(&CValidationInterface::TransactionRemovedFromMempool, pwalletIn, _1, _2, _3));
@@ -30,6 +29,7 @@ void RegisterValidationInterface(CValidationInterface *pwalletIn) {
 }
 
 void UnregisterValidationInterface(CValidationInterface *pwalletIn) {
+    using namespace boost::placeholders;
     g_signals.ScriptForMining.disconnect(boost::bind(&CValidationInterface::GetScriptForMining, pwalletIn, _1));
     g_signals.BlockChecked.disconnect( boost::bind(&CValidationInterface::BlockChecked, pwalletIn, _1, _2));
     g_signals.Broadcast.disconnect(boost::bind( &CValidationInterface::ResendWalletTransactions, pwalletIn, _1, _2));

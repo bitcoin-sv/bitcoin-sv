@@ -3688,11 +3688,8 @@ std::set<CTxDestination>
 CWallet::GetAccountAddresses(const std::string &strAccount) const {
     LOCK(cs_wallet);
     std::set<CTxDestination> result;
-    for (const auto& item :
-         mapAddressBook) {
-        const CTxDestination &address = item.first;
-        const std::string &strName = item.second.name;
-        if (strName == strAccount) {
+    for (const auto &[address, account]: mapAddressBook) {
+        if (account.name == strAccount) {
             result.insert(address);
         }
     }

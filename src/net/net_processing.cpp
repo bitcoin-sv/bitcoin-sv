@@ -280,16 +280,16 @@ void PushNodeVersion(const CNodePtr& pnode, CConnman &connman,
     }
 }
 
-void PushProtoconf(const CNodePtr& pnode, CConnman& connman)
+void PushProtoconf(const CNodePtr& pnode, CConnman& connman, const Config &config)
 {
     std::string streamPolicies { connman.GetStreamPolicyFactory().GetSupportedPolicyNamesStr() };
     connman.PushMessage(
         pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::PROTOCONF,
-            CProtoconf(MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, streamPolicies)
+            CProtoconf(config.GetMaxProtocolRecvPayloadLength(), streamPolicies)
     ));
 
     LogPrint(BCLog::NET, "send protoconf message: max size %d, stream policies %s, number of fields %d\n",
-        MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, streamPolicies, 2);
+        config.GetMaxProtocolRecvPayloadLength(), streamPolicies, 2);
 }
 
 static void PushCreateStream(const CNodePtr& pnode, CConnman& connman, StreamType streamType,
@@ -1970,7 +1970,7 @@ static bool ProcessVersionMessage(const CNodePtr& pfrom, const std::string& strC
     connman.PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::VERACK));
 
     // Announce our protocol configuration immediately after we send VERACK.
-    PushProtoconf(pfrom, connman);
+    PushProtoconf(pfrom, connman, config);
 
     pfrom->nServices = nServices;
     pfrom->GetAssociation().SetPeerAddrLocal(addrMe);
@@ -2276,7 +2276,8 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                               const CNetMsgMaker& msgMaker,
                               const std::atomic<bool>& interruptMsgProc,
                               CDataStream& vRecv,
-                              CConnman& connman)
+                              CConnman& connman,
+                              const Config &config)
 {
     std::vector<CInv> vInv;
     vRecv >> vInv;
@@ -2329,7 +2330,7 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                          inv.hash.ToString(), pfrom->id);
             }
             else if(!fAlreadyHave && !fImporting && !fReindex && !IsInitialBlockDownload()) {
-                pfrom->AskFor(inv);
+                pfrom->AskFor(inv, config);
             }
         }
 
@@ -2499,11 +2500,47 @@ static void ProcessGetBlockTxnMessage(const Config& config,
         return;
     }
 
-    CBlock block;
-    bool ret = ReadBlockFromDisk(block, it->second, config);
-    assert(ret);
+    // Create stream reader object that will be used to read block from disk.
+    auto block_stream_reader = GetDiskBlockStreamReader(it->second, config, false); // Disk block meta-data is not needed and does not need to be calculated.
+    assert(block_stream_reader); // It must always be possible to read a valid block from disk if block was found in block index.
 
-    SendBlockTransactions(block, req, pfrom, connman);
+    // Number of transactions in block
+    const std::size_t num_txn_in_block { block_stream_reader->GetRemainingTransactionsCount() };
+
+    BlockTransactions resp(req);
+
+    std::size_t num_txn_read=0; // Number of transactions that were already read from block stream
+    for(std::size_t i=0; i<req.indices.size(); ++i)
+    {
+        const std::size_t txn_idx { req.indices[i] };
+        if (txn_idx >= num_txn_in_block)
+        {
+            Misbehaving(pfrom, 100, "out-of-bound-tx-index");
+            LogPrintf("Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->id);
+            return;
+        }
+
+        // Transaction indexes in request are assumed to be sorted in ascending order without duplicates.
+        // This must always be true since indexes are differentially encoded in getblocktxn P2P message.
+        assert(txn_idx>=num_txn_read);
+
+        // Read from block stream until we get to the transaction with requested index.
+        for(; num_txn_read<=txn_idx; ++num_txn_read)
+        {
+            assert(!block_stream_reader->EndOfStream()); // We should never get pass the end of stream since we checked transaction index above.
+            auto* tx_ptr = block_stream_reader->ReadTransaction_NoThrow();
+            (void)tx_ptr; // not used except for assert
+            assert(tx_ptr); // Reading block should not fail
+        }
+
+        // CBlockStreamReader object now holds transaction with requested index.
+        // Take ownership of transaction object and store transaction reference in the response.
+        resp.txn[i] = block_stream_reader->GetLastTransactionRef();
+    }
+
+    const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
+    connman.PushMessage(pfrom,
+        msgMaker.Make(NetMsgType::BLOCKTXN, std::move(resp)));
 }
  
 /**
@@ -2608,7 +2645,7 @@ static void ProcessTxMessage(const Config& config,
     {
         LOCK(cs_invQueries);
         pfrom->indexAskFor.get<CNode::TagTxnID>().erase(inv.hash);
-        mapAlreadyAskedFor.erase(inv.hash);
+        mapAlreadyAskedFor->erase(inv.hash);
     }
     // Enqueue txn for validation if it is not known
     if (!IsTxnKnown(inv)) {
@@ -3563,7 +3600,7 @@ static void ProcessFeeFilterMessage(const CNodePtr& pfrom, CDataStream& vRecv)
 * Process protoconf message.
 */
 static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, CConnman& connman,
-    const std::string& strCommand)
+                                    const std::string& strCommand, const Config &config)
 {
     if (pfrom->protoconfReceived) {
         pfrom->fDisconnect = true;
@@ -3593,9 +3630,9 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
             return false;
         }
 
-        // Limit the amount of data we are willing to send to MAX_PROTOCOL_SEND_PAYLOAD_LENGTH if a peer (or an attacker)
+        // Limit the amount of data we are willing to send if a peer (or an attacker)
         // that is running a newer version sends us large size, that we are not prepared to handle. 
-        pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, protoconf.maxRecvPayloadLength));
+        pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(config.GetMaxProtocolSendPayloadLength(), protoconf.maxRecvPayloadLength));
 
         // Parse supported stream policies if we have them
         if(protoconf.numberOfFields >= 2) {
@@ -3605,7 +3642,7 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
         LogPrint(BCLog::NET, "Protoconf received \"%s\" from peer=%d; peer's proposed max message size: %d," 
             "absolute maximal allowed message size: %d, calculated maximal number of Inv elements in a message = %d, "
             "their stream policies: %s, common stream policies: %s\n",
-            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, MAX_PROTOCOL_SEND_PAYLOAD_LENGTH, pfrom->maxInvElements,
+            SanitizeString(strCommand), pfrom->id, protoconf.maxRecvPayloadLength, config.GetMaxProtocolSendPayloadLength(), pfrom->maxInvElements,
             protoconf.streamPolicies, pfrom->GetCommonStreamPoliciesStr());
     }
 
@@ -3698,7 +3735,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::INV) {
-        ProcessInvMessage(pfrom, msgMaker, interruptMsgProc, vRecv, connman);
+        ProcessInvMessage(pfrom, msgMaker, interruptMsgProc, vRecv, connman, config);
     }
 
     else if (strCommand == NetMsgType::GETDATA) {
@@ -3777,7 +3814,7 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
     }
 
     else if (strCommand == NetMsgType::PROTOCONF) {
-        return ProcessProtoconfMessage(pfrom, vRecv, connman, strCommand);
+        return ProcessProtoconfMessage(pfrom, vRecv, connman, strCommand, config);
     }
 
     else if (strCommand == NetMsgType::NOTFOUND) {
@@ -3879,12 +3916,12 @@ bool ProcessMessages(const Config &config, const CNodePtr& pfrom, CConnman &conn
     }
 
     // Get next message for processing
-    std::list<CNetMessage> nextMsg {};
-    fMoreWork = pfrom->GetAssociation().GetNextMessage(nextMsg);
-    if(nextMsg.empty()) {
+    auto [ nextMsg, moreMsgs ] { pfrom->GetAssociation().GetNextMessage() };
+    if(!nextMsg) {
         return false;
     }
-    CNetMessage& msg { nextMsg.front() };
+    fMoreWork = moreMsgs;
+    CNetMessage& msg { *nextMsg };
     msg.SetVersion(pfrom->GetRecvVersion());
 
     std::optional<CLogP2PStallDuration> durationLog;

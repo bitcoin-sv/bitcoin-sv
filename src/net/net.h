@@ -499,8 +499,8 @@ public:
              int64_t bantimeoffset = 0, bool sinceUnixEpoch = false);
     // Needed for unit testing.
     void ClearBanned();
-    bool IsBanned(CNetAddr ip);
-    bool IsBanned(CSubNet subnet);
+    bool IsBanned(const CNetAddr &ip);
+    bool IsBanned(const CSubNet &subnet);
     bool Unban(const CNetAddr &ip);
     bool Unban(const CSubNet &ip);
     void GetBanned(banmap_t &banmap);
@@ -760,7 +760,6 @@ private:
     std::chrono::milliseconds mDebugP2PTheadStallsThreshold;
 
     CAsyncTaskPool mAsyncTaskPool;
-    uint8_t mNodeAsyncTaskLimit;
 
     /** Invalid transaction publisher*/
     CInvalidTxnPublisher mInvalidTxnPublisher;
@@ -836,7 +835,7 @@ extern bool fListen;
 extern bool fRelayTxes;
 
 extern CCriticalSection cs_invQueries;
-extern limitedmap<uint256, int64_t> mapAlreadyAskedFor;
+extern std::unique_ptr<limitedmap<uint256, int64_t>> mapAlreadyAskedFor;
 
 struct LocalServiceInfo {
     int nScore;
@@ -1119,7 +1118,7 @@ public:
         vBlockHashesToAnnounce.push_back(hash);
     }
 
-    void AskFor(const CInv &inv);
+    void AskFor(const CInv &inv, const Config &config);
 
     void CloseSocketDisconnect();
 

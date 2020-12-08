@@ -260,9 +260,9 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
 
 # The maximum number of nodes a single test can spawn
 MAX_NODES = 8
-# Don't assign rpc or p2p ports lower than this
+# Don't assign rpc, p2p or zmq ports lower than this
 PORT_MIN = 11000
-# The number of ports to "reserve" for p2p and rpc, each
+# The number of ports to "reserve" for p2p, rpc and zmq, each
 PORT_RANGE = 5000
 
 
@@ -304,6 +304,11 @@ def p2p_port(n):
 
 def rpc_port(n):
     return PORT_MIN + PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+
+
+def zmq_port(n):
+    assert(n <= MAX_NODES)
+    return PORT_MIN + 2*PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
 
 
 def rpc_url(datadir, i, rpchost=None):
@@ -800,3 +805,8 @@ def check_zmq_test_requirements(configfile, skip_test_exception):
         import zmq
     except ImportError:
         raise Exception("pyzmq module not available.")
+
+def wait_for_txn_propagator(node):
+    # Wait for this node's transactions propagator to finish relaying transactions to other nodes.
+    # Can be used to make sure current transactions are not relayed to nodes being reconnected later.
+    wait_until(lambda: (node.getnetworkinfo()['txnpropagationqlen'] == 0))

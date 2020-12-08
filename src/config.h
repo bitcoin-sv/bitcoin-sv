@@ -56,8 +56,8 @@ public:
     virtual bool SetMaxConsolidationInputScriptSize(uint64_t value, std::string* err = nullptr) = 0;
     virtual uint64_t GetMaxConsolidationInputScriptSize() const = 0;
 
-    virtual bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) = 0;
-    virtual uint64_t GetMinConsolidationInputMaturity() const = 0;
+    virtual bool SetMinConfConsolidationInput(uint64_t value, std::string* err = nullptr) = 0;
+    virtual uint64_t GetMinConfConsolidationInput() const = 0;
 
     virtual bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) = 0;
     virtual bool GetAcceptNonStdConsolidationInput() const = 0;
@@ -199,6 +199,12 @@ public:
     virtual int64_t GetInvalidTxZMQMaxMessageSize() const = 0;
 #endif
 
+    virtual bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) = 0;
+    virtual bool SetRecvInvQueueFactor(uint64_t value, std::string* err) = 0;
+    virtual unsigned int GetMaxProtocolRecvPayloadLength() const = 0;
+    virtual unsigned int GetMaxProtocolSendPayloadLength() const = 0;
+    virtual unsigned int GetRecvInvQueueFactor() const = 0;
+
 protected:
     ~Config() = default;
 };
@@ -232,8 +238,8 @@ public:
     bool SetMaxConsolidationInputScriptSize(uint64_t value, std::string* err = nullptr) override;
     uint64_t GetMaxConsolidationInputScriptSize() const  override;
 
-    bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) override;
-    uint64_t GetMinConsolidationInputMaturity() const  override;
+    bool SetMinConfConsolidationInput(uint64_t value, std::string* err = nullptr) override;
+    uint64_t GetMinConfConsolidationInput() const override;
 
     bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) override;
     bool GetAcceptNonStdConsolidationInput() const  override;
@@ -380,6 +386,12 @@ public:
     int64_t GetInvalidTxZMQMaxMessageSize() const override;
 #endif
 
+    bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) override;
+    bool SetRecvInvQueueFactor(uint64_t value, std::string* err) override;
+    unsigned int GetMaxProtocolRecvPayloadLength() const override;
+    unsigned int GetMaxProtocolSendPayloadLength() const override;
+    unsigned int GetRecvInvQueueFactor() const override;
+
     // Reset state of this object to match a newly constructed one. 
     // Used in constructor and for unit testing to always start with a clean state
     void Reset(); 
@@ -409,7 +421,7 @@ private:
     uint64_t maxTxSizePolicy;
     uint64_t minConsolidationFactor;
     uint64_t maxConsolidationInputScriptSize;
-    uint64_t minConsolidationInputMaturity;
+    uint64_t minConfConsolidationInput;
     bool acceptNonStdConsolidationInput;
     uint64_t dataCarrierSize;
     uint64_t limitAncestorCount;
@@ -457,6 +469,7 @@ private:
     bool mIsSetPromiscuousMempoolFlags;
 
     std::set<uint256> mInvalidBlocks;
+
     std::set<std::string> mBannedUAClients;
     uint64_t maxMerkleTreeDiskSpace;
     uint64_t preferredMerkleTreeFileSize;
@@ -470,6 +483,9 @@ private:
 
     // P2P parameters
     int64_t p2pHandshakeTimeout;
+    unsigned int maxProtocolRecvPayloadLength;
+    unsigned int maxProtocolSendPayloadLength;
+    unsigned int recvInvQueueFactor;
 
     std::optional<bool> mDisableBIP30Checks;
 
@@ -530,13 +546,13 @@ public:
     }
     uint64_t GetMaxConsolidationInputScriptSize() const override { return maxConsolidationInputScriptSize; }
 
-    bool SetMinConsolidationInputMaturity(uint64_t value, std::string* err = nullptr) override
+    bool SetMinConfConsolidationInput(uint64_t value, std::string* err = nullptr) override
     {
         SetErrorMsg(err);
-        minConsolidationInputMaturity = value;
+        minConfConsolidationInput = value;
         return false;
     }
-    uint64_t GetMinConsolidationInputMaturity() const override { return minConsolidationInputMaturity; }
+    uint64_t GetMinConfConsolidationInput() const override { return minConfConsolidationInput; }
 
     bool SetAcceptNonStdConsolidationInput(bool flagValue, std::string* err = nullptr) override
     {
@@ -791,6 +807,12 @@ public:
         return mBannedUAClients.find(uaClient) != mBannedUAClients.end();
     }
 
+    bool SetMaxProtocolRecvPayloadLength(uint64_t value, std::string* err) override { return true; }
+    bool SetRecvInvQueueFactor(uint64_t value, std::string* err) override { return true; }
+    unsigned int GetMaxProtocolRecvPayloadLength() const override { return DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH; }
+    unsigned int GetMaxProtocolSendPayloadLength() const override { return DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH*MAX_PROTOCOL_SEND_PAYLOAD_FACTOR; }
+    unsigned int GetRecvInvQueueFactor() const override { return DEFAULT_RECV_INV_QUEUE_FACTOR; }
+
     bool AddInvalidTxSink(const std::string& sink, std::string* err = nullptr) override { return true; };
     std::set<std::string> GetInvalidTxSinks() const override { return {"NONE"}; };
     std::set<std::string> GetAvailableInvalidTxSinks() const override { return {"NONE"}; };
@@ -857,7 +879,7 @@ private:
     uint64_t maxTxSizePolicy{ DEFAULT_MAX_TX_SIZE_POLICY_AFTER_GENESIS };
     uint64_t minConsolidationFactor{ DEFAULT_MIN_CONSOLIDATION_FACTOR };
     uint64_t maxConsolidationInputScriptSize{DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE };
-    uint64_t minConsolidationInputMaturity { DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY };
+    uint64_t minConfConsolidationInput { DEFAULT_MIN_CONF_CONSOLIDATION_INPUT };
     uint64_t acceptNonStdConsolidationInput { DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT };
     uint64_t maxScriptSizePolicy { DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS };
     std::set<uint256> mInvalidBlocks;

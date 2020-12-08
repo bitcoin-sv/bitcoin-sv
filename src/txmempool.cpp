@@ -850,7 +850,7 @@ void CTxMemPool::removeUncheckedNL(
         }
         else
         {
-            GetMainSignals().TransactionRemovedFromMempool(txid, reason, conflictedWith.value_or(nullptr));
+            GetMainSignals().TransactionRemovedFromMempool(txid, reason, conflictedWith);
         }
 
         // Update the eviction candidate tracker.
@@ -913,8 +913,8 @@ void CTxMemPool::removeRecursiveNL(
     const CTransaction& origTx,
     const CJournalChangeSetPtr& changeSet,
     const CTransactionConflict& conflictedWith,
-    MemPoolRemovalReason reason) {
-
+    MemPoolRemovalReason reason)
+{
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
     setEntries txToRemove;
     txiter origit = mapTx.find(origTx.GetId());
@@ -1022,7 +1022,9 @@ void CTxMemPool::RemoveForReorg(
 void CTxMemPool::RemoveForBlock(
     const std::vector<CTransactionRef> &vtx,
     int32_t nBlockHeight,
-    const CJournalChangeSetPtr& changeSet) {
+    const CJournalChangeSetPtr& changeSet,
+    const uint256& blockhash)
+{
 
     CEnsureNonNullChangeSet nonNullChangeSet{*this, changeSet};
 
@@ -1096,7 +1098,7 @@ void CTxMemPool::RemoveForBlock(
                     }
 
                     // remove conflicted tx from mempool (together with all descendants)
-                    auto conflict = CTransactionConflict{tx.get()};
+                    auto conflict = CTransactionConflict{{tx.get(), &blockhash}};
                     removeStagedNL(conflictedWithDescendants, nonNullChangeSet.Get(), conflict, MemPoolRemovalReason::CONFLICT);
                 }
             }

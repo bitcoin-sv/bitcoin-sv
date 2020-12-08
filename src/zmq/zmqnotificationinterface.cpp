@@ -43,7 +43,7 @@ CZMQNotificationInterface *CZMQNotificationInterface::Create() {
         CZMQAbstractNotifier::Create<CZMQPublishRawTransactionNotifier>;
     factories["pubinvalidtx"] =
         CZMQAbstractNotifier::Create<CZMQPublishTextNotifier>;
-    factories["pubremovedfrommempool"] =
+    factories["pubdiscardedfrommempool"] =
         CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolNotifier>;
     factories["pubremovedfrommempoolblock"] =
         CZMQAbstractNotifier::Create<CZMQPublishRemovedFromMempoolBlockNotifier>;
@@ -198,7 +198,7 @@ void CZMQNotificationInterface::TransactionAddedToMempool(
 
 
 void CZMQNotificationInterface::TransactionRemovedFromMempool(const uint256& txid, MemPoolRemovalReason reason, 
-                                                              const CTransaction* conflictedWith)
+                                                            const CTransactionConflict& conflictedWith)
 {
 
     for (auto i = notifiers.begin(); i != notifiers.end();)

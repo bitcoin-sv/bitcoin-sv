@@ -10,8 +10,9 @@ This test tweaks relative script sizes by manipulating the consolidation factor.
 allows applying this test to standard p2pkh transactions.
 """
 
+import glob
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, hashToHex
+from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, hashToHex, sync_blocks
 from test_framework.mininode import FromHex, CTransaction, COIN
 from decimal import Decimal
 
@@ -86,7 +87,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
     def run_test(self):
         for node in self.nodes:
             self.consolidation_factor = int(node.getnetworkinfo()['minconsolidationfactor'])
-            self.minConfirmations = int(node.getnetworkinfo()['minconsolidationinputmaturity'])
+            self.minConfirmations = int(node.getnetworkinfo()['minconfconsolidationinput'])
             self.log.info ("consolidation factor: {}".format(self.consolidation_factor))
             self.log.info ("minimum input confirmations: {}".format(self.minConfirmations))
 
@@ -122,6 +123,31 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
             confirmations = tx.get('confirmations', 0)
             assert_equal (confirmations, 1)
             self.log.info ("test 3: PASS")
+
+        # Verify deprecated -minconsolidationinputmaturity is an alias to -minconfconsolidationinput
+        self.log.info("Restarting nodes to test config options...")
+        self.stop_nodes()
+        self.extra_args[0].append("-minconsolidationinputmaturity=99")
+        self.start_nodes(self.extra_args)
+        sync_blocks(self.nodes)
+        assert_equal(99, self.nodes[0].getnetworkinfo()['minconfconsolidationinput'])
+        assert_equal(99, self.nodes[0].getnetworkinfo()['minconsolidationinputmaturity'])
+
+        # Verify deprecation warning is logged
+        self.stop_nodes()
+        deprecation_log = False
+        for line in open(glob.glob(self.options.tmpdir + "/node0" + "/regtest/bitcoind.log")[0]):
+            if f"Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead" in line:
+                deprecation_log = True
+                #self.log.info("Found line: %s", line.strip())
+                break
+        assert(deprecation_log)
+
+        # Verify init error when deprecated and new option are used together
+        self.extra_args[0].append("-minconfconsolidationinput=99")
+        self.assert_start_raises_init_error(
+            0, self.extra_args[0],
+            'Cannot use both -minconfconsolidationinput and -minconsolidationinputmaturity (deprecated) at the same time')
 
 if __name__ == '__main__':
     ConsolidationP2PKHTest().main()

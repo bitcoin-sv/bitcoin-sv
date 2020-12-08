@@ -158,7 +158,7 @@ void Shutdown() {
     /// locked. Be sure that anything that writes files or flushes caches only
     /// does this if the respective module was initialized.
 
-    RenameThread("bitcoin-shutoff");
+    RenameThread("shutoff");
     mempool.AddTransactionsUpdated(1);
 
     StopHTTPRPC();
@@ -488,7 +488,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-txindex", strprintf(_("Maintain a full transaction index, used by "
                                 "the getrawtransaction rpc call (default: %d)"),
-                              DEFAULT_TXINDEX)); 
+                              DEFAULT_TXINDEX));
     strUsage += HelpMessageOpt(
         "-maxmerkletreediskspace", strprintf(_("Maximum disk size in bytes that "
         "can be taken by stored merkle trees. This size should not be less than default size "
@@ -722,7 +722,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage +=
         HelpMessageOpt("-zmqpubinvalidtx=<address>",
                        _("Enable publish invalid transaction in <address>. -invalidtxsink=ZMQ should be specified."));
-    strUsage += HelpMessageOpt("-zmqpubremovedfrommempool=<address>",
+    strUsage += HelpMessageOpt("-zmqpubdiscardedfrommempool=<address>",
                                _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
     strUsage += HelpMessageOpt("-zmqpubremovedfrommempoolblock=<address>",
                                _("Enable publish removal of transaction (txid and the reason in json format) in <address>"));
@@ -964,13 +964,18 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                                      DEFAULT_MIN_CONSOLIDATION_FACTOR));
     strUsage +=
             HelpMessageOpt("-maxconsolidationinputscriptsize=<n>",
-                           strprintf(_("This number is the maximum length for a scriptSig input in a consolidation txn (default: %u). "),
+                           strprintf(_("This number is the maximum length for a scriptSig input in a consolidation txn (default: %u). The value may be given in bytes or with unit (B, kB, MB, GB)."),
                                      DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE));
 
     strUsage +=
-            HelpMessageOpt("-minconsolidationinputmaturity=<n>",
+            HelpMessageOpt("-minconfconsolidationinput=<n>",
                            strprintf(_("Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
-                                     DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY));
+                                     DEFAULT_MIN_CONF_CONSOLIDATION_INPUT));
+
+    strUsage +=
+            HelpMessageOpt("-minconsolidationinputmaturity=<n>",
+                           strprintf(_("(DEPRECATED: This option will be removed, use -minconfconsolidationinput instead) Minimum number of confirmations of inputs spent by consolidation transactions (default: %u). "),
+                                     DEFAULT_MIN_CONF_CONSOLIDATION_INPUT));
 
     strUsage +=
             HelpMessageOpt("-acceptnonstdconsolidationinput=<n>",
@@ -1043,13 +1048,13 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set the type of block assembler to use for mining. Supported options are "
                     "JOURNALING. (default: %s)"),
                   enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
-    strUsage += HelpMessageOpt( 
+    strUsage += HelpMessageOpt(
         "-jbamaxtxnbatch=<max batch size>",
         strprintf(_("Set the maximum number of transactions processed in a batch by the journaling block assembler "
                 "(default: %d)"), mining::JournalingBlockAssembler::DEFAULT_MAX_SLOT_TRANSACTIONS)
     );
     if (showDebug) {
-        strUsage += HelpMessageOpt( 
+        strUsage += HelpMessageOpt(
             "-jbafillafternewblock",
             strprintf(_("After a new block has been found it can take a short while for the journaling block assembler "
                         "to catch up and return a new candidate containing every transaction in the mempool. "
@@ -1228,7 +1233,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE / ONE_MEGABYTE));
 #endif
 
+      strUsage += HelpMessageOpt(
+        "-maxprotocolrecvpayloadlength=<n>",
+        strprintf("Set maximum protocol recv payload length you are willing to accept in bytes (default %d). Value should be bigger than legacy protocol payload length: %d B "
+                  "and smaller than: %d B.", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH, ONE_GIGABYTE));
 
+      strUsage += HelpMessageOpt(
+        "-recvinvqueuefactor=<n>",
+        strprintf("Set maximum number of full size inventory messages that we can store for each peer. Inventory message size can be set with -maxprotocolrecvpayloadlength (default %d)."
+          "Value should be an integer between %d and %d )", DEFAULT_RECV_INV_QUEUE_FACTOR, MIN_RECV_INV_QUEUE_FACTOR, MAX_RECV_INV_QUEUE_FACTOR)); 
     return strUsage;
 }
 
@@ -1346,7 +1359,7 @@ void CleanupBlockRevFiles() {
  * "import_files" thread can have longer life span than shutdownToken presented with a reference.
  */
 void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, const task::CCancellationToken shutdownToken) {
-    RenameThread("bitcoin-loadblk");
+    RenameThread("loadblk");
 
     {
         CImportingNow imp;
@@ -1822,10 +1835,9 @@ bool AppInitParameterInteraction(Config &config) {
     {
         return InitError(err);
     }
-    
     // Configure max orphant Tx size
     if (std::string err; !config.SetMaxOrphanTxSize(
-        gArgs.GetArgAsBytes("-maxorphantxsize", 
+        gArgs.GetArgAsBytes("-maxorphantxsize",
             COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE / ONE_MEGABYTE, ONE_MEGABYTE), &err))
     {
         return InitError(err);
@@ -1943,19 +1955,29 @@ bool AppInitParameterInteraction(Config &config) {
     // configure maxiumum scriptSig input size not considered spam in a consolidation transaction
     if (gArgs.IsArgSet("-maxconsolidationinputscriptsize"))
     {
-        uint64_t maxConsolidationInputScriptSize = gArgs.GetArg("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
+        uint64_t maxConsolidationInputScriptSize = gArgs.GetArgAsBytes("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
         if (std::string err; !config.SetMaxConsolidationInputScriptSize(maxConsolidationInputScriptSize, &err)) {
             return InitError(err);
         }
     }
 
     // configure minimum number of confirmations needed by transactions spent in a consolidatin transaction
-    if (gArgs.IsArgSet("-minconsolidationinputmaturity"))
-    {
-        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONSOLIDATION_INPUT_MATURITY);
-        if (std::string err; !config.SetMinConsolidationInputMaturity(param, &err)) {
+    if (gArgs.IsArgSet("-minconfconsolidationinput") && gArgs.IsArgSet("-minconsolidationinputmaturity")) {
+        return InitError(
+            _("Cannot use both -minconfconsolidationinput and -minconsolidationinputmaturity (deprecated) at the same time"));
+    }
+    if (gArgs.IsArgSet("-minconfconsolidationinput")) {
+        uint64_t param = gArgs.GetArg("-minconfconsolidationinput", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
             return InitError(err);
         }
+    }
+    if (gArgs.IsArgSet("-minconsolidationinputmaturity")) {
+        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
+            return InitError(err);
+        }
+        LogPrintf("Option -minconsolidationinputmaturity is deprecated, use -minconfconsolidationinput instead.\n");
     }
 
     // configure if non standard inputs for consolidation transactions are allowed
@@ -2011,11 +2033,11 @@ bool AppInitParameterInteraction(Config &config) {
 
     if (zmqSinkSpecified && !zmqIpDefined)
     {
-        InitError("The 'zmqpubinvalidtx' parameter should be specified when 'invalidtxsink' is set to ZMQ.");
+        return InitError("The 'zmqpubinvalidtx' parameter should be specified when 'invalidtxsink' is set to ZMQ.");
     }
     if (!zmqSinkSpecified && zmqIpDefined)
     {
-        InitError("The 'invalidtxsink' parameter should be set to ZMQ when 'zmqpubinvalidtx' is defined.");
+        return InitError("The 'invalidtxsink' parameter should be set to ZMQ when 'zmqpubinvalidtx' is defined.");
     }
 #endif
 
@@ -2301,6 +2323,20 @@ bool AppInitParameterInteraction(Config &config) {
         {
             return InitError(err);
         }
+    }
+
+    const uint64_t value = gArgs.GetArg("-maxprotocolrecvpayloadlength", DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH);
+    if (std::string err; !config.SetMaxProtocolRecvPayloadLength(value, &err))
+    {
+        return InitError(err);
+    }
+    mapAlreadyAskedFor = std::make_unique<limitedmap<uint256, int64_t>>(CInv::estimateMaxInvElements(config.GetMaxProtocolSendPayloadLength()));
+
+
+    const uint64_t recvInvQueueFactorArg = gArgs.GetArg("-recvinvqueuefactor", DEFAULT_RECV_INV_QUEUE_FACTOR);
+    if (std::string err; !config.SetRecvInvQueueFactor(recvInvQueueFactorArg, &err))
+    {
+        return InitError(err);
     }
 
     return true;
@@ -2939,7 +2975,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     CheckSafeModeParametersForAllForksOnStartup();
 
     LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
-  
+
 
 
 // Step 8: load wallet
@@ -3035,7 +3071,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     connOptions.nMaxFeeler = 1;
     connOptions.nBestHeight = chainActive.Height();
     connOptions.uiInterface = &uiInterface;
-    connOptions.nSendBufferMaxSize = 
+    connOptions.nSendBufferMaxSize =
         gArgs.GetArgAsBytes("-maxsendbuffer", DEFAULT_MAXSENDBUFFER, ONE_KILOBYTE);
     connOptions.nReceiveFloodSize =
         gArgs.GetArgAsBytes("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER, ONE_KILOBYTE);

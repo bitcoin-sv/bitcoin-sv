@@ -637,7 +637,8 @@ bool CheckRegularTransaction(const CTransaction &tx, CValidationState &state, ui
 
     }
 
-    std::set<COutPoint> inOutPoints;
+    static SaltedOutpointHasher hasher {};
+    std::unordered_set<COutPoint, SaltedOutpointHasher> inOutPoints { 1, hasher };
     for (const auto &txin : tx.vin) {
         if (txin.prevout.IsNull()) {
             return state.DoS(10, false, REJECT_INVALID,
@@ -1280,7 +1281,7 @@ CTxnValResult TxnValidation(
     // Note that consolidation transactions paying a voluntary fee will
     // be treated with higher priority. The higher the fee the higher
     // the priority
-    bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height() + 1);
+    bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height());
     if (skipFeeTest) {
         const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
@@ -1513,7 +1514,6 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
     CTxnHandlers& handlers,
     bool fUseLimits,
     std::chrono::steady_clock::time_point end_time_point) {
-
     size_t chainLength = vTxInputData.size();
     if (chainLength > 1) {
         LogPrint(BCLog::TXNVAL,
@@ -1539,7 +1539,7 @@ std::vector<std::pair<CTxnValResult, CTask::Status>> TxnValidationProcessingTask
                         handlers.mpTxnDoubleSpendDetector,
                         fUseLimits);
             // Process validated results
-            ProcessValidatedTxn(pool, result, handlers, false);
+            ProcessValidatedTxn(pool, result, handlers, false, config);
             // Forward results to the next processing stage
             results.emplace_back(std::move(result), CTask::Status::RanToCompletion);
         } catch (const std::exception& e) {
@@ -1569,7 +1569,8 @@ static void HandleInvalidP2POrphanTxn(
 
 static void HandleInvalidP2PNonOrphanTxn(
     const CTxnValResult& txStatus,
-    CTxnHandlers& handlers);
+    CTxnHandlers& handlers,
+    const Config &config);
 
 static void HandleInvalidStateForP2PNonOrphanTxn(
     const CNodePtr& pNode,
@@ -1682,7 +1683,8 @@ void ProcessValidatedTxn(
     CTxMemPool& pool,
     CTxnValResult& txStatus,
     CTxnHandlers& handlers,
-    bool fLimitMempoolSize) {
+    bool fLimitMempoolSize,
+    const Config &config) {
 
     TxSource source {
         txStatus.mTxInputData->GetTxSource()
@@ -1711,13 +1713,17 @@ void ProcessValidatedTxn(
             if (fOrphanTxn) {
                 HandleInvalidP2POrphanTxn(txStatus, handlers);
             } else {
-                HandleInvalidP2PNonOrphanTxn(txStatus, handlers);
+                HandleInvalidP2PNonOrphanTxn(txStatus, handlers, config);
             }
         } else if (handlers.mpOrphanTxns && state.IsMissingInputs()) {
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
 
-        PublishInvalidTransaction(txStatus);
+        // Skip publish transactions with rejection reason txn-already-in-mempool
+        // or txn-already-known.
+        if (state.GetRejectCode() != REJECT_ALREADY_KNOWN) {
+            PublishInvalidTransaction(txStatus);
+        }
 
         // Logging txn status
         LogTxnInvalidStatus(txStatus);
@@ -1789,14 +1795,15 @@ void ProcessValidatedTxn(
 
 static void AskForMissingParents(
     const CNodePtr& pNode,
-    const CTransaction &tx) {
+    const CTransaction &tx,
+    const Config &config) {
     for (const CTxIn &txin : tx.vin) {
         // FIXME: MSG_TX should use a TxHash, not a TxId.
         CInv inv(MSG_TX, txin.prevout.GetTxId());
         pNode->AddInventoryKnown(inv);
         // Check if txn is already known.
         if (!IsTxnKnown(inv)) {
-            pNode->AskFor(inv);
+            pNode->AskFor(inv, config);
         }
     }
 }
@@ -1804,7 +1811,8 @@ static void AskForMissingParents(
 static void HandleOrphanAndRejectedP2PTxns(
     const CNodePtr& pNode,
     const CTxnValResult& txStatus,
-    CTxnHandlers& handlers) {
+    CTxnHandlers& handlers,
+    const Config &config) {
 
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
@@ -1819,7 +1827,7 @@ static void HandleOrphanAndRejectedP2PTxns(
     if (!fRejectedParents) {
         // Add txn to the orphan queue if it is not there.
         if (!handlers.mpOrphanTxns->checkTxnExists(tx.GetId())) {
-            AskForMissingParents(pNode, tx);
+            AskForMissingParents(pNode, tx, config);
             handlers.mpOrphanTxns->addTxn(txStatus.mTxInputData);
         }
         // DoS prevention: do not allow mpOrphanTxns to grow unbounded
@@ -1918,7 +1926,8 @@ static void HandleInvalidP2POrphanTxn(
 
 static void HandleInvalidP2PNonOrphanTxn(
     const CTxnValResult& txStatus,
-    CTxnHandlers& handlers) {
+    CTxnHandlers& handlers,
+    const Config &config) {
 
     const CNodePtr& pNode = txStatus.mTxInputData->GetNodePtr().lock();
     if (!pNode) {
@@ -1928,7 +1937,7 @@ static void HandleInvalidP2PNonOrphanTxn(
     const CValidationState& state = txStatus.mState;
     // Handle txn with missing inputs
     if (state.IsMissingInputs()) {
-        HandleOrphanAndRejectedP2PTxns(pNode, txStatus, handlers);
+        HandleOrphanAndRejectedP2PTxns(pNode, txStatus, handlers, config);
     // Handle an invalid state
     } else {
         int nDoS = 0;
@@ -2132,11 +2141,15 @@ bool GetTransaction(const Config &config, const TxId &txid,
     }
 
     if (pindexSlow) {
-        CBlock block;
-        if (ReadBlockFromDisk(block, pindexSlow, config)) {
-            for (const auto &tx : block.vtx) {
+        if (auto blockStreamReader=GetDiskBlockStreamReader(pindexSlow, config)) {
+            while (!blockStreamReader->EndOfStream()) {
+                const CTransaction* tx = blockStreamReader->ReadTransaction_NoThrow();
+                if(!tx)
+                {
+                    break;
+                }
                 if (tx->GetId() == txid) {
-                    txOut = tx;
+                    txOut = blockStreamReader->GetLastTransactionRef();
                     hashBlock = pindexSlow->GetBlockHash();
                     isGenesisEnabled = IsGenesisEnabled(config, pindexSlow->nHeight);
                     return true;
@@ -2287,6 +2300,8 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
 
     if (!file)
     {
+        error("GetDiskBlockStreamReader(CDiskBlockPos&): OpenBlockFile failed for %s", 
+            pos.ToString());
         return {}; // could not open a stream
     }
 
@@ -2294,7 +2309,45 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
         std::make_unique<CBlockStreamReader<CFileReader>>(
             std::move(file),
             CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
-            calculateDiskBlockMetadata);
+            calculateDiskBlockMetadata,
+            pos);
+}
+
+std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+    const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata)
+{
+    std::unique_ptr<CBlockStreamReader<CFileReader>> blockStreamReader;
+    try
+    {
+        blockStreamReader = GetDiskBlockStreamReader(pindex->GetBlockPos(), calculateDiskBlockMetadata);
+    }
+    catch(const std::exception& e)
+    {
+        error("GetDiskBlockStreamReader(CBlockIndex*): Deserialize or I/O error - %s at %s",
+            e.what(), pindex->GetBlockPos().ToString());
+        return {};
+    }
+
+    if (!blockStreamReader)
+    {
+        return {};
+    }
+
+    if (!CheckProofOfWork(blockStreamReader->GetBlockHeader().GetHash(), blockStreamReader->GetBlockHeader().nBits, config))
+    {
+        error("GetDiskBlockStreamReader(CBlockIndex*): Errors in block header at %s",
+            pindex->GetBlockPos().ToString());
+        return {};
+    }
+
+    if (blockStreamReader->GetBlockHeader().GetHash() != pindex->GetBlockHash())
+    {
+        error("GetDiskBlockStreamReader(CBlockIndex*): GetHash() doesn't match index for %s at %s",
+            pindex->ToString(), pindex->GetBlockPos().ToString());
+        return {};
+    }
+
+    return blockStreamReader;
 }
 
 static bool PopulateBlockIndexBlockDiskMetaData(
@@ -4351,7 +4404,7 @@ static bool ConnectTip(
             RenameThread("Async RemoveForBlock");
             int64_t nTimeRemoveForBlock = GetTimeMicros();
             // Remove transactions from the mempool.;
-            mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet);
+            mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet, blockConnecting.GetHash());
             nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
             nTimeRemoveFromMempool += nTimeRemoveForBlock;
             LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
@@ -4373,7 +4426,6 @@ static bool ConnectTip(
     nTimeChainState += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
-
     if(g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
@@ -6590,13 +6642,19 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
 static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
                              const Config &config) {
     // TODO: merge with ConnectBlock
-    CBlock block;
-    if (!ReadBlockFromDisk(block, pindex, config)) {
-        return error("ReplayBlock(): ReadBlockFromDisk failed at %d, hash=%s",
+    auto blockStreamReader = GetDiskBlockStreamReader(pindex, config);
+    if (!blockStreamReader) {
+        return error("ReplayBlock(): GetDiskBlockStreamReader(CBlockIndex) failed at %d, hash=%s",
                      pindex->nHeight, pindex->GetBlockHash().ToString());
     }
 
-    for (const CTransactionRef &tx : block.vtx) {
+    while (!blockStreamReader->EndOfStream()) {
+        const CTransaction* tx = blockStreamReader->ReadTransaction_NoThrow();
+        if(!tx)
+        {
+            return error("ReplayBlock(): ReadTransaction failed at %d, hash=%s",
+                pindex->nHeight, pindex->GetBlockHash().ToString());
+        }
         if (!tx->IsCoinBase()) {
             for (const CTxIn &txin : tx->vin) {
                 inputs.SpendCoin(txin.prevout);

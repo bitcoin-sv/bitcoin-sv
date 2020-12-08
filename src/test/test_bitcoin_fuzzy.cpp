@@ -196,9 +196,6 @@ int main(int argc, char **argv) {
             try {
                 CMessageHeader mh(pchMessageStart);
                 ds >> mh;
-                if (!mh.IsValidWithoutConfig(pchMessageStart)) {
-                    return 0;
-                }
             } catch (const std::ios_base::failure &e) {
                 return 0;
             }

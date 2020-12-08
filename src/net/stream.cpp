@@ -221,22 +221,25 @@ uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialize
     return nBytesSent;
 }
 
-bool Stream::GetNextMessage(std::list<CNetMessage>& msg)
+std::pair<Stream::QueuedNetMessage, bool> Stream::GetNextMessage()
 {
+    QueuedNetMessage msg {nullptr};
+
     LOCK(cs_mRecvMsgQueue);
 
     // If we have completed msgs queued, return the first one
     if(!mRecvCompleteMsgQueue.empty())
     {
-        msg.splice(msg.end(), mRecvCompleteMsgQueue, mRecvCompleteMsgQueue.begin());
+        msg = std::move(mRecvCompleteMsgQueue.front());
+        mRecvCompleteMsgQueue.pop_front();
 
         // Update total queued msgs size
-        mRecvMsgQueueSize -= msg.front().vRecv.size() + CMessageHeader::HEADER_SIZE;
+        mRecvMsgQueueSize -= msg->vRecv.size() + CMessageHeader::HEADER_SIZE;
         mPauseRecv = mRecvMsgQueueSize > mMaxRecvBuffSize;
     }
 
     // Return whether we still have more msgs queued
-    return !mRecvCompleteMsgQueue.empty();
+    return { std::move(msg), !mRecvCompleteMsgQueue.empty() };
 }
 
 void Stream::CopyStats(StreamStats& stats) const
@@ -337,12 +340,12 @@ Stream::RECV_STATUS Stream::ReceiveMsgBytes(const Config& config, const char* pc
     while (nBytes > 0)
     {   
         // Get current incomplete message, or create a new one.
-        if (mRecvMsgQueue.empty() || mRecvMsgQueue.back().complete())
-        {   
-            mRecvMsgQueue.push_back(CNetMessage(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION));
+        if (mRecvMsgQueue.empty() || mRecvMsgQueue.back()->complete())
+        {
+            mRecvMsgQueue.emplace_back(std::make_unique<CNetMessage>(Params().NetMagic(), SER_NETWORK, INIT_PROTO_VERSION));
         }
 
-        CNetMessage& msg = mRecvMsgQueue.back();
+        CNetMessage& msg { *(mRecvMsgQueue.back()) };
 
         // Absorb network data.
         int handled;
@@ -425,15 +428,15 @@ void Stream::GetNewMsgs()
     auto it { mRecvMsgQueue.begin() };
     for(; it != mRecvMsgQueue.end(); ++it)
     {   
-        if(!it->complete())
+        if(!(*it)->complete())
         {   
             break;
         }
-        uint64_t msgSize { it->vRecv.size() + CMessageHeader::HEADER_SIZE };
+        uint64_t msgSize { (*it)->vRecv.size() + CMessageHeader::HEADER_SIZE };
         nSizeAdded += msgSize;
 
         // Update recieved msg counts
-        mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find(it->hdr.pchCommand) };
+        mapMsgCmdSize::iterator i { mRecvBytesPerMsgCmd.find((*it)->hdr.pchCommand) };
         if(i == mRecvBytesPerMsgCmd.end())
         {   
             i = mRecvBytesPerMsgCmd.find(NET_MESSAGE_COMMAND_OTHER);

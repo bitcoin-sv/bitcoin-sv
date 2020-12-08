@@ -327,7 +327,8 @@ public:
         checkpointData = {  { 
                 {0, uint256S("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943")},
                 {1, uint256S("00000000e23f9436cc8a6d6aaaa515a7b84e7a1720fc9f92805c0007c77420c4")},
-                {2, uint256S("0000000040f8f40b5111d037b8b7ff69130de676327bcbd76ca0e0498a06c44a")}
+                {2, uint256S("0000000040f8f40b5111d037b8b7ff69130de676327bcbd76ca0e0498a06c44a")},
+                {4, uint256S("00000000d33661d5a6906f84e3c64ea6101d144ec83760bcb4ba81edcb15e68d")}
         }};
 
         defaultBlockSizeParams = DefaultBlockSizeParams{
