@@ -1,6 +1,7 @@
 // Copyright (c) 2020 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include <netmessagemaker.h>
 #include <net/block_download_tracker.h>
 #include <net/net_processing.h>
 #include <validation.h>
@@ -363,6 +364,60 @@ std::vector<NodeId> BlockDownloadTracker::getAllSourcesForBlockNL(const uint256&
     }
 
     return sources;
+}
+
+// Select peers to announce new blocks via compact blocks
+void BlockDownloadTracker::maybeSetPeerAsAnnouncingHeaderAndIDsNL(NodeId nodeid, const CNodeStatePtr& nodestate)
+{
+    // Check whether node will provide compact blocks
+    if(!nodestate || !nodestate->fProvidesHeaderAndIDs)
+    {
+        return;
+    }
+
+    // If we already know about this node, move it to the end of the list
+    for(auto it = mNodesAnnouncingHeaderAndIDs.begin(); it != mNodesAnnouncingHeaderAndIDs.end(); ++it)
+    {
+        if(*it == nodeid)
+        {
+            mNodesAnnouncingHeaderAndIDs.erase(it);
+            mNodesAnnouncingHeaderAndIDs.push_back(nodeid);
+            return;
+        }
+    }
+
+    // If we have more than 3 peers in the list, switch one we haven't received a block from for
+    // a while to high bandwidth relaying mode (sendcmpct(1)). Set this node to low bandwidth
+    // relaying mode (sendcmpct(0))
+    CConnman& connman { *g_connman };
+    connman.ForNode(nodeid, [&connman, this](const CNodePtr& pfrom)
+    {
+        bool fAnnounceUsingCMPCTBLOCK {false};
+        uint64_t nCMPCTBLOCKVersion {1};
+        if(mNodesAnnouncingHeaderAndIDs.size() >= 3)
+        {
+            // As per BIP152, we only get 3 of our peers to announce
+            // blocks using compact encodings.
+            connman.ForNode(mNodesAnnouncingHeaderAndIDs.front(),
+                [&connman, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion](const CNodePtr& pnodeStop)
+                {
+                    connman.PushMessage(pnodeStop,
+                                        CNetMsgMaker(pnodeStop->GetSendVersion())
+                                            .Make(NetMsgType::SENDCMPCT, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion));
+                    return true;
+                }
+            );
+            mNodesAnnouncingHeaderAndIDs.pop_front();
+        }
+
+        // Add this node using low bandwidth relaying
+        fAnnounceUsingCMPCTBLOCK = true;
+        connman.PushMessage(pfrom,
+                            CNetMsgMaker(pfrom->GetSendVersion())
+                                .Make(NetMsgType::SENDCMPCT, fAnnounceUsingCMPCTBLOCK, nCMPCTBLOCKVersion));
+        mNodesAnnouncingHeaderAndIDs.push_back(pfrom->GetId());
+        return true;
+    });
 }
 
 
