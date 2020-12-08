@@ -137,7 +137,7 @@ void BlockDownloadTracker::BlockChecked(const uint256& hash, const CValidationSt
                         mMapBlocksInFlight.count(it->second.block.GetHash()) > 0 &&
                         getUniqueBlockCountNL() == 1)
                 {
-                    MaybeSetPeerAsAnnouncingHeaderAndIDs(node, *g_connman);
+                    maybeSetPeerAsAnnouncingHeaderAndIDsNL(node, nodestate);
                 }
 
                 mMapBlockSender.erase(it);
