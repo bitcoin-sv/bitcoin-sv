@@ -1166,6 +1166,9 @@ private:
             bool add,
             txiter hash);
 
+    // typesafe default for conflictedWith parameter of remove* functions
+    const CTransactionConflict noConflict {};
+
     /**
      * Before calling removeUnchecked for a given transaction,
      * updateForRemoveFromMempoolNL must be called on the entire (dependent) set
