@@ -228,9 +228,9 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
         int r = InsecureRandRange(blockIndexStore.size());
         int64_t test_time = chain[r]->GetBlockTime();
         CBlockIndex *ret = chain.FindEarliestAtLeast(test_time);
-        BOOST_CHECK(ret->nTimeMax >= test_time);
+        BOOST_CHECK(ret->GetBlockTimeMax() >= test_time);
         BOOST_CHECK((ret->GetPrev() == nullptr) ||
-                    ret->GetPrev()->nTimeMax < test_time);
+                    ret->GetPrev()->GetBlockTimeMax() < test_time);
         BOOST_CHECK(chain[r]->GetAncestor(ret->GetHeight()) == ret);
     }
 

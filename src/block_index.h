@@ -319,10 +319,10 @@ private:
     //! (memory only) block header metadata
     uint64_t nTimeReceived{};
 
-public:
     //! (memory only) Maximum nTime in the chain upto and including this block.
     unsigned int nTimeMax{ 0 };
 
+public:
     /**
      * T must be of std::map/std::unordered_map associative container interface
      * concept.
