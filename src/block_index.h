@@ -361,6 +361,44 @@ public:
     }
 
     /**
+     * Used after indexes are loaded from the database to update their chain
+     * related data.
+     * NOTE: This function must be called on indexes in sorted by ascending
+     *        height order as it expects the parent data is already set
+     *        correctly.
+     *
+     * Returns: true if index is linked to a chain and false otherwise.
+     */
+    bool PostLoadIndexConnect()
+    {
+        std::lock_guard lock{ blockIndexMutex };
+
+        BuildSkip();
+        SetChainWork();
+        nTimeMax = (pprev ? std::max(pprev->nTimeMax, nTime) : nTime);
+
+        // We can link the chain of blocks for which we've received transactions
+        // at some point. Pruned nodes may have deleted the block.
+        if (nTx > 0) {
+            if (pprev)
+            {
+                if (pprev->nChainTx)
+                {
+                    nChainTx = pprev->nChainTx + nTx;
+                } else {
+                    nChainTx = 0;
+
+                    return false;
+                }
+            } else {
+                nChainTx = nTx;
+            }
+        }
+
+        return true;
+    }
+
+    /**
     * TODO: This method should become private.
     */
     CDiskBlockPos GetBlockPos() const

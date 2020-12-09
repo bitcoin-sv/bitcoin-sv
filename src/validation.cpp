@@ -6025,36 +6025,19 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
     for (const std::pair<int32_t, CBlockIndex *> &item : vSortedByHeight) {
         CBlockIndex *pindex = item.second;
-        pindex->SetChainWork();
-        pindex->nTimeMax =
-            (pindex->pprev ? std::max(pindex->pprev->nTimeMax, pindex->nTime)
-                           : pindex->nTime);
-        // We can link the chain of blocks for which we've received transactions
-        // at some point. Pruned nodes may have deleted the block.
-        if (pindex->nTx > 0) {
-            if (pindex->pprev) {
-                if (pindex->pprev->nChainTx) {
-                    pindex->nChainTx = pindex->pprev->nChainTx + pindex->nTx;
-                } else {
-                    pindex->nChainTx = 0;
-                    mapBlocksUnlinked.insert(
-                        std::make_pair(pindex->pprev, pindex));
-                }
-            } else {
-                pindex->nChainTx = pindex->nTx;
-            }
+        CBlockIndex* pprev = pindex->pprev;
+        if (!pindex->PostLoadIndexConnect() && pprev)
+        {
+            mapBlocksUnlinked.insert( std::make_pair(pprev, pindex) );
         }
         if (pindex->IsValid(BlockValidity::TRANSACTIONS) &&
-            (pindex->nChainTx || pindex->pprev == nullptr)) {
+            (pindex->nChainTx || pprev == nullptr)) {
             setBlockIndexCandidates.insert(pindex);
         }
         if (pindex->getStatus().isInvalid() &&
             (!pindexBestInvalid ||
              pindex->nChainWork > pindexBestInvalid->nChainWork)) {
             pindexBestInvalid = pindex;
-        }
-        if (pindex->pprev) {
-            pindex->BuildSkip();
         }
         if (pindex->IsValid(BlockValidity::TREE) &&
             (pindexBestHeader == nullptr ||
