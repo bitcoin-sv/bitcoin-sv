@@ -151,8 +151,7 @@ std::optional<CBlockUndo> CBlockIndex::GetBlockUndo() const
 
 
 bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blockundo,
-                            bool fCheckForPruning, const Config &config,
-                            std::set<CBlockIndex *, CBlockIndexWorkComparator> &setBlockIndexCandidates)
+                            bool fCheckForPruning, const Config &config)
 {
     std::lock_guard lock{ blockIndexMutex };
     if (GetUndoPosNL().IsNull() ||
@@ -176,12 +175,7 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
             nStatus = nStatus.withUndo();
         }
 
-        // since we are changing validation time we need to update
-        // setBlockIndexCandidates as well - it sorts by that time
-        setBlockIndexCandidates.erase(this);
-
         RaiseValidityNL(BlockValidity::SCRIPTS);
-        setBlockIndexCandidates.insert(this);
 
         setDirtyBlockIndex.insert(this);
     }

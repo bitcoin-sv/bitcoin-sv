@@ -2274,7 +2274,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
         } else if (block->getStatus().isInvalid()) {
             // This block or one of its ancestors is invalid.
             status = "invalid";
-        } else if (block->nChainTx == 0) {
+        } else if (block->GetChainTx() == 0) {
             // This block cannot be connected because full block data for it or
             // one of its parents is missing.
             status = "headers-only";
@@ -2801,11 +2801,11 @@ UniValue getchaintxstats(const Config &config, const JSONRPCRequest &request) {
         pindex->GetAncestor(pindex->nHeight - blockcount);
     int nTimeDiff =
         pindex->GetMedianTimePast() - pindexPast->GetMedianTimePast();
-    int nTxDiff = pindex->nChainTx - pindexPast->nChainTx;
+    int nTxDiff = pindex->GetChainTx() - pindexPast->GetChainTx();
 
     UniValue ret(UniValue::VOBJ);
     ret.push_back(Pair("time", pindex->GetBlockTime()));
-    ret.push_back(Pair("txcount", int64_t(pindex->nChainTx)));
+    ret.push_back(Pair("txcount", int64_t(pindex->GetChainTx())));
     ret.push_back(Pair("window_block_count", blockcount));
     if (blockcount > 0) {
         ret.push_back(Pair("window_tx_count", nTxDiff));

@@ -2287,7 +2287,7 @@ SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const 
     {
         return SafeModeLevel::NONE;
     }
-    else if (forkTipStatus.isValid() && pindexForkTip->nChainTx > 0 &&
+    else if (forkTipStatus.isValid() && pindexForkTip->GetChainTx() > 0 &&
              pindexForkTip->nChainWork - pindexForkBase->nChainWork > (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_VALID_FORK_LENGTH) &&
              chainActive.Tip()->nHeight - pindexForkBase->nHeight <= SAFE_MODE_MAX_VALID_FORK_DISTANCE)
     {
@@ -2300,7 +2300,7 @@ SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const 
         {
             return SafeModeLevel::INVALID;
         }
-        else if (forkTipStatus.isValid() && pindexForkTip->nChainTx > 0)
+        else if (forkTipStatus.isValid() && pindexForkTip->GetChainTx() > 0)
         {
             return SafeModeLevel::VALID;
         }
@@ -2484,7 +2484,7 @@ void CheckSafeModeParametersForAllForksOnStartup()
     {
         // This is needed because older versions of node did not correctly 
         // mark descendants of an invalid block on forks.
-        if (!tip->getStatus().isInvalid() && tip->nChainTx == 0)
+        if (!tip->getStatus().isInvalid() && tip->GetChainTx() == 0)
         {
             // if tip is valid headers only check fork if it has invalid block
             CheckForkForInvalidBlocks(tip);
@@ -3333,10 +3333,25 @@ static bool ConnectBlock(
     }
 
     // Write undo information to disk
-    if (!pindex->writeUndoToDisk(state, blockundo, fCheckForPruning, config, setBlockIndexCandidates))
     {
-        // Failed to write undo data.
-        return false;
+        // since we are changing validation time we need to update
+        // setBlockIndexCandidates as well - it sorts by that time
+        setBlockIndexCandidates.erase(pindex);
+
+        bool res =
+             pindex->writeUndoToDisk(
+                state,
+                blockundo,
+                fCheckForPruning,
+                config);
+
+        setBlockIndexCandidates.insert(pindex);
+
+        if (!res)
+        {
+            // Failed to write undo data.
+            return false;
+        }
     }
 
     if (fTxIndex && !pblocktree->WriteTxIndex(vPos)) {
@@ -3571,7 +3586,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
               __func__, chainActive.Tip()->GetBlockHash().ToString(),
               chainActive.Height(), chainActive.Tip()->GetVersion(),
               log(chainActive.Tip()->nChainWork.getdouble()) / log(2.0),
-              (unsigned long)chainActive.Tip()->nChainTx,
+              (unsigned long)chainActive.Tip()->GetChainTx(),
               DateTimeStrFormat("%Y-%m-%d %H:%M:%S",
                                 chainActive.Tip()->GetBlockTime()),
               GuessVerificationProgress(config.GetChainParams().TxData(),
@@ -3954,7 +3969,7 @@ static CBlockIndex *FindMostWorkChain() {
         CBlockIndex *pindexTest = pindexNew;
         bool fInvalidAncestor = false;
         while (pindexTest && !chainActive.Contains(pindexTest)) {
-            assert(pindexTest->nChainTx || pindexTest->nHeight == 0);
+            assert(pindexTest->GetChainTx() || pindexTest->nHeight == 0);
 
             // Pruned nodes may have entries in setBlockIndexCandidates for
             // which block files have been deleted. Remove those as candidates
@@ -4209,7 +4224,7 @@ static CBlockIndex* ConsiderBlockForMostWorkChain(
 
     if(mostWork.nChainWork > indexOfNewBlock->nChainWork
         || !indexOfNewBlock->IsValid(BlockValidity::TRANSACTIONS)
-        || !indexOfNewBlock->nChainTx)
+        || !indexOfNewBlock->GetChainTx())
     {
         return &mostWork;
     }
@@ -4502,13 +4517,14 @@ bool PreciousBlock(const Config &config, CValidationState &state,
         nLastPreciousChainwork = chainActive.Tip()->nChainWork;
         setBlockIndexCandidates.erase(pindex);
         pindex->IgnoreValidationTime();
-        pindex->nSequenceId = nBlockReverseSequenceId;
+        pindex->SetSequenceId( nBlockReverseSequenceId );
         if (nBlockReverseSequenceId > std::numeric_limits<int32_t>::min()) {
             // We can't keep reducing the counter if somebody really wants to
             // call preciousblock 2**31-1 times on the same set of tips...
             nBlockReverseSequenceId--;
         }
-        if (pindex->IsValid(BlockValidity::TRANSACTIONS) && pindex->nChainTx) {
+        if (pindex->IsValid(BlockValidity::TRANSACTIONS) && pindex->GetChainTx())
+        {
             setBlockIndexCandidates.insert(pindex);
             PruneBlockIndexCandidates();
         }
@@ -4615,7 +4631,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     // so add it again.
     for (const std::pair<const uint256, CBlockIndex *> &it : mapBlockIndex) {
         CBlockIndex *i = it.second;
-        if (i->IsValid(BlockValidity::TRANSACTIONS) && i->nChainTx &&
+        if (i->IsValid(BlockValidity::TRANSACTIONS) && i->GetChainTx() &&
             !setBlockIndexCandidates.value_comp()(i, chainActive.Tip())) {
             setBlockIndexCandidates.insert(i);
         }
@@ -4752,7 +4768,7 @@ bool SoftRejectBlockNL(const Config& config, CValidationState& state,
         // scan whole block index.
         for (const std::pair<const uint256, CBlockIndex *> &it : mapBlockIndex) {
             CBlockIndex *i = it.second;
-            if (i->IsValid(BlockValidity::TRANSACTIONS) && i->nChainTx &&
+            if (i->IsValid(BlockValidity::TRANSACTIONS) && i->GetChainTx() &&
                 !setBlockIndexCandidates.value_comp()(i, chainActive.Tip())) {
                 setBlockIndexCandidates.insert(i);
             }
@@ -4848,7 +4864,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
             it->second->ModifyStatusWithClearedFailedFlags();
             setDirtyBlockIndex.insert(it->second);
             if (it->second->IsValid(BlockValidity::TRANSACTIONS) &&
-                it->second->nChainTx &&
+                it->second->GetChainTx() &&
                 setBlockIndexCandidates.value_comp()(chainActive.Tip(),
                                                      it->second)) {
                 setBlockIndexCandidates.insert(it->second);
@@ -5005,7 +5021,7 @@ static bool ReceivedBlockTransactions(
     pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData);
     setDirtyBlockIndex.insert(pindexNew);
 
-    if (pindexNew->pprev == nullptr || pindexNew->pprev->nChainTx) {
+    if (pindexNew->pprev == nullptr || pindexNew->pprev->GetChainTx()) {
         // If pindexNew is the genesis block or all parents are
         // BLOCK_VALID_TRANSACTIONS.
         std::deque<CBlockIndex *> queue;
@@ -5016,11 +5032,11 @@ static bool ReceivedBlockTransactions(
         while (!queue.empty()) {
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
-            pindex->nChainTx =
-                (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
             {
                 LOCK(cs_nBlockSequenceId);
-                pindex->nSequenceId = nBlockSequenceId++;
+                pindex->SetChainTxAndSequenceId(
+                    (pindex->pprev ? pindex->pprev->GetChainTx() : 0) + pindex->nTx,
+                    nBlockSequenceId++);
             }
             if (chainActive.Tip() == nullptr ||
                 !setBlockIndexCandidates.value_comp()(pindex,
@@ -5988,7 +6004,7 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
             mapBlocksUnlinked.insert( std::make_pair(pprev, pindex) );
         }
         if (pindex->IsValid(BlockValidity::TRANSACTIONS) &&
-            (pindex->nChainTx || pprev == nullptr)) {
+            (pindex->GetChainTx() || pprev == nullptr)) {
             setBlockIndexCandidates.insert(pindex);
         }
         if (pindex->getStatus().isInvalid() &&
@@ -6412,7 +6428,8 @@ bool RewindBlockIndex(const Config &config) {
         CBlockIndex *pindexIter = it->second;
 
         if (pindexIter->IsValid(BlockValidity::TRANSACTIONS) &&
-            pindexIter->nChainTx) {
+            pindexIter->GetChainTx())
+        {
             setBlockIndexCandidates.insert(pindexIter);
         }
     }
@@ -6813,10 +6830,10 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
             // The current active chain's genesis block must be this block.
             assert(pindex == chainActive.Genesis());
         }
-        if (pindex->nChainTx == 0) {
+        if (pindex->GetChainTx() == 0) {
             // nSequenceId can't be set positive for blocks that aren't linked
             // (negative is used for preciousblock)
-            assert(pindex->nSequenceId <= 0);
+            assert(pindex->GetSequenceId() <= 0);
         }
         // VALID_TRANSACTIONS is equivalent to nTx > 0 for all nodes (whether or
         // not pruning has occurred). HAVE_DATA is only equivalent to nTx > 0
@@ -6843,9 +6860,9 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
         // nChainTx != 0 is used to signal that all parent blocks have been
         // processed (but may have been pruned).
         assert((pindexFirstNeverProcessed != nullptr) ==
-               (pindex->nChainTx == 0));
+               (pindex->GetChainTx() == 0));
         assert((pindexFirstNotTransactionsValid != nullptr) ==
-               (pindex->nChainTx == 0));
+               (pindex->GetChainTx() == 0));
         // nHeight must be consistent.
         assert(pindex->nHeight == nHeight);
         // For every block except the genesis block, the chainwork must be
@@ -7013,13 +7030,13 @@ double GuessVerificationProgress(const ChainTxData &data, CBlockIndex *pindex) {
     int64_t nNow = time(nullptr);
 
     double fTxTotal;
-    if (pindex->nChainTx <= data.nTxCount) {
+    if (pindex->GetChainTx() <= data.nTxCount) {
         fTxTotal = data.nTxCount + (nNow - data.nTime) * data.dTxRate;
     } else {
         fTxTotal =
-            pindex->nChainTx + (nNow - pindex->GetBlockTime()) * data.dTxRate;
+            pindex->GetChainTx() + (nNow - pindex->GetBlockTime()) * data.dTxRate;
     }
 
-    return pindex->nChainTx / fTxTotal;
+    return pindex->GetChainTx() / fTxTotal;
 }
 

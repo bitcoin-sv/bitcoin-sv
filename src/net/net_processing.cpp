@@ -413,7 +413,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                 return;
             }
             if (pindex->getStatus().hasData() || chainActive.Contains(pindex)) {
-                if (pindex->nChainTx) {
+                if (pindex->GetChainTx())
+                {
                     state->pindexLastCommonBlock = pindex;
                 }
             }
@@ -1125,7 +1126,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 bool send = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
                 if (mi != mapBlockIndex.end()) {
-                    if (mi->second->nChainTx &&
+                    if (mi->second->GetChainTx() &&
                         !mi->second->IsValid(BlockValidity::SCRIPTS) &&
                         mi->second->IsValid(BlockValidity::TREE)
                         && IsBlockABestChainTipCandidate(*mi->second)) {

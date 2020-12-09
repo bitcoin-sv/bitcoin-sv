@@ -296,6 +296,7 @@ public:
     //! upon
     unsigned int nTx{ 0 };
 
+private:
     //! (memory only) Number of transactions in the chain up to and including
     //! this block.
     //! This value will be non-zero only if and only if transactions for this
@@ -303,7 +304,6 @@ public:
     //! necessary; won't happen before 2030
     unsigned int nChainTx{ 0 };
 
-private:
     //! Verification status of this block. See enum BlockStatus
     BlockStatus nStatus;
 
@@ -314,12 +314,10 @@ private:
     uint32_t nBits{ 0 };
     uint32_t nNonce{ 0 };
 
-public:
     //! (memory only) Sequential id assigned to distinguish order in which
     //! blocks are received.
     int32_t nSequenceId{ 0 };
 
-private:
     //! (memory only) block header metadata
     uint64_t nTimeReceived{};
 
@@ -448,6 +446,28 @@ public:
         std::lock_guard lock(blockIndexMutex);
 
         return mDiskBlockMetaData;
+    }
+
+    void SetSequenceId( int32_t id )
+    {
+        std::lock_guard lock{ blockIndexMutex };
+
+        nSequenceId = id;
+    }
+
+    int32_t GetSequenceId() const
+    {
+        std::lock_guard lock{ blockIndexMutex };
+
+        return nSequenceId;
+    }
+
+    void SetChainTxAndSequenceId(unsigned int chainTx, int32_t id)
+    {
+        std::lock_guard lock{ blockIndexMutex };
+
+        nChainTx = chainTx;
+        nSequenceId = id;
     }
 
     void SetDiskBlockData(
@@ -631,6 +651,8 @@ public:
 
     unsigned int GetChainTx() const
     {
+        std::lock_guard lock{ blockIndexMutex };
+
         return this->nChainTx;
     }
 
@@ -714,8 +736,7 @@ public:
     std::optional<CBlockUndo> GetBlockUndo() const;
 
     bool writeUndoToDisk(CValidationState &state, const CBlockUndo &blockundo,
-                            bool fCheckForPruning, const Config &config,
-                            std::set<CBlockIndex *, CBlockIndexWorkComparator> &setBlockIndexCandidates);
+                            bool fCheckForPruning, const Config &config);
 
     bool verifyUndoValidity();
 
@@ -1010,10 +1031,14 @@ struct CBlockIndexWorkComparator {
         }
 
         // ... then by earliest time received, ...
-        if (pa->nSequenceId < pb->nSequenceId) {
+        auto paSeqId = pa->GetSequenceId();
+        auto pbSeqId = pb->GetSequenceId();
+        if (paSeqId < pbSeqId)
+        {
             return false;
         }
-        if (pa->nSequenceId > pb->nSequenceId) {
+        if (paSeqId > pbSeqId)
+        {
             return true;
         }
 
