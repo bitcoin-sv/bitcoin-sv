@@ -2680,7 +2680,7 @@ FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
     }
 
     uint64_t version;
-    DumpFileID instanceId;
+    DumpFileID instanceId {0};
 
     file >> version;
     if (version > MEMPOOL_DUMP_VERSION || version < MEMPOOL_DUMP_COMPAT_VERSION)
