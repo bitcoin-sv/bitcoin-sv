@@ -266,13 +266,13 @@ private:
     //! CBlockIndex
     const uint256* phashBlock{ nullptr };
 
-public:
     //! pointer to the index of the predecessor of this block
     CBlockIndex* pprev{ nullptr };
 
     //! pointer to the index of some further predecessor of this block
     CBlockIndex* pskip{ nullptr };
 
+public:
     //! height of the entry in the chain. The genesis block has height 0
     int32_t nHeight{ 0 };
 
@@ -406,7 +406,7 @@ public:
     {
         std::lock_guard lock{ blockIndexMutex };
 
-        BuildSkip();
+        BuildSkipNL();
         SetChainWorkNL();
         nTimeMax = (pprev ? std::max(pprev->nTimeMax, nTime) : nTime);
 
@@ -430,6 +430,11 @@ public:
 
         return true;
     }
+
+    bool IsGenesis() const { return pprev == nullptr; }
+
+    CBlockIndex* GetPrev() const { return pprev; }
+    CBlockIndex* GetSkip() const { return pskip; }
 
     /**
     * TODO: This method should become private.
@@ -716,9 +721,6 @@ public:
         return RaiseValidityNL(nUpTo);
     }
 
-    //! Build the skiplist pointer for this entry.
-    void BuildSkip();
-
     std::optional<int> GetFileNumber() const
     {
         std::lock_guard lock(blockIndexMutex);
@@ -815,7 +817,7 @@ private:
         {
             pprev = prev;
             nHeight = pprev->nHeight + 1;
-            BuildSkip();
+            BuildSkipNL();
             // Set soft rejection status from parent.
             // Note that if a parent of a block is not found in index, this must be a genesis block.
             // Since genesis block is never considered soft rejected, defaults set by CBlockIndex
@@ -923,6 +925,8 @@ private:
             nStatus = nStatus.withDataForSoftRejection(false);
         }
     }
+    //! Build the skiplist pointer for this entry.
+    void BuildSkipNL();
 
     void SetDiskBlockMetaData( CDiskBlockMetaData&& meta )
     {

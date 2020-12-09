@@ -54,10 +54,10 @@ BOOST_AUTO_TEST_CASE(skiplist_test) {
 
     for (int i = 0; i < SKIPLIST_LENGTH; i++) {
         if (i > 0) {
-            BOOST_CHECK(vIndex[i]->pskip == vIndex[vIndex[i]->pskip->nHeight]);
-            BOOST_CHECK(vIndex[i]->pskip->nHeight < i);
+            BOOST_CHECK(vIndex[i]->GetSkip() == vIndex[vIndex[i]->GetSkip()->nHeight]);
+            BOOST_CHECK(vIndex[i]->GetSkip()->nHeight < i);
         } else {
-            BOOST_CHECK(vIndex[i]->pskip == nullptr);
+            BOOST_CHECK(vIndex[i]->GetSkip() == nullptr);
         }
     }
 
@@ -90,7 +90,8 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             return CBlockIndex::Make( header, blockIndexStore );
         }();
 
-    BOOST_CHECK( lastIndex->pprev == nullptr );
+    BOOST_CHECK( lastIndex->IsGenesis() );
+    BOOST_CHECK( lastIndex->GetPrev() == nullptr );
 
     CBlockIndex* splitLastIndex{};
 
@@ -106,7 +107,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             lastIndex = CBlockIndex::Make( header, blockIndexStore );
 
             BOOST_CHECK_EQUAL( i, lastIndex->nHeight );
-            BOOST_CHECK(lastIndex->nHeight == lastIndex->pprev->nHeight + 1);
+            BOOST_CHECK(lastIndex->nHeight == lastIndex->GetPrev()->nHeight + 1);
         }
         splitLastIndex = lastIndex;
         for (int i = 50000; i < 100000; ++i)
@@ -119,7 +120,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
             lastIndex = CBlockIndex::Make( header, blockIndexStore );
 
             BOOST_CHECK_EQUAL( i, lastIndex->nHeight );
-            BOOST_CHECK(lastIndex->nHeight == lastIndex->pprev->nHeight + 1);
+            BOOST_CHECK(lastIndex->nHeight == lastIndex->GetPrev()->nHeight + 1);
         }
     }
 
@@ -132,7 +133,7 @@ BOOST_AUTO_TEST_CASE(getlocator_test) {
         splitLastIndex = CBlockIndex::Make( header, blockIndexStore );
 
         BOOST_CHECK_EQUAL( i, splitLastIndex->nHeight );
-        BOOST_CHECK(splitLastIndex->nHeight == splitLastIndex->pprev->nHeight + 1);
+        BOOST_CHECK(splitLastIndex->nHeight == splitLastIndex->GetPrev()->nHeight + 1);
     }
 
     // Build a CChain for the main branch.
@@ -228,8 +229,8 @@ BOOST_AUTO_TEST_CASE(findearliestatleast_test) {
         int64_t test_time = chain[r]->GetBlockTime();
         CBlockIndex *ret = chain.FindEarliestAtLeast(test_time);
         BOOST_CHECK(ret->nTimeMax >= test_time);
-        BOOST_CHECK((ret->pprev == nullptr) ||
-                    ret->pprev->nTimeMax < test_time);
+        BOOST_CHECK((ret->GetPrev() == nullptr) ||
+                    ret->GetPrev()->nTimeMax < test_time);
         BOOST_CHECK(chain[r]->GetAncestor(ret->nHeight) == ret);
     }
 

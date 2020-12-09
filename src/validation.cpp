@@ -313,8 +313,8 @@ CalculateSequenceLocks(const CTransaction &tx, int flags,
 
 static bool EvaluateSequenceLocks(const CBlockIndex &block,
                                   std::pair<int32_t, int64_t> lockPair) {
-    assert(block.pprev);
-    int64_t nBlockTime = block.pprev->GetMedianTimePast();
+    assert(!block.IsGenesis());
+    int64_t nBlockTime = block.GetPrev()->GetMedianTimePast();
     if (lockPair.first >= block.nHeight || lockPair.second >= nBlockTime) {
         return false;
     }
@@ -2186,7 +2186,7 @@ const CBlockIndex* FindForkBase(const CBlockIndex* pindexForkTip)
     const CBlockIndex* pindexWalk = pindexForkTip;
     while (pindexWalk && !chainActive.Contains(pindexWalk))
     {
-        pindexWalk = pindexWalk->pprev;
+        pindexWalk = pindexWalk->GetPrev();
     }
     return pindexWalk;
 }
@@ -2205,7 +2205,7 @@ const CBlockIndex* FindInvalidBlockOnFork(const CBlockIndex* pindexForkTip)
         {
             return pindexWalk;
         }
-        pindexWalk = pindexWalk->pprev;
+        pindexWalk = pindexWalk->GetPrev();
     }
     return nullptr;
 }
@@ -2228,7 +2228,7 @@ bool IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew)
             {
                 if (pindexWalk == pindexNew)
                     return true;
-                pindexWalk = pindexWalk->pprev;
+                pindexWalk = pindexWalk->GetPrev();
             }
         }
     }
@@ -2253,7 +2253,7 @@ void CheckForkForInvalidBlocks(CBlockIndex* pindexForkTip)
             pindexWalk->ModifyStatusWithFailedParent();
             setDirtyBlockIndex.insert(pindexWalk);
             setBlockIndexCandidates.erase(pindexWalk);
-            pindexWalk = pindexWalk->pprev;
+            pindexWalk = pindexWalk->GetPrev();
         }
     }
 }
@@ -2360,9 +2360,7 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
 {
     AssertLockHeld(cs_main);
 
-    if (!pindexNew)
-        return;
-    if (!pindexNew->pprev)
+    if (!pindexNew || pindexNew->IsGenesis())
         return;
 
     LOCK(cs_safeModeLevelForks);
@@ -2373,7 +2371,7 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
     const CBlockIndex* pindexForkTip = nullptr;
     bool checkExistingForks = false;
 
-    if (chainActive.Tip() == pindexNew->pprev || chainActive.Contains(pindexNew) || IsBlockPartOfExistingSafeModeFork(pindexNew))
+    if (chainActive.Tip() == pindexNew->GetPrev() || chainActive.Contains(pindexNew) || IsBlockPartOfExistingSafeModeFork(pindexNew))
     {
         // When we are extending active chain or updating any of the forks or main chain 
         // then only check all existing forks if we should stay in safe mode. If block is part
@@ -2388,7 +2386,7 @@ void CheckSafeModeParameters(const CBlockIndex* pindexNew)
     else
     {
         const CBlockIndex* pindexForkBase = pindexNew;
-        auto itPPrev = safeModeForks.find(pindexNew->pprev);
+        auto itPPrev = safeModeForks.find(pindexNew->GetPrev());
         if (itPPrev != safeModeForks.end())
         {
             // Check if we are extending existing fork that caused safe mode
@@ -2471,7 +2469,7 @@ void CheckSafeModeParametersForAllForksOnStartup()
         if (!chainActive.Contains(item.second))
         {
             setTipCandidates.insert(item.second);
-            setPrevs.insert(item.second->pprev);
+            setPrevs.insert(item.second->GetPrev());
         }
     }
 
@@ -2947,7 +2945,7 @@ static bool ConnectBlock(
 
     // Verify that the view's current state corresponds to the previous block
     uint256 hashPrevBlock =
-        pindex->pprev == nullptr ? uint256() : pindex->pprev->GetBlockHash();
+        pindex->IsGenesis() ? uint256() : pindex->GetPrev()->GetBlockHash();
     assert(hashPrevBlock == view.GetBestBlock());
 
     // Special case for the genesis block, skipping connection of its
@@ -3034,7 +3032,7 @@ static bool ConnectBlock(
     // we're on the known chain at height greater than where BIP34 activated, we
     // can save the db accesses needed for the BIP30 check.
     CBlockIndex *pindexBIP34height =
-        pindex->pprev->GetAncestor(consensusParams.BIP34Height);
+        pindex->GetPrev()->GetAncestor(consensusParams.BIP34Height);
     // Only continue to enforce if we're below BIP34 activation height or the
     // block hash at that height doesn't correspond.
     fEnforceBIP30 =
@@ -3070,7 +3068,7 @@ static bool ConnectBlock(
     if (pindex->nHeight >= consensusParams.CSVHeight) {
         nLockTimeFlags |= StandardNonFinalVerifyFlags(IsGenesisEnabled(config, pindex->nHeight));
     }
-    const uint32_t flags = GetBlockScriptFlags(config, pindex->pprev);
+    const uint32_t flags = GetBlockScriptFlags(config, pindex->GetPrev());
     bool isGenesisEnabled = IsGenesisEnabled(config, pindex->nHeight);
     int64_t nTime2 = GetTimeMicros();
     nTimeForks += nTime2 - nTime1;
@@ -3575,7 +3573,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
                 (pindex->GetVersion() & ~nExpectedVersion) != 0) {
                 ++nUpgraded;
             }
-            pindex = pindex->pprev;
+            pindex = pindex->GetPrev();
         }
         if (nUpgraded > 0) {
             warningMessages.push_back(strprintf(
@@ -3679,7 +3677,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
     }
 
     // Update chainActive and related variables.
-    UpdateTip(config, pindexDelete->pprev);
+    UpdateTip(config, pindexDelete->GetPrev());
     // Let wallets know transactions went from 1-confirmed to
     // 0-confirmed or conflicted:
     GetMainSignals().BlockDisconnected(pblock);
@@ -3813,7 +3811,7 @@ static bool ConnectTip(
     const CJournalChangeSetPtr& changeSet,
     const arith_uint256& mostWorkOnChain)
 {
-    assert(pindexNew->pprev == chainActive.Tip());
+    assert(pindexNew->GetPrev() == chainActive.Tip());
     // Read block from disk.
     int64_t nTime1 = GetTimeMicros();
     std::shared_ptr<const CBlock> pthisBlock;
@@ -4004,16 +4002,16 @@ static CBlockIndex *FindMostWorkChain() {
                         // the future we can try adding to
                         // setBlockIndexCandidates again.
                         mapBlocksUnlinked.insert(
-                            std::make_pair(pindexFailed->pprev, pindexFailed));
+                            std::make_pair(pindexFailed->GetPrev(), pindexFailed));
                         setBlockIndexCandidates.erase(pindexFailed);
-                        pindexFailed = pindexFailed->pprev;
+                        pindexFailed = pindexFailed->GetPrev();
                     }
                 }
                 setBlockIndexCandidates.erase(pindexTest);
                 fInvalidAncestor = true;
                 break;
             }
-            pindexTest = pindexTest->pprev;
+            pindexTest = pindexTest->GetPrev();
         }
         if (!fInvalidAncestor) {
             return pindexNew;
@@ -4089,7 +4087,7 @@ static bool ActivateBestChainStep(
             CBlockIndex *pindexIter = pindexMostWork->GetAncestor(nTargetHeight);
             while (pindexIter && pindexIter->nHeight != nHeight) {
                 vpindexToConnect.push_back(pindexIter);
-                pindexIter = pindexIter->pprev;
+                pindexIter = pindexIter->GetPrev();
             }
             nHeight = nTargetHeight;
 
@@ -4221,7 +4219,7 @@ static CBlockIndex* ConsiderBlockForMostWorkChain(
     // if block is missing from the mapBlockIndex then treat it as code bug
     // since every new block should be added to index before getting here
     assert(it != mapBlockIndex.end());
-    assert(it->second->pprev->GetBlockHash() == block.GetBlockHeader().hashPrevBlock);
+    assert(it->second->GetPrev()->GetBlockHash() == block.GetBlockHeader().hashPrevBlock);
 
     CBlockIndex* indexOfNewBlock = it->second;
 
@@ -4644,7 +4642,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     InvalidChainFound(pindex);
     if(tip_disconnected)
     {
-        uiInterface.NotifyBlockTip(IsInitialBlockDownload(), chainActive.Tip());
+        uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->GetPrev());
     }
 
     if (state.IsValid() && g_connman) {
@@ -4888,7 +4886,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
             pindex->ModifyStatusWithClearedFailedFlags();
             setDirtyBlockIndex.insert(pindex);
         }
-        pindex = pindex->pprev;
+        pindex = pindex->GetPrev();
     }
     return true;
 }
@@ -4937,7 +4935,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
             (isInvalidBlockOnActiveChain || !chainActive.Contains(item.second)))
         {
             setTipCandidates.insert(item.second);
-            setPrevs.insert(item.second->pprev);
+            setPrevs.insert(item.second->GetPrev());
         }
     }
 
@@ -4953,7 +4951,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
         CBlockIndex* pindexWalk = (*it);
         while (pindexWalk->nHeight > pindexNew->nHeight)
         {
-            pindexWalk = pindexWalk->pprev;
+            pindexWalk = pindexWalk->GetPrev();
         }
         if (pindexWalk == pindexNew)
         {
@@ -4964,7 +4962,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
                 pindexWalk->ModifyStatusWithFailedParent();
                 setDirtyBlockIndex.insert(pindexWalk);
                 setBlockIndexCandidates.erase(pindexWalk);
-                pindexWalk = pindexWalk->pprev;
+                pindexWalk = pindexWalk->GetPrev();
             }
             // Check if we have to enter safe mode if chain has been invalidated
             CheckSafeModeParameters(*it);
@@ -5026,7 +5024,8 @@ static bool ReceivedBlockTransactions(
     pindexNew->SetDiskBlockData(block.vtx.size(), pos, metaData);
     setDirtyBlockIndex.insert(pindexNew);
 
-    if (pindexNew->pprev == nullptr || pindexNew->pprev->GetChainTx()) {
+    if (pindexNew->IsGenesis() || pindexNew->GetPrev()->GetChainTx())
+    {
         // If pindexNew is the genesis block or all parents are
         // BLOCK_VALID_TRANSACTIONS.
         std::deque<CBlockIndex *> queue;
@@ -5040,7 +5039,7 @@ static bool ReceivedBlockTransactions(
             {
                 LOCK(cs_nBlockSequenceId);
                 pindex->SetChainTxAndSequenceId(
-                    (pindex->pprev ? pindex->pprev->GetChainTx() : 0) + pindex->nTx,
+                    (!pindex->IsGenesis() ? pindex->GetPrev()->GetChainTx() : 0) + pindex->nTx,
                     nBlockSequenceId++);
             }
             if (chainActive.Tip() == nullptr ||
@@ -5059,9 +5058,10 @@ static bool ReceivedBlockTransactions(
                 mapBlocksUnlinked.erase(it);
             }
         }
-    } else if (pindexNew->pprev &&
-               pindexNew->pprev->IsValid(BlockValidity::TREE)) {
-        mapBlocksUnlinked.insert(std::make_pair(pindexNew->pprev, pindexNew));
+    } else if (!pindexNew->IsGenesis() &&
+               pindexNew->GetPrev()->IsValid(BlockValidity::TREE))
+    {
+        mapBlocksUnlinked.insert(std::make_pair(pindexNew->GetPrev(), pindexNew));
     }
 
     return true;
@@ -5661,7 +5661,8 @@ static bool AcceptBlock(const Config& config,
     }
 
     if (!CheckBlock(config, block, state, pindex->nHeight) ||
-        !ContextualCheckBlock(config, block, state, pindex->pprev)) {
+        !ContextualCheckBlock(config, block, state, pindex->GetPrev()))
+    {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
             pindex->ModifyStatusWithFailed();
             setDirtyBlockIndex.insert(pindex);
@@ -5673,7 +5674,8 @@ static bool AcceptBlock(const Config& config,
     // Header is valid/has work and the merkle tree is good.
     // Relay now, but if it does not build on our best tip, let the
     // SendMessages loop relay it.
-    if (!IsInitialBlockDownload() && chainActive.Tip() == pindex->pprev) {
+    if (!IsInitialBlockDownload() && chainActive.Tip() == pindex->GetPrev())
+    {
         GetMainSignals().NewPoWValidBlock(pindex, pblock);
     }
 
@@ -5913,7 +5915,7 @@ static void PruneOneBlockFile(const int fileNumber) {
             // mapBlocksUnlinked or setBlockIndexCandidates.
             std::pair<std::multimap<CBlockIndex *, CBlockIndex *>::iterator,
                       std::multimap<CBlockIndex *, CBlockIndex *>::iterator>
-                range = mapBlocksUnlinked.equal_range(pindex->pprev);
+                range = mapBlocksUnlinked.equal_range(pindex->GetPrev());
             while (range.first != range.second) {
                 std::multimap<CBlockIndex *, CBlockIndex *>::iterator _it =
                     range.first;
@@ -6005,7 +6007,7 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
     for (const std::pair<int32_t, CBlockIndex *> &item : vSortedByHeight) {
         CBlockIndex *pindex = item.second;
-        CBlockIndex* pprev = pindex->pprev;
+        CBlockIndex* pprev = pindex->GetPrev();
         if (!pindex->PostLoadIndexConnect() && pprev)
         {
             mapBlocksUnlinked.insert( std::make_pair(pprev, pindex) );
@@ -6106,7 +6108,8 @@ CVerifyDB::~CVerifyDB() {
 bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                          int nCheckLevel, int nCheckDepth, const task::CCancellationToken& shutdownToken) {
     LOCK(cs_main);
-    if (chainActive.Tip() == nullptr || chainActive.Tip()->pprev == nullptr) {
+    if (chainActive.Tip() == nullptr || chainActive.Tip()->IsGenesis())
+    {
         return true;
     }
 
@@ -6132,8 +6135,9 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
     CValidationState state;
     int reportDone = 0;
     LogPrintf("[0%%]...");
-    for (CBlockIndex *pindex = chainActive.Tip(); pindex && pindex->pprev;
-         pindex = pindex->pprev) {
+    for (CBlockIndex *pindex = chainActive.Tip(); pindex && !pindex->IsGenesis();
+         pindex = pindex->GetPrev())
+    {
         int percentageDone = std::max(
             1, std::min(
                    99,
@@ -6212,7 +6216,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
                              pindex->nHeight,
                              pindex->GetBlockHash().ToString());
             }
-            pindexState = pindex->pprev;
+            pindexState = pindex->GetPrev();
             if (res == DISCONNECT_UNCLEAN) {
                 nGoodTransactions = 0;
                 pindexFailure = pindex;
@@ -6371,7 +6375,7 @@ bool ReplayBlocks(const Config &config, CoinsDB& view) {
             // still a version of the UTXO set with the effects of that block
             // undone.
         }
-        pindexOld = pindexOld->pprev;
+        pindexOld = pindexOld->GetPrev();
     }
 
     // Roll forward from the forking point to the new tip.
@@ -6765,7 +6769,7 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
     std::multimap<CBlockIndex *, CBlockIndex *> forward;
     for (BlockMap::iterator it = mapBlockIndex.begin();
          it != mapBlockIndex.end(); it++) {
-        forward.insert(std::make_pair(it->second->pprev, it->second));
+        forward.insert(std::make_pair(it->second->GetPrev(), it->second));
     }
 
     assert(forward.size() == mapBlockIndex.size());
@@ -6813,26 +6817,29 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
         if (pindexFirstNeverProcessed == nullptr && pindex->nTx == 0) {
             pindexFirstNeverProcessed = pindex;
         }
-        if (pindex->pprev != nullptr && pindexFirstNotTreeValid == nullptr &&
-            status.getValidity() < BlockValidity::TREE) {
-            pindexFirstNotTreeValid = pindex;
+        if (!pindex->IsGenesis())
+        {
+            if (pindexFirstNotTreeValid == nullptr &&
+                status.getValidity() < BlockValidity::TREE)
+            {
+                pindexFirstNotTreeValid = pindex;
+            }
+            if (pindexFirstNotTransactionsValid == nullptr &&
+                status.getValidity() < BlockValidity::TRANSACTIONS) {
+                pindexFirstNotTransactionsValid = pindex;
+            }
+            if (pindexFirstNotChainValid == nullptr &&
+                status.getValidity() < BlockValidity::CHAIN) {
+                pindexFirstNotChainValid = pindex;
+            }
+            if (pindexFirstNotScriptsValid == nullptr &&
+                status.getValidity() < BlockValidity::SCRIPTS) {
+                pindexFirstNotScriptsValid = pindex;
+            }
         }
-        if (pindex->pprev != nullptr &&
-            pindexFirstNotTransactionsValid == nullptr &&
-            status.getValidity() < BlockValidity::TRANSACTIONS) {
-            pindexFirstNotTransactionsValid = pindex;
-        }
-        if (pindex->pprev != nullptr && pindexFirstNotChainValid == nullptr &&
-            status.getValidity() < BlockValidity::CHAIN) {
-            pindexFirstNotChainValid = pindex;
-        }
-        if (pindex->pprev != nullptr && pindexFirstNotScriptsValid == nullptr &&
-            status.getValidity() < BlockValidity::SCRIPTS) {
-            pindexFirstNotScriptsValid = pindex;
-        }
-
         // Begin: actual consistency checks.
-        if (pindex->pprev == nullptr) {
+        else
+        {
             // Genesis block checks.
             // Genesis block's hash must match.
             assert(pindex->GetBlockHash() == consensusParams.hashGenesisBlock);
@@ -6876,11 +6883,11 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
         assert(pindex->nHeight == nHeight);
         // For every block except the genesis block, the chainwork must be
         // larger than the parent's.
-        assert(pindex->pprev == nullptr ||
-               pindex->GetChainWork() >= pindex->pprev->GetChainWork());
+        assert(pindex->IsGenesis() ||
+               pindex->GetChainWork() >= pindex->GetPrev()->GetChainWork());
         // The pskip pointer must point back for all but the first 2 blocks.
         assert(nHeight < 2 ||
-               (pindex->pskip && (pindex->pskip->nHeight < nHeight)));
+               (pindex->GetSkip() && (pindex->GetSkip()->nHeight < nHeight)));
         // All mapBlockIndex entries must at least be TREE valid
         assert(pindexFirstNotTreeValid == nullptr);
         if (status.getValidity() >= BlockValidity::TREE) {
@@ -6903,17 +6910,17 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
         // Check whether this block is in mapBlocksUnlinked.
         std::pair<std::multimap<CBlockIndex *, CBlockIndex *>::iterator,
                   std::multimap<CBlockIndex *, CBlockIndex *>::iterator>
-            rangeUnlinked = mapBlocksUnlinked.equal_range(pindex->pprev);
+            rangeUnlinked = mapBlocksUnlinked.equal_range(pindex->GetPrev());
         bool foundInUnlinked = false;
         while (rangeUnlinked.first != rangeUnlinked.second) {
-            assert(rangeUnlinked.first->first == pindex->pprev);
+            assert(rangeUnlinked.first->first == pindex->GetPrev());
             if (rangeUnlinked.first->second == pindex) {
                 foundInUnlinked = true;
                 break;
             }
             rangeUnlinked.first++;
         }
-        if (pindex->pprev && status.hasData() &&
+        if (!pindex->IsGenesis() && status.hasData() &&
             pindexFirstNeverProcessed != nullptr &&
             pindexFirstInvalid == nullptr) {
             // If this block has block data available, some parent was never
@@ -6930,7 +6937,7 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
             // mapBlocksUnlinked.
             assert(!foundInUnlinked);
         }
-        if (pindex->pprev && status.hasData() &&
+        if (!pindex->IsGenesis() && status.hasData() &&
             pindexFirstNeverProcessed == nullptr &&
             pindexFirstMissing != nullptr) {
             // We HAVE_DATA for this block, have received data for all parents
@@ -6995,7 +7002,7 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
                 pindexFirstNotScriptsValid = nullptr;
             }
             // Find our parent.
-            CBlockIndex *pindexPar = pindex->pprev;
+            CBlockIndex *pindexPar = pindex->GetPrev();
             // Find which child we just visited.
             std::pair<std::multimap<CBlockIndex *, CBlockIndex *>::iterator,
                       std::multimap<CBlockIndex *, CBlockIndex *>::iterator>

@@ -49,10 +49,10 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
 
         // Return the last non-special-min-difficulty-rules-block
         const CBlockIndex *pindex = pindexPrev;
-        while (pindex->pprev &&
+        while (!pindex->IsGenesis() &&
                pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
                pindex->GetBits() == nProofOfWorkLimit) {
-            pindex = pindex->pprev;
+            pindex = pindex->GetPrev();
         }
 
         return pindex->GetBits();
@@ -214,8 +214,8 @@ static const CBlockIndex *GetSuitableBlock(const CBlockIndex *pindex) {
      */
     const CBlockIndex *blocks[3];
     blocks[2] = pindex;
-    blocks[1] = pindex->pprev;
-    blocks[0] = blocks[1]->pprev;
+    blocks[1] = pindex->GetPrev();
+    blocks[0] = blocks[1]->GetPrev();
 
     // Sorting network.
     if (blocks[0]->GetBlockTime() > blocks[2]->GetBlockTime())

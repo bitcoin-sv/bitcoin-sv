@@ -107,9 +107,12 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex,
     result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
     result.push_back(Pair("chainwork", blockindex->GetChainWork().GetHex()));
 
-    if (blockindex->pprev) {
-        result.push_back(Pair("previousblockhash",
-                              blockindex->pprev->GetBlockHash().GetHex()));
+    if (!blockindex->IsGenesis())
+    {
+        result.push_back(
+            Pair(
+                "previousblockhash",
+                blockindex->GetPrev()->GetBlockHash().GetHex()));
     }
 
     if (nextBlockHash.has_value()) {
@@ -1439,9 +1442,11 @@ void headerBlockToJSON(const Config& config,
     jWriter.pushKV("difficulty", GetDifficulty(blockindex));
     jWriter.pushKV("chainwork", blockindex->GetChainWork().GetHex());
 
-    if (blockindex->pprev)
+    if (!blockindex->IsGenesis())
     {
-        jWriter.pushKV("previousblockhash", blockindex->pprev->GetBlockHash().GetHex());
+        jWriter.pushKV(
+            "previousblockhash",
+            blockindex->GetPrev()->GetBlockHash().GetHex());
     }
 
     if (nextBlockHash.has_value())
@@ -2161,8 +2166,9 @@ UniValue getblockchaininfo(const Config &config,
 
     if (fPruneMode) {
         CBlockIndex *block = chainActive.Tip();
-        while (block && block->pprev && block->pprev->getStatus().hasData()) {
-            block = block->pprev;
+        while (block && !block->IsGenesis() && block->GetPrev()->getStatus().hasData())
+        {
+            block = block->GetPrev();
         }
 
         obj.push_back(Pair("pruneheight", block->nHeight));
@@ -2242,7 +2248,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
     for (const std::pair<const uint256, CBlockIndex *> &item : mapBlockIndex) {
         if (!chainActive.Contains(item.second)) {
             setOrphans.insert(item.second);
-            setPrevs.insert(item.second->pprev);
+            setPrevs.insert(item.second->GetPrev());
         }
     }
 
@@ -2709,7 +2715,7 @@ Examples:
             UniValue v(UniValue::VOBJ);
             v.push_back(Pair("blockhash", bi->GetBlockHash().ToString()));
             v.push_back(Pair("height", bi->nHeight));
-            v.push_back(Pair("previousblockhash", bi->pprev->GetBlockHash().ToString()));
+            v.push_back(Pair("previousblockhash", bi->GetPrev()->GetBlockHash().ToString()));
             v.push_back(Pair("numblocks", bi->GetSoftRejectedFor()));
             result.push_back(v);
         }

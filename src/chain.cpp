@@ -20,7 +20,7 @@ void CChain::SetTip(CBlockIndex *pindex)
     vChain.resize(static_cast<size_t>(pindex->nHeight + 1));
     while (pindex && vChain[static_cast<size_t>(pindex->nHeight)] != pindex) {
         vChain[static_cast<size_t>(pindex->nHeight)] = pindex;
-        pindex = pindex->pprev;
+        pindex = pindex->GetPrev();
     }
 }
 
@@ -63,7 +63,7 @@ const CBlockIndex *CChain::FindFork(const CBlockIndex *pindex) const {
         pindex = pindex->GetAncestor(Height());
     }
     while (pindex && !Contains(pindex)) {
-        pindex = pindex->pprev;
+        pindex = pindex->GetPrev();
     }
     return pindex;
 }

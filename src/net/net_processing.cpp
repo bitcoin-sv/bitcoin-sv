@@ -415,7 +415,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
             pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
         for (unsigned int i = nToFetch - 1; i > 0; i--) {
-            vToFetch[i - 1] = vToFetch[i]->pprev;
+            vToFetch[i - 1] = vToFetch[i]->GetPrev();
         }
 
         // Iterate over those blocks in vToFetch (in forward direction), adding
@@ -815,7 +815,7 @@ void PeerLogicValidation::NewPoWValidBlock(
         // If the peer has, or we announced to them the previous block already,
         // but we don't think they have this one, go ahead and announce it.
         if (state->fPreferHeaderAndIDs && !PeerHasHeader(state, pindex) &&
-            PeerHasHeader(state, pindex->pprev)) {
+            PeerHasHeader(state, pindex->GetPrev())) {
 
             LogPrint(BCLog::NETMSG, "%s sending header-and-ids %s to peer=%d\n",
                      "PeerLogicValidation::NewPoWValidBlock",
@@ -841,7 +841,7 @@ void PeerLogicValidation::UpdatedBlockTip(const CBlockIndex *pindexNew,
         const CBlockIndex *pindexToAnnounce = pindexNew;
         while (pindexToAnnounce != pindexFork) {
             vHashes.push_back(pindexToAnnounce->GetBlockHash());
-            pindexToAnnounce = pindexToAnnounce->pprev;
+            pindexToAnnounce = pindexToAnnounce->GetPrev();
             if (vHashes.size() == MAX_BLOCKS_TO_ANNOUNCE) {
                 // Limit announcements in case of a huge reorganization. Rely on
                 // the peer's synchronization mechanism in that case.
@@ -2607,7 +2607,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
                     // We don't have this block, and it's not yet in flight.
                     vToFetch.push_back(pindexWalk);
                 }
-                pindexWalk = pindexWalk->pprev;
+                pindexWalk = pindexWalk->GetPrev();
             }
             // If pindexWalk still isn't on our main chain, we're looking at
             // a very large reorg at a time we think we're close to caught
@@ -2643,7 +2643,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
                     if(nodestate->fSupportsDesiredCmpctVersion &&
                         vGetData.size() == 1 &&
                         blockDownloadTracker.IsOnlyBlockInFlight(vGetData[0].hash) &&
-                        pindexLast->pprev->IsValid(BlockValidity::CHAIN)) {
+                        pindexLast->GetPrev()->IsValid(BlockValidity::CHAIN)) {
                         // In any case, we want to download using a compact
                         // block, not a regular one.
                         vGetData[0] = CInv(MSG_CMPCT_BLOCK, vGetData[0].hash);
@@ -3898,8 +3898,9 @@ void SendBlockSync(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& m
              * wouldn't be possible if we requested starting at pindexBestHeader
              * and got back an empty response.
              */
-            if (pindexStart->pprev) {
-                pindexStart = pindexStart->pprev;
+            if (!pindexStart->IsGenesis())
+            {
+                pindexStart = pindexStart->GetPrev();
             }
 
             LogPrint(BCLog::NETMSG,
@@ -3971,7 +3972,7 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
                 fRevertToInv = true;
                 break;
             }
-            if (pindex && pBestIndex && pindex->pprev != pBestIndex) {
+            if (pindex && pBestIndex && pindex->GetPrev() != pBestIndex) {
                 // This means that the list of blocks to announce don't
                 // connect to each other. This shouldn't really be possible
                 // to hit during regular operation (because reorgs should
@@ -3991,7 +3992,8 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
             } else if (PeerHasHeader(state, pindex)) {
                 // Keep looking for the first new block.
                 continue;
-            } else if (pindex && (pindex->pprev == nullptr || PeerHasHeader(state, pindex->pprev))) {
+            } else if (pindex && (pindex->IsGenesis() || PeerHasHeader(state, pindex->GetPrev())))
+            {
                 // Peer doesn't have this header but they do have the prior
                 // one.
                 // Start sending headers.

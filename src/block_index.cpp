@@ -64,7 +64,8 @@ const CBlockIndex *CBlockIndex::GetAncestor(int32_t height) const {
     return const_cast<CBlockIndex *>(this)->GetAncestor(height);
 }
 
-void CBlockIndex::BuildSkip() {
+void CBlockIndex::BuildSkipNL()
+{
     if (pprev) {
         pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
     }
@@ -121,8 +122,8 @@ const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
     }
 
     while (pa != pb && pa && pb) {
-        pa = pa->pprev;
-        pb = pb->pprev;
+        pa = pa->GetPrev();
+        pb = pb->GetPrev();
     }
 
     // Eventually all chain branches meet at the genesis block.

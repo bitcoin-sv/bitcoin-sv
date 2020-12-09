@@ -91,7 +91,7 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
     int64_t minTime = pb0->GetBlockTime();
     int64_t maxTime = minTime;
     for (int i = 0; i < lookup; i++) {
-        pb0 = pb0->pprev;
+        pb0 = pb0->GetPrev();
         int64_t time = pb0->GetBlockTime();
         minTime = std::min(time, minTime);
         maxTime = std::max(time, maxTime);

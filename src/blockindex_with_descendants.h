@@ -186,7 +186,7 @@ public:
         // array and pointer to parent.
         for(auto& item: blocks)
         {
-            auto it_parent = bi2item.find(item.BlockIndex()->pprev);
+            auto it_parent = bi2item.find(item.BlockIndex()->GetPrev());
             if(it_parent==bi2item.end())
             {
                 // Either this block is on a different chain than the one for which we're searching for descendants or
