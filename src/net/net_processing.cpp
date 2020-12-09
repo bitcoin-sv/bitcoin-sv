@@ -2865,7 +2865,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
 
         if(pindex->GetChainWork() <=
                 chainActive.Tip()->GetChainWork() || // We know something better
-            pindex->nTx != 0) {
+            pindex->GetBlockTxCount() != 0) {
             // We had this block at some point, but pruned it
             if(fAlreadyInFlight) {
                 // We requested this block for some reason, but our mempool

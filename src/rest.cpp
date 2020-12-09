@@ -253,7 +253,7 @@ static bool rest_block(const Config &config, HTTPRequest *req,
         }
         pblockindex = mapBlockIndex[hash];
         if (fHavePruned && !pblockindex->getStatus().hasData() &&
-            pblockindex->nTx > 0) {
+            pblockindex->GetBlockTxCount() > 0) {
             return RESTERR(req, HTTP_NOT_FOUND,
                            hashStr + " not available (pruned data)");
         }

@@ -97,8 +97,8 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex,
     result.push_back(
         Pair("versionHex", strprintf("%08x", blockindex->GetVersion())));
     result.push_back(Pair("merkleroot", blockindex->GetMerkleRoot().GetHex()));
-    if (blockindex->nTx > 0) {
-        result.push_back(Pair("num_tx", uint64_t(blockindex->nTx)));
+    if (blockindex->GetBlockTxCount() > 0) {
+        result.push_back(Pair("num_tx", uint64_t(blockindex->GetBlockTxCount())));
     }
     result.push_back(Pair("time", blockindex->GetBlockTime()));
     result.push_back(Pair("mediantime", blockindex->GetMedianTimePast()));
@@ -1434,7 +1434,7 @@ void headerBlockToJSON(const Config& config,
     jWriter.pushKV("version", blockHeader.nVersion);
     jWriter.pushKV("versionHex", strprintf("%08x", blockHeader.nVersion));
     jWriter.pushKV("merkleroot", blockHeader.hashMerkleRoot.GetHex());
-    jWriter.pushKV("num_tx", uint64_t(blockindex->nTx));
+    jWriter.pushKV("num_tx", uint64_t(blockindex->GetBlockTxCount()));
     jWriter.pushKV("time", blockHeader.GetBlockTime());
     jWriter.pushKV("mediantime", blockindex->GetMedianTimePast());
     jWriter.pushKV("nonce", uint64_t(blockHeader.nNonce));
@@ -3193,7 +3193,7 @@ UniValue getblockstats_impl(const Config &config,
     } while(!reader->EndOfStream());
 
 
-    size_t numTx = pindex->nTx;
+    size_t numTx = pindex->GetBlockTxCount();
     UniValue ret_all(UniValue::VOBJ);
     ret_all.pushKV("avgfee",
                    ValueFromAmount((numTx > 1)
@@ -3231,7 +3231,7 @@ UniValue getblockstats_impl(const Config &config,
     ret_all.pushKV("total_out", ValueFromAmount(total_out));
     ret_all.pushKV("total_size", total_size);
     ret_all.pushKV("totalfee", ValueFromAmount(totalfee));
-    ret_all.pushKV("txs", (int64_t)pindex->nTx);
+    ret_all.pushKV("txs", (int64_t)pindex->GetBlockTxCount());
     ret_all.pushKV("utxo_increase", outputs - inputs);
     ret_all.pushKV("utxo_size_inc", utxo_size_inc);
 

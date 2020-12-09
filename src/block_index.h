@@ -288,13 +288,11 @@ private:
     //! chain up to and including this block
     arith_uint256 nChainWork;
 
-public:
     //! Number of transactions in this block.
     //! Note: in a potential headers-first mode, this number cannot be relied
     //! upon
     unsigned int nTx{ 0 };
 
-private:
     //! (memory only) Number of transactions in the chain up to and including
     //! this block.
     //! This value will be non-zero only if and only if transactions for this
@@ -463,6 +461,13 @@ public:
         std::lock_guard lock{ blockIndexMutex };
 
         return nSequenceId;
+    }
+
+    unsigned int GetBlockTxCount() const
+    {
+        std::lock_guard lock{ blockIndexMutex };
+
+        return nTx;
     }
 
     void SetChainTxAndSequenceId(unsigned int chainTx, int32_t id)

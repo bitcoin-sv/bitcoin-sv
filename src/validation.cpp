@@ -5039,7 +5039,7 @@ static bool ReceivedBlockTransactions(
             {
                 LOCK(cs_nBlockSequenceId);
                 pindex->SetChainTxAndSequenceId(
-                    (!pindex->IsGenesis() ? pindex->GetPrev()->GetChainTx() : 0) + pindex->nTx,
+                    (!pindex->IsGenesis() ? pindex->GetPrev()->GetChainTx() : 0) + pindex->GetBlockTxCount(),
                     nBlockSequenceId++);
             }
             if (chainActive.Tip() == nullptr ||
@@ -5641,7 +5641,7 @@ static bool AcceptBlock(const Config& config,
     // If we didn't ask for it:
     if (!fRequested) {
         // This is a previously-processed block that was pruned.
-        if (pindex->nTx != 0) {
+        if (pindex->GetBlockTxCount() != 0) {
             return true;
         }
 
@@ -6814,7 +6814,8 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
         if (pindexFirstMissing == nullptr && !status.hasData()) {
             pindexFirstMissing = pindex;
         }
-        if (pindexFirstNeverProcessed == nullptr && pindex->nTx == 0) {
+        if (pindexFirstNeverProcessed == nullptr && pindex->GetBlockTxCount() == 0)
+        {
             pindexFirstNeverProcessed = pindex;
         }
         if (!pindex->IsGenesis())
@@ -6857,19 +6858,19 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
         if (!fHavePruned) {
             // If we've never pruned, then HAVE_DATA should be equivalent to nTx
             // > 0
-            assert(!status.hasData() == (pindex->nTx == 0));
+            assert(!status.hasData() == (pindex->GetBlockTxCount() == 0));
             assert(pindexFirstMissing == pindexFirstNeverProcessed);
         } else if (status.hasData()) {
             // If we have pruned, then we can only say that HAVE_DATA implies
             // nTx > 0
-            assert(pindex->nTx > 0);
+            assert(pindex->GetBlockTxCount() > 0);
         }
         if (status.hasUndo()) {
             assert(status.hasData());
         }
         // This is pruning-independent.
         assert((status.getValidity() >= BlockValidity::TRANSACTIONS) ==
-               (pindex->nTx > 0));
+               (pindex->GetBlockTxCount() > 0));
         // All parents having had data (at some point) is equivalent to all
         // parents being VALID_TRANSACTIONS, which is equivalent to nChainTx
         // being set.
