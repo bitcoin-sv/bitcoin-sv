@@ -1760,7 +1760,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             HelpExampleCli("listunspent", "") + "\nView the details\n" +
             HelpExampleCli("gettxouts", "\"[{\\\"txid\\\": \\\"txid1\\\", \\\"n\\\": 0}]\" \"[\\\"*\\\"]\" true") +
             "\nAs a json rpc call\n" +
-            HelpExampleRpc("gettxouts", "[{\\\"txid\\\": \\\"txid1\\\", \\\"n\\\" : 0}, {\\\"txid\\\": \\\"txid2\\\", \\\"n\\\" : 0}], [\\\"*\\\"], true"));
+            HelpExampleRpc("gettxouts", "[{\"txid\": \"txid1\", \"n\" : 0}, {\"txid\": \"txid2\", \"n\" : 0}], [\"*\"], true"));
     }
 
     RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VARR});
@@ -2659,7 +2659,7 @@ static UniValue getblockstats(const Config &config,
             HelpExampleCli("getblockstats",
                            "000000000000000001618b0a11306363725fbb8dbecbb0201c2b4064cda00790 '[\"minfeerate\",\"avgfeerate\"]'") +
             HelpExampleRpc("getblockstats",
-                           "000000000000000001618b0a11306363725fbb8dbecbb0201c2b4064cda00790 '[\"minfeerate\",\"avgfeerate\"]'"));
+                           "\"000000000000000001618b0a11306363725fbb8dbecbb0201c2b4064cda00790\", [\"minfeerate\",\"avgfeerate\"]"));
     }
 
     LOCK(cs_main);
@@ -2757,7 +2757,7 @@ static UniValue getblockstatsbyheight(const Config &config,
             HelpExampleCli("getblockstatsbyheight",
                            "620538 '[\"minfeerate\",\"avgfeerate\"]'") +
             HelpExampleRpc("getblockstatsbyheight",
-                           "630538 '[\"minfeerate\",\"avgfeerate\"]'"));
+                           "630538, [\"minfeerate\",\"avgfeerate\"]"));
     }
 
     LOCK(cs_main);
@@ -3096,7 +3096,7 @@ static UniValue waitaftervalidatingblock(const Config &config,
             HelpExampleCli("waitaftervalidatingblock",
                            "\"blockhash\" \"add\"") +
             HelpExampleRpc("waitaftervalidatingblock",
-                           "\"blockhash\" \"add\""));
+                           "\"blockhash\", \"add\""));
     }
 
     std::string strHash = request.params[0].get_str();

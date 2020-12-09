@@ -1206,8 +1206,8 @@ static UniValue sendmany(const Config &config, const JSONRPCRequest &request) {
             "\nAs a json rpc call\n" +
             HelpExampleRpc("sendmany",
                            "\"\", "
-                           "\"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\":0.01,"
-                           "\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\","
+                           "{\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\":0.01,"
+                           "\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\":0.02},"
                            " 6, \"testing\""));
     }
 
@@ -1350,8 +1350,8 @@ static UniValue addmultisigaddress(const Config &config,
             "\nAs json rpc call\n" +
             HelpExampleRpc("addmultisigaddress",
                            "2, "
-                           "\"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\","
-                           "\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"");
+                           "[\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\","
+                           "\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\"]");
         throw std::runtime_error(msg);
     }
 
@@ -2745,10 +2745,10 @@ static UniValue lockunspent(const Config &config,
                                           ",\\\"vout\\\":1}]\"") +
             "\nAs a json rpc call\n" +
             HelpExampleRpc("lockunspent", "false, "
-                                          "\"[{\\\"txid\\\":"
-                                          "\\\"a08e6907dbbd3d809776dbfc5d82e371"
-                                          "b764ed838b5655e72f463568df1aadf0\\\""
-                                          ",\\\"vout\\\":1}]\""));
+                                          "[{\"txid\":"
+                                          "\"a08e6907dbbd3d809776dbfc5d82e371"
+                                          "b764ed838b5655e72f463568df1aadf0\""
+                                          ",\"vout\":1}]"));
     }
 
     LOCK2(cs_main, pwallet->cs_wallet);
@@ -3127,9 +3127,9 @@ static UniValue listunspent(const Config &config,
                            "\"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\","
                            "\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\"") +
             HelpExampleRpc("listunspent",
-                           "6, 9999999 "
-                           "\"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\","
-                           "\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\""));
+                           "6, 9999999, "
+                           "[\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\","
+                           "\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\"]"));
     }
 
     int nMinDepth = 1;

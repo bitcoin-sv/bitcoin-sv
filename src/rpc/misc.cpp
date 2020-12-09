@@ -421,8 +421,8 @@ static UniValue createmultisig(const Config &config,
             "\nAs a json rpc call\n" +
             HelpExampleRpc("createmultisig",
                            "2, "
-                           "\"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\","
-                           "\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"");
+                           "[\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\","
+                           "\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\"]");
         throw std::runtime_error(msg);
     }
 

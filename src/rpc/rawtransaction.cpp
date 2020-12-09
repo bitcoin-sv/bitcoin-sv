@@ -523,11 +523,11 @@ static UniValue createrawtransaction(const Config &config,
                            "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\" "
                            "\"{\\\"data\\\":\\\"00010203\\\"}\"") +
             HelpExampleRpc("createrawtransaction",
-                           "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", "
-                           "\"{\\\"address\\\":0.01}\"") +
+                           "[{\"txid\":\"myid\",\"vout\":0}], "
+                           "{\"address\":0.01}") +
             HelpExampleRpc("createrawtransaction",
-                           "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", "
-                           "\"{\\\"data\\\":\\\"00010203\\\"}\""));
+                           "[{\"txid\":\"myid\",\"vout\":0}], "
+                           "{\"data\":\"00010203\"}"));
     }
 
     RPCTypeCheck(request.params,
@@ -1715,8 +1715,8 @@ static UniValue getmerkleproof(const Config& config,
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getmerkleproof", "\"mytxid\"") +
-            HelpExampleCli("getmerkleproof", "\"mytxid\" myblockhash") +
-            HelpExampleRpc("getmerkleproof", "\"mytxid\", myblockhash"));
+            HelpExampleCli("getmerkleproof", "\"mytxid\" \"myblockhash\"") +
+            HelpExampleRpc("getmerkleproof", "\"mytxid\", \"myblockhash\""));
     }
 
     TxId transactionId = TxId(ParseHashV(request.params[0], "hash"));
