@@ -1072,7 +1072,7 @@ static void SendBlock(
 
 static void SendUnseenTransactions(
     // requires: ascending ordered
-    const std::vector<std::pair<unsigned int, uint256>>& vOrderedUnseenTransactions,
+    const std::vector<std::pair<size_t, uint256>>& vOrderedUnseenTransactions,
     CConnman& connman,
     const CNodePtr& pfrom,
     const CNetMsgMaker msgMaker,

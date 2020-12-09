@@ -160,7 +160,7 @@ public:
     class CNotAllExpectedTransactionsFound : public std::exception {};
 
     /** Public only for unit testing and relay testing (not relayed) */
-    std::vector<std::pair<unsigned int, uint256>> vMatchedTxn;
+    std::vector<std::pair<size_t, uint256>> vMatchedTxn;
 
     /**
      * Create from a CBlock, filtering transactions according to filter. Note

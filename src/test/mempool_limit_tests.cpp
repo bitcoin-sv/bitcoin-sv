@@ -58,7 +58,7 @@ namespace {
         size_t count() const { return entries.size(); }
         // number of bytes consumed by transactions of entries
         size_t size() const {
-            return std::accumulate(entries.begin(), entries.end(), 0,
+            return std::accumulate(entries.begin(), entries.end(), static_cast<size_t>(0),
                                    [](size_t size, const Entry& entry) {
                 return size + entry.size;
                 });

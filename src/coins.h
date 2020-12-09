@@ -67,7 +67,7 @@ public:
     CoinImpl(Amount amount, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
         : storage{CTxOut{amount, {}}}
         , out{&storage.value()}
-        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | IsCoinbase}
+        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | (IsCoinbase ? 1u : 0u)}
         , mScriptSize{scriptSize}
     {}
 
@@ -155,14 +155,14 @@ protected:
     CoinImpl(CTxOut&& outIn, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
         : storage{std::move(outIn)}
         , out{&storage.value()}
-        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | IsCoinbase}
+        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | (IsCoinbase ? 1u : 0u)}
         , mScriptSize{scriptSize}
     {}
 
 private:
     CoinImpl(const CTxOut& outIn, uint64_t scriptSize, int32_t nHeightIn, bool IsCoinbase)
         : out{&outIn}
-        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | IsCoinbase}
+        , nHeightAndIsCoinBase{(static_cast<uint32_t>(nHeightIn) << 1) | (IsCoinbase ? 1u : 0u)}
         , mScriptSize{scriptSize}
     {}
 
@@ -197,7 +197,7 @@ public:
 
     explicit Coin(const CoinImpl& coin)
         : mAmount{coin.GetTxOut().nValue}
-        , nHeightAndIsCoinBase((static_cast<uint32_t>(coin.GetHeight()) << 1) | coin.IsCoinBase())
+        , nHeightAndIsCoinBase((static_cast<uint32_t>(coin.GetHeight()) << 1) | (coin.IsCoinBase()? 1u : 0u))
         , mScriptSize{coin.GetScriptSize()}
     {}
 
