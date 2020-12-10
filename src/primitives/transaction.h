@@ -7,9 +7,11 @@
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
 
 #include "amount.h"
+#include "hash.h"
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
+#include <optional>
 
 struct TxId;
 /**
@@ -25,8 +27,10 @@ namespace std
  * differentiated for type safety.
  */
 struct TxId : public uint256 {
-    TxId() {}
-    explicit TxId(const uint256 &b) : uint256(b) {}
+    TxId() = default;
+    explicit TxId(const uint256 &b) : uint256{b} {}
+    TxId(const TxId& b) = default;
+    TxId& operator=(const TxId& b) = default;
 };
 
 /**
@@ -76,6 +80,33 @@ public:
     }
 
     std::string ToString() const;
+};
+
+/**
+ * Hasher objects for std::unordered_set and similar hash-based containers.
+ */
+class StaticHasherSalt
+{
+protected:
+    static const uint64_t k0, k1;
+};
+
+class SaltedTxidHasher : private StaticHasherSalt
+{
+  public:
+    size_t operator()(const uint256& txid) const
+    {
+        return SipHashUint256(k0, k1, txid);
+    }
+};
+
+class SaltedOutpointHasher : private StaticHasherSalt
+{
+  public:
+    size_t operator()(const COutPoint& outpoint) const
+    {
+        return SipHashUint256Extra(k0, k1, outpoint.GetTxId(), outpoint.GetN());
+    }
 };
 
 /**
@@ -312,14 +343,6 @@ public:
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
-    // Compute priority, given priority of inputs and (optionally) tx size
-    double ComputePriority(double dPriorityInputs,
-                           unsigned int nTxSize = 0) const;
-
-    // Compute modified tx size for priority calculation (optionally given tx
-    // size)
-    unsigned int CalculateModifiedSize(unsigned int nTxSize = 0) const;
-
     /**
      * Get the total transaction size in bytes.
      * @return Total transaction size in bytes
@@ -382,6 +405,7 @@ public:
         return a.GetId() == b.GetId();
     }
 };
+
 
 typedef std::shared_ptr<const CTransaction> CTransactionRef;
 static inline CTransactionRef MakeTransactionRef() {

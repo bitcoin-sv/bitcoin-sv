@@ -7,7 +7,7 @@
 #include "consensus/validation.h"
 #include "key.h"
 #include "keystore.h"
-#include "mining/legacy.h"
+#include "mining/assembler.h"
 #include "pubkey.h"
 #include "random.h"
 #include "script/scriptcache.h"
@@ -37,8 +37,8 @@ namespace {
                     MakeTransactionRef(tx),   // a pointer to the tx
                     TxSource::rpc,            // tx source
                     TxValidationPriority::normal,   // tx validation priority
-                    GetTime(),                // nAcceptTime
-                    false)                    // fLimitFree
+                    TxStorage::memory,        // tx storage
+                    GetTime())                // nAcceptTime
             };
             // Mempool Journal ChangeSet
             mining::CJournalChangeSetPtr changeSet {nullptr};

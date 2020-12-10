@@ -27,7 +27,7 @@ class CTxnSendingDetails
         if(mForcedTx)
             return mForcedTx;
         else
-            return mTxInfo.tx;
+            return mTxInfo.GetTx();
     }
 
   private:

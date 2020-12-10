@@ -448,7 +448,7 @@ public:
     /** Get a handle to the TxIdTracker */
     const TxIdTrackerSPtr& GetTxIdTracker();
     /** Get a handle to our transaction validator */
-    std::shared_ptr<CTxnValidator> getTxnValidator();
+    const std::shared_ptr<CTxnValidator>& getTxnValidator();
     /** Get a handle to invalid tx publisher*/
     CInvalidTxnPublisher& getInvalidTxnPublisher();
     /** Enqueue a new transaction for validation */

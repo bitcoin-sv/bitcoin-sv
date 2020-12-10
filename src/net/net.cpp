@@ -3108,7 +3108,7 @@ const TxIdTrackerSPtr& CConnman::GetTxIdTracker() {
     return mTxIdTracker;
 }
 
-std::shared_ptr<CTxnValidator> CConnman::getTxnValidator() {
+const std::shared_ptr<CTxnValidator>& CConnman::getTxnValidator() {
 	return mTxnValidator;
 }
 

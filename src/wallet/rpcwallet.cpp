@@ -126,7 +126,7 @@ void WalletTxToJSON(const CWalletTx &wtx, UniValue &entry) {
     entry.push_back(Pair("time", wtx.GetTxTime()));
     entry.push_back(Pair("timereceived", (int64_t)wtx.nTimeReceived));
 
-    for (const auto &item : wtx.mapValue) {
+    for (const auto& item : wtx.mapValue) {
         entry.push_back(Pair(item.first, item.second));
     }
 }
@@ -832,7 +832,8 @@ static UniValue getreceivedbyaccount(const Config &config,
 
     // Tally
     Amount nAmount(0);
-    for (const auto &[hash_dummy, wtx] : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
+        const CWalletTx &wtx = pairWtx.second;
         CValidationState state;
         if (wtx.IsCoinBase() ||
             !ContextualCheckTransactionForCurrentBlock(
@@ -1409,7 +1410,9 @@ static UniValue ListReceived(
 
     // Tally
     std::map<CTxDestination, tallyitem> mapTally;
-    for (const auto &[hash_dumm, wtx] : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
+        const CWalletTx &wtx = pairWtx.second;
+
         CValidationState state;
         if (wtx.IsCoinBase() ||
             !ContextualCheckTransactionForCurrentBlock(
@@ -1977,7 +1980,8 @@ static UniValue listaccounts(const Config &config,
         }
     }
 
-    for (const auto &[hash_dummy, wtx] : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
+        const CWalletTx &wtx = pairWtx.second;
         Amount nFee;
         std::string strSentAccount;
         std::list<COutputEntry> listReceived;
@@ -2142,9 +2146,11 @@ static UniValue listsinceblock(const Config &config,
 
     UniValue transactions(UniValue::VARR);
 
-    for (const auto &[dummy_hash, wtx] : pwallet->mapWallet) {
-        if (depth == -1 || wtx.GetDepthInMainChain() < depth) {
-            ListTransactions(pwallet, wtx, "*", 0, true, transactions, filter);
+    for (const auto& pairWtx : pwallet->mapWallet) {
+        CWalletTx tx = pairWtx.second;
+
+        if (depth == -1 || tx.GetDepthInMainChain() < depth) {
+            ListTransactions(pwallet, tx, "*", 0, true, transactions, filter);
         }
     }
 

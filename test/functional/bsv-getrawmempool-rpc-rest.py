@@ -47,15 +47,6 @@ class GetRawMempoolTest(BitcoinTestFramework):
         assert 'time' in mempoolEntry
         assert 'height' in mempoolEntry
         assert_equal(self.nodes[0].getblock(self.nodes[0].getbestblockhash())['height'], mempoolEntry['height'])
-
-        assert 'startingpriority' in mempoolEntry
-        assert 'currentpriority' in mempoolEntry
-        assert 'descendantcount' in mempoolEntry
-        assert 'descendantsize' in mempoolEntry
-        assert 'descendantfees' in mempoolEntry
-        assert 'ancestorcount' in mempoolEntry
-        assert 'ancestorsize' in mempoolEntry
-        assert 'ancestorfees' in mempoolEntry
         assert 'depends' in mempoolEntry
 
     def check_getRawMempool(self, mempool, transactions):
@@ -107,7 +98,6 @@ class GetRawMempoolTest(BitcoinTestFramework):
             mempool = self.nodes[0].getrawmempool(True)
             self.check_getRawMempool(mempool, transactions + [largeTx])
             assert_equal(mempool[transactions[0].hash]["depends"], [])
-            assert_equal(mempool[transactions[0].hash]["descendantsize"] > txSize, True)
             assert_equal(mempool[largeTx.hash]["depends"], [tx.hash for tx in transactions])
             assert_equal(mempool[largeTx.hash]["size"] > txSize, True)
 
@@ -117,7 +107,6 @@ class GetRawMempoolTest(BitcoinTestFramework):
             json_obj = json.loads(json_string)
             self.check_getRawMempool(json_obj, transactions + [largeTx])
             assert_equal(mempool[transactions[0].hash]["depends"], [])
-            assert_equal(mempool[transactions[0].hash]["descendantsize"] > txSize, True)
             assert_equal(mempool[largeTx.hash]["depends"], [tx.hash for tx in transactions])
             assert_equal(mempool[largeTx.hash]["size"] > txSize, True)
 

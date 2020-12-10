@@ -54,6 +54,7 @@ BITCOIN_TESTS =\
   test/compress_tests.cpp \
   test/config_tests.cpp \
   test/core_io_tests.cpp \
+  test/cpfp_tests.cpp \
   test/crypto_tests.cpp \
   test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
@@ -61,6 +62,7 @@ BITCOIN_TESTS =\
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
   test/enum_cast_tests.cpp \
+  test/eviction_candidates_tracker_tests.cpp \
   test/excessiveblock_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
@@ -78,8 +80,10 @@ BITCOIN_TESTS =\
   test/locked_ref_tests.cpp \
   test/m_candidates_tests.cpp \
   test/main_tests.cpp \
+  test/mempool_dump_load_tests.cpp \
   test/mempool_snapshot_tests.cpp \
   test/mempool_tests.cpp \
+  test/mempooltxdb_tests.cpp \
   test/merkle_tests.cpp \
   test/merkletreefile_readwrite_tests.cpp \
   test/miner_tests.cpp \

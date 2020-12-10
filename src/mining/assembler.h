@@ -24,7 +24,6 @@ public:
     CBlockRef GetBlockRef() const { return mBlock; }
 
     std::vector<Amount> vTxFees;
-    std::vector<int64_t> vTxSigOpsCount;
 };
 
 
@@ -48,8 +47,8 @@ public:
 
     struct BlockStats
     {
-        uint64_t txCount;    // TxCount excluding the coinbase transaction
-        uint64_t blockSize;  // Block size, including the coinbase transaction
+        uint64_t txCount{0};    // TxCount excluding the coinbase transaction
+        uint64_t blockSize{0};  // Block size, including the coinbase transaction
     };
 
     /** Get the stats of the last block produced with CreateNewBlock() */
@@ -59,16 +58,17 @@ protected:
     uint64_t ComputeMaxGeneratedBlockSize(const CBlockIndex* pindexPrev) const;
 
     // Fill in header fields for a new block template
-    void FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex, const CScript& scriptPubKeyIn) const;
+    void FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex, const CScript& scriptPubKeyIn, const Amount& blockFees) const;
 
     // Keep reference to the global config
     const Config& mConfig;
-
-    // Block accounting
-    Amount mBlockFees {0};
 };
 
 using BlockAssemblerRef = std::shared_ptr<BlockAssembler>;
+
+int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
+                   const CBlockIndex *pindexPrev);
+
 
 }
 

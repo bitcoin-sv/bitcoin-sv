@@ -22,7 +22,6 @@
 #include "invalid_txn_publisher.h"
 #include "key.h"
 #include "mining/journaling_block_assembler.h"
-#include "mining/legacy.h"
 #include "net/net.h"
 #include "net/net_processing.h"
 #include "net/netbase.h"
@@ -75,6 +74,7 @@ static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_REST_ENABLE = false;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
+static const bool DEFAULT_PRINTPRIORITY = false;
 
 std::unique_ptr<CConnman> g_connman;
 std::unique_ptr<PeerLogicValidation> peerLogic;
@@ -193,7 +193,7 @@ void Shutdown() {
     UnregisterNodeSignals(GetNodeSignals());
     if (fDumpMempoolLater &&
         gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
-        DumpMempool();
+        mempool.DumpMempool();
     }
 
     {
@@ -361,9 +361,22 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         _("Imports blocks from external blk000??.dat file on startup"));
 
     strUsage += HelpMessageOpt("-maxmempool=<n>",
-                               strprintf(_("Keep the transaction memory pool "
-                                           "below <n> megabytes (default: %u%s,  must be at least %d). The value may be given in megabytes or with unit (B, kB, MB, GB)."),
-                                         DEFAULT_MAX_MEMPOOL_SIZE, showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "", std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
+                   strprintf(_("Keep the resident size of the transaction memory pool below <n> megabytes "
+                               "(default: %u%s,  must be at least %d). "
+                               "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+                             DEFAULT_MAX_MEMPOOL_SIZE,
+                             showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "",
+                             std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
+    strUsage += HelpMessageOpt("-maxmempoolsizedisk=<n>",
+                               strprintf(_("Additional amount of mempool transactions to keep stored on disk "
+                                           "below <n> megabytes (default: -maxmempool x %u). Actual disk usage will "
+                                           "be larger due to leveldb compaction strategy."
+                                           "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+                                         DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR));
+    strUsage += HelpMessageOpt("-mempoolmaxpercentcpfp=<n>",
+                               strprintf(_("Percentage of total mempool size (ram+disk) to allow for "
+                                           "low paying transactions (0..100) (default: %u)"),
+                                         DEFAULT_MEMPOOL_MAX_PERCENT_CPFP));
     strUsage +=
         HelpMessageOpt("-mempoolexpiry=<n>",
                        strprintf(_("Do not keep transactions in the mempool "
@@ -771,23 +784,11 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             strprintf("Do not accept transactions if number of in-mempool "
                       "ancestors is <n> or more (default: %u)",
                       DEFAULT_ANCESTOR_LIMIT));
-        strUsage +=
-            HelpMessageOpt("-limitancestorsize=<n>",
-                           strprintf("Do not accept transactions whose size "
-                                     "with all in-mempool ancestors exceeds "
-                                     "<n> kilobytes (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                                     DEFAULT_ANCESTOR_SIZE_LIMIT));
         strUsage += HelpMessageOpt(
-            "-limitdescendantcount=<n>",
-            strprintf("Do not accept transactions if any ancestor would have "
-                      "<n> or more in-mempool descendants (default: %u)",
-                      DEFAULT_DESCENDANT_LIMIT));
-        strUsage += HelpMessageOpt(
-            "-limitdescendantsize=<n>",
-            strprintf("Do not accept transactions if any ancestor would have "
-                      "more than <n> kilobytes of in-mempool descendants "
-                      "(default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                      DEFAULT_DESCENDANT_SIZE_LIMIT));
+            "-limitcpfpgroupmemberscount=<n>",
+            strprintf("Do not accept transactions if number of in-mempool transactions"
+                      "which we are not willing to mine due to a low fee is <n> or more (default: %u)",
+                      DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
     strUsage += HelpMessageOpt(
         "-debug=<category>",
@@ -834,16 +835,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "-blocksizeactivationtime=<n>",
             "Change time that specifies when new defaults for -blockmaxsize are used");
         strUsage += HelpMessageOpt(
-            "-limitfreerelay=<n>",
-            strprintf("Continuously rate-limit free transactions to <n> "
-                      "kilobytes per minute (default: %u). The value may be given in kilobytes or with unit (B, kB, MB, GB).",
-                      DEFAULT_LIMITFREERELAY));
-        strUsage +=
-            HelpMessageOpt("-relaypriority",
-                           strprintf("Require high priority for relaying free "
-                                     "or low-fee transactions (default: %d)",
-                                     DEFAULT_RELAYPRIORITY));
-        strUsage += HelpMessageOpt(
             "-maxsigcachesize=<n>",
             strprintf("Limit size of signature cache to <n> MiB (default: %u). The value may be given in megabytes or with unit (B, KiB, MiB, GiB).",
                       DEFAULT_MAX_SIG_CACHE_SIZE));
@@ -876,12 +867,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
     strUsage += HelpMessageOpt(
         "-printtoconsole",
         _("Send trace/debug info to console instead of bitcoind.log file"));
-    if (showDebug) {
-        strUsage += HelpMessageOpt(
-            "-printpriority", strprintf("Log transaction priority and fee per "
-                                        "kB when mining blocks (default: %d)",
-                                        DEFAULT_PRINTPRIORITY));
-    }
     strUsage += HelpMessageOpt("-shrinkdebugfile",
                                _("Shrink bitcoind.log file on client startup "
                                  "(default: 1 when no -debug)"));
@@ -1026,12 +1011,6 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                     testnetChainParams->GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter / ONE_MEGABYTE
                     ));
     strUsage += HelpMessageOpt(
-        "-blockprioritypercentage=<n>",
-        strprintf(_("Set maximum percentage of a block reserved to "
-                    "high-priority/low-fee transactions (default: %d). NOTE: This is supported only by the legacy block assembler which"
-                    " is not default block assembler any more and will be removed in the upcoming release."),
-                  DEFAULT_BLOCK_PRIORITY_PERCENTAGE));
-    strUsage += HelpMessageOpt(
         "-blockmintxfee=<amt>",
         strprintf(_("Set lowest fee rate (in %s/kB) for transactions to be "
                     "included in block creation. (default: %s)"),
@@ -1057,13 +1036,17 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             HelpMessageOpt("-blockcandidatevaliditytest",
                            strprintf(_("Perform validity test on block candidates. Defaults: "
                            "Mainnet: %d, Testnet: %d"), defaultChainParams->TestBlockCandidateValidity(), testnetChainParams->TestBlockCandidateValidity()));
+        strUsage +=
+            HelpMessageOpt("-disablebip30checks",
+                           "Disable BIP30 checks when connecting a block. "
+                           "This flag can not be set on the mainnet.");
     }
 
     /** Block assembler */
     strUsage += HelpMessageOpt(
         "-blockassembler=<type>",
         strprintf(_("Set the type of block assembler to use for mining. Supported options are "
-                    "LEGACY or JOURNALING. (default: %s)"),
+                    "JOURNALING. (default: %s)"),
                   enum_cast<std::string>(mining::DEFAULT_BLOCK_ASSEMBLER_TYPE).c_str()));
     strUsage += HelpMessageOpt(
         "-jbamaxtxnbatch=<max batch size>",
@@ -1433,7 +1416,8 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         }
     } // End scope of CImportingNow
     if (gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
-        LoadMempool(config, shutdownToken);
+        mempool.LoadMempool(config, shutdownToken);
+        mempool.ResumeSanityCheck();
         fDumpMempoolLater = !shutdownToken.IsCanceled();
     }
 }
@@ -1679,14 +1663,6 @@ bool AppInitParameterInteraction(Config &config) {
             return InitError(_("Prune mode is incompatible with -txindex."));
     }
 
-    // if space reserved for high priority transactions is misconfigured
-    // stop program execution and warn the user with a proper error message
-    const int64_t blkprio = gArgs.GetArg("-blockprioritypercentage",
-                                         DEFAULT_BLOCK_PRIORITY_PERCENTAGE);
-    if (std::string err; !config.SetBlockPriorityPercentage(blkprio, &err)) {
-        return InitError(err);
-    }
-
     // Make sure enough file descriptors are available
     int nBind = std::max(
         (gArgs.IsArgSet("-bind") ? gArgs.GetArgs("-bind").size() : 0) +
@@ -1822,6 +1798,19 @@ bool AppInitParameterInteraction(Config &config) {
     {
         return InitError(err);
     }
+    const auto defaultMaxMempoolSizeDisk = int64_t(
+        std::ceil(1.0 * config.GetMaxMempool() * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR
+                  / ONE_MEGABYTE));
+    if (std::string err; !config.SetMaxMempoolSizeDisk(
+        gArgs.GetArgAsBytes("-maxmempoolsizedisk", defaultMaxMempoolSizeDisk, ONE_MEGABYTE), &err))
+    {
+        return InitError(err);
+    }
+    if (std::string err; !config.SetMempoolMaxPercentCPFP(
+        gArgs.GetArg("-mempoolmaxpercentcpfp", DEFAULT_MEMPOOL_MAX_PERCENT_CPFP), &err))
+    {
+        return InitError(err);
+    }
 
     // script validation settings
     if(std::string error; !config.SetBlockScriptValidatorsParams(
@@ -1846,14 +1835,6 @@ bool AppInitParameterInteraction(Config &config) {
     {
         return InitError(err);
     }
-
-    // Configure free transactions limit
-    if (std::string err; !config.SetLimitFreeRelay(
-        gArgs.GetArgAsBytes("-limitfreerelay", DEFAULT_LIMITFREERELAY, ONE_KILOBYTE), &err))
-    {
-        return InitError(err);
-    }
-
     // Configure max orphant Tx size
     if (std::string err; !config.SetMaxOrphanTxSize(
         gArgs.GetArgAsBytes("-maxorphantxsize",
@@ -1920,6 +1901,15 @@ bool AppInitParameterInteraction(Config &config) {
     config.SetTestBlockCandidateValidity(
         gArgs.GetBoolArg("-blockcandidatevaliditytest", chainparams.TestBlockCandidateValidity()));
 
+    // Configure whether to performe BIP30 checks
+    if(gArgs.IsArgSet("-disablebip30checks"))
+    {
+        bool doDisable = gArgs.GetBoolArg("-disablebip30checks", chainparams.DisableBIP30Checks());
+        if (std::string err; !config.SetDisableBIP30Checks(doDisable)){
+            return InitError(err);
+        }
+    }
+
     // Configure mining block assembler
     if(gArgs.IsArgSet("-blockassembler")) {
         std::string assemblerStr { boost::to_upper_copy<std::string>(gArgs.GetArg("-blockassembler", "")) };
@@ -1934,14 +1924,14 @@ bool AppInitParameterInteraction(Config &config) {
         config.SetDataCarrierSize(gArgs.GetArgAsBytes("-datacarriersize", DEFAULT_DATA_CARRIER_SIZE));
     }
 
-    // Configure descendant limit count.
-    if(gArgs.IsArgSet("-limitdescendantcount")) {
-        config.SetLimitDescendantCount(gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
-    }
-
     // Configure ancestor limit count.
     if(gArgs.IsArgSet("-limitancestorcount")) {
         config.SetLimitAncestorCount(gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT));
+    }
+    
+    // Configure ancestor limit count.
+    if(gArgs.IsArgSet("-limitcpfpgroupmemberscount")) {
+        config.SetLimitSecondaryMempoolAncestorCount(gArgs.GetArg("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
 
     // configure max transaction size policy
@@ -1998,17 +1988,6 @@ bool AppInitParameterInteraction(Config &config) {
             return InitError(err);
         }
     }
-
-    // Configure descendant limit size.
-    if(gArgs.IsArgSet("-limitdescendantsize")) {
-        config.SetLimitDescendantSize(gArgs.GetArgAsBytes("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT, ONE_KILOBYTE));
-    }
-
-    // Configure ancestor limit size.
-    if(gArgs.IsArgSet("-limitancestorsize")) {
-        config.SetLimitAncestorSize(gArgs.GetArgAsBytes("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT, ONE_KILOBYTE));
-    }
-
     // Configure genesis activation height.
     int32_t genesisActivationHeight = static_cast<int32_t>(gArgs.GetArg("-genesisactivationheight", chainparams.GetConsensus().genesisHeight));
     if (std::string err; !config.SetGenesisActivationHeight(genesisActivationHeight, &err)) {
@@ -2185,7 +2164,7 @@ bool AppInitParameterInteraction(Config &config) {
     if (gArgs.IsArgSet("-minrelaytxfee")) {
         Amount n(0);
         auto parsed = ParseMoney(gArgs.GetArg("-minrelaytxfee", ""), n);
-        if (!parsed || Amount(0) == n)
+        if (!parsed)
             return InitError(AmountErrMsg("minrelaytxfee",
                                           gArgs.GetArg("-minrelaytxfee", "")));
         // High fee check is done afterward in CWallet::ParameterInteraction()
@@ -2543,7 +2522,12 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     InitScriptCheckQueues(config, threadGroup);
 
     // Late configuration for globaly constructed objects
+    mempool.SuspendSanityCheck();
     mempool.getNonFinalPool().loadConfig();
+    mempool.InitMempoolTxDB();
+    if (!gArgs.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
+        mempool.ResumeSanityCheck();
+    }
 
     // Start the lightweight task scheduler thread
     scheduler.startServiceThread(threadGroup);
@@ -2792,7 +2776,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     nTotalCache -= nMerkleTreeIndexDBCache;
     // the rest goes to in-memory cache
     nCoinCacheUsage = nTotalCache;
-    int64_t nMempoolSizeMax = config.GetMaxMempool();
+    MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n",
               nBlockTreeDBCache * (1.0 / ONE_MEBIBYTE));
@@ -2801,9 +2785,10 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     LogPrintf("* Using %.1fMiB for chain state database\n",
               nCoinDBCache * (1.0 / ONE_MEBIBYTE));
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of "
-              "unused mempool space)\n",
-              nCoinCacheUsage * (1.0 / ONE_MEBIBYTE),
-              nMempoolSizeMax * (1.0 / ONE_MEBIBYTE));
+              "unused mempool space and %.1fMiB of disk space)\n",
+              nCoinCacheUsage * (1.0 / 1024 / 1024),
+              limits.Memory() * (1.0 / 1024 / 1024),
+              limits.Disk() * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
     while (!fLoaded && !shutdownToken.IsCanceled()) {

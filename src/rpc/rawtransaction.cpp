@@ -269,12 +269,12 @@ static CBlockIndex* GetBlockIndex(const Config& config,
 
         if (verifyTxIds)
         {
-            // Check if all provided transactions are in the block 
+            // Check if all provided transactions are in the block
             CBlock block;
             bool allTxIdsFound = false;
             if (ReadBlockFromDisk(block, pblockindex, config))
             {
-                int numberOfTxIdsFound = 0;
+                auto numberOfTxIdsFound = decltype(setTxIds.size()){0};
                 for (const auto &tx : block.vtx)
                 {
                     if (setTxIds.find(tx->GetId()) != setTxIds.end())
@@ -1250,8 +1250,8 @@ static UniValue sendrawtransaction(const Config &config,
             std::move(tx),                  // a pointer to the tx
             TxSource::rpc,                  // tx source
             TxValidationPriority::normal,   // tx validation priority
+            TxStorage::memory,              // tx storage
             GetTime(),                      // nAcceptTime
-            false,                          // fLimitFree
             nMaxRawTxFee);                 // nAbsurdFee
     // Check if transaction is already received through p2p interface,
     // and thus, couldn't be added to the TxIdTracker.
@@ -1320,7 +1320,7 @@ static UniValue sendrawtransaction(const Config &config,
     // - block was mined
     // - the Validator's asynch mode removed the txn (and triggered reject msg)
     // - this txn is final version of timelocked txn and is still being validated
-    if (txinfo.tx != nullptr){
+    if (!txinfo.IsNull()){
         g_connman->EnqueueTransaction({ inv, txinfo });
     }
 
@@ -1560,8 +1560,8 @@ void sendrawtransactions(const Config &config, const JSONRPCRequest &request,
                 std::move(tx),                  // a pointer to the tx
                 TxSource::rpc,                  // tx source
                 TxValidationPriority::normal,   // tx validation priority
-                GetTime(),                      // nAcceptTime
-                false,                          // fLimitFree
+                TxStorage::memory,              // tx storage
+                GetTime(),                      // fLimitFree
                 nMaxRawTxFee);                 // nAbsurdFee
         // Check if transaction is already known
         // - received through p2p interface or present in the mempools
@@ -1621,7 +1621,7 @@ void sendrawtransactions(const Config &config, const JSONRPCRequest &request,
             // It is possible that txn was added and removed from the mempool, because:
             // - a block was mined
             // - PTV's asynch mode removed txn(s)
-            if (txinfo.tx != nullptr){
+            if (txinfo.GetTx() != nullptr){
                 g_connman->EnqueueTransaction({ inv, txinfo });
             }
             LogPrint(BCLog::TXNSRC, "got txn rpc: %s txnsrc user=%s\n",

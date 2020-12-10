@@ -25,6 +25,7 @@ class StallingTest(ComparisonTestFramework):
             '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
             '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
             '-maxmempool=%d' % (ONE_GIGABYTE * 10),
+            '-maxmempoolsizedisk=0',
             '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
             '-maxscriptsizepolicy=0',
             '-rpcservertimeout=1000',

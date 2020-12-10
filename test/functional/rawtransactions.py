@@ -13,9 +13,11 @@
 #    - decoderawtransaction
 #    - getrawtransaction
 """
+from decimal import Decimal
 
+from test_framework.cdefs import ONE_KILOBYTE
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.mininode import CTransaction
+from test_framework.mininode import CTransaction, COIN
 from test_framework.util import *
 
 from io import BytesIO
@@ -27,7 +29,9 @@ class RawTransactionsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 4
-        self.extra_args = [[],[],[],['-maxmempool=300']]
+        self.relayfee = Decimal(1) * ONE_KILOBYTE / COIN
+        self.extra_args = [[],[],[],['-maxmempool=300', '-maxmempoolsizedisk=0', f"-blockmintxfee={self.relayfee}"
+                                     , f"-minrelaytxfee={self.relayfee}"]]
 
     def setup_network(self, split=False):
         super().setup_network()

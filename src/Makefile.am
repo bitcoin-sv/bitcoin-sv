@@ -119,6 +119,7 @@ BITCOIN_CORE_H = \
   locked_ref.h \
   logging.h \
   memusage.h \
+  mempooltxdb.h \
   merkleblock.h \
   merkletreedb.h \
   merkletreestore.h \
@@ -130,7 +131,6 @@ BITCOIN_CORE_H = \
   mining/journal_change_set.h \
   mining/journal_entry.h \
   mining/journaling_block_assembler.h \
-  mining/legacy.h \
   net/association.h \
   net/association_id.h \
   net/net.h \
@@ -196,6 +196,7 @@ BITCOIN_CORE_H = \
   torcontrol.h \
   txdb.h \
   txmempool.h \
+  txmempoolevictioncandidates.h \
   tx_mempool_info.h \
   txn_double_spend_detector.h \
   txn_handlers.h \
@@ -258,6 +259,7 @@ libbitcoin_server_a_SOURCES = \
   invalid_txn_sinks/file_sink.cpp \
   invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
+  mempooltxdb.cpp \
   merkleblock.cpp \
   merkletreedb.cpp \
   merkletreestore.cpp \
@@ -267,8 +269,8 @@ libbitcoin_server_a_SOURCES = \
   mining/journal.cpp \
   mining/journal_builder.cpp \
   mining/journal_change_set.cpp \
+  mining/journal_entry.cpp \
   mining/journaling_block_assembler.cpp \
-  mining/legacy.cpp \
   net/association.cpp \
   net/association_id.cpp \
   net/net.cpp \
@@ -299,6 +301,7 @@ libbitcoin_server_a_SOURCES = \
   torcontrol.cpp \
   txdb.cpp \
   txmempool.cpp \
+  txmempoolevictioncandidates.cpp \
   tx_mempool_info.cpp \
   txn_double_spend_detector.cpp \
   txn_propagator.cpp \

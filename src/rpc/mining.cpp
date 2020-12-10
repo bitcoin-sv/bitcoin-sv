@@ -8,6 +8,8 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "config.h"
+#include "consensus/consensus.h"
+#include "consensus/merkle.h"
 #include "consensus/params.h"
 #include "consensus/validation.h"
 #include "mining/factory.h"
@@ -20,6 +22,8 @@
 #include "pow.h"
 #include "rpc/blockchain.h"
 #include "rpc/server.h"
+#include "script/script_num.h"
+#include "txmempool.h"
 #include "util.h"
 #include "utilstrencodings.h"
 #include "validation.h"
@@ -31,6 +35,29 @@
 #include <memory>
 
 using mining::CBlockTemplate;
+
+void IncrementExtraNonce(CBlock *pblock,
+                         const CBlockIndex *pindexPrev,
+                         unsigned int &nExtraNonce) {
+    // Update nExtraNonce
+    static uint256 hashPrevBlock;
+    if (hashPrevBlock != pblock->hashPrevBlock) {
+        nExtraNonce = 0;
+        hashPrevBlock = pblock->hashPrevBlock;
+    }
+    ++nExtraNonce;
+    // Height first in coinbase required for block.version=2
+    unsigned int nHeight = pindexPrev->nHeight + 1;
+    CMutableTransaction txCoinbase(*pblock->vtx[0]);
+    txCoinbase.vin[0].scriptSig =
+        (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
+    assert(txCoinbase.vin[0].scriptSig.size() <= MAX_COINBASE_SCRIPTSIG_SIZE);
+
+    pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+    pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+}
+
+
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
@@ -267,10 +294,6 @@ static UniValue getmininginfo(const Config &config,
     obj.push_back(Pair("currentblocksize", uint64_t(stats.blockSize)));
     obj.push_back(Pair("currentblocktx", uint64_t(stats.txCount)));
     obj.push_back(Pair("difficulty", double(GetDifficulty(chainActive.Tip()))));
-    obj.push_back(
-        Pair("blockprioritypercentage",
-             uint8_t(gArgs.GetArg("-blockprioritypercentage",
-                                  DEFAULT_BLOCK_PRIORITY_PERCENTAGE))));
     obj.push_back(Pair("errors", GetWarnings("statusbar")));
     obj.push_back(Pair("networkhashps", getnetworkhashps(config, request)));
     obj.push_back(Pair("pooledtx", uint64_t(mempool.Size())));
@@ -289,12 +312,7 @@ static UniValue prioritisetransaction(const Config &config,
             "priority\n"
             "\nArguments:\n"
             "1. \"txid\"       (string, required) The transaction id.\n"
-            "2. priority_delta (numeric, required) The priority to add or "
-            "subtract.\n"
-            "                  The transaction selection algorithm considers "
-            "the tx as it would have a higher priority.\n"
-            "                  (priority of a transaction is calculated: "
-            "coinage * value_in_satoshis / txsize) \n"
+            "2. dummy (numeric, required) Unused, must be set to zero.\n"
             "3. fee_delta      (numeric, required) The fee value (in satoshis) "
             "to add (or subtract, if negative).\n"
             "                  The fee is not actually paid, only the "
@@ -311,10 +329,13 @@ static UniValue prioritisetransaction(const Config &config,
     LOCK(cs_main);
 
     uint256 hash = ParseHashStr(request.params[0].get_str(), "txid");
+    if(request.params[1].get_real() != 0)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Dummy parameter must be set to zero.");
+    }
     Amount nAmount(request.params[2].get_int64());
 
-    mempool.PrioritiseTransaction(hash, request.params[0].get_str(),
-                                  request.params[1].get_real(), nAmount);
+    mempool.PrioritiseTransaction(hash, request.params[0].get_str(), nAmount);
     return true;
 }
 
@@ -408,10 +429,6 @@ void getblocktemplate(const Config& config,
             "collected block fees (ie, not including the block subsidy); if "
             "key is not present, fee is unknown and clients MUST NOT assume "
             "there isn't one\n"
-            "         \"sigops\" : n,                (numeric) total SigOps "
-            "cost, as counted for purposes of block limits; if key is not "
-            "present, sigop cost is unknown and clients MUST NOT assume it is "
-            "zero\n"
             "         \"required\" : true|false      (boolean) if provided and "
             "true, this transaction must be in the final block\n"
             "      }\n"
@@ -440,8 +457,6 @@ void getblocktemplate(const Config& config,
             "  ],\n"
             "  \"noncerange\" : \"00000000ffffffff\",(string) A range of valid "
             "nonces\n"
-            "  \"sigoplimit\" : n,                 (numeric) limit of sigops "
-            "in blocks\n"
             "  \"sizelimit\" : n,                  (numeric) limit of block "
             "size\n"
             "  \"curtime\" : ttt,                  (numeric) current timestamp "
@@ -654,7 +669,7 @@ void getblocktemplate(const Config& config,
     CBlock *pblock = blockRef.get();
 
     // Update nTime
-    UpdateTime(pblock, config, pindexPrev);
+    mining::UpdateTime(pblock, config, pindexPrev);
     pblock->nNonce = 0;
 
     // after start of writing chunks no exception must be thrown, otherwise JSON response will be invalid
@@ -713,8 +728,6 @@ void getblocktemplate(const Config& config,
 
             unsigned int index_in_template = i - 1;
             jWriter.pushKV("fee", pblocktemplate->vTxFees[index_in_template].GetSatoshis());
-            int64_t nTxSigOps = pblocktemplate->vTxSigOpsCount[index_in_template];
-            jWriter.pushKV("sigops", nTxSigOps);
 
             jWriter.writeEndObject();
         }
@@ -741,8 +754,6 @@ void getblocktemplate(const Config& config,
         jWriter.writeEndArray();
 
         jWriter.pushKV("noncerange", "00000000ffffffff");
-        // FIXME: Allow for mining block greater than 1M.
-        jWriter.pushKV("sigoplimit", INT64_MAX);
 
         int64_t defaultmaxBlockSize = config.GetChainParams().GetDefaultBlockSizeParams().maxGeneratedBlockSizeAfter;
         jWriter.pushKV("sizelimit", defaultmaxBlockSize);
