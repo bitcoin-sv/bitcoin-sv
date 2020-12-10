@@ -1560,7 +1560,8 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
     {
         // For a discussion of interactions between writing transactions
         // to disk and transaction wrappers, see the comment at
-        // CTransactionWrapper::GetTx() in tx_mempool_info.cpp
+        // CTransactionWrapper::GetTx() in tx_mempool_info.cpp and the 'add'
+        // lambda in CAsyncMempoolTxDB::Work() in mempooltxdb.cpp.
         std::vector<CTransactionWrapperRef> toBeMoved;
         std::shared_lock lock{smtx};
         for (auto mi = mapTx.get<entry_time>().begin();

@@ -14,6 +14,7 @@
 
 #include <boost/noncopyable.hpp>
 
+class CAsyncMempoolTxDB;
 class CTxMemPoolEntry;
 class CMempoolTxDBReader;
 
@@ -52,6 +53,10 @@ private:
     // Must be mutable so that accessors can be const.
     mutable std::mutex guard;
     mutable std::variant<OwnedPtr, WeakPtr> txref;
+
+    // Accessor for the CAsyncMempoolTxDB worker thread.
+    friend class CAsyncMempoolTxDB;
+    CTransactionRef GetInMemoryTx();
 };
 
 using CTransactionWrapperRef = std::shared_ptr<CTransactionWrapper>;

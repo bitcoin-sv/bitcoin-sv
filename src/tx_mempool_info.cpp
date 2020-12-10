@@ -33,8 +33,8 @@ const TxId& CTransactionWrapper::GetId() const noexcept
 // ================================================
 //
 // In current usage, ResetTransaction() is only called from the mempool's
-// asynchronous writer thread (see CAsyncMempoolTxDB) and GetTransaction() is
-// *never* called from that thread.
+// asynchronous writer thread (see CAsyncMempoolTxDB) and the mempool database
+// reader's GetTransaction() is *never* called from that thread.
 //
 // If the wrapper is constructed from a TxId (i.e., txref is initially an empty
 // weak pointer, IsInMemory() returns false):
@@ -81,6 +81,19 @@ CTransactionRef CTransactionWrapper::GetTx() const
             txref.emplace<WeakPtr>(ptr);
         }
         return ptr;
+    }
+}
+
+CTransactionRef CTransactionWrapper::GetInMemoryTx()
+{
+    std::unique_lock<std::mutex> lock{guard};
+    if (std::holds_alternative<OwnedPtr>(txref))
+    {
+        return std::get<OwnedPtr>(txref);
+    }
+    else
+    {
+        return nullptr;
     }
 }
 
