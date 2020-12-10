@@ -9,6 +9,11 @@
 #include "primitives/transaction.h"
 #include "txn_validation_data.h"
 
+#include <mutex>
+#include <variant>
+
+#include <boost/noncopyable.hpp>
+
 class CTxMemPoolEntry;
 class CMempoolTxDBReader;
 
@@ -18,16 +23,7 @@ class CMempoolTxDBReader;
  * bring it in memory as a transient copy for that user only. The wrapper will
  * not store the reference.
  */
-class CTransactionWrapper {
-private:
-    CTransactionRef tx;
-    // Transaction Id
-    TxId txid;
-    // Mempool Transaction database
-    std::shared_ptr<CMempoolTxDBReader> mempoolTxDB;
-
-    CTransactionRef GetTxFromDB() const;
-
+class CTransactionWrapper : boost::noncopyable {
 public:
     CTransactionWrapper(const CTransactionRef &tx,
                         const std::shared_ptr<CMempoolTxDBReader>& txDB);
@@ -43,7 +39,19 @@ public:
     }
     bool HasDatabase(const std::shared_ptr<CMempoolTxDBReader>& txDB) const noexcept;
 
-    void UpdateTxMovedToDisk();
+    void ResetTransaction();
+
+private:
+    const TxId txid;
+    const std::shared_ptr<CMempoolTxDBReader> mempoolTxDB;
+
+    // Documentation typedefs
+    using OwnedPtr = CTransactionRef;
+    using WeakPtr = CWeakTransactionRef;
+
+    // Must be mutable so that accessors can be const.
+    mutable std::mutex guard;
+    mutable std::variant<OwnedPtr, WeakPtr> txref;
 };
 
 using CTransactionWrapperRef = std::shared_ptr<CTransactionWrapper>;

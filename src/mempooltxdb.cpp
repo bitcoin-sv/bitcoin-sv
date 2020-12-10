@@ -541,7 +541,7 @@ void CAsyncMempoolTxDB::Work()
             {
                 batch.Add(wrapper->GetTx(),
                           [wrapper](const TxId&) {
-                              wrapper->UpdateTxMovedToDisk();
+                              wrapper->ResetTransaction();
                           });
             }
         }

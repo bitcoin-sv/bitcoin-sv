@@ -770,7 +770,7 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
         BOOST_CHECK_EQUAL(tx.use_count(), 3);
     }
 
-    auto moveToDisk = false; // set to false to test the test.
+    auto moveToDisk = true; // set to false to test the test.
 
     // force writeout of everything
     testPool.SaveTxsToDisk(moveToDisk * totalSize_entries);
@@ -850,7 +850,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
     for (const auto& entry : entries)
     {
         // Create a copy of the transaction wrapper because Add() marks them as saved.
-        wrappers.emplace_back(std::make_shared<CTransactionWrapper>(*CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(entry)).Wrapper()));
+        wrappers.emplace_back(std::make_shared<CTransactionWrapper>(entry.GetSharedTx(), nullptr));
     }
     testPoolAccess.mempoolTxDB()->Add(std::move(wrappers));
     testPoolAccess.SyncWithMempoolTxDB();
@@ -871,7 +871,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
         testPool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);
         auto it = testPoolAccess.mapTx().find(entry.GetTxId());
         BOOST_REQUIRE(it != testPoolAccess.mapTx().end());
-        CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()->UpdateTxMovedToDisk();
+        CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()->ResetTransaction();
         BOOST_CHECK(entry.IsInMemory());
         BOOST_CHECK(!it->IsInMemory());
     }
