@@ -753,14 +753,17 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
             "  \"maxorphantxsize\": xxxxx,               (numeric) The maximum size in bytes of "
             "unconnectable transactions in memory\n"
 
-            "  \"limitdescendantsize\": xxxxx,           (numeric) Size limit in bytes of in-mempool "
-            "descendant transaction\n"
-            "  \"limitdescendantcount\": xxxxx,          (numeric) The maximum number of "
-            "descendants some transaction could have in-mempool\n"
-            "  \"limitancestorsize\": xxxxx,             (numeric) Do not accept transactions "
-            "whose size with all in-mempool ancestors exceeds this size in bytes.\n"
             "  \"limitancestorcount\": xxxxx,            (numeric) Do not accept transactions "
             "if number of in-mempool ancestors is <n> or more.\n"
+            "  \"limitcpfpgroupmemberscount\": xxxxx,    (numeric) Do not accept transactions "
+            "if number of in-mempool low paying ancestors is <n> or more.\n"
+
+            "  \"maxmempool\": xxxxx,                    (numeric) Keep the resident size of "
+            "the transaction memory pool below <n> megabytes.\n"
+            "  \"maxmempoolsizedisk\": xxxxx,            (numeric) Additional amount of mempool "
+            "transactions to keep stored on disk below <n> megabytes.\n"
+            "  \"mempoolmaxpercentcpfp\": xxxxx,         (numeric) Percentage of total mempool "
+            "size (ram+disk) to allow for low paying transactions (0..100).\n"
 
             "  \"acceptnonstdoutputs\": xxxx,            (boolean) Relay and mine transactions "
             "that create or consume non-standard output\n"
@@ -805,10 +808,12 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(true)));
     obj.push_back(Pair("maxstackmemoryusagepolicy", config.GetMaxStackMemoryUsage(true, false)));
 
-    obj.push_back(Pair("limitdescendantsize", config.GetLimitDescendantSize()));
-    obj.push_back(Pair("limitdescendantcount", config.GetLimitDescendantCount()));
-    obj.push_back(Pair("limitancestorsize", config.GetLimitAncestorSize()));
     obj.push_back(Pair("limitancestorcount", config.GetLimitAncestorCount()));
+    obj.push_back(Pair("limitcpfpgroupmemberscount", config.GetLimitSecondaryMempoolAncestorCount()));
+
+    obj.push_back(Pair("maxmempool", config.GetMaxMempool()));
+    obj.push_back(Pair("maxmempoolsizedisk", config.GetMaxMempoolSizeDisk()));
+    obj.push_back(Pair("mempoolmaxpercentcpfp", config.GetMempoolMaxPercentCPFP()));
 
     obj.push_back(Pair("acceptnonstdoutputs", config.GetAcceptNonStandardOutput(true)));
     obj.push_back(Pair("datacarrier", fAcceptDatacarrier));

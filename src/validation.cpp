@@ -605,7 +605,7 @@ bool CheckCoinbase(const CTransaction& tx, CValidationState& state, uint64_t max
         return false;
     }
 
-    if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > 100) {
+    if (tx.vin[0].scriptSig.size() < 2 || tx.vin[0].scriptSig.size() > MAX_COINBASE_SCRIPTSIG_SIZE) {
         return state.DoS(100, false, REJECT_INVALID, "bad-cb-length");
     }
 
@@ -840,78 +840,15 @@ static bool CheckMempoolMinFee(
     return true;
 }
 
-static bool CheckTxRelayPriority(
-    const Amount& nModifiedFees,
-    const CFeeRate& minRelayTxFee,
-    const CTxMemPoolEntry& pMempoolEntry,
-    unsigned int nTxSize) {
-    // Check txn relay priority
-    if (gArgs.GetBoolArg("-relaypriority", DEFAULT_RELAYPRIORITY) &&
-        nModifiedFees < minRelayTxFee.GetFee(nTxSize) &&
-        !AllowFree(pMempoolEntry.GetPriority(chainActive.Height() + 1))) {
-        // Require that free transactions have sufficient priority to be
-        // mined in the next block.
-        return false;
-    }
-    return true;
-}
-
-static bool CheckLimitFreeTx(
-    const Config& config,
-    bool fLimitFree,
-    const Amount& nModifiedFees,
-    const CFeeRate& minRelayTxFee,
-    unsigned int nTxSize) {
-    // Continuously rate-limit free (really, very-low-fee) transactions.
-    // This mitigates 'penny-flooding' -- sending thousands of free
-    // transactions just to be annoying or make others' transactions take
-    // longer to confirm.
-    if (!(fLimitFree && nModifiedFees < minRelayTxFee.GetFee(nTxSize))) {
-        return true;
-    }
-    static CCriticalSection csFreeLimiter;
-    static double dFreeCount;
-    static int64_t nLastTime;
-    int64_t nNow = GetTime();
-
-    LOCK(csFreeLimiter);
-
-    // Use an exponentially decaying ~10-minute window:
-    dFreeCount *= pow(1.0 - 1.0 / 600.0, double(nNow - nLastTime));
-    nLastTime = nNow;
-    // -limitfreerelay unit is thousand-bytes-per-minute
-    // At default rate it would take over a month to fill 1GB
-    if (dFreeCount + nTxSize >=
-        config.GetLimitFreeRelay() * 10) {
-        return false;
-    }
-
-    LogPrint(BCLog::MEMPOOL, "Rate limit dFreeCount: %g => %g\n",
-             dFreeCount, dFreeCount + nTxSize);
-    dFreeCount += nTxSize;
-    return true;
-}
-
-static bool CalculateMempoolAncestors(
-    const CTxMemPool &pool,
-    const CTxMemPoolEntry& pMempoolEntry,
-    CTxMemPool::setEntries& setAncestors,
-    std::string& errString) {
-    // Calculate in-mempool ancestors, up to a limit.
-    size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-    size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
-    size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
-    size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
-    if (!pool.CalculateMemPoolAncestors(pMempoolEntry,
-                setAncestors,
-                nLimitAncestors,
-                nLimitAncestorSize,
-                nLimitDescendants,
-                nLimitDescendantSize,
-                errString)) {
-        return false;
-    }
-    return true;
+static bool CheckAncestorLimits(const CTxMemPool& pool,
+                                const CTxMemPoolEntry& entry,
+                                std::string& errString) {
+    const auto limitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
+    const auto limitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
+    return pool.CheckAncestorLimits(entry,
+                                    limitAncestors,
+                                    limitSecondaryMempoolAncestors,
+                                    std::ref(errString));
 }
 
 static uint32_t GetScriptVerifyFlags(const Config &config, bool genesisEnabled) {
@@ -958,23 +895,57 @@ size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue) {
     return numHardwareThrs - GetNumLowPriorityValidationThrs(numHardwareThrs);
 }
 
+MempoolSizeLimits MempoolSizeLimits::FromConfig() {
+    const auto limitMemory = GlobalConfig::GetConfig().GetMaxMempool();
+    const auto limitDisk = GlobalConfig::GetConfig().GetMaxMempoolSizeDisk();
+    const auto limitSecondaryRatio = GlobalConfig::GetConfig().GetMempoolMaxPercentCPFP() / 100.0;
+    const auto limitExpiry = GlobalConfig::GetConfig().GetMemPoolExpiry();
+    return MempoolSizeLimits(
+        limitMemory,
+        limitDisk,
+        limitSecondaryRatio * limitMemory,
+        limitExpiry);
+}
+
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const CJournalChangeSetPtr& changeSet,
-    size_t limit,
-    unsigned long age) {
+    const MempoolSizeLimits& limits) {
 
-    int expired = pool.Expire(GetTime() - age, changeSet);
+    int expired = pool.Expire(GetTime() - limits.Age(), changeSet);
     if (expired != 0) {
         LogPrint(BCLog::MEMPOOL,
                  "Expired %i transactions from the memory pool\n", expired);
     }
+    size_t usageTotal = pool.DynamicMemoryUsage();
+    size_t usageSecondary = pool.SecondaryMempoolUsage();
 
     std::vector<COutPoint> vNoSpendsRemaining;
-    std::vector<TxId> vRemovedTxIds = pool.TrimToSize(
-                                                limit,
-                                                changeSet,
-                                                &vNoSpendsRemaining);
+    std::vector<TxId> vRemovedTxIds;
+
+    if ((usageTotal > limits.Total()) || (usageSecondary > limits.Secondary()))
+    {
+        size_t targetSize = std::min(usageTotal, limits.Total());
+        if (usageSecondary > limits.Secondary())
+        {
+            size_t secondaryExcess = usageSecondary - limits.Secondary();
+            targetSize -= secondaryExcess;
+        }
+        vRemovedTxIds =
+            pool.TrimToSize(targetSize, changeSet, &vNoSpendsRemaining);
+        usageTotal = pool.DynamicMemoryUsage();
+    }
+
+    // Disk usage is eventually consistent with total usage.
+    size_t usageDisk = pool.GetDiskUsage();
+    // Clamp the difference to zero to avoid nasty surprises.
+    size_t usageMemory = std::max(usageTotal, usageDisk) - usageDisk;
+
+    // Since this is called often we'll track the limit pretty close
+    if (usageMemory > limits.Memory()) {
+        size_t toWriteOut = usageMemory - limits.Memory();
+        pool.SaveTxsToDisk(toWriteOut);
+    }
     pcoinsTip->Uncache(vNoSpendsRemaining);
     return vRemovedTxIds;
 }
@@ -982,12 +953,13 @@ std::vector<TxId> LimitMempoolSize(
 void CommitTxToMempool(
     const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& pMempoolEntry,
-    CTxMemPool::setEntries& setAncestors,
+    TxStorage txStorage,
     CTxMemPool& pool,
     CValidationState& state,
     const CJournalChangeSetPtr& changeSet,
     bool fLimitMempoolSize,
-    size_t* pnMempoolSize,
+    size_t* pnPrimaryMempoolSize,
+    size_t* pnSecondaryMempoolSize,
     size_t* pnDynamicMemoryUsage) {
 
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
@@ -997,6 +969,13 @@ void CommitTxToMempool(
     // Post-genesis, non-final txns have their own mempool
     if(state.IsNonFinal() || pool.getNonFinalPool().finalisesExistingTransaction(ptx))
     {
+        if (txStorage != TxStorage::memory)
+        {
+            // Remove the transaction from disk because the non-final memppool
+            // does not use the txdb.
+            pool.RemoveTxFromDisk(ptx);
+        }
+
         // Post-genesis, non-final txns have their own mempool
         TxMempoolInfo info { pMempoolEntry };
         pool.getNonFinalPool().addOrUpdateTransaction(info, pTxInputData, state);
@@ -1007,9 +986,10 @@ void CommitTxToMempool(
     pool.AddUnchecked(
             txid,
             pMempoolEntry,
-            setAncestors,
+            txStorage,
             changeSet,
-            pnMempoolSize,
+            pnPrimaryMempoolSize,
+            pnSecondaryMempoolSize,
             pnDynamicMemoryUsage);
     // Check if the mempool size needs to be limited.
     if (fLimitMempoolSize) {
@@ -1017,8 +997,7 @@ void CommitTxToMempool(
         LimitMempoolSize(
             pool,
             changeSet,
-            GlobalConfig::GetConfig().GetMaxMempool(),
-            GlobalConfig::GetConfig().GetMemPoolExpiry());
+            MempoolSizeLimits::FromConfig());
         if (!pool.Exists(txid)) {
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                      "mempool full");
@@ -1063,7 +1042,6 @@ CTxnValResult TxnValidation(
     const CTransactionRef& ptx = pTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
     const TxId txid = tx.GetId();
-    const bool fLimitFree = pTxInputData->IsLimitFree();
     const int64_t nAcceptTime = pTxInputData->GetAcceptTime();
     const Amount nAbsurdFee = pTxInputData->GetAbsurdFee();
 
@@ -1305,19 +1283,14 @@ CTxnValResult TxnValidation(
     // the priority
     bool skipFeeTest = IsConsolidationTxn(config, tx, view, chainActive.Height());
     if (skipFeeTest) {
-        double priority = 0;
         const CFeeRate blockMinTxFee = config.GetBlockMinFeePerKB();
         const Amount consolidationDelta = blockMinTxFee.GetFee(nTxSize);
-        pool.PrioritiseTransaction(txid, txid.ToString(), priority, consolidationDelta);
+        pool.PrioritiseTransaction(txid, txid.ToString(), consolidationDelta);
         LogPrint(BCLog::TXNVAL,"free consolidation transaction detected, txid:=%s\n", tx.GetId().ToString());
     }
 
-    double nPriorityDummy = 0;
-    pool.ApplyDeltas(txid, nPriorityDummy, nModifiedFees);
+    pool.ApplyDeltas(txid, nModifiedFees);
 
-    Amount inChainInputValue;
-    double dPriority =
-        view.GetPriority(tx, chainActive.Height(), inChainInputValue);
     // Keep track of transactions that spend a coinbase, which we re-scan
     // during reorgs to ensure COINBASE_MATURITY is still met.
     const bool fSpendsCoinbase = CheckTxSpendsCoinbase(tx, view);
@@ -1341,36 +1314,23 @@ CTxnValResult TxnValidation(
             ptx,
             nFees,
             nAcceptTime,
-            dPriority,
             uiChainActiveHeight,
-            inChainInputValue,
             fSpendsCoinbase,
-            nSigOpsCount,
             lp) };
     if (!skipFeeTest) {
         // Check tx's priority based on relaypriority flag and relay fee.
         const CFeeRate minRelayTxFee = config.GetMinFeePerKB();
-        if (!CheckTxRelayPriority(nModifiedFees, minRelayTxFee, *pMempoolEntry, nTxSize)) {
+        if ( nModifiedFees < minRelayTxFee.GetFee(nTxSize)) {
             // Require that free transactions have sufficient priority to be
             // mined in the next block.
             state.DoS(0, false, REJECT_INSUFFICIENTFEE,
                       "insufficient priority");
             return Result{state, pTxInputData, vCoinsToUncache};
         }
-        // Continuously rate-limit free (really, very-low-fee) transactions.
-        // This mitigates 'penny-flooding' -- sending thousands of free
-        // transactions just to be annoying or make others' transactions take
-        // longer to confirm.
-    	if (!CheckLimitFreeTx(config, fLimitFree, nModifiedFees, minRelayTxFee, nTxSize)){
-            state.DoS(0, false, REJECT_INSUFFICIENTFEE,
-                      "rate limited free transaction");
-            return Result{state, pTxInputData, vCoinsToUncache};
-        }
     }
     // Calculate in-mempool ancestors, up to a limit.
-    CTxMemPool::setEntries setAncestors;
     std::string errString;
-    if (!CalculateMempoolAncestors(pool, *pMempoolEntry, setAncestors, errString)) {
+    if (!CheckAncestorLimits(pool, *pMempoolEntry, errString)) {
         state.DoS(0, false, REJECT_NONSTANDARD,
                  "too-long-mempool-chain",
                   errString);
@@ -1510,11 +1470,11 @@ CTxnValResult TxnValidation(
     // the node is not behind and it is not dependent on any other
     // transactions in the Mempool.
     // Transaction is validated successfully. Return valid results.
+
     return Result{state,
                   pTxInputData,
                   vCoinsToUncache,
-                  std::move(pMempoolEntry),
-                  std::move(setAncestors)};
+                  std::move(pMempoolEntry)};
 }
 
 CValidationState HandleTxnProcessingException(
@@ -1652,7 +1612,8 @@ static void LogTxnInvalidStatus(const CTxnValResult& txStatus) {
 
 static void LogTxnCommitStatus(
     const CTxnValResult& txStatus,
-    const size_t& nMempoolSize,
+    const size_t& nPrimaryMempoolSize,
+    const size_t& nSecondaryMempoolSize,
     const size_t& nDynamicMemoryUsage) {
 
     const bool fOrphanTxn = txStatus.mTxInputData->IsOrphanTxn();
@@ -1680,12 +1641,14 @@ static void LogTxnCommitStatus(
         sTxnStatusMsg += FormatStateMessage(state);
     }
     LogPrint(state.IsValid() ? BCLog::MEMPOOL : BCLog::MEMPOOLREJ,
-            "%s: %s txn= %s %s (poolsz %u txn, %u kB) %s\n",
+             "%s: %s txn= %s %s (poolsz %zu txn (pri=%zu,sec=%zu), %zu kB) %s\n",
              enum_cast<std::string>(source),
              state.IsStandardTx() ? "standard" : "nonstandard",
              tx.GetId().ToString(),
              sTxnStatusMsg,
-             nMempoolSize,
+             nPrimaryMempoolSize + nSecondaryMempoolSize,
+             nPrimaryMempoolSize,
+             nSecondaryMempoolSize,
              nDynamicMemoryUsage / 1000,
              TxSource::p2p == source ? "peer=" + csPeerId  : "");
 }
@@ -1729,6 +1692,7 @@ void ProcessValidatedTxn(
     CValidationState& state = txStatus.mState;
     const CTransactionRef& ptx = txStatus.mTxInputData->GetTxnPtr();
     const CTransaction &tx = *ptx;
+    const TxStorage txStorage = txStatus.mTxInputData->GetTxStorage();
     /**
      * 1. Txn validation has failed
      *    - Handle an invalid state for p2p txn
@@ -1769,7 +1733,8 @@ void ProcessValidatedTxn(
         /**
          * Send transaction to the mempool
          */
-        size_t nMempoolSize {};
+        size_t nPrimaryMempoolSize {};
+        size_t nSecondaryMempoolSize {};
         size_t nDynamicMemoryUsage {};
         // Check if required log categories are enabled
         bool fMempoolLogs = LogAcceptCategory(BCLog::MEMPOOL) || LogAcceptCategory(BCLog::MEMPOOLREJ);
@@ -1777,12 +1742,13 @@ void ProcessValidatedTxn(
         CommitTxToMempool(
             txStatus.mTxInputData,
             *(txStatus.mpEntry),
-            txStatus.mSetAncestors,
+            txStorage,
             pool,
             state,
             handlers.mJournalChangeSet,
             fLimitMempoolSize,
-            fMempoolLogs ? &nMempoolSize : nullptr,
+            fMempoolLogs ? &nPrimaryMempoolSize : nullptr,
+            fMempoolLogs ? &nSecondaryMempoolSize : nullptr,
             fMempoolLogs ? &nDynamicMemoryUsage : nullptr);
         // Check txn's commit status and do all required actions.
         if (TxSource::p2p == source) {
@@ -1793,7 +1759,10 @@ void ProcessValidatedTxn(
         }
         // Logging txn commit status
         if (!state.IsResubmittedTx()) {
-            LogTxnCommitStatus(txStatus, nMempoolSize, nDynamicMemoryUsage);
+            LogTxnCommitStatus(txStatus,
+                               nPrimaryMempoolSize,
+                               nSecondaryMempoolSize,
+                               nDynamicMemoryUsage);
         }
     }
     // If txn validation or commit has failed then:
@@ -3583,6 +3552,11 @@ static bool ConnectBlock(
         (!pindexBIP34height ||
          !(pindexBIP34height->GetBlockHash() == consensusParams.BIP34Hash));
 
+    if(config.GetDisableBIP30Checks())
+    {
+        fEnforceBIP30 = false;
+    }
+
     if (fEnforceBIP30) {
         for (const auto &tx : block.vtx) {
             for (size_t o = 0; o < tx->vout.size(); o++) {
@@ -4235,6 +4209,7 @@ static int64_t nTimeConnectTotal = 0;
 static int64_t nTimeFlush = 0;
 static int64_t nTimeChainState = 0;
 static int64_t nTimePostConnect = 0;
+static int64_t nTimeRemoveFromMempool = 0;
 
 struct PerBlockConnectTrace {
     CBlockIndex *pindex = nullptr;
@@ -4327,12 +4302,11 @@ public:
         return blocksConnected;
     }
 
-    void NotifyEntryRemoved(CTransactionRef txRemoved,
+    void NotifyEntryRemoved(const CTransactionWrapper& txRemoved,
                             MemPoolRemovalReason reason) {
         assert(!blocksConnected.back().pindex);
         if (reason == MemPoolRemovalReason::CONFLICT) {
-            blocksConnected.back().conflictedTxs->emplace_back(
-                std::move(txRemoved));
+            blocksConnected.back().conflictedTxs->emplace_back(txRemoved.GetTx());
         }
     }
 };
@@ -4423,6 +4397,21 @@ static bool ConnectTip(
         auto flushed = pCoinsTipSpan.TryFlush();
         assert(flushed == CoinsDBSpan::WriteState::ok);
     }
+
+    auto asyncRemoveForBlock = std::async(std::launch::async, 
+        [&blockConnecting, &pindexNew, &changeSet]()
+        {
+            RenameThread("Async RemoveForBlock");
+            int64_t nTimeRemoveForBlock = GetTimeMicros();
+            // Remove transactions from the mempool.;
+            mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet, blockConnecting.GetHash());
+            nTimeRemoveForBlock = GetTimeMicros() - nTimeRemoveForBlock;
+            nTimeRemoveFromMempool += nTimeRemoveForBlock;
+            LogPrint(BCLog::BENCH, "    - Remove transactions from the mempool: %.2fms [%.2fs]\n",
+                    nTimeRemoveForBlock * 0.001, nTimeRemoveFromMempool * 0.000001);
+        }
+    );
+
     int64_t nTime4 = GetTimeMicros();
     nTimeFlush += nTime4 - nTime3;
     LogPrint(BCLog::BENCH, "  - Flush: %.2fms [%.2fs]\n",
@@ -4430,19 +4419,20 @@ static bool ConnectTip(
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(config.GetChainParams(), state,
                           FLUSH_STATE_IF_NEEDED)) {
+        asyncRemoveForBlock.wait();
         return false;
     }
     int64_t nTime5 = GetTimeMicros();
     nTimeChainState += nTime5 - nTime4;
     LogPrint(BCLog::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n",
              (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
-    // Remove conflicting transactions from the mempool.;
-    mempool.RemoveForBlock(blockConnecting.vtx, pindexNew->nHeight, changeSet, blockConnecting.GetHash());
     if(g_connman)
     {
         g_connman->DequeueTransactions(blockConnecting.vtx);
     }
     disconnectpool.removeForBlock(blockConnecting.vtx);
+
+    asyncRemoveForBlock.wait();
     // Update chainActive & related variables.
     UpdateTip(config, pindexNew);
 
@@ -4660,13 +4650,14 @@ static bool ActivateBestChainStep(
 
             // If any blocks were disconnected, disconnectpool may be non empty. Add
             // any disconnected transactions back to the mempool.
+            // This will also check the mempool and apply the changeSet
             mempool.AddToMempoolForReorg(config, disconnectpool, changeSet);
-        }
-
-        mempool.CheckMempool(*pcoinsTip, changeSet);
-        if(changeSet)
-        {
-            changeSet->apply();
+        } else {
+            mempool.CheckMempool(*pcoinsTip, changeSet);
+            if(changeSet)
+            {
+                changeSet->apply();
+            }
         }
     }
     catch(...) {
@@ -7397,150 +7388,8 @@ std::string CBlockFileInfo::ToString() const {
 }
 
 
-static const uint64_t MEMPOOL_DUMP_VERSION = 1;
-
-bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken)
-{
-    try {
-        int64_t nExpiryTimeout = config.GetMemPoolExpiry();
-        FILE *filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
-        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
-        if (file.IsNull()) {
-            throw std::runtime_error("Failed to open mempool file from disk");
-        }
-
-        int64_t count = 0;
-        int64_t skipped = 0;
-        int64_t failed = 0;
-        int64_t nNow = GetTime();
-
-        uint64_t version;
-        file >> version;
-        if (version != MEMPOOL_DUMP_VERSION) {
-            throw std::runtime_error("Bad mempool dump version");
-        }
-        uint64_t num;
-        file >> num;
-        double prioritydummy = 0;
-        // Take a reference to the validator.
-        const auto& txValidator = g_connman->getTxnValidator();
-        // A pointer to the TxIdTracker.
-        const TxIdTrackerWPtr& pTxIdTracker = g_connman->GetTxIdTracker();
-        while (num--) {
-            CTransactionRef tx;
-            int64_t nTime;
-            int64_t nFeeDelta;
-            file >> tx;
-            file >> nTime;
-            file >> nFeeDelta;
-            Amount amountdelta(nFeeDelta);
-            if (amountdelta != Amount(0)) {
-                mempool.PrioritiseTransaction(tx->GetId(),
-                                              tx->GetId().ToString(),
-                                              prioritydummy, amountdelta);
-            }
-            if (nTime + nExpiryTimeout > nNow) {
-                // Mempool Journal ChangeSet
-                CJournalChangeSetPtr changeSet {
-                    mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::INIT)
-                };
-                const CValidationState& state {
-                    // Execute txn validation synchronously.
-                    txValidator->processValidation(
-                        std::make_shared<CTxInputData>(
-                            pTxIdTracker, // a pointer to the TxIdTracker
-                            tx,    // a pointer to the tx
-                            TxSource::file, // tx source
-                            TxValidationPriority::normal,  // tx validation priority
-                            nTime, // nAcceptTime
-                            true),  // fLimitFree
-                        changeSet, // an instance of the mempool journal
-                        true) // fLimitMempoolSize
-                };
-                // Check results
-                if (state.IsValid()) {
-                    ++count;
-                } else {
-                    ++failed;
-                }
-            } else {
-                ++skipped;
-            }
-            if (shutdownToken.IsCanceled()) {
-                return false;
-            }
-        }
-        std::map<uint256, Amount> mapDeltas;
-        file >> mapDeltas;
-
-        for (const auto &i : mapDeltas) {
-            mempool.PrioritiseTransaction(i.first, i.first.ToString(),
-                                          prioritydummy, i.second);
-        }
-
-        LogPrintf("Imported mempool transactions from disk: %i successes, %i "
-                  "failed, %i expired\n",
-                  count, failed, skipped);
-
-    }
-    catch (const std::exception &e) {
-        LogPrintf("Failed to deserialize mempool data on disk: %s. Continuing anyway.\n",
-                  e.what());
-    }
-
-    // Restore non-final transactions
-    return mempool.getNonFinalPool().loadMempool(shutdownToken);
-}
-
-void DumpMempool(void) {
-    int64_t start = GetTimeMicros();
-
-    std::map<uint256, Amount> mapDeltas;
-    std::vector<TxMempoolInfo> vinfo;
-
-    {
-        std::shared_lock lock(mempool.smtx);
-        for (const auto &i : mempool.mapDeltas) {
-            mapDeltas[i.first] = i.second.second;
-        }
-        vinfo = mempool.InfoAllNL();
-    }
-
-    int64_t mid = GetTimeMicros();
-
-    try {
-        FILE *filestr = fsbridge::fopen(GetDataDir() / "mempool.dat.new", "wb");
-        if (!filestr) {
-            return;
-        }
-
-        CAutoFile file(filestr, SER_DISK, CLIENT_VERSION);
-
-        uint64_t version = MEMPOOL_DUMP_VERSION;
-        file << version;
-
-        file << (uint64_t)vinfo.size();
-        for (const auto &i : vinfo) {
-            file << *(i.tx);
-            file << (int64_t)i.nTime;
-            file << (int64_t)i.nFeeDelta.GetSatoshis();
-            mapDeltas.erase(i.tx->GetId());
-        }
-
-        file << mapDeltas;
-        FileCommit(file.Get());
-        file.fclose();
-        RenameOver(GetDataDir() / "mempool.dat.new",
-                   GetDataDir() / "mempool.dat");
-        int64_t last = GetTimeMicros();
-        LogPrintf("Dumped mempool: %.6fs to copy, %.6fs to dump\n",
-                  (mid - start) * 0.000001, (last - mid) * 0.000001);
-    } catch (const std::exception &e) {
-        LogPrintf("Failed to dump mempool: %s. Continuing anyway.\n", e.what());
-    }
-
-    // Dump non-final pool
-    mempool.getNonFinalPool().dumpMempool();
+CBlockFileInfo *GetBlockFileInfo(size_t n) {
+    return pBlockFileInfoStore->GetBlockFileInfo(n);
 }
 
 //! Guess how far we are in the verification process at the given block index

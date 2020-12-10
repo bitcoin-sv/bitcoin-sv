@@ -130,8 +130,7 @@ bool CZMQPublishHashTransactionNotifier::NotifyTransaction(
 
 bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint256& txid,
                                                                      MemPoolRemovalReason reason,
-                                                                     const CTransaction* conflictedWith,
-                                                                     const uint256* blockhash)
+                                                                     const CTransactionConflict& conflictedWith)
 {
 
     CStringWriter tw;
@@ -149,15 +148,17 @@ bool CZMQPublishRemovedFromMempoolNotifier::NotifyRemovedFromMempool(const uint2
             jw.pushKV("reason", "mempool-sizelimit-exceeded");
             break;
         case MemPoolRemovalReason::CONFLICT:
-            if (conflictedWith != nullptr)
+            if (conflictedWith)
             {
+                const auto& conflictedTransaction = conflictedWith.value().conflictedWith;
+                const auto& blockhash = conflictedWith.value().blockhash;
                 jw.pushKV("reason", "collision-in-block-tx");
                 jw.writeBeginObject("collidedWith");
-                jw.pushKV("txid", conflictedWith->GetId().GetHex());
-                jw.pushKV("size", int64_t(conflictedWith->GetTotalSize()));
+                jw.pushKV("txid", conflictedTransaction->GetId().GetHex());
+                jw.pushKV("size", int64_t(conflictedTransaction->GetTotalSize()));
                 jw.pushK("hex");
                 jw.pushQuote();
-                EncodeHexTx(*conflictedWith, jw.getWriter(), 0);
+                EncodeHexTx(*conflictedTransaction, jw.getWriter(), 0);
                 jw.pushQuote();
                 // push hash of block in which transaction we "collided with" arrived.
                 if (blockhash != nullptr)

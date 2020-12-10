@@ -7,10 +7,15 @@ or a transaction.
 """
 
 from decimal import Decimal
-
+from itertools import chain
+from collections import defaultdict
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
+def scale_params(*params, scale):
+    if isinstance(params, str):
+        params = params.split()
+    return ((param, scale) for param in params)
 
 class BSVNodeSettings(BitcoinTestFramework):
 
@@ -30,21 +35,24 @@ class BSVNodeSettings(BitcoinTestFramework):
         self.start_node(0, node_params)
 
         node_settings = self.nodes[0].getsettings()
-        # check we received expected number of fields (parameter settings)
-        # we substract 1 because we cannot use -minconfconsolidationinput and deprecated switch -minconsolidationinputmaturity
-        # at same time
-        assert_equal(len(node_settings)-1, len(parameters))
+        # check we received expected fields (parameter settings)
+        optional = set(['minconsolidationinputmaturity', 'minconfconsolidationinput'])
+        expected_settings = set(parameters).union(optional)
+        actual_settings = set(node_settings)
+        unexpected_settings = actual_settings - expected_settings
+        assert_equal(unexpected_settings, set())
+        missing_settings = expected_settings - actual_settings
+        assert_equal(missing_settings, set())
 
         # check that set policy parameters return expected values
+
+        param_scales = defaultdict(lambda: 1, chain(
+            scale_params("limitdescendantsize", "limitancestorsize", scale=1000),
+            scale_params("maxorphantxsize", "maxmempool", "maxmempoolsizedisk", scale=1000000)))
         for param in parameters:
-            if param == "limitdescendantsize" or param == "limitancestorsize":
-                # above paremeters are set as multiple of 1000 e.g. 1000*n
-                assert_equal(node_settings[param], parameters[param] * 1000)
-            elif param == "maxorphantxsize":
-                # maxorphantxsize is set in megabytes but we receive size in bytes
-                assert_equal(node_settings[param], parameters[param] * 1000000)
-            else:
-                assert_equal(node_settings[param], parameters[param])
+            expected = (param, parameters[param] * param_scales[param])
+            actual = (param, node_settings[param])
+            assert_equal(expected, actual)
 
     def run_test(self):
 
@@ -59,10 +67,11 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'maxtxsigopscountspolicy': 4294967295,
                        'maxstackmemoryusagepolicy': 100000000,
                        'maxorphantxsize': 100,
-                       'limitdescendantsize': 25000000000,
-                       'limitdescendantcount': 25,
-                       'limitancestorsize': 25000000000,
                        'limitancestorcount': 25,
+                       'limitcpfpgroupmemberscount': 13,
+                       'maxmempool': 432,
+                       'mempoolmaxpercentcpfp': 42,
+                       'maxmempoolsizedisk': 4321,
                        'acceptnonstdoutputs': 1,
                        'datacarrier': 1,
                        'minrelaytxfee': Decimal('0.00000250'),
@@ -88,10 +97,11 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'maxtxsigopscountspolicy': 42949,
                        'maxstackmemoryusagepolicy': 100000,
                        'maxorphantxsize': 1000,
-                       'limitdescendantsize': 25000000,
-                       'limitdescendantcount': 40,
-                       'limitancestorsize': 30000000000,
                        'limitancestorcount': 40,
+                       'limitcpfpgroupmemberscount': 31,
+                       'maxmempool': 423,
+                       'mempoolmaxpercentcpfp': 24,
+                       'maxmempoolsizedisk': 4312,
                        'acceptnonstdoutputs': 0,
                        'datacarrier': 0,
                        'minrelaytxfee': Decimal('0.00000150'),

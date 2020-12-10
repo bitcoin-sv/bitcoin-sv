@@ -232,6 +232,7 @@ add_library(server
     invalid_txn_sinks/file_sink.cpp
     invalid_txn_sinks/zmq_sink.cpp
 	dbwrapper.cpp
+	mempooltxdb.cpp
 	merkleblock.cpp
 	merkletreedb.cpp
 	merkletreestore.cpp
@@ -241,8 +242,8 @@ add_library(server
 	mining/journal.cpp
 	mining/journal_builder.cpp
 	mining/journal_change_set.cpp
+	mining/journal_entry.cpp
 	mining/journaling_block_assembler.cpp
-    mining/legacy.cpp
     net/association.cpp
     net/association_id.cpp
 	net/net.cpp
@@ -273,6 +274,7 @@ add_library(server
 	torcontrol.cpp
 	txdb.cpp
 	txmempool.cpp
+	txmempoolevictioncandidates.cpp
     tx_mempool_info.cpp
 	txn_double_spend_detector.cpp
 	txn_propagator.cpp

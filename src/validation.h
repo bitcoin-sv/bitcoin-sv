@@ -88,15 +88,9 @@ static const Amount HIGH_TX_FEE_PER_KB(COIN / 100);
  * satoshis */
 static const Amount HIGH_MAX_TX_FEE(100 * HIGH_TX_FEE_PER_KB);
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
-static const uint64_t DEFAULT_ANCESTOR_LIMIT = 25;
-/** Default for -limitdescendantcount, max number of in-mempool descendants */
-static const uint64_t DEFAULT_DESCENDANT_LIMIT = 25;
-/** Default for -limitancestorsize, maximum kilobytes of tx + all in-mempool
- * ancestors */
-static const uint64_t DEFAULT_ANCESTOR_SIZE_LIMIT = DEFAULT_ANCESTOR_LIMIT * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
-/** Default for -limitdescendantsize, maximum kilobytes of in-mempool
- * descendants */
-static const uint64_t DEFAULT_DESCENDANT_SIZE_LIMIT = DEFAULT_DESCENDANT_LIMIT * MAX_TX_SIZE_CONSENSUS_BEFORE_GENESIS;
+static const uint64_t DEFAULT_ANCESTOR_LIMIT = 1000;
+/** Default for -limitancestorcount, max number of secondary mempool ancestors */
+static const uint64_t DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT = 25;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in
  * hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
@@ -182,8 +176,6 @@ static const int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = 1000000;
  */
 static const int64_t BLOCK_DOWNLOAD_TIMEOUT_PER_PEER = 500000;
 
-static const unsigned int DEFAULT_LIMITFREERELAY = 0;
-static const bool DEFAULT_RELAYPRIORITY = true;
 static const int64_t DEFAULT_MAX_TIP_AGE = 24 * 60 * 60;
 
 /** Default for -permitbaremultisig */
@@ -662,20 +654,52 @@ size_t GetNumLowPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
  */
 size_t GetNumHighPriorityValidationThrs(size_t nTestingHCValue=SIZE_MAX);
 
+
+class MempoolSizeLimits {
+public:
+    MempoolSizeLimits(size_t memory, size_t disk, size_t secondary, unsigned long age)
+    : limitMemory{memory}
+    , limitDisk{disk}
+    , limitSecondary{secondary}
+    , limitAge{age}
+    {}
+
+    // A size limit for RAM used by mempool. When exceeded write out transactions to disk.
+    size_t Memory() const { return limitMemory; }
+
+    // A size limit for disk used by mempool.
+    size_t Disk() const { return limitDisk; }
+
+    // A size limit for mempool RAM and disk combined. When exceeded remove transactions.
+    size_t Total() const { return limitMemory + limitDisk; }
+
+    // A size limit for secondary mempool ram and disk. When exceeded remove transactions.
+    size_t Secondary() const { return limitSecondary; }
+
+    // A time limit for txn to be tracked by mempool. When exceeded remove transactions.
+    unsigned long Age() const { return limitAge; }
+
+    static MempoolSizeLimits FromConfig();
+
+private:
+    size_t limitMemory;
+    size_t limitDisk;
+    size_t limitSecondary;
+    unsigned long limitAge;
+};
+
 /**
  * Limit mempool size.
  *
  * @param pool A reference to the mempool
  * @param changeSet A reference to the Jorunal ChangeSet
- * @param limit A size limit for txn to remove
- * @param age Time limit for txn to remove
+ * @param limits The limits to enforce by writeout to disk or removal
  * @return A vector with all TxIds which were removed from the mempool
  */
 std::vector<TxId> LimitMempoolSize(
     CTxMemPool &pool,
     const mining::CJournalChangeSetPtr& changeSet,
-    size_t limit,
-    unsigned long age);
+    const MempoolSizeLimits& limits);
 
 /**
  * Submit transaction to the mempool.
@@ -683,11 +707,9 @@ std::vector<TxId> LimitMempoolSize(
  * @param ptx A reference to the transaction
  * @param entry A valid entry point for the given transaction
  * @param fTxValidForFeeEstimation A flag to inform if txn is valid for fee estimations.
- * @param setAncestors  A set of ancestors
  * @param pool A reference to the mempool
  * @param state A reference to a state variable
  * @param changeSet A reference to the Jorunal ChangeSet
- * @param fLimitMempoolSize A flag to limit a mempool size
  * @param pnMempoolSize If not null store mempool size after txn is commited
  * @param pnDynamicMemoryUsage If not null store dynamic memory usage after txn is commited
  */
@@ -695,7 +717,6 @@ void CommitTxToMempool(
     const TxInputDataSPtr& pTxInputData,
     const CTxMemPoolEntry& entry,
     bool fTxValidForFeeEstimation,
-    CTxMemPool::setEntries& setAncestors,
     CTxMemPool& pool,
     CValidationState& state,
     const mining::CJournalChangeSetPtr& changeSet,
@@ -1091,12 +1112,6 @@ static const unsigned int REJECT_ALREADY_KNOWN = 0x101;
 static const unsigned int REJECT_CONFLICT = 0x102;
 /** No space for transaction */
 static const unsigned int REJECT_MEMPOOL_FULL = 0x103;
-
-/** Dump the mempool to disk. */
-void DumpMempool();
-
-/** Load the mempool from disk. */
-bool LoadMempool(const Config &config, const task::CCancellationToken& shutdownToken);
 
 /** AlertNotify */
 void AlertNotify(const std::string &strMessage);

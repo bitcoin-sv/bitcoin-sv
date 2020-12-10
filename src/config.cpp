@@ -18,7 +18,6 @@ void GlobalConfig::Reset()
 {
     feePerKB = CFeeRate {};
     blockMinFeePerKB = CFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
-    blockPriorityPercentage = DEFAULT_BLOCK_PRIORITY_PERCENTAGE;
     preferredBlockFileSize = DEFAULT_PREFERRED_BLOCKFILE_SIZE;
     factorMaxSendQueuesBytes = DEFAULT_FACTOR_MAX_SEND_QUEUES_BYTES;
 
@@ -37,11 +36,9 @@ void GlobalConfig::Reset()
     acceptNonStdConsolidationInput = DEFAULT_ACCEPT_NON_STD_CONSOLIDATION_INPUT;
 
     dataCarrierSize = DEFAULT_DATA_CARRIER_SIZE;
-    limitDescendantCount = DEFAULT_DESCENDANT_LIMIT;
     limitAncestorCount = DEFAULT_ANCESTOR_LIMIT;
-    limitDescendantSize = DEFAULT_DESCENDANT_SIZE_LIMIT;
-    limitAncestorSize = DEFAULT_ANCESTOR_SIZE_LIMIT;
-
+    limitSecondaryMempoolAncestorCount = DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT;
+    
     testBlockCandidateValidity = false;
     blockAssemblerType = mining::DEFAULT_BLOCK_ASSEMBLER_TYPE;
 
@@ -77,8 +74,9 @@ void GlobalConfig::Reset()
     recvInvQueueFactor = DEFAULT_RECV_INV_QUEUE_FACTOR;
 
     mMaxMempool = DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE;
+    mMaxMempoolSizeDisk = mMaxMempool * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR;
+    mMempoolMaxPercentCPFP = DEFAULT_MEMPOOL_MAX_PERCENT_CPFP;
     mMemPoolExpiry = DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR;
-    mLimitFreeRelay = DEFAULT_LIMITFREERELAY * ONE_KILOBYTE;
     mMaxOrphanTxSize = COrphanTxns::DEFAULT_MAX_ORPHAN_TRANSACTIONS_SIZE;
     mStopAtHeight = DEFAULT_STOPATHEIGHT;
     mPromiscuousMempoolFlags = 0;
@@ -89,6 +87,8 @@ void GlobalConfig::Reset()
 
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
+
+    mDisableBIP30Checks = std::nullopt;
 
 #if ENABLE_ZMQ
     invalidTxZMQMaxMessageSize = CInvalidTxnPublisher::DEFAULT_ZMQ_SINK_MAX_MESSAGE_SIZE;
@@ -219,21 +219,6 @@ int64_t GlobalConfig::GetBlockSizeActivationTime() const {
     return blockSizeActivationTime;
 };
 
-bool GlobalConfig::SetBlockPriorityPercentage(int64_t percentage, std::string* err) {
-    // blockPriorityPercentage has to belong to [0..100]
-    if ((percentage < 0) || (percentage > 100)) {
-        if (err)
-            *err = _("Block priority percentage has to belong to the [0..100] interval.");
-        return false;
-    }
-    blockPriorityPercentage = percentage;
-    return true;
-}
-
-uint8_t GlobalConfig::GetBlockPriorityPercentage() const {
-    return blockPriorityPercentage;
-}
-
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
 {
     if (LessThanZero(maxTxSizePolicyIn, err, "Policy value for max tx size must not be less than 0"))
@@ -349,22 +334,6 @@ uint64_t GlobalConfig::GetDataCarrierSize() const {
     return dataCarrierSize;
 }
 
-void GlobalConfig::SetLimitAncestorSize(uint64_t limitAncestorSizeIn) {
-    limitAncestorSize = limitAncestorSizeIn;
-}
-
-uint64_t GlobalConfig::GetLimitAncestorSize() const {
-    return limitAncestorSize;
-}
-
-void GlobalConfig::SetLimitDescendantSize(uint64_t limitDescendantSizeIn) {
-    limitDescendantSize = limitDescendantSizeIn;
-}
-
-uint64_t GlobalConfig::GetLimitDescendantSize() const {
-    return limitDescendantSize;
-}
-
 void GlobalConfig::SetLimitAncestorCount(uint64_t limitAncestorCountIn) {
     limitAncestorCount = limitAncestorCountIn;
 }
@@ -373,12 +342,12 @@ uint64_t GlobalConfig::GetLimitAncestorCount() const {
     return limitAncestorCount;
 }
 
-void GlobalConfig::SetLimitDescendantCount(uint64_t limitDescendantCountIn) {
-    limitDescendantCount = limitDescendantCountIn;
+void GlobalConfig::SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) {
+    limitSecondaryMempoolAncestorCount = limitSecondaryMempoolAncestorCountIn;
 }
 
-uint64_t GlobalConfig::GetLimitDescendantCount() const {
-    return limitDescendantCount;
+uint64_t GlobalConfig::GetLimitSecondaryMempoolAncestorCount()const {
+    return limitSecondaryMempoolAncestorCount;
 }
 
 const CChainParams &GlobalConfig::GetChainParams() const {
@@ -1016,6 +985,25 @@ bool GlobalConfig::SetP2PHandshakeTimeout(int64_t timeout, std::string* err)
     return true;
 }
 
+bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)
+{
+    if(!GetChainParams().CanDisableBIP30Checks())
+    {
+        if(err)
+        {
+            *err = "Can not change disabling of BIP30 checks on " + GetChainParams().NetworkIDString() + " network.";
+            return false;
+        }
+    }
+    mDisableBIP30Checks = disable;
+    return true;
+}
+
+bool GlobalConfig::GetDisableBIP30Checks() const
+{
+    return mDisableBIP30Checks.value_or(GetChainParams().DisableBIP30Checks());
+}
+
 #if ENABLE_ZMQ
 bool GlobalConfig::SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err)
 {
@@ -1234,7 +1222,7 @@ uint64_t GlobalConfig::GetMaxScriptSize(bool isGenesisEnabled, bool isConsensus)
 }
 
 bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
-    if (LessThanZero(maxMempool, err, "Policy value for maximum memory pool must not be less than 0."))
+    if (LessThanZero(maxMempool, err, "Policy value for maximum resident memory pool must not be less than 0."))
     {
         return false;
     }
@@ -1242,7 +1230,7 @@ bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
     {
         if (err)
         {
-            *err = strprintf(_("Policy value for maximum memory pool must be at least %d MB"), std::ceil(DEFAULT_MAX_MEMPOOL_SIZE * 0.3));
+            *err = strprintf(_("Policy value for maximum resident memory pool must be at least %d MB"), std::ceil(DEFAULT_MAX_MEMPOOL_SIZE * 0.3));
         }
         return false;
     }
@@ -1254,6 +1242,45 @@ bool GlobalConfig::SetMaxMempool(int64_t maxMempool, std::string* err) {
 
 uint64_t GlobalConfig::GetMaxMempool() const {
     return mMaxMempool;
+}
+
+bool GlobalConfig::SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) {
+    if (LessThanZero(maxMempoolSizeDisk, err, "Policy value for maximum on-disk memory pool must not be less than 0."))
+    {
+        return false;
+    }
+
+    mMaxMempoolSizeDisk = static_cast<uint64_t>(maxMempoolSizeDisk);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMaxMempoolSizeDisk() const {
+    return mMaxMempoolSizeDisk;
+}
+
+bool GlobalConfig::SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) {
+    if (LessThanZero(mempoolMaxPercentCPFP, err, "Policy value for percentage of memory for low paying transactions must not be less than 0."))
+    {
+        return false;
+    }
+
+    if (mempoolMaxPercentCPFP > 100)
+    {
+        if (err)
+        {
+            *err = "Policy value for percentage of memory for low paying transactions must not be greater than 100";
+        }
+        return false;
+    }
+
+    mMempoolMaxPercentCPFP = static_cast<uint64_t>(mempoolMaxPercentCPFP);
+
+    return true;
+}
+
+uint64_t GlobalConfig::GetMempoolMaxPercentCPFP() const {
+    return mMempoolMaxPercentCPFP;
 }
 
 bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
@@ -1269,21 +1296,6 @@ bool GlobalConfig::SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) {
 
 uint64_t GlobalConfig::GetMemPoolExpiry() const {
     return mMemPoolExpiry;
-}
-
-bool GlobalConfig::SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) {
-    if (LessThanZero(limitFreeRelay, err, "Policy value for rate-limit free transactions must not be less than 0."))
-    {
-        return false;
-    }
-
-    mLimitFreeRelay = static_cast<uint64_t>(limitFreeRelay);
-
-    return true;
-}
-
-uint64_t GlobalConfig::GetLimitFreeRelay() const {
-    return mLimitFreeRelay;
 }
 
 bool GlobalConfig::SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) {

@@ -30,7 +30,7 @@ class MempoolLimitTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
-        self.extra_args = [["-maxmempool=300", "-spendzeroconfchange=0", "-genesisactivationheight=1", "-maxtxsizepolicy=0"]]
+        self.extra_args = [["-maxmempool=300", "-maxmempoolsizedisk=0", "-spendzeroconfchange=0", "-genesisactivationheight=1", "-maxtxsizepolicy=0"]]
 
     def run_test(self):
         relayfee = self.nodes[0].getnetworkinfo()['relayfee']

@@ -299,7 +299,7 @@ BOOST_AUTO_TEST_CASE(bitwise_and)
     };
     // clang-format on
 
-    for(const auto e : v)
+    for(const auto& e : v)
     {
         bint lhs{get<0>(e)};
         bint rhs{get<1>(e)};
@@ -345,7 +345,7 @@ BOOST_AUTO_TEST_CASE(bitwise_or)
     };
     // clang-format on
 
-    for(const auto e : v)
+    for(const auto& e : v)
     {
         bint lhs{get<0>(e)};
         bint rhs{get<1>(e)};

@@ -112,9 +112,9 @@ namespace
             Tx9.vout[0].nValue = GetAmount();
 
             // Now insert everyting into the mempool.
-            TestMemPoolEntryHelper entry;
+            TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
             for (auto tx : allTxs) {
-                testPool.AddUnchecked(tx->GetId(), entry.FromTx(*tx),
+                testPool.AddUnchecked(tx->GetId(), entry.FromTx(*tx), TxStorage::memory,
                                       mining::CJournalChangeSetPtr{nullptr});
             }
         }
@@ -165,7 +165,7 @@ BOOST_AUTO_TEST_CASE(PoolSnapshotTest)
 
     // Check that all hashes are unique.
     for (const auto& entry : slice) {
-        const auto key = entry.GetTx().GetId();
+        const auto key = entry.GetTxId();
         BOOST_CHECK_EQUAL(1, hashes.count(key));
         BOOST_CHECK_NO_THROW(hashes.erase(key));
     }

@@ -229,6 +229,7 @@ BOOST_AUTO_TEST_CASE(UpdateTest)
             txnRef,
             TxSource::unknown,
             TxValidationPriority::high,
+            TxStorage::memory,
             GetTime()
         )
     };

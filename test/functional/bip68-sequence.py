@@ -25,8 +25,8 @@ NOT_FINAL_ERROR = "64: non-BIP68-final"
 class BIP68Test(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
-        self.extra_args = [["-blockprioritypercentage=0"],
-                           ["-blockprioritypercentage=0", "-acceptnonstdtxn=0"]]
+        self.extra_args = [[],
+                           ["-acceptnonstdtxn=0"]]
 
     def run_test(self):
         self.relayfee = self.nodes[0].getnetworkinfo()["relayfee"]
@@ -271,7 +271,7 @@ class BIP68Test(BitcoinTestFramework):
         # Now mine some blocks, but make sure tx2 doesn't get mined.
         # Use prioritisetransaction to lower the effective feerate to 0
         self.nodes[0].prioritisetransaction(
-            tx2.hash, -1e15, int(-self.relayfee * COIN))
+            tx2.hash, 0, int(-self.relayfee * COIN))
         cur_time = int(time.time())
         for i in range(10):
             self.nodes[0].setmocktime(cur_time + 600)
@@ -287,7 +287,7 @@ class BIP68Test(BitcoinTestFramework):
 
         # Mine tx2, and then try again
         self.nodes[0].prioritisetransaction(
-            tx2.hash, 1e15, self.nodes[0].calculate_fee(tx2))
+            tx2.hash, 0, self.nodes[0].calculate_fee(tx2))
 
         # Advance the time on the node so that we can test timelocks
         self.nodes[0].setmocktime(cur_time + 600)

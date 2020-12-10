@@ -59,9 +59,6 @@ static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_BEFORE = 32 * ONE_MEG
 static const uint64_t STN_DEFAULT_MAX_GENERATED_BLOCK_SIZE_AFTER = 128 * ONE_MEGABYTE;
 
 
-/** Default for -blockprioritypercentage, define the amount of block space
- * reserved to high priority transactions **/
-static const uint64_t DEFAULT_BLOCK_PRIORITY_PERCENTAGE = 5;
 /** Default for -blockmintxfee, which sets the minimum feerate for a transaction
  * in blocks created by mining code **/
 static const Amount DEFAULT_BLOCK_MIN_TX_FEE(500);
@@ -95,6 +92,11 @@ static const unsigned int DEFAULT_MAX_NONFINAL_MEMPOOL_SIZE = 50;
 static const CFeeRate MEMPOOL_FULL_FEE_INCREMENT(Amount(1000));
 /** Default for -maxscriptsizepolicy **/
 static const unsigned int DEFAULT_MAX_SCRIPT_SIZE_POLICY_AFTER_GENESIS = 10000;
+/** Default -maxmempoolsizedisk factor, maximum megabytes of total mempool disk usage as scaled -maxmempool */
+static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR = 10;
+/** Default percentage of total mempool size (ram+disk) to use as max limit for CPFP transactions */
+static const unsigned int DEFAULT_MEMPOOL_MAX_PERCENT_CPFP = 10;
+
 /**
  * Min feerate for defining dust. Historically this has been the same as the
  * minRelayTxFee, however changing the dust limit changes which transactions are

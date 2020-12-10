@@ -9,7 +9,7 @@
 #include <validation.h>
 #include <versionbits.h>
 
-using mining::BlockAssembler;
+namespace mining {
 
 BlockAssembler::BlockAssembler(const Config& config)
 : mConfig{config}
@@ -40,7 +40,8 @@ uint64_t BlockAssembler::ComputeMaxGeneratedBlockSize(const CBlockIndex* pindexP
 }
 
 // Fill in header fields for a new block template
-void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex, const CScript& scriptPubKeyIn) const
+void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex,
+                                     const CScript& scriptPubKeyIn, const Amount& blockFees) const
 {
     const CChainParams& chainparams { mConfig.GetChainParams() };
 
@@ -51,7 +52,7 @@ void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex
     coinbaseTx.vin[0].prevout = COutPoint{};
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
-    coinbaseTx.vout[0].nValue = mBlockFees + GetBlockSubsidy(blockHeight, chainparams.GetConsensus());
+    coinbaseTx.vout[0].nValue = blockFees + GetBlockSubsidy(blockHeight, chainparams.GetConsensus());
     // BIP34 only requires that the block height is available as a CScriptNum, but generally
     // miner software which reads the coinbase tx will not support SCriptNum.
     // Adding the extra 00 byte makes it look like a int32.
@@ -72,4 +73,27 @@ void BlockAssembler::FillBlockHeader(CBlockRef& block, const CBlockIndex* pindex
     block->nBits = GetNextWorkRequired(pindex, block.get(), mConfig);
     block->nNonce = 0;
 }
+
+int64_t UpdateTime(CBlockHeader *pblock, const Config &config,
+                   const CBlockIndex *pindexPrev) {
+    int64_t nOldTime = pblock->nTime;
+    int64_t nNewTime =
+        std::max(pindexPrev->GetMedianTimePast() + 1, GetAdjustedTime());
+
+    if (nOldTime < nNewTime) {
+        pblock->nTime = nNewTime;
+    }
+
+    const Consensus::Params &consensusParams =
+        config.GetChainParams().GetConsensus();
+
+    // Updating time can change work required on testnet:
+    if (consensusParams.fPowAllowMinDifficultyBlocks) {
+        pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, config);
+    }
+
+    return nNewTime - nOldTime;
+}
+
+} // namespace mining
 

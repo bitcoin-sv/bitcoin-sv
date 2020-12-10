@@ -782,7 +782,7 @@ public:
      */
     bool SelectCoinsMinConf(
         const Amount nTargetValue, int nConfMine, int nConfTheirs,
-        uint64_t nMaxAncestors, std::vector<COutput> vCoins,
+        const int64_t nMaxAncestors, const int64_t nMaxSecondaryMempoolAncestors, std::vector<COutput> vCoins,
         std::set<std::pair<const CWalletTx *, unsigned int>> &setCoinsRet,
         Amount &nValueRet) const;
 

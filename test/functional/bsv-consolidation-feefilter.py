@@ -48,7 +48,6 @@ class FeeFilterTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
-            "-relaypriority=1"
             "-txindex=1"
             ],[
             "-whitelist=127.0.0.1",
@@ -57,7 +56,6 @@ class FeeFilterTest(BitcoinTestFramework):
             "-blockmintxfee={}".format(Decimal(self.blockmintxfee_sats)/COIN),
             "-minconsolidationfactor=10",
             "-acceptnonstdtxn=1",
-            "-relaypriority=1"
             "-txindex=1"
         ]]
 

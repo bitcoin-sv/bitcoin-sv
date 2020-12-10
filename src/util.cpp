@@ -330,6 +330,13 @@ void ArgsManager::ForceSetArg(const std::string &strArg,
     mapMultiArgs[strArg].push_back(strValue);
 }
 
+void ArgsManager::ForceSetBoolArg(const std::string &strArg, bool fValue) {
+    if (fValue)
+        return ForceSetArg(strArg, std::string("1"));
+    else
+        return ForceSetArg(strArg, std::string("0"));
+}
+
 /**
  * This function is only used for testing purpose so
  * so we should not worry about element uniqueness and

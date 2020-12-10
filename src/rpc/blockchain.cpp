@@ -284,22 +284,6 @@ std::string EntryDescriptionString() {
            "entered pool in seconds since 1 Jan 1970 GMT\n"
            "    \"height\" : n,           (numeric) block height when "
            "transaction entered pool\n"
-           "    \"startingpriority\" : n, (numeric) DEPRECATED. Priority when "
-           "transaction entered pool\n"
-           "    \"currentpriority\" : n,  (numeric) DEPRECATED. Transaction "
-           "priority now\n"
-           "    \"descendantcount\" : n,  (numeric) number of in-mempool "
-           "descendant transactions (including this one)\n"
-           "    \"descendantsize\" : n,   (numeric) virtual transaction size "
-           "of in-mempool descendants (including this one)\n"
-           "    \"descendantfees\" : n,   (numeric) modified fees (see above) "
-           "of in-mempool descendants (including this one)\n"
-           "    \"ancestorcount\" : n,    (numeric) number of in-mempool "
-           "ancestor transactions (including this one)\n"
-           "    \"ancestorsize\" : n,     (numeric) virtual transaction size "
-           "of in-mempool ancestors (including this one)\n"
-           "    \"ancestorfees\" : n,     (numeric) modified fees (see above) "
-           "of in-mempool ancestors (including this one)\n"
            "    \"depends\" : [           (array) unconfirmed transactions "
            "used as inputs for this transaction\n"
            "        \"transactionid\",    (string) parent transaction id\n"
@@ -312,7 +296,7 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
 {
     if (pushId)
     {
-        jWriter.writeBeginObject(e.GetTx().GetId().ToString());
+        jWriter.writeBeginObject(e.GetTxId().ToString());
     }
     else
     {
@@ -324,17 +308,9 @@ void writeMempoolEntryToJsonNL(const CTxMemPoolEntry& e,
     jWriter.pushKV("modifiedfee", e.GetModifiedFee());
     jWriter.pushKV("time", e.GetTime());
     jWriter.pushKV("height", static_cast<uint64_t>(e.GetHeight()));
-    jWriter.pushKV("startingpriority", e.GetPriority(e.GetHeight()));
-    jWriter.pushKV("currentpriority", e.GetPriority(chainActive.Height()));
-    jWriter.pushKV("descendantcount", e.GetCountWithDescendants());
-    jWriter.pushKV("descendantsize", e.GetSizeWithDescendants());
-    jWriter.pushKV("descendantfees", e.GetModFeesWithDescendants().GetSatoshis());
-    jWriter.pushKV("ancestorcount", e.GetCountWithAncestors());
-    jWriter.pushKV("ancestorsize", e.GetSizeWithAncestors());
-    jWriter.pushKV("ancestorfees", e.GetModFeesWithAncestors().GetSatoshis());
     std::set<std::string> deps;
-    const CTransaction& tx = e.GetTx();
-    for (const CTxIn& txin : tx.vin)
+    const auto tx = e.GetSharedTx();
+    for (const CTxIn &txin : tx->vin)
     {
         const auto& hash = txin.prevout.GetTxId();
         if (snapshot.TxIdExists(hash)) {
@@ -365,9 +341,6 @@ void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false)
     else
     {
         std::vector<uint256> vtxids;
-        // FIXME: This causes a really expensive copy & sort of the mempool
-        //        index. Is sorting really necessary? Note that the verbose
-        //        variant returns transactions in a different order.
         mempool.QueryHashes(vtxids);
 
         jWriter.writeBeginArray();
@@ -551,7 +524,7 @@ void getmempoolancestors(const Config &config,
             jWriter.writeBeginArray();
             for (const auto& entry : snapshot)
             {
-                jWriter.pushV(entry.GetTx().GetId().ToString());
+                jWriter.pushV(entry.GetTxId().ToString());
             }
             jWriter.writeEndArray();
         } else {
@@ -636,7 +609,7 @@ void getmempooldescendants(const Config &config,
             jWriter.writeBeginArray();
             for (const auto& entry : snapshot)
             {
-                jWriter.pushV(entry.GetTx().GetId().ToString());
+                jWriter.pushV(entry.GetTxId().ToString());
             }
             jWriter.writeEndArray();
         } else {
@@ -1965,8 +1938,10 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             {
                 jWriter.pushKV("error", "missing");
             }
-            else if(const CTransaction* tx = mempool.IsSpentBy(outPoints[arrayIndex]))
+            else if(const auto wrapper = mempool.IsSpentBy(outPoints[arrayIndex]))
             {
+                // FIXME: This could be reading the transaction from disk!
+                const auto tx = wrapper->GetTx();
                 jWriter.pushKV("error", "spent");
                 jWriter.writeBeginObject("collidedWith");
                 jWriter.pushKV("txid", tx->GetId().GetHex());
@@ -2308,14 +2283,18 @@ UniValue mempoolInfoToJSON(const Config& config) {
         Pair("nonfinalsize", (int64_t)mempool.getNonFinalPool().getNumTxns()));
     ret.push_back(Pair("bytes", (int64_t)mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t)mempool.DynamicMemoryUsage()));
+    ret.push_back(Pair("usagedisk", (int64_t)mempool.GetDiskUsage()));
+    ret.push_back(Pair("usagecpfp", (int64_t)mempool.SecondaryMempoolUsage()));
     ret.push_back(
         Pair("nonfinalusage",
              (int64_t)mempool.getNonFinalPool().estimateMemoryUsage()));
-    size_t maxmempool = config.GetMaxMempool();
-    ret.push_back(Pair("maxmempool", (int64_t)maxmempool));
+    MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
+    ret.push_back(Pair("maxmempool", static_cast<int64_t>(limits.Memory())));
+    ret.push_back(Pair("maxmempoolsizedisk", static_cast<int64_t>(limits.Disk())));
+    ret.push_back(Pair("maxmempoolsizecpfp", static_cast<int64_t>(limits.Secondary())));
     ret.push_back(
         Pair("mempoolminfee",
-             ValueFromAmount(mempool.GetMinFee(maxmempool).GetFeePerK())));
+             ValueFromAmount(mempool.GetMinFee(limits.Total()).GetFeePerK())));
 
     return ret;
 }
@@ -3051,15 +3030,17 @@ UniValue rebuildjournal(const Config &config, const JSONRPCRequest &request) {
     if (request.fHelp || request.params.size() != 0) {
         throw std::runtime_error(
             "rebuildjournal\n"
-            "\nForces the block assembly journal to be rebuilt to make it "
-            "consistent with the TX mempool.\n"
+            "\nForces the block assembly journal and the TX mempool to be rebuilt to make them "
+            "consistent with each other.\n"
             "\nResult:\n"
             "\nExamples:\n" +
             HelpExampleCli("rebuildjournal", "") +
             HelpExampleRpc("rebuildjournal", ""));
     }
 
-    mempool.RebuildJournal();
+    auto changeSet = mempool.RebuildMempool();
+    changeSet->apply();
+
     return NullUniValue;
 }
 

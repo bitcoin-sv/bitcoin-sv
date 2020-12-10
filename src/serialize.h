@@ -8,6 +8,8 @@
 
 #include "compat/endian.h"
 
+#include <boost/uuid/uuid.hpp>
+
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -578,6 +580,14 @@ template <typename Stream, typename T>
 void Unserialize(Stream &os, std::shared_ptr<const T> &p);
 
 /**
+ * UUID
+ */
+template <typename Stream>
+void Serialize(Stream &os, const boost::uuids::uuid &v);
+template <typename Stream>
+void Unserialize(Stream &is, boost::uuids::uuid &v);
+
+/**
  * unique_ptr
  */
 template <typename Stream, typename T>
@@ -840,6 +850,27 @@ void Serialize(Stream &os, const std::shared_ptr<const T> &p) {
 template <typename Stream, typename T>
 void Unserialize(Stream &is, std::shared_ptr<const T> &p) {
     p = std::make_shared<const T>(deserialize, is);
+}
+
+/**
+ * UUID
+ */
+template <typename Stream>
+void Serialize(Stream &os, const boost::uuids::uuid &v) {
+    // The size of the UUID is fixed at 16 bytes.
+    static constexpr auto uuid_size = boost::uuids::uuid::static_size();
+    static_assert(uuid_size == 16);
+    static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
+    os.write(reinterpret_cast<const char*>(v.data), uuid_size);
+}
+
+template <typename Stream>
+void Unserialize(Stream &is, boost::uuids::uuid &v) {
+    // The size of the UUID is fixed at 16 bytes.
+    static constexpr auto uuid_size = boost::uuids::uuid::static_size();
+    static_assert(uuid_size == 16);
+    static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
+    is.read(reinterpret_cast<char*>(v.data), uuid_size);
 }
 
 /**

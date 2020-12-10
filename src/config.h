@@ -45,8 +45,6 @@ public:
     virtual bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) = 0;
     virtual int64_t GetBlockSizeActivationTime() const = 0;
 
-    virtual bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) = 0;
-    virtual uint8_t GetBlockPriorityPercentage() const = 0;
     virtual const CChainParams &GetChainParams() const = 0;
 
     virtual bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) = 0;
@@ -76,17 +74,11 @@ public:
     virtual void SetDataCarrierSize(uint64_t dataCarrierSize) = 0;
     virtual uint64_t GetDataCarrierSize() const = 0;
 
-    virtual void SetLimitAncestorSize(uint64_t limitAncestorSize) = 0;
-    virtual uint64_t GetLimitAncestorSize() const = 0;
-
-    virtual void SetLimitDescendantSize(uint64_t limitDescendantSize) = 0;
-    virtual uint64_t GetLimitDescendantSize() const = 0;
-
     virtual void SetLimitAncestorCount(uint64_t limitAncestorCount) = 0;
     virtual uint64_t GetLimitAncestorCount() const = 0;
 
-    virtual void SetLimitDescendantCount(uint64_t limitDescendantCount) = 0;
-    virtual uint64_t GetLimitDescendantCount() const = 0;
+    virtual void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) = 0;
+    virtual uint64_t GetLimitSecondaryMempoolAncestorCount() const = 0;
 
     virtual void SetTestBlockCandidateValidity(bool test) = 0;
     virtual bool GetTestBlockCandidateValidity() const = 0;
@@ -166,11 +158,14 @@ public:
     virtual bool SetMaxMempool(int64_t maxMempool, std::string* err) = 0;
     virtual uint64_t GetMaxMempool() const = 0;
 
+    virtual bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) = 0;
+    virtual uint64_t GetMaxMempoolSizeDisk() const = 0;
+
+    virtual bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) = 0;
+    virtual uint64_t GetMempoolMaxPercentCPFP() const = 0;
+
     virtual bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) = 0;
     virtual uint64_t GetMemPoolExpiry() const = 0;
-
-    virtual bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) = 0;
-    virtual uint64_t GetLimitFreeRelay() const = 0;
 
     virtual bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) = 0;
     virtual uint64_t GetMaxOrphanTxSize() const = 0;
@@ -195,6 +190,9 @@ public:
     // P2P parameters
     virtual bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) = 0;
     virtual int64_t GetP2PHandshakeTimeout() const = 0;
+
+    virtual bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) = 0;
+    virtual bool GetDisableBIP30Checks() const = 0;
 
 #if ENABLE_ZMQ
     virtual bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) = 0;
@@ -229,8 +227,6 @@ public:
     bool SetBlockSizeActivationTime(int64_t activationTime, std::string* err = nullptr) override;
     int64_t GetBlockSizeActivationTime() const override;
 
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override;
-    uint8_t GetBlockPriorityPercentage() const override;
     const CChainParams &GetChainParams() const override;
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override;
@@ -260,18 +256,12 @@ public:
     void SetDataCarrierSize(uint64_t dataCarrierSize) override;
     uint64_t GetDataCarrierSize() const override;
 
-    void SetLimitAncestorSize(uint64_t limitAncestorSize) override;
-    uint64_t GetLimitAncestorSize() const override;
-
-    void SetLimitDescendantSize(uint64_t limitDescendantSize) override;
-    uint64_t GetLimitDescendantSize() const override;
-
     void SetLimitAncestorCount(uint64_t limitAncestorCount) override;
     uint64_t GetLimitAncestorCount() const override;
 
-    void SetLimitDescendantCount(uint64_t limitDescendantCount) override;
-    uint64_t GetLimitDescendantCount() const override;
-
+    void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) override;
+    uint64_t GetLimitSecondaryMempoolAncestorCount() const override;
+    
     void SetTestBlockCandidateValidity(bool test) override;
     bool GetTestBlockCandidateValidity() const override;
 
@@ -355,11 +345,14 @@ public:
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override;
     uint64_t GetMaxMempool() const override;
 
+    bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) override;
+    uint64_t GetMaxMempoolSizeDisk() const override;
+
+    bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) override;
+    uint64_t GetMempoolMaxPercentCPFP() const override;
+
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override;
     uint64_t GetMemPoolExpiry() const override;
-
-    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override;
-    uint64_t GetLimitFreeRelay() const override;
 
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override;
     uint64_t GetMaxOrphanTxSize() const override;
@@ -385,6 +378,9 @@ public:
     bool SetP2PHandshakeTimeout(int64_t timeout, std::string* err = nullptr) override;
     int64_t GetP2PHandshakeTimeout() const override { return p2pHandshakeTimeout; }
 
+    bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override;
+    bool GetDisableBIP30Checks() const override;
+
 #if ENABLE_ZMQ
     bool SetInvalidTxZMQMaxMessageSize(int64_t max, std::string* err = nullptr) override;
     int64_t GetInvalidTxZMQMaxMessageSize() const override;
@@ -405,7 +401,6 @@ private:
     // All fileds are initialized in Reset()    
     CFeeRate feePerKB;
     CFeeRate blockMinFeePerKB;
-    uint64_t blockPriorityPercentage;
     uint64_t preferredBlockFileSize;
     uint64_t factorMaxSendQueuesBytes;
 
@@ -429,10 +424,8 @@ private:
     uint64_t minConfConsolidationInput;
     bool acceptNonStdConsolidationInput;
     uint64_t dataCarrierSize;
-    uint64_t limitDescendantCount;
     uint64_t limitAncestorCount;
-    uint64_t limitDescendantSize;
-    uint64_t limitAncestorSize;
+    uint64_t limitSecondaryMempoolAncestorCount;
 
     bool testBlockCandidateValidity;
     mining::CMiningFactory::BlockAssemblerType blockAssemblerType;
@@ -467,8 +460,9 @@ private:
     uint64_t mMaxCoinsProviderCacheSize;
 
     uint64_t mMaxMempool;
+    uint64_t mMaxMempoolSizeDisk;
+    uint64_t mMempoolMaxPercentCPFP;
     uint64_t mMemPoolExpiry;
-    uint64_t mLimitFreeRelay;
     uint64_t mMaxOrphanTxSize;
     int32_t mStopAtHeight;
     uint64_t mPromiscuousMempoolFlags;
@@ -492,10 +486,12 @@ private:
     unsigned int maxProtocolRecvPayloadLength;
     unsigned int maxProtocolSendPayloadLength;
     unsigned int recvInvQueueFactor;
+
+    std::optional<bool> mDisableBIP30Checks;
+
 #if ENABLE_ZMQ
     int64_t invalidTxZMQMaxMessageSize;
 #endif
-
 };
 
 // Dummy for subclassing in unittests
@@ -525,12 +521,6 @@ public:
         return false; 
     }
     int64_t GetBlockSizeActivationTime() const override { return 0; }
-
-    bool SetBlockPriorityPercentage(int64_t blockPriorityPercentage, std::string* err = nullptr) override {
-        SetErrorMsg(err);
-        return false;
-    }
-    uint8_t GetBlockPriorityPercentage() const override { return 0; }
 
     bool SetMaxTxSizePolicy(int64_t value, std::string* err = nullptr) override
     {
@@ -587,17 +577,11 @@ public:
     uint64_t GetDataCarrierSize() const override { return dataCarrierSize; }
     void SetDataCarrierSize(uint64_t dataCarrierSizeIn) override { dataCarrierSize = dataCarrierSizeIn; }
 
-    void SetLimitAncestorSize(uint64_t limitAncestorSize) override {}
-    uint64_t GetLimitAncestorSize() const override { return 0; }
-
-    void SetLimitDescendantSize(uint64_t limitDescendantSize) override {}
-    uint64_t GetLimitDescendantSize() const override { return 0; }
-
     void SetLimitAncestorCount(uint64_t limitAncestorCount) override {}
     uint64_t GetLimitAncestorCount() const override { return 0; }
 
-    void SetLimitDescendantCount(uint64_t limitDescendantCount) override {}
-    uint64_t GetLimitDescendantCount() const override { return 0; }
+    void SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) override {}
+    uint64_t GetLimitSecondaryMempoolAncestorCount() const override { return 0; }
 
     void SetTestBlockCandidateValidity(bool skip) override {}
     bool GetTestBlockCandidateValidity() const override { return false; }
@@ -747,6 +731,24 @@ public:
     }
     uint64_t GetMaxMempool() const override { return DEFAULT_MAX_MEMPOOL_SIZE * ONE_MEGABYTE; }
 
+    bool SetMaxMempoolSizeDisk(int64_t maxMempoolSizeDisk, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMaxMempoolSizeDisk() const override {
+        return DEFAULT_MAX_MEMPOOL_SIZE * DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR * ONE_MEGABYTE;
+    }
+
+    bool SetMempoolMaxPercentCPFP(int64_t mempoolMaxPercentCPFP, std::string* err) override
+    {
+        SetErrorMsg(err);
+
+        return true;
+    }
+    uint64_t GetMempoolMaxPercentCPFP() const override { return DEFAULT_MEMPOOL_MAX_PERCENT_CPFP; }
+
     bool SetMemPoolExpiry(int64_t memPoolExpiry, std::string* err) override
     {
         SetErrorMsg(err);
@@ -754,14 +756,6 @@ public:
         return true;
     }
     uint64_t GetMemPoolExpiry() const override { return DEFAULT_MEMPOOL_EXPIRY * SECONDS_IN_ONE_HOUR; }
-
-    bool SetLimitFreeRelay(int64_t limitFreeRelay, std::string* err) override
-    {
-        SetErrorMsg(err);
-
-        return true;
-    }
-    uint64_t GetLimitFreeRelay() const override { return DEFAULT_LIMITFREERELAY * ONE_KILOBYTE; }
 
     bool SetMaxOrphanTxSize(int64_t maxOrphanTxSize, std::string* err) override
     {
@@ -866,6 +860,16 @@ public:
     uint64_t GetMaxMerkleTreeMemoryCacheSize() const override
     {
         return 0;
+    }
+
+    bool SetDisableBIP30Checks(bool disable, std::string* err = nullptr) override
+    {
+        return true;
+    }
+
+    bool GetDisableBIP30Checks() const override
+    {
+        return true;
     }
 
 private:

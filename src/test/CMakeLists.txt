@@ -76,6 +76,7 @@ add_test_to_suite(bitcoin test_bitcoin
 	compress_tests.cpp
 	config_tests.cpp
 	core_io_tests.cpp
+	cpfp_tests.cpp
 	crypto_tests.cpp
 	cscript_tests.cpp
 	cuckoocache_tests.cpp
@@ -84,12 +85,14 @@ add_test_to_suite(bitcoin test_bitcoin
 	dstencode_tests.cpp
 	enum_cast_tests.cpp
 	excessiveblock_tests.cpp
+	eviction_candidates_tracker_tests.cpp
 	getarg_tests.cpp
 	hash_tests.cpp
 	inv_tests.cpp
     int_serialization_tests.cpp
     instruction_iterator_tests.cpp
     invalid_txn_publisher_tests.cpp
+	journal_assembler_group_tests.cpp
 	journal_tests.cpp
 	json_tests.cpp
 	jsonutil.cpp
@@ -99,8 +102,11 @@ add_test_to_suite(bitcoin test_bitcoin
 	locked_ref_tests.cpp
 	m_candidates_tests.cpp
 	main_tests.cpp
+	mempool_dump_load_tests.cpp
 	mempool_snapshot_tests.cpp
 	mempool_tests.cpp
+	mempooltxdb_tests.cpp
+	mempool_limit_tests.cpp
 	merkle_tests.cpp
 	merkletreefile_readwrite_tests.cpp
 	miner_tests.cpp

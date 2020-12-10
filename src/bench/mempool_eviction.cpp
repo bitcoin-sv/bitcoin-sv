@@ -15,16 +15,14 @@ namespace
 static void AddTx(const CTransaction &tx, const Amount &nFee,
                   CTxMemPool &pool) {
     int64_t nTime = 0;
-    double dPriority = 10.0;
     int32_t nHeight = 1;
     bool spendsCoinbase = false;
-    unsigned int sigOpCost = 4;
     LockPoints lp;
     pool.AddUnchecked(tx.GetId(),
                       CTxMemPoolEntry(MakeTransactionRef(tx), nFee, nTime,
-                                      dPriority, nHeight, tx.GetValueOut(),
-                                      spendsCoinbase, sigOpCost, lp),
-                      nullChangeSet);
+                                      nHeight,
+                                      spendsCoinbase, lp),
+                      TxStorage::memory, nullChangeSet);
 }
 
 // Right now this is only testing eviction performance in an extremely small
@@ -109,7 +107,7 @@ static void MempoolEviction(benchmark::State &state) {
     CTransaction t4(tx4);
     CTransaction t5(tx5);
     CTransaction t6(tx6);
-    CTransaction t7(tx1);
+    CTransaction t7(tx7);
 
     while (state.KeepRunning()) {
         AddTx(t1, Amount(10000LL), pool);

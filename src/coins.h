@@ -295,27 +295,6 @@ inline CoinImpl CoinImpl::FromCoinWithScript(CoinWithScript&& other) noexcept
     return std::move( other ).ToCoinImpl();
 }
 
-class SaltedOutpointHasher {
-private:
-    /** Salt */
-    const uint64_t k0, k1;
-
-public:
-    SaltedOutpointHasher();
-
-    /**
-     * This *must* return size_t. With Boost 1.46 on 32-bit systems the
-     * unordered_map will behave unpredictably if the custom hasher returns a
-     * uint64_t, resulting in failures when syncing the chain (#4634).
-     * Note: This information above might be outdated as the unordered map
-     * container type has meanwhile been switched to the C++ standard library
-     * implementation.
-     */
-    size_t operator()(const COutPoint &outpoint) const {
-        return SipHashUint256Extra(k0, k1, outpoint.GetTxId(), outpoint.GetN());
-    }
-};
-
 class CCoinsCacheEntry {
     // The actual cached data.
     CoinImpl coin;
@@ -574,14 +553,6 @@ public:
     //! Same as HaveInputs but with addition of limiting cache size
     //! If result is std::nullopt
     std::optional<bool> HaveInputsLimited(const CTransaction &tx, size_t maxCachedCoinsUsage) const;
-
-    /**
-     * Return priority of tx at height nHeight. Also calculate the sum of the
-     * values of the inputs that are already in the chain. These are the inputs
-     * that will age and increase priority as new blocks are added to the chain.
-     */
-    double GetPriority(const CTransaction &tx, int32_t nHeight,
-                       Amount &inChainInputValue) const;
 
     /**
      * Detach provider - this function expects that view won't be used until

@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(bint_unary_ops)
     };
     // clang-format on
 
-    for(const auto [n, arg_poly, op_code, exp_poly] : test_data)
+    for(const auto& [n, arg_poly, op_code, exp_poly] : test_data)
     {
         const bint bn{n};
 
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(bint_binary_ops)
         {max64, {1, 0, 0}, {-1, 0, 0}, OP_MAX, {1, 0, 0}},
     };
 
-    for(const auto [n, arg_0_poly, arg_1_poly, op_code, exp_poly] : test_data)
+    for(const auto& [n, arg_0_poly, arg_1_poly, op_code, exp_poly] : test_data)
     {
         LimitedStack stack(UINT32_MAX);
 
@@ -250,8 +250,7 @@ BOOST_AUTO_TEST_CASE(bint_ternary_ops)
         {max64, {2, 4}, {2, 0}, {2, 2}, OP_WITHIN, {0}},  // too high
     };
 
-    for(const auto [n, arg_0_poly, arg_1_poly, arg_2_poly, op_code, exp_poly] :
-        test_data)
+    for(const auto& [n, arg_0_poly, arg_1_poly, arg_2_poly, op_code, exp_poly] : test_data)
     {
         LimitedStack stack(UINT32_MAX);
 
@@ -315,7 +314,7 @@ BOOST_AUTO_TEST_CASE(bint_bint_numequalverify)
         {max64, {2, 0, 0}, {-1, 0, 0}, OP_NUMEQUALVERIFY, {0}},
     };
 
-    for(const auto [n, arg_0_poly, arg_1_poly, op_code, exp_poly] : test_data)
+    for(const auto& [n, arg_0_poly, arg_1_poly, op_code, exp_poly] : test_data)
     {
         LimitedStack stack(UINT32_MAX);
 
@@ -444,7 +443,7 @@ BOOST_AUTO_TEST_CASE(operands_too_large)
     };
     // clang-format on
 
-    for (const auto [arg0_size, arg1_size, op_code, exp_status,
+    for (const auto& [arg0_size, arg1_size, op_code, exp_status,
         exp_script_error] : test_data)
     {
         LimitedStack stack(UINT32_MAX);
@@ -627,7 +626,7 @@ BOOST_AUTO_TEST_CASE(op_size)
         {max64, {1, 1} },
     };
 
-    for(const auto [n, arg_poly] : test_data)
+    for(const auto& [n, arg_poly] : test_data)
     {
         const bint bn{n};
 
@@ -671,7 +670,7 @@ BOOST_AUTO_TEST_CASE(op_pick)
         {OP_2, 0},
     };
 
-    for(const auto [op_code, i] : test_data)
+    for(const auto& [op_code, i] : test_data)
     {
         vector<uint8_t> args;
         args.push_back(OP_0);
@@ -771,7 +770,7 @@ BOOST_AUTO_TEST_CASE(op_split)
     };
     // clang-format on
 
-    for (const auto [i, pos, lhs, rhs] : test_data) {
+    for (const auto& [i, pos, lhs, rhs] : test_data) {
         vector<uint8_t> args;
         args.push_back(0x2);
         args.push_back(0x0);
@@ -826,7 +825,7 @@ BOOST_AUTO_TEST_CASE(op_lshift)
     };
     // clang-format on
 
-    for(const auto [n_shift, expected] : test_data)
+    for(const auto& [n_shift, expected] : test_data)
     {
         vector<uint8_t> args{0x2, 0x0, 0x1}; // 0000 0000 0000 0001 <- bits to shift
         args.insert(args.end(), n_shift.begin(), n_shift.end());
@@ -875,7 +874,7 @@ BOOST_AUTO_TEST_CASE(op_rshift)
     };
     // clang-format on
 
-    for(const auto [n_shift, expected] : test_data)
+    for(const auto& [n_shift, expected] : test_data)
     {
         vector<uint8_t> args{0x2, 0x80, 0x0}; // 1000 0000 0000 0000 <- bits to shift
         args.insert(args.end(), n_shift.begin(), n_shift.end());
@@ -982,7 +981,7 @@ BOOST_AUTO_TEST_CASE(op_checksig)
     };
     // clang-format on
 
-    for(const auto [signature, pub_key, exp_status, exp_error, exp_stack_top] :
+    for(const auto& [signature, pub_key, exp_status, exp_error, exp_stack_top] :
         test_data)
     {
         vector<uint8_t> args;
@@ -1050,8 +1049,8 @@ BOOST_AUTO_TEST_CASE(op_checkmultisig)
     };
     // clang-format on
 
-    for(const auto [n_sigs, signatures, n_pub_keys, public_keys, exp_status,
-                    exp_error, exp_stack_top] : test_data)
+    for(const auto& [n_sigs, signatures, n_pub_keys, public_keys, exp_status,
+                     exp_error, exp_stack_top] : test_data)
     {
         vector<uint8_t> args{OP_0}; // historic bug start with OP_0
 

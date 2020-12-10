@@ -253,7 +253,6 @@ class PTVP2PTest(ComparisonTestFramework):
         args = ['-checkmempool=0',
                 '-persistmempool=0',
                 '-limitancestorcount=50',
-                '-limitdescendantcount=50',
                 '-txnvalidationasynchrunfreq=100',
                 '-numstdtxvalidationthreads=6',
                 '-numnonstdtxvalidationthreads=2']

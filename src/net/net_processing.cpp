@@ -1203,7 +1203,7 @@ void RelayTransaction(const CTransaction &tx, CConnman &connman) {
         txinfo = mempool.getNonFinalPool().getInfo(tx.GetId());
     }
 
-    if(txinfo.tx)
+    if (!txinfo.IsNull())
     {
         connman.EnqueueTransaction( {inv, txinfo} );
     }
@@ -1595,11 +1595,11 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                     // To protect privacy, do not answer getdata using the
                     // mempool when that TX couldn't have been INVed in reply to
                     // a MEMPOOL request.
-                    if (txinfo.tx &&
+                    if (!txinfo.IsNull() &&
                         txinfo.nTime <= pfrom->timeLastMempoolReq) {
                         connman.PushMessage(pfrom,
                                             msgMaker.Make(NetMsgType::TX,
-                                                          *txinfo.tx));
+                                                          *txinfo.GetTx()));
                         push = true;
                     }
                 }
@@ -2658,8 +2658,8 @@ static void ProcessTxMessage(const Config& config,
                 std::move(ptx), // a pointer to the tx
                 TxSource::p2p,  // tx source
                 TxValidationPriority::high,  // tx validation priority
+                TxStorage::memory, // tx storage
                 GetTime(),      // nAcceptTime
-                true,           // fLimitFree
                 Amount(0),      // nAbsurdFee
                 pfrom));        // pNode
     } else {
@@ -4434,7 +4434,7 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
         LOCK(pto->cs_filter);
 
         for (const auto &txinfo : vtxinfo) {
-            const uint256 &txid = txinfo.tx->GetId();
+            const uint256 &txid = txinfo.GetTxId();
             CInv inv(MSG_TX, txid);
             pto->setInventoryTxToSend.erase(txid);
             if (filterrate != Amount(0)) {
@@ -4442,7 +4442,7 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
                     continue;
                 }
             }
-            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.tx)) {
+            if (!pto->mFilter.IsRelevantAndUpdate(*txinfo.GetTx())) {
                 continue;
             }
             pto->filterInventoryKnown.insert(txid);
@@ -4646,19 +4646,20 @@ void SendFeeFilter(const Config &config, const CNodePtr& pto, CConnman& connman,
         !(pto->fWhitelisted &&
           gArgs.GetBoolArg("-whitelistforcerelay",
                            DEFAULT_WHITELISTFORCERELAY))) {
-        Amount currentFilter = mempool.GetMinFee(config.GetMaxMempool()).GetFeePerK();
+        MempoolSizeLimits limits = MempoolSizeLimits::FromConfig();
+        Amount currentFilter =
+            mempool
+                .GetMinFee(limits.Total())
+                .GetFeePerK();
         int64_t timeNow = GetTimeMicros();
         if (timeNow > pto->nextSendTimeFeeFilter) {
             static CFeeRate default_feerate =
                 CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
             static FeeFilterRounder filterRounder(default_feerate);
             Amount filterToSend = filterRounder.round(currentFilter);
-            // If we don't allow free transactions, then we always have a fee
+            // We don't allow free transactions, we always have a fee
             // filter of at least minRelayTxFee
-            if (config.GetLimitFreeRelay() <= 0) {
-                filterToSend = std::max(filterToSend,
-                                        config.GetMinFeePerKB().GetFeePerK());
-            }
+            filterToSend = std::max(filterToSend, config.GetMinFeePerKB().GetFeePerK());
 
             if (filterToSend != pto->lastSentFeeFilter) {
                 connman.PushMessage(

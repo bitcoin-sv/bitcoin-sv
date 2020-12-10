@@ -52,17 +52,15 @@ CJournalChangeSet::~CJournalChangeSet()
 void CJournalChangeSet::addOperation(Operation op, CJournalEntry&& txn)
 {
     std::unique_lock<std::mutex> lock { mMtx };
-    TxId txid = txn.GetTxId();
     mChangeSet.emplace_back(op, std::move(txn));
-    addOperationCommonNL(op, txid);
-   
+    addOperationCommon(op);
 }
 
 void CJournalChangeSet::addOperation(Operation op, const CJournalEntry& txn)
 {
     std::unique_lock<std::mutex> lock { mMtx };
     mChangeSet.emplace_back(op, txn);
-    addOperationCommonNL(op, txn.GetTxId());
+    addOperationCommon(op);
 }
 
 // Is our reason for the update a basic one? By "basic", we mean a change that
@@ -93,7 +91,7 @@ void CJournalChangeSet::apply()
 void CJournalChangeSet::clear()
 {
     std::unique_lock<std::mutex> lock { mMtx };
-    clearNL();
+    mChangeSet.clear();
 }
 
 
@@ -109,7 +107,7 @@ bool CJournalChangeSet::CheckTopoSort() const
         auto selectionsEnd =boost::make_filter_iterator(predicate, mChangeSet.cend(), mChangeSet.cend());
         std::transform(selections, selectionsEnd,
                        std::inserter(transactionIds, transactionIds.begin()),
-                       [](auto& change) { return change.second.getTxn()->GetHash(); });
+                       [](auto& change) { return change.second.getTxn()->GetId(); });
         std::sort(transactionIds.begin(), transactionIds.end());
         return transactionIds;
     };
@@ -133,9 +131,10 @@ bool CJournalChangeSet::CheckTopoSort() const
         if (!isAddition(*i)) {
             continue;
         }
-        const CTransactionRef& txn = i->second.getTxn();
-        auto unsorted = std::find_if(txn->vin.cbegin(),
-                                    txn->vin.cend(),
+        // FIXME: We may read the transaction from disk, but for now
+        //        this method is only called from CheckMempool().
+        auto txn = i->second.getTxn()->GetTx();
+        auto unsorted = std::find_if(txn->vin.cbegin(), txn->vin.cend(),
                                      [&laterTransactions](const CTxIn& txInput) {
                                          return laterTransactions.count(txInput.prevout.GetTxId());
                                      });
@@ -154,18 +153,16 @@ bool CJournalChangeSet::CheckTopoSort() const
             }
             uint256 prevTxId(unsorted->prevout.GetTxId());
             const auto prevTx = std::find_if(mChangeSet.cbegin(), mChangeSet.cend(), [&prevTxId](const auto &change) {
-                return change.second.getTxn()->GetHash() == prevTxId;
+                return change.second.getTxn()->GetId() == prevTxId;
             });
             size_t prevTxIdx = std::distance(mChangeSet.cbegin(), prevTx);
-            LogPrintf("=x== ChangeSet[%d] %s input %d ancestor depth %d"
-                      " references a later ChangeSet[%d] %s ancestor depth %d\n",
+            LogPrintf("=x== ChangeSet[%d] %s input %d"
+                      " references a later ChangeSet[%d] %s\n",
                       (std::distance(mChangeSet.cbegin(), i)),
                       txn->GetHash().GetHex(),
                       std::distance(txn->vin.cbegin(), unsorted),
-                      i->second.getAncestorCount()->nCountWithAncestors,
                       prevTxIdx,
-                      prevTxId.GetHex(),
-                      prevTx->second.getAncestorCount()->nCountWithAncestors
+                      prevTxId.GetHex()
                       );
         }
     }
@@ -181,33 +178,13 @@ void CJournalChangeSet::applyNL()
         mBuilder.applyChangeSet(*this);
 
         // Make sure we don't get applied again if we are later called by the destructor
-        clearNL();
+        mChangeSet.clear();
     }
 }
 
-void mining::CJournalChangeSet::clearNL()
-{
-    mChangeSet.clear();
-    mAddedTransactions.clear();
-    mRemovedTransactions.clear();
-}
-
-bool CJournalChangeSet::checkTxnAdded(const TxId& txid) const
-{
-    std::unique_lock<std::mutex> lock { mMtx };
-    return mAddedTransactions.find(txid) != mAddedTransactions.end();
-}
-
-bool CJournalChangeSet::checkTxnRemoved(const TxId& txid) const
-{
-    std::unique_lock<std::mutex> lock { mMtx };
-    return mRemovedTransactions.find(txid) != mRemovedTransactions.end();
-}
-
-
 
 // Common post operation addition steps - caller holds mutex
-void CJournalChangeSet::addOperationCommonNL(Operation op, const TxId& txid)
+void CJournalChangeSet::addOperationCommon(Operation op)
 {
     // If this was a remove operation then we're no longer a simply appending
     if(op != Operation::ADD)
@@ -215,20 +192,8 @@ void CJournalChangeSet::addOperationCommonNL(Operation op, const TxId& txid)
         mTailAppendOnly = false;
     }
 
-    // update sets of the added or removed transactions
-    if (op == Operation::ADD)
-    {
-        mAddedTransactions.insert(txid);
-        mRemovedTransactions.erase(txid);
-    }
-    else
-    {
-        mAddedTransactions.erase(txid);
-        mRemovedTransactions.insert(txid);
-    }
-
     // If it's safe to do so, immediately apply this change to the journal
-    if(isUpdateReasonBasic())
+    if(isUpdateReasonBasic() && mChangeSet.back().second.isPaying())
     {
         applyNL();
     }

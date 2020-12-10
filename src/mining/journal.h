@@ -10,7 +10,7 @@
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/random_access_index.hpp>
-#include <boost/multi_index/mem_fun.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
 
 #include <atomic>
 #include <memory>
@@ -60,13 +60,19 @@ class CJournal final
     // Apply changes to the journal
     void applyChanges(const CJournalChangeSet& changeSet);
 
-    // Checks if the transaction is added to journal
-    bool checkTxnExists(const TxId& txid) const;
-
   private:
 
     // Protect our data structures
     mutable std::shared_mutex mMtx {};
+
+    // Compare journal entries
+    struct EntrySorter
+    {
+        bool operator()(const CJournalEntry& entry1, const CJournalEntry& entry2) const
+        {
+            return entry1.getTxn()->GetId() < entry2.getTxn()->GetId();
+        }
+    };
 
     // The journal itself is a multi-index of transactions and the order they
     // should be read/replayed from the journal.
@@ -75,7 +81,8 @@ class CJournal final
         boost::multi_index::indexed_by<
             // Unique transaction
             boost::multi_index::ordered_unique<
-                boost::multi_index::const_mem_fun<CJournalEntry, const TxId, &CJournalEntry::GetTxId>
+                boost::multi_index::identity<CJournalEntry>,
+                EntrySorter
             >,
             // Order of replay
             boost::multi_index::sequenced<>
@@ -187,6 +194,9 @@ class CJournalTester final
     // Dump out the contents of the journal
     void dumpJournalContents(std::ostream& str) const;
 
+    // Get journal content
+    std::set<TxId> getContents() const;
+
   private:
 
     // For speed of checking we need to rebuild the journal using a random access
@@ -196,7 +206,8 @@ class CJournalTester final
         boost::multi_index::indexed_by<
             // Unique transaction
             boost::multi_index::ordered_unique<
-                boost::multi_index::const_mem_fun<CJournalEntry, const TxId, &CJournalEntry::GetTxId>
+                boost::multi_index::identity<CJournalEntry>,
+                CJournal::EntrySorter
             >,
             // Order of replay
             boost::multi_index::random_access<>
