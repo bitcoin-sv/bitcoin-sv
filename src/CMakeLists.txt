@@ -239,7 +239,6 @@ add_library(server
 	block_file_access.cpp
 	chain.cpp
 	checkpoints.cpp
-	config.cpp
 	httprpc.cpp
 	httpserver.cpp
 	init.cpp
