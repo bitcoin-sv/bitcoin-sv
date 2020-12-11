@@ -2657,7 +2657,7 @@ static UniValue getblockstats(const Config &config,
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getblockstats",
-                           "000000000000000001618b0a11306363725fbb8dbecbb0201c2b4064cda00790 '[\"minfeerate\",\"avgfeerate\"]'") +
+                           "000000000000000001618b0a11306363725fbb8dbecbb0201c2b4064cda00790 \"[\\\"minfeerate\\\",\\\"avgfeerate\\\"]\"") +
             HelpExampleRpc("getblockstats",
                            "\"000000000000000001618b0a11306363725fbb8dbecbb0201c2b4064cda00790\", [\"minfeerate\",\"avgfeerate\"]"));
     }
@@ -2755,7 +2755,7 @@ static UniValue getblockstatsbyheight(const Config &config,
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getblockstatsbyheight",
-                           "620538 '[\"minfeerate\",\"avgfeerate\"]'") +
+                           "620538 \"[\\\"minfeerate\\\",\\\"avgfeerate\\\"]\"") +
             HelpExampleRpc("getblockstatsbyheight",
                            "630538, [\"minfeerate\",\"avgfeerate\"]"));
     }
