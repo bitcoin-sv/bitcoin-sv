@@ -201,7 +201,7 @@ add_library(common
 	script/standard.cpp
 	txhasher.cpp
 	warnings.cpp
-    write_preferring_upgradable_mutex.cpp
+	write_preferring_upgradable_mutex.cpp
 )
 
 target_link_libraries(common util secp256k1)
@@ -209,7 +209,7 @@ target_link_libraries(common util secp256k1)
 # libbitcoinconsensus
 add_library(bitcoinconsensus
 	arith_uint256.cpp
-    big_int.cpp
+	big_int.cpp
 	hash.cpp
 	primitives/transaction.cpp
 	pubkey.cpp
@@ -243,8 +243,8 @@ add_library(server
 	httpserver.cpp
 	init.cpp
 	invalid_txn_publisher.cpp
-    invalid_txn_sinks/file_sink.cpp
-    invalid_txn_sinks/zmq_sink.cpp
+	invalid_txn_sinks/file_sink.cpp
+	invalid_txn_sinks/zmq_sink.cpp
 	dbwrapper.cpp
 	mempooltxdb.cpp
 	merkleblock.cpp
@@ -259,16 +259,16 @@ add_library(server
 	mining/journal_change_set.cpp
 	mining/journal_entry.cpp
 	mining/journaling_block_assembler.cpp
-    net/association.cpp
-    net/association_id.cpp
-    net/block_download_tracker.cpp
+	net/association.cpp
+	net/association_id.cpp
+	net/block_download_tracker.cpp
 	net/net.cpp
-    net/net_message.cpp
+	net/net_message.cpp
 	net/net_processing.cpp
-    net/node_state.cpp
-    net/stream.cpp
-    net/stream_policy.cpp
-    net/stream_policy_factory.cpp
+	net/node_state.cpp
+	net/stream.cpp
+	net/stream_policy.cpp
+	net/stream_policy_factory.cpp
 	noui.cpp
 	orphan_txns.cpp
 	policy/fees.cpp
@@ -287,11 +287,11 @@ add_library(server
 	script/sigcache.cpp
 	script/ismine.cpp
 	timedata.cpp
-    time_locked_mempool.cpp
+	time_locked_mempool.cpp
 	txdb.cpp
 	txmempool.cpp
 	txmempoolevictioncandidates.cpp
-    tx_mempool_info.cpp
+	tx_mempool_info.cpp
 	txn_double_spend_detector.cpp
 	txn_propagator.cpp
 	txn_validation_data.cpp
@@ -300,7 +300,7 @@ add_library(server
 	ui_interface.cpp
 	validation.cpp
 	validationinterface.cpp
-    vmtouch.cpp
+	vmtouch.cpp
 )
 
 # This require libevent
@@ -349,11 +349,11 @@ endif()
 
 # RPC client support
 add_library(rpcclient
-    rpc/client.cpp
-    rpc/client_config.cpp
-    rpc/client_utils.cpp
-    rpc/http_request.cpp
-    rpc/http_response.cpp
+	rpc/client.cpp
+	rpc/client_config.cpp
+	rpc/client_utils.cpp
+	rpc/http_request.cpp
+	rpc/http_response.cpp
 )
 target_link_libraries(rpcclient univalue util)
 
