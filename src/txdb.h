@@ -12,9 +12,11 @@
 #include "write_preferring_upgradable_mutex.h"
 
 #include <map>
+#include <shared_mutex>
 #include <string>
 #include <utility>
 #include <vector>
+#include <optional>
 
 class CBlockFileInfo;
 class CBlockIndex;
@@ -215,7 +217,7 @@ private:
     uint64_t mCacheSizeThreshold;
 
     /* A mutex to support a thread safe access to cache. */
-    mutable std::mutex mCoinsViewCacheMtx {};
+    mutable std::shared_mutex mCoinsViewCacheMtx {};
 
     /**
      * Contains outpoints that are currently being loaded from base view by
@@ -223,7 +225,59 @@ private:
      * multiple threads and enables us not to hold the locks while loading from
      * base view, which can be slow if it is backed by disk.
      */
-    mutable std::set<COutPoint> mFetchingCoins;
+    class FetchingCoins
+    {
+    public:
+        class ScopeGuard
+        {
+        public:
+            ScopeGuard( FetchingCoins& fc, std::set<COutPoint>::iterator it ) noexcept
+                : mFc{ &fc }
+                , mIt{ it }
+            {}
+            ~ScopeGuard() noexcept
+            {
+                if(mFc)
+                {
+                    std::lock_guard lock{ mFc->mMutex };
+                    mFc->mCoins.erase( mIt );
+                }
+            }
+
+            ScopeGuard(const ScopeGuard&) = delete;
+            ScopeGuard& operator=(const ScopeGuard&) = delete;
+            ScopeGuard(ScopeGuard&&) = default;
+            ScopeGuard& operator=(ScopeGuard&&) = default;
+
+        private:
+            // helper to get default move construction/assignment in this class
+            struct NullDeleter{void operator()(FetchingCoins*){}};
+
+            // unique_ptr is used instead of std::optional<ref_wrapper> because
+            // move from ref_wrapper actually makes a copy so we'd still need to
+            // write custom move constructor/assignment in such case which is
+            // error prone and thus we try to avoid it
+            std::unique_ptr<FetchingCoins, NullDeleter> mFc;
+            std::set<COutPoint>::iterator mIt;
+        };
+
+        std::optional<ScopeGuard> TryInsert(const COutPoint& outpoint)
+        {
+            std::lock_guard lock{ mMutex };
+
+            if (auto [it, success] = mCoins.insert(outpoint); success)
+            {
+                return std::optional<ScopeGuard>{std::in_place, *this, it};
+            }
+
+            return std::nullopt;
+        }
+
+    private:
+        mutable std::mutex mMutex;
+        mutable std::set<COutPoint> mCoins;
+    };
+    mutable FetchingCoins mFetchingCoins;
 };
 
 /**
