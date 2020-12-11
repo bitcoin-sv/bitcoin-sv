@@ -220,7 +220,6 @@ add_library(bitcoinconsensus
 	script/script.cpp
 	script/script_num.cpp
 	script/script_error.cpp
-	utilstrencodings.cpp
 )
 
 target_link_libraries(bitcoinconsensus common)
