@@ -10,7 +10,10 @@
 #include <boost/uuid/uuid_io.hpp>
 
 #include <algorithm>
+#include <array>
+#include <future>
 #include <random>
+#include <unordered_map>
 #include <vector>
 
 
@@ -888,4 +891,136 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
     BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
 }
+
+
+namespace {
+    CTransactionWrapperRef MakeTxWrapper(std::shared_ptr<CMempoolTxDBReader> txdb)
+    {
+        const auto entries = GetABunchOfEntries(1);
+        return std::make_shared<CTransactionWrapper>(entries[0].GetSharedTx(), txdb);
+    }
+
+    struct FakeMempoolTxDB : CMempoolTxDBReader
+    {
+        virtual bool GetTransaction(const uint256 &txid, CTransactionRef &tx) override
+        {
+            if (const auto it = database.find(txid); it != database.end())
+            {
+                // Always return a copy of the transaction in the database to
+                // simulate actual reading from disk.
+                tx = std::make_shared<CTransaction>(*it->second);;
+                return true;
+            }
+            tx = nullptr;
+            return false;
+        }
+
+        virtual bool TransactionExists(const uint256 &txid) override
+        {
+            return database.count(txid) > 0;
+        }
+
+        void QuoteSaveToDiskUnquote(const CTransactionWrapperRef& wrapper)
+        {
+            if (wrapper->IsInMemory())
+            {
+                // Create a separate copy of the transaction to avoid ownership
+                // mixups with the wrapper.
+                auto tx = std::make_shared<CTransaction>(*wrapper->GetTx());
+                database.emplace(tx->GetId(), tx);
+                wrapper->ResetTransaction();
+            }
+        }
+
+        std::unordered_map<uint256, CTransactionRef> database;
+    };
+
+    void MultiCheck(const CTransactionRef& tx, const CTransactionWrapperRef& wrapper)
+    {
+        std::array<std::future<CTransactionRef>, 100> threads;
+        for (auto& f : threads)
+        {
+            f = std::async(std::launch::async,
+                           [&](){
+                               return wrapper->GetTx();
+                           });
+        }
+
+        const auto firsttx = threads[0].get();
+        BOOST_CHECK(firsttx != nullptr);
+        for (auto& f : threads)
+        {
+            if (f.valid())
+            {
+                BOOST_CHECK(f.get() == firsttx);
+            }
+        }
+        if (tx)
+        {
+            BOOST_CHECK(firsttx == tx);
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE(TxWrapper_UniqueOwned)
+{
+    const auto wrapper = MakeTxWrapper(nullptr);
+
+    // Make sure the same wrapper always returns the same pointer when it's in-memory
+    const auto tx = wrapper->GetTx();
+    MultiCheck(tx, wrapper);
+    BOOST_CHECK(wrapper->GetTx() == tx);
+}
+
+BOOST_AUTO_TEST_CASE(TxWrapper_UniqueOwnedWeak)
+{
+    const auto txdb = std::make_shared<FakeMempoolTxDB>();
+    const auto wrapper = MakeTxWrapper(txdb);
+
+    // Make sure the same wrapper always returns the same pointer when a tx is
+    // kept in memory even when it's "saved to disk".
+    const auto tx = wrapper->GetTx();
+    txdb->QuoteSaveToDiskUnquote(wrapper);
+    BOOST_CHECK(!wrapper->IsInMemory());
+    BOOST_CHECK(txdb->TransactionExists(wrapper->GetId()));
+    CTransactionRef anothertx;
+    BOOST_CHECK(txdb->GetTransaction(wrapper->GetId(), anothertx));
+    BOOST_CHECK(anothertx != tx);
+
+    MultiCheck(tx, wrapper);
+    BOOST_CHECK(wrapper->GetTx() == tx);
+}
+
+BOOST_AUTO_TEST_CASE(TxWrapper_EventuallyUniqueWeak)
+{
+    const auto txdb = std::make_shared<FakeMempoolTxDB>();
+    const auto wrapper = MakeTxWrapper(txdb);
+
+    // Make sure the same wrapper always returns the same pointer when it's been
+    // read from the txdb once.
+    auto tx = wrapper->GetTx();
+    txdb->QuoteSaveToDiskUnquote(wrapper);
+    BOOST_CHECK(!wrapper->IsInMemory());
+    BOOST_CHECK(txdb->TransactionExists(wrapper->GetId()));
+
+    CTransactionRef savedtx;
+    BOOST_CHECK(txdb->GetTransaction(wrapper->GetId(), savedtx));
+    BOOST_CHECK(savedtx != nullptr);
+    BOOST_CHECK(savedtx != tx);
+    BOOST_CHECK(savedtx->GetId() == wrapper->GetId());
+
+    // At this point, we stil have a live copy of the pointer, so the wrapper
+    // should be able to return it.
+    BOOST_CHECK(wrapper->GetTx() == tx);
+
+    // Throw away all live tx pointers, only the one in the database exists and
+    // it's different than the weak reference in the wrapper.
+    savedtx.reset();
+    tx.reset();
+
+    // The wrapper should read from the database exactly once.
+    MultiCheck(nullptr, wrapper);
+    BOOST_CHECK(wrapper->GetTx() != nullptr);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
