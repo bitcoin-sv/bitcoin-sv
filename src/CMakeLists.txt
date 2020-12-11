@@ -182,13 +182,13 @@ add_library(common
 	amount.cpp
 	base58.cpp
 	chainparams.cpp
-	config.cpp
-	consensus/merkle.cpp
 	coins.cpp
 	compressor.cpp
-	dstencode.cpp
+	config.cpp
+	consensus/merkle.cpp
 	core_read.cpp
 	core_write.cpp
+	dstencode.cpp
 	key.cpp
 	keystore.cpp
 	net/netaddress.cpp
@@ -218,8 +218,8 @@ add_library(bitcoinconsensus
 	script/limitedstack.cpp
 	script/opcodes.cpp
 	script/script.cpp
-	script/script_num.cpp
 	script/script_error.cpp
+	script/script_num.cpp
 )
 
 target_link_libraries(bitcoinconsensus common)
@@ -230,22 +230,22 @@ target_include_directories(bitcoinconsensus
 
 # Bitcoin server facilities
 add_library(server
-	addrman.cpp
 	addrdb.cpp
-	bloom.cpp
-	blockencodings.cpp
-	block_file_info.cpp
-	blockfileinfostore.cpp
+	addrman.cpp
 	block_file_access.cpp
+	block_file_info.cpp
+	blockencodings.cpp
+	blockfileinfostore.cpp
+	bloom.cpp
 	chain.cpp
 	checkpoints.cpp
+	dbwrapper.cpp
 	httprpc.cpp
 	httpserver.cpp
 	init.cpp
 	invalid_txn_publisher.cpp
 	invalid_txn_sinks/file_sink.cpp
 	invalid_txn_sinks/zmq_sink.cpp
-	dbwrapper.cpp
 	mempooltxdb.cpp
 	merkleblock.cpp
 	merkletree.cpp
@@ -277,26 +277,26 @@ add_library(server
 	rest.cpp
 	rpc/abc.cpp
 	rpc/blockchain.cpp
-	rpc/mining.cpp
 	rpc/mining-fbb.cpp
+	rpc/mining.cpp
 	rpc/misc.cpp
 	rpc/net.cpp
 	rpc/rawtransaction.cpp
 	rpc/server.cpp
+	script/ismine.cpp
 	script/scriptcache.cpp
 	script/sigcache.cpp
-	script/ismine.cpp
-	timedata.cpp
 	time_locked_mempool.cpp
+	timedata.cpp
+	tx_mempool_info.cpp
 	txdb.cpp
 	txmempool.cpp
 	txmempoolevictioncandidates.cpp
-	tx_mempool_info.cpp
 	txn_double_spend_detector.cpp
 	txn_propagator.cpp
+	txn_recent_rejects.cpp
 	txn_validation_data.cpp
 	txn_validator.cpp
-	txn_recent_rejects.cpp
 	ui_interface.cpp
 	validation.cpp
 	validationinterface.cpp
