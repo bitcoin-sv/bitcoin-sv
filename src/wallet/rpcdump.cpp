@@ -1209,7 +1209,8 @@ UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
             HelpExampleCli("importmulti", "\"[{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my address\\\"}, \\\"timestamp\\\":1455191478}, "
                                           "{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my 2nd address\\\"}, \\\"label\\\":\\\"example 2\\\", \\\"timestamp\\\":1455191480}]\"") +
             HelpExampleCli("importmulti", "\"[{\\\"scriptPubKey\\\": {\\\"address\\\":\\\"my address\\\"}, \\\"timestamp\\\":1455191478}]\" \"{\\\"rescan\\\":false}\"") +
-
+            HelpExampleRpc("importmulti", "[{\"scriptPubKey\": {\"address\":\"my address\"}, \"timestamp\":1455191478}], {\"rescan\":false}") +
+            
             "\nResponse is an array with the same size as the input that has the execution result :\n"
             "  [{ \"success\": true } , { \"success\": false, \"error\": { \"code\": -1, \"message\": \"Internal Server Error\"} }, ... ]\n");
     }

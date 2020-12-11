@@ -3308,6 +3308,7 @@ static UniValue fundrawtransaction(const Config &config,
                            "\"[]\" \"{\\\"myaddress\\\":0.01}\"") +
             "\nAdd sufficient unsigned inputs to meet the output value\n" +
             HelpExampleCli("fundrawtransaction", "\"rawtransactionhex\"") +
+            HelpExampleRpc("fundrawtransaction", "\"rawtransactionhex\"") +
             "\nSign the transaction\n" +
             HelpExampleCli("signrawtransaction", "\"fundedtransactionhex\"") +
             "\nSend the transaction\n" +
@@ -3468,7 +3469,8 @@ static UniValue generate(const Config &config, const JSONRPCRequest &request) {
             "[ blockhashes ]     (array) hashes of blocks generated\n"
             "\nExamples:\n"
             "\nGenerate 11 blocks\n" +
-            HelpExampleCli("generate", "11"));
+            HelpExampleCli("generate", "11") +
+            HelpExampleRpc("generate", "11"));
     }
 
     int num_generate = request.params[0].get_int();
