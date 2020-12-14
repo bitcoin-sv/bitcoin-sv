@@ -525,6 +525,12 @@ class P2PAssociation(BitcoinTestFramework):
                       init_data_dir=True)
         self.start_node(3)
 
+        # Check streampolicies field from getnetworkinfo
+        assert_equal(self.nodes[0].getnetworkinfo()["streampolicies"], "BlockPriority,Default")
+        assert_equal(self.nodes[1].getnetworkinfo()["streampolicies"], "BlockPriority,Default")
+        assert_equal(self.nodes[2].getnetworkinfo()["streampolicies"], "BlockPriority,Default")
+        assert_equal(self.nodes[3].getnetworkinfo()["streampolicies"], "Default")
+
         # Connect the new node to one of the existing nodes and check that they establish a Default association
         connect_nodes(self.nodes[1], 3)
         expected1 = [
