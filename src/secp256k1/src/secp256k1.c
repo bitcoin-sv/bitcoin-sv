@@ -6,6 +6,12 @@
 
 #include "include/secp256k1.h"
 
+#if defined(__clang__) || defined (__GNUC__)
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+#else
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS
+#endif
+
 #include "util.h"
 #include "num_impl.h"
 #include "field_impl.h"
