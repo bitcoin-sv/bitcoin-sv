@@ -67,7 +67,7 @@ struct LockPoints {
 };
 
 class CTxMemPool;
-struct CPFPGroup;
+class CPFPGroup;
 
 /**
  * Statistics for the secondary mempool and CPFP groups.
@@ -430,7 +430,7 @@ private:
     CTimeLockedMempool mTimeLockedPool {};
 
     // The group definition needs access to the mempool index iterator type.
-    friend struct CPFPGroup;
+    friend class CPFPGroup;
 
 public:
     // FIXME: DEPRECATED - this will become private and ultimately changed or removed
@@ -1248,17 +1248,33 @@ public:
 };
 
 // Group definition in the secondary mempool.
-struct CPFPGroup
+class CPFPGroup
 {
     SecondaryMempoolEntryData evaluationParams {};
 
     // Transactions are topologically sorted.
     std::vector<CTxMemPool::txiter> transactions {};
 
-    CTxMemPool::txiter PayingTransaction() const
+    // txid of the groups paying transaction
+    TxId payingTxId {};
+
+    static std::atomic<uint64_t> counter;
+    mining::GroupID groupId {};
+
+public:
+
+    explicit CPFPGroup(SecondaryMempoolEntryData evalParams, std::vector<CTxMemPool::txiter>&& txs)
+        : evaluationParams{evalParams}
+        , transactions{txs}
+        , groupId{counter++}
     {
-        return transactions.back();
+        payingTxId = transactions.back()->GetTxId();
     }
+
+    const TxId& PayingTransactionId() const { return payingTxId; }
+    mining::GroupID Id() const { return groupId; }
+    const SecondaryMempoolEntryData& EvaluationParams() const { return evaluationParams; }
+    const std::vector<CTxMemPool::txiter>& Transactions() const { return transactions; }
 };
 
 

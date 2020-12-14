@@ -65,8 +65,8 @@ const CTxMemPool::setEntries& CEvictionCandidateTracker::GetChildrenNoGroup(CTxM
 bool CEvictionCandidateTracker::HasChildren(const CPFPGroup& group) const
 {
     // here we are trying to find if any member of the group has child outside of the group
-    CTxMemPool::setEntries groupMembers(group.transactions.begin(), group.transactions.end());
-    for (auto entry : group.transactions)
+    CTxMemPool::setEntries groupMembers(group.Transactions().begin(), group.Transactions().end());
+    for (auto entry : group.Transactions())
     {
         for (auto child : GetChildrenNoGroup(entry))
         {
@@ -121,7 +121,7 @@ void CEvictionCandidateTracker::EntryAdded(CTxMemPool::txiter entry)
     {
         if(parent->IsCPFPGroupMember())
         {
-            ExpireEntry(parent->GetCPFPGroup()->PayingTransaction()->GetTxId());
+            ExpireEntry(parent->GetCPFPGroup()->PayingTransactionId());
         }
         else
         {
@@ -146,7 +146,7 @@ void CEvictionCandidateTracker::EntryRemoved(const TxId& txId, const CTxMemPool:
         }
         if(parent->IsCPFPGroupMember())
         {
-            InsertEntry(parent->GetCPFPGroup()->PayingTransaction());
+            InsertEntry(parent->GetCPFPGroup()->Transactions().back());
         }
         else
         {

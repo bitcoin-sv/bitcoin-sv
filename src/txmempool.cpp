@@ -136,7 +136,7 @@ mining::GroupID CTxMemPoolEntry::GetCPFPGroupId() const
 { 
     if(group)
     {
-        return mining::GroupID{ group->PayingTransaction()->GetTxId() };
+        return mining::GroupID{ group->Id() };
     }
     return std::nullopt; 
 }
@@ -148,6 +148,8 @@ void CTxMemPoolEntry::UpdateFeeDelta(Amount newFeeDelta) {
 void CTxMemPoolEntry::UpdateLockPoints(const LockPoints &lp) {
     lockPoints = lp;
 }
+
+std::atomic<uint64_t> CPFPGroup::counter = 1;
 
 namespace {
 // Takes given change set if not empty, creates new otherwise
@@ -371,10 +373,8 @@ SecondaryMempoolEntryData CTxMemPool::FillGroupingDataNL(const CTxMemPool::setEn
 void CTxMemPool::AcceptSingleGroupNL(const CTxMemPool::setEntriesTopoSorted& groupMembers, mining::CJournalChangeSet& changeSet)
 {
     auto groupingData = FillGroupingDataNL(groupMembers);
-    auto group = std::make_shared<CPFPGroup>();
-    group->evaluationParams = groupingData;
-    group->transactions = {groupMembers.begin(), groupMembers.end()};
-
+    auto group = std::make_shared<CPFPGroup>(groupingData, std::vector<CTxMemPool::txiter>{groupMembers.begin(), groupMembers.end()});
+    
     // assemble the group
     for(auto entry: groupMembers)
     {
@@ -605,7 +605,7 @@ CTxMemPool::setEntriesTopoSorted CTxMemPool::RemoveFromPrimaryMempoolNL(CTxMemPo
 
             // keep one reference while iterating to prevent deletion
             auto group = entry->group;
-            for(txiter groupMember: group->transactions)
+            for(txiter groupMember: group->Transactions())
             {
                 // if the entry is in the entriesToIgnore skip it
                 if(entriesToIgnore == nullptr || entriesToIgnore->find(groupMember) == entriesToIgnore->end())
@@ -2224,7 +2224,7 @@ int64_t CTxMemPool::evaluateEvictionCandidateNL(txiter entry)
 {
     if(entry->IsCPFPGroupMember())
     {
-        const auto& evalParams = entry->GetCPFPGroup()->evaluationParams;
+        const auto& evalParams = entry->GetCPFPGroup()->EvaluationParams();
         return (evalParams.fee + evalParams.feeDelta).GetSatoshis() * 1000 / entry->GetTxSize();
     }
     
@@ -2296,7 +2296,7 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     {
         if(entry->IsCPFPGroupMember())
         {
-            auto groupParams = entry->GetCPFPGroup()->evaluationParams;
+            const auto& groupParams = entry->GetCPFPGroup()->EvaluationParams();
             return CFeeRate(groupParams.fee + groupParams.feeDelta, groupParams.size);
         }
         return CFeeRate(entry->GetModifiedFee(), entry->GetTxSize());

@@ -19,7 +19,7 @@ namespace
 {
     const size_t txnSize = 500;
     // Generate a new random transaction
-    CJournalEntry NewTxn(GroupID groupId)
+    CJournalEntry NewTxn(GroupID groupId, bool isPaying)
     {
         static uint64_t unique {1ULL << 33};  // thwart variable size integer encoding
         CMutableTransaction txn {};
@@ -29,13 +29,13 @@ namespace
         txn.vout[0].scriptPubKey = CScript() << stuff << OP_DROP << unique++ << OP_DROP;
         const auto tx = MakeTransactionRef(std::move(txn));
         return { std::make_shared<CTransactionWrapper>(tx, nullptr),
-                 tx->GetTotalSize(), Amount{0}, groupId };
+                 tx->GetTotalSize(), Amount{0}, groupId, isPaying};
     }
     void NewChangeSet(CJournalBuilder &builder, size_t groupSize, GroupID groupId)
     {
         auto changeSet = builder.getNewChangeSet(JournalUpdateReason::NEW_TXN);
         while (groupSize--) {
-            CJournalEntry singletxn { NewTxn(groupId) };
+            CJournalEntry singletxn { NewTxn(groupId, groupSize == 1) };
             changeSet->addOperation(CJournalChangeSet::Operation::ADD, singletxn);
         }
         changeSet->apply();
@@ -89,7 +89,7 @@ namespace
             auto txn = *iter;
             const auto tx = MakeTransactionRef(*txn);
             CJournalEntry entry { std::make_shared<CTransactionWrapper>(tx, nullptr),
-                                  tx->GetTotalSize(), Amount{0}, std::nullopt };
+                                  tx->GetTotalSize(), Amount{0}, std::nullopt, false};
             changeSet->addOperation(CJournalChangeSet::Operation::REMOVE, entry);
         }
         changeSet->apply();
@@ -141,17 +141,13 @@ BOOST_AUTO_TEST_CASE(TestJournalAddGroup)
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);
 
     // add a group that will fit in the block
-    TxId txid1;
-    txid1.SetHex("1");
-    NewChangeSet(builder, maxUserTxns - 4, txid1);
+    NewChangeSet(builder, maxUserTxns - 4, 1);
     block = CreateBlock();
     BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns - 4);
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1 + maxUserTxns - 4);
 
     // add a group that will just fit in the block
-    TxId txid2;
-    txid2.SetHex("2");
-    NewChangeSet(builder, 3, txid2);
+    NewChangeSet(builder, 3, 2);
     block = CreateBlock();
     BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns - 4 + 3);
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1 + maxUserTxns - 4 + 3);
@@ -163,9 +159,7 @@ BOOST_AUTO_TEST_CASE(TestJournalAddGroup)
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);
 
     // add a group that will just not fit in the block
-    TxId txid3;
-    txid3.SetHex("3");
-    NewChangeSet(builder, maxUserTxns, txid3);
+    NewChangeSet(builder, maxUserTxns, 3);
     block = CreateBlock();
     BOOST_CHECK_EQUAL(CountJournalTxns(builder), 1 + maxUserTxns);
     BOOST_CHECK_EQUAL(CountBlockUserTxns(block), 1);

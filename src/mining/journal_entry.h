@@ -18,7 +18,7 @@ namespace mining
  *
  * The block assembler should not accept a partial group into the block template.
  */
-using GroupID = std::optional<TxId>;
+using GroupID = std::optional<uint64_t>;
 
 /**
 * What we actually store for each journal entry.
@@ -32,7 +32,8 @@ class CJournalEntry
     CJournalEntry(const CTransactionWrapperRef& txn,
                   uint64_t txnSize,
                   const Amount& fee,
-                  GroupID groupId);
+                  GroupID groupId,
+                  bool isCpfpGroupPayingTx);
     explicit CJournalEntry(const CTxMemPoolEntry& entry);
 
     // accessors
@@ -44,7 +45,7 @@ class CJournalEntry
     const GroupID& getGroupId() const { return mGroupId; }
 
     // Is this the paying transaction of its group (if any)
-    bool isPaying() const { return !mGroupId || mGroupId == mTxn->GetId(); }
+    bool isPaying() const { return isCpfpPayingTx; }
 
   private:
 
@@ -59,6 +60,9 @@ class CJournalEntry
 
     // Group id for the transaction
     GroupID mGroupId {};
+
+    // is groups paying transaction
+    bool isCpfpPayingTx;
 };
 
 }
