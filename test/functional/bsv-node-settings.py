@@ -47,7 +47,6 @@ class BSVNodeSettings(BitcoinTestFramework):
         # check that set policy parameters return expected values
 
         param_scales = defaultdict(lambda: 1, chain(
-            scale_params("limitdescendantsize", "limitancestorsize", scale=1000),
             scale_params("maxorphantxsize", "maxmempool", "maxmempoolsizedisk", scale=1000000)))
         for param in parameters:
             expected = (param, parameters[param] * param_scales[param])
@@ -66,6 +65,7 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'maxpubkeyspermultisigpolicy': 4294967295,
                        'maxtxsigopscountspolicy': 4294967295,
                        'maxstackmemoryusagepolicy': 100000000,
+                       'maxstackmemoryusageconsensus': 9223372036854775807,
                        'maxorphantxsize': 100,
                        'limitancestorcount': 25,
                        'limitcpfpgroupmemberscount': 13,
@@ -96,6 +96,7 @@ class BSVNodeSettings(BitcoinTestFramework):
                        'maxpubkeyspermultisigpolicy': 42949,
                        'maxtxsigopscountspolicy': 42949,
                        'maxstackmemoryusagepolicy': 100000,
+                       'maxstackmemoryusageconsensus': 92233720,
                        'maxorphantxsize': 1000,
                        'limitancestorcount': 40,
                        'limitcpfpgroupmemberscount': 31,
