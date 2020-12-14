@@ -73,6 +73,11 @@ class FullBlockTest(ComparisonTestFramework):
         parser.add_option(
             "--runbarelyexpensive", dest="runbarelyexpensive", default=True)
 
+    def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
+        # RPC timeout needs to be high because in debug build invalidateblock can take >90s to complete
+        timewait=150
+        return super().add_node(i, extra_args, rpchost, timewait, binary, init_data_dir)
+
     def run_test(self):
         self.nodes[0].setexcessiveblock(self.excessive_block_size)
         self.test.run()
