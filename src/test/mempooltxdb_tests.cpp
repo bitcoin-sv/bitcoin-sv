@@ -13,6 +13,7 @@
 #include <random>
 #include <vector>
 
+
 namespace {
     mining::CJournalChangeSetPtr nullChangeSet{nullptr};
 
@@ -26,12 +27,30 @@ namespace {
             mtx.vin[0].scriptSig = CScript() << OP_11;
             mtx.vout.resize(1);
             mtx.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
-            mtx.vout[0].nValue = Amount(33000LL + i);
-            result.emplace_back(entry.FromTx(mtx));
+            mtx.vout[0].nValue = Amount{33000LL + i};
+            result.emplace_back(entry.Fee(Amount{10000}).FromTx(mtx));
         }
         return result;
     }
+
+    uint64_t totalSize(const std::vector<CTxMemPoolEntry>& entries)
+    {
+        uint64_t total = 0;
+        for (const auto& e : entries)
+        {
+            total += e.GetTxSize();
+        }
+        return total;
+    }
 }
+
+CTxMemPool& globalMempool()
+{
+    extern CTxMemPool mempool;
+    return mempool;
+}
+
+
 
 BOOST_FIXTURE_TEST_SUITE(mempooltxdb_tests, TestingSetup)
 BOOST_AUTO_TEST_CASE(WriteToTxDB)
@@ -43,13 +62,11 @@ BOOST_AUTO_TEST_CASE(WriteToTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Check that all transactions are in the database.
@@ -69,13 +86,11 @@ BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Check that all transactions are in the database.
@@ -90,9 +105,9 @@ BOOST_AUTO_TEST_CASE(DoubleWriteToTxDB)
     {
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
-    BOOST_WARN_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_WARN_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_WARN_EQUAL(txdb.GetTxCount(), entries.size());
-    BOOST_CHECK_GE(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_GE(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_GE(txdb.GetTxCount(), entries.size());
     for (const auto& e : entries)
     {
@@ -110,13 +125,11 @@ BOOST_AUTO_TEST_CASE(DeleteFromTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Remove transactions from the database one by one.
@@ -142,15 +155,13 @@ BOOST_AUTO_TEST_CASE(BatchDeleteFromTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
     std::vector<CMempoolTxDB::TxData> txdata;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
         txdata.emplace_back(e.GetTxId(), e.GetTxSize());
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Remove all transactions from the database at once.
@@ -190,13 +201,11 @@ BOOST_AUTO_TEST_CASE(ClearTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Clear the database and check that it's empty.
@@ -219,13 +228,11 @@ BOOST_AUTO_TEST_CASE(GetContentsOfTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
         BOOST_CHECK(txdb.AddTransactions({e.GetSharedTx()}));
     }
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Check that all transactions are in the database and only the ones we wrote.
@@ -404,17 +411,15 @@ BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    uint64_t totalSize = 0;
     std::vector<CTransactionWrapperRef> wrappers;
     for (const auto& e : entries)
     {
-        totalSize += e.GetTxSize();
         wrappers.emplace_back(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
     }
 
     txdb.Add(std::move(wrappers));
     txdb.Sync();
-    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize);
+    BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
 
     // Check that all transactions are in the databas.
@@ -717,6 +722,118 @@ BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrim)
     BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), 0);
     BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
+}
+
+BOOST_AUTO_TEST_CASE(RemoveFromDiskOnMempoolTrimDoesNotConfuseJBA)
+{
+    CTxMemPool& testPool = globalMempool();
+    CTxMemPoolTestAccess testPoolAccess(testPool);
+
+    auto [totalSize_entries, count_entries] = ([&testPool] () {
+        auto entries = GetABunchOfEntries(6);
+
+        // Add transactions:
+        for (auto& entry : entries) {
+            testPool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);
+        }
+
+        return std::make_pair(totalSize(entries), entries.size());
+        })();
+
+    const auto poolSize = testPool.Size();
+    BOOST_CHECK_EQUAL(poolSize, count_entries);
+
+    auto jba = mining::g_miningFactory->GetAssembler();
+    CBlockIndex* bla;
+
+    // Get a block template
+    auto template1 = jba->CreateNewBlock(CScript{}, bla);
+    // wait for JBA to process all transactions in mempool
+    const auto maxWaits = 100;
+    auto waits = 0;
+    while (template1->GetBlockRef()->GetTransactionCount() < count_entries + 1)
+    {
+        MilliSleep(waits);
+        template1 = jba->CreateNewBlock(CScript{}, bla);
+        if ( ++waits >= maxWaits)
+        {
+            BOOST_CHECK_GE(waits, maxWaits);
+            break;
+        }
+    }
+    auto& vtx1 = template1->GetBlockRef()->vtx;
+    // remove coinbase
+    vtx1.erase(vtx1.begin());
+
+    // Check that mempool and JBA also hold the same shared pointers as the block template
+    for(const auto& tx: vtx1) {
+        BOOST_CHECK_EQUAL(tx.use_count(), 3);
+    }
+
+    auto moveToDisk = false; // set to false to test the test.
+
+    // force writeout of everything
+    testPool.SaveTxsToDisk(moveToDisk * totalSize_entries);
+    testPoolAccess.SyncWithMempoolTxDB();
+    BOOST_CHECK_EQUAL(testPool.Size(), poolSize);
+
+    // But it does store something to disk:
+    BOOST_CHECK_EQUAL(testPool.GetDiskUsage(), moveToDisk * totalSize_entries);
+    BOOST_CHECK_EQUAL(testPool.GetDiskTxCount(), moveToDisk * count_entries);
+    BOOST_CHECK(testPoolAccess.CheckMempoolTxDB());
+
+    // Check that the mempool dropped it's shared pointer in the wrapper
+    for(const auto& tx: vtx1) {
+        BOOST_CHECK_EQUAL(tx.use_count(), 3 - moveToDisk);
+    }
+
+    // force JBA to create new journal by removing one entry
+    {
+        auto tx = vtx1.begin();
+        testPoolAccess.RemoveRecursive(**tx, nullChangeSet);
+        // forget the erased entry
+        count_entries -= 1;
+        totalSize_entries -= (*tx)->GetTotalSize();
+        vtx1.erase(tx);
+    }
+
+    // Get another block template
+    auto template2 = jba->CreateNewBlock(CScript{}, bla);
+    // wait for JBA to notice the journal reset and to re-process all transactions
+    waits = 0;
+    while (template2->GetBlockRef() == template1->GetBlockRef() ||
+           template2->GetBlockRef()->GetTransactionCount() < count_entries) {
+        MilliSleep(waits);
+        template2 = jba->CreateNewBlock(CScript{}, bla);
+        if ( ++waits >= maxWaits)
+        {
+            BOOST_CHECK_GE(waits, maxWaits);
+            break;
+        }
+    }
+
+    auto& vtx2 = template2->GetBlockRef()->vtx;
+    // remove coinbase
+    vtx2.erase(vtx2.begin());
+
+    // Check that the block template refcount went up the only shared pointers
+    for(const auto& tx: vtx1) {
+        BOOST_CHECK_EQUAL(tx.use_count(), 4 - moveToDisk);
+    }
+
+    // Check that the other block template has the same refcounts
+    for(const auto& tx: vtx2) {
+        BOOST_CHECK_EQUAL(tx.use_count(), 4 - moveToDisk);
+    }
+
+    BOOST_CHECK_EQUAL(vtx1.size(), vtx2.size());
+    // check that both blocks share all the memory used by transactions
+    auto set1 = std::set<CTransactionRef>(vtx1.cbegin(), vtx1.cend());
+    for(auto tx: vtx2) {
+        auto erased = set1.erase(tx);
+        BOOST_CHECK(erased == 1);
+    }
+    BOOST_CHECK(set1.empty());
 }
 
 BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
