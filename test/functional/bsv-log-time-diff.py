@@ -33,6 +33,10 @@ class LogTimeDiffTest(BitcoinTestFramework):
         block.solve()
         return block
 
+    def getDataLambda(self, conn, block_hash):
+        lm = conn.last_message.get("getdata")
+        return lm and lm.inv[0].hash == block_hash
+
     def run_test(self):
 
         self.stop_node(0)
@@ -55,7 +59,7 @@ class LogTimeDiffTest(BitcoinTestFramework):
             headers_message = msg_headers()
             headers_message.headers = [CBlockHeader(block)]
             connection1.cb.send_message(headers_message)
-            connection1.cb.wait_for_getdata(block.sha256)
+            wait_until(lambda: self.getDataLambda(connection1.cb, block.sha256), lock=mininode_lock)
 
             # 4. connection1 sends BLOCK
             connection1.cb.send_message(msg_block(block))
@@ -69,7 +73,7 @@ class LogTimeDiffTest(BitcoinTestFramework):
             connection2.cb.send_message(headers_message)
 
             # 7. connection2 waits for GETDATA and sends BLOCK
-            connection2.cb.wait_for_getdata(block.sha256)
+            wait_until(lambda: self.getDataLambda(connection2.cb, block.sha256), lock=mininode_lock)
             connection2.cb.send_message(msg_block(block))
 
             # syncing
