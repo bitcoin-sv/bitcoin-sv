@@ -135,6 +135,8 @@ private:
 public:
     template<typename T> struct UnitTestAccess;
 
+    using MaxFiles = CDBWrapper::MaxFiles;
+
     /**
      * @param[in] cacheSizeThreshold
      *                        Maximum amount of coins that can be stored in
@@ -148,6 +150,7 @@ public:
     CoinsDB(
         uint64_t cacheSizeThreshold,
         size_t nCacheSize,
+        MaxFiles maxFiles,
         bool fMemory = false,
         bool fWipe = false);
 

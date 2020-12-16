@@ -1189,6 +1189,9 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         _("Set soft maximum limit of cached coin tip buffer size (default: unlimited -> 0). "
             "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
+        "-maxcoinsdbfiles=<n>",
+        _("Set maximum number of files used by coins leveldb (default: %d). "));
+    strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
             CTxnValidator::DEFAULT_MAX_MEMORY_TRANSACTION_QUEUES)) ;
@@ -2148,6 +2151,12 @@ bool AppInitParameterInteraction(Config &config) {
         return InitError(err);
     }
 
+    if(std::string err; !config.SetMaxCoinsDbOpenFiles(
+        gArgs.GetArg("-maxcoinsdbfiles", CoinsDB::MaxFiles::Default().maxFiles), &err))
+    {
+        return InitError(err);
+    }
+
     RegisterAllRPCCommands(tableRPC);
 #ifdef ENABLE_WALLET
     RegisterWalletRPCCommands(tableRPC);
@@ -2811,6 +2820,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
                     std::make_unique<CoinsDB>(
                         config.GetMaxCoinsProviderCacheSize(),
                         nCoinDBCache,
+                        CDBWrapper::MaxFiles{config.GetMaxCoinsDbOpenFiles()},
                         false,
                         fReindex || fReindexChainState);
 
