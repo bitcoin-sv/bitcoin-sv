@@ -12,6 +12,83 @@ using mining::CJournalChangeSet;
 using mining::JournalUpdateReason;
 using mining::CJournalBuilder;
 
+namespace
+{
+    bool CheckTopoSort(
+        CJournalChangeSet::ChangeSet&& changeSet,
+        JournalUpdateReason updateReason)
+    {
+        auto filterAndSort = [&changeSet](auto predicate) {
+            std::vector<uint256> transactionIds;
+            transactionIds.reserve(changeSet.size());
+            auto selections = boost::make_filter_iterator(predicate, changeSet.cbegin(), changeSet.cend());
+            auto selectionsEnd =boost::make_filter_iterator(predicate, changeSet.cend(), changeSet.cend());
+            std::transform(selections, selectionsEnd,
+                           std::inserter(transactionIds, transactionIds.begin()),
+                           [](auto& change) { return change.second.getTxn()->GetId(); });
+            std::sort(transactionIds.begin(), transactionIds.end());
+            return transactionIds;
+        };
+
+        auto isAddition = [](auto& change) { return change.first == CJournalChangeSet::Operation::ADD; };
+        std::vector<uint256> addedTransactions = filterAndSort(isAddition);
+        std::vector<uint256> removedTransactions = filterAndSort(
+            [](auto& change) {return change.first == CJournalChangeSet::Operation::REMOVE; });
+
+        std::unordered_set<uint256> laterTransactions;
+        laterTransactions.reserve(addedTransactions.size());
+        std::set_difference(addedTransactions.cbegin(), addedTransactions.cend(),
+                            removedTransactions.cbegin(), removedTransactions.cend(),
+                            std::inserter(laterTransactions, laterTransactions.begin()));
+
+        const auto effectiveTransactionsSize = laterTransactions.size();
+
+        bool sorted = true;
+
+        for(auto i = changeSet.cbegin(); i != changeSet.cend(); ++i) {
+            if (!isAddition(*i)) {
+                continue;
+            }
+            // FIXME: We may read the transaction from disk, but for now
+            //        this method is only called from CheckMempool().
+            auto txn = i->second.getTxn()->GetTx();
+            auto unsorted = std::find_if(txn->vin.cbegin(), txn->vin.cend(),
+                                         [&laterTransactions](const CTxIn& txInput) {
+                                             return laterTransactions.count(txInput.prevout.GetTxId());
+                                         });
+            // subsequent entries are allowed to see us
+            laterTransactions.erase(txn->GetHash());
+
+            if (unsorted != txn->vin.cend()) {
+                if (sorted) {
+                    LogPrintf("=x===== Toposort violation in ChangeSet %s with %d changes %d effective %d ADD %d REMOVE\n",
+                              enum_cast<std::string>( updateReason ),
+                              std::distance(changeSet.cbegin(), changeSet.cend()),
+                              effectiveTransactionsSize,
+                              addedTransactions.size(),
+                              removedTransactions.size());
+                    sorted = false;
+                }
+                uint256 prevTxId(unsorted->prevout.GetTxId());
+                const auto prevTx = std::find_if(changeSet.cbegin(), changeSet.cend(), [&prevTxId](const auto &change) {
+                    return change.second.getTxn()->GetId() == prevTxId;
+                });
+                size_t prevTxIdx = std::distance(changeSet.cbegin(), prevTx);
+                LogPrintf("=x== ChangeSet[%d] %s input %d"
+                          " references a later ChangeSet[%d] %s\n",
+                          (std::distance(changeSet.cbegin(), i)),
+                          txn->GetHash().GetHex(),
+                          std::distance(txn->vin.cbegin(), unsorted),
+                          prevTxIdx,
+                          prevTxId.GetHex()
+                          );
+            }
+        }
+
+        return sorted;
+    }
+}
+
 // Enable enum_cast for JournalUpdateReason, so we can log informatively
 const enumTableT<JournalUpdateReason>& mining::enumTable(JournalUpdateReason)
 {
@@ -99,75 +176,14 @@ void CJournalChangeSet::clear()
 // that references another ADD transaction that appears later in the changeset.
 bool CJournalChangeSet::CheckTopoSort() const
 {
+    ChangeSet changeSet;
+    {
+        std::scoped_lock lock{ mMtx };
 
-    auto filterAndSort = [this](auto predicate) {
-        std::vector<uint256> transactionIds;
-        transactionIds.reserve(mChangeSet.size());
-        auto selections = boost::make_filter_iterator(predicate, mChangeSet.cbegin(), mChangeSet.cend());
-        auto selectionsEnd =boost::make_filter_iterator(predicate, mChangeSet.cend(), mChangeSet.cend());
-        std::transform(selections, selectionsEnd,
-                       std::inserter(transactionIds, transactionIds.begin()),
-                       [](auto& change) { return change.second.getTxn()->GetId(); });
-        std::sort(transactionIds.begin(), transactionIds.end());
-        return transactionIds;
-    };
-
-    auto isAddition = [](auto& change) { return change.first == CJournalChangeSet::Operation::ADD; };
-    std::vector<uint256> addedTransactions = filterAndSort(isAddition);
-    std::vector<uint256> removedTransactions = filterAndSort(
-        [](auto& change) {return change.first == CJournalChangeSet::Operation::REMOVE; });
-
-    std::unordered_set<uint256> laterTransactions;
-    laterTransactions.reserve(addedTransactions.size());
-    std::set_difference(addedTransactions.cbegin(), addedTransactions.cend(),
-                        removedTransactions.cbegin(), removedTransactions.cend(),
-                        std::inserter(laterTransactions, laterTransactions.begin()));
-
-    const auto effectiveTransactionsSize = laterTransactions.size();
-
-    bool sorted = true;
-
-    for(auto i = mChangeSet.cbegin(); i != mChangeSet.cend(); ++i) {
-        if (!isAddition(*i)) {
-            continue;
-        }
-        // FIXME: We may read the transaction from disk, but for now
-        //        this method is only called from CheckMempool().
-        auto txn = i->second.getTxn()->GetTx();
-        auto unsorted = std::find_if(txn->vin.cbegin(), txn->vin.cend(),
-                                     [&laterTransactions](const CTxIn& txInput) {
-                                         return laterTransactions.count(txInput.prevout.GetTxId());
-                                     });
-        // subsequent entries are allowed to see us
-        laterTransactions.erase(txn->GetHash());
-
-        if (unsorted != txn->vin.cend()) {
-            if (sorted) {
-                LogPrintf("=x===== Toposort violation in ChangeSet %s with %d changes %d effective %d ADD %d REMOVE\n",
-                          enum_cast<std::string>(getUpdateReason()),
-                          std::distance(mChangeSet.cbegin(), mChangeSet.cend()),
-                          effectiveTransactionsSize,
-                          addedTransactions.size(),
-                          removedTransactions.size());
-                sorted = false;
-            }
-            uint256 prevTxId(unsorted->prevout.GetTxId());
-            const auto prevTx = std::find_if(mChangeSet.cbegin(), mChangeSet.cend(), [&prevTxId](const auto &change) {
-                return change.second.getTxn()->GetId() == prevTxId;
-            });
-            size_t prevTxIdx = std::distance(mChangeSet.cbegin(), prevTx);
-            LogPrintf("=x== ChangeSet[%d] %s input %d"
-                      " references a later ChangeSet[%d] %s\n",
-                      (std::distance(mChangeSet.cbegin(), i)),
-                      txn->GetHash().GetHex(),
-                      std::distance(txn->vin.cbegin(), unsorted),
-                      prevTxIdx,
-                      prevTxId.GetHex()
-                      );
-        }
+        changeSet = mChangeSet;
     }
 
-    return sorted;
+    return ::CheckTopoSort( std::move(changeSet), getUpdateReason() );
 }
 
 // Apply our changes to the journal - Caller holds mutex
