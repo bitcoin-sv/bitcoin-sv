@@ -5478,12 +5478,12 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
     }
 
     // Check for duplicate
-    BlockMap::iterator miSelf = mapBlockIndex.find(hash);
-    CBlockIndex *pindex = nullptr;
     if (hash != chainparams.GetConsensus().hashGenesisBlock) {
-        if (miSelf != mapBlockIndex.end()) {
+        if (BlockMap::iterator miSelf = mapBlockIndex.find(hash);
+            miSelf != mapBlockIndex.end())
+        {
             // Block header is already known.
-            pindex = miSelf->second;
+            CBlockIndex* pindex = miSelf->second;
             if (ppindex) {
                 *ppindex = pindex;
             }
@@ -5521,12 +5521,9 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
         }
     }
 
-    if (pindex == nullptr) {
-        pindex = AddToBlockIndex(block);
-    }
-
-    if (ppindex) {
-        *ppindex = pindex;
+    if (CBlockIndex* newIdx = AddToBlockIndex(block); ppindex)
+    {
+        *ppindex = newIdx;
     }
 
     CheckBlockIndex(chainparams.GetConsensus());
