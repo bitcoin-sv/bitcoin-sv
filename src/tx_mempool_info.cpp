@@ -149,11 +149,19 @@ const TxId& TxMempoolInfo::GetTxId() const
 
 const CTransactionRef& TxMempoolInfo::GetTx() const
 {
-    if (!tx && wrapper)
+    if (auto loadTx = tx.load(); loadTx.has_value())
     {
-        tx = wrapper->GetTx();
+        return loadTx.value();
     }
-    return tx;
+
+    if (wrapper)
+    {
+        // this can be called multiple times by multiple threads before tx is
+        // really set - that's a rare situation so it's not an issue
+        return tx.store( wrapper->GetTx() );
+    }
+
+    return {};
 }
 
 TxStorage TxMempoolInfo::GetTxStorage() const noexcept

@@ -9,7 +9,10 @@
 #include "primitives/transaction.h"
 #include "txn_validation_data.h"
 
+#include <atomic>
+#include <functional>
 #include <mutex>
+#include <optional>
 #include <variant>
 
 #include <boost/noncopyable.hpp>
@@ -95,10 +98,64 @@ private:
     /** The transaction wrapper */
     CTransactionWrapperRef wrapper {nullptr};
 
+    // Wrapper that enables us to use TxMempoolInfo implicit copy/move
+    // construction and assignment.
+    // Class guarantees that once the value is set it won't be overwritten.
+    class AtomicTxRef
+    {
+    public:
+        AtomicTxRef() = default;
+        AtomicTxRef( CTransactionRef ref ) noexcept
+            : mValue{ ref }
+        {}
+        AtomicTxRef(AtomicTxRef&& other)
+            : mValue{ std::atomic_load( &other.mValue ) }
+        {}
+        AtomicTxRef& operator=(AtomicTxRef&& other)
+        {
+            mValue = std::atomic_load( &other.mValue );
+            return *this;
+        }
+        AtomicTxRef(const AtomicTxRef& other)
+            : mValue{ std::atomic_load( &other.mValue ) }
+        {}
+        AtomicTxRef& operator=(const AtomicTxRef& other)
+        {
+            mValue = std::atomic_load( &other.mValue );
+            return *this;
+        }
+
+        // Try to set the value if mValue is still nullptr otherwise
+        // just return existing value so we don't invalidate any existing
+        // references to the underlying pointer.
+        const CTransactionRef& store( const CTransactionRef& ref )
+        {
+            CTransactionRef expectedNullptr;
+            std::atomic_compare_exchange_strong(
+                &mValue,
+                &expectedNullptr,
+                ref );
+
+            return mValue;
+        }
+        std::optional<std::reference_wrapper<const CTransactionRef>> load() const
+        {
+            if (auto ref = std::atomic_load( &mValue ); ref)
+            {
+                return mValue;
+            }
+
+            return {};
+        }
+
+    private:
+        CTransactionRef mValue;
+    };
+
     // A local cache for the transaction which may be stored on disk in the
     // mempool transaction database and we don't want to re-read it every time
     // we need a reference.
-    mutable CTransactionRef tx {nullptr};
+    mutable AtomicTxRef tx;
 
     static const TxId nullTxId;
 };
