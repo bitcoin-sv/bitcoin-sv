@@ -201,7 +201,7 @@ void Shutdown() {
         if (pcoinsTip != nullptr) {
             FlushStateToDisk();
         }
-        pcoinsTip.release();
+        pcoinsTip.reset();
         delete pblocktree;
         pblocktree = nullptr;
     }
@@ -2801,7 +2801,7 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
         do {
             try {
                 UnloadBlockIndex();
-                pcoinsTip.release();
+                pcoinsTip.reset();
                 delete pblocktree;
 
                 pblocktree =
