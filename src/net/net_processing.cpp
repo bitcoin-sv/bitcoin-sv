@@ -4400,11 +4400,17 @@ void SendInventory(const Config &config, const CNodePtr& pto, CConnman &connman,
         // if next element will cause too large message, then we send it now, as message size is still under limit
         // vInv size is actually limited before -- with INVENTORY_BROADCAST_MAX_PER_MB
         if (vInv.size() == pto->maxInvElements) {
-            connman.PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
+            connman.PushMessage(pto, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::INV, vInv));
             vInv.clear();
         }
     }
     pto->vInventoryBlockToSend.clear();
+
+    // Send blocks inventory seperately over a higher priority stream (if available)
+    if (!vInv.empty()) {
+        connman.PushMessage(pto, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::INV, vInv));
+        vInv.clear();
+    }
 
     // Check whether periodic sends should happen
     bool fSendTrickle = pto->fWhitelisted;
