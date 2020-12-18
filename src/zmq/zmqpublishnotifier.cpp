@@ -100,11 +100,11 @@ bool CZMQAbstractPublishNotifier::SendZMQMessage(const char *command,
     assert(psocket);
     assert(zmqPublisher);
 
-    bool rc = zmqPublisher->SendZMQMessage(psocket, command, data, size, nSequence);
-    if (rc == false) return false;
+    /* SendZMQMessage can be called by multiple threads. Increment memory only sequence number here to ensure its uniqueness in sent messages */
+    uint32_t sequence = nSequence++;
 
-    /* increment memory only sequence number after sending */
-    nSequence++;
+    bool rc = zmqPublisher->SendZMQMessage(psocket, command, data, size, sequence);
+    if (rc == false) return false;
 
     return true;
 }
