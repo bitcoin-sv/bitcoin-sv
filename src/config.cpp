@@ -1074,7 +1074,7 @@ bool GlobalConfig::SetRecvInvQueueFactor(uint64_t value, std::string* err)
     {
         if(err)
         {
-            *err = "RecvInvQueueFactor should not be between: " + std::to_string(MIN_RECV_INV_QUEUE_FACTOR) + " and " + 
+            *err = "RecvInvQueueFactor should be between: " + std::to_string(MIN_RECV_INV_QUEUE_FACTOR) + " and " + 
                    std::to_string(MAX_RECV_INV_QUEUE_FACTOR) + ".";
         }
         return false;
