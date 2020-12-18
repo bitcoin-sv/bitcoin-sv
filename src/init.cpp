@@ -367,12 +367,15 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                              DEFAULT_MAX_MEMPOOL_SIZE,
                              showDebug ? ", 0 to turn off mempool memory sharing with dbcache" : "",
                              std::ceil(DEFAULT_MAX_MEMPOOL_SIZE*0.3)));
-    strUsage += HelpMessageOpt("-maxmempoolsizedisk=<n>",
-                               strprintf(_("Additional amount of mempool transactions to keep stored on disk "
-                                           "below <n> megabytes (default: -maxmempool x %u). Actual disk usage will "
-                                           "be larger due to leveldb compaction strategy."
-                                           "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
-                                         DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR));
+    if (showDebug) 
+    {
+        strUsage += HelpMessageOpt("-maxmempoolsizedisk=<n>",
+                                   strprintf(_("Experimental: Additional amount of mempool transactions to keep stored on disk "
+                                               "below <n> megabytes (default: -maxmempool x %u). Actual disk usage will "
+                                               "be larger due to leveldb compaction strategy."
+                                               "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
+                                             DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR));
+    }
     strUsage += HelpMessageOpt("-mempoolmaxpercentcpfp=<n>",
                                strprintf(_("Percentage of total mempool size (ram+disk) to allow for "
                                            "low paying transactions (0..100) (default: %u)"),
