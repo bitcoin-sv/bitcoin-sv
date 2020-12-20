@@ -35,6 +35,11 @@ public:
         return Make(0, payloadType, std::move(sCommand), std::forward<Args>(args)...);
     }
 
+    int GetVersion() const
+    {
+        return nVersion;
+    }
+
 private:
     const int nVersion;
 };

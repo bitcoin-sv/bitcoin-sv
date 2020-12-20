@@ -975,6 +975,8 @@ public:
     uint32_t maxInvElements {CInv::estimateMaxInvElements(LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH)};
     /** protoconfReceived is false by default and set to true when protoconf is received from peer **/
     bool protoconfReceived {false};
+    /** Maximum size for data that is allowed to be sent to the client */
+    uint32_t maxRecvPayloadLength {0};
 
     /** Constructor for producing CNode shared pointer instances */
     template<typename ... Args>

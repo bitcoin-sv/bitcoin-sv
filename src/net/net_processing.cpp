@@ -22,6 +22,8 @@
 #include "limited_cache.h"
 #include "locked_ref.h"
 #include "merkleblock.h"
+#include "merkleproof.h"
+#include "merkletreestore.h"
 #include "net/block_download_tracker.h"
 #include "net/net.h"
 #include "net/netbase.h"
@@ -2009,6 +2011,30 @@ static void ProcessSendHeadersMessage(const CNodePtr& pfrom)
 }
 
 /**
+* Process sendhdrsen message.
+*/
+static void ProcessSendHdrsEnMessage(const CNodePtr& pfrom)
+{
+    // Try to obtain an access to the node's state data.
+    const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
+    const CNodeStatePtr& state { stateRef.get() };
+    if(state)
+    {
+        if(state->fPreferHeadersEnriched)
+        {
+            // This message should only be received once. If its already set it might
+            // indicate a misbehaving node. Increase the banscore
+            Misbehaving(pfrom, 1, "Invalid SendHdrsEn activity");
+            LogPrint(BCLog::NETMSG, "Peer %d sent SendHdrsEn more than once\n", pfrom->id);
+        }
+        else
+        {
+            state->fPreferHeadersEnriched = true;
+        }
+    }
+}
+
+/**
 * Process send compact message.
 */
 static void ProcessSendCompactMessage(const CNodePtr& pfrom, CDataStream& vRecv)
@@ -2312,7 +2338,45 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     connman.PushMessage(pfrom,
         msgMaker.Make(NetMsgType::BLOCKTXN, std::move(resp)));
 }
- 
+
+
+namespace {
+
+/**
+ * Returns pointer to the first block specified by locator or nullptr.
+ *
+ * Returns nullopt if locator is not specified and block in hashStop is not found.
+ */
+std::optional<const CBlockIndex*> GetFirstBlockIndexFromLocatorNL(const CBlockLocator& locator, const uint256& hashStop)
+{
+    AssertLockHeld(cs_main);
+
+    const CBlockIndex* pindex = nullptr;
+    if(locator.IsNull())
+    {
+        // If locator is null, return the hashStop block
+        pindex = mapBlockIndex.Get(hashStop);
+        if (!pindex)
+        {
+            return {};
+
+        }
+    }
+    else 
+    {
+        // Find the last block the caller has in the main chain
+        pindex = FindForkInGlobalIndex(chainActive, locator);
+        if(pindex) 
+        {
+            pindex = chainActive.Next(pindex);
+        }
+    }
+
+    return pindex;
+}
+
+} // anonymous namespace
+
 /**
 * Process get headers message.
 */
@@ -2328,26 +2392,22 @@ static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
     LOCK(cs_main);
     if(IsInitialBlockDownload() && !pfrom->fWhitelisted) {
         LogPrint(BCLog::NETMSG, "Ignoring getheaders from peer=%d because "
-                             "node is in initial block download\n",
+                                "node is in initial block download\n",
                  pfrom->id);
         return;
     }
 
     const CBlockIndex* pindex = nullptr;
-    if(locator.IsNull()) {
-        // If locator is null, return the hashStop block
-        pindex = mapBlockIndex.Get(hashStop);
-        if(!pindex)
-        {
-            return;
-        }
+    if(auto opt_block_index = GetFirstBlockIndexFromLocatorNL(locator, hashStop))
+    {
+        pindex = *opt_block_index;
     }
-    else {
-        // Find the last block the caller has in the main chain
-        pindex = FindForkInGlobalIndex(chainActive, locator);
-        if(pindex) {
-            pindex = chainActive.Next(pindex);
-        }
+    else
+    {
+        LogPrint(BCLog::NETMSG, "Ignoring getheaders from peer=%d because "
+                                "it requested unknown block (hashstop=%s) without locator\n",
+                 pfrom->id, hashStop.ToString());
+        return;
     }
 
     // We must use CBlocks, as CBlockHeaders won't include the 0x00 nTx
@@ -2382,7 +2442,239 @@ static void ProcessGetHeadersMessage(const CNodePtr& pfrom,
     state->pindexBestHeaderSent = pindex ? pindex : chainActive.Tip();
     connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
 }
- 
+
+namespace {
+
+/**
+ * Defines the structure of hdrsen message and holds data needed to create it
+ */
+class CBlockHeaderEnriched
+{
+public:
+    CBlockHeader blockHeader;
+    uint64_t nTx{ 0 };
+    bool noMoreHeaders{ false };
+    bool hasCoinbaseData{ false };
+    using TSCMerkleProof = ::MerkleProof; // Contains Merkle proof in binary TSC format (https://tsc.bitcoinassociation.net/standards/merkle-proof-standardised-format)
+    TSCMerkleProof coinbaseMerkleProof;
+    std::vector<uint8_t> coinbaseTx;
+
+    // Pointer to block index object is only included in object so that it can be used
+    // when setting (non-const) data members after construction.
+    const CBlockIndex* blockIndex{nullptr};
+
+    /**
+     * Return size (in bytes) of serialized message when transmitted over the network
+     */
+    std::size_t GetSerializedSize() const
+    {
+        return GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+    }
+
+    // Default constructor is only needed by serialization framework
+    CBlockHeaderEnriched() = default;
+
+    CBlockHeaderEnriched(const CBlockIndex* blockIndex)
+    : blockHeader(blockIndex->GetBlockHeader())
+    , nTx(blockIndex->GetBlockTxCount())
+    , blockIndex(blockIndex)
+    {
+    }
+
+    template <typename Stream> void Serialize(Stream& s) const
+    {
+        blockHeader.Serialize(s);
+        WriteCompactSize(s, nTx);
+        s << noMoreHeaders;
+        s << hasCoinbaseData;
+        if (hasCoinbaseData)
+        {
+            s << coinbaseMerkleProof;
+            s.write((char*)&coinbaseTx[0], coinbaseTx.size());
+        }
+    }
+
+    /**
+     * Set values of members that provide information about coinbase transaction
+     * by reading the data from block file and Merkle tree factory.
+     *
+     * If data is not available, values of these members are cleared and hasCoinbaseData
+     * is set to false.
+     *
+     * @param version Serialization version (including any flags) used to serialize coinbase transaction.
+     * @param config Needed by CMerkleTreeFactory.
+     * @param chainActiveHeight Current height of active chain. Needed by CMerkleTreeFactory.
+     */
+    void SetCoinBaseInfo(int serializationVersion, const Config& config, int32_t chainActiveHeight)
+    {
+        hasCoinbaseData = false;
+        coinbaseTx.clear();
+        coinbaseMerkleProof = TSCMerkleProof();
+        // Default constructor should set these to values we expect here
+        assert( coinbaseMerkleProof.Flags() == 0 ); // Always set to 0 because we're providing transaction ID in txOrId, block hash in target, Merkle branch as proof in nodes and there is a single proof
+        assert( coinbaseMerkleProof.Index() == 0 ); // Always set to 0, because we're providing proof for coinbase transaction
+
+        try
+        {
+            auto blockReader = blockIndex->GetDiskBlockStreamReader();
+            if(blockReader)
+            {
+                // Read CB txn from disk
+                auto& cbTx = blockReader->ReadTransaction();
+
+                // Serialize CB txn into coinbaseTx using the specified protocol version.
+                CVectorWriter vw(SER_NETWORK, serializationVersion, coinbaseTx, 0, cbTx);
+
+                coinbaseMerkleProof.TxnId( cbTx.GetId() );
+                coinbaseMerkleProof.Target( blockIndex->GetBlockHash() );
+            }
+        }
+        catch(...)
+        {
+            LogPrint(BCLog::NETMSG, "hdrsen: Reading of coinbase txn failed.");
+        }
+
+        if(!coinbaseTx.empty())
+        {
+            // Get Merkle proof for CB txn from Merkle tree cache.
+            // Note that this can be done without holding cs_main lock.
+            if(CMerkleTreeRef merkleTree=pMerkleTreeFactory->GetMerkleTree(config, *blockIndex, chainActiveHeight))
+            {
+                auto merkleTreeHashes = merkleTree->GetMerkleProof(0, false).merkleTreeHashes;
+
+                TSCMerkleProof::nodes_type nodes;
+                for(auto& h: merkleTreeHashes)
+                {
+                    nodes.emplace_back(h);
+                    assert( nodes.back().mType ==0 ); // Type of node in Merkle proof is always 0 because we're providing hash in value field
+                }
+                coinbaseMerkleProof.Nodes( std::move(nodes) );
+
+                // If we were able to get both CB txn and its Merkle proof, we can return coinbase data.
+                hasCoinbaseData = true;
+            }
+            else
+            {
+                // Delete CB txn if we were unable to get its Merkle proof, since it is not needed.
+                coinbaseTx.clear();
+            }
+        }
+    }
+};
+
+} // anonymous namespace
+
+/**
+ * Process enriched get headers message.
+ */
+static void ProcessGetHeadersEnrichedMessage(const CNodePtr& pfrom,
+                                             const CNetMsgMaker& msgMaker,
+                                             CDataStream& vRecv,
+                                             CConnman& connman,
+                                             const Config& config)
+{
+    CBlockLocator locator;
+    uint256 hashStop;
+    vRecv >> locator >> hashStop;
+
+    // Get block data that must be obtained under lock
+    const CBlockIndex* lastBlockIndex;
+    std::vector<CBlockHeaderEnriched> vHeadersEnriched;
+    int32_t chainActiveHeight;
+    {
+        if(IsInitialBlockDownload() && !pfrom->fWhitelisted) {
+            LogPrint(BCLog::NETMSG, "Ignoring gethdrsen from peer=%d because "
+                                    "node is in initial block download\n",
+                     pfrom->id);
+            return;
+        }
+
+        LOCK(cs_main);
+
+        // Get index of the first requested block
+        const CBlockIndex* pindex = nullptr;
+        if(auto opt_block_index = GetFirstBlockIndexFromLocatorNL(locator, hashStop))
+        {
+            pindex = *opt_block_index;
+        }
+        else
+        {
+            LogPrint(BCLog::NET, "Ignoring gethdrsen from peer=%d because "
+                                 "it requested unknown block (hashstop=%s) without locator\n",
+                     pfrom->id, hashStop.ToString());
+            return;
+        }
+
+        LogPrint(BCLog::NET, "gethdrsen %d to %s from peer=%d\n",
+                 (pindex ? pindex->GetHeight() : -1),
+                 hashStop.IsNull() ? "end" : hashStop.ToString(), pfrom->id);
+
+        int nLimit = MAX_HEADERS_RESULTS;
+        for (; pindex; pindex = chainActive.Next(pindex))
+        {
+            auto& hdr = vHeadersEnriched.emplace_back( pindex );
+
+            if (chainActive.Tip() == pindex)
+            {
+                // This is the last header that we currently have.
+                hdr.noMoreHeaders = true;
+            }
+
+            if (--nLimit <= 0 || pindex->GetBlockHash() == hashStop)
+            {
+                break;
+            }
+        }
+
+        // Remember index of the last block that will be returned to node so that
+        // we can later update BestHeaderSent for that node.
+        // Null values are handled in the same way as in ProcessGetHeadersMessage.
+        lastBlockIndex = pindex ? pindex : chainActive.Tip();
+
+        chainActiveHeight = chainActive.Height();
+    }
+
+    // Get data that is slow to obtain but can be obtained without holding cs_main lock
+    size_t combinedMsgSize = GetSizeOfCompactSize(vHeadersEnriched.size()); // number of bytes needed to store number of enriched headers
+    for (auto it=vHeadersEnriched.begin(); it!=vHeadersEnriched.end(); ++it)
+    {
+        auto& enrichedHeader = *it;
+
+        // Store coinbase info to enriched header object.
+        // CB txn should be serialized using the same protocol version as in msgMaker.
+        enrichedHeader.SetCoinBaseInfo(msgMaker.GetVersion(), config, chainActiveHeight);
+
+        // Check if total message size is still within limits.
+        // Note that we start checking only after we have already created one header,
+        // so that a single header is always returned even if the message is too big.
+        combinedMsgSize += enrichedHeader.GetSerializedSize();
+        if (combinedMsgSize > static_cast<size_t>(pfrom->maxRecvPayloadLength))
+        {
+            if (it==vHeadersEnriched.begin())
+            {
+                // Do not return subsequent headers if message has gotten too big after the first header.
+                vHeadersEnriched.erase(it+1, vHeadersEnriched.end());
+            }
+            else
+            {
+                // Do not return this and subsequent headers if message has gotten too big.
+                vHeadersEnriched.erase(it, vHeadersEnriched.end());
+            }
+            lastBlockIndex = vHeadersEnriched.back().blockIndex;
+            break;
+        }
+    }
+
+    // Update node's BestHeaderSent like it is done in ProcessGetHeadersMessage so that
+    // 'gethdrsen' is functionally equivalent to 'getheaders' except it provides more data.
+    const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
+    const CNodeStatePtr& state { stateRef.get() };
+    assert(state);
+    state->pindexBestHeaderSent = lastBlockIndex;
+
+    connman.PushMessage(pfrom, msgMaker.Make(NetMsgType::HDRSEN, vHeadersEnriched));
+}
+
 /**
 * Process tx message.
 */
@@ -3381,6 +3673,7 @@ static bool ProcessProtoconfMessage(const CNodePtr& pfrom, CDataStream& vRecv, C
         // Limit the amount of data we are willing to send if a peer (or an attacker)
         // that is running a newer version sends us large size, that we are not prepared to handle. 
         pfrom->maxInvElements = CInv::estimateMaxInvElements(std::min(config.GetMaxProtocolSendPayloadLength(), protoconf.maxRecvPayloadLength));
+        pfrom->maxRecvPayloadLength = protoconf.maxRecvPayloadLength;
 
         // Parse supported stream policies if we have them
         if(protoconf.numberOfFields >= 2) {
@@ -3662,6 +3955,10 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
         ProcessSendHeadersMessage(pfrom);
     }
 
+    else if (strCommand == NetMsgType::SENDHDRSEN) {
+        ProcessSendHdrsEnMessage(pfrom);
+    }
+
     else if (strCommand == NetMsgType::SENDCMPCT) {
         ProcessSendCompactMessage(pfrom, vRecv);
     }
@@ -3686,6 +3983,10 @@ static bool ProcessMessage(const Config& config, const CNodePtr& pfrom,
 
     else if (strCommand == NetMsgType::GETHEADERS) {
         ProcessGetHeadersMessage(pfrom, msgMaker, vRecv, connman);
+    }
+
+    else if (strCommand == NetMsgType::GETHDRSEN) {
+        ProcessGetHeadersEnrichedMessage(pfrom, msgMaker, vRecv, connman, config);
     }
 
     else if (strCommand == NetMsgType::TX) {
@@ -4142,7 +4443,7 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
     // and send. If no header would connect, or if we have too many blocks,
     // or if the peer doesn't want headers, just add all to the inv queue.
     bool fRevertToInv =
-        ((!state->fPreferHeaders &&
+        ((!state->fPreferHeaders && !state->fPreferHeadersEnriched &&
           (!state->fPreferHeaderAndIDs ||
            pto->vBlockHashesToAnnounce.size() > 1)) ||
          pto->vBlockHashesToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE);
@@ -4257,6 +4558,60 @@ void SendBlockHeaders(const Config& config, const CNodePtr& pto, CConnman &connm
             }
             connman.PushMessage(pto, msgMaker.Make(NetMsgType::HEADERS, vHeaders));
             state->pindexBestHeaderSent = pBestIndex;
+        }
+        else if (state->fPreferHeadersEnriched) {
+            const CBlockIndex* tip = chainActive.Tip();
+            const std::int32_t chainActiveHeight = tip->GetHeight();
+
+            // Convert vHeaders to array of enriched headers.
+            std::vector<CBlockHeaderEnriched> vHeadersEnriched;
+            vHeadersEnriched.reserve(vHeaders.size());
+            size_t combinedMsgSize = 0;
+            for(auto& h: vHeaders)
+            {
+                auto pindex = mapBlockIndex.Get(h.GetHash());
+                assert(pindex);
+
+                // Create enriched header
+                auto& enrichedHeader = vHeadersEnriched.emplace_back(pindex);
+
+                if (tip == pindex)
+                {
+                    // This is the last header that we currently have.
+                    enrichedHeader.noMoreHeaders = true;
+                }
+
+                // Set coinbase information in enriched header
+                // Note that contents of CB tx and its Merkle proof should be available here
+                // since we only recently processed this block.
+                enrichedHeader.SetCoinBaseInfo(msgMaker.GetVersion(), config, chainActiveHeight);
+
+                combinedMsgSize += enrichedHeader.GetSerializedSize();
+                if ( (combinedMsgSize + GetSizeOfCompactSize(vHeadersEnriched.size())) > static_cast<std::size_t>(pto->maxRecvPayloadLength) )
+                {
+                    // Size of hdrsen message would exceed maximum message size the peer can accept.
+                    // Revert to sending inv.
+                    fRevertToInv=true;
+                    break;
+                }
+            }
+
+            if(!fRevertToInv) {
+                if (vHeadersEnriched.size() > 1) {
+                    LogPrint(BCLog::NETMSG,
+                             "%s: %u hdrsen, range (%s, %s), to peer=%d\n",
+                             __func__, vHeadersEnriched.size(),
+                             vHeadersEnriched.front().blockHeader.GetHash().ToString(),
+                             vHeadersEnriched.back().blockHeader.GetHash().ToString(), pto->id);
+                }
+                else {
+                    LogPrint(BCLog::NETMSG, "%s: sending hdrsen %s to peer=%d\n",
+                             __func__, vHeadersEnriched.front().blockHeader.GetHash().ToString(),
+                             pto->id);
+                }
+                connman.PushMessage(pto, msgMaker.Make(NetMsgType::HDRSEN, vHeadersEnriched));
+                state->pindexBestHeaderSent = pBestIndex;
+            }
         }
         else {
             fRevertToInv = true;

@@ -21,8 +21,10 @@ const char *GETDATA = "getdata";
 const char *MERKLEBLOCK = "merkleblock";
 const char *GETBLOCKS = "getblocks";
 const char *GETHEADERS = "getheaders";
+const char* GETHDRSEN = "gethdrsen";
 const char *TX = "tx";
 const char *HEADERS = "headers";
+const char* HDRSEN = "hdrsen";
 const char *BLOCK = "block";
 const char *GETADDR = "getaddr";
 const char *MEMPOOL = "mempool";
@@ -34,6 +36,7 @@ const char *FILTERADD = "filteradd";
 const char *FILTERCLEAR = "filterclear";
 const char *REJECT = "reject";
 const char *SENDHEADERS = "sendheaders";
+const char *SENDHDRSEN = "sendhdrsen";
 const char *FEEFILTER = "feefilter";
 const char *SENDCMPCT = "sendcmpct";
 const char *CMPCTBLOCK = "cmpctblock";
@@ -48,7 +51,9 @@ const char *EXTMSG = "extmsg";
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
            strCommand == NetMsgType::CMPCTBLOCK ||
-           strCommand == NetMsgType::BLOCKTXN;
+           strCommand == NetMsgType::BLOCKTXN ||
+           strCommand == NetMsgType::HDRSEN; // We treat this message as block like because we don't want the
+                                             // message to be bigger than max block size we are willing to accept
 }
 
 uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
@@ -98,11 +103,11 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
 static const std::string allNetMessageTypes[] = {
     NetMsgType::VERSION,      NetMsgType::VERACK,     NetMsgType::ADDR,
     NetMsgType::INV,          NetMsgType::GETDATA,    NetMsgType::MERKLEBLOCK,
-    NetMsgType::GETBLOCKS,    NetMsgType::GETHEADERS, NetMsgType::TX,
-    NetMsgType::HEADERS,      NetMsgType::BLOCK,      NetMsgType::GETADDR,
+    NetMsgType::GETBLOCKS,    NetMsgType::GETHEADERS, NetMsgType::GETHDRSEN,   NetMsgType::TX,
+    NetMsgType::HEADERS,      NetMsgType::HDRSEN,     NetMsgType::BLOCK,       NetMsgType::GETADDR,
     NetMsgType::MEMPOOL,      NetMsgType::PING,       NetMsgType::PONG,
     NetMsgType::NOTFOUND,     NetMsgType::FILTERLOAD, NetMsgType::FILTERADD,
-    NetMsgType::FILTERCLEAR,  NetMsgType::REJECT,     NetMsgType::SENDHEADERS,
+    NetMsgType::FILTERCLEAR,  NetMsgType::REJECT,     NetMsgType::SENDHEADERS, NetMsgType::SENDHDRSEN,
     NetMsgType::FEEFILTER,    NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
     NetMsgType::GETBLOCKTXN,  NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
     NetMsgType::CREATESTREAM, NetMsgType::STREAMACK,  NetMsgType::DSDETECTED,
