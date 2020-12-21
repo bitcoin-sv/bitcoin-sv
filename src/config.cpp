@@ -270,9 +270,13 @@ uint64_t GlobalConfig::GetMaxTxSize(bool isGenesisEnabled, bool isConsensus) con
     return maxTxSizePolicy;
 }
 
-bool GlobalConfig::SetMinConsolidationFactor(uint64_t minConsolidationFactorIn, std::string* err)
+bool GlobalConfig::SetMinConsolidationFactor(int64_t minConsolidationFactorIn, std::string* err)
 {
-    minConsolidationFactor = minConsolidationFactorIn;
+    if (LessThanZero(minConsolidationFactorIn, err, "Minimum consolidation factor cannot be less than zero."))
+    {
+        return false;
+    }
+    minConsolidationFactor = static_cast<uint64_t>(minConsolidationFactorIn);
     return true;
 }
 
@@ -281,16 +285,16 @@ uint64_t GlobalConfig::GetMinConsolidationFactor() const
     return minConsolidationFactor;
 }
 
-bool GlobalConfig::SetMaxConsolidationInputScriptSize(uint64_t maxConsolidationInputScriptSizeIn, std::string* err)
+bool GlobalConfig::SetMaxConsolidationInputScriptSize(int64_t maxConsolidationInputScriptSizeIn, std::string* err)
 {
-    if (LessThanZero(maxConsolidationInputScriptSizeIn, err, "Maximum length for a scriptSig input in a consolidation txn must not be less than zero."))
+    if (LessThanZero(maxConsolidationInputScriptSizeIn, err, "Maximum length for a scriptSig input in a consolidation txn cannot be less than zero."))
     {
         return false;
     }
     else if (maxConsolidationInputScriptSizeIn == 0) {
         maxConsolidationInputScriptSize = DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE;
     } else {
-        maxConsolidationInputScriptSize = maxConsolidationInputScriptSizeIn;
+        maxConsolidationInputScriptSize = static_cast<uint64_t>(maxConsolidationInputScriptSizeIn);
     }
     return true;
 }
@@ -300,12 +304,19 @@ uint64_t GlobalConfig::GetMaxConsolidationInputScriptSize() const
     return maxConsolidationInputScriptSize;
 }
 
-bool GlobalConfig::SetMinConfConsolidationInput(uint64_t minconfIn, std::string* err)
+bool GlobalConfig::SetMinConfConsolidationInput(int64_t minconfIn, std::string* err)
 {
-    if (minconfIn == 0) {
+    if (LessThanZero(minconfIn, err, "Minimum number of confirmations of inputs spent by consolidation transactions cannot be less than 0"))
+    {
+        return false;
+    }
+    if (minconfIn == 0)
+    {
         minConfConsolidationInput = DEFAULT_MIN_CONF_CONSOLIDATION_INPUT;
-    } else {
-        minConfConsolidationInput = minconfIn;
+    }
+    else
+    {
+        minConfConsolidationInput = static_cast<uint64_t>(minconfIn);
     }
     return true;
 }
