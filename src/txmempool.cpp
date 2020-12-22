@@ -119,17 +119,14 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx,
                                  LockPoints lp)
     : tx{std::make_shared<CTransactionWrapper>(_tx, nullptr)},
       nFee{_nFee},
+      nTxSize{_tx->GetTotalSize()},
+      nUsageSize{RecursiveDynamicUsage(_tx)},
       nTime{_nTime},
+      feeDelta{Amount{0}},
       lockPoints{lp},
       entryHeight{_entryHeight},
       spendsCoinbase{_spendsCoinbase}
-{
-    nTxSize = _tx->GetTotalSize();
-    nUsageSize = RecursiveDynamicUsage(_tx);
-
-
-    feeDelta = Amount {0};
-}
+{}
 
 // CPFP group, if any that this transaction belongs to.
 mining::GroupID CTxMemPoolEntry::GetCPFPGroupId() const
@@ -1561,6 +1558,10 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
     OpenMempoolTxDB();
     uint64_t movedToDiskSize = 0;
     {
+        // For a discussion of interactions between writing transactions
+        // to disk and transaction wrappers, see the comment at
+        // CTransactionWrapper::GetTx() in tx_mempool_info.cpp and the 'add'
+        // lambda in CAsyncMempoolTxDB::Work() in mempooltxdb.cpp.
         std::vector<CTransactionWrapperRef> toBeMoved;
         std::shared_lock lock{smtx};
         for (auto mi = mapTx.get<entry_time>().begin();

@@ -533,15 +533,34 @@ void CAsyncMempoolTxDB::Work()
     };
 
     // Add transactions to the database and update the wrappers.
+    //
+    // Due to the way CTxMemPool::SaveTxsToDisk() works, there may be multiple
+    // adds for the same transaction. These are resolved as follows:
+    //
+    //  * If the second instance arrives after the current batch has been
+    //    committed to disk:
+    //     - ResetTransaction() will already have been called;
+    //     - GetInMemoryTx() will return a null pointer;
+    //     - consequently, this second instance will be ignored.
+    //  * If the second instance arrives while the current batch is still
+    //    being constructed:
+    //     - if the first add was *not* coalesced with (removed due to) a
+    //       subsequent remove (see: CMempoolTxDB::Batch::Remove), the second
+    //       add will be ignored due to the first instance still living in the
+    //       coalescing batch (see: CMempoolTxDB::Batch::Add).
+    //     - if the first add *was* removed due to a subsequent remove, the
+    //       current add prevails. However, this can only happen if the
+    //       transaction was re-added to the mempool after it had already been
+    //       removed from it.
     const auto add = [&batch](const AddTask& task)
     {
         for (const auto& wrapper : task.transactions)
         {
-            if (wrapper->IsInMemory())
+            if (const auto tx = wrapper->GetInMemoryTx())
             {
-                batch.Add(wrapper->GetTx(),
+                batch.Add(tx,
                           [wrapper](const TxId&) {
-                              wrapper->UpdateTxMovedToDisk();
+                              wrapper->ResetTransaction();
                           });
             }
         }
