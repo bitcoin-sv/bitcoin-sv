@@ -128,14 +128,14 @@ CJournalChangeSet::~CJournalChangeSet()
 // Add a new operation to the set
 void CJournalChangeSet::addOperation(Operation op, CJournalEntry&& txn)
 {
-    std::unique_lock<std::mutex> lock { mMtx };
+    std::scoped_lock lock{ mMtx };
     mChangeSet.emplace_back(op, std::move(txn));
     addOperationCommon(op);
 }
 
 void CJournalChangeSet::addOperation(Operation op, const CJournalEntry& txn)
 {
-    std::unique_lock<std::mutex> lock { mMtx };
+    std::scoped_lock lock{ mMtx };
     mChangeSet.emplace_back(op, txn);
     addOperationCommon(op);
 }
@@ -160,14 +160,14 @@ bool CJournalChangeSet::isUpdateReasonBasic() const
 // Apply our changes to the journal
 void CJournalChangeSet::apply()
 {
-    std::unique_lock<std::mutex> lock { mMtx };
+    std::scoped_lock lock{ mMtx };
     applyNL();
 }
 
 // Clear the changeset without applying it
 void CJournalChangeSet::clear()
 {
-    std::unique_lock<std::mutex> lock { mMtx };
+    std::scoped_lock lock{ mMtx };
     mChangeSet.clear();
 }
 
