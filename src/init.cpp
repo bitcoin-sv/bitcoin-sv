@@ -1949,7 +1949,7 @@ bool AppInitParameterInteraction(Config &config) {
     // configure min ratio between tx input to tx output size to be considered free consolidation tx.
     if (gArgs.IsArgSet("-minconsolidationfactor"))
     {
-        uint64_t minConsolidationFactor = gArgs.GetArg("-minconsolidationfactor", DEFAULT_MIN_CONSOLIDATION_FACTOR);
+        int64_t minConsolidationFactor = gArgs.GetArg("-minconsolidationfactor", DEFAULT_MIN_CONSOLIDATION_FACTOR);
         if (std::string err; !config.SetMinConsolidationFactor(minConsolidationFactor, &err)) {
             return InitError(err);
         }
@@ -1958,7 +1958,7 @@ bool AppInitParameterInteraction(Config &config) {
     // configure maxiumum scriptSig input size not considered spam in a consolidation transaction
     if (gArgs.IsArgSet("-maxconsolidationinputscriptsize"))
     {
-        uint64_t maxConsolidationInputScriptSize = gArgs.GetArgAsBytes("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
+        int64_t maxConsolidationInputScriptSize = gArgs.GetArgAsBytes("-maxconsolidationinputscriptsize", DEFAULT_MAX_CONSOLIDATION_INPUT_SCRIPT_SIZE);
         if (std::string err; !config.SetMaxConsolidationInputScriptSize(maxConsolidationInputScriptSize, &err)) {
             return InitError(err);
         }
@@ -1970,13 +1970,13 @@ bool AppInitParameterInteraction(Config &config) {
             _("Cannot use both -minconfconsolidationinput and -minconsolidationinputmaturity (deprecated) at the same time"));
     }
     if (gArgs.IsArgSet("-minconfconsolidationinput")) {
-        uint64_t param = gArgs.GetArg("-minconfconsolidationinput", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        int64_t param = gArgs.GetArg("-minconfconsolidationinput", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
         if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
             return InitError(err);
         }
     }
     if (gArgs.IsArgSet("-minconsolidationinputmaturity")) {
-        uint64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
+        int64_t param = gArgs.GetArg("-minconsolidationinputmaturity", DEFAULT_MIN_CONF_CONSOLIDATION_INPUT);
         if (std::string err; !config.SetMinConfConsolidationInput(param, &err)) {
             return InitError(err);
         }
