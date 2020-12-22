@@ -523,11 +523,11 @@ static UniValue createrawtransaction(const Config &config,
                            "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\" "
                            "\"{\\\"data\\\":\\\"00010203\\\"}\"") +
             HelpExampleRpc("createrawtransaction",
-                           "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", "
-                           "\"{\\\"address\\\":0.01}\"") +
+                           "[{\"txid\":\"myid\",\"vout\":0}], "
+                           "{\"address\":0.01}") +
             HelpExampleRpc("createrawtransaction",
-                           "\"[{\\\"txid\\\":\\\"myid\\\",\\\"vout\\\":0}]\", "
-                           "\"{\\\"data\\\":\\\"00010203\\\"}\""));
+                           "[{\"txid\":\"myid\",\"vout\":0}], "
+                           "{\"data\":\"00010203\"}"));
     }
 
     RPCTypeCheck(request.params,
@@ -1715,8 +1715,8 @@ static UniValue getmerkleproof(const Config& config,
             "}\n"
             "\nExamples:\n" +
             HelpExampleCli("getmerkleproof", "\"mytxid\"") +
-            HelpExampleCli("getmerkleproof", "\"mytxid\" myblockhash") +
-            HelpExampleRpc("getmerkleproof", "\"mytxid\", myblockhash"));
+            HelpExampleCli("getmerkleproof", "\"mytxid\" \"myblockhash\"") +
+            HelpExampleRpc("getmerkleproof", "\"mytxid\", \"myblockhash\""));
     }
 
     TxId transactionId = TxId(ParseHashV(request.params[0], "hash"));
@@ -1808,9 +1808,9 @@ static UniValue verifymerkleproof(const Config& config,
             "\nResult:\n"
             "true|false                           (boolean) If true, proof for \"txOrId\" was successfully verified, false otherwise\n"
             "\nExamples:\n" +
-            HelpExampleCli("verifymerkleproof", "'{\"flags\": 2, \"index\": 1, \"txOrId\": \"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\", "
-                "\"target\": {\"merkleroot\": \"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\"}, "
-                "\"nodes\": [\"*\", \"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\"]}'") +
+            HelpExampleCli("verifymerkleproof", "\"{\\\"flags\\\": 2, \\\"index\\\": 1, \\\"txOrId\\\": \\\"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\\\", "
+                "\\\"target\\\": {\\\"merkleroot\\\": \\\"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\\\"}, "
+                "\\\"nodes\\\": [\\\"*\\\", \\\"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\\\"]}\"") +
             HelpExampleRpc("verifymerkleproof", "{\"flags\": 2, \"index\": 1, \"txOrId\": \"b4cc287e58f87cdae59417329f710f3ecd75a4ee1d2872b7248f50977c8493f3\", "
                 "\"target\": {\"merkleroot\": \"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\"}, "
                 "\"nodes\": [\"*\", \"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9\"]}"));   

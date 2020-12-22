@@ -238,7 +238,8 @@ static UniValue generatetoaddress(const Config &config,
             "[ blockhashes ]     (array) hashes of blocks generated\n"
             "\nExamples:\n"
             "\nGenerate 11 blocks to myaddress\n" +
-            HelpExampleCli("generatetoaddress", "11 \"myaddress\""));
+            HelpExampleCli("generatetoaddress", "11 \"myaddress\"") +
+            HelpExampleRpc("generatetoaddress", "11, \"myaddress\""));
     }
 
     int nGenerate = request.params[0].get_int();
