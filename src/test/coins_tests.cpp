@@ -586,7 +586,7 @@ BOOST_AUTO_TEST_CASE(coin_write) {
 BOOST_FIXTURE_TEST_CASE(coin_get_lazy, TestingSetup) {
     // First delete pcoinsTip as we don't want to cause a dead lock in this
     // test since we'll be instantiating a pcoinsTip alternative
-    pcoinsTip.release();
+    pcoinsTip.reset();
 
     /* Check method CCoinsViewDB::GetCoin_NoLargeScript
      * Method should unserialize contents of the script only if size of script is not larger than specified.
@@ -837,7 +837,7 @@ BOOST_FIXTURE_TEST_CASE(no_coins_caching, TestingSetup)
 {
     // First delete pcoinsTip as we don't want to cause a dead lock in this
     // test since we'll be instantiating a pcoinsTip alternative
-    pcoinsTip.release();
+    pcoinsTip.reset();
 
     // Id of an unspent transaction
     auto txId = uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
@@ -1009,7 +1009,7 @@ BOOST_FIXTURE_TEST_CASE(coins_caching, TestingSetup)
 {
     // First delete pcoinsTip as we don't want to cause a dead lock in this
     // test since we'll be instantiating a pcoinsTip alternative
-    pcoinsTip.release();
+    pcoinsTip.reset();
 
     // Id of an unspent transaction
     auto txId = uint256S("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");

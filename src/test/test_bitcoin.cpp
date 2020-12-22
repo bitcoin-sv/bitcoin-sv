@@ -142,7 +142,7 @@ TestingSetup::~TestingSetup() {
     threadGroup.interrupt_all();
     threadGroup.join_all();
     UnloadBlockIndex();
-    pcoinsTip.release();
+    pcoinsTip.reset();
     delete pblocktree;
 }
 
