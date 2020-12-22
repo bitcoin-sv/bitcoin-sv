@@ -142,6 +142,9 @@ public:
     virtual bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) = 0;
     virtual uint64_t GetMaxCoinsProviderCacheSize() const = 0;
 
+    virtual bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) = 0;
+    virtual uint64_t GetMaxCoinsDbOpenFiles() const = 0;
+
     virtual void SetInvalidBlocks(const std::set<uint256>& hashes) = 0;
     virtual const std::set<uint256>& GetInvalidBlocks() const = 0;
     virtual bool IsBlockInvalidated(const uint256& hash) const = 0;
@@ -329,6 +332,9 @@ public:
     bool SetMaxCoinsProviderCacheSize(int64_t max, std::string* err) override;
     uint64_t GetMaxCoinsProviderCacheSize() const override {return mMaxCoinsProviderCacheSize;}
 
+    bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err) override;
+    uint64_t GetMaxCoinsDbOpenFiles() const override {return mMaxCoinsDbOpenFiles; }
+
     void SetInvalidBlocks(const std::set<uint256>& hashes) override; 
     const std::set<uint256>& GetInvalidBlocks() const override;
     bool IsBlockInvalidated(const uint256& hash) const override;
@@ -458,6 +464,8 @@ private:
 
     uint64_t mMaxCoinsViewCacheSize;
     uint64_t mMaxCoinsProviderCacheSize;
+
+    uint64_t mMaxCoinsDbOpenFiles;
 
     uint64_t mMaxMempool;
     uint64_t mMaxMempoolSizeDisk;
@@ -722,6 +730,14 @@ public:
         return false;
     }
     uint64_t GetMaxCoinsProviderCacheSize() const override {return 0; /* unlimited */}
+
+    bool SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)  override
+    {
+        SetErrorMsg(err);
+
+        return false;
+    }
+    uint64_t GetMaxCoinsDbOpenFiles() const override {return 64; /* old default */}
 
     bool SetMaxMempool(int64_t maxMempool, std::string* err) override
     {

@@ -828,6 +828,18 @@ bool GlobalConfig::SetMaxCoinsProviderCacheSize(int64_t max, std::string* err)
     return true;
 }
 
+bool GlobalConfig::SetMaxCoinsDbOpenFiles(int64_t max, std::string* err)
+{
+    if (LessThanZero(max - 1, err, "Minimum value for max number of leveldb open files for coinsdb size must not be less than 1."))
+    {
+        return false;
+    }
+
+    mMaxCoinsDbOpenFiles = static_cast<uint64_t>(max);
+
+    return true;
+}
+
 void GlobalConfig::SetInvalidBlocks(const std::set<uint256>& hashes)
 {
     mInvalidBlocks = hashes;

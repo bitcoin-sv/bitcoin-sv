@@ -362,6 +362,12 @@ private:
     std::vector<uint8_t> CreateObfuscateKey() const;
 
 public:
+    struct MaxFiles {
+        const size_t maxFiles;
+        explicit MaxFiles(size_t maxFiles_) : maxFiles{maxFiles_} {}
+        static MaxFiles Default() { return MaxFiles{64}; }
+    };
+
     /**
      * @param[in] path        Location in the filesystem where leveldb data will
      * be stored.
@@ -377,7 +383,8 @@ public:
     CDBWrapper(CDBWrapper&&) = delete;
     CDBWrapper& operator=(CDBWrapper&&) = delete;
     CDBWrapper(const fs::path &path, size_t nCacheSize, bool fMemory = false,
-               bool fWipe = false, bool obfuscate = false);
+               bool fWipe = false, bool obfuscate = false,
+               MaxFiles nMaxFiles = MaxFiles::Default());
     ~CDBWrapper();
 
 public:

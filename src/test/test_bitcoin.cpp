@@ -109,6 +109,7 @@ TestingSetup::TestingSetup(const std::string &chainName, mining::CMiningFactory:
         std::make_unique<CoinsDB>(
             std::numeric_limits<size_t>::max(),
             1 << 23,
+            CoinsDB::MaxFiles::Default(),
             true);
     if (!InitBlockIndex(testConfig)) {
         throw std::runtime_error("InitBlockIndex failed.");
