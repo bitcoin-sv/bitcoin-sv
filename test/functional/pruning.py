@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2014-2016 The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+# Copyright (c) 2021 Bitcoin Association
+# Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #
 # Test pruning code
@@ -17,8 +17,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 import time
 import os
-
-MIN_BLOCKS_TO_KEEP = 288
+from test_framework.cdefs import MIN_BLOCKS_TO_KEEP
 
 # Rescans start at the earliest block up to 2 hours before a key timestamp, so
 # the manual prune RPC avoids pruning blocks in the same window to be

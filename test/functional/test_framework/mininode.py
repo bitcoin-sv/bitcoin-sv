@@ -665,6 +665,114 @@ class CBlockHeader():
                time.ctime(self.nTime), self.nBits, self.nNonce)
 
 
+class TSCMerkleProof():
+    def __init__(self):
+        self.set_null()
+
+    class Node():
+        def __init__(self):
+            self.set_null()
+
+        def set_null(self):
+            self.type = 0
+            self.value = 0
+
+        def deserialize(self, f):
+            self.type = struct.unpack("<b", f.read(1))[0]
+            if self.type != 0:
+                raise ValueError("Unsupported value of type field (%i) in TSCMerkleProof.Node" % self.type)
+            self.value = deser_uint256(f)
+
+        def serialize(self):
+            r = b"".join((
+                struct.pack("<b", self.type),
+                ser_uint256(self.value)
+            ))
+            return r
+        
+        def __repr__(self):
+            return "(%i, %064x)" % (self.type, self.value)
+
+    def set_null(self):
+        self.flags = 0
+        self.index = 0
+        self.txOrId = 0
+        self.target = 0
+        self.nodes = None
+
+    def deserialize(self, f):
+        self.flags = struct.unpack("<b", f.read(1))[0]
+        if self.flags != 0:
+            raise ValueError("Unsupported value of flags field (%i) in TSCMerkleProof" % self.flags)
+        self.index = deser_compact_size(f)
+        self.txOrId = deser_uint256(f)
+        self.target = deser_uint256(f)
+        self.nodes = deser_vector(f, TSCMerkleProof.Node)
+
+    def serialize(self):
+        r = b"".join((
+            struct.pack("<b", self.flags),
+            ser_compact_size(self.index),
+            ser_uint256(self.txOrId),
+            ser_uint256(self.target),
+            ser_vector(self.nodes)
+        ))
+        return r
+
+    def __repr__(self):
+        return "TSCMerkleProof(flags=%i index=%i txOrId=%064x target=%064x nodes=%s)" \
+            % (self.flags, self.index, self.txOrId, self.target, repr(self.nodes))
+
+
+class CBlockHeaderEnriched(CBlockHeader):
+
+    def __init__(self, header=None):
+        super(CBlockHeaderEnriched, self).__init__(header)
+        if header is None:
+            self.set_null()
+        else:
+            self.nTx = header.nTx
+            self.noMoreHeaders = header.noMoreHeaders
+            self.hasCoinbaseData = header.hasCoinbaseData
+            self.coinbaseMerkleProof = header.coinbaseMerkleProof
+            self.coinBaseTx = header.coinBaseTx
+
+    def set_null(self):
+        super(CBlockHeaderEnriched, self).set_null()
+        self.nTx = 0
+        self.noMoreHeaders = False
+        self.hasCoinbaseData = False
+        self.coinbaseMerkleProof = None
+        self.coinBaseTx = None
+
+    def deserialize(self, f):
+        super(CBlockHeaderEnriched, self).deserialize(f)
+        self.nTx = deser_compact_size(f)
+        self.noMoreHeaders = struct.unpack("<b", f.read(1))[0]
+        self.hasCoinbaseData = struct.unpack("<b", f.read(1))[0]
+        if self.hasCoinbaseData == True:
+            self.coinbaseMerkleProof = TSCMerkleProof()
+            self.coinbaseMerkleProof.deserialize(f)
+            self.coinBaseTx = CTransaction()
+            self.coinBaseTx.deserialize(f)
+
+    def serialize(self):
+        r = b"".join((
+            super(CBlockHeaderEnriched, self).serialize(),
+            ser_compact_size(self.nTx),
+            struct.pack("<b", self.noMoreHeaders),
+            struct.pack("<b", self.hasCoinbaseData)
+            ))
+        if self.hasCoinbaseData:
+            r += self.coinbaseMerkleProof.serialize()
+            r += self.coinBaseTx.serialize()
+        return r
+
+    def __repr__(self):
+        return "CBlockHeaderEnriched(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x nTx=%i noMoreHeaders=%i hasCoinbaseData=%i coinbaseMerkleProof=%s coinBaseTx=%s)" \
+            % (self.nVersion, self.hashPrevBlock, self.hashMerkleRoot,
+               time.ctime(self.nTime), self.nBits, self.nNonce, self.nTx, self.noMoreHeaders, self.hasCoinbaseData, repr(self.coinbaseMerkleProof), repr(self.coinBaseTx))
+
 class CBlock(CBlockHeader):
 
     def __init__(self, header=None):
@@ -1429,6 +1537,22 @@ class msg_sendheaders():
         return "msg_sendheaders()"
 
 
+class msg_sendhdrsen():
+    command = b"sendhdrsen"
+
+    def __init__(self):
+        pass
+
+    def deserialize(self, f):
+        pass
+
+    def serialize(self):
+        return b""
+
+    def __repr__(self):
+        return "msg_sendhdrsen()"
+
+
 # getheaders message has
 # number of entries
 # vector of hashes
@@ -1476,6 +1600,52 @@ class msg_headers():
 
     def __repr__(self):
         return "msg_headers(headers=%s)" % repr(self.headers)
+
+# gethdrsen message has
+# number of entries
+# vector of hashes
+# hash_stop (hash of last desired block header, 0 to get as many as possible)
+class msg_gethdrsen():
+    command = b"gethdrsen"
+
+    def __init__(self, locator_have=[], hashstop=0):
+        self.locator = CBlockLocator(locator_have)
+        self.hashstop = hashstop
+
+    def deserialize(self, f):
+        self.locator = CBlockLocator()
+        self.locator.deserialize(f)
+        self.hashstop = deser_uint256(f)
+
+    def serialize(self):
+        r = b"".join((
+            self.locator.serialize(),
+            ser_uint256(self.hashstop),))
+        return r
+
+    def __repr__(self):
+        return "msg_gethdrsen(locator=%s, stop=%064x)" \
+            % (repr(self.locator), self.hashstop)
+
+
+# hdrsen message has
+# <count> <vector of block headers>
+class msg_hdrsen():
+    command = b"hdrsen"
+
+    def __init__(self):
+        self.headers = []
+
+    def deserialize(self, f):
+        # comment in bitcoind indicates these should be deserialized as blocks
+        self.headers = deser_vector(f, CBlockHeaderEnriched)
+
+    def serialize(self):
+        blocks = [CBlockHeaderEnriched(x) for x in self.headers]
+        return ser_vector(blocks)
+
+    def __repr__(self):
+        return "msg_hdrsen(hdrsen=%s)" % repr(self.headers)
 
 
 class msg_reject():
@@ -1843,6 +2013,10 @@ class NodeConnCB():
 
     def on_headers(self, conn, message): pass
 
+    def on_gethdrsen(self, conn, message): pass
+
+    def on_hdrsen(self, conn, message): pass
+
     def on_mempool(self, conn): pass
 
     def on_pong(self, conn, message): pass
@@ -1852,6 +2026,8 @@ class NodeConnCB():
     def on_sendcmpct(self, conn, message): pass
 
     def on_sendheaders(self, conn, message): pass
+
+    def on_sendhdrsen(self, conn, message): pass
 
     def on_tx(self, conn, message): pass
 
@@ -1915,6 +2091,14 @@ class NodeConnCB():
 
     def wait_for_getheaders(self, timeout=60):
         def test_function(): return self.last_message.get("getheaders")
+        wait_until(test_function, timeout=timeout, lock=mininode_lock)
+
+    def wait_for_headers(self, timeout=60):
+        def test_function(): return self.last_message.get("headers")
+        wait_until(test_function, timeout=timeout, lock=mininode_lock)
+
+    def wait_for_hdrsen(self, timeout=60):
+        def test_function(): return self.last_message.get("hdrsen")
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_inv(self, expected_inv, timeout=60, check_interval=0.05):
@@ -2056,10 +2240,13 @@ class NodeConn(asyncore.dispatcher):
         b"pong": msg_pong,
         b"headers": msg_headers,
         b"getheaders": msg_getheaders,
+        b"hdrsen": msg_hdrsen,
+        b"gethdrsen": msg_gethdrsen,
         b"reject": msg_reject,
         b"mempool": msg_mempool,
         b"feefilter": msg_feefilter,
         b"sendheaders": msg_sendheaders,
+        b"sendhdrsen": msg_sendhdrsen,
         b"sendcmpct": msg_sendcmpct,
         b"cmpctblock": msg_cmpctblock,
         b"getblocktxn": msg_getblocktxn,
