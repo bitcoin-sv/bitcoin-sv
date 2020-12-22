@@ -1,6 +1,8 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "tx_mempool_info.h"
+
 #include "txmempool.h"
 #include "mempooltxdb.h"
 
