@@ -40,6 +40,7 @@ BITCOIN_TESTS =\
   test/blockencodings_tests.cpp \
   test/blockfile_reading_tests.cpp \
   test/block_info_tests.cpp \
+  test/blockindex_with_descendants_tests.cpp \
   test/blockmaxsize_tests.cpp \
   test/blockstatus_tests.cpp \
   test/blockvalidationstatus_tests.cpp \
