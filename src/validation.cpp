@@ -47,6 +47,7 @@
 #include "blockfileinfostore.h"
 #include "block_file_access.h"
 #include "invalid_txn_publisher.h"
+#include "blockindex_with_descendants.h"
 
 #include <atomic>
 
@@ -4297,9 +4298,23 @@ static CBlockIndex *FindMostWorkChain() {
         {
             std::set<CBlockIndex *, CBlockIndexWorkComparator>::reverse_iterator
                 it = setBlockIndexCandidates.rbegin();
-            if (it == setBlockIndexCandidates.rend()) {
-                return nullptr;
-            }
+            do {
+                if (it == setBlockIndexCandidates.rend()) {
+                    return nullptr;
+                }
+
+                if((*it)->IsSoftRejected())
+                {
+                    // This block is marked as soft rejected and should not be considered.
+                    // Try the next one.
+                    ++it;
+                    continue;
+                }
+
+                // We found a valid candidate header
+                break;
+            } while(true);
+
             pindexNew = *it;
         }
 
@@ -4366,7 +4381,13 @@ static void PruneBlockIndexCandidates() {
     std::set<CBlockIndex *, CBlockIndexWorkComparator>::iterator it =
         setBlockIndexCandidates.begin();
     while (it != setBlockIndexCandidates.end() &&
-           setBlockIndexCandidates.value_comp()(*it, chainActive.Tip())) {
+           setBlockIndexCandidates.value_comp()(*it, chainActive.Tip()) &&
+           // Current tip is better only if it is not considered soft rejected,
+           // or if the other block is also soft rejected.
+           // Otherwise the block index candidate must not be deleted so that we can
+           // return to it later (e.g. in case the block we're currently working
+           // towards turns out to be invalid).
+           (!chainActive.Tip()->IsSoftRejected() || (*it)->IsSoftRejected())) {
         setBlockIndexCandidates.erase(it++);
     }
     // Either the current tip or a successor of it we're working towards is left
@@ -4869,6 +4890,43 @@ bool PreciousBlock(const Config &config, CValidationState &state,
     return ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
 }
 
+
+namespace {
+
+/**
+ * Disconnect blocks from chain tip that are considered soft rejected
+ *
+ * @returns true: At least one block at tip was disconnected.
+ *          false: Tip is not considered soft rejected and nothing was done.
+ *          nullopt: There was an error when trying to disconnect the block at tip
+ */
+std::optional<bool> DisconnectSoftRejectedTipsNL(const Config& config, CValidationState& state, DisconnectedBlockTransactions& disconnectpool, CJournalChangeSetPtr& changeSet)
+{
+    AssertLockHeld(cs_main);
+
+    bool tip_disconnected = false;
+    while(chainActive.Tip()->IsSoftRejected())
+    {
+        const CBlockIndex* tip = chainActive.Tip();
+
+        // ActivateBestChain considers blocks already in chainActive
+        // unconditionally valid already, so force disconnect away from it.
+        if (!DisconnectTip(config, state, &disconnectpool, changeSet))
+        {
+            // DisconnectTip has failed.
+            return std::nullopt;
+        }
+
+        tip_disconnected = true;
+        LogPrintf("Block %s was disconnected from active chain tip (height=%d) because it is considered soft rejected at this height and for the next %d block(s)\n",
+                  tip->GetBlockHash().ToString(), tip->nHeight, tip->GetSoftRejectedFor());
+    }
+
+    return tip_disconnected;
+}
+
+} // anonymous namespace
+
 bool InvalidateBlock(const Config &config, CValidationState &state,
                      CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
@@ -4880,6 +4938,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
 
     DisconnectedBlockTransactions disconnectpool;
     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::REORG) };
+    bool tip_disconnected = false;
     if (chainActive.Contains(pindex))
     {
         while (chainActive.Contains(pindex))
@@ -4897,6 +4956,17 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
                 mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
                 return false;
             }
+        }
+
+        tip_disconnected = true;
+
+        // Also disconnect any blocks from tip that may have become
+        // soft rejected because the height is now lower
+        if(!DisconnectSoftRejectedTipsNL(config, state, disconnectpool, changeSet).has_value())
+        {
+            // Disconnecting tip has failed.
+            mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
+            return false;
         }
     }
     else
@@ -4921,7 +4991,10 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     }
 
     InvalidChainFound(pindex);
-    uiInterface.NotifyBlockTip(IsInitialBlockDownload(), pindex->pprev);
+    if(tip_disconnected)
+    {
+        uiInterface.NotifyBlockTip(IsInitialBlockDownload(), chainActive.Tip());
+    }
 
     if (state.IsValid() && g_connman) {
         CScopedBlockOriginRegistry reg(pindex->GetBlockHash(), "invalidateblock");
@@ -4933,6 +5006,176 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
 
     // Check mempool & journal
     mempool.CheckMempool(*pcoinsTip, changeSet);
+
+    return true;
+}
+
+namespace {
+
+/**
+ * Set soft rejected status of root block in blockIndexWithDescendants and update affected descendants.
+ *
+ * Also marks all updated blocks as dirty.
+ */
+void SetRootSoftRejectedForNL(const BlockIndexWithDescendants& blockIndexWithDescendants, std::int32_t numBlocks)
+{
+    AssertLockHeld(cs_main);
+    auto* item = blockIndexWithDescendants.Root();
+    item->BlockIndex()->SetSoftRejectedFor(numBlocks);
+    setDirtyBlockIndex.insert(item->BlockIndex());
+
+    item = item->Next();
+    for(; item!=nullptr; item=item->Next())
+    {
+        // NOTE: tree is traversed depth first so that parents are always updated before children
+        item->BlockIndex()->SetSoftRejectedFromParent();
+        setDirtyBlockIndex.insert(item->BlockIndex());
+    }
+}
+
+} // anonymous namespace
+
+bool SoftRejectBlockNL(const Config& config, CValidationState& state,
+                       CBlockIndex* const pindex, std::int32_t numBlocks)
+{
+    assert(numBlocks>=0);
+    AssertLockHeld(cs_main);
+
+    if(pindex->nHeight==0)
+    {
+        // It is logically incorrect to consider genesis block soft rejected.
+        return error("SoftRejectBlockNL(): Genesis block %s cannot be soft rejected\n",
+                     pindex->GetBlockHash().ToString());
+    }
+
+    if(pindex->IsSoftRejected())
+    {
+        // Soft rejection status can only be changed on blocks that were explicitly marked as soft rejected.
+        if(pindex->ShouldBeConsideredSoftRejectedBecauseOfParent())
+        {
+            return error("SoftRejectBlockNL(): Block %s is already considered soft rejected because of its parent and cannot be marked independently\n",
+                         pindex->GetBlockHash().ToString());
+
+        }
+
+        // Value of numBlocks can only be increased.
+        // Consequently, length of active chain can only be decreased, which simplifies implementation.
+        if(numBlocks <= pindex->GetSoftRejectedFor())
+        {
+            return error("SoftRejectBlockNL(): Block %s is currently marked as soft rejected for the next %d block(s) and this number can only be increased when rejecting\n",
+                         pindex->GetBlockHash().ToString(), pindex->GetSoftRejectedFor());
+        }
+    }
+
+    // Find all descendants of block on all chains up to height after which this block
+    // is no longer considered soft rejected.
+    const std::int32_t maxHeight = pindex->nHeight + numBlocks;
+    const BlockIndexWithDescendants blocks{pindex, mapBlockIndex, maxHeight};
+
+    // Check that setting this block as soft rejected will not affect subsequent
+    // blocks that are already explicitly marked as soft rejected.
+    for(auto* item = blocks.Root()->Next(); item!=nullptr; item=item->Next())
+    {
+        if(item->BlockIndex()->IsSoftRejected() && !item->BlockIndex()->ShouldBeConsideredSoftRejectedBecauseOfParent())
+        {
+            return error("SoftRejectBlockNL(): Block %s cannot be marked soft rejected for the next %d block(s) because this would affect descendant block %s that is also marked as soft rejected\n",
+                         pindex->GetBlockHash().ToString(), pindex->GetSoftRejectedFor(), item->BlockIndex()->GetBlockHash().ToString());
+        }
+    }
+
+    // Remember original soft rejection status of this block so that it can be restored if something goes wrong
+    const std::int32_t old_SoftRejectedFor = pindex->GetSoftRejectedFor();
+
+    // Set (or change) soft rejection status of this block and update affected descendants.
+    SetRootSoftRejectedForNL(blocks, numBlocks);
+
+    // Disconnect blocks from chain tip that are considered soft rejected
+    DisconnectedBlockTransactions disconnectpool;
+    CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::REORG) };
+    auto tip_disconnected = DisconnectSoftRejectedTipsNL(config, state, disconnectpool, changeSet);
+    if(!tip_disconnected.has_value())
+    {
+        // Disconnect tip has failed.
+        // Restore soft rejection status of this block as it was
+        SetRootSoftRejectedForNL(blocks, old_SoftRejectedFor);
+
+        // It's probably hopeless to try to make the mempool consistent
+        // here if DisconnectTip failed, but we can try.
+        mempool.RemoveFromMempoolForReorg(config, disconnectpool, changeSet);
+
+        return false;
+    }
+
+    if(*tip_disconnected)
+    {
+        // If tip was disconnected, we also need to do some housekeeping.
+        // NOTE: We do basically the same thing as it is done in the function InvalidateBlock
+        //       except marking the chain as invalid.
+
+        // DisconnectTip will add transactions to disconnectpool; try to add these
+        // back to the mempool.
+        mempool.AddToMempoolForReorg(config, disconnectpool, changeSet);
+
+        // The resulting new best tip may not be in setBlockIndexCandidates anymore,
+        // so add it again. Since the best tip may be on a different chain, we need to
+        // scan whole block index.
+        for (const std::pair<const uint256, CBlockIndex *> &it : mapBlockIndex) {
+            CBlockIndex *i = it.second;
+            if (i->IsValid(BlockValidity::TRANSACTIONS) && i->nChainTx &&
+                !setBlockIndexCandidates.value_comp()(i, chainActive.Tip())) {
+                setBlockIndexCandidates.insert(i);
+            }
+        }
+
+        uiInterface.NotifyBlockTip(IsInitialBlockDownload(), chainActive.Tip());
+
+        if (state.IsValid() && g_connman) {
+            CScopedBlockOriginRegistry reg(pindex->GetBlockHash(), "softrejectblock");
+            auto source = task::CCancellationSource::Make();
+            // state is used to report errors, not block related invalidity
+            // (see description of ActivateBestChain)
+            ActivateBestChain(task::CCancellationToken::JoinToken(source->GetToken(), GetShutdownToken()), config, state, changeSet);
+        }
+
+        // Check mempool & journal
+        mempool.CheckMempool(*pcoinsTip, changeSet);
+    }
+
+    return true;
+}
+
+bool AcceptSoftRejectedBlockNL(CBlockIndex* pindex, std::int32_t numBlocks)
+{
+    assert(numBlocks>=-1);
+    AssertLockHeld(cs_main);
+
+    if(!pindex->IsSoftRejected())
+    {
+        return error("AcceptSoftRejectedBlockNL(): Block %s is not soft rejected\n",
+                     pindex->GetBlockHash().ToString());
+    }
+
+    // Soft rejection status can only be changed on blocks that were explicitly marked as soft rejected.
+    if(pindex->ShouldBeConsideredSoftRejectedBecauseOfParent())
+    {
+        return error("AcceptSoftRejectedBlockNL(): Block %s is soft rejected because of its parent and cannot be accepted independently\n",
+                     pindex->GetBlockHash().ToString());
+    }
+
+    // Value of numBlocks can only be decreased.
+    // Consequently, length of active chain can only be increased, which simplifies implementation.
+    if(numBlocks >= pindex->GetSoftRejectedFor())
+    {
+        return error("AcceptSoftRejectedBlockNL(): Block %s is currently marked as soft rejected for the next %d block(s) and this number can only be decreased when accepting\n",
+                     pindex->GetBlockHash().ToString(), pindex->GetSoftRejectedFor());
+    }
+
+    // Find all descendants of block on all chains up to height after which this block was no longer considered soft rejected.
+    const std::int32_t maxHeight = pindex->nHeight + pindex->GetSoftRejectedFor();
+    const BlockIndexWithDescendants blocks{pindex, mapBlockIndex, maxHeight};
+
+    // Unset (or change) soft rejection status of this block and update affected descendants.
+    SetRootSoftRejectedForNL(blocks, numBlocks);
 
     return true;
 }
@@ -5022,6 +5265,11 @@ static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
         pindexNew->pprev = (*miPrev).second;
         pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
         pindexNew->BuildSkip();
+        // Set soft rejection status from parent.
+        // Note that if a parent of a block is not found in index, this must be a genesis block.
+        // Since genesis block is never considered soft rejected, defaults set by CBlockIndex
+        // constructor are OK.
+        pindexNew->SetSoftRejectedFromParent();
     }
     pindexNew->nTimeReceived = GetTime();
     pindexNew->nTimeMax =

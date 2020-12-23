@@ -125,6 +125,9 @@ static const CRPCConvertParam vRPCConvertParams[] = {
     {"getminingcandidate", 0, "coinbase"},
     {"getblockbyheight", 0, "height"},
     {"verifymerkleproof", 0, "proof"},
+    {"softrejectblock", 1, "numblocks"},
+    {"acceptblock", 1, "numblocks"},
+    {"getsoftrejectedblocks", 0, "onlymarked"},
     // Echo with conversion (For testing only)
     {"echojson", 0, "arg0"},
     {"echojson", 1, "arg1"},

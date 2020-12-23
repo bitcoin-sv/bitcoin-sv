@@ -96,6 +96,9 @@ private:
     // The block disk file hash and content size are set.
     static const uint32_t HAS_DISK_BLOCK_META_DATA_FLAG = 0x80;
 
+    // The block index contains data for soft rejection
+    static const uint32_t HAS_SOFT_REJ_FLAG = 0x100;
+
     // Mask used to check if the block failed.
     static const uint32_t INVALID_MASK = FAILED_FLAG | FAILED_PARENT_FLAG;
 
@@ -142,6 +145,16 @@ public:
     BlockStatus withFailedParent(bool hasFailedParent = true) const {
         return BlockStatus((status & ~FAILED_PARENT_FLAG) |
                            (hasFailedParent ? FAILED_PARENT_FLAG : 0));
+    }
+
+    bool hasDataForSoftRejection() const
+    {
+        return status & HAS_SOFT_REJ_FLAG;
+    }
+    [[nodiscard]] BlockStatus withDataForSoftRejection(bool hasData = true) const
+    {
+        return BlockStatus((status & ~HAS_SOFT_REJ_FLAG) |
+                           (hasData ? HAS_SOFT_REJ_FLAG : 0));
     }
 
     /**
@@ -277,6 +290,7 @@ public:
         nBits = 0;
         nNonce = 0;
         mDiskBlockMetaData = {};
+        nSoftRejected = -1; // not soft rejected
 
         // set to maximum time by default to indicate that validation has not
         // yet been completed
@@ -315,6 +329,7 @@ public:
         nStatus = other.nStatus;
         nTx = other.nTx;
         mDiskBlockMetaData = other.mDiskBlockMetaData;
+        nSoftRejected = other.nSoftRejected;
         mValidationCompletionTime = other.mValidationCompletionTime;
     }
 
@@ -359,6 +374,84 @@ public:
         {
             mDiskBlockMetaData = std::move(metaData);
             nStatus = nStatus.withDiskBlockMetaData();
+        }
+    }
+
+    /**
+     * Return true iff this block is soft rejected.
+     */
+    bool IsSoftRejected() const
+    {
+        return nSoftRejected >= 0;
+    }
+
+    /**
+     * Return true iff this block should be considered soft rejected because of its parent.
+     *
+     * @note Parent of this block must be known and its value of nSoftRejected must be set correctly.
+     */
+    bool ShouldBeConsideredSoftRejectedBecauseOfParent() const
+    {
+        assert(pprev);
+        return pprev->nSoftRejected > 0; // NOTE: Parent block makes this one soft rejected only if it affects one or more blocks after it.
+                                         //       If this value is 0 or -1, this block is not soft rejected because of its parent.
+    }
+
+    /**
+     * Return number of blocks after this one that should also be considered soft rejected.
+     *
+     * If <0, this block is not soft rejected and does not affect descendant blocks.
+     */
+    std::int32_t GetSoftRejectedFor() const
+    {
+        return nSoftRejected;
+    }
+
+    /**
+     * Set number of blocks after this one, which should also be considered soft rejected.
+     *
+     * If numBlocks is -1, this block will not be considered soft rejected. Values lower than -1 must not be used.
+     *
+     * @note Can only be called on blocks that are not soft rejected because of its parent.
+     *       This implies that parent of this block must be known and its value of nSoftRejected must be set correctly.
+     * @note After calling this method, SetSoftRejectedFromParent() should be called on known descendants
+     *       of this block on all chains. This should be done recursively up to and including numBlocks (or previous
+     *       value of nSoftRejected, whichever is larger) higher than this block.
+     *       This will ensure that soft rejection status is properly propagated to subsequent blocks.
+     */
+    void SetSoftRejectedFor(std::int32_t numBlocks)
+    {
+        assert(numBlocks>=-1);
+        assert(!ShouldBeConsideredSoftRejectedBecauseOfParent()); // this block must not be soft rejected because of its parent
+
+        nSoftRejected = numBlocks;
+
+        // Data only needs to be stored on disk if block is soft rejected because
+        // absence of this data means that block is not considered soft rejected.
+        nStatus = nStatus.withDataForSoftRejection( IsSoftRejected() );
+    }
+
+    /**
+     * Set soft rejection status from parent block.
+     *
+     * This method should be used to properly propagate soft rejection status on child blocks
+     * (either on newly received block or when status in parent is changed).
+     *
+     * @note Parent of this block must be known and its value of nSoftRejected must be set correctly.
+     */
+    void SetSoftRejectedFromParent()
+    {
+        if(ShouldBeConsideredSoftRejectedBecauseOfParent())
+        {
+            // If previous block was marked soft rejected, this one is also soft rejected, but for one block less.
+            nSoftRejected = pprev->nSoftRejected - 1;
+            nStatus = nStatus.withDataForSoftRejection(true);
+        }
+        else
+        {
+            // This block is not soft rejected.
+            nSoftRejected = -1;
+            nStatus = nStatus.withDataForSoftRejection(false);
         }
     }
 
@@ -487,6 +580,21 @@ public:
 protected:
     CDiskBlockMetaData mDiskBlockMetaData;
 
+    /**
+     * If >=0, this block is considered soft rejected. Value specifies number of descendants
+     * in chain after this block that should also be considered soft rejected.
+     *
+     * If <0, this block is not considered soft rejected (i.e. it is a normal block).
+     *
+     * For the next block in chain, value of this member is always equal to the value in parent minus one,
+     * or is -1 if value in parent is already -1. This way soft rejection status is propagated
+     * down the chain and a descendant block that is high enough will not be soft rejected anymore.
+     *
+     * This value is used in best chain selection algorithm. Chains whose tip is soft rejected,
+     * are not considered when selecting best chain.
+     */
+    std::int32_t nSoftRejected;
+
     using SteadyClockTimePoint =
         std::chrono::time_point<std::chrono::steady_clock>;
     // Time when the block validation has been completed to SCRIPT level.
@@ -583,6 +691,38 @@ public:
                 nStatus = nStatus.withDiskBlockMetaData(false);
                 LogPrintf("Can not read metadata from block %s. Probably upgrading from downgraded version. \n", GetBlockHash().ToString());
             }
+        }
+        if(nStatus.hasDataForSoftRejection())
+        {
+            try
+            {
+                READWRITE(VARINT(nSoftRejected));
+            }
+            catch (std::ios_base::failure&)
+            {
+                // Detect and handle the case when someone has marked a block as soft rejected,
+                // then downgraded the executable to version before soft rejected blocks were implemented,
+                // then modified this block index so that it was again written to database (nStatus still contains the flag, but value for nSoftRejected is not present),
+                // and finally upgraded the executable to version that implements soft rejected blocks.
+                // In this case we treat the block as not soft rejected as it was in the downgraded version of executable.
+                // NOTE: This does not properly handle all cases, since we could still successfully read value for nSoftRejected
+                //       from some garbage that was stored in this place by the downgraded version of executable. For officially
+                //       released versions to which downgrading is supported, this should not really happen in practice because care
+                //       is taken that new block index data is only appended at the end. Development/test versions, however, do
+                //       not have this guarantee.
+                //       To avoid this issue in all cases, all blocks should be unmarked as soft rejected before downgrading
+                //       back to version that does not implement soft rejected blocks. Note that in downgraded version all blocks
+                //       are considered as not being soft rejected anyway so there is no reason not to do that before downgrading.
+                nStatus = nStatus.withDataForSoftRejection(false);
+                nSoftRejected = -1;
+                LogPrintf("Can not read soft rejection status for block %s from database. Probably upgrading from downgraded version.\n", GetBlockHash().ToString());
+            }
+        }
+        else if(ser_action.ForRead())
+        {
+            // By default the block is not soft rejected so that actual value
+            // does not need to be stored for most of the blocks.
+            nSoftRejected = -1;
         }
     }
 
