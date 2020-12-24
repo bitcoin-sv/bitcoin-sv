@@ -16,6 +16,7 @@
 #include <utility>
 #include <vector>
 
+class CBlockFileInfo;
 class CBlockIndex;
 struct CDiskTxPos;
 class uint256;

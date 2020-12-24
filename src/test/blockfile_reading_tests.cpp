@@ -125,10 +125,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
     const DummyConfig config;
 
     auto block = BuildRandomTestBlock();
-    CBlockIndex index{block};
-    std::unique_ptr<uint256> randomHash(new uint256(InsecureRand256()));
-    index.phashBlock = randomHash.get();
-
+    CBlockIndex::TemporaryBlockIndex index{ block };
     CBlockFileInfoStore blockFileInfoStore;
     WriteBlockToDisk(config, block, index, blockFileInfoStore);
 
@@ -138,7 +135,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     // check that blockIndex was updated with disk content size and hash data
     {
-        auto data = index.StreamBlockFromDisk(INIT_PROTO_VERSION);
+        auto data = index->StreamBlockFromDisk(INIT_PROTO_VERSION);
 
         BOOST_REQUIRE( data.stream );
 
@@ -165,7 +162,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
             TestAccessCBlockIndex::CorruptDiskBlockMetaData( index );
 
         auto streamCorruptMetaData =
-            index.StreamBlockFromDisk(INIT_PROTO_VERSION);
+            index->StreamBlockFromDisk(INIT_PROTO_VERSION);
         BOOST_REQUIRE_EQUAL(streamCorruptMetaData.metaData.DiskDataSize(), 1);
         BOOST_REQUIRE_EQUAL(
             streamCorruptMetaData.metaData.DiskDataHash().GetCheapHash(),
@@ -184,16 +181,14 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
     const DummyConfig config;
 
     auto block = BuildRandomTestBlock();
-    CBlockIndex index{block};
-    std::unique_ptr<uint256> randomHash(new uint256(InsecureRand256()));
-    index.phashBlock = randomHash.get();
+    CBlockIndex::TemporaryBlockIndex index{ block };
 
     WriteBlockToDisk(config, block, index, *pBlockFileInfoStore);
 
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
     LOCK(cs_main);
-    auto data = index.StreamBlockFromDisk(INIT_PROTO_VERSION);
+    auto data = index->StreamBlockFromDisk(INIT_PROTO_VERSION);
 
     BOOST_REQUIRE( data.stream );
 

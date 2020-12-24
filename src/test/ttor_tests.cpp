@@ -5,6 +5,7 @@
 #include "chain.h"
 #include "config.h"
 #include "consensus/consensus.h"
+#include "pow.h"
 #include "primitives/transaction.h"
 #include "test/test_bitcoin.h"
 #include "uint256.h"
@@ -19,14 +20,6 @@
 
 namespace{ class Unique; }
 
-CBlockIndex& AddToBlockIndex(CBlockIndex& block)
-{
-    auto res = mapBlockIndex.emplace(InsecureRand256(), &block).first;
-    CBlockIndex& current = *res->second;
-    current.phashBlock = &res->first;
-    return current;
-}
-
 template <>
 struct CBlockIndex::UnitTestAccess<class Unique>
 {
@@ -39,6 +32,17 @@ struct CBlockIndex::UnitTestAccess<class Unique>
 };
 using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
 
+CBlockIndex& AddToBlockIndex(CBlockIndex& prev)
+{
+    CBlockHeader header;
+    header.nTime = mapBlockIndex.size(); // for uniqueness in current block hash
+    header.hashPrevBlock = prev.GetBlockHash();
+    header.nBits = GetNextWorkRequired( &prev, &header, GlobalConfig::GetConfig() );
+    CBlockIndex& current = *CBlockIndex::Make( header, mapBlockIndex );
+    TestAccessCBlockIndex::SetStatusWithValidity( current );
+
+    return current;
+}
 
 BOOST_FIXTURE_TEST_SUITE(ttor_tests, TestingSetup)
 
@@ -72,68 +76,60 @@ BOOST_AUTO_TEST_CASE(invalidate_chain)
     // - IsValid
     // - InvalidateChain
     LOCK(cs_main);
-    std::vector<CBlockIndex*> blocks(14);
-    for (size_t i = 0; i < blocks.size(); ++i)
-    {
-        blocks[i] = new CBlockIndex();
-        CBlockIndex& curr = AddToBlockIndex(*blocks[i]);
-        TestAccessCBlockIndex::SetStatusWithValidity(curr);
-    }
+    std::vector<std::reference_wrapper<CBlockIndex>> blocks;
+
+    assert( chainActive.Genesis() );
+    assert( mapBlockIndex.find( chainActive.Genesis()->GetBlockHash() ) != mapBlockIndex.end() );
 
     // valid active chain
-    blocks[0]->pprev = chainActive.Genesis();
-    blocks[1]->pprev = blocks[0];
-    blocks[2]->pprev = blocks[1];
-    blocks[3]->pprev = blocks[2];
+    blocks.push_back( AddToBlockIndex( *chainActive.Genesis() ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
 
     //valid non-active chain
-    blocks[4]->pprev = blocks[0];
-    blocks[5]->pprev = blocks[4];
+    blocks.push_back( AddToBlockIndex( blocks[0] ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
 
     //invalid chain with some forks
-    blocks[6]->pprev = blocks[0];
-    blocks[7]->pprev = blocks[6];
-    blocks[8]->pprev = blocks[7];
+    blocks.push_back( AddToBlockIndex( blocks[0] ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
 
-    blocks[9]->pprev = blocks[7];
-    blocks[10]->pprev = blocks[9];
+    blocks.push_back( AddToBlockIndex( blocks[7] ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
 
-    blocks[11]->pprev = blocks[7];
-    blocks[12]->pprev = blocks[11];
-    blocks[13]->pprev = blocks[12];
+    blocks.push_back( AddToBlockIndex( blocks[7] ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
+    blocks.push_back( AddToBlockIndex( blocks.back() ) );
 
-    // set heights
-    for (size_t i = 0; i < blocks.size(); ++i)
-    {
-        blocks[i]->nHeight = blocks[i]->pprev->nHeight + 1;
-    }
     // set current active chain tip
-    chainActive.SetTip(blocks[3]);
+    chainActive.SetTip( &blocks[3].get() );
 
     // start with all valid blocks
     for (size_t i = 0; i < blocks.size(); ++i)
     {
-        BOOST_CHECK(blocks[i]->IsValid(BlockValidity::TREE) == true);
+        BOOST_CHECK(blocks[i].get().IsValid(BlockValidity::TREE) == true);
     }
 
     // invalidate block 6 and its chain
-    blocks[6]->ModifyStatusWithFailed();
-    InvalidateChain(blocks[6]);
+    blocks[6].get().ModifyStatusWithFailed();
+    InvalidateChain( &blocks[6].get() );
 
     // block 6 should remain invalid but not with failed parent
-    BOOST_CHECK(blocks[6]->getStatus().hasFailed() == true);
-    BOOST_CHECK(blocks[6]->getStatus().hasFailedParent() == false);
+    BOOST_CHECK(blocks[6].get().getStatus().hasFailed() == true);
+    BOOST_CHECK(blocks[6].get().getStatus().hasFailedParent() == false);
 
-    // all blocks in forks from invalid block should have failed parent status 
+    // all blocks in forks from invalid block should have failed parent status
     for (size_t i = 7; i < blocks.size(); ++i)
     {
-        BOOST_CHECK(blocks[i]->getStatus().hasFailedParent() == true);
+        BOOST_CHECK(blocks[i].get().getStatus().hasFailedParent() == true);
     }
 
     // all blocks in active chain should be valid
     for (size_t i = 0; i < 6; ++i)
     {
-        BOOST_CHECK(blocks[i]->IsValid(BlockValidity::TREE) == true);
+        BOOST_CHECK(blocks[i].get().IsValid(BlockValidity::TREE) == true);
     }
 }
 

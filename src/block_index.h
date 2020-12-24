@@ -5,16 +5,11 @@
 #define BITCOIN_BLOCKINDEX_H
 
 #include "arith_uint256.h"
-#include "pow.h"
-#include "block_file_info.h"
 #include "consensus/params.h"
 #include "disk_block_pos.h"
-#include "primitives/block.h"
-#include "uint256.h"
-#include "logging.h"
-#include "undo.h"
-#include "protocol.h"
 #include "streams.h"
+#include "undo.h"
+#include "utiltime.h"
 #include <chrono>
 #include <shared_mutex>
 #include <unordered_map>
@@ -251,10 +246,14 @@ arith_uint256 GetBlockProof(const CBlockIndex &block);
  * the root, with each block potentially having multiple candidates to be the
  * next block. A blockindex may have multiple pprev pointing to it, but at most
  * one of them can be part of the currently active branch.
+ *
+ * Only genesis blocks have pprev and pskip set to nullptr, the rest must
+ * always have a previous block.
  */
 class CBlockIndex {
 public:
     template<typename T> struct UnitTestAccess;
+    class TemporaryBlockIndex;
 
     struct BlockStreamAndMetaData
     {
@@ -324,20 +323,52 @@ public:
     //! (memory only) Maximum nTime in the chain upto and including this block.
     unsigned int nTimeMax{ 0 };
 
-    CBlockIndex() = default;
+    /**
+     * T must be of std::map/std::unordered_map associative container interface
+     * concept.
+     */
+    template<typename T>
+    static CBlockIndex* Make( const CBlockHeader& block, T& container )
+    {
+        assert( !block.IsNull() );
 
-    CBlockIndex(const CBlockHeader &block)
-        : nVersion{ block.nVersion }
-        , hashMerkleRoot{ block.hashMerkleRoot }
-        , nTime{ block.nTime }
-        , nBits{ block.nBits }
-        , nNonce{ block.nNonce }
-        // Default to block time if nTimeReceived is never set, which
-        // in effect assumes that this block is honestly mined.
-        // Note that nTimeReceived isn't written to disk, so blocks read from
-        // disk will be assumed to be honestly mined.
-        , nTimeReceived{ block.nTime }
-    {}
+        // Construct new block index object
+        auto prev = container.find(block.hashPrevBlock);
+
+        // Only genesis blocks may have missing previous block!
+        assert(
+            (block.hashPrevBlock.IsNull() && prev == container.end() ) ||
+            prev != container.end());
+
+        std::unique_ptr<CBlockIndex> pindexNew{
+                new CBlockIndex(
+                    block,
+                    (prev != container.end() ? prev->second : nullptr)) };
+
+        auto item = container.try_emplace( block.GetHash(), pindexNew.get() );
+        assert( item.second );
+        pindexNew->phashBlock = &(item.first->first);
+
+        return pindexNew.release(); // at this point index is guaranteed to be owned by the container
+    }
+    /**
+     * T must be of std::map/std::unordered_map associative container interface
+     * concept.
+     */
+    template<typename T>
+    static CBlockIndex* UnsafeMakePartial( const uint256& hash, T& container )
+    {
+        assert( !hash.IsNull() );
+
+        // Construct new block index object
+        std::unique_ptr<CBlockIndex> pindexNew{ new CBlockIndex() };
+
+        auto item = container.try_emplace( hash, pindexNew.get() );
+        assert( item.second );
+        pindexNew->phashBlock = &(item.first->first);
+
+        return pindexNew.release(); // at this point index is guaranteed to be owned by the container
+    }
 
     void LoadFromPersistentData(const CBlockIndex& other, CBlockIndex* previous)
     {
@@ -504,18 +535,7 @@ public:
     void SetSoftRejectedFromParent()
     {
         std::lock_guard lock(blockIndexMutex);
-        if(ShouldBeConsideredSoftRejectedBecauseOfParentNL())
-        {
-            // If previous block was marked soft rejected, this one is also soft rejected, but for one block less.
-            nSoftRejected = pprev->nSoftRejected - 1;
-            nStatus = nStatus.withDataForSoftRejection(true);
-        }
-        else
-        {
-            // This block is not soft rejected.
-            nSoftRejected = -1;
-            nStatus = nStatus.withDataForSoftRejection(false);
-        }
+        SetSoftRejectedFromParentNL();
     }
 
     void SetChainWork()
@@ -741,6 +761,50 @@ protected:
     SteadyClockTimePoint mValidationCompletionTime{ SteadyClockTimePoint::max() };
 
 private:
+    CBlockIndex() = default;
+
+    CBlockIndex(const CBlockHeader& block)
+        : nVersion{ block.nVersion }
+        , hashMerkleRoot{ block.hashMerkleRoot }
+        , nTime{ block.nTime }
+        , nBits{ block.nBits }
+        , nNonce{ block.nNonce }
+        // Default to block time if nTimeReceived is never set, which
+        // in effect assumes that this block is honestly mined.
+        // Note that nTimeReceived isn't written to disk, so blocks read from
+        // disk will be assumed to be honestly mined.
+        , nTimeReceived{ block.nTime }
+    {}
+
+    CBlockIndex(const CBlockHeader& block, CBlockIndex* prev)
+        : CBlockIndex{ block }
+    {
+        // nSequenceId remains 0 to blocks only when the full data is available,
+        // to avoid miners withholding blocks but broadcasting headers, to get a
+        // competitive advantage.
+
+        if (prev)
+        {
+            pprev = prev;
+            nHeight = pprev->nHeight + 1;
+            BuildSkip();
+            // Set soft rejection status from parent.
+            // Note that if a parent of a block is not found in index, this must be a genesis block.
+            // Since genesis block is never considered soft rejected, defaults set by CBlockIndex
+            // constructor are OK.
+            SetSoftRejectedFromParentNL();
+        }
+        else
+        {
+            // Only genesis blocks may have missing previous block!
+            assert( block.hashPrevBlock.IsNull() );
+        }
+        nTimeReceived = GetTime();
+        nTimeMax = pprev ? std::max(pprev->nTimeMax, nTime) : nTime;
+        SetChainWork();
+        RaiseValidityNL( BlockValidity::TREE );
+    }
+
     bool ValidityChangeRequiresValidationTimeSetting(BlockValidity nUpTo) const
     {
         return
@@ -782,6 +846,22 @@ private:
         return {};
     }
 
+    void SetSoftRejectedFromParentNL()
+    {
+        if(ShouldBeConsideredSoftRejectedBecauseOfParentNL())
+        {
+            // If previous block was marked soft rejected, this one is also soft rejected, but for one block less.
+            nSoftRejected = pprev->nSoftRejected - 1;
+            nStatus = nStatus.withDataForSoftRejection(true);
+        }
+        else
+        {
+            // This block is not soft rejected.
+            nSoftRejected = -1;
+            nStatus = nStatus.withDataForSoftRejection(false);
+        }
+    }
+
     // Check whether this block index entry is valid up to the passed validity
     // level.
     bool IsValidNL(enum BlockValidity nUpTo = BlockValidity::TRANSACTIONS) const {
@@ -819,6 +899,65 @@ private:
 
     mutable std::mutex blockIndexMutex;
 };
+
+/**
+ * TODO make const in future MRs once const correctness is achieved
+ *
+ * Class for creating temporary block index that can be used for various
+ * checks if block is a valid candidate for potential later inclusion.
+ * Class is also used in unit tests.
+ */
+class CBlockIndex::TemporaryBlockIndex
+{
+public:
+    // Creates a genesis like block without parent
+    TemporaryBlockIndex( const CBlockHeader& block )
+        : mDummyHash{ block.GetHash() }
+        , mIndex{ block }
+    {
+        //pSkip is not set here intentionally: logic depends on pSkip to be nullptr at this point
+        mIndex.phashBlock = &mDummyHash;
+        mIndex.SetChainWork();
+    }
+
+    // TODO make parent const in future MRs
+    //
+    // Creates a child block
+    TemporaryBlockIndex(CBlockIndex& parent, const CBlockHeader& block )
+        : mDummyHash{ block.GetHash() }
+        , mIndex{ block }
+    {
+        //pSkip is not set here intentionally: logic depends on pSkip to be nullptr at this point
+        mIndex.phashBlock = &mDummyHash;
+
+        mIndex.pprev = &parent;
+        mIndex.nHeight = parent.nHeight + 1;
+
+        mIndex.SetChainWork();
+    }
+
+    // We want to limit the scope of temporary as much as possible
+    TemporaryBlockIndex(TemporaryBlockIndex&&) = delete;
+    TemporaryBlockIndex& operator=(TemporaryBlockIndex&&) = delete;
+    TemporaryBlockIndex(const TemporaryBlockIndex&) = delete;
+    TemporaryBlockIndex& operator=(const TemporaryBlockIndex&) = delete;
+
+    operator const CBlockIndex&() const { return mIndex; }
+    operator const CBlockIndex*() const { return &mIndex; }
+    const CBlockIndex* operator->() const { return &mIndex; }
+    const CBlockIndex* get() const { return &mIndex; }
+
+    // TODO delete this non-const batch in later MRs
+    operator CBlockIndex&() { return mIndex; }
+    operator CBlockIndex*() { return &mIndex; }
+    CBlockIndex* operator->() { return &mIndex; }
+    CBlockIndex* get() { return &mIndex; }
+
+private:
+    uint256 mDummyHash;
+    CBlockIndex mIndex;
+};
+
 
 /**
  * Maintain a map of CBlockIndex for all known headers.

@@ -15,6 +15,7 @@
 #include "mining/factory.h"
 #include "mining/journal_builder.h"
 #include "net/net_processing.h"
+#include "pow.h"
 #include "pubkey.h"
 #include "random.h"
 #include "rpc/mining.h"

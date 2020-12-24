@@ -361,16 +361,13 @@ bool CheckSequenceLocks(
         return true;
     }
 
-    CBlockIndex index;
-    index.pprev = const_cast<CBlockIndex*>(&tip); // safe to cast as tip won't change
-
     // CheckSequenceLocks() uses chainActive.Height()+1 to evaluate height based
     // locks because when SequenceLocks() is called within ConnectBlock(), the
     // height of the block *being* evaluated is what is used. Thus if we want to
     // know if a transaction can be part of the *next* block, we need to use one
     // more than chainActive.Height()
-    index.nHeight = tip.nHeight + 1;
 
+    CBlockIndex::TemporaryBlockIndex index{ const_cast<CBlockIndex&>(tip), {} };
     std::pair<int32_t, int64_t> lockPair;
     if (bool useExistingLockPoints = (viewMemPool == nullptr); useExistingLockPoints) {
         assert(lp);
@@ -4881,40 +4878,13 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
 
 static CBlockIndex *AddToBlockIndex(const CBlockHeader &block) {
     // Check for duplicate
-    uint256 hash = block.GetHash();
-    BlockMap::iterator it = mapBlockIndex.find(hash);
+    BlockMap::iterator it = mapBlockIndex.find( block.GetHash() );
     if (it != mapBlockIndex.end()) {
         return it->second;
     }
 
-    // Construct new block index object
-    CBlockIndex *pindexNew = new CBlockIndex(block);
-    assert(pindexNew);
-    // We assign the sequence id to blocks only when the full data is available,
-    // to avoid miners withholding blocks but broadcasting headers, to get a
-    // competitive advantage.
-    pindexNew->nSequenceId = 0;
-    BlockMap::iterator mi =
-        mapBlockIndex.insert(std::make_pair(hash, pindexNew)).first;
-    pindexNew->phashBlock = &((*mi).first);
-    BlockMap::iterator miPrev = mapBlockIndex.find(block.hashPrevBlock);
-    if (miPrev != mapBlockIndex.end()) {
-        pindexNew->pprev = (*miPrev).second;
-        pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
-        pindexNew->BuildSkip();
-        // Set soft rejection status from parent.
-        // Note that if a parent of a block is not found in index, this must be a genesis block.
-        // Since genesis block is never considered soft rejected, defaults set by CBlockIndex
-        // constructor are OK.
-        pindexNew->SetSoftRejectedFromParent();
-    }
-    pindexNew->nTimeReceived = GetTime();
-    pindexNew->nTimeMax =
-        (pindexNew->pprev
-             ? std::max(pindexNew->pprev->nTimeMax, pindexNew->nTime)
-             : pindexNew->nTime);
-    pindexNew->SetChainWork();
-    pindexNew->RaiseValidity(BlockValidity::TREE);
+    CBlockIndex* pindexNew = CBlockIndex::Make( block, mapBlockIndex );
+
     if (pindexBestHeader == nullptr ||
         pindexBestHeader->nChainWork < pindexNew->nChainWork) {
         pindexBestHeader = pindexNew;
@@ -5876,12 +5846,8 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
 
     CoinsDBView view{ *pcoinsTip };
     CCoinsViewCache viewNew{ view };
-    CBlockIndex indexDummy(block);
-    uint256 dummyHash;
-    indexDummy.phashBlock = &dummyHash;
-    indexDummy.pprev = pindexPrev;
-    indexDummy.nHeight = pindexPrev->nHeight + 1;
-    indexDummy.SetChainWork();
+
+    CBlockIndex::TemporaryBlockIndex indexDummy{ *pindexPrev, block };
 
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(config, block, state, pindexPrev,
@@ -5889,7 +5855,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
         return error("%s: Consensus::ContextualCheckBlockHeader: %s", __func__,
                      FormatStateMessage(state));
     }
-    if (!CheckBlock(config, block, state, indexDummy.nHeight, validationOptions)) {
+    if (!CheckBlock(config, block, state, indexDummy->nHeight, validationOptions)) {
         return error("%s: Consensus::CheckBlock: %s", __func__,
                      FormatStateMessage(state));
     }
@@ -5898,7 +5864,7 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
                      FormatStateMessage(state));
     }
     auto source = task::CCancellationSource::Make();
-    if (!ConnectBlock(source->GetToken(), false, config, block, state, &indexDummy, viewNew, indexDummy.nChainWork, true))
+    if (!ConnectBlock(source->GetToken(), false, config, block, state, indexDummy.get(), viewNew, indexDummy->nChainWork, true))
     {
         return false;
     }
@@ -5995,14 +5961,8 @@ CBlockIndex *InsertBlockIndex(uint256 hash) {
     }
 
     // Create new
-    CBlockIndex *pindexNew = new CBlockIndex();
-    if (!pindexNew) {
-        throw std::runtime_error(std::string(__func__) +
-                                 ": new CBlockIndex failed");
-    }
-
-    mi = mapBlockIndex.insert(std::make_pair(hash, pindexNew)).first;
-    pindexNew->phashBlock = &((*mi).first);
+    CBlockIndex* pindexNew =
+        CBlockIndex::UnsafeMakePartial( hash, mapBlockIndex );
 
     return pindexNew;
 }

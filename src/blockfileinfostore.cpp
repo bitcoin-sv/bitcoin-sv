@@ -6,6 +6,7 @@
 #include "blockfileinfostore.h"
 
 #include "block_file_access.h"
+#include "block_file_info.h"
 #include "config.h"
 #include "util.h"
 #include "txdb.h"  // CBlockTreeDB

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "sync.h"
+#include "block_file_info.h"
 #include "chain.h"
 #include "validation.h"
 

@@ -57,9 +57,11 @@ static void UpdateUTXOSet(const CBlock &block, CCoinsViewCache &view,
 static void UndoBlock(const CBlock &block, CCoinsViewCache &view,
                       const CBlockUndo &blockUndo,
                       const CChainParams &chainparams, uint32_t nHeight) {
-    CBlockIndex pindex;
-    pindex.nHeight = nHeight;
-    TestAccessProcessingBlockIndex::ApplyBlockUndo(blockUndo, block, &pindex, view, task::CCancellationSource::Make()->GetToken());
+
+    CBlockIndex::TemporaryBlockIndex index{ {} };
+
+    index->nHeight = nHeight;
+    TestAccessProcessingBlockIndex::ApplyBlockUndo(blockUndo, block, index.get(), view, task::CCancellationSource::Make()->GetToken());
 }
 
 static bool HasSpendableCoin(const CCoinsViewCache &view, const uint256 &txid) {

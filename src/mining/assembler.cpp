@@ -1,6 +1,8 @@
 // Copyright (c) 2019 Bitcoin Association.
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
+#include "pow.h"
+
 #include <chainparams.h>
 #include <config.h>
 #include <mining/assembler.h>

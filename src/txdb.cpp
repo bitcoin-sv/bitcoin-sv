@@ -5,6 +5,7 @@
 
 #include "txdb.h"
 
+#include "block_file_info.h"
 #include "chainparams.h"
 #include "config.h"
 #include "disk_block_index.h"
@@ -467,7 +468,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
             break;
         }
 
-        CBlockIndex idx;
+        CBlockIndex::TemporaryBlockIndex idx{ {} };
         CDiskBlockIndex diskindex{ idx };
         if (!pcursor->GetValue(diskindex)) {
             return error("LoadBlockIndex() : failed to read value");

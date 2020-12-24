@@ -3,6 +3,7 @@
 
 #include "block_file_access.h"
 
+#include "block_file_info.h"
 #include "chain.h"
 #include "clientversion.h"
 #include "config.h"

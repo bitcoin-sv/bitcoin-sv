@@ -9,6 +9,7 @@
 #include "blockstreams.h"
 #include "config.h"
 #include "clientversion.h"
+#include "pow.h"
 #include "warnings.h"
 #include "abort_node.h"
 
