@@ -26,7 +26,7 @@ namespace
         return GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, pos.nFile);
     }
 
-    FILE* OpenDiskFile(
+    UniqueCFile OpenDiskFile(
         const CDiskBlockPos& pos,
         const char* prefix,
         bool fReadOnly)
@@ -37,19 +37,18 @@ namespace
 
         fs::path path = GetBlockPosFilename(pos, prefix);
         fs::create_directories(path.parent_path());
-        FILE *file = fsbridge::fopen(path, "rb+");
+        UniqueCFile file{ fsbridge::fopen(path, "rb+") };
         if (!file && !fReadOnly) {
-            file = fsbridge::fopen(path, "wb+");
+            file.reset( fsbridge::fopen(path, "wb+") );
         }
         if (!file) {
             LogPrintf("Unable to open file %s\n", path.string());
             return nullptr;
         }
         if (pos.nPos) {
-            if (fseek(file, pos.nPos, SEEK_SET)) {
+            if (fseek(file.get(), pos.nPos, SEEK_SET)) {
                 LogPrintf("Unable to seek to position %u of %s\n", pos.nPos,
                           path.string());
-                fclose(file);
                 return nullptr;
             }
         }
@@ -75,13 +74,13 @@ namespace
     }
 
     /** Open a block file (blk?????.dat). */
-    FILE* OpenBlockFile(const CDiskBlockPos& pos, bool fReadOnly = false)
+    UniqueCFile OpenBlockFile(const CDiskBlockPos& pos, bool fReadOnly = false)
     {
         return OpenDiskFile(pos, "blk", fReadOnly);
     }
 
     /** Open an undo file (rev?????.dat) */
-    FILE* OpenUndoFile(const CDiskBlockPos& pos, bool fReadOnly = false)
+    UniqueCFile OpenUndoFile(const CDiskBlockPos& pos, bool fReadOnly = false)
     {
         return OpenDiskFile(pos, "rev", fReadOnly);
     }
@@ -277,24 +276,22 @@ void BlockFileAccess::FlushBlockFile(
 {
     CDiskBlockPos posOld(fileNo, 0);
 
-    FILE *fileOld = OpenBlockFile(posOld);
+    UniqueCFile fileOld = OpenBlockFile(posOld);
     if (fileOld) {
         if (finalize)
         {
-            TruncateFile(fileOld, blockFileInfo.nSize);
+            TruncateFile(fileOld.get(), blockFileInfo.nSize);
         }
-        FileCommit(fileOld);
-        fclose(fileOld);
+        FileCommit(fileOld.get());
     }
 
     fileOld = OpenUndoFile(posOld);
     if (fileOld) {
         if (finalize)
         {
-            TruncateFile(fileOld, blockFileInfo.nUndoSize);
+            TruncateFile(fileOld.get(), blockFileInfo.nUndoSize);
         }
-        FileCommit(fileOld);
-        fclose(fileOld);
+        FileCommit(fileOld.get());
     }
 }
 
@@ -303,15 +300,14 @@ bool BlockFileAccess::PreAllocateBlock(
     const CDiskBlockPos& pos)
 {
     if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos)) {
-        FILE *file = OpenBlockFile(pos);
+        UniqueCFile file = OpenBlockFile(pos);
         if (file) {
             LogPrintf(
                 "Pre-allocating up to position 0x%x in blk%05u.dat\n",
                 nNewChunks * BLOCKFILE_CHUNK_SIZE, pos.nFile);
-            AllocateFileRange(file, pos.nPos,
+            AllocateFileRange(file.get(), pos.nPos,
                 nNewChunks * BLOCKFILE_CHUNK_SIZE -
                 pos.nPos);
-            fclose(file);
         }
 
         return true;
@@ -325,13 +321,12 @@ bool BlockFileAccess::PreAllocateUndoBlock(
     const CDiskBlockPos& pos)
 {
     if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos)) {
-        FILE *file = OpenUndoFile(pos);
+        UniqueCFile file = OpenUndoFile(pos);
         if (file) {
             LogPrintf("Pre-allocating up to position 0x%x in rev%05u.dat\n",
                 nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
-            AllocateFileRange(file, pos.nPos,
+            AllocateFileRange(file.get(), pos.nPos,
                 nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
-            fclose(file);
         }
 
         return true;
