@@ -223,7 +223,8 @@ bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
     return true;
 }
 
-void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData metadata)
+void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
+    CDiskBlockMetaData&& metadata)
 {
     LOCK(cs_main);
     if (!nStatus.hasDiskBlockMetaData())
@@ -234,15 +235,16 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData metadat
             return;
         }
         LogPrintf("Setting block index file metadata for block %s\n", GetBlockHash().ToString());
-        SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
+        SetDiskBlockMetaData(std::move(metadata));
         setDirtyBlockIndex.insert(this);
     }
 }
 
-void CBlockIndex::SetBlockIndexFileMetaDataIfNotSet(CDiskBlockMetaData metadata)
+void CBlockIndex::SetBlockIndexFileMetaDataIfNotSet(
+    CDiskBlockMetaData&& metadata)
 {
     std::lock_guard lock{ blockIndexMutex };
-    SetBlockIndexFileMetaDataIfNotSetNL(metadata);
+    SetBlockIndexFileMetaDataIfNotSetNL(std::move(metadata));
 }
 
 std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStreamReader(
@@ -316,7 +318,7 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
 
     hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
 
-    SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData{hash, size});
+    SetBlockIndexFileMetaDataIfNotSetNL({std::move(hash), size});
 
     if(fseek(file, GetBlockPosNL().Pos(), SEEK_SET) != 0)
     {
@@ -349,8 +351,7 @@ std::unique_ptr<CForwardAsyncReadonlyStream> CBlockIndex::StreamBlockFromDisk(
         }
     }
 
-    assert(GetDiskBlockMetaData().diskDataSize > 0);
-    assert(!GetDiskBlockMetaData().diskDataHash.IsNull());
+    assert(!GetDiskBlockMetaData().IsNull());
 
     // We expect that block data on disk is in same format as data sent over the
     // network. If this would change in the future then CBlockStream would need

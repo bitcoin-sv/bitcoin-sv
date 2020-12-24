@@ -1337,7 +1337,8 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
     if (!hasDiskBlockMetaData)
     {
         hasher.Finalize(reinterpret_cast<uint8_t *>(&metadata.diskDataHash));
-        blockIndex.SetBlockIndexFileMetaDataIfNotSet(metadata);
+        blockIndex.SetBlockIndexFileMetaDataIfNotSet(
+            std::move(metadata));
     }
 
     // RPC requests have additional layer around the actual response 
@@ -1422,7 +1423,8 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     if (!diskBlockMetaData.has_value() && reader->EndOfStream())
     {
         diskBlockMetaData = reader->getDiskBlockMetadata();
-        blockIndex.SetBlockIndexFileMetaDataIfNotSet(diskBlockMetaData.value());
+        blockIndex.SetBlockIndexFileMetaDataIfNotSet(
+            std::move(diskBlockMetaData.value()));
     }
     headerBlockToJSON(config, header, &blockIndex, diskBlockMetaData, confirmations, nextBlockHash, jWriter);
 

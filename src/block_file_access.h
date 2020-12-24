@@ -15,7 +15,7 @@
 class CBlock;
 class CBlockUndo;
 class Config;
-struct CDiskBlockMetaData;
+class CDiskBlockMetaData;
 struct CDiskBlockPos;
 struct CDiskTxPos;
 class CTransaction;
