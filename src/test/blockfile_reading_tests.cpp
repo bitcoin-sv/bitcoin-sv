@@ -36,6 +36,11 @@ struct CBlockIndex::UnitTestAccess<class Unique>
 
         return randomHash;
     }
+
+    static int GetNFile(CBlockIndex& blockIndex)
+    {
+        return blockIndex.nFile;
+    }
 };
 using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
 
@@ -196,7 +201,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
 
     // prepare file ids set for pruning
     std::set<int> fileIds;
-    fileIds.insert(index.nFile);
+    fileIds.insert(TestAccessCBlockIndex::GetNFile(index));
 
     // start reading and inbetween the read try to delete the file on disk
     {

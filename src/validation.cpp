@@ -5916,9 +5916,9 @@ bool TestBlockValidity(const Config &config, CValidationState &state,
  */
 static void PruneOneBlockFile(const int fileNumber) {
     for (const std::pair<const uint256, CBlockIndex *> &it : mapBlockIndex) {
-        CBlockIndex *pindex = it.second;
-        if (pindex->nFile == fileNumber) {
-            pindex->ClearFileInfo();
+        CBlockIndex* pindex = it.second;
+        if (pindex->ClearFileInfoIfFileNumberEquals(fileNumber))
+        {
             setDirtyBlockIndex.insert(pindex);
 
             // Prune from mapBlocksUnlinked -- any block we prune would have
@@ -6072,10 +6072,12 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     LogPrintf("Checking all blk files are present...\n");
     std::set<int> setBlkDataFiles;
     for(const auto& item : mapBlockIndex){
-        CBlockIndex *pindex = item.second;
-        if (pindex->getStatus().hasData()) {
-            setBlkDataFiles.insert(pindex->nFile);
+        auto nFile = item.second->GetFileNumber();
+        if (nFile.has_value())
+        {
+            setBlkDataFiles.insert(nFile.value());
         }
+
     }
     for (const int i : setBlkDataFiles) {
         if (auto file = BlockFileAccess::OpenBlockFile( i ); file == nullptr)

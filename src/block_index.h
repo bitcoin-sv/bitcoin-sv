@@ -275,10 +275,10 @@ public:
     //! height of the entry in the chain. The genesis block has height 0
     int32_t nHeight{ 0 };
 
+private:
     //! Which # file this block is stored in (blk?????.dat)
     int nFile{ 0 };
 
-private:
     //! Byte offset within blk?????.dat where this block's data is stored
     unsigned int nDataPos{ 0 };
 
@@ -487,18 +487,26 @@ public:
             GetBlockProof(*this);
     }
 
-    void ClearFileInfo()
+    // Returns true if clear is successful, otherwise false
+    bool ClearFileInfoIfFileNumberEquals(int fileNumber)
     {
         std::lock_guard lock(blockIndexMutex);
-        nStatus =
-            nStatus
-                .withData(false)
-                .withUndo(false)
-                .withDiskBlockMetaData(false);
-        nFile = 0;
-        nDataPos = 0;
-        nUndoPos = 0;
-        mDiskBlockMetaData = {};
+        if (nFile == fileNumber)
+        {
+            nStatus =
+                nStatus
+                    .withData(false)
+                    .withUndo(false)
+                    .withDiskBlockMetaData(false);
+            nFile = 0;
+            nDataPos = 0;
+            nUndoPos = 0;
+            mDiskBlockMetaData = {};
+
+            return true;
+        }
+
+        return false;
     }
 
     CBlockHeader GetBlockHeader() const {
@@ -623,6 +631,16 @@ public:
 
     //! Build the skiplist pointer for this entry.
     void BuildSkip();
+
+    std::optional<int> GetFileNumber() const
+    {
+        std::lock_guard lock(blockIndexMutex);
+        if (nStatus.hasData())
+        {
+            return nFile;
+        }
+        return std::nullopt;
+    }
 
     //! Efficiently find an ancestor of this block.
     CBlockIndex *GetAncestor(int32_t height);
