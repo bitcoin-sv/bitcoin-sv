@@ -232,9 +232,11 @@ public:
     //! Byte offset within blk?????.dat where this block's data is stored
     unsigned int nDataPos;
 
+private:
     //! Byte offset within rev?????.dat where this block's undo data is stored
     unsigned int nUndoPos;
 
+public:
     //! (memory only) Total amount of work (expected number of hashes) in the
     //! chain up to and including this block
     arith_uint256 nChainWork;
@@ -339,13 +341,6 @@ public:
     CDiskBlockPos GetBlockPos() const {
         if (nStatus.hasData()) {
             return { nFile, nDataPos };
-        }
-        return {};
-    }
-
-    CDiskBlockPos GetUndoPos() const {
-        if (nStatus.hasUndo()) {
-            return { nFile, nUndoPos };
         }
         return {};
     }
@@ -647,6 +642,14 @@ private:
         return
             nUpTo == BlockValidity::SCRIPTS
             && mValidationCompletionTime == SteadyClockTimePoint::max();
+    }
+
+    CDiskBlockPos GetUndoPos() const
+    {
+       if (nStatus.hasUndo()) {
+            return { nFile, nUndoPos };
+        }
+        return {};
     }
 };
 
