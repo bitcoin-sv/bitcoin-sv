@@ -518,7 +518,7 @@ void getblocktemplate(const Config& config,
                 {
                     result = "duplicate";
                 }
-                else if (pindex->nStatus.isInvalid())
+                else if (pindex->getStatus().isInvalid())
                 {
                     result = "duplicate-invalid";
                 }
@@ -828,7 +828,7 @@ UniValue processBlock(
             if (pindex->IsValid(BlockValidity::SCRIPTS)) {
                 return "duplicate";
             }
-            if (pindex->nStatus.isInvalid()) {
+            if (pindex->getStatus().isInvalid()) {
                 return "duplicate-invalid";
             }
             // Otherwise, we might only have the header - process the block

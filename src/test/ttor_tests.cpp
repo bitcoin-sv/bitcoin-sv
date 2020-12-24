@@ -17,6 +17,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+namespace{ class Unique; }
+
 CBlockIndex& AddToBlockIndex(CBlockIndex& block)
 {
     auto res = mapBlockIndex.emplace(InsecureRand256(), &block).first;
@@ -24,6 +26,19 @@ CBlockIndex& AddToBlockIndex(CBlockIndex& block)
     current.phashBlock = &res->first;
     return current;
 }
+
+template <>
+struct CBlockIndex::UnitTestAccess<class Unique>
+{
+    UnitTestAccess() = delete;
+
+    static void SetStatusWithValidity(CBlockIndex& blockIndex)
+    {
+        blockIndex.nStatus = blockIndex.nStatus.withValidity(BlockValidity::SCRIPTS);
+    }
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
+
 
 BOOST_FIXTURE_TEST_SUITE(ttor_tests, TestingSetup)
 
@@ -62,7 +77,7 @@ BOOST_AUTO_TEST_CASE(invalidate_chain)
     {
         blocks[i] = new CBlockIndex();
         CBlockIndex& curr = AddToBlockIndex(*blocks[i]);
-        curr.nStatus = curr.nStatus.withValidity(BlockValidity::SCRIPTS);
+        TestAccessCBlockIndex::SetStatusWithValidity(curr);
     }
 
     // valid active chain
@@ -102,17 +117,17 @@ BOOST_AUTO_TEST_CASE(invalidate_chain)
     }
 
     // invalidate block 6 and its chain
-    blocks[6]->nStatus = blocks[6]->nStatus.withFailed();
+    blocks[6]->ModifyStatusWithFailed();
     InvalidateChain(blocks[6]);
 
     // block 6 should remain invalid but not with failed parent
-    BOOST_CHECK(blocks[6]->nStatus.hasFailed() == true);
-    BOOST_CHECK(blocks[6]->nStatus.hasFailedParent() == false);
+    BOOST_CHECK(blocks[6]->getStatus().hasFailed() == true);
+    BOOST_CHECK(blocks[6]->getStatus().hasFailedParent() == false);
 
     // all blocks in forks from invalid block should have failed parent status 
     for (size_t i = 7; i < blocks.size(); ++i)
     {
-        BOOST_CHECK(blocks[i]->nStatus.hasFailedParent() == true);
+        BOOST_CHECK(blocks[i]->getStatus().hasFailedParent() == true);
     }
 
     // all blocks in active chain should be valid

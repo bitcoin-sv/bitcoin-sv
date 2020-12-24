@@ -155,7 +155,7 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
 {
     std::lock_guard lock{ blockIndexMutex };
     if (GetUndoPosNL().IsNull() ||
-        !IsValid(BlockValidity::SCRIPTS)) {
+        !IsValidNL(BlockValidity::SCRIPTS)) {
         if (GetUndoPosNL().IsNull()) {
             CDiskBlockPos _pos;
             if (!pBlockFileInfoStore->FindUndoPos(
@@ -179,7 +179,7 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
         // setBlockIndexCandidates as well - it sorts by that time
         setBlockIndexCandidates.erase(this);
 
-        RaiseValidity(BlockValidity::SCRIPTS);
+        RaiseValidityNL(BlockValidity::SCRIPTS);
         setBlockIndexCandidates.insert(this);
 
         setDirtyBlockIndex.insert(this);

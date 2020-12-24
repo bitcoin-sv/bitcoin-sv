@@ -2204,7 +2204,7 @@ const CBlockIndex* FindInvalidBlockOnFork(const CBlockIndex* pindexForkTip)
     const CBlockIndex* pindexWalk = pindexForkTip;
     while (pindexWalk && !chainActive.Contains(pindexWalk))
     {
-        if (pindexWalk->nStatus.isInvalid())
+        if (pindexWalk->getStatus().isInvalid())
         {
             return pindexWalk;
         }
@@ -2222,7 +2222,7 @@ bool IsBlockPartOfExistingSafeModeFork(const CBlockIndex* pindexNew)
 
     // if we received only header then block is not yet part of the fork 
     // so check only for blocks with data
-    if (pindexNew->nStatus.hasData())
+    if (pindexNew->getStatus().hasData())
     {
         for (auto const& fork : safeModeForks)
         {
@@ -2253,7 +2253,7 @@ void CheckForkForInvalidBlocks(CBlockIndex* pindexForkTip)
         CBlockIndex* pindexWalk = pindexForkTip;
         while (pindexWalk != pindexInvalidBlock)
         {
-            pindexWalk->nStatus = pindexWalk->nStatus.withFailedParent();
+            pindexWalk->ModifyStatusWithFailedParent();
             setDirtyBlockIndex.insert(pindexWalk);
             setBlockIndexCandidates.erase(pindexWalk);
             pindexWalk = pindexWalk->pprev;
@@ -2280,6 +2280,7 @@ SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const 
 {
     AssertLockHeld(cs_main);
 
+    BlockStatus forkTipStatus = pindexForkTip->getStatus();
     if (!pindexForkTip || !pindexForkBase)
     {
         return SafeModeLevel::NONE;
@@ -2289,7 +2290,7 @@ SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const 
     {
         return SafeModeLevel::NONE;
     }
-    else if (pindexForkTip->nStatus.isValid() && pindexForkTip->nChainTx > 0 &&
+    else if (forkTipStatus.isValid() && pindexForkTip->nChainTx > 0 &&
              pindexForkTip->nChainWork - pindexForkBase->nChainWork > (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_VALID_FORK_LENGTH) &&
              chainActive.Tip()->nHeight - pindexForkBase->nHeight <= SAFE_MODE_MAX_VALID_FORK_DISTANCE)
     {
@@ -2298,11 +2299,11 @@ SafeModeLevel ShouldForkTriggerSafeMode(const CBlockIndex* pindexForkTip, const 
     else if (chainActive.Tip()->nHeight - pindexForkBase->nHeight <= SAFE_MODE_MAX_FORK_DISTANCE &&
              chainActive.Tip()->nChainWork + (GetBlockProof(*chainActive.Tip()) * SAFE_MODE_MIN_POW_DIFFERENCE) <= pindexForkTip->nChainWork)
     {
-        if (pindexForkTip->nStatus.isInvalid())
+        if (forkTipStatus.isInvalid())
         {
             return SafeModeLevel::INVALID;
         }
-        else if (pindexForkTip->nStatus.isValid() && pindexForkTip->nChainTx > 0)
+        else if (forkTipStatus.isValid() && pindexForkTip->nChainTx > 0)
         {
             return SafeModeLevel::VALID;
         }
@@ -2486,7 +2487,7 @@ void CheckSafeModeParametersForAllForksOnStartup()
     {
         // This is needed because older versions of node did not correctly 
         // mark descendants of an invalid block on forks.
-        if (!tip->nStatus.isInvalid() && tip->nChainTx == 0)
+        if (!tip->getStatus().isInvalid() && tip->nChainTx == 0)
         {
             // if tip is valid headers only check fork if it has invalid block
             CheckForkForInvalidBlocks(tip);
@@ -2522,7 +2523,7 @@ static void InvalidChainFound(CBlockIndex *pindexNew) {
 static void InvalidBlockFound(CBlockIndex *pindex,
                               const CValidationState &state) {
     if (!state.CorruptionPossible()) {
-        pindex->nStatus = pindex->nStatus.withFailed();
+        pindex->ModifyStatusWithFailed();
         setDirtyBlockIndex.insert(pindex);
         setBlockIndexCandidates.erase(pindex);
         InvalidChainFound(pindex);
@@ -3965,8 +3966,9 @@ static CBlockIndex *FindMostWorkChain() {
             // which block files have been deleted. Remove those as candidates
             // for the most work chain if we come across them; we can't switch
             // to a chain unless we have all the non-active-chain parent blocks.
-            bool fInvalidChain = pindexTest->nStatus.isInvalid();
-            bool fMissingData = !pindexTest->nStatus.hasData();
+            BlockStatus testStatus = pindexTest->getStatus();
+            bool fInvalidChain = testStatus.isInvalid();
+            bool fMissingData = !testStatus.hasData();
             if (fInvalidChain || fMissingData) 
             {
                 if (fInvalidChain)
@@ -4567,7 +4569,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
     AssertLockHeld(cs_main);
 
     // Mark the block itself as invalid.
-    pindex->nStatus = pindex->nStatus.withFailed();
+    pindex->ModifyStatusWithFailed();
     setDirtyBlockIndex.insert(pindex);
     setBlockIndexCandidates.erase(pindex);
 
@@ -4579,7 +4581,7 @@ bool InvalidateBlock(const Config &config, CValidationState &state,
         while (chainActive.Contains(pindex))
         {
             CBlockIndex* pindexWalk = chainActive.Tip();
-            pindexWalk->nStatus = pindexWalk->nStatus.withFailedParent();
+            pindexWalk->ModifyStatusWithFailedParent();
             setDirtyBlockIndex.insert(pindexWalk);
             setBlockIndexCandidates.erase(pindexWalk);
             // ActivateBestChain considers blocks already in chainActive
@@ -4849,7 +4851,7 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
     while (it != mapBlockIndex.end()) {
         if (!it->second->IsValid() &&
             it->second->GetAncestor(nHeight) == pindex) {
-            it->second->nStatus = it->second->nStatus.withClearedFailureFlags();
+            it->second->ModifyStatusWithClearedFailedFlags();
             setDirtyBlockIndex.insert(it->second);
             if (it->second->IsValid(BlockValidity::TRANSACTIONS) &&
                 it->second->nChainTx &&
@@ -4868,8 +4870,8 @@ bool ResetBlockFailureFlags(CBlockIndex *pindex) {
 
     // Remove the invalidity flag from all ancestors too.
     while (pindex != nullptr) {
-        if (pindex->nStatus.isInvalid()) {
-            pindex->nStatus = pindex->nStatus.withClearedFailureFlags();
+        if (pindex->getStatus().isInvalid()) {
+            pindex->ModifyStatusWithClearedFailedFlags();
             setDirtyBlockIndex.insert(pindex);
         }
         pindex = pindex->pprev;
@@ -4932,7 +4934,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
     std::set<CBlockIndex*> setPrevs;
 
     // Check that we are invalidating chain from an invalid block
-    assert(pindexNew->nStatus.isInvalid());
+    assert(pindexNew->getStatus().isInvalid());
 
     // Check if invalid block is on current active chain
     bool isInvalidBlockOnActiveChain = chainActive.Contains(pindexNew);
@@ -4971,7 +4973,7 @@ void InvalidateChain(const CBlockIndex* pindexNew)
             pindexWalk = (*it);
             while (pindexWalk != pindexNew)
             {
-                pindexWalk->nStatus = pindexWalk->nStatus.withFailedParent();
+                pindexWalk->ModifyStatusWithFailedParent();
                 setDirtyBlockIndex.insert(pindexWalk);
                 setBlockIndexCandidates.erase(pindexWalk);
                 pindexWalk = pindexWalk->pprev;
@@ -5024,7 +5026,7 @@ static bool ReceivedBlockTransactions(
         {
             LogPrintf("Block %s at height %d violates TTOR order.\n", block.GetHash().ToString(), pindexNew->nHeight);
             // Mark the block itself as invalid.
-            pindexNew->nStatus = pindexNew->nStatus.withFailed();
+            pindexNew->ModifyStatusWithFailed();
             setDirtyBlockIndex.insert(pindexNew);
             setBlockIndexCandidates.erase(pindexNew);
             InvalidateChain(pindexNew);
@@ -5454,7 +5456,7 @@ static const CBlockIndex* FindPreviousBlockIndex(const CBlockHeader &block, CVal
     if (mi != mapBlockIndex.end())
     {
         ppindex = (*mi).second;
-        if (ppindex->nStatus.isInvalid())
+        if (ppindex->getStatus().isInvalid())
         {
             state.DoS(100, error("%s: prev block invalid", __func__), REJECT_INVALID, "bad-prevblk");
             ppindex = nullptr;
@@ -5497,7 +5499,7 @@ static bool AcceptBlockHeader(const Config &config, const CBlockHeader &block,
             if (ppindex) {
                 *ppindex = pindex;
             }
-            if (pindex->nStatus.isInvalid()) {
+            if (pindex->getStatus().isInvalid()) {
                 return state.Invalid(error("%s: block %s is marked invalid",
                                            __func__, hash.ToString()),
                                      0, "duplicate");
@@ -5601,7 +5603,7 @@ static bool AcceptBlock(const Config& config,
     // Try to process all requested blocks that we don't have, but only
     // process an unrequested block if it's new and has enough work to
     // advance our tip, and isn't too many blocks ahead.
-    bool fAlreadyHave = pindex->nStatus.hasData();
+    bool fAlreadyHave = pindex->getStatus().hasData();
 
     // Compare block header timestamps and received times of the block and the
     // chaintip.  If they have the same chain height, just log the time
@@ -5673,7 +5675,7 @@ static bool AcceptBlock(const Config& config,
     if (!CheckBlock(config, block, state, pindex->nHeight) ||
         !ContextualCheckBlock(config, block, state, pindex->pprev)) {
         if (state.IsInvalid() && !state.CorruptionPossible()) {
-            pindex->nStatus = pindex->nStatus.withFailed();
+            pindex->ModifyStatusWithFailed();
             setDirtyBlockIndex.insert(pindex);
         }
         return error("%s: %s (block %s)", __func__, FormatStateMessage(state),
@@ -6047,7 +6049,7 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
             (pindex->nChainTx || pindex->pprev == nullptr)) {
             setBlockIndexCandidates.insert(pindex);
         }
-        if (pindex->nStatus.isInvalid() &&
+        if (pindex->getStatus().isInvalid() &&
             (!pindexBestInvalid ||
              pindex->nChainWork > pindexBestInvalid->nChainWork)) {
             pindexBestInvalid = pindex;
@@ -6072,7 +6074,7 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
     std::set<int> setBlkDataFiles;
     for(const auto& item : mapBlockIndex){
         CBlockIndex *pindex = item.second;
-        if (pindex->nStatus.hasData()) {
+        if (pindex->getStatus().hasData()) {
             setBlkDataFiles.insert(pindex->nFile);
         }
     }
@@ -6184,7 +6186,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
             break;
         }
 
-        if (fPruneMode && !pindex->nStatus.hasData()) {
+        if (fPruneMode && !pindex->getStatus().hasData()) {
             // If pruning, only go back as far as we have data.
             LogPrintf("VerifyDB(): block verification stopping at height %d "
                       "(pruning, no data)\n",
@@ -6442,7 +6444,7 @@ bool RewindBlockIndex(const Config &config) {
     CBlockIndex *pindex = chainActive.Tip();
     CJournalChangeSetPtr changeSet { mempool.getJournalBuilder().getNewChangeSet(JournalUpdateReason::REORG) };
     while (chainActive.Height() >= nHeight) {
-        if (fPruneMode && !chainActive.Tip()->nStatus.hasData()) {
+        if (fPruneMode && !chainActive.Tip()->getStatus().hasData()) {
             // If pruning, don't try rewinding past the HAVE_DATA point; since
             // older blocks can't be served anyway, there's no need to walk
             // further, and trying to DisconnectTip() will fail (and require a
@@ -6688,7 +6690,7 @@ bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
 
                 // process in case the block isn't known yet
                 if (mapBlockIndex.count(hash) == 0 ||
-                    !mapBlockIndex[hash]->nStatus.hasData()) {
+                    !mapBlockIndex[hash]->getStatus().hasData()) {
                     LOCK(cs_main);
                     CValidationState state;
                     if (AcceptBlock(config, pblock, state, nullptr, true, dbp,
@@ -6834,30 +6836,31 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
     CBlockIndex *pindexFirstNotScriptsValid = nullptr;
     while (pindex != nullptr) {
         nNodes++;
-        if (pindexFirstInvalid == nullptr && pindex->nStatus.hasFailed()) {
+        BlockStatus status = pindex->getStatus();
+        if (pindexFirstInvalid == nullptr && status.hasFailed()) {
             pindexFirstInvalid = pindex;
         }
-        if (pindexFirstMissing == nullptr && !pindex->nStatus.hasData()) {
+        if (pindexFirstMissing == nullptr && !status.hasData()) {
             pindexFirstMissing = pindex;
         }
         if (pindexFirstNeverProcessed == nullptr && pindex->nTx == 0) {
             pindexFirstNeverProcessed = pindex;
         }
         if (pindex->pprev != nullptr && pindexFirstNotTreeValid == nullptr &&
-            pindex->nStatus.getValidity() < BlockValidity::TREE) {
+            status.getValidity() < BlockValidity::TREE) {
             pindexFirstNotTreeValid = pindex;
         }
         if (pindex->pprev != nullptr &&
             pindexFirstNotTransactionsValid == nullptr &&
-            pindex->nStatus.getValidity() < BlockValidity::TRANSACTIONS) {
+            status.getValidity() < BlockValidity::TRANSACTIONS) {
             pindexFirstNotTransactionsValid = pindex;
         }
         if (pindex->pprev != nullptr && pindexFirstNotChainValid == nullptr &&
-            pindex->nStatus.getValidity() < BlockValidity::CHAIN) {
+            status.getValidity() < BlockValidity::CHAIN) {
             pindexFirstNotChainValid = pindex;
         }
         if (pindex->pprev != nullptr && pindexFirstNotScriptsValid == nullptr &&
-            pindex->nStatus.getValidity() < BlockValidity::SCRIPTS) {
+            status.getValidity() < BlockValidity::SCRIPTS) {
             pindexFirstNotScriptsValid = pindex;
         }
 
@@ -6880,18 +6883,18 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
         if (!fHavePruned) {
             // If we've never pruned, then HAVE_DATA should be equivalent to nTx
             // > 0
-            assert(!pindex->nStatus.hasData() == (pindex->nTx == 0));
+            assert(!status.hasData() == (pindex->nTx == 0));
             assert(pindexFirstMissing == pindexFirstNeverProcessed);
-        } else if (pindex->nStatus.hasData()) {
+        } else if (status.hasData()) {
             // If we have pruned, then we can only say that HAVE_DATA implies
             // nTx > 0
             assert(pindex->nTx > 0);
         }
-        if (pindex->nStatus.hasUndo()) {
-            assert(pindex->nStatus.hasData());
+        if (status.hasUndo()) {
+            assert(status.hasData());
         }
         // This is pruning-independent.
-        assert((pindex->nStatus.getValidity() >= BlockValidity::TRANSACTIONS) ==
+        assert((status.getValidity() >= BlockValidity::TRANSACTIONS) ==
                (pindex->nTx > 0));
         // All parents having had data (at some point) is equivalent to all
         // parents being VALID_TRANSACTIONS, which is equivalent to nChainTx
@@ -6913,22 +6916,22 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
                (pindex->pskip && (pindex->pskip->nHeight < nHeight)));
         // All mapBlockIndex entries must at least be TREE valid
         assert(pindexFirstNotTreeValid == nullptr);
-        if (pindex->nStatus.getValidity() >= BlockValidity::TREE) {
+        if (status.getValidity() >= BlockValidity::TREE) {
             // TREE valid implies all parents are TREE valid
             assert(pindexFirstNotTreeValid == nullptr);
         }
-        if (pindex->nStatus.getValidity() >= BlockValidity::CHAIN) {
+        if (status.getValidity() >= BlockValidity::CHAIN) {
             // CHAIN valid implies all parents are CHAIN valid
             assert(pindexFirstNotChainValid == nullptr);
         }
-        if (pindex->nStatus.getValidity() >= BlockValidity::SCRIPTS) {
+        if (status.getValidity() >= BlockValidity::SCRIPTS) {
             // SCRIPTS valid implies all parents are SCRIPTS valid
             assert(pindexFirstNotScriptsValid == nullptr);
         }
         if (pindexFirstInvalid == nullptr) {
             // Checks for not-invalid blocks.
             // The failed mask cannot be set for blocks without invalid parents.
-            assert(!pindex->nStatus.isInvalid());
+            assert(!status.isInvalid());
         }
         // Check whether this block is in mapBlocksUnlinked.
         std::pair<std::multimap<CBlockIndex *, CBlockIndex *>::iterator,
@@ -6943,7 +6946,7 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
             }
             rangeUnlinked.first++;
         }
-        if (pindex->pprev && pindex->nStatus.hasData() &&
+        if (pindex->pprev && status.hasData() &&
             pindexFirstNeverProcessed != nullptr &&
             pindexFirstInvalid == nullptr) {
             // If this block has block data available, some parent was never
@@ -6951,7 +6954,7 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
             // mapBlocksUnlinked.
             assert(foundInUnlinked);
         }
-        if (!pindex->nStatus.hasData()) {
+        if (!status.hasData()) {
             // Can't be in mapBlocksUnlinked if we don't HAVE_DATA
             assert(!foundInUnlinked);
         }
@@ -6960,7 +6963,7 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
             // mapBlocksUnlinked.
             assert(!foundInUnlinked);
         }
-        if (pindex->pprev && pindex->nStatus.hasData() &&
+        if (pindex->pprev && status.hasData() &&
             pindexFirstNeverProcessed == nullptr &&
             pindexFirstMissing != nullptr) {
             // We HAVE_DATA for this block, have received data for all parents

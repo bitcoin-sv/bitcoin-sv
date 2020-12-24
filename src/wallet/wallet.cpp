@@ -4224,7 +4224,7 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
         // re-enable.
         if (fPruneMode) {
             CBlockIndex *block = chainActive.Tip();
-            while (block && block->pprev && block->pprev->nStatus.hasData() &&
+            while (block && block->pprev && block->pprev->getStatus().hasData() &&
                    block->pprev->nTx > 0 && pindexRescan != block) {
                 block = block->pprev;
             }

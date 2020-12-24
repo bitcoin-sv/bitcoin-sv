@@ -1246,7 +1246,8 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
     {
         LOCK(cs_main);
 
-        if (fHavePruned && !blockIndex.nStatus.hasData() && blockIndex.nTx > 0) 
+        BlockStatus status = blockIndex.getStatus();
+        if (fHavePruned && !status.hasData() && blockIndex.nTx > 0)
         {
             throw block_parse_error("Block not available (pruned data)");
         }
@@ -1261,7 +1262,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
             throw block_parse_error(blockIndex.GetBlockHash().GetHex() + " not found on disk");
         }
 
-        hasDiskBlockMetaData = blockIndex.nStatus.hasDiskBlockMetaData();
+        hasDiskBlockMetaData = status.hasDiskBlockMetaData();
         if (hasDiskBlockMetaData)
         {
             metadata = blockIndex.GetDiskBlockMetaData();
@@ -1362,12 +1363,13 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     {
         LOCK(cs_main);
 
-        if (fHavePruned && !blockIndex.nStatus.hasData() && blockIndex.nTx > 0) 
+        BlockStatus status = blockIndex.getStatus();
+        if (fHavePruned && !status.hasData() && blockIndex.nTx > 0) 
         {
             throw block_parse_error("Block not available (pruned data)");
         }
 
-        bool hasDiskBlockMetaData = blockIndex.nStatus.hasDiskBlockMetaData();
+        bool hasDiskBlockMetaData = status.hasDiskBlockMetaData();
         if (hasDiskBlockMetaData) 
         {
             diskBlockMetaData = blockIndex.GetDiskBlockMetaData();
@@ -2190,7 +2192,7 @@ UniValue getblockchaininfo(const Config &config,
 
     if (fPruneMode) {
         CBlockIndex *block = chainActive.Tip();
-        while (block && block->pprev && block->pprev->nStatus.hasData()) {
+        while (block && block->pprev && block->pprev->getStatus().hasData()) {
             block = block->pprev;
         }
 
@@ -2300,7 +2302,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
         if (chainActive.Contains(block)) {
             // This block is part of the currently active chain.
             status = "active";
-        } else if (block->nStatus.isInvalid()) {
+        } else if (block->getStatus().isInvalid()) {
             // This block or one of its ancestors is invalid.
             status = "invalid";
         } else if (block->nChainTx == 0) {
@@ -3095,7 +3097,7 @@ UniValue getblockstats_impl(const Config &config,
 
     CBlock block;
 
-    if (fHavePruned && !pindex->nStatus.hasData() &&
+    if (fHavePruned && !pindex->getStatus().hasData() &&
         pindex->nTx > 0) {
         throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
     }

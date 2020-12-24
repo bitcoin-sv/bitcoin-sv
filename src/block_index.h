@@ -257,9 +257,11 @@ public:
     //! necessary; won't happen before 2030
     unsigned int nChainTx{ 0 };
 
+private:
     //! Verification status of this block. See enum BlockStatus
     BlockStatus nStatus;
 
+public:
     //! block header
     int32_t nVersion{ 0 };
     uint256 hashMerkleRoot;
@@ -294,6 +296,8 @@ public:
 
     void LoadFromPersistentData(const CBlockIndex& other, CBlockIndex* previous)
     {
+        std::lock_guard lock(blockIndexMutex);
+
         pprev = previous;
         nHeight = other.nHeight;
         nFile = other.nFile;
@@ -336,13 +340,15 @@ public:
         const CDiskBlockPos& pos,
         CDiskBlockMetaData metaData)
     {
+        std::lock_guard lock(blockIndexMutex);
+
         nTx = transactionsCount;
         nChainTx = 0;
         nFile = pos.File();
         nDataPos = pos.Pos();
         nUndoPos = 0;
         nStatus = nStatus.withData();
-        RaiseValidity(BlockValidity::TRANSACTIONS);
+        RaiseValidityNL(BlockValidity::TRANSACTIONS);
 
         if (!metaData.diskDataHash.IsNull() && metaData.diskDataSize)
         {
@@ -441,6 +447,7 @@ public:
 
     void ClearFileInfo()
     {
+        std::lock_guard lock(blockIndexMutex);
         nStatus =
             nStatus
                 .withData(false)
@@ -517,6 +524,26 @@ public:
         return this->nChainWork;
     }
 
+    BlockStatus getStatus() const {
+        std::lock_guard lock(blockIndexMutex);
+        return nStatus;
+    }
+
+    void ModifyStatusWithFailed() {
+        std::lock_guard lock(blockIndexMutex);
+        nStatus = nStatus.withFailed();
+    }
+
+    void ModifyStatusWithClearedFailedFlags() {
+        std::lock_guard lock(blockIndexMutex);
+        nStatus = nStatus.withClearedFailureFlags();
+    }
+
+    void ModifyStatusWithFailedParent() {
+        std::lock_guard lock(blockIndexMutex);
+        nStatus = nStatus.withFailedParent();
+    }
+
     /**
      * Pretend that validation to SCRIPT level was instantanious. This is used
      * for precious blocks where we wish to treat a certain block as if it was
@@ -542,31 +569,14 @@ public:
             nHeight, hashMerkleRoot.ToString(), GetBlockHash().ToString());
     }
 
-    //! Check whether this block index entry is valid up to the passed validity
-    //! level.
     bool IsValid(enum BlockValidity nUpTo = BlockValidity::TRANSACTIONS) const {
-        return nStatus.isValid(nUpTo);
+        std::lock_guard lock(blockIndexMutex);
+        return IsValidNL(nUpTo);
     }
 
-    //! Raise the validity level of this block index entry.
-    //! Returns true if the validity was changed.
     bool RaiseValidity(enum BlockValidity nUpTo) {
-        // Only validity flags allowed.
-        if (nStatus.isInvalid()) {
-            return false;
-        }
-
-        if (nStatus.getValidity() >= nUpTo) {
-            return false;
-        }
-
-        if (ValidityChangeRequiresValidationTimeSetting(nUpTo))
-        {
-            mValidationCompletionTime = std::chrono::steady_clock::now();
-        }
-
-        nStatus = nStatus.withValidity(nUpTo);
-        return true;
+        std::lock_guard lock(blockIndexMutex);
+        return RaiseValidityNL(nUpTo);
     }
 
     //! Build the skiplist pointer for this entry.
@@ -670,6 +680,33 @@ private:
             return { nFile, nDataPos };
         }
         return {};
+    }
+
+    // Check whether this block index entry is valid up to the passed validity
+    // level.
+    bool IsValidNL(enum BlockValidity nUpTo = BlockValidity::TRANSACTIONS) const {
+        return nStatus.isValid(nUpTo);
+    }
+
+    // Raise the validity level of this block index entry.
+    // Returns true if the validity was changed.
+    bool RaiseValidityNL(enum BlockValidity nUpTo) {
+        // Only validity flags allowed.
+        if (nStatus.isInvalid()) {
+            return false;
+        }
+
+        if (nStatus.getValidity() >= nUpTo) {
+            return false;
+        }
+
+        if (ValidityChangeRequiresValidationTimeSetting(nUpTo))
+        {
+            mValidationCompletionTime = std::chrono::steady_clock::now();
+        }
+
+        nStatus = nStatus.withValidity(nUpTo);
+        return true;
     }
 
     mutable std::mutex blockIndexMutex;

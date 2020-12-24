@@ -412,7 +412,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                 // We consider the chain that this peer is on invalid.
                 return;
             }
-            if (pindex->nStatus.hasData() || chainActive.Contains(pindex)) {
+            if (pindex->getStatus().hasData() || chainActive.Contains(pindex)) {
                 if (pindex->nChainTx) {
                     state->pindexLastCommonBlock = pindex;
                 }
@@ -705,7 +705,7 @@ namespace
                 0,
                 CBlockHeaderAndShortTxIDs{*mBlock}};
 
-            if(index.nStatus.hasDiskBlockMetaData())
+            if(index.getStatus().hasDiskBlockMetaData())
             {
                 auto metaData = index.GetDiskBlockMetaData();
                 mCompactBlockMessage =
@@ -1210,7 +1210,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
 
                 // Pruned nodes may have deleted the block, so check whether
                 // it's available before trying to send.
-                if (send && (mi->second->nStatus.hasData())) {
+                if (send && (mi->second->getStatus().hasData())) {
                     bool isMostRecentBlock = chainActive.Tip() == mi->second;
                     // Send block from disk
 
@@ -2156,7 +2156,7 @@ static bool ProcessGetBlocks(
         // that block relay might require.
         const int nPrunedBlocksLikelyToHave = MIN_BLOCKS_TO_KEEP - 3600 / chainparams.GetConsensus().nPowTargetSpacing;
         if(fPruneMode &&
-            (!pindex->nStatus.hasData() ||
+            (!pindex->getStatus().hasData() ||
              pindex->nHeight <=
                  chainActive.Tip()->nHeight - nPrunedBlocksLikelyToHave)) {
             LogPrint(
@@ -2222,7 +2222,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     LOCK(cs_main);
 
     BlockMap::iterator it = mapBlockIndex.find(req.blockhash);
-    if(it == mapBlockIndex.end() || !it->second->nStatus.hasData()) {
+    if(it == mapBlockIndex.end() || !it->second->getStatus().hasData()) {
         LogPrint(BCLog::NETMSG, "Peer %d sent us a getblocktxn for a block we don't have", pfrom->id);
         return;
     }
@@ -2577,7 +2577,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
             // up to a limit.
             while(pindexWalk && !chainActive.Contains(pindexWalk) && vToFetch.size() <= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
             {
-                if(!pindexWalk->nStatus.hasData() && !blockDownloadTracker.IsInFlight(pindexWalk->GetBlockHash())) {
+                if(!pindexWalk->getStatus().hasData() && !blockDownloadTracker.IsInFlight(pindexWalk->GetBlockHash())) {
                     // We don't have this block, and it's not yet in flight.
                     vToFetch.push_back(pindexWalk);
                 }
@@ -2832,7 +2832,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         bool fAlreadyInFlight { blockDownloadTracker.IsInFlight(pindex->GetBlockHash()) };
         bool fAlreadyInFlightFromThisPeer { blockDownloadTracker.IsInFlight(blockSource) };
 
-        if(pindex->nStatus.hasData()) {
+        if(pindex->getStatus().hasData()) {
             // Nothing to do here
             return true;
         }
