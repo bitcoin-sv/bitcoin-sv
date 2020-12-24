@@ -22,6 +22,23 @@
 #include <optional>
 #include <vector>
 
+namespace{ class Unique; }
+
+template <>
+struct CBlockIndex::UnitTestAccess<class Unique>
+{
+    UnitTestAccess() = delete;
+
+    static uint256 CorruptDiskBlockMetaData( CBlockIndex& blockIndex )
+    {
+        uint256 randomHash = GetRandHash();
+        blockIndex.SetDiskBlockMetaData( randomHash, 1 );
+
+        return randomHash;
+    }
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<class Unique>;
+
 namespace
 {
     void WriteBlockToDisk(
@@ -140,8 +157,8 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
     // confirm that once the data is present it is not updated once again
     // (is read from block index cache instead)
     {
-        uint256 randomHash = GetRandHash();
-        index.SetDiskBlockMetaData(randomHash, 1);
+        uint256 randomHash =
+            TestAccessCBlockIndex::CorruptDiskBlockMetaData( index );
 
         auto streamCorruptMetaData =
             index.StreamBlockFromDisk(INIT_PROTO_VERSION);

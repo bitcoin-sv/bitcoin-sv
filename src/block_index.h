@@ -326,14 +326,6 @@ public:
     }
 
     CDiskBlockMetaData GetDiskBlockMetaData() const {return mDiskBlockMetaData;}
-    void SetDiskBlockMetaData(const uint256& hash, size_t size)
-    {
-        assert(!hash.IsNull());
-        assert(size > 0);
-
-        mDiskBlockMetaData = {hash, size};
-        nStatus = nStatus.withDiskBlockMetaData();
-    }
 
     void SetDiskBlockData(
         size_t transactionsCount,
@@ -707,6 +699,15 @@ private:
 
         nStatus = nStatus.withValidity(nUpTo);
         return true;
+    }
+
+    void SetDiskBlockMetaData(const uint256& hash, size_t size)
+    {
+        assert(!hash.IsNull());
+        assert(size > 0);
+
+        mDiskBlockMetaData = {hash, size};
+        nStatus = nStatus.withDiskBlockMetaData();
     }
 
     mutable std::mutex blockIndexMutex;
