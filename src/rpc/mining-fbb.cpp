@@ -209,6 +209,7 @@ UniValue getminingcandidate(const Config& config, const JSONRPCRequest& request)
                     "        \"id\": n,                  (string) Candidate identifier for submitminingsolution\n"
                     "        \"prevhash\": \"xxxx\",     (hex string) Hash of the previous block\n"
                     "        \"coinbase\": \"xxxx\",     (optional hex string encoded binary transaction) Coinbase transaction\n"
+                    "        \"coinbaseValue\": n,       (integer) Total funds available for the coinbase transaction (in Satoshis)\n"
                     "        \"version\": n,             (integer) Block version\n"
                     "        \"nBits\": \"xxxx\",        (hex string) Difficulty\n"
                     "        \"time\": n,                (integer) Block time\n"
