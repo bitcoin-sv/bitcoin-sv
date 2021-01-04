@@ -2226,7 +2226,7 @@ int64_t CTxMemPool::evaluateEvictionCandidateNL(txiter entry)
     if(entry->IsCPFPGroupMember())
     {
         const auto& evalParams = entry->GetCPFPGroup()->EvaluationParams();
-        return (evalParams.fee + evalParams.feeDelta).GetSatoshis() * 1000 / entry->GetTxSize();
+        return (evalParams.fee + evalParams.feeDelta).GetSatoshis() * 1000 / evalParams.size;
     }
     
     int64_t score = entry->GetModifiedFee().GetSatoshis() * 1000 / entry->GetTxSize();
