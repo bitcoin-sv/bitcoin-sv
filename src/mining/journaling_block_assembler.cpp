@@ -105,9 +105,6 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
 
     mLastBlockStats = blockStats;
 
-    bool isGenesisEnabled = IsGenesisEnabled(mConfig, chainActive.Height() + 1);
-    bool sigOpCountError;
-
     // Build template
     std::unique_ptr<CBlockTemplate> blockTemplate { std::make_unique<CBlockTemplate>(block) };
     blockTemplate->vTxFees = mTxFees;
