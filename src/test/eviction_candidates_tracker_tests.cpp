@@ -100,17 +100,28 @@ public:
 
     void AddGroup(std::vector<CTxMemPoolEntry> entries)
     {
-        auto group = std::make_shared<CPFPGroup>();
+        SecondaryMempoolEntryData groupData;
+        std::vector<CTxMemPoolTestAccess::txiter> iters;
         CTxMemPoolTestAccess::txiter lastIt;
         for(auto& entry: entries)
         {
-            CTestTxMemPoolEntry(entry).group() = group;
-            group->evaluationParams.fee += entry.GetFee();
-            group->evaluationParams.size += entry.GetTxSize();
+            groupData.fee += entry.GetFee();
+            groupData.size += entry.GetTxSize();
             auto it = AddTx(entry);
-            group->transactions.push_back(it);   
+            iters.push_back(it);   
             lastIt = it;
         }
+        
+        auto group = std::make_shared<CPFPGroup>(groupData, std::vector<CTxMemPoolTestAccess::txiter>(iters));
+        for(auto iter: iters)
+        {
+            mapTx.modify(iter, [&group](CTxMemPoolEntry& entry) {
+                                    CTestTxMemPoolEntry(entry).group() = group;
+                                    CTestTxMemPoolEntry(entry).groupingData() = std::nullopt;
+                                });
+        }
+        
+        
         if(tracker)
         {
             tracker->EntryModified(lastIt);
@@ -129,7 +140,7 @@ public:
 
         if(entry->IsCPFPGroupMember())
         {
-            for(auto it: entry->GetCPFPGroup()->transactions)
+            for(auto it: entry->GetCPFPGroup()->Transactions())
             {
                 CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).group().reset();
             }

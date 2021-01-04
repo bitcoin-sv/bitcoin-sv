@@ -322,6 +322,7 @@ BOOST_AUTO_TEST_CASE(group_forming_and_disbanding)
     entriesToRemove.clear();
     entriesToRemove.insert(payForGroupIt);
     testAccess.removeStagedNL(entriesToRemove, *changeSet, CTransactionConflict{}, MemPoolRemovalReason::UNKNOWN);
+    changeSet->apply();
 
     // everything should be removed from journal
     BOOST_ASSERT(JournalTester(journal).journalSize() == 0);

@@ -22,7 +22,7 @@ namespace
         txn.nLockTime = lockTime++;
         const auto tx = MakeTransactionRef(std::move(txn));
         return { std::make_shared<CTransactionWrapper>(tx, nullptr),
-                 tx->GetTotalSize(), Amount{0}, std::nullopt };
+                 tx->GetTotalSize(), Amount{0}, std::nullopt, false};
     }
     // Generate a new random transaction that depends on another
     CJournalEntry NewTxn(std::initializer_list<CTransactionWrapperRef> other)
@@ -35,7 +35,7 @@ namespace
         txn.nLockTime = lockTime++;
         const auto tx = MakeTransactionRef(std::move(txn));
         return { std::make_shared<CTransactionWrapper>(tx, nullptr),
-                 tx->GetTotalSize(), Amount{0}, std::nullopt };
+                 tx->GetTotalSize(), Amount{0}, std::nullopt, false};
     }
 
     CJournalChangeSetPtr changeSet(CJournalBuilder* builder, JournalUpdateReason reason, std::initializer_list<std::pair<CJournalChangeSet::Operation, CJournalEntry>> ops)
