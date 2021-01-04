@@ -4375,7 +4375,7 @@ void SendTxnInventory(const Config &config, const CNodePtr& pto, CConnman &connm
             vRelayExpiration.pop_front();
         }
 
-        auto ret = mapRelay.insert(std::make_pair(std::move(txn.getInv().hash), std::move(txn.getTxnRef())));
+        auto ret = mapRelay.insert(std::make_pair(std::move(txn.getInv().hash), txn.getTxnRef()));
         if(ret.second)
         {
             vRelayExpiration.push_back(std::make_pair(nNow + 15 * 60 * 1000000, ret.first));
