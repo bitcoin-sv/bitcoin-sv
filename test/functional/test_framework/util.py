@@ -477,8 +477,20 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
         timeout -= wait
     raise AssertionError("Mempool sync failed")
 
-def check_mempool_equals(rpc, should_be_in_mempool, timeout=20):
-    wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool}, timeout=timeout)
+def check_mempool_equals(rpc, should_be_in_mempool, timeout=20, check_interval=0.1):
+    try:
+        wait_until(lambda: set(rpc.getrawmempool()) == {t.hash for t in should_be_in_mempool},
+                   timeout=timeout, check_interval=check_interval)
+    except:
+        mempool = set(rpc.getrawmempool())
+        expected = {t.hash for t in should_be_in_mempool}
+        missing = expected - mempool
+        unexpected = mempool - expected
+        if missing:
+            rpc.log.info("Transactions missing from the mempool: " + str(list(missing)))
+        if unexpected:
+            rpc.log.info("Transactions that should not be in the mempool: " + str(list(unexpected)))
+        raise
 
 # The function checks if transaction/block was rejected
 # The actual reject reason is checked if specified
