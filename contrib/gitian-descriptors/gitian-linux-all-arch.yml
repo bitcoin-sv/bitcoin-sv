@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-sv-1.0.6-linux"
+name: "bitcoin-sv-1.0.7-linux"
 enable_cache: true
 suites:
 - "bionic"
