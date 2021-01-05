@@ -163,7 +163,7 @@ const CTransactionRef& TxMempoolInfo::GetTx() const
         return tx.store( wrapper->GetTx() );
     }
 
-    return {};
+    return nullTxRef;
 }
 
 TxStorage TxMempoolInfo::GetTxStorage() const noexcept

@@ -158,5 +158,6 @@ private:
     mutable AtomicTxRef tx;
 
     static const TxId nullTxId;
+    inline static const CTransactionRef nullTxRef;
 };
 
