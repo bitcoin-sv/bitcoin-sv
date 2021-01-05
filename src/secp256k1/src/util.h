@@ -24,6 +24,12 @@ static SECP256K1_INLINE void secp256k1_callback_call(const secp256k1_callback * 
     cb->fn(text, (void*)cb->data);
 }
 
+#if defined(__clang__) || defined (__GNUC__)
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+#else
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS
+#endif
+
 #ifdef DETERMINISTIC
 #define TEST_FAILURE(msg) do { \
     fprintf(stderr, "%s\n", msg); \
