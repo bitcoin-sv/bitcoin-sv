@@ -98,6 +98,7 @@ endfunction(link_secp256k1_internal)
 # Phony target to build benchmarks
 if (NOT MSVC)
 	add_custom_target(bench-secp256k1)
+	add_dependencies(check bench-secp256k1)
 endif()
 
 function(add_secp256k1_bench NAME)
