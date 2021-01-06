@@ -11,6 +11,7 @@
 #include "hash.h"
 #include "memusage.h"
 #include "serialize.h"
+#include "txhasher.h"
 #include "uint256.h"
 
 #include <cassert>

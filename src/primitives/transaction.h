@@ -7,7 +7,6 @@
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
 
 #include "amount.h"
-#include "hash.h"
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
@@ -80,33 +79,6 @@ public:
     }
 
     std::string ToString() const;
-};
-
-/**
- * Hasher objects for std::unordered_set and similar hash-based containers.
- */
-class StaticHasherSalt
-{
-protected:
-    static const uint64_t k0, k1;
-};
-
-class SaltedTxidHasher : private StaticHasherSalt
-{
-  public:
-    size_t operator()(const uint256& txid) const
-    {
-        return SipHashUint256(k0, k1, txid);
-    }
-};
-
-class SaltedOutpointHasher : private StaticHasherSalt
-{
-  public:
-    size_t operator()(const COutPoint& outpoint) const
-    {
-        return SipHashUint256Extra(k0, k1, outpoint.GetTxId(), outpoint.GetN());
-    }
 };
 
 /**

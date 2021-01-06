@@ -186,6 +186,7 @@ add_library(common
 	scheduler.cpp
 	script/sign.cpp
 	script/standard.cpp
+	txhasher.cpp
 	warnings.cpp
     write_preferring_upgradable_mutex.cpp
 )
