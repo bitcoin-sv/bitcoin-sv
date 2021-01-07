@@ -529,7 +529,7 @@ void getblocktemplate(const Config& config,
                 {
                     CValidationState state;
                     BlockValidationOptions validationOptions =
-                        BlockValidationOptions(false, true);
+                        BlockValidationOptions().withCheckPoW(false);
                     TestBlockValidity(config, state, block, pindexPrev,
                                       validationOptions);
                     result = BIP22ValidationResult(config, state);

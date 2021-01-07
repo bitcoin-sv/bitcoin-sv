@@ -87,7 +87,10 @@ std::unique_ptr<CBlockTemplate> JournalingBlockAssembler::CreateNewBlock(const C
     if(mConfig.GetTestBlockCandidateValidity())
     {
         CValidationState state {};
-        BlockValidationOptions validationOptions { false, false, true };
+        BlockValidationOptions validationOptions = BlockValidationOptions()
+            .withCheckPoW(false)
+            .withCheckMerkleRoot(false)
+            .withMarkChecked(true);
         if(!TestBlockValidity(mConfig, state, *block, pindexPrevNew, validationOptions))
         {
             throw std::runtime_error(strprintf("%s: TestBlockValidity failed: %s",

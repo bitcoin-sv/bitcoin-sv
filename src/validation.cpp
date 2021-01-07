@@ -2944,8 +2944,9 @@ static bool ConnectBlock(
     int64_t nTimeStart = GetTimeMicros();
 
     // Check it again in case a previous version let a bad block in
-    BlockValidationOptions validationOptions =
-        BlockValidationOptions(!fJustCheck, !fJustCheck);
+    BlockValidationOptions validationOptions = BlockValidationOptions()
+        .withCheckPoW(!fJustCheck)
+        .withCheckMerkleRoot(!fJustCheck);
     if (!CheckBlock(config, block, state, pindex->GetHeight(), validationOptions)) {
         return error("%s: Consensus::CheckBlock: %s", __func__,
                      FormatStateMessage(state));
@@ -5706,7 +5707,7 @@ bool VerifyNewBlock(const Config &config,
                     const std::shared_ptr<const CBlock> pblock) {
 
     CValidationState state;
-    BlockValidationOptions validationOptions{false, true};
+    BlockValidationOptions validationOptions = BlockValidationOptions().withCheckPoW(false);
     const CBlockIndex* pindexPrev = FindPreviousBlockIndex(*pblock, state);
     if (!pindexPrev)
     {

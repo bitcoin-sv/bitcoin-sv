@@ -356,16 +356,34 @@ private:
     bool markChecked : 1;
 
 public:
-    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false}
-    {}
-
-    BlockValidationOptions(bool checkPoWIn, bool checkMerkleRootIn, bool markCheckedIn = false)
-        : checkPoW{checkPoWIn}, checkMerkleRoot{checkMerkleRootIn}, markChecked{markCheckedIn}
+    BlockValidationOptions() : checkPoW{true}, checkMerkleRoot{true}, markChecked{false} 
     {}
 
     bool shouldValidatePoW() const { return checkPoW; }
     bool shouldValidateMerkleRoot() const { return checkMerkleRoot; }
     bool shouldMarkChecked() const { return markChecked; }
+
+    [[nodiscard]]
+    BlockValidationOptions withCheckPoW(bool checkPoWIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.checkPoW = checkPoWIn;
+        return option;
+    }
+    [[nodiscard]]
+    BlockValidationOptions withCheckMerkleRoot(bool checkMerkleRootIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.checkMerkleRoot = checkMerkleRootIn;
+        return option;
+    }
+    [[nodiscard]]
+    BlockValidationOptions withMarkChecked(bool markCheckedIn = true) const
+    {
+        BlockValidationOptions option = *this;
+        option.markChecked = markCheckedIn;
+        return option;
+    }
 };
 
 /**
