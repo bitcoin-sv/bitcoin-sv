@@ -304,7 +304,7 @@ namespace {
     size_t EstimateTaskQueueSize(const Config& config)
     {
         // The size of a single transaction data element.
-        static constexpr size_t maxTxDataSize {sizeof(Task)};
+        static constexpr size_t dataSize {sizeof(Task)};
 
         // Additional factor to account for:
         //   - vector capacity being larger than the number of elements;
@@ -315,10 +315,10 @@ namespace {
         // number of transactions in an add or remove task.
         const auto maxTxCount = std::max(config.GetLimitAncestorCount(),
                                          config.GetLimitSecondaryMempoolAncestorCount());
-        assert(maxTxCount < std::numeric_limits<size_t>::max() / maxTxDataSize);
+        assert(maxTxCount < std::numeric_limits<size_t>::max() / dataSize);
 
         // Finally, calculate the queue size, checking for overflow.
-        const auto maxTaskSize = static_cast<size_t>(maxTxCount * maxTxDataSize);
+        const auto maxTaskSize = static_cast<size_t>(maxTxCount * dataSize);
         assert(maxTaskSize < std::numeric_limits<size_t>::max() / sizeFactor);
         return sizeFactor * maxTaskSize;
     }
