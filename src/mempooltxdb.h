@@ -187,10 +187,10 @@ public:
     void Clear();
 
     // Asynchronously add a transaction to the database.
-    void Add(const CTransactionWrapperRef& transactionToAdd);
+    void Add(CTransactionWrapperRef&& transactionToAdd);
 
     // Asynchronously remove a transaction from the database.
-    void Remove(const CMempoolTxDB::TxData& transactionToRemove);
+    void Remove(CMempoolTxDB::TxData&& transactionToRemove);
 
     // Get the size of the data in the database.
     uint64_t GetDiskUsage()

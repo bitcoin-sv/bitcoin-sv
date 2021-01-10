@@ -410,15 +410,15 @@ void CAsyncMempoolTxDB::Clear()
     queue->Synchronize({ClearTask{}}, true);
 }
 
-void CAsyncMempoolTxDB::Add(const CTransactionWrapperRef& transactionToAdd)
+void CAsyncMempoolTxDB::Add(CTransactionWrapperRef&& transactionToAdd)
 {
-    const auto success = queue->PushWait(Task{AddTask{transactionToAdd}});
+    const auto success = queue->PushWait(Task{AddTask{std::move(transactionToAdd)}});
     assert(success && "Push to task queue failed");
 }
 
-void CAsyncMempoolTxDB::Remove(const CMempoolTxDB::TxData& transactionToRemove)
+void CAsyncMempoolTxDB::Remove(CMempoolTxDB::TxData&& transactionToRemove)
 {
-    const auto success = queue->PushWait(Task{RemoveTask{transactionToRemove}});
+    const auto success = queue->PushWait(Task{RemoveTask{std::move(transactionToRemove)}});
     assert(success && "Push to task queue failed");
 }
 

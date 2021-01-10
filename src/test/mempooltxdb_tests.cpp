@@ -447,10 +447,10 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
         txdb.Add(CTestTxMemPoolEntry::GetTxWrapper(e));
     }
 
-    // Remove all transactions from the database at once.
-    for (const auto& td : txdata)
+    // Remove all transactions from the database.
+    for (auto& td : txdata)
     {
-        txdb.Remove(td);
+        txdb.Remove(std::move(td));
     }
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);

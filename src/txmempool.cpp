@@ -1563,7 +1563,8 @@ void CTxMemPool::SaveTxsToDisk(uint64_t requiredSize) {
              mi != mapTx.get<entry_time>().end() && movedToDiskSize < requiredSize;
              ++mi) {
             if (mi->IsInMemory()) {
-                mempoolTxDB->Add(mi->tx);
+                auto tx = mi->tx;
+                mempoolTxDB->Add(std::move(tx));
                 movedToDiskSize += mi->GetTxSize();
             }
         }
