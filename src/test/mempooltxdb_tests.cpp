@@ -416,7 +416,7 @@ BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
     // Write the entries to the database.
     for (const auto& e : entries)
     {
-        txdb.Add(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
+        txdb.Add(CTestTxMemPoolEntry::GetTxWrapper(e));
     }
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
@@ -444,7 +444,7 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
     for (const auto& e : entries)
     {
         txdata.emplace_back(e.GetTxId(), e.GetTxSize());
-        txdb.Add(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
+        txdb.Add(CTestTxMemPoolEntry::GetTxWrapper(e));
     }
 
     // Remove all transactions from the database at once.
@@ -474,7 +474,7 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
     // Write the entries to the database.
     for (const auto& e : entries)
     {
-        txdb.Add(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
+        txdb.Add(CTestTxMemPoolEntry::GetTxWrapper(e));
     }
 
     txdb.Clear();
@@ -499,7 +499,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteCoalesce)
 
     for (const auto& e : entries)
     {
-        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper()});
+        txdb.Add({CTestTxMemPoolEntry::GetTxWrapper(e)});
     }
 
     txdb.Sync();
@@ -530,7 +530,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
 
     for (auto it = entries.begin(); it != middle; ++it)
     {
-        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()});
+        txdb.Add({CTestTxMemPoolEntry::GetTxWrapper(*it)});
     }
     std::shuffle(entries.begin(), middle, generator);
     for (auto it = entries.begin(); it != middle; ++it)
@@ -541,7 +541,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
 
     for (auto it = middle; it != entries.end(); ++it)
     {
-        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()});
+        txdb.Add({CTestTxMemPoolEntry::GetTxWrapper(*it)});
     }
     std::shuffle(middle, entries.end(), generator);
     for (auto it = middle; it != entries.end(); ++it)
@@ -604,7 +604,7 @@ BOOST_AUTO_TEST_CASE(AsyncAutoRemoveXrefKey)
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
-    txdb.Add({CTestTxMemPoolEntry(e).Wrapper()});
+    txdb.Add({CTestTxMemPoolEntry::GetTxWrapper(e)});
     BOOST_CHECK(!txdb.GetXrefKey(xref));
 
     BOOST_CHECK(txdb.SetXrefKey(uuid));
@@ -868,7 +868,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
         testPool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);
         auto it = testPoolAccess.mapTx().find(entry.GetTxId());
         BOOST_REQUIRE(it != testPoolAccess.mapTx().end());
-        CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()->ResetTransaction();
+        CTestTxMemPoolEntry::GetTxWrapper(*it)->ResetTransaction();
         BOOST_CHECK(entry.IsInMemory());
         BOOST_CHECK(!it->IsInMemory());
     }
