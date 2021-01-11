@@ -1192,7 +1192,8 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfiles=<n>",
-        _("Set maximum number of files used by coins leveldb (default: %d). "));
+        strprintf(_("Set maximum number of files used by coins leveldb (default: %d). "),
+                  CoinsDB::MaxFiles::Default().maxFiles));
     strUsage += HelpMessageOpt(
         "-txnvalidationqueuesmaxmemory=<n>",
         strprintf("Set the maximum memory usage for the transaction queues in MB (default: %d). The value may be given in megabytes or with unit (B, kB, MB, GB).",
