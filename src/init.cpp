@@ -371,7 +371,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strUsage += HelpMessageOpt("-maxmempoolsizedisk=<n>",
                                    strprintf(_("Experimental: Additional amount of mempool transactions to keep stored on disk "
                                                "below <n> megabytes (default: -maxmempool x %u). Actual disk usage will "
-                                               "be larger due to leveldb compaction strategy."
+                                               "be larger due to leveldb compaction strategy. "
                                                "The value may be given in megabytes or with unit (B, kB, MB, GB)."),
                                              DEFAULT_MAX_MEMPOOL_SIZE_DISK_FACTOR));
     }
@@ -788,7 +788,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
                       DEFAULT_ANCESTOR_LIMIT));
         strUsage += HelpMessageOpt(
             "-limitcpfpgroupmemberscount=<n>",
-            strprintf("Do not accept transactions if number of in-mempool transactions"
+            strprintf("Do not accept transactions if number of in-mempool transactions "
                       "which we are not willing to mine due to a low fee is <n> or more (default: %u)",
                       DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
@@ -922,7 +922,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
         strprintf(_("Set maximum stack memory usage used for script verification "
                     "we're willing to relay/mine in a single transaction "
                     "(default: %u MB, 0 = unlimited) "
-                    "after Genesis is activated (policy level). The value may be given in bytes or with unit (B, kB, MB, GB)."
+                    "after Genesis is activated (policy level). The value may be given in bytes or with unit (B, kB, MB, GB). "
                     "Must be less or equal to -maxstackmemoryusageconsensus."),
                   DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS/ONE_MEGABYTE));
     strUsage +=
@@ -1245,7 +1245,7 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
 
       strUsage += HelpMessageOpt(
         "-recvinvqueuefactor=<n>",
-        strprintf("Set maximum number of full size inventory messages that we can store for each peer (default %d). Inventory message size can be set with -maxprotocolrecvpayloadlength."
+        strprintf("Set maximum number of full size inventory messages that we can store for each peer (default %d). Inventory message size can be set with -maxprotocolrecvpayloadlength. "
           "Value should be an integer between %d and %d )", DEFAULT_RECV_INV_QUEUE_FACTOR, MIN_RECV_INV_QUEUE_FACTOR, MAX_RECV_INV_QUEUE_FACTOR)); 
     return strUsage;
 }
