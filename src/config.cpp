@@ -362,16 +362,34 @@ uint64_t GlobalConfig::GetDataCarrierSize() const {
     return dataCarrierSize;
 }
 
-void GlobalConfig::SetLimitAncestorCount(uint64_t limitAncestorCountIn) {
-    limitAncestorCount = limitAncestorCountIn;
+bool  GlobalConfig::SetLimitAncestorCount(int64_t limitAncestorCountIn, std::string* err) {
+    if (limitAncestorCountIn <= 0)
+    {
+        if (err)
+        {
+            *err = "The maximal number of the in-mempool ancestors must be greater than 0.";
+        }
+        return false;
+    }
+    limitAncestorCount = static_cast<uint64_t>(limitAncestorCountIn);
+    return true;
 }
 
 uint64_t GlobalConfig::GetLimitAncestorCount() const {
     return limitAncestorCount;
 }
 
-void GlobalConfig::SetLimitSecondaryMempoolAncestorCount(uint64_t limitSecondaryMempoolAncestorCountIn) {
-    limitSecondaryMempoolAncestorCount = limitSecondaryMempoolAncestorCountIn;
+bool GlobalConfig::SetLimitSecondaryMempoolAncestorCount(int64_t limitSecondaryMempoolAncestorCountIn, std::string* err) {
+    if (limitSecondaryMempoolAncestorCountIn <= 1)
+    {
+        if (err)
+        {
+            *err = "The maximal number of the CPFP group members must be greater than 1.";
+        }
+        return false;
+    }
+    limitSecondaryMempoolAncestorCount = static_cast<uint64_t>(limitSecondaryMempoolAncestorCountIn);
+    return true;
 }
 
 uint64_t GlobalConfig::GetLimitSecondaryMempoolAncestorCount()const {
