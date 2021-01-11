@@ -289,27 +289,12 @@ namespace {
 
     struct AddTask
     {
-        std::vector<CTransactionWrapperRef> transactions;
+        CTransactionWrapperRef transaction;
     };
 
     struct RemoveTask
     {
-        std::vector<CMempoolTxDB::TxData> transactions;
-    };
-
-    struct TaskSizeCalculator
-    {
-        size_t operator()(const SyncTask&) const noexcept { return 0; }
-        size_t operator()(const ClearTask&) const noexcept { return 0; }
-        size_t operator()(const InvokeTask&) const noexcept { return 0; }
-        size_t operator()(const AddTask& task) const noexcept
-        {
-            return task.transactions.capacity() * sizeof(decltype(task.transactions)::value_type);
-        }
-        size_t operator()(const RemoveTask& task) const noexcept
-        {
-            return task.transactions.capacity() * sizeof(decltype(task.transactions)::value_type);
-        }
+        CMempoolTxDB::TxData transaction;
     };
 
     using Task = std::variant<ClearTask, SyncTask, InvokeTask, AddTask, RemoveTask>;
@@ -319,9 +304,7 @@ namespace {
     size_t EstimateTaskQueueSize(const Config& config)
     {
         // The size of a single transaction data element.
-        static constexpr size_t maxTxDataSize {
-            std::max(sizeof(decltype(AddTask::transactions)::value_type),
-                     sizeof(decltype(RemoveTask::transactions)::value_type))};
+        static constexpr size_t dataSize {sizeof(Task)};
 
         // Additional factor to account for:
         //   - vector capacity being larger than the number of elements;
@@ -332,10 +315,10 @@ namespace {
         // number of transactions in an add or remove task.
         const auto maxTxCount = std::max(config.GetLimitAncestorCount(),
                                          config.GetLimitSecondaryMempoolAncestorCount());
-        assert(maxTxCount < std::numeric_limits<size_t>::max() / maxTxDataSize);
+        assert(maxTxCount < std::numeric_limits<size_t>::max() / dataSize);
 
         // Finally, calculate the queue size, checking for overflow.
-        const auto maxTaskSize = static_cast<size_t>(maxTxCount * maxTxDataSize);
+        const auto maxTaskSize = static_cast<size_t>(maxTxCount * dataSize);
         assert(maxTaskSize < std::numeric_limits<size_t>::max() / sizeFactor);
         return sizeFactor * maxTaskSize;
     }
@@ -346,8 +329,7 @@ class CAsyncMempoolTxDB::TaskQueue : CThreadSafeQueue<Task>
     // Calculate the actual size of a given task.
     static size_t CalculateTaskSize(const Task& task) noexcept
     {
-        static const TaskSizeCalculator calculator;
-        return sizeof(task) + std::visit(calculator, task);
+        return sizeof(task);
     }
 
 public:
@@ -428,15 +410,15 @@ void CAsyncMempoolTxDB::Clear()
     queue->Synchronize({ClearTask{}}, true);
 }
 
-void CAsyncMempoolTxDB::Add(std::vector<CTransactionWrapperRef>&& transactionsToAdd)
+void CAsyncMempoolTxDB::Add(CTransactionWrapperRef&& transactionToAdd)
 {
-    const auto success = queue->PushWait(Task{AddTask{std::move(transactionsToAdd)}});
+    const auto success = queue->PushWait(Task{AddTask{std::move(transactionToAdd)}});
     assert(success && "Push to task queue failed");
 }
 
-void CAsyncMempoolTxDB::Remove(std::vector<CMempoolTxDB::TxData>&& transactionsToRemove)
+void CAsyncMempoolTxDB::Remove(CMempoolTxDB::TxData&& transactionToRemove)
 {
-    const auto success = queue->PushWait(Task{RemoveTask{std::move(transactionsToRemove)}});
+    const auto success = queue->PushWait(Task{RemoveTask{std::move(transactionToRemove)}});
     assert(success && "Push to task queue failed");
 }
 
@@ -554,25 +536,20 @@ void CAsyncMempoolTxDB::Work()
     //       removed from it.
     const auto add = [&batch](const AddTask& task)
     {
-        for (const auto& wrapper : task.transactions)
+        const auto& wrapper = task.transaction;
+        if (const auto tx = wrapper->GetInMemoryTx())
         {
-            if (const auto tx = wrapper->GetInMemoryTx())
-            {
-                batch.Add(tx,
-                          [wrapper](const TxId&) {
-                              wrapper->ResetTransaction();
-                          });
-            }
+            batch.Add(tx,
+                      [wrapper](const TxId&) {
+                          wrapper->ResetTransaction();
+                      });
         }
     };
 
     // Remove transactions from the database.
     const auto remove = [&batch](const RemoveTask& task)
     {
-        for (const auto& txdata : task.transactions)
-        {
-            batch.Remove(txdata.txid, txdata.size);
-        }
+        batch.Remove(task.transaction.txid, task.transaction.size);
     };
 
     const auto dispatcher {dispatch{sync, clear, invoke, add, remove}};

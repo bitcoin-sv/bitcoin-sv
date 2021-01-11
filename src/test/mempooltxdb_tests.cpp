@@ -414,13 +414,10 @@ BOOST_AUTO_TEST_CASE(AsyncWriteToTxDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    std::vector<CTransactionWrapperRef> wrappers;
     for (const auto& e : entries)
     {
-        wrappers.emplace_back(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
+        txdb.Add(CTestTxMemPoolEntry::GetTxWrapper(e));
     }
-
-    txdb.Add(std::move(wrappers));
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), totalSize(entries));
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), entries.size());
@@ -444,16 +441,17 @@ BOOST_AUTO_TEST_CASE(AsyncDeleteFromTxDB)
 
     // Write the entries to the database.
     std::vector<CMempoolTxDB::TxData> txdata;
-    std::vector<CTransactionWrapperRef> wrappers;
     for (const auto& e : entries)
     {
         txdata.emplace_back(e.GetTxId(), e.GetTxSize());
-        wrappers.emplace_back(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
+        txdb.Add(CTestTxMemPoolEntry::GetTxWrapper(e));
     }
-    txdb.Add(std::move(wrappers));
 
-    // Remove all transactions from the database at once.
-    txdb.Remove(std::move(txdata));
+    // Remove all transactions from the database.
+    for (auto& td : txdata)
+    {
+        txdb.Remove(std::move(td));
+    }
     txdb.Sync();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
@@ -474,13 +472,11 @@ BOOST_AUTO_TEST_CASE(AsyncClearDB)
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
 
     // Write the entries to the database.
-    std::vector<CTransactionWrapperRef> wrappers;
     for (const auto& e : entries)
     {
-        wrappers.emplace_back(CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper());
+        txdb.Add(CTestTxMemPoolEntry::GetTxWrapper(e));
     }
 
-    txdb.Add(std::move(wrappers));
     txdb.Clear();
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
     BOOST_CHECK_EQUAL(txdb.GetTxCount(), 0);
@@ -503,7 +499,7 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteCoalesce)
 
     for (const auto& e : entries)
     {
-        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(e)).Wrapper()});
+        txdb.Add({CTestTxMemPoolEntry::GetTxWrapper(e)});
     }
 
     txdb.Sync();
@@ -534,23 +530,23 @@ BOOST_AUTO_TEST_CASE(AsyncMultiWriteRemoveCoalesce)
 
     for (auto it = entries.begin(); it != middle; ++it)
     {
-        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()});
+        txdb.Add({CTestTxMemPoolEntry::GetTxWrapper(*it)});
     }
     std::shuffle(entries.begin(), middle, generator);
     for (auto it = entries.begin(); it != middle; ++it)
     {
-        txdb.Remove({{it->GetTxId(), it->GetTxSize()}});
+        txdb.Remove({it->GetTxId(), it->GetTxSize()});
     }
     txdb.Sync();
 
     for (auto it = middle; it != entries.end(); ++it)
     {
-        txdb.Add({CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()});
+        txdb.Add({CTestTxMemPoolEntry::GetTxWrapper(*it)});
     }
     std::shuffle(middle, entries.end(), generator);
     for (auto it = middle; it != entries.end(); ++it)
     {
-        txdb.Remove({{it->GetTxId(), it->GetTxSize()}});
+        txdb.Remove({it->GetTxId(), it->GetTxSize()});
     }
     txdb.Sync();
 
@@ -608,12 +604,12 @@ BOOST_AUTO_TEST_CASE(AsyncAutoRemoveXrefKey)
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
-    txdb.Add({CTestTxMemPoolEntry(e).Wrapper()});
+    txdb.Add({CTestTxMemPoolEntry::GetTxWrapper(e)});
     BOOST_CHECK(!txdb.GetXrefKey(xref));
 
     BOOST_CHECK(txdb.SetXrefKey(uuid));
     BOOST_CHECK(txdb.GetXrefKey(xref));
-    txdb.Remove({{e.GetTxId(), e.GetTxSize()}});
+    txdb.Remove({e.GetTxId(), e.GetTxSize()});
     BOOST_CHECK(!txdb.GetXrefKey(xref));
     BOOST_CHECK_EQUAL(txdb.GetDiskUsage(), 0);
 }
@@ -849,13 +845,11 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
     testPoolAccess.OpenMempoolTxDB();
 
     // Add transactions to the database that are not in the mempool.
-    std::vector<CTransactionWrapperRef> wrappers;
     for (const auto& entry : entries)
     {
         // Create a copy of the transaction wrapper because Add() marks them as saved.
-        wrappers.emplace_back(std::make_shared<CTransactionWrapper>(entry.GetSharedTx(), nullptr));
+        testPoolAccess.mempoolTxDB()->Add(std::make_shared<CTransactionWrapper>(entry.GetSharedTx(), nullptr));
     }
-    testPoolAccess.mempoolTxDB()->Add(std::move(wrappers));
     testPoolAccess.SyncWithMempoolTxDB();
     BOOST_CHECK_EQUAL(testPool.Size(), 0);
     BOOST_CHECK_GT(testPool.GetDiskUsage(), 0);
@@ -874,7 +868,7 @@ BOOST_AUTO_TEST_CASE(CheckMempoolTxDB)
         testPool.AddUnchecked(entry.GetTxId(), entry, TxStorage::memory, nullChangeSet);
         auto it = testPoolAccess.mapTx().find(entry.GetTxId());
         BOOST_REQUIRE(it != testPoolAccess.mapTx().end());
-        CTestTxMemPoolEntry(const_cast<CTxMemPoolEntry&>(*it)).Wrapper()->ResetTransaction();
+        CTestTxMemPoolEntry::GetTxWrapper(*it)->ResetTransaction();
         BOOST_CHECK(entry.IsInMemory());
         BOOST_CHECK(!it->IsInMemory());
     }

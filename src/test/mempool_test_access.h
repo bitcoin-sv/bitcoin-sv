@@ -134,7 +134,10 @@ template<> struct CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>
     auto& group() {return entry.group;};
     auto& groupingData() {return entry.groupingData;};
 
-    CTransactionWrapperRef& Wrapper() { return entry.tx; }
+    static CTransactionWrapperRef GetTxWrapper(const CTxMemPoolEntry& entry)
+    {
+        return entry.tx;
+    }
 };
 
 using CTestTxMemPoolEntry = CTxMemPoolEntry::UnitTestAccess<UnitTestAccessTag>;
