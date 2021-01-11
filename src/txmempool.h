@@ -13,6 +13,7 @@
 #include "primitives/transaction.h"
 #include "sync.h"
 #include "time_locked_mempool.h"
+#include "txhasher.h"
 #include "tx_mempool_info.h"
 #include "txn_validation_data.h"
 #include "policy/policy.h"

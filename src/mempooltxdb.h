@@ -6,6 +6,7 @@
 #define BITCOIN_MEMPOOLTXDB_H
 
 #include "dbwrapper.h"
+#include "txhasher.h"
 #include "tx_mempool_info.h"
 
 #include <boost/uuid/uuid.hpp>
