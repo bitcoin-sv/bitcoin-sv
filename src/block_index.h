@@ -301,7 +301,7 @@ private:
     unsigned int nChainTx{ 0 };
 
     //! Verification status of this block. See enum BlockStatus
-    BlockStatus nStatus;
+    mutable BlockStatus nStatus;
 
     //! block header
     int32_t nVersion{ 0 };
@@ -749,7 +749,7 @@ public:
                             const Config &config) const;
 
     void SetBlockIndexFileMetaDataIfNotSet(
-        CDiskBlockMetaData&& metadata);
+        CDiskBlockMetaData&& metadata) const;
 
     std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
                             bool calculateDiskBlockMetadata=false) const;
@@ -758,13 +758,13 @@ public:
     std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
                             const Config &config, bool calculateDiskBlockMetadata=false) const;
 
-    BlockStreamAndMetaData StreamBlockFromDisk(int networkVersion);
+    BlockStreamAndMetaData StreamBlockFromDisk(int networkVersion) const;
 
-    std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk();
+    std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk() const;
 
     friend class CDiskBlockIndex;
 protected:
-    CDiskBlockMetaData mDiskBlockMetaData;
+    mutable CDiskBlockMetaData mDiskBlockMetaData;
 
     /**
      * If >=0, this block is considered soft rejected. Value specifies number of descendants
@@ -846,10 +846,10 @@ private:
     }
 
     bool PopulateBlockIndexBlockDiskMetaDataNL(FILE* file,
-                            int networkVersion);
+                            int networkVersion) const;
 
     void SetBlockIndexFileMetaDataIfNotSetNL(
-        CDiskBlockMetaData&& metadata);
+        CDiskBlockMetaData&& metadata) const;
 
     CDiskBlockPos GetUndoPosNL() const
     {
@@ -931,7 +931,7 @@ private:
     //! Build the skiplist pointer for this entry.
     void BuildSkipNL();
 
-    void SetDiskBlockMetaData( CDiskBlockMetaData&& meta )
+    void SetDiskBlockMetaData( CDiskBlockMetaData&& meta ) const
     {
         assert( !meta.IsNull() );
 

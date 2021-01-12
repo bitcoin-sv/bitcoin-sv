@@ -223,7 +223,7 @@ bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
 }
 
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
-    CDiskBlockMetaData&& metadata)
+    CDiskBlockMetaData&& metadata) const
 {
     LOCK(cs_main);
     if (!nStatus.hasDiskBlockMetaData())
@@ -235,12 +235,14 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
         }
         LogPrintf("Setting block index file metadata for block %s\n", GetBlockHash().ToString());
         SetDiskBlockMetaData(std::move(metadata));
-        setDirtyBlockIndex.insert(this);
+
+        // TODO: this const_cast will be removed in the following commits along with inserting into setDirtyBlockIndex
+        setDirtyBlockIndex.insert(const_cast<CBlockIndex*>(this));
     }
 }
 
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSet(
-    CDiskBlockMetaData&& metadata)
+    CDiskBlockMetaData&& metadata) const
 {
     std::lock_guard lock{ blockIndexMutex };
     SetBlockIndexFileMetaDataIfNotSetNL(std::move(metadata));
@@ -296,7 +298,7 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStream
 
 bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
     FILE* file,
-    int networkVersion)
+    int networkVersion) const
 {
     CBlockStream stream{
         CNonOwningFileReader{file},
@@ -327,7 +329,7 @@ bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
     return true;
 }
 auto CBlockIndex::StreamBlockFromDisk(
-    int networkVersion)
+    int networkVersion) const
     -> BlockStreamAndMetaData
 {
     std::lock_guard lock{ blockIndexMutex };
@@ -361,7 +363,7 @@ auto CBlockIndex::StreamBlockFromDisk(
         };
 }
 
-std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk()
+std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk() const
 {
     std::lock_guard lock{ blockIndexMutex };
     UniqueCFile file{ BlockFileAccess::OpenBlockFile(GetBlockPosNL()) };
