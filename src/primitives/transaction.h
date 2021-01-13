@@ -10,6 +10,7 @@
 #include "script/script.h"
 #include "serialize.h"
 #include "uint256.h"
+#include <optional>
 
 struct TxId;
 /**
@@ -20,15 +21,15 @@ namespace std
     template<> class hash<TxId> : public hash<uint256> {};
 }
 
-static const int SERIALIZE_TRANSACTION = 0x00;
-
 /**
  * A TxId is the identifier of a transaction. Currently identical to TxHash but
  * differentiated for type safety.
  */
 struct TxId : public uint256 {
-    TxId() {}
-    explicit TxId(const uint256 &b) : uint256(b) {}
+    TxId() = default;
+    explicit TxId(const uint256 &b) : uint256{b} {}
+    TxId(const TxId& b) = default;
+    TxId& operator=(const TxId& b) = default;
 };
 
 /**
@@ -314,14 +315,6 @@ public:
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
-    // Compute priority, given priority of inputs and (optionally) tx size
-    double ComputePriority(double dPriorityInputs,
-                           unsigned int nTxSize = 0) const;
-
-    // Compute modified tx size for priority calculation (optionally given tx
-    // size)
-    unsigned int CalculateModifiedSize(unsigned int nTxSize = 0) const;
-
     /**
      * Get the total transaction size in bytes.
      * @return Total transaction size in bytes
@@ -385,7 +378,8 @@ public:
     }
 };
 
-typedef std::shared_ptr<const CTransaction> CTransactionRef;
+using CTransactionRef = std::shared_ptr<const CTransaction>;
+using CWeakTransactionRef = std::weak_ptr<const CTransaction>;
 static inline CTransactionRef MakeTransactionRef() {
     return std::make_shared<const CTransaction>();
 }

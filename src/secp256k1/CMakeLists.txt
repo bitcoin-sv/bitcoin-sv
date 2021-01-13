@@ -98,6 +98,7 @@ endfunction(link_secp256k1_internal)
 # Phony target to build benchmarks
 if (NOT MSVC)
 	add_custom_target(bench-secp256k1)
+	add_dependencies(check bench-secp256k1)
 endif()
 
 function(add_secp256k1_bench NAME)
@@ -129,6 +130,14 @@ if(SECP256K1_ENABLE_MODULE_MULTISET)
     set(ENABLE_MODULE_MULTISET 1)
 	add_secp256k1_bench(bench_multiset src/bench_multiset.c)
 endif()
+
+# Enable secp256k1's efficiently computable endomorphism
+option(SECP256K1_ENABLE_ENDOMORPHISM "Enable secp256k1's efficiently computable endomorphism" ON)
+if(SECP256K1_ENABLE_ENDOMORPHISM)
+	set(USE_ENDOMORPHISM 1)
+endif()
+
+
 
 # Static precomputation for eliptic curve mutliplication
 option(SECP256K1_ECMULT_STATIC_PRECOMPUTATION "Precompute libsecp256k1's eliptic curve mutliplication tables" ON)

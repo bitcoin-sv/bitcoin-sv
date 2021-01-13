@@ -4,12 +4,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "primitives/block.h"
-
 #include "crypto/common.h"
 #include "hash.h"
 #include "script/script_num.h"
 #include "tinyformat.h"
-#include "utilstrencodings.h"
 
 uint256 CBlockHeader::GetHash() const {
     return SerializeHash(*this);
@@ -51,7 +49,7 @@ size_t CBlock::GetSizeWithoutCoinbase()
     return size;
 }
 
-uint64_t CBlock::GetHeightFromCoinbase()
+int32_t CBlock::GetHeightFromCoinbase()
     const // Returns the block's height as specified in its coinbase transaction
 {
     const CScript &sig = vtx[0]->vin[0].scriptSig;

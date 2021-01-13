@@ -10,7 +10,9 @@
 #ifndef BITCOIN_PROTOCOL_H
 #define BITCOIN_PROTOCOL_H
 
+#include "consensus/consensus.h"
 #include "net/netaddress.h"
+#include "net/net_types.h"
 #include "serialize.h"
 #include "uint256.h"
 #include "version.h"
@@ -22,10 +24,11 @@
 class Config;
 
 /**
- * Maximum length of incoming protocol messages (Currently 2MiB).
+ * Default maximum length of incoming protocol messages set to 2MiB.
+ * It is used if 'maxprotocolrecvpayloadlength' parameter is not provided.
  * NB: Messages propagating block content are not subject to this limit.
  */
-static const unsigned int MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
+static const unsigned int DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
 
 /**
  * By default, size of messages to other peers are limited by this default value.
@@ -35,11 +38,27 @@ static const unsigned int MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = 2 * 1024 * 1024;
 static const unsigned int LEGACY_MAX_PROTOCOL_PAYLOAD_LENGTH = 1 * 1024 * 1024;
 
 /**
- * Maximum size of message that can be send to peer.
- * If a peer sends Protoconf message with maxRecvPayloadLength larger than MAX_PROTOCOL_SEND_PAYLOAD_LENGTH,
- * this peer's maxRecvPayloadLength is set to this value.
+ * Maximal protocol recv payload length allowed to set by 'maxprotocolrecvpayloadlength' parameter
+ */
+static const uint64_t MAX_PROTOCOL_RECV_PAYLOAD_LENGTH = ONE_GIGABYTE;
+
+/**
+ * We limit maximum size of message that can be send to peer to be MAX_PROTOCOL_SEND_PAYLOAD_FACTOR times
+ * the size of the maximum size of message that we can recieve (DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH or set by maxprotocolrecvpayloadlength parameter).
 **/
-static const unsigned int MAX_PROTOCOL_SEND_PAYLOAD_LENGTH = 2 * MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+static const unsigned int MAX_PROTOCOL_SEND_PAYLOAD_FACTOR = 4;
+
+/**
+ * Maximum number of received full size inventory messages to be queued at once.
+ * Maximum size of received inventory messages is set by 'maxprotocolrecvpayloadlength' parameter
+ */
+static const unsigned int DEFAULT_RECV_INV_QUEUE_FACTOR = 3;
+
+/**
+ * Maximal and minimal factors of full size inventory messages allowed to be stored.
+ */
+static const unsigned int MAX_RECV_INV_QUEUE_FACTOR = 10;
+static const unsigned int MIN_RECV_INV_QUEUE_FACTOR = 1;
 
 /**
  * Message header.
@@ -69,7 +88,6 @@ public:
 
     std::string GetCommand() const;
     bool IsValid(const Config &config) const;
-    bool IsValidWithoutConfig(const MessageMagic &magic) const;
     bool IsOversized(const Config &config) const;
 
     ADD_SERIALIZE_METHODS;
@@ -271,6 +289,16 @@ extern const char *BLOCKTXN;
  * Sent right after VERACK message, regardless of remote peer's protocol version
  */
 extern const char *PROTOCONF;
+/**
+ * The createstream message is for setting up a new stream within an existing
+ * association.
+ */
+extern const char *CREATESTREAM;
+/**
+ * The streamack message is an acknowledgement that a previously requested
+ * attempt to setup a new stream has been successful.
+ */
+extern const char *STREAMACK;
 
 /**
  * Indicate if the message is used to transmit the content of a block.
@@ -440,14 +468,19 @@ public:
 
 /** protoconf message data **/
 class CProtoconf {
+    // Maximum number of named stream policies
+    static constexpr size_t MAX_NUM_STREAM_POLICIES {10};
 
 public:
-    uint64_t numberOfFields;
-    uint32_t maxRecvPayloadLength;
+    /** numberOfFields is set to 2, increment if new properties are added **/
+    uint64_t numberOfFields {2};
+    uint32_t maxRecvPayloadLength {0};
+    std::string streamPolicies {};
 public:
-    CProtoconf() : numberOfFields(1), maxRecvPayloadLength(0) {}
-    /** numberOfFields is set to 1, increment if new properties are added **/
-    CProtoconf(unsigned int maxRecvPayloadLengthIn) : numberOfFields(1), maxRecvPayloadLength(maxRecvPayloadLengthIn) {}
+    CProtoconf() = default;
+    CProtoconf(unsigned int maxRecvPayloadLengthIn, const std::string& streamPoliciesIn)
+    : numberOfFields{2}, maxRecvPayloadLength{maxRecvPayloadLengthIn}, streamPolicies{streamPoliciesIn}
+    {}
 
     ADD_SERIALIZE_METHODS;
     template <typename Stream, typename Operation>
@@ -455,6 +488,9 @@ public:
         READWRITECOMPACTSIZE(numberOfFields);
         if (numberOfFields > 0) {
             READWRITE(maxRecvPayloadLength);
+            if(numberOfFields > 1) {
+                READWRITE(LIMITED_STRING(streamPolicies, (MAX_STREAM_POLICY_NAME_LENGTH + 1) * MAX_NUM_STREAM_POLICIES));
+            }
         } else {
             throw std::ios_base::failure("Invalid deserialization. Number of fields specified in protoconf is equal to 0.");
         }

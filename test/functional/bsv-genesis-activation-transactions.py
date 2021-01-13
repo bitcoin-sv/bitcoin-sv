@@ -17,13 +17,11 @@ Genesis height is 104.
 7. Create and send transaction tx4 with OP_TRUE in the unlocking that tries to spend tx3 (height 104).
 8. Mine block (height 104). It should contain new transactions tx3 and tx4.
 """
-from test_framework.test_framework import ComparisonTestFramework
+from test_framework.test_framework import ComparisonTestFramework, wait_until
 from test_framework.script import CScript, OP_RETURN, OP_TRUE
 from test_framework.blocktools import create_transaction, prepare_init_chain
-from test_framework.util import assert_equal, p2p_port
-from test_framework.comptool import TestManager, TestInstance, RejectResult
+from test_framework.util import assert_equal, check_for_log_msg
 from test_framework.mininode import msg_tx
-from time import sleep
 
 class BSVGenesisActivationTransactions(ComparisonTestFramework):
 
@@ -55,7 +53,7 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         tx1 = create_transaction(out[1].tx, out[1].n, b"", 100000, CScript([OP_RETURN]))
         self.test.connections[0].send_message(msg_tx(tx1))
         # wait for transaction processing
-        sleep(1)
+        wait_until(lambda: tx1.hash in self.nodes[0].getrawmempool(), timeout=10)
         # Mine block (height 102) with new transaction.
         self.nodes[0].generate(1)
         # Obtain newly mined block. It should contain new transaction tx1.
@@ -68,8 +66,8 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         # Create transaction with OP_TRUE in the unlocking that tries to spend tx1.
         tx2 = create_transaction(tx1, 0, b'\x51', 1, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(tx2))
-        # wait for transaction processing
-        sleep(1)
+        # wait for tx to be orphaned
+        wait_until(lambda: check_for_log_msg(self, "stored orphan txn= " + tx2.hash, "/node0"))
         # Mine block (height 103).
         self.nodes[0].generate(1)
         # Obtain newly mined block. It should NOT contain new transaction tx2.
@@ -84,8 +82,10 @@ class BSVGenesisActivationTransactions(ComparisonTestFramework):
         # Create transaction with OP_TRUE in the unlocking that tries to spend tx3.
         tx4 = create_transaction(tx3, 0, b'\x51', 1, CScript([OP_TRUE]))
         self.test.connections[0].send_message(msg_tx(tx4))
-        # wait for transaction processing
-        sleep(1)
+        # Make sure transactions are in mempool
+        wait_until(lambda: len(self.nodes[0].getrawmempool()) >= 2, timeout=10)
+        assert({tx3.hash, tx4.hash} == set(self.nodes[0].getrawmempool()))
+
         # Mine block (height 104) with new transactions.
         self.nodes[0].generate(1)
         # Obtain newly mined block. It should contain new transactions tx3 and tx4.

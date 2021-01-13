@@ -35,8 +35,7 @@ protected:
     void TransactionAddedToMempool(const CTransactionRef &tx) override;
     void TransactionRemovedFromMempool(const uint256& txid,
                                        MemPoolRemovalReason reason,
-                                       const CTransaction* conflictedWith,
-                                       const uint256* blockhash) override;
+                                       const CTransactionConflict& conflictedWith) override;
     void TransactionRemovedFromMempoolBlock(const uint256& txid,
                                             MemPoolRemovalReason reason) override;
     void

@@ -12,7 +12,7 @@ class CBlockIndex;
 class CZMQAbstractPublishNotifier : public CZMQAbstractNotifier {
 private:
     //!< upcounting per message sequence number
-    uint32_t nSequence;
+    std::atomic<uint32_t> nSequence{0};
 
     std::shared_ptr<CZMQPublisher> zmqPublisher;
 
@@ -43,7 +43,7 @@ class CZMQPublishRemovedFromMempoolNotifier : public CZMQAbstractPublishNotifier
 {
 public:
     bool NotifyRemovedFromMempool(const uint256& txid, const MemPoolRemovalReason reason,
-                                  const CTransaction* conflictedWith, const uint256* blockhash) override;
+                                  const CTransactionConflict& conflictedWith) override;
 };
 
 class CZMQPublishRemovedFromMempoolBlockNotifier : public CZMQAbstractPublishNotifier

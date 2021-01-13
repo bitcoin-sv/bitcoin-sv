@@ -5,11 +5,8 @@
 
 #include "script/standard.h"
 #include "script/script_num.h"
-
 #include "pubkey.h"
 #include "script/script.h"
-#include "util.h"
-#include "utilstrencodings.h"
 #include "int_serialization.h"
 
 typedef std::vector<uint8_t> valtype;
@@ -109,8 +106,8 @@ bool Solver(const CScript &scriptPubKey,
 
     // Scan templates
     const CScript &script1 = scriptPubKey;
-    for (const std::pair<txnouttype, CScript> &tplate : mTemplates) {
-        const CScript &script2 = tplate.second;
+    for (const auto &[tp_outtype, tp_script]  : mTemplates) {
+        const CScript &script2 = tp_script;
         vSolutionsRet.clear();
 
         opcodetype opcode1, opcode2;
@@ -122,7 +119,7 @@ bool Solver(const CScript &scriptPubKey,
         while (true) {
             if (pc1 == script1.end() && pc2 == script2.end()) {
                 // Found a match
-                typeRet = tplate.first;
+                typeRet = tp_outtype;
                 if (typeRet == TX_MULTISIG) {
                     // we check minimal encoding before calling CScriptNum to prevent exception throwing in CScriptNum constructor.
                     // This output will then be unspendable because EvalScript will fail execution of such script

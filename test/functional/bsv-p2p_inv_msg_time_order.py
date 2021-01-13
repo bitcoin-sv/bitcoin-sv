@@ -38,6 +38,7 @@ class P2PInvMsgTimeOrder(BitcoinTestFramework):
             connection = p2pc[0]
             connection2 = p2pc[1]
 
+            # protected by mininode_lock
             txinvs = []
 
             # Append txinv
@@ -74,10 +75,11 @@ class P2PInvMsgTimeOrder(BitcoinTestFramework):
 
             # Due to asynchronous validation we can not expect that an order of receiving transactions is the same as order of sending.
             for txid in transaction_list_by_time:
-                wait_until(lambda:  txid in txinvs, timeout=20)
+                wait_until(lambda:  txid in txinvs, lock=mininode_lock, timeout=20)
 
-            # Assert the number of received transactions is the same as the number of sent transactions.
-            assert_equal(len(transaction_list_by_time), len(txinvs))
+            with mininode_lock:
+                # Assert the number of received transactions is the same as the number of sent transactions.
+                assert_equal(len(transaction_list_by_time), len(txinvs))
 
     def run_test(self):
         self.run_test_parametrized()

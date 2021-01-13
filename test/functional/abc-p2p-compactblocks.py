@@ -60,13 +60,11 @@ class FullBlockTest(ComparisonTestFramework):
         self.setup_clean_chain = True
         # excessive_block_size needs to be > generated block size
         self.excessive_block_size = 64 * ONE_MEGABYTE
-        self.extra_args = [['-norelaypriority',
+        self.extra_args = [['-minrelaytxfee=0',
                             '-whitelist=127.0.0.1',
                             '-limitancestorcount=999999',
-                            '-limitancestorsize=999999',
-                            '-limitdescendantcount=999999',
-                            '-limitdescendantsize=999999',
                             '-maxmempool=99999',
+                            '-maxmempoolsizedisk=0',
                             "-excessiveblocksize=%d"
                             % self.excessive_block_size]]
 
@@ -74,6 +72,11 @@ class FullBlockTest(ComparisonTestFramework):
         super().add_options(parser)
         parser.add_option(
             "--runbarelyexpensive", dest="runbarelyexpensive", default=True)
+
+    def add_node(self, i, extra_args, rpchost=None, timewait=None, binary=None, init_data_dir=False):
+        # RPC timeout needs to be high because in debug build invalidateblock can take >90s to complete
+        timewait=150
+        return super().add_node(i, extra_args, rpchost, timewait, binary, init_data_dir)
 
     def run_test(self):
         self.nodes[0].setexcessiveblock(self.excessive_block_size)

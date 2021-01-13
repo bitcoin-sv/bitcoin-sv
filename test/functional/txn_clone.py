@@ -119,6 +119,8 @@ class TxnMallTest(BitcoinTestFramework):
         # ... mine a block...
         self.nodes[2].generate(1)
 
+        # Before connecting node1 and node2, wait for node1 to relay all previous transactions
+        wait_for_txn_propagator(self.nodes[1])
         # Reconnect the split network, and sync chain:
         connect_nodes(self.nodes[1], 2)
         self.nodes[2].sendrawtransaction(fund_bar_tx["hex"])

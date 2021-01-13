@@ -3,49 +3,66 @@
 
 #pragma once
 
-#include <txmempool.h>
+#include "tx_mempool_info.h"
+
+class CTxMemPoolEntry;
 
 namespace mining
 {
 
 /**
+ * \class GroupID
+ *
+ * GroupID identifies consecutive transactions in the journal that belong to
+ * the same CPFP group that should all be mined in the same block.
+ *
+ * The block assembler should not accept a partial group into the block template.
+ */
+using GroupID = std::optional<uint64_t>;
+
+/**
 * What we actually store for each journal entry.
-* Contains a pointer to the transaction itself, ancestor count information,
-* and fee/sigops accounting details.
+* Contains a pointer to the transaction itself, group id and fee accounting details.
 */
 class CJournalEntry
 {
   public:
 
     // Constructors
-    CJournalEntry(const CTransactionRef& txn, const AncestorDescendantCountsPtr& count,
-                  const Amount& fee, int64_t sigOps)
-    : mTxn{txn}, mAncestorCount{count}, mFee{fee}, mSigOpsCount{sigOps}
-    {}
+    CJournalEntry(const CTransactionWrapperRef& txn,
+                  uint64_t txnSize,
+                  const Amount& fee,
+                  GroupID groupId,
+                  bool isCpfpGroupPayingTx);
+    explicit CJournalEntry(const CTxMemPoolEntry& entry);
 
-    CJournalEntry(const CTxMemPoolEntry& entry)
-    : CJournalEntry{entry.GetSharedTx(), entry.GetAncestorDescendantCounts(), entry.GetFee(),
-                    entry.GetSigOpCount()}
-    {}
-
-    // Accessors
-    const CTransactionRef& getTxn() const { return mTxn; }
-    const AncestorDescendantCountsPtr& getAncestorCount() const { return mAncestorCount; }
+    // accessors
+    const CTransactionWrapperRef& getTxn() const { return mTxn; }
+    uint64_t getTxnSize() const { return mTxnSize; }
     const Amount& getFee() const { return mFee; }
-    int64_t getSigOpsCount() const { return mSigOpsCount; }
-    const TxId GetTxId() const {return mTxn->GetId(); }
+
+    // Which group of transactions if any does this entry belong to
+    const GroupID& getGroupId() const { return mGroupId; }
+
+    // Is this the paying transaction of its group (if any)
+    bool isPaying() const { return isCpfpPayingTx; }
 
   private:
 
-    // Shared pointer to the transaction itself
-    CTransactionRef mTxn {};
+    // Shared pointer to the transaction wrapper
+    CTransactionWrapperRef mTxn {};
 
-    // Shared pointer to the ancestor count information
-    AncestorDescendantCountsPtr mAncestorCount {};
+    // Transaction size.
+    uint64_t mTxnSize;
 
-    // Fee and sig ops count for the transaction
+    // Fee for the transaction
     Amount mFee {0};
-    int64_t mSigOpsCount {0};
+
+    // Group id for the transaction
+    GroupID mGroupId {};
+
+    // is groups paying transaction
+    bool isCpfpPayingTx;
 };
 
 }

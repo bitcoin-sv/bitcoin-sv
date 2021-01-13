@@ -126,7 +126,7 @@ void WalletTxToJSON(const CWalletTx &wtx, UniValue &entry) {
     entry.push_back(Pair("time", wtx.GetTxTime()));
     entry.push_back(Pair("timereceived", (int64_t)wtx.nTimeReceived));
 
-    for (const std::pair<std::string, std::string> &item : wtx.mapValue) {
+    for (const auto& item : wtx.mapValue) {
         entry.push_back(Pair(item.first, item.second));
     }
 }
@@ -419,11 +419,8 @@ static UniValue getaddressesbyaccount(const Config &config,
 
     // Find all addresses that have the given account
     UniValue ret(UniValue::VARR);
-    for (const std::pair<CTxDestination, CAddressBookData> &item :
-         pwallet->mapAddressBook) {
-        const CTxDestination &dest = item.first;
-        const std::string &strName = item.second.name;
-        if (strName == strAccount) {
+    for (const auto &[dest, addressBookData] : pwallet->mapAddressBook) {
+        if (addressBookData.name == strAccount) {
             ret.push_back(EncodeDestination(dest));
         }
     }
@@ -762,9 +759,7 @@ static UniValue getreceivedbyaddress(const Config &config,
 
     // Tally
     Amount nAmount(0);
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
-        const CWalletTx &wtx = pairWtx.second;
-
+    for (const auto &[hash_dummy, wtx] : pwallet->mapWallet) {
         CValidationState state;
         if (wtx.IsCoinBase() ||
             !ContextualCheckTransactionForCurrentBlock(
@@ -837,7 +832,7 @@ static UniValue getreceivedbyaccount(const Config &config,
 
     // Tally
     Amount nAmount(0);
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         const CWalletTx &wtx = pairWtx.second;
         CValidationState state;
         if (wtx.IsCoinBase() ||
@@ -1211,8 +1206,8 @@ static UniValue sendmany(const Config &config, const JSONRPCRequest &request) {
             "\nAs a json rpc call\n" +
             HelpExampleRpc("sendmany",
                            "\"\", "
-                           "\"{\\\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\\\":0.01,"
-                           "\\\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\\\":0.02}\","
+                           "{\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\":0.01,"
+                           "\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\":0.02},"
                            " 6, \"testing\""));
     }
 
@@ -1355,8 +1350,8 @@ static UniValue addmultisigaddress(const Config &config,
             "\nAs json rpc call\n" +
             HelpExampleRpc("addmultisigaddress",
                            "2, "
-                           "\"[\\\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\\\","
-                           "\\\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\\\"]\"");
+                           "[\"16sSauSf5pF2UkUwvKGq4qjNRzBZYqgEL5\","
+                           "\"171sgjn4YtPu27adkKGrdDwzRTxnRkBfKV\"]");
         throw std::runtime_error(msg);
     }
 
@@ -1393,7 +1388,7 @@ static UniValue ListReceived(
     CWallet *const pwallet,
     const UniValue &params,
     bool fByAccounts,
-    int nChainActiveHeight,
+    int32_t nChainActiveHeight,
     int nMedianTimePast) {
 
     // Minimum confirmations
@@ -1415,7 +1410,7 @@ static UniValue ListReceived(
 
     // Tally
     std::map<CTxDestination, tallyitem> mapTally;
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         const CWalletTx &wtx = pairWtx.second;
 
         CValidationState state;
@@ -1458,10 +1453,7 @@ static UniValue ListReceived(
     // Reply
     UniValue ret(UniValue::VARR);
     std::map<std::string, tallyitem> mapAccountTally;
-    for (const std::pair<CTxDestination, CAddressBookData> &item :
-         pwallet->mapAddressBook) {
-        const CTxDestination &dest = item.first;
-        const std::string &strAccount = item.second.name;
+    for (const auto &[dest, account]: pwallet->mapAddressBook) {
         std::map<CTxDestination, tallyitem>::iterator it = mapTally.find(dest);
         if (it == mapTally.end() && !fIncludeEmpty) {
             continue;
@@ -1477,7 +1469,7 @@ static UniValue ListReceived(
         }
 
         if (fByAccounts) {
-            tallyitem &_item = mapAccountTally[strAccount];
+            tallyitem &_item = mapAccountTally[account.name];
             _item.nAmount += nAmount;
             _item.nConf = std::min(_item.nConf, nConf);
             _item.fIsWatchonly = fIsWatchonly;
@@ -1487,13 +1479,13 @@ static UniValue ListReceived(
                 obj.push_back(Pair("involvesWatchonly", true));
             }
             obj.push_back(Pair("address", EncodeDestination(dest)));
-            obj.push_back(Pair("account", strAccount));
+            obj.push_back(Pair("account", account.name));
             obj.push_back(Pair("amount", ValueFromAmount(nAmount)));
             obj.push_back(
                 Pair("confirmations",
                      (nConf == std::numeric_limits<int>::max() ? 0 : nConf)));
             if (!fByAccounts) {
-                obj.push_back(Pair("label", strAccount));
+                obj.push_back(Pair("label", account.name));
             }
             UniValue transactions(UniValue::VARR);
             if (it != mapTally.end()) {
@@ -1981,15 +1973,14 @@ static UniValue listaccounts(const Config &config,
     }
 
     std::map<std::string, Amount> mapAccountBalances;
-    for (const std::pair<CTxDestination, CAddressBookData> &entry :
-         pwallet->mapAddressBook) {
+    for (const auto &entry : pwallet->mapAddressBook) {
         // This address belongs to me
         if (IsMine(*pwallet, entry.first) & includeWatchonly) {
             mapAccountBalances[entry.second.name] = Amount(0);
         }
     }
 
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         const CWalletTx &wtx = pairWtx.second;
         Amount nFee;
         std::string strSentAccount;
@@ -2023,10 +2014,8 @@ static UniValue listaccounts(const Config &config,
     }
 
     UniValue ret(UniValue::VOBJ);
-    for (const std::pair<std::string, Amount> &accountBalance :
-         mapAccountBalances) {
-        ret.push_back(
-            Pair(accountBalance.first, ValueFromAmount(accountBalance.second)));
+    for (const auto &[name, balance] : mapAccountBalances) {
+        ret.push_back(Pair(name, ValueFromAmount(balance)));
     }
     return ret;
 }
@@ -2157,7 +2146,7 @@ static UniValue listsinceblock(const Config &config,
 
     UniValue transactions(UniValue::VARR);
 
-    for (const std::pair<uint256, CWalletTx> &pairWtx : pwallet->mapWallet) {
+    for (const auto& pairWtx : pwallet->mapWallet) {
         CWalletTx tx = pairWtx.second;
 
         if (depth == -1 || tx.GetDepthInMainChain() < depth) {
@@ -2756,10 +2745,10 @@ static UniValue lockunspent(const Config &config,
                                           ",\\\"vout\\\":1}]\"") +
             "\nAs a json rpc call\n" +
             HelpExampleRpc("lockunspent", "false, "
-                                          "\"[{\\\"txid\\\":"
-                                          "\\\"a08e6907dbbd3d809776dbfc5d82e371"
-                                          "b764ed838b5655e72f463568df1aadf0\\\""
-                                          ",\\\"vout\\\":1}]\""));
+                                          "[{\"txid\":"
+                                          "\"a08e6907dbbd3d809776dbfc5d82e371"
+                                          "b764ed838b5655e72f463568df1aadf0\""
+                                          ",\"vout\":1}]"));
     }
 
     LOCK2(cs_main, pwallet->cs_wallet);
@@ -3138,9 +3127,9 @@ static UniValue listunspent(const Config &config,
                            "\"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\","
                            "\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\"") +
             HelpExampleRpc("listunspent",
-                           "6, 9999999 "
-                           "\"[\\\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\\\","
-                           "\\\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\\\"]\""));
+                           "6, 9999999, "
+                           "[\"1PGFqEzfmQch1gKD3ra4k18PNj3tTUUSqg\","
+                           "\"1LtvqCaApEdUGFkpKMM4MstjcaL4dKg8SP\"]"));
     }
 
     int nMinDepth = 1;
@@ -3319,6 +3308,7 @@ static UniValue fundrawtransaction(const Config &config,
                            "\"[]\" \"{\\\"myaddress\\\":0.01}\"") +
             "\nAdd sufficient unsigned inputs to meet the output value\n" +
             HelpExampleCli("fundrawtransaction", "\"rawtransactionhex\"") +
+            HelpExampleRpc("fundrawtransaction", "\"rawtransactionhex\"") +
             "\nSign the transaction\n" +
             HelpExampleCli("signrawtransaction", "\"fundedtransactionhex\"") +
             "\nSend the transaction\n" +
@@ -3479,7 +3469,8 @@ static UniValue generate(const Config &config, const JSONRPCRequest &request) {
             "[ blockhashes ]     (array) hashes of blocks generated\n"
             "\nExamples:\n"
             "\nGenerate 11 blocks\n" +
-            HelpExampleCli("generate", "11"));
+            HelpExampleCli("generate", "11") +
+            HelpExampleRpc("generate", "11"));
     }
 
     int num_generate = request.params[0].get_int();

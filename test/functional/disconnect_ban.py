@@ -22,7 +22,7 @@ class DisconnectBanTest(BitcoinTestFramework):
 
         self.log.info("setban: successfully ban single IP address")
         # node1 should have 2 connections to node0 at this point
-        assert_equal(len(self.nodes[1].getpeerinfo()), 2)
+        wait_until(lambda: len(self.nodes[1].getpeerinfo()) == 2, timeout=10)
         self.nodes[1].setban("127.0.0.1", "add")
         wait_until(lambda: len(self.nodes[1].getpeerinfo()) == 0, timeout=10)
         # all nodes must be disconnected at this point

@@ -5,15 +5,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "pow.h"
-
 #include "arith_uint256.h"
 #include "chain.h"
-#include "chainparams.h"
 #include "config.h"
 #include "consensus/params.h"
 #include "primitives/block.h"
 #include "uint256.h"
-#include "util.h"
 #include "validation.h"
 
 /**
@@ -26,11 +23,11 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
 
     // Only change once per difficulty adjustment interval
-    uint32_t nHeight = pindexPrev->nHeight + 1;
+    int32_t nHeight = pindexPrev->nHeight + 1;
     if (nHeight % params.DifficultyAdjustmentInterval() == 0) {
         // Go back by what we want to be 14 days worth of blocks
         assert(nHeight >= params.DifficultyAdjustmentInterval());
-        uint32_t nHeightFirst = nHeight - params.DifficultyAdjustmentInterval();
+        int32_t nHeightFirst = nHeight - params.DifficultyAdjustmentInterval();
         const CBlockIndex *pindexFirst = pindexPrev->GetAncestor(nHeightFirst);
         assert(pindexFirst);
 
@@ -264,7 +261,7 @@ uint32_t GetNextCashWorkRequired(const CBlockIndex *pindexPrev,
     }
 
     // Compute the difficulty based on the full adjustment interval.
-    const uint32_t nHeight = pindexPrev->nHeight;
+    const int32_t nHeight = pindexPrev->nHeight;
     assert(nHeight >= params.DifficultyAdjustmentInterval());
 
     // Get the last suitable block of the difficulty interval.
@@ -272,7 +269,7 @@ uint32_t GetNextCashWorkRequired(const CBlockIndex *pindexPrev,
     assert(pindexLast);
 
     // Get the first suitable block of the difficulty interval.
-    uint32_t nHeightFirst = nHeight - 144;
+    int32_t nHeightFirst = nHeight - 144;
     const CBlockIndex *pindexFirst =
         GetSuitableBlock(pindexPrev->GetAncestor(nHeightFirst));
     assert(pindexFirst);

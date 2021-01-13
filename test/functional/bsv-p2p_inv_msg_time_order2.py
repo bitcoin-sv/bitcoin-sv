@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
 # Copyright (C) 2018-2019 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
+'''
+Test checks if transactions included in inv message are in the same order 
+in which they were sent to node (send_message()) and then validated. -broadcastdelay=10000 is used to prevent 
+the node from broadcasting of each transaction separately it processed. Only one inv is sent for all transactions 
+in mempool after 10s instead.
+'''
+
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.blocktools import *
 from test_framework.util import *
 from test_framework.script import *
-import time
 from time import sleep
 
 
 def invsOrderedbyTime(invListExpected, txinvs):
-    for x in range(60):
-        with mininode_lock:
-            if (invListExpected == txinvs):
-                return True
-        time.sleep(1)
-
+    # invListExpected contains transactions that were sent, txinvs contains transactions that were received in INV.
+    # It's not guaranteed that all transactions were accepted to mempool and therefore sent back in INV message.
+    # Function checks if transactions in txinvs are in correct order.
     for i in range(len(txinvs)):
+        logger.debug("Received tx inv %s at %d, sent at %d", txinvs[i], i, invListExpected.index(txinvs[i]))
+        logger.debug("Sent tx at %d is %s", i, invListExpected[i])
         if invListExpected.index(txinvs[i]) < i:
             return False
     return True
@@ -26,23 +31,6 @@ class TxnInvOrder(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.num_txns = 3
-
-    def make_txns(self, fee, num, ids, testnode):
-        self.nodes[0].settxfee(fee)
-        txids = []
-        for i in range(num):
-            txids.append(self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 1))
-        ids.extend(txids)
-        return ids
-
-        # For checking if the txn queues for all peers have drained yet
-    def check_queue_drains(self):
-        peerinfo = self.nodes[0].getpeerinfo()
-        for peer in peerinfo:
-            txninvsize = peer['txninvsize']
-            if (txninvsize > 0):
-                return False
-        return True
 
     def create_tx_simple(self, fee, txs):
         self.nodes[0].settxfee(fee)
@@ -55,20 +43,13 @@ class TxnInvOrder(BitcoinTestFramework):
         txs.append(ftx)
         return txs
 
-    # For checking the txns make it into all peers mempools
-    def check_final_mempool(self):
-        for n in range(0, self.num_nodes):
-            mempoolsize = self.nodes[n].getmempoolinfo()['size']
-            if(mempoolsize != self.num_txns*4):
-                return False
-        return True
-
     def test_inventory_order(self):
         self.stop_node(0)
-        with self.run_node_with_connections("", 0, ['-broadcastdelay=50000', '-txnpropagationfreq=50000'], 2) as p2pc:
+        with self.run_node_with_connections("", 0, ['-broadcastdelay=10000'], 2) as p2pc:
             connection = p2pc[0]
             connection2 = p2pc[1]
 
+            # protected by mininode_lock
             txinvs = []
 
             # Append txinv
@@ -91,11 +72,14 @@ class TxnInvOrder(BitcoinTestFramework):
 
             for tx in txs:
                 connection.send_message(msg_tx(tx))
-                sleep(0.1)
+                # wait for transaction to be processed
+                connection.cb.sync_with_ping()
 
-            wait_until(lambda: invsOrderedbyTime(ids, txinvs), timeout=20)
+            # have to wait to receive one inv message with all transactions
+            wait_until(lambda: len(txinvs) > 0, timeout=60, lock=mininode_lock)
 
-            assert (invsOrderedbyTime(ids, txinvs))
+            with mininode_lock:
+                assert (invsOrderedbyTime(ids, txinvs))
 
     def run_test(self):
         # Make some coins to spend

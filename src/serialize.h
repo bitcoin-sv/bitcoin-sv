@@ -8,6 +8,8 @@
 
 #include "compat/endian.h"
 
+#include <boost/uuid/uuid.hpp>
+
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -396,7 +398,8 @@ I ReadVarInt(Stream &is) {
     REF(CFlatData((char *)&(obj), (char *)&(obj) + sizeof(obj)))
 #define VARINT(obj) REF(WrapVarInt(REF(obj)))
 #define COMPACTSIZE(obj) REF(CCompactSize(REF(obj)))
-#define LIMITED_STRING(obj, n) REF(LimitedString<n>(REF(obj)))
+#define LIMITED_STRING(obj, n) REF(LimitedBytes<n, std::string>(REF(obj)))
+#define LIMITED_BYTE_VEC(obj, n) REF(LimitedBytes<n, std::vector<uint8_t>>(REF(obj)))
 
 /**
  * Wrapper for serializing arrays and POD.
@@ -464,28 +467,28 @@ public:
     }
 };
 
-template <size_t Limit> class LimitedString {
+template <size_t Limit, typename ArrayType> class LimitedBytes {
 protected:
-    std::string &string;
+    ArrayType& array;
 
 public:
-    LimitedString(std::string &_string) : string(_string) {}
+    LimitedBytes(ArrayType& _array) : array(_array) {}
 
     template <typename Stream> void Unserialize(Stream &s) {
         size_t size = ReadCompactSize(s);
         if (size > Limit) {
-            throw std::ios_base::failure("String length limit exceeded");
+            throw std::ios_base::failure("Array length limit exceeded");
         }
-        string.resize(size);
+        array.resize(size);
         if (size != 0) {
-            s.read((char *)&string[0], size);
+            s.read((char*)&array[0], size);
         }
     }
 
     template <typename Stream> void Serialize(Stream &s) const {
-        WriteCompactSize(s, string.size());
-        if (!string.empty()) {
-            s.write((char *)&string[0], string.size());
+        WriteCompactSize(s, array.size());
+        if (!array.empty()) {
+            s.write((char*)&array[0], array.size());
         }
     }
 };
@@ -575,6 +578,14 @@ template <typename Stream, typename T>
 void Serialize(Stream &os, const std::shared_ptr<const T> &p);
 template <typename Stream, typename T>
 void Unserialize(Stream &os, std::shared_ptr<const T> &p);
+
+/**
+ * UUID
+ */
+template <typename Stream>
+void Serialize(Stream &os, const boost::uuids::uuid &v);
+template <typename Stream>
+void Unserialize(Stream &is, boost::uuids::uuid &v);
 
 /**
  * unique_ptr
@@ -775,7 +786,7 @@ void Unserialize(Stream &is, std::pair<K, T> &item) {
 template <typename Stream, typename K, typename T, typename Pred, typename A>
 void Serialize(Stream &os, const std::map<K, T, Pred, A> &m) {
     WriteCompactSize(os, m.size());
-    for (const std::pair<K, T> &p : m) {
+    for (const auto& p : m) {
         Serialize(os, p);
     }
 }
@@ -839,6 +850,27 @@ void Serialize(Stream &os, const std::shared_ptr<const T> &p) {
 template <typename Stream, typename T>
 void Unserialize(Stream &is, std::shared_ptr<const T> &p) {
     p = std::make_shared<const T>(deserialize, is);
+}
+
+/**
+ * UUID
+ */
+template <typename Stream>
+void Serialize(Stream &os, const boost::uuids::uuid &v) {
+    // The size of the UUID is fixed at 16 bytes.
+    static constexpr auto uuid_size = boost::uuids::uuid::static_size();
+    static_assert(uuid_size == 16);
+    static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
+    os.write(reinterpret_cast<const char*>(v.data), uuid_size);
+}
+
+template <typename Stream>
+void Unserialize(Stream &is, boost::uuids::uuid &v) {
+    // The size of the UUID is fixed at 16 bytes.
+    static constexpr auto uuid_size = boost::uuids::uuid::static_size();
+    static_assert(uuid_size == 16);
+    static_assert(sizeof(boost::uuids::uuid::value_type) == sizeof(char));
+    is.read(reinterpret_cast<char*>(v.data), uuid_size);
 }
 
 /**

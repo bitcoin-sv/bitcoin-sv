@@ -8,6 +8,8 @@
 #include "consensus/merkle.h"
 #include "random.h"
 
+#include "mempool_test_access.h"
+
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
@@ -62,16 +64,16 @@ static CBlock BuildBlockTestCase() {
 }
 
 // Number of shared use_counts we expect for a tx we havent touched
-// == 3 (mempool + journal + our copy from the GetSharedTx call)
-#define SHARED_TX_OFFSET 3
+// == 2 (mempool + our copy from the GetSharedTx call)
+#define SHARED_TX_OFFSET 2
 
 BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
     CTxMemPool pool;
-    pool.SetBlockMinTxFee(CFeeRate());
-    TestMemPoolEntryHelper entry;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
-    pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), nullChangeSet);
+    pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
         pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
@@ -98,7 +100,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest) {
             SHARED_TX_OFFSET + 1);
 
         size_t poolSize = pool.Size();
-        pool.RemoveRecursive(*block.vtx[2], nullChangeSet);
+        testPoolAccess.RemoveRecursive(*block.vtx[2], nullChangeSet);
         BOOST_CHECK_EQUAL(pool.Size(), poolSize - 1);
 
         CBlock block2;
@@ -187,11 +189,11 @@ public:
 
 BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
     CTxMemPool pool;
-    pool.SetBlockMinTxFee(CFeeRate());
-    TestMemPoolEntryHelper entry;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
-    pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), nullChangeSet);
+    pool.AddUnchecked(block.vtx[2]->GetId(), entry.FromTx(*block.vtx[2]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
         pool.mapTx.find(block.vtx[2]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
@@ -279,11 +281,11 @@ BOOST_AUTO_TEST_CASE(NonCoinbasePreforwardRTTest) {
 
 BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
     CTxMemPool pool;
-    pool.SetBlockMinTxFee(CFeeRate());
-    TestMemPoolEntryHelper entry;
+    CTxMemPoolTestAccess testPoolAccess(pool);
+    TestMemPoolEntryHelper entry(DEFAULT_TEST_TX_FEE);
     CBlock block(BuildBlockTestCase());
 
-    pool.AddUnchecked(block.vtx[1]->GetId(), entry.FromTx(*block.vtx[1]), nullChangeSet);
+    pool.AddUnchecked(block.vtx[1]->GetId(), entry.FromTx(*block.vtx[1]), TxStorage::memory, nullChangeSet);
     BOOST_CHECK_EQUAL(
         pool.mapTx.find(block.vtx[1]->GetId())->GetSharedTx().use_count(),
         SHARED_TX_OFFSET + 0);
@@ -346,6 +348,7 @@ BOOST_AUTO_TEST_CASE(SufficientPreforwardRTTest) {
 
 BOOST_AUTO_TEST_CASE(EmptyBlockRoundTripTest) {
     CTxMemPool pool;
+    CTxMemPoolTestAccess testPoolAccess(pool);
     CMutableTransaction coinbase;
     coinbase.vin.resize(1);
     coinbase.vin[0].scriptSig.resize(10);

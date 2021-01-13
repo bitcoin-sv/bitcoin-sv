@@ -50,9 +50,11 @@ BITCOIN_TESTS =\
   test/checkpoints_tests.cpp \
   test/checkqueue_tests.cpp \
   test/coins_tests.cpp \
+  test/write_preferring_upgradable_mutex_tests.cpp \
   test/compress_tests.cpp \
   test/config_tests.cpp \
   test/core_io_tests.cpp \
+  test/cpfp_tests.cpp \
   test/crypto_tests.cpp \
   test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
@@ -60,6 +62,7 @@ BITCOIN_TESTS =\
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
   test/enum_cast_tests.cpp \
+  test/eviction_candidates_tracker_tests.cpp \
   test/excessiveblock_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
@@ -77,16 +80,21 @@ BITCOIN_TESTS =\
   test/locked_ref_tests.cpp \
   test/m_candidates_tests.cpp \
   test/main_tests.cpp \
+  test/mempool_test_access.h \
+  test/mempool_dump_load_tests.cpp \
+  test/mempool_snapshot_tests.cpp \
   test/mempool_tests.cpp \
+  test/mempooltxdb_tests.cpp \
   test/merkle_tests.cpp \
   test/merkletreefile_readwrite_tests.cpp \
   test/miner_tests.cpp \
-  test/net_association_tests.cpp \
-  test/object_stream_deserialization_tests.cpp \
-  test/opcode_tests.cpp \
   test/multisig_tests.cpp \
+  test/net_association_tests.cpp \
+  test/net_message_maker_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
+  test/object_stream_deserialization_tests.cpp \
+  test/opcode_tests.cpp \
   test/pmt_tests.cpp \
   test/pow_tests.cpp \
   test/prevector_tests.cpp \

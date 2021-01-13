@@ -4,8 +4,6 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "protocol.h"
-
-#include "chainparams.h"
 #include "config.h"
 #include "util.h"
 #include "utilstrencodings.h"
@@ -42,6 +40,8 @@ const char *CMPCTBLOCK = "cmpctblock";
 const char *GETBLOCKTXN = "getblocktxn";
 const char *BLOCKTXN = "blocktxn";
 const char *PROTOCONF = "protoconf";
+const char *CREATESTREAM = "createstrm";
+const char *STREAMACK = "streamack";
 
 bool IsBlockLike(const std::string &strCommand) {
     return strCommand == NetMsgType::BLOCK ||
@@ -77,7 +77,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
     {
         // If the message doesn't not contain a block content,
         // it is limited to MAX_PROTOCOL_RECV_PAYLOAD_LENGTH.
-        return MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
+        return config.GetMaxProtocolRecvPayloadLength();
     }
     else
     {
@@ -93,15 +93,16 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
  * above and in protocol.h.
  */
 static const std::string allNetMessageTypes[] = {
-    NetMsgType::VERSION,     NetMsgType::VERACK,     NetMsgType::ADDR,
-    NetMsgType::INV,         NetMsgType::GETDATA,    NetMsgType::MERKLEBLOCK,
-    NetMsgType::GETBLOCKS,   NetMsgType::GETHEADERS, NetMsgType::TX,
-    NetMsgType::HEADERS,     NetMsgType::BLOCK,      NetMsgType::GETADDR,
-    NetMsgType::MEMPOOL,     NetMsgType::PING,       NetMsgType::PONG,
-    NetMsgType::NOTFOUND,    NetMsgType::FILTERLOAD, NetMsgType::FILTERADD,
-    NetMsgType::FILTERCLEAR, NetMsgType::REJECT,     NetMsgType::SENDHEADERS,
-    NetMsgType::FEEFILTER,   NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
-    NetMsgType::GETBLOCKTXN, NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
+    NetMsgType::VERSION,      NetMsgType::VERACK,     NetMsgType::ADDR,
+    NetMsgType::INV,          NetMsgType::GETDATA,    NetMsgType::MERKLEBLOCK,
+    NetMsgType::GETBLOCKS,    NetMsgType::GETHEADERS, NetMsgType::TX,
+    NetMsgType::HEADERS,      NetMsgType::BLOCK,      NetMsgType::GETADDR,
+    NetMsgType::MEMPOOL,      NetMsgType::PING,       NetMsgType::PONG,
+    NetMsgType::NOTFOUND,     NetMsgType::FILTERLOAD, NetMsgType::FILTERADD,
+    NetMsgType::FILTERCLEAR,  NetMsgType::REJECT,     NetMsgType::SENDHEADERS,
+    NetMsgType::FEEFILTER,    NetMsgType::SENDCMPCT,  NetMsgType::CMPCTBLOCK,
+    NetMsgType::GETBLOCKTXN,  NetMsgType::BLOCKTXN,   NetMsgType::PROTOCONF,
+    NetMsgType::CREATESTREAM, NetMsgType::STREAMACK,
 };
 static const std::vector<std::string>
     allNetMessageTypesVec(allNetMessageTypes,
@@ -170,30 +171,6 @@ bool CMessageHeader::IsValid(const Config &config) const {
     if (IsOversized(config)) {
         LogPrintf("CMessageHeader::IsValid(): (%s, %u bytes) is oversized\n",
                   GetCommand(), nPayloadLength);
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * This is a transition method in order to stay compatible with older code that
- * do not use the config. It assumes message will not get too large. This cannot
- * be used for any piece of code that will download blocks as blocks may be
- * bigger than the permitted size. Idealy, code that uses this function should
- * be migrated toward using the config.
- */
-bool CMessageHeader::IsValidWithoutConfig(const MessageMagic &magic) const {
-    // Check start string
-    if (!CheckHeaderMagicAndCommand(*this, magic)) {
-        return false;
-    }
-
-    // Payload size
-    if (nPayloadLength > MAX_PROTOCOL_RECV_PAYLOAD_LENGTH) {
-        LogPrintf(
-            "CMessageHeader::IsValidForSeeder(): (%s, %u bytes) is oversized\n",
-            GetCommand(), nPayloadLength);
         return false;
     }
 

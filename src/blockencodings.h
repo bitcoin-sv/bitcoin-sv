@@ -238,7 +238,7 @@ public:
     bool IsTxAvailable(size_t index) const;
     ReadStatus FillBlock(CBlock &block,
                          const std::vector<CTransactionRef> &vtx_missing,
-                         int blockHeight);
+                         int32_t blockHeight);
 };
 
 #endif

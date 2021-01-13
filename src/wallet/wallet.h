@@ -246,7 +246,7 @@ public:
     /**
      * Return height of transaction in blockchain. If in mempool returs MEMPOOL_HEIGHT
      */
-    int GetHeightInMainChain() const;
+    int32_t GetHeightInMainChain() const;
     /**
     * Return is the transaction height larger or equal to the genesis activation height. 
     * If in mempool, we assume that it will be mined in next block.
@@ -782,7 +782,7 @@ public:
      */
     bool SelectCoinsMinConf(
         const Amount nTargetValue, int nConfMine, int nConfTheirs,
-        uint64_t nMaxAncestors, std::vector<COutput> vCoins,
+        const int64_t nMaxAncestors, const int64_t nMaxSecondaryMempoolAncestors, std::vector<COutput> vCoins,
         std::set<std::pair<const CWalletTx *, unsigned int>> &setCoinsRet,
         Amount &nValueRet) const;
 

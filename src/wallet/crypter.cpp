@@ -3,13 +3,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "crypter.h"
-
 #include "crypto/aes.h"
 #include "crypto/sha512.h"
 #include "script/standard.h"
 #include "util.h"
-
-#include <string>
 #include <vector>
 
 int CCrypter::BytesToKeySHA512AES(const std::vector<uint8_t> &chSalt,

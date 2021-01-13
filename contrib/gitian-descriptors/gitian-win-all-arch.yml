@@ -1,5 +1,5 @@
 ---
-name: "bitcoin-sv-1.0.6-win"
+name: "bitcoin-sv-1.0.7-win"
 enable_cache: true
 suites:
 - "bionic"
@@ -29,7 +29,7 @@ files: []
 script: |
   WRAP_DIR=$HOME/wrapped
   HOSTS="i686-w64-mingw32 x86_64-w64-mingw32"
-  CONFIGFLAGS="--enable-reduce-exports --disable-bench --without-seeder"
+  CONFIGFLAGS="--enable-reduce-exports --disable-bench"
   FAKETIME_HOST_PROGS="ar ranlib nm windres strip objcopy"
   FAKETIME_PROGS="date makensis zip"
   HOST_CFLAGS="-O2 -g"

@@ -129,13 +129,22 @@ class RESTTest (BitcoinTestFramework):
         #
         # GETUTXOS: now check both with the same request #
         #
+        # request data of one known transaction twice at two different positions
+        # to make sure that utxo position index works as expected
         json_request = '/checkmempool/' + \
-            txid + '-' + str(n) + '/' + vintx + '-0'
+            txid + '-' + str(n) + '/' + vintx + '-0/' + txid + '-' + str(n)
         json_string = http_get_call(
             url.hostname, url.port, '/rest/getutxos' + json_request + self.FORMAT_SEPARATOR + 'json')
         json_obj = json.loads(json_string)
-        assert_equal(len(json_obj['utxos']), 1)
-        assert_equal(json_obj['bitmap'], "10")
+        assert_equal(len(json_obj['utxos']), 2)
+        assert_equal(json_obj['bitmap'], "101")
+        # now check the same thing without also querying mempool
+        json_request = '/' + txid + '-' + str(n) + '/' + vintx + '-0/' + txid + '-' + str(n)
+        json_string = http_get_call(
+            url.hostname, url.port, '/rest/getutxos' + json_request + self.FORMAT_SEPARATOR + 'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 2)
+        assert_equal(json_obj['bitmap'], "101")
 
         # test binary response
         bb_hash = self.nodes[0].getbestblockhash()

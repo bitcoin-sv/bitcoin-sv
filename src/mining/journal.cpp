@@ -64,7 +64,7 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
         else if(op == CJournalChangeSet::Operation::REMOVE)
         {
             // Lookup txn
-            auto txnit { index0.find(txn.GetTxId()) };
+            auto txnit { index0.find(txn) };
             if(txnit != index0.end())
             {
                 // If this is a REORG and if we're erasing the first transaction in the journal
@@ -91,14 +91,6 @@ void CJournal::applyChanges(const CJournalChangeSet& changeSet)
     {
         mInvalidatingTime = GetTimeMicros();
     }
-}
-
-// Checks if the transaction is added to journal
-bool CJournal::checkTxnExists(const TxId& txid) const
-{
-    std::shared_lock lock { mMtx };
-    const auto& getter = mTransactions.get<0>();
-    return getter.find(txid) != getter.end();
 }
 
 // Get start index for our underlying sequence
@@ -251,8 +243,11 @@ size_t CJournalTester::journalSize() const
 // Check the given transaction exists in the journal
 bool CJournalTester::checkTxnExists(const CJournalEntry& txn) const
 {
-    const auto& getter = mTransactions.get<0>();
-    return getter.find(txn.GetTxId()) != getter.end();
+    // Get view on index 0, which is based on unique Id
+    const auto& index { mTransactions.get<0>() };
+
+    // Lookup requested txn Id
+    return (index.count(txn) > 0);
 }
 
 // Report on the relative ordering within the journal of txn1 compared to txn2.
@@ -262,8 +257,8 @@ CJournalTester::TxnOrder CJournalTester::checkTxnOrdering(const CJournalEntry& t
     const auto& index0 { mTransactions.get<0>() };
 
     // Lookup txn1 and txn2
-    auto it1 { index0.find(txn1.GetTxId()) };
-    auto it2 { index0.find(txn2.GetTxId()) };
+    auto it1 { index0.find(txn1) };
+    auto it2 { index0.find(txn2) };
     if(it1 == index0.end() || it2 == index0.end())
     {
         return CJournalTester::TxnOrder::NOTFOUND;
@@ -299,6 +294,16 @@ void CJournalTester::dumpJournalContents(std::ostream& str) const
     {
         str << txn.getTxn()->GetId().ToString() << std::endl;
     }
+}
+
+std::set<TxId> mining::CJournalTester::getContents() const
+{
+    std::set<TxId> contents;
+    for(const auto& entry: mTransactions)
+    {
+        contents.insert(entry.getTxn()->GetId());
+    }
+    return contents;
 }
 
 const enumTableT<CJournalTester::TxnOrder>& mining::enumTable(CJournalTester::TxnOrder)

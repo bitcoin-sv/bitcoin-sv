@@ -116,7 +116,7 @@ class PTVTxnChains(ComparisonTestFramework):
         # This test case shows that false-positive orphans are not created while processing a set of chains, where chainlength=20.
         # Each thread from the validaiton thread pool should have an assigned chain of txns to process.
         args = ['-maxorphantxsize=0', '-txnvalidationasynchrunfreq=0',
-                '-limitancestorcount=20', '-limitdescendantcount=20', '-checkmempool=0', '-persistmempool=0'
+                '-limitancestorcount=20', '-checkmempool=0', '-persistmempool=0'
                 '-maxstdtxvalidationduration=100']
         with self.run_node_with_connections('Scenario 2: {} chains of length 20. Storing orphans is disabled.'.format(num_of_threads),
                 0, args, number_of_connections=1) as (conn,):
@@ -129,7 +129,7 @@ class PTVTxnChains(ComparisonTestFramework):
         # all remaining txns from the chain are detected as false-positive orphans.
         # Due to a runtime environment it is not possible to estimate the number of such rejects.
         args = ['-maxorphantxsize=10', '-txnvalidationasynchrunfreq=0',
-                '-limitancestorcount=50', '-limitdescendantcount=50', '-checkmempool=0', '-persistmempool=0']
+                '-limitancestorcount=50', '-checkmempool=0', '-persistmempool=0']
         with self.run_node_with_connections("Scenario 3: 100 chains of length 50. Storing orphans is enabled.",
                 0, args, number_of_connections=1) as (conn,):
             # Run test case.

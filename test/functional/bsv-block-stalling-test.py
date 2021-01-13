@@ -25,6 +25,7 @@ class StallingTest(ComparisonTestFramework):
             '-excessiveblocksize=%d' % (ONE_GIGABYTE * 6),
             '-blockmaxsize=%d' % (ONE_GIGABYTE * 6),
             '-maxmempool=%d' % (ONE_GIGABYTE * 10),
+            '-maxmempoolsizedisk=0',
             '-maxtxsizepolicy=%d' % ONE_GIGABYTE,
             '-maxscriptsizepolicy=0',
             '-rpcservertimeout=1000',
@@ -52,7 +53,7 @@ class StallingTest(ComparisonTestFramework):
 
         # Create 1GB block
         block(1, spend=out[0], block_size=1*ONE_GIGABYTE)
-        yield self.accepted()
+        yield self.accepted(420) # larger timeout is needed to prevent timeouts on busy machine and debug builds
 
         # Create long chain of smaller blocks
         test = TestInstance(sync_every_block=False)
@@ -83,7 +84,7 @@ class StallingTest(ComparisonTestFramework):
         self.log.info("Starting IBD")
         connect_nodes(self.nodes[0], 2)
         connect_nodes(self.nodes[1], 2)
-        self.sync_all(timeout=120)
+        self.sync_all(timeout=240) # larger timeout is needed to prevent timeouts on busy machine and debug builds
 
         # Check we didn't hit a stall for node2
         assert(not check_for_log_msg(self, "stalling block download", "/node2"))

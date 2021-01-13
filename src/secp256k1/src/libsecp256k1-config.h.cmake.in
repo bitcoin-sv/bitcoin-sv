@@ -21,6 +21,8 @@
 
 #cmakedefine USE_ASM_X86_64
 
+#cmakedefine USE_ENDOMORPHISM
+
 #cmakedefine USE_ECMULT_STATIC_PRECOMPUTATION
 
 #cmakedefine ENABLE_MODULE_RECOVERY

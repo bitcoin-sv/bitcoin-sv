@@ -9,8 +9,6 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
-#include <utility>
-
 #include <openssl/asn1.h>
 #include <openssl/bn.h>
 

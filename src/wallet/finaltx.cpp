@@ -2,7 +2,6 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-#include "chainparams.h"
 #include "config.h"
 #include "consensus/validation.h"
 #include "primitives/transaction.h"
@@ -10,7 +9,7 @@
 
 bool CheckFinalTx(
     const CTransaction &tx,
-    int nChainActiveHeight,
+    int32_t nChainActiveHeight,
     int nMedianTimePast,
     int flags = -1) {
 

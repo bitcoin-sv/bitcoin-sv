@@ -84,7 +84,7 @@ public:
         READWRITE(vtx);
     }
 
-    uint64_t
+    int32_t
     GetHeightFromCoinbase() const; // Returns the block's height as specified in
                                    // its coinbase transaction
 

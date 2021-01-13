@@ -17,9 +17,9 @@ void CChain::SetTip(CBlockIndex *pindex)
         return;
     }
 
-    vChain.resize(pindex->nHeight + 1);
-    while (pindex && vChain[pindex->nHeight] != pindex) {
-        vChain[pindex->nHeight] = pindex;
+    vChain.resize(static_cast<size_t>(pindex->nHeight + 1));
+    while (pindex && vChain[static_cast<size_t>(pindex->nHeight)] != pindex) {
+        vChain[static_cast<size_t>(pindex->nHeight)] = pindex;
         pindex = pindex->pprev;
     }
 }
@@ -39,7 +39,7 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
             break;
         }
         // Exponentially larger steps back, plus the genesis block.
-        int nHeight = std::max(pindex->nHeight - nStep, 0);
+        int32_t nHeight = std::max(pindex->nHeight - nStep, 0);
         if (Contains(pindex)) {
             // Use O(1) CChain index if possible.
             pindex = (*this)[nHeight];
@@ -84,7 +84,7 @@ static inline int InvertLowestOne(int n) {
 }
 
 /** Compute what height to jump back to with the CBlockIndex::pskip pointer. */
-static inline int GetSkipHeight(int height) {
+static inline int32_t GetSkipHeight(int32_t height) {
     if (height < 2) {
         return 0;
     }
@@ -96,16 +96,16 @@ static inline int GetSkipHeight(int height) {
                         : InvertLowestOne(height);
 }
 
-CBlockIndex *CBlockIndex::GetAncestor(int height) {
+CBlockIndex *CBlockIndex::GetAncestor(int32_t height) {
     if (height > nHeight || height < 0) {
         return nullptr;
     }
 
     CBlockIndex *pindexWalk = this;
-    int heightWalk = nHeight;
+    int32_t heightWalk = nHeight;
     while (heightWalk > height) {
-        int heightSkip = GetSkipHeight(heightWalk);
-        int heightSkipPrev = GetSkipHeight(heightWalk - 1);
+        int32_t heightSkip = GetSkipHeight(heightWalk);
+        int32_t heightSkipPrev = GetSkipHeight(heightWalk - 1);
         if (pindexWalk->pskip != nullptr &&
             (heightSkip == height || (heightSkip > height &&
                                       !(heightSkipPrev < heightSkip - 2 &&
@@ -122,7 +122,7 @@ CBlockIndex *CBlockIndex::GetAncestor(int height) {
     return pindexWalk;
 }
 
-const CBlockIndex *CBlockIndex::GetAncestor(int height) const {
+const CBlockIndex *CBlockIndex::GetAncestor(int32_t height) const {
     return const_cast<CBlockIndex *>(this)->GetAncestor(height);
 }
 

@@ -4,13 +4,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "arith_uint256.h"
-
 #include "crypto/common.h"
 #include "uint256.h"
-#include "utilstrencodings.h"
-
-#include <cstdio>
-#include <cstring>
+#include <string>
 
 template <unsigned int BITS>
 base_uint<BITS>::base_uint(const std::string &str) {

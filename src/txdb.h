@@ -9,6 +9,7 @@
 #include "chain.h"
 #include "coins.h"
 #include "dbwrapper.h"
+#include "write_preferring_upgradable_mutex.h"
 
 #include <map>
 #include <string>
@@ -16,7 +17,6 @@
 #include <vector>
 
 class CBlockIndex;
-class CCoinsViewDBCursor;
 class uint256;
 
 //! No need to periodic flush if at least this much space still available.
@@ -81,46 +81,326 @@ struct CDiskTxPos : public CDiskBlockPos {
     }
 };
 
-/** CCoinsView backed by the coin database (chainstate/) */
-class CCoinsViewDB final : public CCoinsView {
-protected:
-    CDBWrapper db;
-
-public:
-    CCoinsViewDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
-
-    bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
-    bool HaveCoin(const COutPoint &outpoint) const override;
-    uint256 GetBestBlock() const override;
-    std::vector<uint256> GetHeadBlocks() const override;
-    bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) override;
-    CCoinsViewCursor *Cursor() const override;
-    CCoinsViewCursor *Cursor(const TxId &txId) const override;
-
-    //! Returns true if database is in an older format.
-    bool IsOldDBFormat();
-    size_t EstimateSize() const override;
-};
-
-/** Specialization of CCoinsViewCursor to iterate over a CCoinsViewDB */
-class CCoinsViewDBCursor : public CCoinsViewCursor {
+/** Iterate over coins in DB */
+class CCoinsViewDBCursor {
 public:
     ~CCoinsViewDBCursor() {}
 
-    bool GetKey(COutPoint &key) const override;
-    bool GetValue(Coin &coin) const override;
-    unsigned int GetValueSize() const override;
+    bool GetKey(COutPoint &key) const;
+    bool GetValue(Coin &coin) const;
+    bool GetValue(CoinWithScript &coin) const;
 
-    bool Valid() const override;
-    void Next() override;
+    bool Valid() const;
+    void Next();
+
+    //! Get best block at the time this cursor was created
+    const uint256 &GetBestBlock() const { return hashBlock; }
 
 private:
     CCoinsViewDBCursor(CDBIterator *pcursorIn, const uint256 &hashBlockIn)
-        : CCoinsViewCursor(hashBlockIn), pcursor(pcursorIn) {}
+        : hashBlock(hashBlockIn), pcursor(pcursorIn) {}
+    std::optional<CoinImpl> GetCoin(uint64_t maxScriptSize) const;
+    uint256 hashBlock;
     std::unique_ptr<CDBIterator> pcursor;
     std::pair<char, COutPoint> keyTmp;
 
-    friend class CCoinsViewDB;
+    friend class CoinsDB;
+};
+
+/**
+ * CCoinsProvider backed by the coin database (chainstate/)
+ * and adds a memory cache of de-serialized coins.
+ *
+ * Provider is intended to be used from multiple threads but only one of the
+ * threads is allowed to write to it - the rest of the threads must release their
+ * read locks and try again later.
+ *
+ * Cache is limited for loading new coins (they can still be flushed from child
+ * providers down without caring for the threshold limit) so once the cache is
+ * full only coins without script are stored in it while coins with script are
+ * re-requested from base on every call to GetCoin() that requires a script.
+ */
+class CoinsDB {
+private:
+    friend class CoinsDBView;
+    friend class CoinsDBSpan;
+
+    /**
+     * Make mutable so that we can "fill the cache" even from Get-methods
+     * declared as "const".
+     */
+    mutable uint256 hashBlock;
+    mutable CoinsStore mCache;
+
+public:
+    template<typename T> struct UnitTestAccess;
+
+    using MaxFiles = CDBWrapper::MaxFiles;
+
+    /**
+     * @param[in] cacheSizeThreshold
+     *                        Maximum amount of coins that can be stored in
+     *                        cache after being loaded from the database.
+     *                        Added coins and coins without scripts do not count
+     *                        to this limit and may exceed it.
+     * @param[in] nCacheSize  Underlying database cache size
+     * @param[in] fMemory     If true, use leveldb's memory environment.
+     * @param[in] fWipe       If true, remove all existing data.
+     */
+    CoinsDB(
+        uint64_t cacheSizeThreshold,
+        size_t nCacheSize,
+        MaxFiles maxFiles,
+        bool fMemory = false,
+        bool fWipe = false);
+
+    CoinsDB(const CoinsDB&) = delete;
+    CoinsDB& operator=(const CoinsDB&) = delete;
+    CoinsDB(CoinsDB&&) = delete;
+    CoinsDB& operator=(CoinsDB&&) = delete;
+
+    /**
+     * Check if we have the given utxo already loaded in this cache.
+     */
+    bool HaveCoinInCache(const COutPoint &outpoint) const;
+
+    //! Calculate the size of the cache (in number of transaction outputs)
+    unsigned int GetCacheSize() const;
+
+    //! Calculate the size of the cache (in bytes)
+    size_t DynamicMemoryUsage() const;
+
+    //! Returns true if database is in an older format.
+    bool IsOldDBFormat();
+
+    CCoinsViewDBCursor* Cursor() const;
+
+    size_t EstimateSize() const;
+
+    /**
+     * Push the modifications applied to this cache to its base.
+     * Failure to call this method before destruction will cause the changes to
+     * be forgotten. If false is returned, the state of this cache (and its
+     * backing view) will be undefined.
+     */
+    bool Flush();
+
+    /**
+     * Removes UTXOs with the given outpoints from the cache.
+     */
+    void Uncache(const std::vector<COutPoint>& vOutpoints);
+
+private:
+    uint256 GetBestBlock() const;
+
+    //! Do a bulk modification (multiple Coin changes + BestBlock change).
+    //! The passed mapCoins can be modified.
+    bool BatchWrite(
+        const WPUSMutex::Lock& writeLock,
+        const uint256& hashBlock,
+        CCoinsMap&& mapCoins);
+
+    //! Get a cursor to iterate over coins by txId. Cursor is positioned at the first key in the source that is at or past target.
+    //! If coin with txId is not found then cursor is at position at first record after txId - source is sorted by txId
+    CCoinsViewDBCursor* Cursor(const TxId &txId) const;
+
+    //! Get any unspent output with a given txid.
+    std::optional<Coin> GetCoinByTxId(const TxId &txid) const;
+
+    void ReadLock(WPUSMutex::Lock& lockHandle) const
+    {
+        mMutex.ReadLock( lockHandle );
+    }
+
+    bool TryWriteLock(WPUSMutex::Lock& lockHandle)
+    {
+        return mMutex.TryWriteLock( lockHandle );
+    }
+
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
+    std::optional<CoinImpl> DBGetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const;
+    uint256 DBGetBestBlock() const;
+    std::vector<uint256> GetHeadBlocks() const;
+    bool DBBatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
+
+    /**
+     * A mutex that guarantees that coins from cache will not be removed and
+     * more importantly loaded coin scripts will not be removed until all read
+     * locks of this mutex are released and a write lock is held.
+     */
+    mutable WPUSMutex mMutex;
+
+    CDBWrapper db;
+
+    /**
+     * Return the larger script loading size - either the requested size or the
+     * remaining size of the remaining available cache of current class instance.
+     */
+    uint64_t getMaxScriptLoadingSize(uint64_t requestedMaxScriptSize) const
+    {
+        if(mCacheSizeThreshold > mCache.DynamicMemoryUsage())
+        {
+            return std::max(requestedMaxScriptSize, mCacheSizeThreshold - mCache.DynamicMemoryUsage());
+        }
+
+        return requestedMaxScriptSize;
+    }
+
+    //! Returns whether we still have space to store a script of certain size
+    bool hasSpaceForScript(uint64_t scriptSize) const
+    {
+        return mCacheSizeThreshold >= (mCache.DynamicMemoryUsage() + scriptSize);
+    }
+
+    uint64_t mCacheSizeThreshold;
+
+    /* A mutex to support a thread safe access to cache. */
+    mutable std::mutex mCoinsViewCacheMtx {};
+
+    /**
+     * Contains outpoints that are currently being loaded from base view by
+     * FetchCoin(). This prevents simultaneous loads of the same coin by
+     * multiple threads and enables us not to hold the locks while loading from
+     * base view, which can be slow if it is backed by disk.
+     */
+    mutable std::set<COutPoint> mFetchingCoins;
+};
+
+/**
+ * View for read-only querying of coins providers.
+ *
+ * Class automatically obtains CoinsDB read lock on construction and
+ * releases it on destruction.
+ */
+class CoinsDBView : public ICoinsView
+{
+public:
+    friend class CoinsViewLockedMemPoolNL;
+    friend class CCoinsViewMemPool;
+
+    CoinsDBView(const CoinsDB& db)
+        : mDB{db}
+    {
+        mDB.ReadLock( mLock );
+    }
+
+    // If found return basic coin info without script loaded
+    std::optional<Coin> GetCoin(const COutPoint& outpoint) const
+    {
+        auto coinData = mDB.GetCoin(outpoint, 0);
+        if(coinData.has_value())
+        {
+            return Coin{coinData.value()};
+        }
+
+        return {};
+    }
+
+    // Return coin with script loaded
+    //
+    // It will return either:
+    // * a non owning coin pointing to the coin stored in view hierarchy cache
+    // * an owning coin if there is not enough space for coin in cache
+    // * nothing if coin is not found
+    //
+    // Non owning coins must be released before view goes out of scope
+    std::optional<CoinWithScript> GetCoinWithScript(const COutPoint& outpoint) const
+    {
+        auto coinData = mDB.GetCoin(outpoint, std::numeric_limits<size_t>::max());
+        if(coinData.has_value())
+        {
+            assert(coinData->HasScript());
+
+            return std::move(coinData.value());
+        }
+
+        return {};
+    }
+    uint256 GetBestBlock() const override { return mDB.GetBestBlock(); }
+    std::vector<uint256> GetHeadBlocks() const { return mDB.GetHeadBlocks(); }
+
+    std::optional<Coin> GetCoinByTxId(const TxId &txid) const { return mDB.GetCoinByTxId(txid); }
+
+private:
+    // The caller of GetCoin needs to hold mempool.smtx.
+    std::optional<CoinImpl> GetCoin(const COutPoint &outpoint, uint64_t maxScriptSize) const override
+    {
+        return mDB.GetCoin(outpoint, maxScriptSize);
+    }
+
+    const CoinsDB& mDB;
+
+    // This variable enforces read only access to mDB
+    WPUSMutex::Lock mLock;
+
+    void ReleaseLock() override
+    {
+        mLock = {};
+    }
+
+    void ReLock() override
+    {
+        assert(mLock.GetLockType() == WPUSMutex::Lock::Type::unlocked);
+
+        mDB.ReadLock( mLock );
+    }
+
+    friend class CoinsDBSpan;
+};
+
+/**
+ * Same as CCoinsViewCache but with additional functionality for pushing the
+ * changes to the underlying CoinsDB.
+ *
+ * It holds read lock and on TryFlush() it tries to obtain write lock.
+ * * If it's the first instance that tries to obtain it it waits for all the read
+ *   locks to be released before locking, flushing and re-obtaining read lock.
+ * * If it's not the first instance that tries to obtain it, it immediately
+ *   returns with holding a read lock and it is expected that the owner gracefully
+ *   releases the instance and re-tries the task at a later point in time if needed.
+ */
+class CoinsDBSpan : public CCoinsViewCache
+{
+public:
+    template<typename T> struct UnitTestAccess;
+
+    enum class WriteState
+    {
+        ok,
+        error,
+        invalidated // span can no longer be used
+    };
+
+    explicit CoinsDBSpan(CoinsDB& db)
+        // CCoinsViewCache constructor doesn't use mView (only stores its
+        // address) so we can provide it in an uninitialized state.
+        : CCoinsViewCache{ mView }
+        , mDB{ db }
+        , mView{ mDB }
+    {}
+
+    /**
+     * Push the modifications applied to this cache to its base.
+     * Failure to call this method before destruction will cause the changes to
+     * be forgotten.
+     *
+     * Return:
+     * * If WriteState::error is returned, the state of
+     *   this cache (and its backing coins database) will be undefined.
+     * * If WriteState::invalidated is returned, the span is expected to
+     *   gracefully release the read lock otherwise a dead lock will occur.
+     */
+    WriteState TryFlush();
+
+    std::vector<uint256> GetHeadBlocks() const
+    {
+        assert(mThreadId == std::this_thread::get_id());
+        return mDB.GetHeadBlocks();
+    }
+
+private:
+    CoinsDB& mDB;
+    CoinsDBView mView;
 };
 
 /** Access to the block database (blocks/index/) */

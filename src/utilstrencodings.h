@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <array>
 #include "rpc/text_writer.h"
 
 #define BEGIN(a) ((char *)&(a))
@@ -105,12 +106,14 @@ bool ParseUInt64(const std::string &str, uint64_t *out);
  */
 bool ParseDouble(const std::string &str, double *out);
 
+
+inline constexpr std::array<char, 16> hexmap = {'0', '1', '2', '3', '4', '5', '6', '7',
+                                '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
 template <typename T>
 void HexStr(const T itbegin, const T itend, CTextWriter& writer, bool fSpaces = false)
 {
     std::string rv;
-    static const char hexmap[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
-                                    '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
     writer.ReserveAdditional((itend - itbegin) * 3);
     for (T it = itbegin; it < itend; ++it)
     {

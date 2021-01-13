@@ -163,9 +163,11 @@ class MiningJournal(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.maxblocksize = 1 * ONE_MEGABYTE
         self.num_nodes = 2
-        self.extra_args = [['-whitelist=127.0.0.1', '-maxmempool=300', '-maxtipage={}'.format(max_tip_age),
+        self.extra_args = [['-whitelist=127.0.0.1', '-maxmempool=300', '-maxmempoolsizedisk=0',
+                            '-maxtipage={}'.format(max_tip_age),
                             '-debug=journal', '-blockassembler=journaling',
-                            '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool']] * self.num_nodes
+                            '-blockmaxsize={}'.format(self.maxblocksize), '-persistmempool',
+                            "-checkmempool=1", ]] * self.num_nodes
         self.conncbs = []
         self.num_utxos = 5000
         self.ancestor_depth = 25
@@ -299,7 +301,7 @@ class MiningJournal(BitcoinTestFramework):
 
         # Reconnect to force node0 to reorg to node1s longer chain
         connect_nodes(self.nodes[node0], node1)
-        sync_blocks(self.nodes, timeout=120)
+        sync_blocks(self.nodes, timeout=300)
         info0 = self.nodes[node0].getmempoolinfo()
         info1 = self.nodes[node1].getmempoolinfo()
         assert_equal(info0["size"], info0["journalsize"])

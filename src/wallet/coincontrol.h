@@ -42,10 +42,6 @@ public:
 
     void Select(const COutPoint &output) { setSelected.insert(output); }
 
-    void UnSelect(const COutPoint &output) { setSelected.erase(output); }
-
-    void UnSelectAll() { setSelected.clear(); }
-
     void ListSelected(std::vector<COutPoint> &vOutpoints) const {
         vOutpoints.assign(setSelected.begin(), setSelected.end());
     }

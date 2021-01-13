@@ -27,10 +27,10 @@ class CValidationState;
  * there.
  */
 class TxInUndoSerializer {
-    const Coin *pcoin;
+    const CoinWithScript* pcoin;
 
 public:
-    TxInUndoSerializer(const Coin *pcoinIn) : pcoin(pcoinIn) {}
+    TxInUndoSerializer(const CoinWithScript* pcoinIn) : pcoin(pcoinIn) {}
 
     template <typename Stream> void Serialize(Stream &s) const {
         ::Serialize(
@@ -44,15 +44,15 @@ public:
 };
 
 class TxInUndoDeserializer {
-    Coin *pcoin;
+    CoinWithScript* pcoin;
 
 public:
-    TxInUndoDeserializer(Coin *pcoinIn) : pcoin(pcoinIn) {}
+    TxInUndoDeserializer(CoinWithScript* pcoinIn) : pcoin(pcoinIn) {}
 
     template <typename Stream> void Unserialize(Stream &s) {
         uint32_t nCode = 0;
         ::Unserialize(s, VARINT(nCode));
-        uint32_t nHeight = nCode / 2;
+        int32_t nHeight = nCode / 2;
         bool fCoinBase = nCode & 1;
         if (nHeight > 0) {
             // Old versions stored the version number for the last spend of a
@@ -65,7 +65,7 @@ public:
         CTxOut txout;
         ::Unserialize(s, REF(CTxOutCompressor(REF(txout))));
 
-        *pcoin = Coin(std::move(txout), nHeight, fCoinBase);
+        *pcoin = CoinWithScript::MakeOwning(std::move(txout), nHeight, fCoinBase);
     }
 };
 
@@ -76,7 +76,7 @@ static const size_t MAX_INPUTS_PER_TX =
 class CTxUndo {
 public:
     // Undo information for all txins
-    std::vector<Coin> vprevout;
+    std::vector<CoinWithScript> vprevout;
 
     template <typename Stream> void Serialize(Stream &s) const {
         // TODO: avoid reimplementing vector serializer.
@@ -131,7 +131,7 @@ enum DisconnectResult {
  * @param out The out point that corresponds to the tx input.
  * @return A DisconnectResult
  */
-DisconnectResult UndoCoinSpend(const Coin &undo, CCoinsViewCache &view,
+DisconnectResult UndoCoinSpend(const CoinWithScript &undo, CCoinsViewCache &view,
                                const COutPoint &out, const Config &config);
 
 /**

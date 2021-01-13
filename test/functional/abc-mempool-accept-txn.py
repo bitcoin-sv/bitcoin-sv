@@ -38,7 +38,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.coinbase_pubkey = self.coinbase_key.get_pubkey()
         self.tip = None
         self.blocks = {}
-        self.extra_args = [['-norelaypriority']]
+        self.extra_args = [['-minrelaytxfee=0']]
 
     def add_options(self, parser):
         super().add_options(parser)

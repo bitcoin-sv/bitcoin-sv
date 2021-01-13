@@ -2389,7 +2389,7 @@ static void ApproximateBestSubset(
 
 bool CWallet::SelectCoinsMinConf(
     const Amount nTargetValue, const int nConfMine, const int nConfTheirs,
-    const uint64_t nMaxAncestors, std::vector<COutput> vCoins,
+    const int64_t nMaxAncestors, const int64_t nMaxSecondaryMempoolAncestors, std::vector<COutput> vCoins,
     std::set<std::pair<const CWalletTx *, unsigned int>> &setCoinsRet,
     Amount &nValueRet) const {
     setCoinsRet.clear();
@@ -2418,8 +2418,10 @@ bool CWallet::SelectCoinsMinConf(
             continue;
         }
 
-        if (!mempool.TransactionWithinChainLimit(pcoin->GetId(),
-                                                 nMaxAncestors)) {
+        // check if we extend the chain we will still be inside limits
+        if (!mempool.TransactionWithinChainLimit(pcoin->GetId(), 
+            nMaxAncestors - 1, nMaxSecondaryMempoolAncestors -1)) 
+        {
             continue;
         }
 
@@ -2562,35 +2564,42 @@ bool CWallet::SelectCoins(
         }
     }
 
-    size_t nMaxChainLength = std::min(
-        gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT),
-        gArgs.GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT));
+    int64_t nMaxChainLength = gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
+    int64_t nMaxSecondaryMempoolChainLength = gArgs.GetArg("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT);
     bool fRejectLongChains = gArgs.GetBoolArg(
         "-walletrejectlongchains", DEFAULT_WALLET_REJECT_LONG_CHAINS);
 
     bool res =
         nTargetValue <= nValueFromPresetInputs ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 6, 0,
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 6, 0, 0,
                            vCoins, setCoinsRet, nValueRet) ||
-        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, 0,
+        SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 1, 1, 0, 0,
                            vCoins, setCoinsRet, nValueRet) ||
         (bSpendZeroConfChange &&
-         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, 2,
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1, 2, 0,
                             vCoins, setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            std::min((size_t)4, nMaxChainLength / 3), vCoins,
+                            std::min((int64_t)4, nMaxChainLength / 3), 0, vCoins,
                             setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            nMaxChainLength / 2, vCoins, setCoinsRet,
+                            nMaxChainLength / 2, 0, vCoins, setCoinsRet,
                             nValueRet)) ||
         (bSpendZeroConfChange &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            nMaxChainLength, vCoins, setCoinsRet, nValueRet)) ||
+                            nMaxChainLength, 0, vCoins, setCoinsRet, nValueRet)) ||
         (bSpendZeroConfChange && !fRejectLongChains &&
          SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
-                            std::numeric_limits<uint64_t>::max(), vCoins,
+                            std::numeric_limits<int64_t>::max(), 0, vCoins,
+                            setCoinsRet, nValueRet)) ||
+        (bSpendZeroConfChange && !fRejectLongChains &&
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
+                            std::numeric_limits<int64_t>::max(), nMaxSecondaryMempoolChainLength, vCoins,
+                            setCoinsRet, nValueRet)) ||
+        (bSpendZeroConfChange && !fRejectLongChains &&
+         SelectCoinsMinConf(nTargetValue - nValueFromPresetInputs, 0, 1,
+                            std::numeric_limits<int64_t>::max(), std::numeric_limits<int64_t>::max(), vCoins,
                             setCoinsRet, nValueRet));
 
     // Because SelectCoinsMinConf clears the setCoinsRet, we now add the
@@ -2720,7 +2729,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     // that fee sniping isn't a problem yet, but by implementing a fix now we
     // ensure code won't be written that makes assumptions about nLockTime that
     // preclude a fix later.
-    txNew.nLockTime = chainActive.Height();
+    txNew.nLockTime = static_cast<uint32_t>(chainActive.Height());
 
     // Secondly occasionally randomly pick a nLockTime even further back, so
     // that transactions that are delayed after signing for whatever reason,
@@ -2730,7 +2739,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         txNew.nLockTime = std::max(0, (int)txNew.nLockTime - GetRandInt(100));
     }
 
-    assert(txNew.nLockTime <= (unsigned int)chainActive.Height());
+    assert(txNew.nLockTime <= static_cast<uint32_t>(chainActive.Height()));
     assert(txNew.nLockTime < LOCKTIME_THRESHOLD);
 
     {
@@ -2756,7 +2765,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 nValueToSelect += nFeeRet;
             }
 
-            double dPriority = 0;
             // vouts to the payees
             for (const auto &recipient : vecSend) {
                 CTxOut txout(recipient.nAmount, recipient.scriptPubKey);
@@ -2804,7 +2812,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
             }
 
             for (const auto &pcoin : setCoins) {
-                Amount nCredit = pcoin.first->tx->vout[pcoin.second].nValue;
                 // The coin age after the next block (depth+1) is used instead
                 // of the current, reflecting an assumption the user would
                 // accept a bit more delay for a chance at a free transaction.
@@ -2813,7 +2820,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
                 int age = pcoin.first->GetDepthInMainChain();
                 assert(age >= 0);
                 if (age != 0) age += 1;
-                dPriority += (double)nCredit.GetSatoshis() * age;
             }
 
             const Amount nChange = nValueIn - nValueToSelect;
@@ -2924,7 +2930,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
 
             CTransaction txNewConst(txNew);
             unsigned int nBytes = txNewConst.GetTotalSize();
-            dPriority = txNewConst.ComputePriority(dPriority, nBytes);
 
             // Remove scriptSigs to eliminate the fee calculation dummy
             // signatures.
@@ -3039,20 +3044,12 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     if (gArgs.GetBoolArg("-walletrejectlongchains",
                          DEFAULT_WALLET_REJECT_LONG_CHAINS)) {
         // Lastly, ensure this tx will pass the mempool's chain limits.
-        LockPoints lp;
-        CTxMemPoolEntry entry(wtxNew.tx, Amount(0), 0, 0, 0, Amount(0), false,
-                              0, lp);
-        CTxMemPool::setEntries setAncestors;
+        CTxMemPoolEntry entry {wtxNew.tx, Amount{0}, 0, 0, false, LockPoints{}};
         size_t nLimitAncestors = GlobalConfig::GetConfig().GetLimitAncestorCount();
-        size_t nLimitAncestorSize = GlobalConfig::GetConfig().GetLimitAncestorSize();
+        size_t nLimitSecondaryMempoolAncestors = GlobalConfig::GetConfig().GetLimitSecondaryMempoolAncestorCount();
 
-        size_t nLimitDescendants = GlobalConfig::GetConfig().GetLimitDescendantCount();
-        size_t nLimitDescendantSize = GlobalConfig::GetConfig().GetLimitDescendantSize();
-
-        std::string errString;
-        if (!mempool.CalculateMemPoolAncestors(
-                entry, setAncestors, nLimitAncestors, nLimitAncestorSize,
-                nLimitDescendants, nLimitDescendantSize, errString)) {
+        if (!mempool.CheckAncestorLimits(
+                entry, nLimitAncestors, nLimitSecondaryMempoolAncestors, std::nullopt)) {
             strFailReason = _("Transaction has too long of a mempool chain");
             return false;
         }
@@ -3277,7 +3274,7 @@ bool CWallet::DelAddressBook(const CTxDestination &address) {
         LOCK(cs_wallet);
 
         // Delete destdata tuples associated with address.
-        for (const std::pair<std::string, std::string> &item :
+        for (const auto& item :
              mapAddressBook[address].destdata) {
             CWalletDB(*dbw).EraseDestData(address, item.first);
         }
@@ -3691,11 +3688,8 @@ std::set<CTxDestination>
 CWallet::GetAccountAddresses(const std::string &strAccount) const {
     LOCK(cs_wallet);
     std::set<CTxDestination> result;
-    for (const std::pair<CTxDestination, CAddressBookData> &item :
-         mapAddressBook) {
-        const CTxDestination &address = item.first;
-        const std::string &strName = item.second.name;
-        if (strName == strAccount) {
+    for (const auto &[address, account]: mapAddressBook) {
+        if (account.name == strAccount) {
             result.insert(address);
         }
     }
@@ -3859,7 +3853,7 @@ void CWallet::GetKeyBirthTimes(
         BlockMap::const_iterator blit = mapBlockIndex.find(wtx.hashBlock);
         if (blit != mapBlockIndex.end() && chainActive.Contains(blit->second)) {
             // ... which are already in a block.
-            int nHeight = blit->second->nHeight;
+            int32_t nHeight = blit->second->nHeight;
             for (const CTxOut &txout : wtx.tx->vout) {
                 // Iterate over all their outputs...
                 CAffectedKeysVisitor(*this, vAffected)
@@ -4512,7 +4506,7 @@ void CMerkleTx::SetMerkleBranch(const CBlockIndex *pindex, int posInBlock) {
 }
 
 int CMerkleTx::GetDepthInMainChain() const {
-    int height = GetHeightInMainChain();
+    int32_t height = GetHeightInMainChain();
     if (height == MEMPOOL_HEIGHT) {
         return 0;
     }
@@ -4543,7 +4537,7 @@ int CMerkleTx::GetHeightInMainChain() const {
 }
 
 bool CMerkleTx::IsGenesisEnabled() const {
-    int height = GetHeightInMainChain();
+    int32_t height = GetHeightInMainChain();
     if (height == MEMPOOL_HEIGHT) {
         AssertLockHeld(cs_main);
         return ::IsGenesisEnabled(GlobalConfig::GetConfig(), chainActive.Height() + 1);
@@ -4579,8 +4573,8 @@ bool CMerkleTx::SubmitTxToMempool(const Amount nAbsurdFee,
             tx,           // a pointer to the tx
             TxSource::wallet, // tx source
             TxValidationPriority::normal, // tx validation priority
+            TxStorage::memory, // tx storage
             GetTime(),    // nAcceptTime
-            true,         // fLimitFree
             nAbsurdFee),  // nAbsurdFee
         changeSet, // an instance of the mempool journal
         true); // fLimitMempoolSize

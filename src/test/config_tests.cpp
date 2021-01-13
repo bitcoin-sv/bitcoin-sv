@@ -87,7 +87,7 @@ BOOST_AUTO_TEST_CASE(max_block_size_related_defaults) {
 
     // Make up genesis activation parameters 
     // - Genesis will be activated at block height 100
-    uint64_t heightActivateGenesis   = 100;
+    int32_t heightActivateGenesis   = 100;
     config.SetGenesisActivationHeight(heightActivateGenesis);
 
     // Providing defaults should not override anything
@@ -299,5 +299,40 @@ BOOST_AUTO_TEST_CASE(max_send_queues_size) {
     testConfig.SetFactorMaxSendQueuesBytes(testFactor);
     BOOST_CHECK_EQUAL(testConfig.GetMaxSendQueuesBytes(), testBlockSize * testFactor);
 }
+
+BOOST_AUTO_TEST_CASE(p2p_config)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
+    BOOST_CHECK(config.SetP2PHandshakeTimeout(2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL, &err));
+    BOOST_CHECK_EQUAL(config.GetP2PHandshakeTimeout(), 2 * DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL);
+    BOOST_CHECK(!config.SetP2PHandshakeTimeout(0, &err));
+    BOOST_CHECK(!config.SetP2PHandshakeTimeout(-1, &err));
+}
+
+BOOST_AUTO_TEST_CASE(disable_BIP30)
+{
+    GlobalConfig config {};
+    std::string err {};
+
+    SelectParams(CBaseChainParams::MAIN);
+    BOOST_CHECK(config.SetDisableBIP30Checks(true, &err) == false);
+    BOOST_CHECK(err == "Can not change disabling of BIP30 checks on " + config.GetChainParams().NetworkIDString() + " network.");
+    BOOST_CHECK(config.GetDisableBIP30Checks() == false);
+
+    for(const auto& networkType: {CBaseChainParams::TESTNET, CBaseChainParams::REGTEST, CBaseChainParams::STN})
+    {
+        config.Reset();
+        SelectParams(networkType);
+        BOOST_CHECK(config.GetDisableBIP30Checks() == false);
+        BOOST_CHECK(config.SetDisableBIP30Checks(true, &err) == true);
+        BOOST_CHECK(config.GetDisableBIP30Checks() == true);
+        BOOST_CHECK(config.SetDisableBIP30Checks(false, &err) == true);
+        BOOST_CHECK(config.GetDisableBIP30Checks() == false);
+    }
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -308,24 +308,6 @@ bool IsP2SH(bsv::span<const uint8_t>);
 
 size_t CountOp(bsv::span<const uint8_t>, opcodetype);
 
-struct CScriptWitness {
-    // Note that this encodes the data elements being pushed, rather than
-    // encoding them as a CScript that pushes them.
-    std::vector<std::vector<uint8_t>> stack;
-
-    // Some compilers complain without a default constructor
-    CScriptWitness() {}
-
-    bool IsNull() const { return stack.empty(); }
-
-    void SetNull() {
-        stack.clear();
-        stack.shrink_to_fit();
-    }
-
-    std::string ToString() const;
-};
-
 class CReserveScript {
 public:
     CScript reserveScript;

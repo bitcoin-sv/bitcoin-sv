@@ -1,63 +1,41 @@
 // Copyright (c) 2019 Bitcoin Association
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-
 #include "jsonwriter.h"
-#include "univalue_escapes.h"
-#include <univalue.h>
+#include "tinyformat.h"
 
-// This method is a copy of a method with the same name in univalue_write.cpp
-static std::string json_escape(const std::string& inS)
+CJSONWriter::ScalarValue::ScalarValue(const Amount& amount)
 {
-    std::string outS;
-    outS.reserve(inS.size() * 2);
+    int64_t amt = amount.GetSatoshis();
+    int64_t n_abs = std::abs(amt);
+    int64_t quotient = n_abs / COIN.GetSatoshis();
+    int64_t remainder = n_abs % COIN.GetSatoshis();
 
-    for (size_t i = 0; i < inS.size(); i++) 
-    {
-        unsigned char ch = inS[i];
-        const char* escStr = escapes[ch];
-
-        if (escStr)
-        {
-            outS += escStr;
-        }
-        else
-        {
-            outS += ch;
-        }
-    }
-
-    return outS;
+    _jsonValue = strprintf("%s%d.%08d", (amt < 0) ? "-" : "", quotient, remainder);
 }
 
 void CJSONWriter::writeBeginArray(const std::string& objectName)
 {
     createTag("[", true, objectName);
+    _doNotAddComma = true;
 }
 
-void CJSONWriter::writeEndArray(bool addEndingComma)
+void CJSONWriter::writeEndArray()
 {
-    std::string endTag = "]";
-    if (addEndingComma)
-    {
-        endTag += ",";
-    }
-    createTag(endTag, false);
+    _doNotAddComma = true;
+    createTag("]", false);
 }
 
 void CJSONWriter::writeBeginObject(const std::string& objectName)
 {
     createTag("{", true, objectName);
+    _doNotAddComma = true;
 }
 
-void CJSONWriter::writeEndObject(bool addEndingComma)
+void CJSONWriter::writeEndObject()
 {
-    std::string endTag = "}";
-    if (addEndingComma)
-    {
-        endTag += ",";
-    }
-    createTag(endTag, false);
+    _doNotAddComma = true;
+    createTag("}", false);
 }
 
 CTextWriter& CJSONWriter::getWriter()
@@ -65,96 +43,55 @@ CTextWriter& CJSONWriter::getWriter()
     return jWriter;
 }
 
-std::string CJSONWriter::getIntStr(int64_t val)
+void CJSONWriter::pushV(const ScalarValue& val)
 {
-    return std::to_string(val);;
+    indentStr();
+    jWriter.Write(val.str());
+}
+
+void CJSONWriter::pushV(const std::vector<std::string>& val)
+{
+    for (const std::string& element : val)
+    {
+        pushV(element);
+    }
 }
 
 void CJSONWriter::pushK(const std::string& key)
 {
-    jWriter.Write(indentStr());
-    jWriter.Write('"');
-    jWriter.Write(json_escape(key));
-    writeString("\": ", false, true);
-}
-
-void CJSONWriter::pushV(const std::string& val, bool addEndingComma)
-{
-    jWriter.Write(indentStr());
-    jWriter.Write('"');
-    jWriter.Write(json_escape(val));
-    jWriter.Write('"');
-
-    if (addEndingComma)
-    {
-        jWriter.Write(',');
-    }
-    jWriter.WriteLine("");
-}
-
-void CJSONWriter::pushKVMoney(const std::string& key, const std::string& val, bool addEndingComma)
-{
-    jWriter.Write(indentStr());
-    jWriter.Write('"');
+    indentStr();
+    jWriter.Write('\"');
     jWriter.Write(json_escape(key));
     jWriter.Write("\": ");
-    writeString(val, addEndingComma);
 }
 
-void CJSONWriter::pushKV(const std::string& key, const std::string& val, bool addEndingComma)
+void CJSONWriter::pushKNoComma(const std::string& key)
 {
-    jWriter.Write(indentStr());
-    jWriter.Write('"');
-    jWriter.Write(json_escape(key));
-    jWriter.Write("\": \"");
-    jWriter.Write(json_escape(val));
-    writeString("\"", addEndingComma);
+    pushK(key);
+    _doNotAddComma = true;
 }
 
-void CJSONWriter::pushKV(const std::string& key, const char* val, bool addEndingComma)
+void CJSONWriter::pushKVJSONFormatted(const std::string& key, const std::string& val)
 {
-    jWriter.Write(indentStr());
-    jWriter.Write('"');
-    jWriter.Write(json_escape(key));
-    jWriter.Write("\": \"");
-    jWriter.Write(json_escape(val));
-    writeString("\"", addEndingComma);
+    pushK(key);
+    jWriter.Write(val);
 }
 
-void CJSONWriter::pushKV(const std::string& key, int64_t val, bool addEndingComma)
+void CJSONWriter::pushVJSONFormatted(const std::string& val)
 {
-    jWriter.Write(indentStr());
-    jWriter.Write('"');
-    jWriter.Write(json_escape(key));
-    jWriter.Write("\": ");
-
-    writeString(getIntStr(val), addEndingComma);
+    indentStr();
+    jWriter.Write(val);
 }
 
-void CJSONWriter::pushKV(const std::string& key, int val, bool addEndingComma)
+void CJSONWriter::pushKV(const std::string& key, const ScalarValue& val)
 {
-    jWriter.Write(indentStr());
-    jWriter.Write('"');
-    jWriter.Write(json_escape(key));
-    jWriter.Write("\": ");
-
-    writeString(getIntStr((int64_t)val), addEndingComma);
+    pushK(key);
+    jWriter.Write(val.str());
 }
 
-void CJSONWriter::pushKV(const std::string& key, bool val, bool addEndingComma)
+void CJSONWriter::pushQuote()
 {
-    jWriter.Write(indentStr());
-    jWriter.Write('"');
-    jWriter.Write(json_escape(key));
-    jWriter.Write("\": ");
-
-    std::string boolStr = val ? "true" : "false";
-    writeString(boolStr, addEndingComma);
-}
-
-void CJSONWriter::pushQuote(bool ignorePrettyIndent, bool addEndingComma)
-{
-    writeString("\"", addEndingComma, ignorePrettyIndent);
+    jWriter.Write('\"');
 }
 
 void CJSONWriter::flush()
@@ -162,16 +99,27 @@ void CJSONWriter::flush()
     jWriter.Flush();
 }
 
-std::string CJSONWriter::indentStr()
+void CJSONWriter::indentStr()
 {
-    if (!_prettyIndent)
+    if (!_doNotAddComma)
     {
-        return "";
+        jWriter.Write(',');
     }
     else
     {
+        _doNotAddComma = false;
+    }
+
+    if (_prettyIndent)
+    {
+        if (!_firstWrite)
+        {
+            jWriter.Write('\n');
+        }
+
         size_t indentation = _indentSize * _indentLevel;
-        return std::string(indentation, ' ');
+        jWriter.Write(std::string(indentation, ' '));
+        _firstWrite = false;
     }
 }
 
@@ -184,43 +132,17 @@ void CJSONWriter::createTag(const std::string& tag, bool incrementLevel, const s
 
     if (!objectName.empty())
     {
-        jWriter.Write(indentStr());
-        jWriter.Write('"');
-        jWriter.Write(json_escape(objectName));
-        jWriter.Write("\": ");
-        jWriter.Write(tag);
+        pushK(objectName);
     }
     else
     {
-        jWriter.Write(indentStr());
-        jWriter.Write(tag);
+        indentStr();
     }
 
-    if (_prettyIndent)
-    {
-        //this condition is here only to prevent adding additional new line after last curly bracket
-        if (incrementLevel || _indentLevel != 0)
-        {
-            jWriter.Write('\n');
-        }
-    }
+    jWriter.Write(tag);
 
     if (incrementLevel)
     {
         _indentLevel++;
     }
 }
-
-void CJSONWriter::writeString(const std::string& jsonText, bool addEndingComma, bool ignorePrettyIndent)
-{
-    jWriter.Write(jsonText);
-    if (addEndingComma)
-    {
-        jWriter.Write(',');
-    }
-    if (!ignorePrettyIndent && _prettyIndent)
-    {
-        jWriter.Write('\n');
-    }
-}
-

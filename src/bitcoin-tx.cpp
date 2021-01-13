@@ -514,24 +514,6 @@ static bool findSigHashFlags(SigHashType &sigHashType,
     return false;
 }
 
-uint256 ParseHashUO(std::map<std::string, UniValue> &o, std::string strKey) {
-    if (!o.count(strKey)) {
-        return uint256();
-    }
-
-    return ParseHashUV(o[strKey], strKey);
-}
-
-std::vector<uint8_t> ParseHexUO(std::map<std::string, UniValue> &o,
-                                std::string strKey) {
-    if (!o.count(strKey)) {
-        std::vector<uint8_t> emptyVec;
-        return emptyVec;
-    }
-
-    return ParseHexUV(o[strKey], strKey);
-}
-
 static Amount AmountFromValue(const UniValue &value) {
     if (!value.isNum() && !value.isStr()) {
         throw std::runtime_error("Amount is not a number or string");
@@ -564,8 +546,8 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     // raw tx:
     CMutableTransaction mergedTx(txVariants[0]);
     bool fComplete = true;
-    CCoinsView viewDummy;
-    CCoinsViewCache view(&viewDummy);
+    CCoinsViewEmpty dummy;
+    CCoinsViewCache view{dummy};
 
     if (!registers.count("privatekeys")) {
         throw std::runtime_error("privatekeys register variable must be set.");
@@ -623,11 +605,11 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
         CScript scriptPubKey(pkData.begin(), pkData.end());
 
         {
-            const Coin &coin = view.AccessCoin(out);
-            if (!coin.IsSpent() &&
-                coin.GetTxOut().scriptPubKey != scriptPubKey) {
+            if (auto coin = view.GetCoinWithScript(out);
+                coin.has_value() && !coin->IsSpent() &&
+                coin->GetTxOut().scriptPubKey != scriptPubKey) {
                 std::string err("Previous output scriptPubKey mismatch:\n");
-                err = err + ScriptToAsmStr(coin.GetTxOut().scriptPubKey) +
+                err = err + ScriptToAsmStr(coin->GetTxOut().scriptPubKey) +
                       "\nvs:\n" + ScriptToAsmStr(scriptPubKey);
                 throw std::runtime_error(err);
             }
@@ -643,7 +625,7 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
             // and Genesis activation height is 1, effectively using Genesis rules. 
             // This basically means, that output script starting with OP_RETURN will
             // be treated as possibly spendable.
-            view.AddCoin(out, Coin(txout, 1, false), true, 1);
+            view.AddCoin(out, CoinWithScript::MakeOwning(std::move(txout), 1, false), true, 1);
         }
 
         // If redeemScript given and private keys given, add redeemScript to the
@@ -662,14 +644,15 @@ static void MutateTxSign(const Config& config, CMutableTransaction& tx, const st
     // Sign what we can:
     for (size_t i = 0; i < mergedTx.vin.size(); i++) {
         CTxIn &txin = mergedTx.vin[i];
-        const Coin &coin = view.AccessCoin(txin.prevout);
-        if (coin.IsSpent()) {
+        auto coin = view.GetCoinWithScript(txin.prevout);
+        if (!coin.has_value() || coin->IsSpent())
+        {
             fComplete = false;
             continue;
         }
 
-        const CScript &prevPubKey = coin.GetTxOut().scriptPubKey;
-        const Amount amount = coin.GetTxOut().nValue;
+        const CScript &prevPubKey = coin->GetTxOut().scriptPubKey;
+        const Amount amount = coin->GetTxOut().nValue;
 
         // we will assume that script is after genesis for every script type except p2sh
         bool assumeUtxoAfterGenesis = !IsP2SH(prevPubKey);

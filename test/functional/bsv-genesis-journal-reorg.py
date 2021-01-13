@@ -101,12 +101,21 @@ class JournalReorg(BitcoinTestFramework):
 
         # Generate blocks on each node to get us out of IBD and have some funds to spend
         for node in self.nodes:
+            # Disconnect nodes before each generate RPC. On a busy environment generate
+            # RPC might not create the provided number of blocks. While nodes are communicating
+            # P2P messages can cause generateBlocks function to skip a block. Check the comment 
+            # in generateBlocks function for details.
+            disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(150)
+            connect_nodes_bi(self.nodes, 0, 1)
             self.sync_all()
 
         # Wait for coinbase to mature
         for node in self.nodes:
+           # Disconnect nodes for the same reason as above.
+            disconnect_nodes_bi(self.nodes, 0, 1)
             node.generate(50)
+            connect_nodes_bi(self.nodes, 0, 1)
             self.sync_all()
 
         # Disconnect nodes so they can build their own competing chains

@@ -20,8 +20,7 @@ class ABC_RPC_Test (BitcoinTestFramework):
         self.num_nodes = 1
         self.tip = None
         self.setup_clean_chain = True
-        self.extra_args = [['-norelaypriority',
-                            '-whitelist=127.0.0.1']]
+        self.extra_args = [['-whitelist=127.0.0.1']]
 
     def test_excessiveblock(self):
         # Check that we start with REGTEST_DEFAULT_MAX_BLOCK_SIZE

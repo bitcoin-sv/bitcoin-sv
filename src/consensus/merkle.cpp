@@ -280,18 +280,18 @@ void CMerkleTree::CalculateMerkleTree(const std::vector<elementType>& vTransacti
     auto batchEndIter = batchBeginIter;
     std::vector<std::future<CMerkleTree>> futures;
     //Distance can return a negative value, prevent signed/unsigned mismatch
-    while (std::distance(batchBeginIter, vTransactions.cend()) > intBatchSize)
-    {
-        std::advance(batchEndIter, intBatchSize);
-        futures.push_back(CreateBatchTask<elementType>(batchBeginIter, batchEndIter, *pThreadPool));
-        batchBeginIter = batchEndIter;
+    //Note that the following null check is redundant, but it is clearer like this
+    if (pThreadPool) {
+        while (std::distance(batchBeginIter, vTransactions.cend()) > intBatchSize) {
+            std::advance(batchEndIter, intBatchSize);
+            futures.push_back(CreateBatchTask<elementType>(batchBeginIter, batchEndIter, *pThreadPool));
+            batchBeginIter = batchEndIter;
+        }
+        // The last batch
+        if (std::distance(batchBeginIter, vTransactions.cend()) > 0) {
+            futures.push_back(CreateBatchTask<elementType>(batchBeginIter, vTransactions.cend(), *pThreadPool));
+        }
     }
-    // The last batch
-    if (std::distance(batchBeginIter, vTransactions.cend()) > 0)
-    {
-        futures.push_back(CreateBatchTask<elementType>(batchBeginIter, vTransactions.cend(), *pThreadPool));
-    }
-
     //In the meantime, calculate subtree of the first batch
     batchBeginIter = vTransactions.cbegin();
     batchEndIter = batchBeginIter;

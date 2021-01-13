@@ -199,6 +199,9 @@ public:
     // Forces a arg setting, used only in testing
     void ForceSetArg(const std::string &strArg, const std::string &strValue);
 
+    // Forces a boolean arg setting, used only in testing
+    void ForceSetBoolArg(const std::string &strArg, bool fValue);
+
     // Forces a multi arg setting, used only in testing
     void ForceSetMultiArg(const std::string &strArg,
                           const std::string &strValue);
@@ -241,7 +244,7 @@ std::string GetThreadName();
  * .. and a wrapper that just calls func once
  */
 template <typename Callable> void TraceThread(const char *name, Callable func) {
-    std::string s = strprintf("bitcoin-%s", name);
+    std::string s = strprintf("%s", name);
     RenameThread(s.c_str());
     try {
         LogPrintf("%s thread start\n", name);

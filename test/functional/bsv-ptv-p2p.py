@@ -253,7 +253,6 @@ class PTVP2PTest(ComparisonTestFramework):
         args = ['-checkmempool=0',
                 '-persistmempool=0',
                 '-limitancestorcount=50',
-                '-limitdescendantcount=50',
                 '-txnvalidationasynchrunfreq=100',
                 '-numstdtxvalidationthreads=6',
                 '-numnonstdtxvalidationthreads=2']
@@ -367,13 +366,11 @@ class PTVP2PTest(ComparisonTestFramework):
             # Run test case.
             nonstd_txs, ds_txs, rejected_txs = self.run_scenario3(conn, spend_txs, tc5_txs_num, self.locking_script_2, ds_txs_num)
             # All txs from the nonstd_txs result set should be accepted
-            self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=30)
+            self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=60)
             # There are tc5_num_of_subsets more transaction in the mempool (random txns from the ds_txs set)
             assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs)+tc5_num_of_subsets)
             # Only tc5_num_of_subsets txns are allowed to be in the mempool from the given ds set.
             assert_equal(len(self.check_intersec_with_mempool(conn.rpc, ds_txs)), tc5_num_of_subsets)
-            # There is a high chance of getting 'txn-double-spend-detected' reject msgs (the exact number is runtime-dependant)
-            assert_greater_than(len(rejected_txs), 0)
 
         #
         # Test Case 6 (TC6).
@@ -400,7 +397,7 @@ class PTVP2PTest(ComparisonTestFramework):
             # Run test case.
             nonstd_txs, ds_txs, rejected_txs = self.run_scenario3(conn, spend_txs, tc6_txs_num, self.locking_script_2, ds_txs_num, shuffle_txs=True)
             # All txs from the nonstd_txs result set should be accepted
-            self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=30)
+            self.check_mempool_with_subset(conn.rpc, nonstd_txs, timeout=60)
             # There are tc6_num_of_subsets more transaction in the mempool (random txns from the ds_txs set)
             assert_equal(conn.rpc.getmempoolinfo()['size'], len(nonstd_txs)+tc6_num_of_subsets)
             # Only tc6_num_of_subsets txns are allowed to be in the mempool from the given ds set.

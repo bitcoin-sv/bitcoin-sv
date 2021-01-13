@@ -3,21 +3,14 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "httpserver.h"
-
 #include "chainparamsbase.h"
-#include "compat.h"
 #include "config.h"
 #include "net/netbase.h"
 #include "rpc/http_protocol.h" // For HTTP status codes
-#include "sync.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilstrencodings.h"
-
-#include <signal.h>
-#include <sys/stat.h>
 #include <sys/types.h>
-
 #include <event2/buffer.h>
 #include <event2/event.h>
 #include <event2/http.h>
@@ -81,7 +74,11 @@ private:
     class ThreadCounter {
     public:
         WorkQueue &wq;
-        ThreadCounter(WorkQueue &w) : wq(w) {
+        ThreadCounter(const ThreadCounter&) = delete;
+        ThreadCounter& operator=(const ThreadCounter&) = delete;
+        ThreadCounter(ThreadCounter&&) = delete;
+        ThreadCounter& operator=(ThreadCounter&&) = delete;
+        explicit ThreadCounter(WorkQueue &w) : wq(w) {
             std::lock_guard<std::mutex> lock(wq.cs);
             wq.numThreads += 1;
         }
@@ -93,12 +90,15 @@ private:
     };
 
 public:
-    WorkQueue(size_t _maxDepth)
+    WorkQueue(const WorkQueue&) = delete;
+    WorkQueue& operator=(const WorkQueue&) = delete;
+    WorkQueue(WorkQueue&&) = delete;
+    WorkQueue& operator=(WorkQueue&&) = delete;
+    explicit WorkQueue(size_t _maxDepth)
         : running(true), maxDepth(_maxDepth), numThreads(0) {}
     /** Precondition: worker threads have all stopped
      * (call WaitExit)
      */
-    ~WorkQueue() {}
     /** Enqueue a work item */
     bool Enqueue(WorkItem *item) {
         std::unique_lock<std::mutex> lock(cs);
@@ -136,12 +136,6 @@ public:
         std::unique_lock<std::mutex> lock(cs);
         while (numThreads > 0)
             cond.wait(lock);
-    }
-
-    /** Return current depth of queue */
-    size_t Depth() {
-        std::unique_lock<std::mutex> lock(cs);
-        return queue.size();
     }
 };
 
@@ -298,7 +292,7 @@ static void http_reject_request_cb(struct evhttp_request *req, void *) {
 
 /** Event dispatcher thread */
 static bool ThreadHTTP(struct event_base *base, struct evhttp *http) {
-    RenameThread("bitcoin-http");
+    RenameThread("http");
     LogPrint(BCLog::HTTP, "Entering http event loop\n");
     event_base_dispatch(base);
     // Event loop will be interrupted by InterruptHTTPServer()
@@ -356,7 +350,7 @@ static bool HTTPBindAddresses(struct evhttp *http) {
 /** Simple wrapper to set thread name and run work queue */
 static void HTTPWorkQueueRun(WorkQueue<HTTPClosure> *queue, int workerNum)
 {
-    std::string s = strprintf("bitcoin-httpworker%d", workerNum);
+    std::string s = strprintf("httpworker%d", workerNum);
     RenameThread(s.c_str());
     queue->Run();
 }
