@@ -85,7 +85,7 @@ class JournalingBlockAssembler : public BlockAssembler
     CJournalPtr mJournal {nullptr};
 
     // Variables used for mining statistics
-    std::atomic<BlockStats> mLastBlockStats {};
+    BlockStats mLastBlockStats{};
 
     // All details for the block we are currently building
     static constexpr uint64_t COINBASE_SIG_OPS {100};
