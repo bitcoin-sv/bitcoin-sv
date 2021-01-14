@@ -28,7 +28,6 @@ from collections import defaultdict
 import copy
 import hashlib
 from contextlib import contextmanager
-from enum import Enum
 from io import BytesIO
 import logging
 import random
@@ -41,8 +40,8 @@ from threading import RLock, Thread
 import uuid
 
 from test_framework.siphash import siphash256
-from test_framework.cdefs import MAX_BLOCK_SIGOPS_PER_MB
 from test_framework.util import hex_str_to_bytes, bytes_to_hex_str, wait_until
+from test_framework.streams import StreamType
 
 BIP0031_VERSION = 60000
 MY_VERSION = 70015 # INVALID_CB_NO_BAN_VERSION
@@ -62,15 +61,6 @@ NODE_BLOOM = (1 << 2)
 NODE_WITNESS = (1 << 3)
 NODE_XTHIN = (1 << 4)
 NODE_BITCOIN_CASH = (1 << 5)
-
-# Stream types enumeration
-class StreamType(Enum):
-    UNKNOWN = 0
-    GENERAL = 1
-    DATA1 = 2
-    DATA2 = 3
-    DATA3 = 4
-    DATA4 = 5
 
 # Howmuch data will be read from the network at once
 READ_BUFFER_SIZE = 8192

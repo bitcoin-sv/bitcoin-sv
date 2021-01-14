@@ -2,10 +2,11 @@
 # Copyright (c) 2020  Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from test_framework.associations import BlockPriorityStreamPolicy, DefaultStreamPolicy, AssociationCB
-from test_framework.mininode import msg_ping, StreamType
+from test_framework.associations import AssociationCB
+from test_framework.mininode import msg_ping
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, wait_until
+from test_framework.streams import StreamType, BlockPriorityStreamPolicy, DefaultStreamPolicy
 
 # Test functionality within the test framework for simply creating P2P associations to nodes
 

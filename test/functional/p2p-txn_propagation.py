@@ -20,7 +20,7 @@ class P2PTxnPropagation(BitcoinTestFramework):
     def setup_network(self):
         self.setup_nodes()
         for n in range(1, self.num_nodes):
-            connect_nodes(self.nodes[0], n)
+            connect_nodes(self.nodes, 0, n)
 
     def setup_nodes(self):
         self.add_nodes(self.num_nodes, self.extra_args, timewait=900)

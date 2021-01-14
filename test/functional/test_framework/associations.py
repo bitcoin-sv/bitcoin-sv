@@ -2,31 +2,10 @@
 # Copyright (c) 2020 Bitcoin Association
 # Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
-from .mininode import (StreamType, NodeConn, NodeConnCB, msg_createstream, msg_block, msg_cmpctblock,
+from .mininode import (NodeConn, NodeConnCB, msg_createstream, msg_block, msg_cmpctblock,
     msg_blocktxn, msg_getblocktxn, msg_headers, msg_getheaders, msg_ping, msg_pong)
 from .util import p2p_port
-
-# Stream policies
-class DefaultStreamPolicy():
-    def __init__(self):
-        self.policy_name = b"Default"
-        self.additional_streams = []
-
-    def stream_type_for_message_type(self, msg):
-        # Everything over the GENERAL stream
-        return StreamType.GENERAL
-
-class BlockPriorityStreamPolicy():
-    def __init__(self):
-        self.policy_name = b"BlockPriority"
-        self.additional_streams = [ StreamType.DATA1 ]
-
-    def stream_type_for_message_type(self, msg):
-        # Block related and pings over DATA1, everything else over GENERAL
-        if type(msg) in [msg_block, msg_cmpctblock, msg_blocktxn, msg_getblocktxn, msg_headers, msg_getheaders, msg_ping, msg_pong]:
-            return StreamType.DATA1
-        return StreamType.GENERAL
-
+from .streams import StreamType
 
 # Association callbacks
 class AssociationCB():

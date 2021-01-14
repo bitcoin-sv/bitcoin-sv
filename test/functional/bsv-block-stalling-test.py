@@ -82,8 +82,8 @@ class StallingTest(ComparisonTestFramework):
 
         # Connect the new nodes up so they do IBD
         self.log.info("Starting IBD")
-        connect_nodes(self.nodes[0], 2)
-        connect_nodes(self.nodes[1], 2)
+        connect_nodes(self.nodes, 0, 2)
+        connect_nodes(self.nodes, 1, 2)
         self.sync_all(timeout=240) # larger timeout is needed to prevent timeouts on busy machine and debug builds
 
         # Check we didn't hit a stall for node2
