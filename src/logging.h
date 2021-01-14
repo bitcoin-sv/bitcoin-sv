@@ -48,6 +48,10 @@ enum LogFlags : uint32_t {
     TXNSRC = (1 << 22),
     JOURNAL = (1 << 23),
     TXNVAL = (1 << 24),
+    NETCONN = (1 << 25),
+    NETMSG = (1 << 26),
+    NETMSGVERB = (1 << 27),
+    NETMSGALL = NETMSG | NETMSGVERB,
     ALL = ~uint32_t(0),
 };
 
