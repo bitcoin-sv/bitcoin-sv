@@ -194,7 +194,7 @@ void AdvertiseLocal(const CNodePtr& pnode) {
             addrLocal.SetIP(pnode->GetAssociation().GetPeerAddrLocal());
         }
         if (addrLocal.IsRoutable()) {
-            LogPrint(BCLog::NET, "AdvertiseLocal: advertising address %s\n",
+            LogPrint(BCLog::NETCONN, "AdvertiseLocal: advertising address %s\n",
                      addrLocal.ToString());
             FastRandomContext insecure_rand;
             pnode->PushAddress(addrLocal, insecure_rand);
@@ -350,14 +350,14 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
             // Look for an existing connection
             CNodePtr pnode = FindNode(connect.addrConnect);
             if (pnode) {
-                LogPrintf("Failed to open new connection, already connected\n");
+                LogPrint(BCLog::NETCONN, "Failed to open new connection, already connected\n");
                 return nullptr;
             }
         }
     }
 
     /// debug print
-    LogPrint(BCLog::NET, "trying connection %s lastseen=%.1fhrs\n",
+    LogPrint(BCLog::NETCONN, "trying connection %s lastseen=%.1fhrs\n",
              connect.pszDest ? connect.pszDest : connect.addrConnect.ToString(),
              connect.pszDest
                  ? 0.0
@@ -372,8 +372,7 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
                 : ConnectSocket(connect.addrConnect, hSocket, nConnectTimeout,
                                 &proxyConnectionFailed)) {
         if (!IsSelectableSocket(hSocket)) {
-            LogPrintf("Cannot create connection: non-selectable socket created "
-                      "(fd >= FD_SETSIZE ?)\n");
+            LogPrint(BCLog::NETCONN, "Cannot create connection: non-selectable socket created (fd >= FD_SETSIZE ?)\n");
             CloseSocket(hSocket);
             return nullptr;
         }
@@ -389,7 +388,7 @@ CNodePtr CConnman::ConnectNode(NodeConnectInfo& connect)
             if (pnode) {
                 pnode->MaybeSetAddrName(std::string(connect.pszDest));
                 CloseSocket(hSocket);
-                LogPrintf("Failed to open new connection, already connected\n");
+                LogPrint(BCLog::NETCONN, "Failed to open new connection, already connected\n");
                 return nullptr;
             }
         }
@@ -443,7 +442,7 @@ void CConnman::DumpBanlist() {
         SetBannedSetDirty(false);
     }
 
-    LogPrint(BCLog::NET,
+    LogPrint(BCLog::NETCONN,
              "Flushed %d banned node ips/subnets to banlist.dat  %dms\n",
              banmap.size(), GetTimeMillis() - nStart);
 }
@@ -592,7 +591,7 @@ void CConnman::SweepBanned() {
         if (now > banEntry.nBanUntil) {
             setBanned.erase(it++);
             setBannedIsDirty = true;
-            LogPrint(BCLog::NET,
+            LogPrint(BCLog::NETCONN,
                      "%s: Removed banned node ip/subnet from banlist.dat: %s\n",
                      __func__, subNet.ToString());
         } else {
@@ -865,7 +864,7 @@ std::vector<CTxnSendingDetails> CNode::FetchNInventory(size_t n)
 /** Set peers known stream policies */
 void CNode::SetSupportedStreamPolicies(const std::string& policies)
 {
-    LogPrint(BCLog::NET, "Setting known stream policies to %s for peer=%d\n", policies, id);
+    LogPrint(BCLog::NETCONN, "Setting known stream policies to %s for peer=%d\n", policies, id);
 
     std::set<std::string> ourPolicies { g_connman->GetStreamPolicyFactory().GetSupportedPolicyNames() };
 
@@ -880,7 +879,7 @@ void CNode::SetSupportedStreamPolicies(const std::string& policies)
         mSupportedStreamPolicies.begin(), mSupportedStreamPolicies.end(),
         std::inserter(mCommonStreamPolicies, mCommonStreamPolicies.begin())
     );
-    LogPrint(BCLog::NET, "Set common stream policies to %s for peer=%d\n", GetCommonStreamPoliciesStr(), id);
+    LogPrint(BCLog::NETCONN, "Set common stream policies to %s for peer=%d\n", GetCommonStreamPoliciesStr(), id);
 }
 
 /** Get stream polices in common with this peer as a string formatted list */
@@ -953,7 +952,7 @@ bool CNode::GetPausedForSending(bool checkPauseRecv)
                 if(!mEnteredPauseSendRecv)
                 {
                     // Log that we have just become paused for both sending and receiving
-                    LogPrint(BCLog::NET, "Entered pause send and recv for peer=%d\n", id);
+                    LogPrint(BCLog::NETCONN, "Entered pause send and recv for peer=%d\n", id);
                 }
                 mEnteredPauseSendRecv = true;
             }
@@ -962,7 +961,7 @@ bool CNode::GetPausedForSending(bool checkPauseRecv)
                 if(mEnteredPauseSendRecv)
                 {
                     // Log that we have just left paused for both sending and receiving
-                    LogPrint(BCLog::NET, "Cleared pause send and recv for peer=%d\n", id);
+                    LogPrint(BCLog::NETCONN, "Cleared pause send and recv for peer=%d\n", id);
                 }
                 mEnteredPauseSendRecv = false;
             }
@@ -1028,24 +1027,24 @@ void CNode::ServiceSockets(fd_set& setRecv, fd_set& setSend, fd_set& setError, C
     if (nTime - nTimeConnected > nHandshakeTimeout) {
         auto timeout = gArgs.GetArg("-p2ptimeout", DEFAULT_P2P_TIMEOUT_INTERVAL);
         if (nLastRecv == 0 || nLastSend == 0) {
-            LogPrint(BCLog::NET, "socket no message in first %d seconds, %d %d from %d\n",
+            LogPrint(BCLog::NETCONN, "socket no message in first %d seconds, %d %d from %d\n",
                      nHandshakeTimeout, nLastRecv != 0, nLastSend != 0, id);
             fDisconnect = true;
         }
         else if (nTime - nLastSend > timeout) {
-            LogPrintf("socket sending timeout: %is\n", nTime - nLastSend);
+            LogPrint(BCLog::NETCONN, "socket sending timeout: %is\n", nTime - nLastSend);
             fDisconnect = true;
         }
         else if (nTime - nLastRecv > (nVersion > BIP0031_VERSION ? timeout : 90 * 60)) {
-            LogPrintf("socket receive timeout: %is\n", nTime - nLastRecv);
+            LogPrint(BCLog::NETCONN, "socket receive timeout: %is\n", nTime - nLastRecv);
             fDisconnect = true;
         }
         else if (nPingNonceSent && nPingUsecStart + (timeout * MICROS_PER_SECOND) < GetTimeMicros()) {
-            LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - nPingUsecStart));
+            LogPrint(BCLog::NETCONN, "ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - nPingUsecStart));
             fDisconnect = true;
         }
         else if (!fSuccessfullyConnected) {
-            LogPrintf("version handshake timeout from %d\n", id);
+            LogPrint(BCLog::NETCONN, "version handshake timeout from %d\n", id);
             fDisconnect = true;
         }
     }
@@ -1259,7 +1258,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
 
     if (hSocket != INVALID_SOCKET) {
         if (!addr.SetSockAddr((const struct sockaddr *)&sockaddr)) {
-            LogPrintf("Warning: Unknown socket family\n");
+            LogPrint(BCLog::NETCONN, "Warning: Unknown socket family\n");
         }
     }
 
@@ -1276,21 +1275,21 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
     if (hSocket == INVALID_SOCKET) {
         int nErr = WSAGetLastError();
         if (nErr != WSAEWOULDBLOCK) {
-            LogPrintf("socket error accept failed: %s\n",
+            LogPrint(BCLog::NETCONN, "socket error accept failed: %s\n",
                       NetworkErrorString(nErr));
         }
         return;
     }
 
     if (!fNetworkActive) {
-        LogPrintf("connection from %s dropped: not accepting new connections\n",
+        LogPrint(BCLog::NETCONN, "connection from %s dropped: not accepting new connections\n",
                   addr.ToString());
         CloseSocket(hSocket);
         return;
     }
 
     if (!IsSelectableSocket(hSocket)) {
-        LogPrintf("connection from %s dropped: non-selectable socket\n",
+        LogPrint(BCLog::NETCONN, "connection from %s dropped: non-selectable socket\n",
                   addr.ToString());
         CloseSocket(hSocket);
         return;
@@ -1307,7 +1306,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
 #endif
 
     if (IsBanned(addr) && !whitelisted) {
-        LogPrint(BCLog::NET, "connection from %s dropped (banned)\n", addr.ToString());
+        LogPrint(BCLog::NETCONN, "connection from %s dropped (banned)\n", addr.ToString());
         CloseSocket(hSocket);
         return;
     }
@@ -1315,8 +1314,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
     if (nInbound >= nMaxInbound) {
         if (!AttemptToEvictConnection()) {
             // No connection to evict, disconnect the new connection
-            LogPrint(BCLog::NET, "failed to find an eviction candidate - "
-                                 "connection dropped (full)\n");
+            LogPrint(BCLog::NETCONN, "failed to find an eviction candidate - connection dropped (full)\n");
             CloseSocket(hSocket);
             return;
         }
@@ -1343,7 +1341,7 @@ void CConnman::AcceptConnection(const ListenSocket &hListenSocket) {
 
     GetNodeSignals().InitializeNode(pnode, *this, nullptr);
 
-    LogPrint(BCLog::NET, "connection from %s accepted\n", addr.ToString());
+    LogPrint(BCLog::NETCONN, "connection from %s accepted\n", addr.ToString());
 
     {
         LOCK(cs_vNodes);
@@ -1460,7 +1458,7 @@ void CConnman::ThreadSocketHandler() {
         if (nSelect == SOCKET_ERROR) {
             if (have_fds) {
                 int nErr = WSAGetLastError();
-                LogPrintf("socket select error %s\n", NetworkErrorString(nErr));
+                LogPrint(BCLog::NETCONN, "socket select error %s\n", NetworkErrorString(nErr));
                 for (SOCKET i = 0; i <= hSocketMax; i++) {
                     FD_SET(i, &fdsetRecv);
                 }
@@ -1723,7 +1721,7 @@ void CConnman::DumpAddresses() {
     CAddrDB adb(config->GetChainParams());
     adb.Write(addrman);
 
-    LogPrint(BCLog::NET, "Flushed %d addresses to peers.dat  %dms\n",
+    LogPrint(BCLog::NETCONN, "Flushed %d addresses to peers.dat  %dms\n",
              addrman.size(), GetTimeMillis() - nStart);
 }
 
@@ -1920,7 +1918,7 @@ void CConnman::ThreadOpenConnections() {
                         std::chrono::milliseconds(randsleep))) {
                     return;
                 }
-                LogPrint(BCLog::NET, "Making feeler connection to %s\n",
+                LogPrint(BCLog::NETCONN, "Making feeler connection to %s\n",
                          addrConnect.ToString());
             }
 
@@ -2061,7 +2059,7 @@ void CConnman::ThreadOpenNewStreamConnections()
             // Try establishing connection for a new stream
             if(!OpenNetworkConnection(pendingStream))
             {
-                LogPrint(BCLog::NET, "Failed to open new stream connection\n");
+                LogPrint(BCLog::NETCONN, "Failed to open new stream connection\n");
             }
         }
 
@@ -2354,7 +2352,7 @@ void Discover(boost::thread_group &threadGroup) {
 }
 
 void CConnman::SetNetworkActive(bool active) {
-    LogPrint(BCLog::NET, "SetNetworkActive: %s\n", active);
+    LogPrint(BCLog::NETCONN, "SetNetworkActive: %s\n", active);
 
     if (!active) {
         fNetworkActive = false;
@@ -2493,7 +2491,7 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
         // sweep out unused entries
         SweepBanned();
 
-        LogPrint(BCLog::NET,
+        LogPrint(BCLog::NETCONN,
                  "Loaded %d banned node ips/subnets from banlist.dat  %dms\n",
                  banmap.size(), GetTimeMillis() - nStart);
     } else {
@@ -2565,7 +2563,7 @@ bool CConnman::Start(CScheduler &scheduler, std::string &strNodeError,
                     &CConnman::ThreadOpenNewStreamConnections, this)));
     }
     else {
-        LogPrint(BCLog::NET, "Multi-streams disabled\n");
+        LogPrint(BCLog::NETCONN, "Multi-streams disabled\n");
     }
 
     // Process messages
@@ -2655,8 +2653,8 @@ void CConnman::Stop() {
     for (ListenSocket &hListenSocket : vhListenSocket) {
         if (hListenSocket.socket != INVALID_SOCKET) {
             if (!CloseSocket(hListenSocket.socket)) {
-                LogPrintf("CloseSocket(hListenSocket) failed with error %s\n",
-                          NetworkErrorString(WSAGetLastError()));
+                LogPrint(BCLog::NETCONN, "CloseSocket(hListenSocket) failed with error %s\n",
+                    NetworkErrorString(WSAGetLastError()));
             }
         }
     }
@@ -2944,15 +2942,15 @@ CNode::CNode(
     addrName = addrNameIn == "" ? mAssociation.GetPeerAddr().ToStringIPPort() : addrNameIn;
 
     if (fLogIPs) {
-        LogPrint(BCLog::NET, "Added connection to %s peer=%d\n", addrName, id);
+        LogPrint(BCLog::NETCONN, "Added connection to %s peer=%d\n", addrName, id);
     } else {
-        LogPrint(BCLog::NET, "Added connection peer=%d\n", id);
+        LogPrint(BCLog::NETCONN, "Added connection peer=%d\n", id);
     }
 }
 
 CNode::~CNode()
 {
-    LogPrint(BCLog::NET, "Removing peer=%d\n", id);
+    LogPrint(BCLog::NETCONN, "Removing peer=%d\n", id);
 }
 
 void CNode::AskFor(const CInv &inv, const Config &config) {
@@ -2982,8 +2980,10 @@ void CNode::AskFor(const CInv &inv, const Config &config) {
     } else {
         nRequestTime = 0;
     }
-    LogPrint(BCLog::NET, "askfor %s  %d (%s) peer=%d\n", inv.ToString(),
-             nRequestTime,
+
+    // Log TX askfor only at most verbose level
+    LogPrint((inv.type == MSG_TX)? BCLog::NETMSGVERB : BCLog::NETMSG,
+             "askfor %s %d (%s) peer=%d\n", inv.ToString(), nRequestTime,
              DateTimeStrFormat("%H:%M:%S", nRequestTime / MICROS_PER_SECOND), id);
 
     // Make sure not to reuse time indexes to keep things in the same order
@@ -3016,11 +3016,11 @@ void CConnman::PushMessage(const CNodePtr& pnode, CSerializedNetMsg &&msg, Strea
     uint64_t nPayloadLength = msg.Size();
     if (nPayloadLength > std::numeric_limits<uint32_t>::max())
     {
-        LogPrint(BCLog::NET, "message %s (%d bytes) cannot be sent because it exceeds max P2P message limit peer=%d\n",
+        LogPrint(BCLog::NETMSG, "message %s (%d bytes) cannot be sent because it exceeds max P2P message limit peer=%d\n",
             SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
         return;
     }
-    LogPrint(BCLog::NET, "sending %s (%d bytes) peer=%d\n",
+    LogPrint(BCLog::NETMSGVERB, "sending %s (%d bytes) peer=%d\n",
              SanitizeString(msg.Command().c_str()), nPayloadLength, pnode->id);
 
     std::vector<uint8_t> serializedHeader;
@@ -3097,7 +3097,7 @@ CNodePtr CConnman::MoveStream(NodeId from, const AssociationIDPtr& newAssocID, S
     }
 
     // Transfer the stream
-    LogPrint(BCLog::NET, "Stream for association ID %s moving from peer=%d to peer=%d\n",
+    LogPrint(BCLog::NETCONN, "Stream for association ID %s moving from peer=%d to peer=%d\n",
         newAssocID->ToString(), from, toNode->id);
     fromNode->GetAssociation().MoveStream(newStreamType, toNode->GetAssociation());
 
