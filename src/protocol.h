@@ -362,16 +362,13 @@ enum ServiceFlags : uint64_t {
  */
 class CAddress : public CService {
 public:
-    CAddress();
+    CAddress() = default;
     explicit CAddress(CService ipIn, ServiceFlags nServicesIn);
-
-    void Init();
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
-        if (ser_action.ForRead()) Init();
         int nVersion = s.GetVersion();
         if (s.GetType() & SER_DISK) READWRITE(nVersion);
         if ((s.GetType() & SER_DISK) ||
@@ -385,10 +382,10 @@ public:
 
     // TODO: make private (improves encapsulation)
 public:
-    ServiceFlags nServices;
+    ServiceFlags nServices{NODE_NONE};
 
     // disk and network only
-    unsigned int nTime;
+    unsigned int nTime{100000000};
 };
 
 /** getdata message type flags */

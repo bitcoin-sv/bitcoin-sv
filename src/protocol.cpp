@@ -182,18 +182,7 @@ bool CMessageHeader::IsOversized(const Config &config) const
     return nPayloadLength > NetMsgType::GetMaxMessageLength(GetCommand(), config);
 }
 
-CAddress::CAddress() : CService() {
-    Init();
-}
-
-CAddress::CAddress(CService ipIn, ServiceFlags nServicesIn) : CService(ipIn) {
-    Init();
-    nServices = nServicesIn;
-}
-
-void CAddress::Init() {
-    nServices = NODE_NONE;
-    nTime = 100000000;
+CAddress::CAddress(CService ipIn, ServiceFlags nServicesIn) : CService{ipIn}, nServices{nServicesIn} {
 }
 
 std::string CInv::GetCommand() const {

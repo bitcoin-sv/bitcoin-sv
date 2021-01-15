@@ -15,11 +15,6 @@
 static const uint8_t pchIPv4[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
 static const uint8_t pchOnionCat[] = {0xFD, 0x87, 0xD8, 0x7E, 0xEB, 0x43};
 
-void CNetAddr::Init() {
-    memset(ip, 0, sizeof(ip));
-    scopeId = 0;
-}
-
 void CNetAddr::SetIP(const CNetAddr &ipIn) {
     memcpy(ip, ipIn.ip, sizeof(ip));
 }
@@ -50,10 +45,6 @@ bool CNetAddr::SetSpecial(const std::string &strName) {
         return true;
     }
     return false;
-}
-
-CNetAddr::CNetAddr() {
-    Init();
 }
 
 CNetAddr::CNetAddr(const struct in_addr &ipv4Addr) {
@@ -408,14 +399,6 @@ int CNetAddr::GetReachabilityFrom(const CNetAddr *paddrPartner) const {
                     return REACH_PRIVATE;
             }
     }
-}
-
-void CService::Init() {
-    port = 0;
-}
-
-CService::CService() {
-    Init();
 }
 
 CService::CService(const CNetAddr &cip, unsigned short portIn)
