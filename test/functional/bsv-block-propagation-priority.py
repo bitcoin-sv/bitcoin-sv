@@ -112,7 +112,11 @@ class BlockPriorityTest(BitcoinTestFramework):
         last_msg_pos = self.num_txns + 1
 
         # Initial node setup
-        with self.run_node_with_connections("Setup node", 0, [], 1) as connections:
+        extra_args = [
+            '-maxnonstdtxvalidationduration=100000',
+            '-maxtxnvalidatorasynctasksrunduration=100001'
+        ]
+        with self.run_node_with_connections("Setup node", 0, extra_args, 1) as connections:
             conn = connections[0]
 
             # Create and send some transactions to the node
@@ -123,15 +127,19 @@ class BlockPriorityTest(BitcoinTestFramework):
             for tx in islice(tx_generator, self.num_txns):
                 inv_items.append(CInv(1, tx.sha256))
                 conn.send_message(msg_tx(tx))
-            wait_until(lambda: node.getmempoolinfo()['size'] == self.num_txns)
+            wait_until(lambda: node.getmempoolinfo()['size'] == self.num_txns, timeout=240)
 
         # Restart node with associations
         associations_stream_policies = [ BlockPriorityStreamPolicy(), DefaultStreamPolicy(), BlockPriorityStreamPolicy(), DefaultStreamPolicy() ]
-        extra_args = ['-whitelist=127.0.0.1']
+        extra_args = [
+            '-whitelist=127.0.0.1',
+            '-maxnonstdtxvalidationduration=100000',
+            '-maxtxnvalidatorasynctasksrunduration=100001'
+        ]
         with self.run_node_with_associations("Test block priority", 0, extra_args, associations_stream_policies, cb_class=MyAssociationCB) as associations:
             # Wait for node to fully reinitialise itself
             node = self.nodes[0]
-            wait_until(lambda: node.getmempoolinfo()['size'] == self.num_txns)
+            wait_until(lambda: node.getmempoolinfo()['size'] == self.num_txns, timeout=180)
 
             # Send MEMPOOL request so node will accept our GETDATA for transactions in the mempool
             for association in associations:
