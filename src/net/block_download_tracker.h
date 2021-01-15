@@ -111,6 +111,9 @@ class BlockDownloadTracker
     // Lookup sender NodeIds for the given block
     std::vector<NodeId> getAllSourcesForBlockNL(const uint256& hash) const;
 
+    // Select peers to announce new blocks via compact blocks
+    void maybeSetPeerAsAnnouncingHeaderAndIDsNL(NodeId nodeid, const CNodeStatePtr& nodestate);
+
 
     // Blocks currently in flight and who they are in flight from
     InFlightMap mMapBlocksInFlight {};
@@ -120,6 +123,9 @@ class BlockDownloadTracker
 
     // Where downloaded blocks came from and whether to punish
     std::multimap<uint256, BlockPunish> mMapBlockSender {};
+
+    // Stack of nodes which we have set to announce using compact blocks
+    std::list<NodeId> mNodesAnnouncingHeaderAndIDs {};
 
     // Mutex
     mutable std::mutex mMtx {};
