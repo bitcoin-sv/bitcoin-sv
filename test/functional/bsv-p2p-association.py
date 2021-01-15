@@ -147,6 +147,9 @@ class P2PAssociation(BitcoinTestFramework):
         newStyleSixthConnCB = TestNode()
         badStreamConn4 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSixthConnCB, assocID=newStyleFirstConn.assocID)
         newStyleSixthConnCB.add_connection(badStreamConn4)
+        newStyleSeventhConnCB = TestNode()
+        badStreamConn5 = NodeConn('127.0.0.1', p2p_port(0), self.nodes[0], newStyleSeventhConnCB, assocID=newStyleFirstConn.assocID)
+        newStyleSeventhConnCB.add_connection(badStreamConn5)
 
         # Start up network handling in another thread. This needs to be called
         # after the P2P connections have been created.
@@ -235,6 +238,12 @@ class P2PAssociation(BitcoinTestFramework):
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
+                {
+                    'id'           : 11,                                # badStreamConn5
+                    'associd'      : 'Not-Set',
+                    'streampolicy' : 'Default',
+                    'streams'      : [ 'GENERAL' ]
+                },
             ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
 
@@ -312,6 +321,12 @@ class P2PAssociation(BitcoinTestFramework):
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
                 },
+                {
+                    'id'           : 11,                                # badStreamConn5
+                    'associd'      : 'Not-Set',
+                    'streampolicy' : 'Default',
+                    'streams'      : [ 'GENERAL' ]
+                },
             ]
         wait_until(lambda: self.check_peer_info(self.nodes[0], expected), timeout=5)
         with mininode_lock: assert(newStyleSecondConnCB.last_streamack is not None)
@@ -324,6 +339,15 @@ class P2PAssociation(BitcoinTestFramework):
         assert("No node found with association ID" in str(newStyleThirdConnCB.last_reject.reason))
         # Connection will be closed
         wait_until(lambda: badStreamConn1.state == "closed", lock=mininode_lock, timeout=5)
+
+        # Send create stream with missing association ID
+        badStreamConn5.send_message(msg_createstream(stream_type=StreamType.DATA2.value, assocID=""))
+        # Should receive reject, no streamack
+        wait_until(lambda: newStyleSeventhConnCB.last_reject is not None, lock=mininode_lock, timeout=5)
+        with mininode_lock: assert(newStyleSeventhConnCB.last_streamack is None)
+        assert("Badly formatted message" in str(newStyleSeventhConnCB.last_reject.reason))
+        # Connection will be closed
+        wait_until(lambda: badStreamConn5.state == "closed", lock=mininode_lock, timeout=5)
 
         # Send create stream for unknown stream type
         badStreamConn2.send_message(msg_createstream(stream_type=9, assocID=badStreamConn2.assocID))
@@ -441,7 +465,7 @@ class P2PAssociation(BitcoinTestFramework):
                     'streams'      : [ 'GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4' ]
                 },
                 {
-                    'id'           : 11,                                # A new association established to node1
+                    'id'           : 12,                                # A new association established to node1
                     'associd'      : '<UNKNOWN>',
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1' ]
@@ -480,13 +504,13 @@ class P2PAssociation(BitcoinTestFramework):
                     'streams'      : [ 'GENERAL', 'DATA1', 'DATA2', 'DATA3', 'DATA4' ]
                 },
                 {
-                    'id'           : 11,                                # Association to node 1
+                    'id'           : 12,                                # Association to node 1
                     'associd'      : '<UNKNOWN>',
                     'streampolicy' : 'BlockPriority',
                     'streams'      : [ 'GENERAL', 'DATA1' ]
                 },
                 {
-                    'id'           : 13,                                # Old style association to node 2
+                    'id'           : 14,                                # Old style association to node 2
                     'associd'      : 'Not-Set',
                     'streampolicy' : 'Default',
                     'streams'      : [ 'GENERAL' ]
