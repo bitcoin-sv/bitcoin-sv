@@ -140,6 +140,11 @@ static const std::string DEFAULT_STREAM_POLICY_LIST =
     std::string{BlockPriorityStreamPolicy::POLICY_NAME} + "," +
     std::string{DefaultStreamPolicy::POLICY_NAME};
 
+// Parallel block fetch timeout for slow peers (in seconds)
+static const unsigned int DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT = 30;
+// Parralel block fetch maximum number of requests for a single block to different peers
+static const size_t DEFAULT_MAX_BLOCK_PARALLEL_FETCH = 3;
+
 /**
  * Default maximum amount of concurrent async tasks per node before node message
  * processing is skipped until the amount is freed up again.

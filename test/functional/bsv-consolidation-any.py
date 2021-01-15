@@ -9,7 +9,7 @@ This test creates "spendable by anyone" scripts to easely tweak the script sizes
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.script import CScript, OP_NOP, OP_DROP, OP_2DROP, OP_TRUE, SIGHASH_FORKID, SIGHASH_ANYONECANPAY, SIGHASH_NONE
-from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, bytes_to_hex_str
+from test_framework.util import assert_raises_rpc_error, satoshi_round, assert_equal, bytes_to_hex_str, sync_blocks
 from test_framework.mininode import ToHex, FromHex, CTransaction, CTxOut, CTxIn, COutPoint, uint256_from_str, hex_str_to_bytes, COIN
 from decimal import Decimal
 
@@ -191,6 +191,7 @@ class ConsolidationP2PKHTest(BitcoinTestFramework):
         single_output_script_sizes = [25,50]
         for node in self.nodes:
             node.generate(200)
+            sync_blocks(self.nodes)
             for output_count in output_counts:
                 for single_output_script_size in single_output_script_sizes:
                     network_info = node.getnetworkinfo()

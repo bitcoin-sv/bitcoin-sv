@@ -69,6 +69,9 @@ class BanStream : public std::exception
 class Stream
 {
   public:
+    // Default stream sending bandwidth rate limit to apply (no limit)
+    static constexpr int64_t DEFAULT_SEND_RATE_LIMIT {-1};
+
     Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRecvBuffSize);
     ~Stream();
 
@@ -173,6 +176,10 @@ class Stream
     int64_t mLastSpotMeasurementTime { GetTimeMicros() };
     // Bytes received since last spot measurement
     uint64_t mBytesRecvThisSpot {0};
+
+    // Sending rate limiting
+    int64_t mSendRateLimit {DEFAULT_SEND_RATE_LIMIT};
+    int64_t mSendStartTime { GetTimeMicros() };
 
     /**
      * Storage for the last chunk being sent to the peer. This variable contains

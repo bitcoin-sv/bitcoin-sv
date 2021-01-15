@@ -211,6 +211,20 @@ AverageBandwidth Association::GetAverageBandwidth(const StreamType streamType) c
     return streamIt->second->GetAverageBandwidth();
 }
 
+AverageBandwidth Association::GetAverageBandwidth(const StreamPolicy::MessageType msgType) const
+{
+    StreamType streamType { StreamType::UNKNOWN };
+
+    {
+        // What stream type carries the requested message type?
+        LOCK(cs_mStreams);
+        streamType = mStreamPolicy->GetStreamTypeForMessage(msgType);
+    }
+
+    // Get average bandwidth for stream type
+    return GetAverageBandwidth(streamType);
+}
+
 void Association::CopyStats(AssociationStats& stats) const
 {
     {

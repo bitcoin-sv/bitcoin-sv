@@ -16,8 +16,10 @@
 #include "init.h"
 #include "locked_ref.h"
 #include "merkleblock.h"
+#include "net/block_download_tracker.h"
 #include "net/net.h"
 #include "net/netbase.h"
+#include "net/node_state.h"
 #include "netmessagemaker.h"
 #include "policy/fees.h"
 #include "primitives/block.h"
@@ -60,30 +62,10 @@ namespace {
 /** Number of nodes with fSyncStarted. */
 std::atomic<int> nSyncStarted = 0;
 
-/**
- * Sources of received blocks, saved to be able to send them reject messages or
- * ban them when processing happens afterwards. Protected by cs_main.
- * Set mapBlockSource[hash].second to false if the node should not be punished
- * if the block is invalid.
- */
-std::map<uint256, std::pair<NodeId, bool>> mapBlockSource;
-
 uint256 hashRecentRejectsChainTip;
 
-/**
- * Blocks that are in flight, and that are in the queue to be downloaded.
- * Protected by cs_main.
- */
-struct QueuedBlock {
-    uint256 hash;
-    const CBlockIndex& blockIndex;
-    //!< Whether this block has validated headers at the time of request.
-    bool fValidatedHeaders;
-    //!< Optional, used for CMPCTBLOCK downloads
-    std::unique_ptr<PartiallyDownloadedBlock> partialBlock;
-};
-std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator>>
-    mapBlocksInFlight;
+/** Track blocks in flight and where they're coming from */
+BlockDownloadTracker blockDownloadTracker {};
 
 /** Stack of nodes which we have set to announce using compact blocks */
 std::list<NodeId> lNodesAnnouncingHeaderAndIDs;
@@ -109,119 +91,12 @@ std::deque<std::pair<int64_t, MapRelay::iterator>> vRelayExpiration;
 
 namespace {
 
-struct CBlockReject {
-    uint8_t chRejectCode;
-    std::string strRejectReason;
-    uint256 hashBlock;
-};
-
-/**
- * Maintain validation-specific state about nodes, protected by cs_main, instead
- * by CNode's own locks. This simplifies asynchronous operation, where
- * processing of incoming data is done after the ProcessMessage call returns,
- * and we're no longer holding the node's locks.
- */
-struct CNodeState {
-    //! The peer's address
-    const CService address {};
-    //! Whether we have a fully established connection.
-    bool fCurrentlyConnected {false};
-    //! Accumulated misbehaviour score for this peer.
-    int nMisbehavior {0};
-    //! Whether this peer should be disconnected and banned (unless
-    //! whitelisted).
-    bool fShouldBan {false};
-    //! String name of this peer (debugging/logging purposes).
-    const std::string name {};
-    //! List of asynchronously-determined block rejections to notify this peer
-    //! about.
-    std::vector<CBlockReject> rejects {};
-    //! The best known block we know this peer has announced.
-    const CBlockIndex* pindexBestKnownBlock {nullptr};
-    //! The hash of the last unknown block this peer has announced.
-    uint256 hashLastUnknownBlock {};
-    //! The last full block we both have.
-    const CBlockIndex* pindexLastCommonBlock {nullptr};
-    //! The best header we have sent our peer.
-    const CBlockIndex* pindexBestHeaderSent {nullptr};
-    //! Length of current-streak of unconnecting headers announcements
-    int nUnconnectingHeaders {0};
-    //! Whether we've started headers synchronization with this peer.
-    bool fSyncStarted {false};
-    //! Since when we're stalling block download progress (in microseconds), or
-    //! 0.
-    int64_t nStallingSince {0};
-    std::list<QueuedBlock> vBlocksInFlight {};
-    //! When the first entry in vBlocksInFlight started downloading. Don't care
-    //! when vBlocksInFlight is empty.
-    int64_t nDownloadingSince {0};
-    int nBlocksInFlight {0};
-    int nBlocksInFlightValidHeaders {0};
-    //! Whether we consider this a preferred download peer.
-    bool fPreferredDownload {false};
-    //! Whether this peer wants invs or headers (when possible) for block
-    //! announcements.
-    bool fPreferHeaders {false};
-    //! Whether this peer wants invs or cmpctblocks (when possible) for block
-    //! announcements.
-    bool fPreferHeaderAndIDs {false};
-    /**
-     * Whether this peer will send us cmpctblocks if we request them.
-     * This is not used to gate request logic, as we really only care about
-     * fSupportsDesiredCmpctVersion, but is used as a flag to "lock in" the
-     * version of compact blocks we send.
-     */
-    bool fProvidesHeaderAndIDs {false};
-    /**
-     * If we've announced NODE_WITNESS to this peer: whether the peer sends
-     * witnesses in cmpctblocks/blocktxns, otherwise: whether this peer sends
-     * non-witnesses in cmpctblocks/blocktxns.
-     */
-    bool fSupportsDesiredCmpctVersion {false};
-
-    /*
-    * Capture the number and frequency of Invalid checksum
-    */
-    double dInvalidChecksumFrequency {0};
-    std::chrono::system_clock::time_point nTimeOfLastInvalidChecksumHeader { std::chrono::system_clock::now() };
-
-    int64_t nextSendThresholdTime {0};
-
-    /**
-    * A mutex for locking these details. Needs (at least for now) to be
-    * recursive because of all the legacy structure.
-    */
-    std::recursive_mutex mMtx {};
-
-    CNodeState(CAddress addrIn, std::string addrNameIn)
-        : address(addrIn), name(addrNameIn) {
-        hashLastUnknownBlock.SetNull();
-    }
-
-    bool CanSend() const {
-        return nextSendThresholdTime < GetTimeMicros();
-    }
-};
-
-using CNodeStatePtr = std::shared_ptr<CNodeState>;
-using CNodeStateRef = CLockedRef<CNodeStatePtr, std::unique_lock<std::recursive_mutex>>;
-
-/** Map maintaining per-node state. */
-std::map<NodeId, CNodeStatePtr> mapNodeState;
-std::shared_mutex mapNodeStateMtx {};
-
-// Fetch node state
-CNodeStateRef GetState(NodeId pnode) {
-    // Lock access for reading to the map of node states
-    std::shared_lock<std::shared_mutex> lock { mapNodeStateMtx };
-
-    auto it { mapNodeState.find(pnode) };
-    if(it == mapNodeState.end()) {
-        // Not found, return null
-        return {};
-    }
-    // Return a shared ref to the item in the map, locked appropriately
-    return { it->second, it->second->mMtx };
+bool IsBlockDownloadStallingFromPeer(const CNodePtr& node, uint64_t& avgbw)
+{
+    avgbw = node->GetAssociation().GetAverageBandwidth(StreamPolicy::MessageType::BLOCK).first;
+    int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
+    minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
+    return (avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000);
 }
 
 void UpdatePreferredDownload(const CNodePtr& pnode) {
@@ -338,147 +213,36 @@ void FinalizeNode(NodeId nodeid, bool &fUpdateConnectionTime)
 
     fUpdateConnectionTime = false;
 
-    // Try to obtain an access to the node's state data.
-    const CNodeStateRef stateRef { GetState(nodeid) };
-    const CNodeStatePtr& state { stateRef.get() };
-    assert(state);
+    // Erase orphan txns received from the given nodeId
+    g_connman->EraseOrphanTxnsFromPeer(nodeid);
+
+    // Read & modify mapNodeState in an exclusive mode.
+    std::unique_lock<std::shared_mutex> lock { mapNodeStateMtx };
+    auto it { mapNodeState.find(nodeid) };
+    assert(it != mapNodeState.end());
+
+    const CNodeStateRef stateRef { it->second, it->second->mMtx };
+    const CNodeStatePtr state { stateRef.get() };
 
     if (state->fSyncStarted) {
         nSyncStarted--;
     }
-
     if (state->nMisbehavior == 0 && state->fCurrentlyConnected) {
         fUpdateConnectionTime = true;
     }
-
-    for (const QueuedBlock &entry : state->vBlocksInFlight) {
-        mapBlocksInFlight.erase(entry.hash);
-    }
-    // Get rid of stale mapBlockSource entries for this peer as they may leak
-    // if we don't clean them up (I saw on the order of ~100 stale entries on
-    // a full resynch in my testing -- these entries stay forever).
-    // Performance note: most of the time mapBlockSource has 0 or 1 entries.
-    // During synch of blockchain it may end up with as many as 1000 entries,
-    // which still only takes ~1ms to iterate through on even old hardware.
-    // So this memleak cleanup is not expensive and worth doing since even
-    // small leaks are bad. :)
-    for (auto it = mapBlockSource.begin(); it != mapBlockSource.end(); /*NA*/) {
-        if (it->second.first == nodeid) {
-            mapBlockSource.erase(it++);
-        } else {
-            ++it;
-        }
-    }
-    // Erase orphan txns received from the given nodeId
-    g_connman->EraseOrphanTxnsFromPeer(nodeid);
     nPreferredDownload -= state->fPreferredDownload;
-    nPeersWithValidatedDownloads -= (state->nBlocksInFlightValidHeaders != 0);
-    assert(nPeersWithValidatedDownloads >= 0);
 
-    // Modify mapNodeState in an exclusive mode.
-    {
-        std::unique_lock<std::shared_mutex> lock { mapNodeStateMtx };
-        mapNodeState.erase(nodeid);
-        if (mapNodeState.empty()) {
-            // Do a consistency check after the last peer is removed.
-            assert(mapBlocksInFlight.empty());
-            assert(nPreferredDownload == 0);
-            assert(nPeersWithValidatedDownloads == 0);
-        }
-    }
-}
+    // Finished with node entry
+    mapNodeState.erase(it);
+    bool lastPeer { mapNodeState.empty() };
 
-// Requires cs_main.
-// Returns a bool indicating whether we requested this block.
-// Also used if a block was /not/ received and timed out or started with another
-// peer.
-bool MarkBlockAsReceived(const uint256 &hash) {
-
-    AssertLockHeld(cs_main);
-    std::map<uint256,
-             std::pair<NodeId, std::list<QueuedBlock>::iterator>>::iterator
-        itInFlight = mapBlocksInFlight.find(hash);
-    if (itInFlight != mapBlocksInFlight.end()) {
-        // Try to obtain an access to the node's state data.
-        const CNodeStateRef stateRef { GetState(itInFlight->second.first) };
-        const CNodeStatePtr& state { stateRef.get() };
-        assert(state);
-        state->nBlocksInFlightValidHeaders -=
-            itInFlight->second.second->fValidatedHeaders;
-        if (state->nBlocksInFlightValidHeaders == 0 &&
-            itInFlight->second.second->fValidatedHeaders) {
-            // Last validated block on the queue was received.
-            nPeersWithValidatedDownloads--;
-        }
-        if (state->vBlocksInFlight.begin() == itInFlight->second.second) {
-            // First block on the queue was received, update the start download
-            // time for the next one
-            state->nDownloadingSince =
-                std::max(state->nDownloadingSince, GetTimeMicros());
-        }
-        state->vBlocksInFlight.erase(itInFlight->second.second);
-        state->nBlocksInFlight--;
-        state->nStallingSince = 0;
-        mapBlocksInFlight.erase(itInFlight);
-        return true;
+    if (lastPeer) {
+        // Do a consistency check after the last peer is removed.
+        assert(nPreferredDownload == 0);
     }
 
-    return false;
-}
-
-// Requires cs_main.
-// returns false, still setting pit, if the block was already in flight from the
-// same peer pit will only be valid as long as the same cs_main lock is being
-// held.
-static bool
-MarkBlockAsInFlight(const Config &config, NodeId nodeid, const uint256 &hash,
-                    const Consensus::Params &consensusParams,
-					const CNodeStatePtr& state,
-                    const CBlockIndex& pindex,
-                    std::list<QueuedBlock>::iterator **pit = nullptr) {
-
-    AssertLockHeld(cs_main);
-    // Short-circuit most stuff in case its from the same node.
-    std::map<uint256,
-             std::pair<NodeId, std::list<QueuedBlock>::iterator>>::iterator
-        itInFlight = mapBlocksInFlight.find(hash);
-    if (itInFlight != mapBlocksInFlight.end() &&
-        itInFlight->second.first == nodeid) {
-        if (pit){
-            *pit = &itInFlight->second.second;
-        }
-        return false;
-    }
-
-    // Make sure it's not listed somewhere already.
-    MarkBlockAsReceived(hash);
-
-    assert(state);
-    std::list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(
-        state->vBlocksInFlight.end(),
-        {hash, pindex, true,
-         std::unique_ptr<PartiallyDownloadedBlock>(
-             pit ? new PartiallyDownloadedBlock(config, &mempool) : nullptr)});
-    state->nBlocksInFlight++;
-    state->nBlocksInFlightValidHeaders += it->fValidatedHeaders;
-    if (state->nBlocksInFlight == 1) {
-        // We're starting a block download (batch) from this peer.
-        state->nDownloadingSince = GetTimeMicros();
-    }
-
-    if (state->nBlocksInFlightValidHeaders == 1) {
-        nPeersWithValidatedDownloads++;
-    }
-
-    itInFlight = mapBlocksInFlight
-                     .insert(std::make_pair(hash, std::make_pair(nodeid, it)))
-                     .first;
-
-    if (pit) {
-        *pit = &itInFlight->second.second;
-    }
-
-    return true;
+    // Clear out node details from block download tracker
+    blockDownloadTracker.ClearPeer(nodeid, state, lastPeer);
 }
 
 /** Check whether the last unknown block a peer advertised is not yet known. */
@@ -522,59 +286,6 @@ void UpdateBlockAvailability(const uint256 &hash, const CNodeStatePtr& state) {
     }
 }
 
-void MaybeSetPeerAsAnnouncingHeaderAndIDs(NodeId nodeid, CConnman &connman) {
-
-    AssertLockHeld(cs_main);
-    {
-        // Try to obtain an access to the node's state data.
-        const CNodeStateRef nodestateRef { GetState(nodeid) };
-        const CNodeStatePtr& nodestate { nodestateRef.get() };
-        if (!nodestate) {
-            LogPrint(BCLog::NET, "node state unavailable: peer=%d\n", nodeid);
-            return;
-        }
-        if (!nodestate->fProvidesHeaderAndIDs) {
-            return;
-        }
-    }
-    for (std::list<NodeId>::iterator it = lNodesAnnouncingHeaderAndIDs.begin();
-         it != lNodesAnnouncingHeaderAndIDs.end(); it++) {
-        if (*it == nodeid) {
-            lNodesAnnouncingHeaderAndIDs.erase(it);
-            lNodesAnnouncingHeaderAndIDs.push_back(nodeid);
-            return;
-        }
-    }
-    connman.ForNode(nodeid, [&connman](const CNodePtr& pfrom) {
-        bool fAnnounceUsingCMPCTBLOCK = false;
-        uint64_t nCMPCTBLOCKVersion = 1;
-        if (lNodesAnnouncingHeaderAndIDs.size() >= 3) {
-            // As per BIP152, we only get 3 of our peers to announce
-            // blocks using compact encodings.
-            connman.ForNode(lNodesAnnouncingHeaderAndIDs.front(),
-                            [&connman, fAnnounceUsingCMPCTBLOCK,
-                             nCMPCTBLOCKVersion](const CNodePtr& pnodeStop) {
-                                connman.PushMessage(
-                                    pnodeStop,
-                                    CNetMsgMaker(pnodeStop->GetSendVersion())
-                                        .Make(NetMsgType::SENDCMPCT,
-                                              fAnnounceUsingCMPCTBLOCK,
-                                              nCMPCTBLOCKVersion));
-                                return true;
-                            });
-            lNodesAnnouncingHeaderAndIDs.pop_front();
-        }
-        fAnnounceUsingCMPCTBLOCK = true;
-        connman.PushMessage(pfrom,
-                            CNetMsgMaker(pfrom->GetSendVersion())
-                                .Make(NetMsgType::SENDCMPCT,
-                                      fAnnounceUsingCMPCTBLOCK,
-                                      nCMPCTBLOCKVersion));
-        lNodesAnnouncingHeaderAndIDs.push_back(pfrom->GetId());
-        return true;
-    });
-}
-
 // Requires cs_main
 bool CanDirectFetch(const Consensus::Params &consensusParams) {
     AssertLockHeld(cs_main);
@@ -608,7 +319,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                               std::vector<const CBlockIndex*>& vBlocks,
                               NodeId &nodeStaller,
                               const Consensus::Params& consensusParams,
-                              const CNodeStatePtr& state) {
+                              const CNodeStatePtr& state,
+                              CConnman& connman) {
     if (count == 0) {
         return;
     }
@@ -655,6 +367,28 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
     int32_t nWindowEnd = state->pindexLastCommonBlock->nHeight + nWindowSize;
     int32_t nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
+
+    // Lambda to record a block we should fetch
+    auto FetchBlock = [nodeid, count, nWindowEnd, &vBlocks, &nodeStaller, &waitingfor](const CBlockIndex* pindex)
+    {
+        // The block is not already downloaded, and not yet in flight.
+        if (pindex->nHeight > nWindowEnd) {
+            // We reached the end of the window.
+            if (vBlocks.size() == 0 && waitingfor != nodeid) {
+                // We aren't able to fetch anything, but we would be if
+                // the download window was one larger.
+                nodeStaller = waitingfor;
+            }
+            return false;
+        }
+        vBlocks.push_back(pindex);
+        if (vBlocks.size() == count) {
+            return false;
+        }
+
+        return true;
+    };
+
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed)
         // successors of pindexWalk (towards pindexBestKnownBlock) into
@@ -684,24 +418,58 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
                 if (pindex->nChainTx) {
                     state->pindexLastCommonBlock = pindex;
                 }
-            } else if (mapBlocksInFlight.count(pindex->GetBlockHash()) == 0) {
-                // The block is not already downloaded, and not yet in flight.
-                if (pindex->nHeight > nWindowEnd) {
-                    // We reached the end of the window.
-                    if (vBlocks.size() == 0 && waitingfor != nodeid) {
-                        // We aren't able to fetch anything, but we would be if
-                        // the download window was one larger.
-                        nodeStaller = waitingfor;
-                    }
+            }
+            else if (! blockDownloadTracker.IsInFlight(pindex->GetBlockHash())) {
+                if(! FetchBlock(pindex)) {
+                    // Can't fetch anymore
                     return;
                 }
-                vBlocks.push_back(pindex);
-                if (vBlocks.size() == count) {
-                    return;
-                }
-            } else if (waitingfor == -1) {
+            }
+            else if (waitingfor == -1) {
                 // This is the first already-in-flight block.
-                waitingfor = mapBlocksInFlight[pindex->GetBlockHash()].first;
+                const uint256& hash { pindex->GetBlockHash() };
+                waitingfor = blockDownloadTracker.GetPeerForBlock(hash);
+
+                size_t stallerCount {0};
+                const std::vector<BlockDownloadTracker::InFlightBlock> allInFlightDetails { blockDownloadTracker.GetBlockDetails(hash) };
+                bool stalling { ! allInFlightDetails.empty() };
+                for(const auto& inFlightDetails : allInFlightDetails) {
+                    // In flight for a while?
+                    int64_t inFlightSecs { (GetTimeMicros() - inFlightDetails.inFlightSince) / MICROS_PER_SECOND };
+                    if(inFlightSecs >= gArgs.GetArg("-blockdownloadslowfetchtimeout", DEFAULT_BLOCK_DOWNLOAD_SLOW_FETCH_TIMEOUT)) {
+                        // Are we getting (any) data from this peer?
+                        const CNodePtr& nodePtr { connman.FindNodeById(inFlightDetails.block.GetNode()) };
+                        if(nodePtr) {
+                            uint64_t avgbw {0};
+                            if(IsBlockDownloadStallingFromPeer(nodePtr, avgbw)) {
+                                // This peer is stalling
+                                ++stallerCount;
+                            }
+                            else {
+                                // This peer seems active currently
+                                stalling = false;
+                                break;
+                            }
+                        }
+                    }
+                    else {
+                        // Give this peer more time
+                        stalling = false;
+                        break;
+                    }
+                }
+
+                if(stalling) {
+                    // Should we ask someone else for this block?
+                    size_t maxParallelFetch { static_cast<size_t>(gArgs.GetArg("-blockdownloadmaxparallelfetch", DEFAULT_MAX_BLOCK_PARALLEL_FETCH)) };
+                    if(stallerCount < maxParallelFetch && ! blockDownloadTracker.IsInFlight( {hash, nodeid} )) {
+                        LogPrint(BCLog::NET, "Triggering parallel block download for %s to peer=%d\n", hash.ToString(), nodeid);
+                        if(! FetchBlock(pindex)) {
+                            // Can't fetch anymore
+                            return;
+                        }
+                    }
+                }
             }
         }
     }
@@ -763,6 +531,62 @@ private:
 };
 
 } // namespace
+
+void MaybeSetPeerAsAnnouncingHeaderAndIDs(NodeId nodeid, CConnman& connman)
+{
+    // FIXME: Move this function and lNodesAnnouncingHeaderAndIDs into BlockDownloadTracker,
+    // then it won't need cs_main at all
+    LOCK(cs_main);
+
+    {
+        // Try to obtain an access to the node's state data.
+        const CNodeStateRef nodestateRef { GetState(nodeid) };
+        const CNodeStatePtr& nodestate { nodestateRef.get() };
+        if (!nodestate) {
+            LogPrint(BCLog::NET, "node state unavailable: peer=%d\n", nodeid);
+            return;
+        }
+        if (!nodestate->fProvidesHeaderAndIDs) {
+            return;
+        }
+    }
+    for (std::list<NodeId>::iterator it = lNodesAnnouncingHeaderAndIDs.begin();
+         it != lNodesAnnouncingHeaderAndIDs.end(); it++) {
+        if (*it == nodeid) {
+            lNodesAnnouncingHeaderAndIDs.erase(it);
+            lNodesAnnouncingHeaderAndIDs.push_back(nodeid);
+            return;
+        }
+    }
+    connman.ForNode(nodeid, [&connman](const CNodePtr& pfrom) {
+        bool fAnnounceUsingCMPCTBLOCK = false;
+        uint64_t nCMPCTBLOCKVersion = 1;
+        if (lNodesAnnouncingHeaderAndIDs.size() >= 3) {
+            // As per BIP152, we only get 3 of our peers to announce
+            // blocks using compact encodings.
+            connman.ForNode(lNodesAnnouncingHeaderAndIDs.front(),
+                            [&connman, fAnnounceUsingCMPCTBLOCK,
+                             nCMPCTBLOCKVersion](const CNodePtr& pnodeStop) {
+                                connman.PushMessage(
+                                    pnodeStop,
+                                    CNetMsgMaker(pnodeStop->GetSendVersion())
+                                        .Make(NetMsgType::SENDCMPCT,
+                                              fAnnounceUsingCMPCTBLOCK,
+                                              nCMPCTBLOCKVersion));
+                                return true;
+                            });
+            lNodesAnnouncingHeaderAndIDs.pop_front();
+        }
+        fAnnounceUsingCMPCTBLOCK = true;
+        connman.PushMessage(pfrom,
+                            CNetMsgMaker(pfrom->GetSendVersion())
+                                .Make(NetMsgType::SENDCMPCT,
+                                      fAnnounceUsingCMPCTBLOCK,
+                                      nCMPCTBLOCKVersion));
+        lNodesAnnouncingHeaderAndIDs.push_back(pfrom->GetId());
+        return true;
+    });
+}
 
 // Forward declarion of ProcessMessage
 static bool ProcessMessage(const Config& config, const CNodePtr& pfrom, const std::string& strCommand,
@@ -1083,48 +907,10 @@ void PeerLogicValidation::UpdatedBlockTip(const CBlockIndex *pindexNew,
     nTimeBestReceived = GetTime();
 }
 
-void PeerLogicValidation::BlockChecked(const CBlock &block,
-                                       const CValidationState &state) {
-    LOCK(cs_main);
-
-    const uint256 hash(block.GetHash());
-    auto it = mapBlockSource.find(hash);
-    
-    if(it != mapBlockSource.end())
-    {
-        int nDoS = 0;
-        if (state.IsInvalid(nDoS)) {
-            // Try to obtain an access to the node's state data.
-            const CNodeStateRef nodestateRef { GetState(it->second.first) };
-            const CNodeStatePtr& nodestate { nodestateRef.get() };
-            // Don't send reject message with code 0 or an internal reject code.
-            if (it != mapBlockSource.end() && nodestate &&
-                state.GetRejectCode() > 0 &&
-                state.GetRejectCode() < REJECT_INTERNAL) {
-                CBlockReject reject = {
-                    uint8_t(state.GetRejectCode()),
-                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH),
-                    hash};
-                nodestate->rejects.push_back(reject);
-                if (nDoS > 0 && it->second.second) {
-                    Misbehaving(it->second.first, nDoS, state.GetRejectReason());
-                }
-            }
-        }
-        // Check that:
-        // 1. The block is valid
-        // 2. We're not in initial block download
-        // 3. This is currently the best block we're aware of. We haven't updated
-        //    the tip yet so we have no way to check this directly here. Instead we
-        //    just check that there are currently no other blocks in flight.
-        else if (state.IsValid() && !IsInitialBlockDownload() &&
-                 mapBlocksInFlight.count(hash) == mapBlocksInFlight.size()) {
-            MaybeSetPeerAsAnnouncingHeaderAndIDs(it->second.first, *connman);
-        }
-
-        mapBlockSource.erase(it);
-    }
-    // else block came from for e.g. RPC so we don't have the source node
+void PeerLogicValidation::BlockChecked(const CBlock& block,
+                                       const CValidationState& state)
+{
+    blockDownloadTracker.BlockChecked(block.GetHash(), state);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1680,22 +1466,8 @@ static void ProcessRejectMessage(CDataStream& vRecv, const CNodePtr& pfrom)
             LogPrint(BCLog::NET, "Reject %s\n", SanitizeString(ss.str()));
 
             if (ccode == REJECT_TOOBUSY) {
-                // Try to obtain an access to the node's state data.
-                const CNodeStateRef stateRef { GetState(pfrom->GetId()) };
-                const CNodeStatePtr& state { stateRef.get() };
-                if (!state) {
-                    return;
-                }
-                // Peer is too busy with sending blocks so we will not ask from a peer for TOOBUSY_RETRY_DELAY.
-                state->nextSendThresholdTime = GetTimeMicros() + TOOBUSY_RETRY_DELAY;
-                // cs_main needs to be locked due to a reference to mapBlocksInFlight
-                {
-                    LOCK(cs_main);
-                    for (const QueuedBlock &entry : state->vBlocksInFlight) {
-                        mapBlocksInFlight.erase(entry.hash);
-                    }
-                }
-
+                // Peer is too busy with sending blocks so we will not ask again for a while
+                blockDownloadTracker.PeerTooBusy(pfrom->GetId());
             }
         }
         catch (const std::ios_base::failure &)
@@ -2303,7 +2075,7 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
             LogPrint(BCLog::NET, "got block inv: %s %s peer=%d\n", inv.hash.ToString(),
                 fAlreadyHave ? "have" : "new", pfrom->id);
             UpdateBlockAvailability(inv.hash, GetState(pfrom->GetId()).get());
-            if(!fAlreadyHave && !fImporting && !fReindex && !mapBlocksInFlight.count(inv.hash)) {
+            if(!fAlreadyHave && !fImporting && !fReindex && !blockDownloadTracker.IsInFlight(inv.hash)) {
                 // We used to request the full block here, but since
                 // headers-announcements are now the primary method of
                 // announcement on the network, and since, in the case that
@@ -2832,7 +2604,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
             // up to a limit.
             while(pindexWalk && !chainActive.Contains(pindexWalk) && vToFetch.size() <= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
             {
-                if(!pindexWalk->nStatus.hasData() && !mapBlocksInFlight.count(pindexWalk->GetBlockHash())) {
+                if(!pindexWalk->nStatus.hasData() && !blockDownloadTracker.IsInFlight(pindexWalk->GetBlockHash())) {
                     // We don't have this block, and it's not yet in flight.
                     vToFetch.push_back(pindexWalk);
                 }
@@ -2857,17 +2629,9 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
                         // Can't download any more from this peer
                         break;
                     }
-                    vGetData.push_back(
-                        CInv(MSG_BLOCK, pindex->GetBlockHash()));
-                    MarkBlockAsInFlight(
-                        config,
-                        pfrom->GetId(),
-                        pindex->GetBlockHash(),
-                        chainparams.GetConsensus(),
-                        nodestate,
-                        *pindex);
-                    LogPrint(BCLog::NET,
-                             "Requesting block %s from  peer=%d\n",
+                    vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
+                    blockDownloadTracker.MarkBlockAsInFlight(config, { pindex->GetBlockHash(), pfrom->id }, nodestate, *pindex);
+                    LogPrint(BCLog::NET, "Requesting block %s from peer=%d\n",
                              pindex->GetBlockHash().ToString(), pfrom->id);
                 }
                 if(vGetData.size() > 1) {
@@ -2879,7 +2643,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
                 if(vGetData.size() > 0) {
                     if(nodestate->fSupportsDesiredCmpctVersion &&
                         vGetData.size() == 1 &&
-                        mapBlocksInFlight.size() == 1 &&
+                        blockDownloadTracker.IsOnlyBlockInFlight(vGetData[0].hash) &&
                         pindexLast->pprev->IsValid(BlockValidity::CHAIN)) {
                         // In any case, we want to download using a compact
                         // block, not a regular one.
@@ -2906,24 +2670,33 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
     vRecv >> resp;
 
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
+    BlockDownloadTracker::BlockSource blockSource { resp.blockhash, pfrom->id };
     bool fBlockRead = false;
     {
-        LOCK(cs_main);
+        // Get node state details. Holding the lock on the node state ensures this nodes
+        // vBlocksInFlight can't change underneath us.
+        const CNodeStateRef stateRef { GetState(pfrom->id) };
+        const CNodeStatePtr& state { stateRef.get() };
+        assert(state);
 
-        std::map<uint256, std::pair<NodeId, std::list<QueuedBlock>::iterator>>::iterator it =
-            mapBlocksInFlight.find(resp.blockhash);
-        if(it == mapBlocksInFlight.end() || !it->second.second->partialBlock || it->second.first != pfrom->GetId()) {
-            LogPrint(BCLog::NET,
-                     "Peer %d sent us block transactions for block we weren't expecting\n",
-                     pfrom->id);
+        BlockDownloadTracker::InFlightBlock inFlightBlock {};
+        try {
+            inFlightBlock = blockDownloadTracker.GetBlockDetails(blockSource);
+            if(! inFlightBlock.queuedBlockIt->partialBlock) {
+                throw std::runtime_error("Partial block not set");
+            }
+        }
+        catch(std::exception& e) {
+            LogPrint(BCLog::NET, "Peer %d sent us block transactions for block we weren't expecting (%s)\n",
+                pfrom->id, e.what());
             return;
         }
 
-        PartiallyDownloadedBlock &partialBlock = *it->second.second->partialBlock;
-        ReadStatus status = partialBlock.FillBlock(*pblock, resp.txn, it->second.second->blockIndex.nHeight);
+        PartiallyDownloadedBlock& partialBlock { *(inFlightBlock.queuedBlockIt->partialBlock) };
+        ReadStatus status = partialBlock.FillBlock(*pblock, resp.txn, inFlightBlock.queuedBlockIt->blockIndex.nHeight);
         if(status == READ_STATUS_INVALID) {
             // Reset in-flight state in case of whitelist.
-            MarkBlockAsReceived(resp.blockhash);
+            blockDownloadTracker.MarkBlockAsFailed(blockSource, state);
             Misbehaving(pfrom, 100, "invalid-cmpctblk-txns");
             LogPrintf("Peer %d sent us invalid compact block/non-matching block transactions\n",
                       pfrom->id);
@@ -2933,8 +2706,7 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
             // Might have collided, fall back to getdata now :(
             std::vector<CInv> invs;
             invs.push_back(CInv(MSG_BLOCK, resp.blockhash));
-            connman.PushMessage(pfrom,
-                                msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, invs));
+            connman.PushMessage(pfrom, msgMaker.Make(CSerializedNetMsg::PayloadType::BLOCK, NetMsgType::GETDATA, invs));
         }
         else {
             // Block is either okay, or possibly we received
@@ -2955,17 +2727,13 @@ static void ProcessBlockTxnMessage(const Config& config, const CNodePtr& pfrom,
             // handling in ProcessNewBlock to ensure the block index is
             // updated, reject messages go out, etc.
 
-            // it is now an empty pointer
-            MarkBlockAsReceived(resp.blockhash);
+            // BIP 152 permits peers to relay compact blocks after validating
+            // the header only; we should not punish peers if the block turns
+            // out to be invalid.
+            blockDownloadTracker.MarkBlockAsReceived(blockSource, false, state);
             fBlockRead = true;
-            // mapBlockSource is only used for sending reject messages and
-            // DoS scores, so the race between here and cs_main in
-            // ProcessNewBlock is fine. BIP 152 permits peers to relay
-            // compact blocks after validating the header only; we should
-            // not punish peers if the block turns out to be invalid.
-            mapBlockSource.emplace(resp.blockhash, std::make_pair(pfrom->GetId(), false));
         }
-    } // Don't hold cs_main when we call into ProcessNewBlock
+    }
 
     if(fBlockRead) {
         bool fNewBlock = false;
@@ -3075,10 +2843,12 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
     std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
     bool fBlockReconstructed = false;
 
+    // If AcceptBlockHeader returned true, it set pindex
+    assert(pindex);
+    BlockDownloadTracker::BlockSource blockSource { pindex->GetBlockHash(), pfrom->id };
+
     {
         LOCK(cs_main);
-        // If AcceptBlockHeader returned true, it set pindex
-        assert(pindex);
         // Try to obtain an access to the node's state data.
         const CNodeStateRef nodestateRef { GetState(pfrom->GetId()) };
         const CNodeStatePtr& nodestate { nodestateRef.get() };
@@ -3086,11 +2856,8 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         // Update block's availability.
         UpdateBlockAvailability(pindex->GetBlockHash(), nodestate);
 
-        std::map<uint256,
-                 std::pair<NodeId, std::list<QueuedBlock>::iterator>>::
-            iterator blockInFlightIt =
-                mapBlocksInFlight.find(pindex->GetBlockHash());
-        bool fAlreadyInFlight = blockInFlightIt != mapBlocksInFlight.end();
+        bool fAlreadyInFlight { blockDownloadTracker.IsInFlight(pindex->GetBlockHash()) };
+        bool fAlreadyInFlightFromThisPeer { blockDownloadTracker.IsInFlight(blockSource) };
 
         if(pindex->nStatus.hasData()) {
             // Nothing to do here
@@ -3125,17 +2892,10 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         {
             if((!fAlreadyInFlight &&
                  nodestate->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) ||
-                (fAlreadyInFlight && blockInFlightIt->second.first == pfrom->GetId()))
+                fAlreadyInFlightFromThisPeer)
             {
                 std::list<QueuedBlock>::iterator *queuedBlockIt = nullptr;
-                if(!MarkBlockAsInFlight(
-                        config,
-                        pfrom->GetId(),
-                        pindex->GetBlockHash(),
-                        chainparams.GetConsensus(),
-                        nodestate,
-                        *pindex,
-                        &queuedBlockIt))
+                if(!blockDownloadTracker.MarkBlockAsInFlight(config, blockSource, nodestate, *pindex, &queuedBlockIt))
                 {
                     if(!(*queuedBlockIt)->partialBlock)
                     {
@@ -3154,7 +2914,7 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                 ReadStatus status = partialBlock.InitData(cmpctblock, g_connman->GetCompactExtraTxns());
                 if(status == READ_STATUS_INVALID) {
                     // Reset in-flight state in case of whitelist
-                    MarkBlockAsReceived(pindex->GetBlockHash());
+                    blockDownloadTracker.MarkBlockAsFailed(blockSource, nodestate);
                     Misbehaving(pfrom, 100, "invalid-cmpctblk");
                     LogPrintf("Peer %d sent us invalid compact block\n", pfrom->id);
                     return true;
@@ -3241,11 +3001,10 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
     if(fBlockReconstructed) {
         // If we got here, we were able to optimistically reconstruct a
         // block that is in flight from some other peer.
-        {
-            LOCK(cs_main);
-            mapBlockSource.emplace(pblock->GetHash(),
-                                   std::make_pair(pfrom->GetId(), false));
-        }
+        const CNodeStateRef nodestateRef { GetState(pfrom->GetId()) };
+        const CNodeStatePtr& nodestate { nodestateRef.get() };
+        assert(nodestate);
+        blockDownloadTracker.MarkBlockAsReceived(blockSource, false, nodestate);
 
         bool fNewBlock = false;
         auto source = task::CCancellationSource::Make();
@@ -3272,17 +3031,6 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
                         {
                             pfrom->nLastBlockTime = GetTime();
                         }
-                    }
-
-                    // hold cs_main for CBlockIndex::IsValid()
-                    LOCK(cs_main);
-                    if(pindex->IsValid(BlockValidity::TRANSACTIONS))
-                    {
-                        // Clear download state for this block, which is in process from
-                        // some other peer. We do this after calling. ProcessNewBlock so
-                        // that a malleated cmpctblock announcement can't be used to
-                        // interfere with block relay.
-                        MarkBlockAsReceived(pblock->GetHash());
                     }
                 },
                 source);
@@ -3312,14 +3060,13 @@ static void ProcessBlockMessage(const Config& config, const CNodePtr& pfrom, CDa
     bool forceProcessing = pfrom->fWhitelisted && !IsInitialBlockDownload();
     const uint256 hash(pblock->GetHash());
     {
-        LOCK(cs_main);
+        const CNodeStateRef nodestateRef { GetState(pfrom->GetId()) };
+        const CNodeStatePtr& nodestate { nodestateRef.get() };
+        assert(nodestate);
+
         // Also always process if we requested the block explicitly, as we
         // may need it even though it is not a candidate for a new best tip.
-        forceProcessing |= MarkBlockAsReceived(hash);
-        // mapBlockSource is only used for sending reject messages and DoS
-        // scores, so the race between here and cs_main in ProcessNewBlock
-        // is fine.
-        mapBlockSource.emplace(hash, std::make_pair(pfrom->GetId(), true));
+        forceProcessing |= blockDownloadTracker.MarkBlockAsReceived({ hash, pfrom->id }, true, nodestate);
     }
 
     bool fNewBlock = false;
@@ -4483,10 +4230,8 @@ bool DetectStalling(const Config &config, const CNodePtr& pto, const CNodeStateP
         // Also, don't abandon this attempt to download all the while we are making
         // sufficient progress, as measured by the current download speed to this
         // peer.
-        uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth() };
-        int64_t minDownloadSpeed { gArgs.GetArg("-blockstallingmindownloadspeed", DEFAULT_MIN_BLOCK_STALLING_RATE) };
-        minDownloadSpeed = std::max(static_cast<decltype(minDownloadSpeed)>(0), minDownloadSpeed);
-        if(avgbw < static_cast<uint64_t>(minDownloadSpeed) * 1000) {
+        uint64_t avgbw {0};
+        if(IsBlockDownloadStallingFromPeer(pto, avgbw)) {
             LogPrintf("Peer=%d is stalling block download (current speed %d), disconnecting\n", pto->id, avgbw);
             pto->fDisconnect = true;
             return true;
@@ -4540,16 +4285,10 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
         NodeId staller = -1;
         FindNextBlocksToDownload(pto->GetId(),
                                  MAX_BLOCKS_IN_TRANSIT_PER_PEER - state->nBlocksInFlight,
-                                 vToDownload, staller, consensusParams, state);
+                                 vToDownload, staller, consensusParams, state, connman);
         for (const CBlockIndex *pindex : vToDownload) {
             vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
-            MarkBlockAsInFlight(
-                config,
-                pto->GetId(),
-                pindex->GetBlockHash(),
-                consensusParams,
-                state,
-                *pindex);
+            blockDownloadTracker.MarkBlockAsInFlight(config, {pindex->GetBlockHash(), pto->id}, state, *pindex);
             LogPrint(BCLog::NET, "Requesting block %s (%d) peer=%d\n",
                      pindex->GetBlockHash().ToString(), pindex->nHeight,
                      pto->id);
@@ -4561,7 +4300,7 @@ void SendGetDataBlocks(const Config &config, const CNodePtr& pto, CConnman& conn
             assert(stallerState);
             if (stallerState->nStallingSince == 0) {
                 stallerState->nStallingSince = GetTimeMicros();
-                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth() };
+                uint64_t avgbw { pto->GetAssociation().GetAverageBandwidth(StreamPolicy::MessageType::BLOCK).first };
                 LogPrint(BCLog::NET, "Stall started (current speed %d) peer=%d\n", avgbw, staller);
             }
         }
