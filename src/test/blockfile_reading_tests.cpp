@@ -143,9 +143,9 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
             Hash(serializedData.begin(), serializedData.end());
 
         auto metaData = index.GetDiskBlockMetaData();
-        BOOST_REQUIRE_EQUAL(metaData.diskDataSize, serializedData.size());
+        BOOST_REQUIRE_EQUAL(metaData.DiskDataSize(), serializedData.size());
         BOOST_REQUIRE_EQUAL(
-            metaData.diskDataHash.GetCheapHash(),
+            metaData.DiskDataHash().GetCheapHash(),
             expectedHash.GetCheapHash());
 
         BOOST_REQUIRE_EQUAL_COLLECTIONS(
@@ -163,9 +163,9 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
         auto streamCorruptMetaData =
             index.StreamBlockFromDisk(INIT_PROTO_VERSION);
         auto metaData = index.GetDiskBlockMetaData();
-        BOOST_REQUIRE_EQUAL(metaData.diskDataSize, 1);
+        BOOST_REQUIRE_EQUAL(metaData.DiskDataSize(), 1);
         BOOST_REQUIRE_EQUAL(
-            metaData.diskDataHash.GetCheapHash(),
+            metaData.DiskDataHash().GetCheapHash(),
             randomHash.GetCheapHash());
         BOOST_REQUIRE_EQUAL(
             SerializeAsyncStream(*streamCorruptMetaData, 5u).size(),

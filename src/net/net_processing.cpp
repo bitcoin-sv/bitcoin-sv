@@ -711,8 +711,8 @@ namespace
                 mCompactBlockMessage =
                     std::make_shared<const CCompactBlockMessageData>(
                         std::move(serializedData),
-                        metaData.diskDataHash,
-                        metaData.diskDataSize);
+                        metaData.DiskDataHash(),
+                        metaData.DiskDataSize());
             }
             else
             {
@@ -1058,8 +1058,8 @@ static void SendBlock(
     auto metaData = index.GetDiskBlockMetaData();
     CSerializedNetMsg blockMsg{
             NetMsgType::BLOCK,
-            std::move(metaData.diskDataHash),
-            metaData.diskDataSize,
+            std::move(metaData.DiskDataHash()),
+            metaData.DiskDataSize(),
             std::move(stream)
         };
 

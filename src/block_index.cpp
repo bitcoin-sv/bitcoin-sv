@@ -358,7 +358,7 @@ std::unique_ptr<CForwardAsyncReadonlyStream> CBlockIndex::StreamBlockFromDisk(
     // to be used to change the resulting fromat.
     return
         std::make_unique<CFixedSizeStream<CAsyncFileReader>>(
-            GetDiskBlockMetaData().diskDataSize,
+            GetDiskBlockMetaData().DiskDataSize(),
             CAsyncFileReader{std::move(file)});
 }
 
@@ -376,7 +376,7 @@ std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk()
     {
         return
             std::make_unique<CSyncFixedSizeStream<CFileReader>>(
-                GetDiskBlockMetaData().diskDataSize,
+                GetDiskBlockMetaData().DiskDataSize(),
                 CFileReader{std::move(file)});
     }
 

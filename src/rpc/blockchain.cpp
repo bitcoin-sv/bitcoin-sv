@@ -1240,7 +1240,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
                                        CBlockIndex& blockIndex, const std::string& rpcReqId,
                                        bool processedInBatch, const RetFormat& rf)
 {
-    CDiskBlockMetaData metadata;
+    CDiskBlockMetaDataMutable metadata;
     bool hasDiskBlockMetaData;
     std::unique_ptr<CForwardReadonlyStream> stream;
     {
@@ -1275,7 +1275,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         {
             if (hasDiskBlockMetaData)
             {
-                req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize));
+                req.WriteHeader("Content-Length", std::to_string(metadata.DiskDataSize()));
             }
             req.WriteHeader("Content-Type", "application/octet-stream");
             break;
@@ -1284,7 +1284,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         {
             if (hasDiskBlockMetaData)
             {
-                req.WriteHeader("Content-Length", std::to_string(metadata.diskDataSize * 2));
+                req.WriteHeader("Content-Length", std::to_string(metadata.DiskDataSize() * 2));
             }
             req.WriteHeader("Content-Type", "text/plain");
             break;
@@ -1330,13 +1330,13 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
         if (!hasDiskBlockMetaData)
         {
             hasher.Write(chunk.Begin(), chunk.Size());
-            metadata.diskDataSize += chunk.Size();
+            metadata.MutableDiskDataSize() += chunk.Size();
         }
     } while (!stream->EndOfStream());
 
     if (!hasDiskBlockMetaData)
     {
-        hasher.Finalize(reinterpret_cast<uint8_t *>(&metadata.diskDataHash));
+        hasher.Finalize(reinterpret_cast<uint8_t *>(&metadata.MutableDiskDataHash()));
         blockIndex.SetBlockIndexFileMetaDataIfNotSet(
             std::move(metadata));
     }
@@ -1458,7 +1458,7 @@ void headerBlockToJSON(const Config& config,
     jWriter.pushKV("confirmations", confirmations);
     if (diskBlockMetaData.has_value())
     {
-        jWriter.pushKV("size", diskBlockMetaData.value().diskDataSize);
+        jWriter.pushKV("size", diskBlockMetaData.value().DiskDataSize());
     }
     jWriter.pushKV("height", blockindex->nHeight);
     jWriter.pushKV("version", blockHeader.nVersion);

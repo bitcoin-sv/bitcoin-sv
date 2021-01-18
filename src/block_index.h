@@ -216,9 +216,24 @@ public:
         READWRITE(diskDataSize);
     }
 
-// TODO make private:
+protected:
     uint256 diskDataHash;
     uint64_t diskDataSize = 0;
+};
+
+class CDiskBlockMetaDataMutable : public CDiskBlockMetaData
+{
+public:
+
+    CDiskBlockMetaDataMutable& operator=(const CDiskBlockMetaData& other)
+    {
+        diskDataHash = other.DiskDataHash();
+        diskDataSize = other.DiskDataSize();
+        return *this;
+    }
+
+    uint256& MutableDiskDataHash() { return diskDataHash; }
+    uint64_t& MutableDiskDataSize() { return diskDataSize; }
 };
 
 arith_uint256 GetBlockProof(const CBlockIndex &block);
@@ -358,7 +373,7 @@ public:
         nStatus = nStatus.withData();
         RaiseValidityNL(BlockValidity::TRANSACTIONS);
 
-        if (!metaData.diskDataHash.IsNull() && metaData.diskDataSize)
+        if (!metaData.DiskDataHash().IsNull() && metaData.DiskDataSize())
         {
             mDiskBlockMetaData = std::move(metaData);
             nStatus = nStatus.withDiskBlockMetaData();
