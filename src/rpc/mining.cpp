@@ -365,7 +365,9 @@ static UniValue BIP22ValidationResult(const Config &config,
 }
 
 void getblocktemplate(const Config& config,
-                      const JSONRPCRequest& request, HTTPRequest& httpReq, bool processedInBatch = true)
+                      const JSONRPCRequest& request,
+                      HTTPRequest* httpReq,
+                      bool processedInBatch = true)
 {
     if (request.fHelp || request.params.size() > 1) {
         throw std::runtime_error(
@@ -473,6 +475,9 @@ void getblocktemplate(const Config& config,
             HelpExampleRpc("getblocktemplate", ""));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     LOCK(cs_main);
 
     std::string strMode = "template";
@@ -545,12 +550,12 @@ void getblocktemplate(const Config& config,
             // after start of writing chunks no exception must be thrown, otherwise JSON response will be invalid
             if (!processedInBatch)
             {
-                httpReq.WriteHeader("Content-Type", "application/json");
-                httpReq.StartWritingChunks(HTTP_OK);
+                httpReq->WriteHeader("Content-Type", "application/json");
+                httpReq->StartWritingChunks(HTTP_OK);
             }
 
             {
-                CHttpTextWriter httpWriter(httpReq);
+                CHttpTextWriter httpWriter(*httpReq);
                 CJSONWriter jWriter(httpWriter, false);
                 jWriter.writeBeginObject();
                 jWriter.pushKVJSONFormatted("result", result.write());
@@ -562,7 +567,7 @@ void getblocktemplate(const Config& config,
 
             if (!processedInBatch)
             {
-                httpReq.StopWritingChunks();
+                httpReq->StopWritingChunks();
             }
             return;  
         }
@@ -676,12 +681,12 @@ void getblocktemplate(const Config& config,
     // after start of writing chunks no exception must be thrown, otherwise JSON response will be invalid
     if (!processedInBatch)
     {
-        httpReq.WriteHeader("Content-Type", "application/json");
-        httpReq.StartWritingChunks(HTTP_OK);
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
     {
-        CHttpTextWriter httpWriter(httpReq);
+        CHttpTextWriter httpWriter(*httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
         jWriter.writeBeginObject();
@@ -773,7 +778,7 @@ void getblocktemplate(const Config& config,
 
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     } 
 }
 

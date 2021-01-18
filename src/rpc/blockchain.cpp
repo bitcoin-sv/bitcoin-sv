@@ -352,8 +352,10 @@ void writeMempoolToJson(CJSONWriter& jWriter, bool fVerbose = false)
     }
 }
 
-void getrawmempool(const Config &config, const JSONRPCRequest &request, HTTPRequest& httpReq,
-                       bool processedInBatch)
+void getrawmempool(const Config& config,
+                   const JSONRPCRequest& request,
+                   HTTPRequest* httpReq,
+                   bool processedInBatch)
 {
     if (request.fHelp || request.params.size() > 1) {
         throw std::runtime_error(
@@ -379,6 +381,9 @@ void getrawmempool(const Config &config, const JSONRPCRequest &request, HTTPRequ
             HelpExampleRpc("getrawmempool", "true"));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     bool fVerbose = false;
     if (request.params.size() > 0) {
         fVerbose = request.params[0].get_bool();
@@ -386,12 +391,12 @@ void getrawmempool(const Config &config, const JSONRPCRequest &request, HTTPRequ
 
     if (!processedInBatch)
     {
-        httpReq.WriteHeader("Content-Type", "application/json");
-        httpReq.StartWritingChunks(HTTP_OK);
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
     {
-        CHttpTextWriter httpWriter(httpReq);
+        CHttpTextWriter httpWriter(*httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
         jWriter.writeBeginObject();
@@ -405,13 +410,14 @@ void getrawmempool(const Config &config, const JSONRPCRequest &request, HTTPRequ
 
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
-void getrawnonfinalmempool(const Config &config,
-                            const JSONRPCRequest &request, HTTPRequest& httpReq,
-                            bool processedInBatch)
+void getrawnonfinalmempool(const Config& config,
+                           const JSONRPCRequest& request,
+                           HTTPRequest* httpReq,
+                           bool processedInBatch)
 {
     if (request.fHelp || request.params.size() > 0) {
         throw std::runtime_error(
@@ -429,14 +435,17 @@ void getrawnonfinalmempool(const Config &config,
             HelpExampleRpc("getrawnonfinalmempool", ""));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     if (!processedInBatch)
     {
-        httpReq.WriteHeader("Content-Type", "application/json");
-        httpReq.StartWritingChunks(HTTP_OK);
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
     {
-        CHttpTextWriter httpWriter(httpReq);
+        CHttpTextWriter httpWriter(*httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
         jWriter.writeBeginObject();
@@ -458,12 +467,14 @@ void getrawnonfinalmempool(const Config &config,
 
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
-void getmempoolancestors(const Config &config,
-                         const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
+void getmempoolancestors(const Config& config,
+                         const JSONRPCRequest& request,
+                         HTTPRequest* httpReq,
+                         bool processedInBatch)
 {
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 2) {
@@ -492,6 +503,9 @@ void getmempoolancestors(const Config &config,
             HelpExampleRpc("getmempoolancestors", "\"mytxid\""));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     bool fVerbose = false;
     if (request.params.size() > 1) {
         fVerbose = request.params[1].get_bool();
@@ -509,12 +523,12 @@ void getmempoolancestors(const Config &config,
     }
     if (!processedInBatch)
     {
-        httpReq.WriteHeader("Content-Type", "application/json");
-        httpReq.StartWritingChunks(HTTP_OK);
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
     {
-        CHttpTextWriter httpWriter(httpReq);
+        CHttpTextWriter httpWriter(*httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
         jWriter.writeBeginObject();
@@ -544,12 +558,14 @@ void getmempoolancestors(const Config &config,
 
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
-void getmempooldescendants(const Config &config,
-                           const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
+void getmempooldescendants(const Config& config,
+                           const JSONRPCRequest& request,
+                           HTTPRequest* httpReq,
+                           bool processedInBatch)
 {
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 2) {
@@ -578,6 +594,9 @@ void getmempooldescendants(const Config &config,
             HelpExampleRpc("getmempooldescendants", "\"mytxid\""));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     bool fVerbose = false;
     if (request.params.size() > 1) fVerbose = request.params[1].get_bool();
 
@@ -594,12 +613,12 @@ void getmempooldescendants(const Config &config,
 
     if (!processedInBatch)
     {
-        httpReq.WriteHeader("Content-Type", "application/json");
-        httpReq.StartWritingChunks(HTTP_OK);
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
     {
-        CHttpTextWriter httpWriter(httpReq);
+        CHttpTextWriter httpWriter(*httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
         jWriter.writeBeginObject();
@@ -629,12 +648,14 @@ void getmempooldescendants(const Config &config,
 
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
-void getmempoolentry(const Config &config,
-                     const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
+void getmempoolentry(const Config& config,
+                     const JSONRPCRequest& request,
+                     HTTPRequest* httpReq,
+                     bool processedInBatch)
 {
     if (request.fHelp || request.params.size() != 1) {
         throw std::runtime_error(
@@ -652,6 +673,9 @@ void getmempoolentry(const Config &config,
             HelpExampleRpc("getmempoolentry", "\"mytxid\""));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     uint256 hash = ParseHashV(request.params[0], "parameter 1");
 
     const auto kind = CTxMemPool::TxSnapshotKind::SINGLE;
@@ -664,12 +688,12 @@ void getmempoolentry(const Config &config,
     }
     if (!processedInBatch)
     {
-        httpReq.WriteHeader("Content-Type", "application/json");
-        httpReq.StartWritingChunks(HTTP_OK);
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
     {
-        CHttpTextWriter httpWriter(httpReq);
+        CHttpTextWriter httpWriter(*httpReq);
         CJSONWriter jWriter(httpWriter, false);
 
         jWriter.writeBeginObject();
@@ -685,7 +709,7 @@ void getmempoolentry(const Config &config,
 
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
@@ -841,8 +865,11 @@ static void parseGetBlockVerbosity(const UniValue &verbosityParam,
     }
 }
 
-void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
-              HTTPRequest &httpReq, bool processedInBatch) {
+void getblock(const Config& config,
+              const JSONRPCRequest& jsonRPCReq,
+              HTTPRequest* httpReq,
+              bool processedInBatch)
+{
 
     if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
         jsonRPCReq.params.size() > 2) {
@@ -975,6 +1002,9 @@ void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
                 "81d7e2a3dd146f6ed09\""));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     std::string strHash = jsonRPCReq.params[0].get_str();
     uint256 hash(uint256S(strHash));
 
@@ -992,11 +1022,20 @@ void getblock(const Config &config, const JSONRPCRequest &jsonRPCReq,
         confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), pblockindex, nextBlockHash);
     }
 
-    getblockdata(*pblockindex, config, jsonRPCReq, httpReq, processedInBatch, confirmations, nextBlockHash);
+    getblockdata(*pblockindex,
+                 config,
+                 jsonRPCReq,
+                 *httpReq,
+                 processedInBatch,
+                 confirmations,
+                 nextBlockHash);
 }
 
-void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
-                      HTTPRequest &httpReq, bool processedInBatch) {
+void getblockbyheight(const Config& config,
+                      const JSONRPCRequest& jsonRPCReq,
+                      HTTPRequest* httpReq,
+                      bool processedInBatch)
+{
 
     if (jsonRPCReq.fHelp || jsonRPCReq.params.size() < 1 ||
         jsonRPCReq.params.size() > 2) {
@@ -1124,6 +1163,9 @@ void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
             HelpExampleRpc("getblockbyheight", "\"1214adbda81d7e2a3dd146f6ed09\""));
     }
 
+    if(httpReq == nullptr)
+        return;
+
     int32_t nHeight = jsonRPCReq.params[0].get_int();
     if (nHeight < 0 || nHeight > chainActive.Height()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
@@ -1138,7 +1180,13 @@ void getblockbyheight(const Config &config, const JSONRPCRequest &jsonRPCReq,
         confirmations = ComputeNextBlockAndDepthNL(chainActive.Tip(), pblockindex, nextBlockHash);
     }
 
-    getblockdata(*pblockindex, config, jsonRPCReq, httpReq, processedInBatch, confirmations, nextBlockHash);
+    getblockdata(*pblockindex,
+                 config,
+                 jsonRPCReq,
+                 *httpReq,
+                 processedInBatch,
+                 confirmations,
+                 nextBlockHash);
 }
 
 void getblockdata(CBlockIndex &pblockindex, const Config &config,
@@ -1717,7 +1765,10 @@ UniValue gettxout(const Config &config, const JSONRPCRequest &request) {
     return NullUniValue;
 }
 
-void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest& httpReq, bool processedInBatch)
+void gettxouts(const Config& config,
+               const JSONRPCRequest& request,
+               HTTPRequest* httpReq,
+               bool processedInBatch)
 {
     if (request.fHelp || request.params.size() < 2 ||
         request.params.size() > 3) {
@@ -1762,6 +1813,9 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
             "\nAs a json rpc call\n" +
             HelpExampleRpc("gettxouts", "[{\"txid\": \"txid1\", \"n\" : 0}, {\"txid\": \"txid2\", \"n\" : 0}], [\"*\"], true"));
     }
+
+    if(httpReq == nullptr)
+        return;
 
     RPCTypeCheck(request.params, {UniValue::VARR, UniValue::VARR});
     
@@ -1869,11 +1923,11 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
 
     if (!processedInBatch)
     {
-	    httpReq.WriteHeader("Content-Type", "application/json");
-	    httpReq.StartWritingChunks(HTTP_OK);
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
-   
-    CHttpTextWriter httpWriter(httpReq);
+
+    CHttpTextWriter httpWriter(*httpReq);
     CJSONWriter jWriter(httpWriter, false);
 
     jWriter.writeBeginObject();
@@ -1985,7 +2039,7 @@ void gettxouts(const Config &config, const JSONRPCRequest &request, HTTPRequest&
 
     if (!processedInBatch)
     {
-	      httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
