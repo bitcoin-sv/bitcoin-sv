@@ -749,6 +749,8 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
             "of signature operations we're willing to relay/mine in a single transaction\n"
             "  \"maxstackmemoryusagepolicy\": xxxxx,     (numeric) The maximum stack memory "
             "usage in bytes used for script verification we're willing to relay/mine in a single transaction\n"
+            "  \"maxstackmemoryusageconsensus\": xxxxx,  (numeric) The maximum stack memory usage in bytes "
+            "used for script verification we're willing to accept from any source\n"
 
             "  \"maxorphantxsize\": xxxxx,               (numeric) The maximum size in bytes of "
             "unconnectable transactions in memory\n"
@@ -807,6 +809,7 @@ static UniValue getsettings(const Config &config, const JSONRPCRequest &request)
     obj.push_back(Pair("maxpubkeyspermultisigpolicy", config.GetMaxPubKeysPerMultiSig(true, false)));
     obj.push_back(Pair("maxtxsigopscountspolicy", config.GetMaxTxSigOpsCountPolicy(true)));
     obj.push_back(Pair("maxstackmemoryusagepolicy", config.GetMaxStackMemoryUsage(true, false)));
+    obj.push_back(Pair("maxstackmemoryusageconsensus", config.GetMaxStackMemoryUsage(true, true)));
 
     obj.push_back(Pair("limitancestorcount", config.GetLimitAncestorCount()));
     obj.push_back(Pair("limitcpfpgroupmemberscount", config.GetLimitSecondaryMempoolAncestorCount()));
