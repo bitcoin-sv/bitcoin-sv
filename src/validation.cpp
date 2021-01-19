@@ -44,6 +44,7 @@
 #include "versionbits.h"
 #include "warnings.h"
 #include "blockfileinfostore.h"
+#include "block_file_access.h"
 #include "invalid_txn_publisher.h"
 
 #include <atomic>
@@ -2098,7 +2099,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
     if (fTxIndex) {
         CDiskTxPos postx;
         if (pblocktree->ReadTxIndex(txid, postx)) {
-            CAutoFile file(CDiskFiles::OpenBlockFile(postx, true), SER_DISK,
+            CAutoFile file(BlockFileAccess::OpenBlockFile(postx, true), SER_DISK,
                            CLIENT_VERSION);
             if (file.IsNull()) {
                 return error("%s: OpenBlockFile failed", __func__);
@@ -2208,7 +2209,7 @@ static bool WriteBlockToDisk(
     CDiskBlockMetaData& metaData)
 {
     // Open history file to append
-    CAutoFile fileout(CDiskFiles::OpenBlockFile(pos), SER_DISK, CLIENT_VERSION);
+    CAutoFile fileout(BlockFileAccess::OpenBlockFile(pos), SER_DISK, CLIENT_VERSION);
     if (fileout.IsNull()) {
         return error("WriteBlockToDisk: OpenBlockFile failed");
     }
@@ -2238,7 +2239,7 @@ bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
     block.SetNull();
 
     // Open history file to read
-    CAutoFile filein(CDiskFiles::OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
+    CAutoFile filein(BlockFileAccess::OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
     if (filein.IsNull()) {
         return error("ReadBlockFromDisk: OpenBlockFile failed for %s",
                      pos.ToString());
@@ -2295,7 +2296,7 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     const CDiskBlockPos& pos, bool calculateDiskBlockMetadata)
 {
-    UniqueCFile file{ CDiskFiles::OpenBlockFile(pos, true) };
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(pos, true) };
 
     if (!file)
     {
@@ -2391,7 +2392,7 @@ std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
 {
     AssertLockHeld(cs_main);
 
-    UniqueCFile file{ CDiskFiles::OpenBlockFile(index.GetBlockPos(), true) };
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos(), true) };
 
     if (!file)
     {
@@ -2423,7 +2424,7 @@ std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& ind
 {
     AssertLockHeld(cs_main);
 
-    UniqueCFile file{ CDiskFiles::OpenBlockFile(index.GetBlockPos(), true) };
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos(), true) };
 
     if (!file)
     {
@@ -3144,7 +3145,7 @@ bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos,
                      const uint256 &hashBlock,
                      const CMessageHeader::MessageMagic &messageStart) {
     // Open history file to append
-    CAutoFile fileout(CDiskFiles::OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
+    CAutoFile fileout(BlockFileAccess::OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
     if (fileout.IsNull()) {
         return error("%s: OpenUndoFile failed", __func__);
     }
@@ -3172,7 +3173,7 @@ bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos,
 bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos,
                       const uint256 &hashBlock) {
     // Open history file to read
-    CAutoFile filein(CDiskFiles::OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
+    CAutoFile filein(BlockFileAccess::OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
     if (filein.IsNull()) {
         return error("%s: OpenUndoFile failed", __func__);
     }
@@ -6224,16 +6225,10 @@ void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune)
 {
     for (const int i : setFilesToPrune)
     {
-        CDiskBlockPos pos{i, 0};
-        boost::system::error_code ec;
-        fs::remove(GetBlockPosFilename(pos, "blk"), ec);
-
-        if(!ec) // if there was no error
+        if (BlockFileAccess::RemoveFile( i )) // if there was no error
         {
-            // only delete rev file and remove block index data if blk file
-            // deletion succeeded otherwise keep the data for now as it's most
-            // likely still being used
-            fs::remove(GetBlockPosFilename(pos, "rev"));
+            // remove block index data if file deletion succeeded otherwise keep
+            // the data for now as it's most likely still being used
             PruneOneBlockFile(i);
             LogPrintf("Prune: %s deleted blk/rev (%05u)\n", __func__, i);
         }
@@ -6265,45 +6260,6 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes) {
     }
 
     return true;
-}
-
-FILE *CDiskFiles::OpenDiskFile(const CDiskBlockPos &pos, const char *prefix,
-                          bool fReadOnly) {
-    if (pos.IsNull()) {
-        return nullptr;
-    }
-
-    fs::path path = GetBlockPosFilename(pos, prefix);
-    fs::create_directories(path.parent_path());
-    FILE *file = fsbridge::fopen(path, "rb+");
-    if (!file && !fReadOnly) {
-        file = fsbridge::fopen(path, "wb+");
-    }
-    if (!file) {
-        LogPrintf("Unable to open file %s\n", path.string());
-        return nullptr;
-    }
-    if (pos.nPos) {
-        if (fseek(file, pos.nPos, SEEK_SET)) {
-            LogPrintf("Unable to seek to position %u of %s\n", pos.nPos,
-                      path.string());
-            fclose(file);
-            return nullptr;
-        }
-    }
-    return file;
-}
-
-FILE *CDiskFiles::OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly) {
-    return OpenDiskFile(pos, "blk", fReadOnly);
-}
-
-FILE *CDiskFiles::OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly) {
-    return OpenDiskFile(pos, "rev", fReadOnly);
-}
-
-fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix) {
-    return GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, pos.nFile);
 }
 
 CBlockIndex *InsertBlockIndex(uint256 hash) {
@@ -6401,9 +6357,8 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
         }
     }
     for (const int i : setBlkDataFiles) {
-        CDiskBlockPos pos(i, 0);
-        if (CAutoFile(CDiskFiles::OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION)
-                .IsNull()) {
+        if (auto file = BlockFileAccess::GetBlockFile( i ); file == nullptr)
+        {
             return false;
         }
     }
@@ -6904,19 +6859,17 @@ void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& 
     
     int nFile = 0;
     while (true) {
-        CDiskBlockPos pos(nFile, 0);
-        if (!fs::exists(GetBlockPosFilename(pos, "blk"))) {
-            // No block files left to reindex
-            break;
-        }
-        FILE *file = CDiskFiles::OpenBlockFile(pos, true);
-        if (!file) {
-            // This error is logged in OpenBlockFile
+        UniqueCFile file = BlockFileAccess::GetBlockFile( nFile );
+        if (file == nullptr)
+        {
+            // No block files left to reindex or an error occurred.
+            // Potential errors are logged in OpenBlockFile.
             break;
         }
         LogPrintf("Reindexing block file blk%05u.dat...\n",
             (unsigned int)nFile);
-        LoadExternalBlockFile(config, file, &pos);
+        CDiskBlockPos pos{ nFile, 0 };
+        LoadExternalBlockFile(config, file.release(), &pos);
         nFile++;
     }
 

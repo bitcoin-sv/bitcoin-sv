@@ -81,6 +81,7 @@ BITCOIN_CORE_H = \
   bloom.h \
   blockencodings.h \
   blockfileinfostore.h \
+  block_file_access.h \
   blockstreams.h \
   blockvalidation.h \
   chain.h \
@@ -252,6 +253,7 @@ libbitcoin_server_a_SOURCES = \
   bloom.cpp \
   blockencodings.cpp \
   blockfileinfostore.cpp \
+  block_file_access.cpp \
   chain.cpp \
   checkpoints.cpp \
   config.cpp \

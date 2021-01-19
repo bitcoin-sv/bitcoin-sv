@@ -222,6 +222,7 @@ add_library(server
 	bloom.cpp
 	blockencodings.cpp
 	blockfileinfostore.cpp
+	block_file_access.cpp
 	chain.cpp
 	checkpoints.cpp
 	config.cpp

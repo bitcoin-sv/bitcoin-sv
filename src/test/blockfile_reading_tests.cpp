@@ -6,6 +6,7 @@
 #include "stream_test_helpers.h"
 #include "protocol.h"
 #include "blockfileinfostore.h"
+#include "block_file_access.h"
 #include "consensus/validation.h"
 #include "config.h"
 #include "chainparams.h"
@@ -50,7 +51,7 @@ namespace
 
         // Open history file to append
         CAutoFile fileout{
-            CDiskFiles::OpenBlockFile(blockPos),
+            BlockFileAccess::OpenBlockFile(blockPos),
             SER_DISK,
             CLIENT_VERSION};
         if (fileout.IsNull())

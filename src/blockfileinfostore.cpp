@@ -4,6 +4,8 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "blockfileinfostore.h"
+
+#include "block_file_access.h"
 #include "config.h"
 #include "util.h"
 #include "txdb.h"  // CBlockTreeDB
@@ -37,7 +39,7 @@ void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
 
     CDiskBlockPos posOld(nLastBlockFile, 0);
 
-    FILE *fileOld = CDiskFiles::OpenBlockFile(posOld);
+    FILE *fileOld = BlockFileAccess::OpenBlockFile(posOld);
     if (fileOld) {
         if (fFinalize) {
             TruncateFile(fileOld, vinfoBlockFile[nLastBlockFile].nSize);
@@ -46,7 +48,7 @@ void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
         fclose(fileOld);
     }
 
-    fileOld = CDiskFiles::OpenUndoFile(posOld);
+    fileOld = BlockFileAccess::OpenUndoFile(posOld);
     if (fileOld) {
         if (fFinalize) {
             TruncateFile(fileOld, vinfoBlockFile[nLastBlockFile].nUndoSize);
@@ -115,7 +117,7 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
                 fCheckForPruning = true;
             }
             if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos)) {
-                FILE *file = CDiskFiles::OpenBlockFile(pos);
+                FILE *file = BlockFileAccess::OpenBlockFile(pos);
                 if (file) {
                     LogPrintf(
                         "Pre-allocating up to position 0x%x in blk%05u.dat\n",
@@ -156,7 +158,7 @@ bool CBlockFileInfoStore::FindUndoPos(CValidationState &state, int nFile, CDiskB
             fCheckForPruning = true;
         }
         if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos)) {
-            FILE *file = CDiskFiles::OpenUndoFile(pos);
+            FILE *file = BlockFileAccess::OpenUndoFile(pos);
             if (file) {
                 LogPrintf("Pre-allocating up to position 0x%x in rev%05u.dat\n",
                     nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);

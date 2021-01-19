@@ -65,20 +65,6 @@ public:
 };
 
 
-/** Utility functions for opening disk and block files */
-class CDiskFiles
-{
-    static FILE *OpenDiskFile(const CDiskBlockPos &pos, const char *prefix,
-        bool fReadOnly);
-public:
-    /** Open a block file (blk?????.dat). */
-    static FILE *OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-
-    /** Open an undo file (rev?????.dat) */
-    static FILE *OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly = false);
-};
-
-
 /** Access to info about block files */
 extern std::unique_ptr<CBlockFileInfoStore> pBlockFileInfoStore;
 

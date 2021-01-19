@@ -467,11 +467,6 @@ unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize);
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 
 /**
- * Translation to a filesystem path.
- */
-fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
-
-/**
  * Import blocks from an external file.
  */
 bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
