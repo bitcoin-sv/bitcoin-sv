@@ -26,21 +26,48 @@ namespace
         return GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, pos.nFile);
     }
 
+    enum class OpenDiskType
+    {
+        ReadIfExists,
+        WriteIfExists,
+        Write
+    };
+
     UniqueCFile OpenDiskFile(
         const CDiskBlockPos& pos,
         const char* prefix,
-        bool fReadOnly)
+        OpenDiskType type)
     {
         if (pos.IsNull()) {
             return nullptr;
         }
 
         fs::path path = GetBlockPosFilename(pos, prefix);
-        fs::create_directories(path.parent_path());
-        UniqueCFile file{ fsbridge::fopen(path, "rb+") };
-        if (!file && !fReadOnly) {
-            file.reset( fsbridge::fopen(path, "wb+") );
-        }
+
+        UniqueCFile file{
+            [&path, type]
+            {
+                if (type == OpenDiskType::ReadIfExists)
+                {
+                    return UniqueCFile{ fsbridge::fopen(path, "rb") };
+                }
+                else if (type == OpenDiskType::WriteIfExists)
+                {
+                    return UniqueCFile{ fsbridge::fopen(path, "rb+") };
+                }
+
+                if (UniqueCFile file{ fsbridge::fopen(path, "rb+") }; file)
+                {
+                    return file;
+                }
+
+                // Only create directories for new files
+                fs::create_directories(path.parent_path());
+
+                // make a new file
+                return UniqueCFile{ fsbridge::fopen(path, "wb+") };
+            }()};
+
         if (!file) {
             LogPrintf("Unable to open file %s\n", path.string());
             return nullptr;
@@ -74,33 +101,26 @@ namespace
     }
 
     /** Open a block file (blk?????.dat). */
-    UniqueCFile OpenBlockFile(const CDiskBlockPos& pos, bool fReadOnly = false)
+    UniqueCFile OpenBlockFile(const CDiskBlockPos& pos, OpenDiskType type = OpenDiskType::ReadIfExists)
     {
-        return OpenDiskFile(pos, "blk", fReadOnly);
+        return OpenDiskFile(pos, "blk", type);
     }
 
     /** Open an undo file (rev?????.dat) */
-    UniqueCFile OpenUndoFile(const CDiskBlockPos& pos, bool fReadOnly = false)
+    UniqueCFile OpenUndoFile(const CDiskBlockPos& pos, OpenDiskType type = OpenDiskType::ReadIfExists)
     {
-        return OpenDiskFile(pos, "rev", fReadOnly);
+        return OpenDiskFile(pos, "rev", type);
     }
 }
 
 UniqueCFile BlockFileAccess::GetBlockFile( int fileNo )
 {
-    CDiskBlockPos pos{ fileNo, 0 };
-
-    if (!fs::exists(GetBlockPosFilename(pos, "blk")))
-    {
-        return nullptr;
-    }
-
-    return UniqueCFile{ OpenBlockFile(pos, true) };
+    return GetBlockFile( { fileNo, 0 } );
 }
 
 UniqueCFile BlockFileAccess::GetBlockFile( const CDiskBlockPos& pos )
 {
-    return UniqueCFile{ OpenBlockFile(pos, true) };
+    return OpenBlockFile(pos, OpenDiskType::ReadIfExists);
 }
 
 bool BlockFileAccess::RemoveFile( int fileNo )
@@ -128,7 +148,7 @@ bool BlockFileAccess::WriteBlockToDisk(
     CDiskBlockMetaData& metaData)
 {
     // Open history file to append
-    CAutoFile fileout{ OpenBlockFile(pos), SER_DISK, CLIENT_VERSION };
+    CAutoFile fileout{ OpenBlockFile(pos, OpenDiskType::WriteIfExists), SER_DISK, CLIENT_VERSION };
     if (fileout.IsNull()) {
         return error("WriteBlockToDisk: OpenBlockFile failed");
     }
@@ -160,7 +180,7 @@ bool BlockFileAccess::UndoWriteToDisk(
     const CMessageHeader::MessageMagic& messageStart)
 {
     // Open history file to append
-    CAutoFile fileout{ OpenUndoFile(pos), SER_DISK, CLIENT_VERSION };
+    CAutoFile fileout{ OpenUndoFile(pos, OpenDiskType::WriteIfExists), SER_DISK, CLIENT_VERSION };
     if (fileout.IsNull()) {
         return error("%s: OpenUndoFile failed", __func__);
     }
@@ -193,7 +213,7 @@ bool BlockFileAccess::ReadBlockFromDisk(
     block.SetNull();
 
     // Open history file to read
-    CAutoFile filein{ OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION };
+    CAutoFile filein{ OpenBlockFile(pos, OpenDiskType::ReadIfExists), SER_DISK, CLIENT_VERSION };
     if (filein.IsNull()) {
         return error("ReadBlockFromDisk: OpenBlockFile failed for %s",
                      pos.ToString());
@@ -221,7 +241,7 @@ auto BlockFileAccess::GetDiskBlockStreamReader(
     bool calculateDiskBlockMetadata)
     -> std::unique_ptr<CBlockStreamReader<CFileReader>>
 {
-    UniqueCFile file{ OpenBlockFile(pos, true) };
+    UniqueCFile file{ OpenBlockFile(pos, OpenDiskType::ReadIfExists) };
 
     if (!file)
     {
@@ -244,7 +264,7 @@ bool BlockFileAccess::UndoReadFromDisk(
     const uint256& hashBlock)
 {
     // Open history file to read
-    CAutoFile filein{ OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION };
+    CAutoFile filein{ OpenUndoFile(pos, OpenDiskType::ReadIfExists), SER_DISK, CLIENT_VERSION };
     if (filein.IsNull()) {
         return error("%s: OpenUndoFile failed", __func__);
     }
@@ -276,7 +296,7 @@ void BlockFileAccess::FlushBlockFile(
 {
     CDiskBlockPos posOld(fileNo, 0);
 
-    UniqueCFile fileOld = OpenBlockFile(posOld);
+    UniqueCFile fileOld = OpenBlockFile(posOld, OpenDiskType::WriteIfExists);
     if (fileOld) {
         if (finalize)
         {
@@ -285,7 +305,7 @@ void BlockFileAccess::FlushBlockFile(
         FileCommit(fileOld.get());
     }
 
-    fileOld = OpenUndoFile(posOld);
+    fileOld = OpenUndoFile(posOld, OpenDiskType::WriteIfExists);
     if (fileOld) {
         if (finalize)
         {
@@ -300,7 +320,7 @@ bool BlockFileAccess::PreAllocateBlock(
     const CDiskBlockPos& pos)
 {
     if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos)) {
-        UniqueCFile file = OpenBlockFile(pos);
+        UniqueCFile file = OpenBlockFile(pos, OpenDiskType::Write);
         if (file) {
             LogPrintf(
                 "Pre-allocating up to position 0x%x in blk%05u.dat\n",
@@ -308,9 +328,9 @@ bool BlockFileAccess::PreAllocateBlock(
             AllocateFileRange(file.get(), pos.nPos,
                 nNewChunks * BLOCKFILE_CHUNK_SIZE -
                 pos.nPos);
-        }
 
-        return true;
+            return true;
+        }
     }
 
     return false;
@@ -321,15 +341,15 @@ bool BlockFileAccess::PreAllocateUndoBlock(
     const CDiskBlockPos& pos)
 {
     if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos)) {
-        UniqueCFile file = OpenUndoFile(pos);
+        UniqueCFile file = OpenUndoFile(pos, OpenDiskType::Write);
         if (file) {
             LogPrintf("Pre-allocating up to position 0x%x in rev%05u.dat\n",
                 nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
             AllocateFileRange(file.get(), pos.nPos,
                 nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
-        }
 
-        return true;
+            return true;
+        }
     }
 
     return false;
@@ -340,7 +360,7 @@ bool BlockFileAccess::LoadBlockHashAndTx(
     uint256& hashBlock,
     CTransactionRef& txOut)
 {
-    CAutoFile file{ OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION };
+    CAutoFile file{ OpenBlockFile(postx, OpenDiskType::ReadIfExists), SER_DISK, CLIENT_VERSION };
     if (file.IsNull()) {
         return error("%s: OpenBlockFile failed", __func__);
     }

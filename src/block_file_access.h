@@ -46,12 +46,22 @@ namespace BlockFileAccess
         const CDiskBlockPos& pos,
         const uint256& hashBlock);
 
+    /**
+     * Pre-condition:
+     * Block file is already pre-allocated to have enough free space at position
+     * pos to write data to disk.
+     */
     bool WriteBlockToDisk(
         const CBlock& block,
         CDiskBlockPos& pos,
         const CMessageHeader::MessageMagic& messageStart,
         CDiskBlockMetaData& metaData);
 
+    /**
+     * Pre-condition:
+     * Block file is already pre-allocated to have enough free space at position
+     * pos to write data to disk.
+     */
     bool UndoWriteToDisk(
         const CBlockUndo& blockundo,
         CDiskBlockPos& pos,
