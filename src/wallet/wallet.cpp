@@ -5,6 +5,7 @@
 
 #include "wallet/wallet.h"
 
+#include "block_file_access.h"
 #include "chain.h"
 #include "checkpoints.h"
 #include "config.h"
@@ -1734,7 +1735,8 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
 
     while (pindex) {
         
-        auto stream = GetDiskBlockStreamReader(pindex->GetBlockPos());
+        auto stream =
+            BlockFileAccess::GetDiskBlockStreamReader(pindex->GetBlockPos());
 
         if (stream)
         {

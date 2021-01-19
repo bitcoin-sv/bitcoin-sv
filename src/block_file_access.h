@@ -3,11 +3,15 @@
 
 #pragma once
 
+#include <memory>
+
+#include "blockstreams.h"
 #include "cfile_util.h"
 #include "protocol.h"
 
 class CBlock;
 class CBlockUndo;
+class Config;
 struct CDiskBlockMetaData;
 struct CDiskBlockPos;
 
@@ -22,6 +26,15 @@ namespace BlockFileAccess
 
     UniqueCFile GetBlockFile( int fileNo );
     bool RemoveFile( int fileNo );
+
+    bool ReadBlockFromDisk(
+        CBlock& block,
+        const CDiskBlockPos& pos,
+        const Config& config);
+
+    std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+        const CDiskBlockPos& pos,
+        bool calculateDiskBlockMetadata=false);
 
     bool WriteBlockToDisk(
         const CBlock& block,

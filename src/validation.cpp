@@ -2184,34 +2184,6 @@ unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize)
     }
 }
 
-bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
-                       const Config &config) {
-    block.SetNull();
-
-    // Open history file to read
-    CAutoFile filein(BlockFileAccess::OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
-    if (filein.IsNull()) {
-        return error("ReadBlockFromDisk: OpenBlockFile failed for %s",
-                     pos.ToString());
-    }
-
-    // Read block
-    try {
-        filein >> block;
-    } catch (const std::exception &e) {
-        return error("%s: Deserialize or I/O error - %s at %s", __func__,
-                     e.what(), pos.ToString());
-    }
-
-    // Check the header
-    if (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
-        return error("ReadBlockFromDisk: Errors in block header at %s",
-                     pos.ToString());
-    }
-
-    return true;
-}
-
 void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata)
 {
     LOCK(cs_main);
@@ -2230,7 +2202,8 @@ void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData me
 
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config) {
-    if (!ReadBlockFromDisk(block, pindex->GetBlockPos(), config)) {
+    if (!BlockFileAccess::ReadBlockFromDisk(block, pindex->GetBlockPos(), config))
+    {
         return false;
     }
 
@@ -2244,32 +2217,15 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
 }
 
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CDiskBlockPos& pos, bool calculateDiskBlockMetadata)
-{
-    UniqueCFile file{ BlockFileAccess::OpenBlockFile(pos, true) };
-
-    if (!file)
-    {
-        error("GetDiskBlockStreamReader(CDiskBlockPos&): OpenBlockFile failed for %s", 
-            pos.ToString());
-        return {}; // could not open a stream
-    }
-
-    return
-        std::make_unique<CBlockStreamReader<CFileReader>>(
-            std::move(file),
-            CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
-            calculateDiskBlockMetadata,
-            pos);
-}
-
-std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata)
 {
     std::unique_ptr<CBlockStreamReader<CFileReader>> blockStreamReader;
     try
     {
-        blockStreamReader = GetDiskBlockStreamReader(pindex->GetBlockPos(), calculateDiskBlockMetadata);
+        blockStreamReader =
+            BlockFileAccess::GetDiskBlockStreamReader(
+                pindex->GetBlockPos(),
+                calculateDiskBlockMetadata);
     }
     catch(const std::exception& e)
     {
@@ -6937,8 +6893,11 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                             range.first;
                         std::shared_ptr<CBlock> pblockrecursive =
                             std::make_shared<CBlock>();
-                        if (ReadBlockFromDisk(*pblockrecursive, it->second,
-                                              config)) {
+                        if (BlockFileAccess::ReadBlockFromDisk(
+                                *pblockrecursive,
+                                it->second,
+                                config))
+                        {
                             LogPrint(
                                 BCLog::REINDEX,
                                 "%s: Processing out of order child %s of %s\n",

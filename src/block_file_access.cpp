@@ -5,9 +5,11 @@
 
 #include "chain.h"
 #include "clientversion.h"
+#include "config.h"
 #include "disk_block_pos.h"
 #include "hash.h"
 #include "fs.h"
+#include "pow.h"
 #include "primitives/block.h"
 #include "streams.h"
 #include "undo.h"
@@ -174,4 +176,57 @@ bool BlockFileAccess::UndoWriteToDisk(
     fileout << hasher.GetHash();
 
     return true;
+}
+
+bool BlockFileAccess::ReadBlockFromDisk(
+    CBlock& block,
+    const CDiskBlockPos& pos,
+    const Config& config)
+{
+    block.SetNull();
+
+    // Open history file to read
+    CAutoFile filein{ OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION };
+    if (filein.IsNull()) {
+        return error("ReadBlockFromDisk: OpenBlockFile failed for %s",
+                     pos.ToString());
+    }
+
+    // Read block
+    try {
+        filein >> block;
+    } catch (const std::exception &e) {
+        return error("%s: Deserialize or I/O error - %s at %s", __func__,
+                     e.what(), pos.ToString());
+    }
+
+    // Check the header
+    if (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
+        return error("ReadBlockFromDisk: Errors in block header at %s",
+                     pos.ToString());
+    }
+
+    return true;
+}
+
+auto BlockFileAccess::GetDiskBlockStreamReader(
+    const CDiskBlockPos& pos,
+    bool calculateDiskBlockMetadata)
+    -> std::unique_ptr<CBlockStreamReader<CFileReader>>
+{
+    UniqueCFile file{ OpenBlockFile(pos, true) };
+
+    if (!file)
+    {
+        error("GetDiskBlockStreamReader(CDiskBlockPos&): OpenBlockFile failed for %s",
+            pos.ToString());
+        return {}; // could not open a stream
+    }
+
+    return
+        std::make_unique<CBlockStreamReader<CFileReader>>(
+            std::move(file),
+            CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
+            calculateDiskBlockMetadata,
+            pos);
 }

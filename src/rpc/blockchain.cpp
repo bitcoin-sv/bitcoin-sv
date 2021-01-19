@@ -7,6 +7,7 @@
 #include "rpc/blockchain.h"
 
 #include "amount.h"
+#include "block_file_access.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -1324,7 +1325,10 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
             diskBlockMetaData = blockIndex.GetDiskBlockMetaData();
         }
 
-        reader = GetDiskBlockStreamReader(blockIndex.GetBlockPos(), !hasDiskBlockMetaData);
+        reader =
+            BlockFileAccess::GetDiskBlockStreamReader(
+                blockIndex.GetBlockPos(),
+                !hasDiskBlockMetaData);
     }
 
     if (!reader) 
@@ -2817,7 +2821,8 @@ UniValue getblockstats_impl(const Config &config,
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
 
-    auto reader = GetDiskBlockStreamReader(pindex->GetBlockPos(), false);
+    auto reader =
+        BlockFileAccess::GetDiskBlockStreamReader(pindex->GetBlockPos(), false);
     if (!reader)
     {
         assert(!"cannot load block from disk");
