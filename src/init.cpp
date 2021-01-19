@@ -1188,8 +1188,10 @@ std::string HelpMessage(HelpMessageMode mode, const Config& config) {
             "The value may be given in bytes or with unit (B, kB, MB, GB)."));
     strUsage += HelpMessageOpt(
         "-maxcoinsprovidercachesize=<n>",
-        _("Set soft maximum limit of cached coin tip buffer size (default: unlimited -> 0). "
-            "The value may be given in bytes or with unit (B, kB, MB, GB)."));
+        strprintf(_("Set soft maximum limit of cached coin tip buffer size (default: %d GB, minimum: %d MB). "
+            "The value may be given in bytes or with unit (B, kB, MB, GB)."),
+            DEFAULT_COINS_PROVIDER_CACHE_SIZE / ONE_GIGABYTE,
+            MIN_COINS_PROVIDER_CACHE_SIZE / ONE_MEGABYTE));
     strUsage += HelpMessageOpt(
         "-maxcoinsdbfiles=<n>",
         strprintf(_("Set maximum number of files used by coins leveldb (default: %d). "),
@@ -2149,7 +2151,8 @@ bool AppInitParameterInteraction(Config &config) {
     }
 
     if(std::string err; !config.SetMaxCoinsProviderCacheSize(
-        gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", 0), &err))
+        gArgs.GetArgAsBytes("-maxcoinsprovidercachesize", DEFAULT_COINS_PROVIDER_CACHE_SIZE),
+        &err))
     {
         return InitError(err);
     }

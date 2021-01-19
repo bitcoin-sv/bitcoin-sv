@@ -8,7 +8,37 @@
 #include "validation.h"
 #include "util.h"
 #include "consensus/merkle.h"
+
 #include <boost/algorithm/string.hpp>
+#include <limits>
+
+namespace
+{
+    bool LessThan(
+        int64_t argValue,
+        std::string* err,
+        const std::string& errorMessage,
+        int64_t minValue)
+    {
+        if (argValue < minValue)
+        {
+            if (err)
+            {
+                *err = errorMessage;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    bool LessThanZero(
+        int64_t argValue,
+        std::string* err,
+        const std::string& errorMessage)
+    {
+        return LessThan( argValue, err, errorMessage, 0 );
+    }
+}
 
 GlobalConfig::GlobalConfig() {
     Reset();
@@ -66,7 +96,7 @@ void GlobalConfig::Reset()
     mAcceptNonStandardOutput = true;
 
     mMaxCoinsViewCacheSize = 0;
-    mMaxCoinsProviderCacheSize = 0;
+    mMaxCoinsProviderCacheSize = DEFAULT_COINS_PROVIDER_CACHE_SIZE;
 
     maxProtocolRecvPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH;
     maxProtocolSendPayloadLength = DEFAULT_MAX_PROTOCOL_RECV_PAYLOAD_LENGTH * MAX_PROTOCOL_SEND_PAYLOAD_FACTOR;
@@ -127,19 +157,6 @@ void GlobalConfig::CheckSetDefaultCalled() const
         throw std::runtime_error(
             "GlobalConfig::SetDefaultBlockSizeParams must be called before accessing block size related parameters");
     }
-}
-
-bool GlobalConfig::LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage)
-{
-    if (argValue < 0) 
-    {
-        if (err) 
-        {
-            *err = errorMessage;
-        }
-        return true;
-    }
-    return false;
 }
 
 bool GlobalConfig::SetMaxBlockSize(uint64_t maxSize, std::string* err) {
@@ -829,7 +846,14 @@ bool GlobalConfig::SetMaxCoinsViewCacheSize(int64_t max, std::string* err)
 
 bool GlobalConfig::SetMaxCoinsProviderCacheSize(int64_t max, std::string* err)
 {
-    if (LessThanZero(max, err, "Policy value for maximum coins provider cache size must not be less than 0."))
+    static_assert( MIN_COINS_PROVIDER_CACHE_SIZE <= std::numeric_limits<int64_t>::max() );
+
+    if (LessThan(
+            max,
+            err,
+            "Policy value for maximum coins provider cache size must not be less than "
+                + std::to_string(MIN_COINS_PROVIDER_CACHE_SIZE),
+            MIN_COINS_PROVIDER_CACHE_SIZE))
     {
         return false;
     }

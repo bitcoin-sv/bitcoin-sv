@@ -483,8 +483,6 @@ private:
     uint64_t preferredMerkleTreeFileSize;
     uint64_t maxMerkleTreeMemoryCacheSize;
 
-    bool LessThanZero(int64_t argValue, std::string* err, const std::string& errorMessage);
-
     std::set<std::string> invalidTxSinks;
     int64_t invalidTxFileSinkSize;
     InvalidTxEvictionPolicy invalidTxFileSinkEvictionPolicy;
