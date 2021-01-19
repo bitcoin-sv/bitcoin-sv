@@ -16,8 +16,22 @@
 #include "undo.h"
 #include "util.h"
 
+#include <mutex>
+
 namespace
 {
+    // Mutex is used to synchronize file deletions and resizes.
+    // For block files that are opened for reading we don't need to hold the mutex
+    // as we rely on filesystem to do the right thing (on Linux/Mac the filesystem
+    // extends file's life if the file is deleted while in use; on Windows
+    // filesystem prevents deletion so we need to try deleting the file again at
+    // a later point in time).
+    // For block undo files we need to hold the lock during reading as during
+    // deletion it is expected that if block file deletion succeeded, block
+    // undo file deletion will also succeed (and ignored if deletion doesn't
+    // succeed).
+    std::shared_mutex serializationMutex;
+
     /**
      * Translation to a filesystem path.
      */
@@ -125,6 +139,10 @@ UniqueCFile BlockFileAccess::GetBlockFile( const CDiskBlockPos& pos )
 
 bool BlockFileAccess::RemoveFile( int fileNo )
 {
+    // We use lock to prevent cases where block file deletion would succeed
+    // while deleting undo file would fail as the undo file is in use.
+    std::scoped_lock lock{ serializationMutex };
+
     CDiskBlockPos pos{ fileNo, 0 };
     boost::system::error_code ec;
     fs::remove(GetBlockPosFilename(pos, "blk"), ec);
@@ -179,6 +197,14 @@ bool BlockFileAccess::UndoWriteToDisk(
     const uint256& hashBlock,
     const CMessageHeader::MessageMagic& messageStart)
 {
+    // We know that we are writing to separate locations as pre-requirement
+    // is to allocate space so this can be a shared lock.
+    // We use shared lock to prevent BlockFileStore::RemoveFile from only
+    // partially succeeding (deletes block file but can't delete undo file)
+    // - this should never happen in practice since we don't write to old
+    // undo files and don't delete new ones.
+    std::shared_lock lock{ serializationMutex };
+
     // Open history file to append
     CAutoFile fileout{ OpenUndoFile(pos, OpenDiskType::WriteIfExists), SER_DISK, CLIENT_VERSION };
     if (fileout.IsNull()) {
@@ -263,6 +289,12 @@ bool BlockFileAccess::UndoReadFromDisk(
     const CDiskBlockPos& pos,
     const uint256& hashBlock)
 {
+    // We use shared lock to prevent BlockFileStore::RemoveFile from only
+    // partially succeeding (deletes block file but can't delete undo file)
+    // - this should never happen in practice since we don't write to old
+    // undo files and don't delete new ones.
+    std::shared_lock lock{ serializationMutex };
+
     // Open history file to read
     CAutoFile filein{ OpenUndoFile(pos, OpenDiskType::ReadIfExists), SER_DISK, CLIENT_VERSION };
     if (filein.IsNull()) {
@@ -294,6 +326,11 @@ void BlockFileAccess::FlushBlockFile(
     const CBlockFileInfo& blockFileInfo,
     bool finalize)
 {
+    // We use lock to make sure there are no file resizes pending - this should
+    // not happen in practice as we don't truncate fies before a new file is
+    // already prepared.
+    std::scoped_lock lock{ serializationMutex };
+
     CDiskBlockPos posOld(fileNo, 0);
 
     UniqueCFile fileOld = OpenBlockFile(posOld, OpenDiskType::WriteIfExists);
@@ -319,6 +356,10 @@ bool BlockFileAccess::PreAllocateBlock(
     uint64_t nNewChunks,
     const CDiskBlockPos& pos)
 {
+    // We use lock to make sure there is only one resize active at the same time.
+    // Also OpenBlockFile OpenDiskType::Write parameter requires a unique lock.
+    std::scoped_lock lock{ serializationMutex };
+
     if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos)) {
         UniqueCFile file = OpenBlockFile(pos, OpenDiskType::Write);
         if (file) {
@@ -340,6 +381,10 @@ bool BlockFileAccess::PreAllocateUndoBlock(
     uint64_t nNewChunks,
     const CDiskBlockPos& pos)
 {
+    // We use lock to make sure there is only one resize active at the same time.
+    // Also OpenBlockFile OpenDiskType::Write parameter requires a unique lock.
+    std::scoped_lock lock{ serializationMutex };
+
     if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos)) {
         UniqueCFile file = OpenUndoFile(pos, OpenDiskType::Write);
         if (file) {

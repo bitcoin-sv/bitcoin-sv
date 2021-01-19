@@ -25,7 +25,12 @@ static constexpr unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
 static constexpr unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
-/** Utility functions for opening block and undo files */
+/**
+ * Utility functions for opening block and undo files.
+ * The entire codebase should access block/undo files through these functions
+ * as they internally guarantee read/resize/delete files system access
+ * synchronization.
+ */
 namespace BlockFileAccess
 {
     UniqueCFile GetBlockFile( int fileNo );
