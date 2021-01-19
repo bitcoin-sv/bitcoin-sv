@@ -4,11 +4,15 @@
 """
 Test rpc method dumpparameters. Rpc method dumpparameters returns non-sensitive parameters
 set by switches and config file (also includes force set parameters).
+Test non-sensitive parameters are also dumped to log file at node startup.
 
-Verify sensitive parameters (rpcuser, rpcpassword, rpcauth) are excluded from the response.
+Verify sensitive parameters (rpcuser, rpcpassword, rpcauth) are not dumped to log file and are excluded
+from the response.
 """
+import glob
 import os
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import check_for_log_msg, wait_until
 
 
 class BSVdumpparameters(BitcoinTestFramework):
@@ -34,6 +38,22 @@ class BSVdumpparameters(BitcoinTestFramework):
         assert 'rpcuser=user' not in response
         assert 'rpcpassword=password' not in response
         assert 'rpcauth=user:salt' not in response
+
+        # checked only non sensitive paremters are written to log at node startup
+        def wait_for_log():
+            nonsensitive_parameters = ["debug", "regtest=1", "excessiveblocksize=300MB"]
+            sensitive_parameters = ["rpcuser=user", "rpcpassword=password", "rpcauth=user:salt"]
+
+            for nonsensitive in nonsensitive_parameters:
+                if not check_for_log_msg(self, "[main] " + nonsensitive, "/node0"):
+                    return False
+
+            for sensitive in sensitive_parameters:
+                if check_for_log_msg(self, "[main] " + sensitive, "/node0"):
+                    return False
+            return True
+
+        wait_until(wait_for_log, check_interval=0.5)
 
 
 if __name__ == '__main__':

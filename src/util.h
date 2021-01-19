@@ -135,6 +135,7 @@ public:
     std::vector<std::string> GetArgs(const std::string &strArg);
     bool IsSensitiveArg(const std::string& argName);
     std::vector<std::string> GetNonSensitiveParameters();
+    void LogSetParameters();
 
     /**
      * Return true if the given argument has been manually set.

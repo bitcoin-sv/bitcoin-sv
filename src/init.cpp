@@ -2998,6 +2998,8 @@ bool AppInitMain(Config &config, boost::thread_group &threadGroup,
     LogPrintf("No wallet support compiled in!\n");
 #endif
 
+    gArgs.LogSetParameters();
+
     // Step 9: data directory maintenance
 
     // if pruning, unset the service bit and perform the initial blockstore

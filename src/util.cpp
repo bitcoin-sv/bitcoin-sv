@@ -220,6 +220,15 @@ std::vector<std::string> ArgsManager::GetNonSensitiveParameters()
     return nonSensitiveParameters;
 }
 
+void ArgsManager::LogSetParameters()
+{
+    LogPrint(BCLog::ALL, "Printing non-sensitive parameters that are force set and set by switches and config file...\n");
+    for(const auto& arg : gArgs.GetNonSensitiveParameters())
+    {
+        LogPrintf("%s\n", arg);
+    }
+}
+
 std::vector<std::string> ArgsManager::GetArgs(const std::string &strArg) {
     LOCK(cs_args);
     return mapMultiArgs.at(strArg);
