@@ -51,12 +51,12 @@ namespace
 
         // Open history file to append
         CAutoFile fileout{
-            BlockFileAccess::OpenBlockFile(blockPos),
+            BlockFileAccess::GetBlockFile(blockPos),
             SER_DISK,
             CLIENT_VERSION};
         if (fileout.IsNull())
         {
-            throw std::runtime_error{"WriteBlockToDisk: OpenBlockFile failed"};
+            throw std::runtime_error{"WriteBlockToDisk: GetBlockFile failed"};
         }
 
         // Write index header

@@ -97,6 +97,11 @@ UniqueCFile BlockFileAccess::GetBlockFile( int fileNo )
     return UniqueCFile{ OpenBlockFile(pos, true) };
 }
 
+UniqueCFile BlockFileAccess::GetBlockFile( const CDiskBlockPos& pos )
+{
+    return UniqueCFile{ OpenBlockFile(pos, true) };
+}
+
 bool BlockFileAccess::RemoveFile( int fileNo )
 {
     CDiskBlockPos pos{ fileNo, 0 };

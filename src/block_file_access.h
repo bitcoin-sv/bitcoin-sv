@@ -10,6 +10,7 @@
 #include "blockstreams.h"
 #include "cfile_util.h"
 #include "protocol.h"
+#include "streams.h"
 
 class CBlock;
 class CBlockUndo;
@@ -34,6 +35,7 @@ namespace BlockFileAccess
     FILE* OpenUndoFile(const CDiskBlockPos& pos, bool fReadOnly = false);
 
     UniqueCFile GetBlockFile( int fileNo );
+    UniqueCFile GetBlockFile( const CDiskBlockPos& pos );
     bool RemoveFile( int fileNo );
 
     bool ReadBlockFromDisk(
