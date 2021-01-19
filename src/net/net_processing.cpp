@@ -1742,6 +1742,10 @@ static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string&
 
         // Parse association ID
         AssociationIDPtr idptr { AssociationID::Make(associationID) };
+        if(idptr == nullptr)
+        {
+            throw std::runtime_error("NULL association ID");
+        }
         LogPrint(BCLog::NET, "Got request for new %s stream within association %s, peer=%d\n",
             enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
 
@@ -1802,6 +1806,10 @@ static bool ProcessStreamAckMessage(const CNodePtr& pfrom, const std::string& st
 
         // Parse association ID
         AssociationIDPtr idptr { AssociationID::Make(associationID) };
+        if(idptr == nullptr)
+        {
+            throw std::runtime_error("NULL association ID");
+        }
         LogPrint(BCLog::NET, "Got stream ack for new %s stream within association %s, peer=%d\n",
             enum_cast<std::string>(streamType), idptr->ToString(), pfrom->id);
 
