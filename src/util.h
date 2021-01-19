@@ -22,6 +22,7 @@
 #include "utiltime.h"
 
 #include <atomic>
+#include <array>
 #include <cstdint>
 #include <exception>
 #include <map>
@@ -127,9 +128,13 @@ protected:
     std::map<std::string, std::vector<std::string>> mapMultiArgs;
 
 public:
+    static inline const std::array<std::string, 3> sensitiveArgs{"-rpcuser", "-rpcpassword", "-rpcauth"};
+
     void ParseParameters(int argc, const char *const argv[]);
     void ReadConfigFile(const std::string &confPath);
     std::vector<std::string> GetArgs(const std::string &strArg);
+    bool IsSensitiveArg(const std::string& argName);
+    std::vector<std::string> GetNonSensitiveParameters();
 
     /**
      * Return true if the given argument has been manually set.

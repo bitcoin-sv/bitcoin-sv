@@ -187,6 +187,39 @@ void ArgsManager::ParseParameters(int argc, const char *const argv[]) {
     }
 }
 
+bool ArgsManager::IsSensitiveArg(const std::string& argName)
+{
+    return std::find(sensitiveArgs.begin(), sensitiveArgs.end(), argName) != sensitiveArgs.end();
+}
+
+std::vector<std::string> ArgsManager::GetNonSensitiveParameters()
+{
+    std::vector<std::string> nonSensitiveParameters;
+
+    // Parameter names (keys of mapMultiArgs) are in form of -name. They also need to be specified like that
+    // when starting bitcoind (e.g. bitcoin -name) or they will not be added to mapMultiArgs.
+    // Filter out sensitive parameters and remove first character (-)
+    for(const auto& arg : mapMultiArgs)
+    {
+        if (IsSensitiveArg(arg.first))
+        {
+            continue;
+        }
+        for(const auto& value : arg.second)
+        {
+            if (value.empty())
+            {
+                nonSensitiveParameters.push_back(arg.first.substr(1));
+            }
+            else
+            {
+                nonSensitiveParameters.push_back(arg.first.substr(1) + "=" + value);
+            }
+        }
+    }
+    return nonSensitiveParameters;
+}
+
 std::vector<std::string> ArgsManager::GetArgs(const std::string &strArg) {
     LOCK(cs_args);
     return mapMultiArgs.at(strArg);
