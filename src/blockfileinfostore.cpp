@@ -37,25 +37,10 @@ void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,
 void CBlockFileInfoStore::FlushBlockFile(bool fFinalize) {
     LOCK(cs_LastBlockFile);
 
-    CDiskBlockPos posOld(nLastBlockFile, 0);
-
-    FILE *fileOld = BlockFileAccess::OpenBlockFile(posOld);
-    if (fileOld) {
-        if (fFinalize) {
-            TruncateFile(fileOld, vinfoBlockFile[nLastBlockFile].nSize);
-        }
-        FileCommit(fileOld);
-        fclose(fileOld);
-    }
-
-    fileOld = BlockFileAccess::OpenUndoFile(posOld);
-    if (fileOld) {
-        if (fFinalize) {
-            TruncateFile(fileOld, vinfoBlockFile[nLastBlockFile].nUndoSize);
-        }
-        FileCommit(fileOld);
-        fclose(fileOld);
-    }
+    BlockFileAccess::FlushBlockFile(
+        nLastBlockFile,
+        vinfoBlockFile[nLastBlockFile],
+        fFinalize );
 }
 
 std::vector<std::pair<int, const CBlockFileInfo *>> CBlockFileInfoStore::GetAndClearDirtyFileInfo()

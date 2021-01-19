@@ -3,7 +3,9 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <optional>
 
 #include "blockstreams.h"
 #include "cfile_util.h"
@@ -52,4 +54,17 @@ namespace BlockFileAccess
         CDiskBlockPos& pos,
         const uint256& hashBlock,
         const CMessageHeader::MessageMagic& messageStart);
+
+    /**
+     * Function makes sure that all block and undo file data that is remaining
+     * in filesystem memory cache is flushed to disk.
+     *
+     * blockFileInfo is used only in case finalize is set to true.
+     * In case finalize is set to true block and undo file are truncated to
+     * size of data (empty reserved space after the data is removed).
+     */
+    void FlushBlockFile(
+        int fileNo,
+        const CBlockFileInfo& blockFileInfo,
+        bool finalize);
 }

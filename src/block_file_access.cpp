@@ -261,3 +261,31 @@ bool BlockFileAccess::UndoReadFromDisk(
 
     return true;
 }
+
+void BlockFileAccess::FlushBlockFile(
+    int fileNo,
+    const CBlockFileInfo& blockFileInfo,
+    bool finalize)
+{
+    CDiskBlockPos posOld(fileNo, 0);
+
+    FILE *fileOld = OpenBlockFile(posOld);
+    if (fileOld) {
+        if (finalize)
+        {
+            TruncateFile(fileOld, blockFileInfo.nSize);
+        }
+        FileCommit(fileOld);
+        fclose(fileOld);
+    }
+
+    fileOld = OpenUndoFile(posOld);
+    if (fileOld) {
+        if (finalize)
+        {
+            TruncateFile(fileOld, blockFileInfo.nUndoSize);
+        }
+        FileCommit(fileOld);
+        fclose(fileOld);
+    }
+}
