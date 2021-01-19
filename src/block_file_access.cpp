@@ -7,6 +7,7 @@
 #include "clientversion.h"
 #include "config.h"
 #include "disk_block_pos.h"
+#include "disk_tx_pos.h"
 #include "hash.h"
 #include "fs.h"
 #include "pow.h"
@@ -330,4 +331,31 @@ bool BlockFileAccess::PreAllocateUndoBlock(
     }
 
     return false;
+}
+
+bool BlockFileAccess::LoadBlockHashAndTx(
+    const CDiskTxPos& postx,
+    uint256& hashBlock,
+    CTransactionRef& txOut)
+{
+    CAutoFile file{ OpenBlockFile(postx, true), SER_DISK, CLIENT_VERSION };
+    if (file.IsNull()) {
+        return error("%s: OpenBlockFile failed", __func__);
+    }
+    CBlockHeader header;
+    try {
+        file >> header;
+#if defined(WIN32)
+        _fseeki64(file.Get(), postx.nTxOffset, SEEK_CUR);
+#else
+        fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
+#endif
+        file >> txOut;
+    } catch (const std::exception &e) {
+        return error("%s: Deserialize or I/O error - %s", __func__,
+                     e.what());
+    }
+    hashBlock = header.GetHash();
+
+    return true;
 }

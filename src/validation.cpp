@@ -2100,25 +2100,10 @@ bool GetTransaction(const Config &config, const TxId &txid,
     if (fTxIndex) {
         CDiskTxPos postx;
         if (pblocktree->ReadTxIndex(txid, postx)) {
-            CAutoFile file(BlockFileAccess::OpenBlockFile(postx, true), SER_DISK,
-                           CLIENT_VERSION);
-            if (file.IsNull()) {
-                return error("%s: OpenBlockFile failed", __func__);
+            if (!BlockFileAccess::LoadBlockHashAndTx( postx, hashBlock, txOut ))
+            {
+                return false;
             }
-            CBlockHeader header;
-            try {
-                file >> header;
-#if defined(WIN32)
-                _fseeki64(file.Get(), postx.nTxOffset, SEEK_CUR);
-#else
-                fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
-#endif
-                file >> txOut;
-            } catch (const std::exception &e) {
-                return error("%s: Deserialize or I/O error - %s", __func__,
-                             e.what());
-            }
-            hashBlock = header.GetHash();
             if (txOut->GetId() != txid) {
                 return error("%s: txid mismatch", __func__);
             }

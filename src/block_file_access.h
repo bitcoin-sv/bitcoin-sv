@@ -16,6 +16,8 @@ class CBlockUndo;
 class Config;
 struct CDiskBlockMetaData;
 struct CDiskBlockPos;
+struct CDiskTxPos;
+class CTransaction;
 
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static constexpr unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
@@ -75,4 +77,9 @@ namespace BlockFileAccess
 
     bool PreAllocateBlock( uint64_t nNewChunks, const CDiskBlockPos& pos );
     bool PreAllocateUndoBlock( uint64_t nNewChunks, const CDiskBlockPos& pos );
+
+    bool LoadBlockHashAndTx(
+        const CDiskTxPos& postx,
+        uint256& hashBlock,
+        std::shared_ptr<const CTransaction>& txOut);
 }
