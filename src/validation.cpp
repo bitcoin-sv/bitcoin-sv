@@ -2184,56 +2184,6 @@ unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize)
     }
 }
 
-/** 
- * Write index header. If size larger thant 32 bit max than write 32 bit max and 64 bit size.
- * 32 bit max (0xFFFFFFFF) indicates that there is 64 bit size value following.
- */
-void WriteIndexHeader(CAutoFile& fileout,
-                      const CMessageHeader::MessageMagic& messageStart,
-                      uint64_t nSize)
-{
-    if (nSize >= std::numeric_limits<unsigned int>::max())
-    {
-        fileout << FLATDATA(messageStart) << std::numeric_limits<uint32_t>::max() << nSize;
-    }
-    else
-    {
-        fileout << FLATDATA(messageStart) << static_cast<uint32_t>(nSize);
-    }
-}
-
-static bool WriteBlockToDisk(
-    const CBlock &block,
-    CDiskBlockPos &pos,
-    const CMessageHeader::MessageMagic &messageStart,
-    CDiskBlockMetaData& metaData)
-{
-    // Open history file to append
-    CAutoFile fileout(BlockFileAccess::OpenBlockFile(pos), SER_DISK, CLIENT_VERSION);
-    if (fileout.IsNull()) {
-        return error("WriteBlockToDisk: OpenBlockFile failed");
-    }
-
-    // Write index header.
-    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, block));    
-    
-    // Write block
-    long fileOutPos = ftell(fileout.Get());
-    if (fileOutPos < 0) {
-        return error("WriteBlockToDisk: ftell failed");
-    }
-
-    pos.nPos = (unsigned int)fileOutPos;
-
-    std::vector<uint8_t> data;
-    CVectorWriter{SER_DISK, CLIENT_VERSION, data, 0, block};
-    metaData = { Hash(data.begin(), data.end()), data.size() };
-
-    fileout.write(reinterpret_cast<const char*>(data.data()), data.size());
-
-    return true;
-}
-
 bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
                        const Config &config) {
     block.SetNull();
@@ -3141,35 +3091,6 @@ std::optional<bool> CheckInputs(
 
 namespace {
 
-bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos,
-                     const uint256 &hashBlock,
-                     const CMessageHeader::MessageMagic &messageStart) {
-    // Open history file to append
-    CAutoFile fileout(BlockFileAccess::OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
-    if (fileout.IsNull()) {
-        return error("%s: OpenUndoFile failed", __func__);
-    }
-
-    // Write index header. 
-    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, blockundo));
-
-    // Write undo data
-    long fileOutPos = ftell(fileout.Get());
-    if (fileOutPos < 0) {
-        return error("%s: ftell failed", __func__);
-    }
-    pos.nPos = (unsigned int)fileOutPos;
-    fileout << blockundo;
-
-    // calculate & write checksum
-    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
-    hasher << hashBlock;
-    hasher << blockundo;
-    fileout << hasher.GetHash();
-
-    return true;
-}
-
 bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos,
                       const uint256 &hashBlock) {
     // Open history file to read
@@ -3853,7 +3774,7 @@ static bool ConnectBlock(
                         40, fCheckForPruning)) {
                 return error("ConnectBlock(): FindUndoPos failed");
             }
-            if (!UndoWriteToDisk(blockundo, _pos, pindex->pprev->GetBlockHash(),
+            if (!BlockFileAccess::UndoWriteToDisk(blockundo, _pos, pindex->pprev->GetBlockHash(),
                                  config.GetChainParams().DiskMagic())) {
                 return AbortNode(state, "Failed to write undo data");
             }
@@ -5986,7 +5907,8 @@ static bool AcceptBlock(const Config& config,
         }
         CDiskBlockMetaData metaData;
         if (dbp == nullptr) {
-            if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData)) {
+            if (!BlockFileAccess::WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData))
+            {
                 AbortNode(state, "Failed to write block");
             }
         }
@@ -6836,7 +6758,8 @@ bool InitBlockIndex(const Config &config) {
                 return error("LoadBlockIndex(): FindBlockPos failed");
             }
             CDiskBlockMetaData metaData;
-            if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData)) {
+            if (!BlockFileAccess::WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData))
+            {
                 return error(
                     "LoadBlockIndex(): writing genesis block to disk failed");
             }

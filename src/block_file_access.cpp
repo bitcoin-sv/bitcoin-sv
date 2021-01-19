@@ -3,8 +3,14 @@
 
 #include "block_file_access.h"
 
+#include "chain.h"
+#include "clientversion.h"
 #include "disk_block_pos.h"
+#include "hash.h"
 #include "fs.h"
+#include "primitives/block.h"
+#include "streams.h"
+#include "undo.h"
 #include "util.h"
 
 namespace
@@ -46,6 +52,24 @@ namespace
         }
         return file;
     }
+
+    /**
+     * Write index header. If size larger thant 32 bit max than write 32 bit max and 64 bit size.
+     * 32 bit max (0xFFFFFFFF) indicates that there is 64 bit size value following.
+     */
+    void WriteIndexHeader(CAutoFile& fileout,
+                          const CMessageHeader::MessageMagic& messageStart,
+                          uint64_t nSize)
+    {
+        if (nSize >= std::numeric_limits<unsigned int>::max())
+        {
+            fileout << FLATDATA(messageStart) << std::numeric_limits<uint32_t>::max() << nSize;
+        }
+        else
+        {
+            fileout << FLATDATA(messageStart) << static_cast<uint32_t>(nSize);
+        }
+    }
 }
 
 FILE* BlockFileAccess::OpenBlockFile(const CDiskBlockPos& pos, bool fReadOnly)
@@ -84,6 +108,70 @@ bool BlockFileAccess::RemoveFile( int fileNo )
     // only delete rev file if blk file deletion succeeded otherwise keep the
     // data for now as it's most likely still being used
     fs::remove(GetBlockPosFilename(pos, "rev"));
+
+    return true;
+}
+
+bool BlockFileAccess::WriteBlockToDisk(
+    const CBlock& block,
+    CDiskBlockPos& pos,
+    const CMessageHeader::MessageMagic& messageStart,
+    CDiskBlockMetaData& metaData)
+{
+    // Open history file to append
+    CAutoFile fileout{ OpenBlockFile(pos), SER_DISK, CLIENT_VERSION };
+    if (fileout.IsNull()) {
+        return error("WriteBlockToDisk: OpenBlockFile failed");
+    }
+
+    // Write index header.
+    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, block));    
+    
+    // Write block
+    long fileOutPos = ftell(fileout.Get());
+    if (fileOutPos < 0) {
+        return error("WriteBlockToDisk: ftell failed");
+    }
+
+    pos.nPos = (unsigned int)fileOutPos;
+
+    std::vector<uint8_t> data;
+    CVectorWriter{SER_DISK, CLIENT_VERSION, data, 0, block};
+    metaData = { Hash(data.begin(), data.end()), data.size() };
+
+    fileout.write(reinterpret_cast<const char*>(data.data()), data.size());
+
+    return true;
+}
+
+bool BlockFileAccess::UndoWriteToDisk(
+    const CBlockUndo& blockundo,
+    CDiskBlockPos& pos,
+    const uint256& hashBlock,
+    const CMessageHeader::MessageMagic& messageStart)
+{
+    // Open history file to append
+    CAutoFile fileout{ OpenUndoFile(pos), SER_DISK, CLIENT_VERSION };
+    if (fileout.IsNull()) {
+        return error("%s: OpenUndoFile failed", __func__);
+    }
+
+    // Write index header. 
+    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, blockundo));
+
+    // Write undo data
+    long fileOutPos = ftell(fileout.Get());
+    if (fileOutPos < 0) {
+        return error("%s: ftell failed", __func__);
+    }
+    pos.nPos = (unsigned int)fileOutPos;
+    fileout << blockundo;
+
+    // calculate & write checksum
+    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
+    hasher << hashBlock;
+    hasher << blockundo;
+    fileout << hasher.GetHash();
 
     return true;
 }

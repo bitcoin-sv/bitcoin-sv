@@ -4,7 +4,11 @@
 #pragma once
 
 #include "cfile_util.h"
+#include "protocol.h"
 
+class CBlock;
+class CBlockUndo;
+struct CDiskBlockMetaData;
 struct CDiskBlockPos;
 
 /** Utility functions for opening block and undo files */
@@ -18,4 +22,16 @@ namespace BlockFileAccess
 
     UniqueCFile GetBlockFile( int fileNo );
     bool RemoveFile( int fileNo );
+
+    bool WriteBlockToDisk(
+        const CBlock& block,
+        CDiskBlockPos& pos,
+        const CMessageHeader::MessageMagic& messageStart,
+        CDiskBlockMetaData& metaData);
+
+    bool UndoWriteToDisk(
+        const CBlockUndo& blockundo,
+        CDiskBlockPos& pos,
+        const uint256& hashBlock,
+        const CMessageHeader::MessageMagic& messageStart);
 }
