@@ -101,19 +101,9 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
             if (fPruneMode) {
                 fCheckForPruning = true;
             }
-            if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos)) {
-                FILE *file = BlockFileAccess::OpenBlockFile(pos);
-                if (file) {
-                    LogPrintf(
-                        "Pre-allocating up to position 0x%x in blk%05u.dat\n",
-                        nNewChunks * BLOCKFILE_CHUNK_SIZE, pos.nFile);
-                    AllocateFileRange(file, pos.nPos,
-                        nNewChunks * BLOCKFILE_CHUNK_SIZE -
-                        pos.nPos);
-                    fclose(file);
-                }
-            }
-            else {
+
+            if (!BlockFileAccess::PreAllocateBlock( nNewChunks, pos ))
+            {
                 return state.Error("out of disk space");
             }
         }
@@ -142,17 +132,9 @@ bool CBlockFileInfoStore::FindUndoPos(CValidationState &state, int nFile, CDiskB
         if (fPruneMode) {
             fCheckForPruning = true;
         }
-        if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos)) {
-            FILE *file = BlockFileAccess::OpenUndoFile(pos);
-            if (file) {
-                LogPrintf("Pre-allocating up to position 0x%x in rev%05u.dat\n",
-                    nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
-                AllocateFileRange(file, pos.nPos,
-                    nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
-                fclose(file);
-            }
-        }
-        else {
+
+        if (!BlockFileAccess::PreAllocateUndoBlock( nNewChunks, pos ))
+        {
             return state.Error("out of disk space");
         }
     }

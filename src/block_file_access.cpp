@@ -289,3 +289,45 @@ void BlockFileAccess::FlushBlockFile(
         fclose(fileOld);
     }
 }
+
+bool BlockFileAccess::PreAllocateBlock(
+    uint64_t nNewChunks,
+    const CDiskBlockPos& pos)
+{
+    if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos)) {
+        FILE *file = OpenBlockFile(pos);
+        if (file) {
+            LogPrintf(
+                "Pre-allocating up to position 0x%x in blk%05u.dat\n",
+                nNewChunks * BLOCKFILE_CHUNK_SIZE, pos.nFile);
+            AllocateFileRange(file, pos.nPos,
+                nNewChunks * BLOCKFILE_CHUNK_SIZE -
+                pos.nPos);
+            fclose(file);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+bool BlockFileAccess::PreAllocateUndoBlock(
+    uint64_t nNewChunks,
+    const CDiskBlockPos& pos)
+{
+    if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos)) {
+        FILE *file = OpenUndoFile(pos);
+        if (file) {
+            LogPrintf("Pre-allocating up to position 0x%x in rev%05u.dat\n",
+                nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
+            AllocateFileRange(file, pos.nPos,
+                nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
+            fclose(file);
+        }
+
+        return true;
+    }
+
+    return false;
+}
