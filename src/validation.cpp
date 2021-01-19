@@ -3047,34 +3047,6 @@ std::optional<bool> CheckInputs(
 
 namespace {
 
-bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos,
-                      const uint256 &hashBlock) {
-    // Open history file to read
-    CAutoFile filein(BlockFileAccess::OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
-    if (filein.IsNull()) {
-        return error("%s: OpenUndoFile failed", __func__);
-    }
-
-    // Read block
-    uint256 hashChecksum;
-    // We need a CHashVerifier as reserializing may lose data
-    CHashVerifier<CAutoFile> verifier(&filein);
-    try {
-        verifier << hashBlock;
-        verifier >> blockundo;
-        filein >> hashChecksum;
-    } catch (const std::exception &e) {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-    }
-
-    // Verify checksum
-    if (hashChecksum != verifier.GetHash()) {
-        return error("%s: Checksum mismatch", __func__);
-    }
-
-    return true;
-}
-
 /** Abort with a message */
 bool AbortNode(const std::string &strMessage,
                const std::string &userMessage = "") {
@@ -3131,7 +3103,8 @@ static DisconnectResult DisconnectBlock(const CBlock &block,
         return DISCONNECT_FAILED;
     }
 
-    if (!UndoReadFromDisk(blockUndo, pos, pindex->pprev->GetBlockHash())) {
+    if (!BlockFileAccess::UndoReadFromDisk(blockUndo, pos, pindex->pprev->GetBlockHash()))
+    {
         error("DisconnectBlock(): failure reading undo data");
         return DISCONNECT_FAILED;
     }
@@ -6382,7 +6355,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
             CBlockUndo undo;
             CDiskBlockPos pos = pindex->GetUndoPos();
             if (!pos.IsNull()) {
-                if (!UndoReadFromDisk(undo, pos,
+                if (!BlockFileAccess::UndoReadFromDisk(undo, pos,
                                       pindex->pprev->GetBlockHash())) {
                     return error(
                         "VerifyDB(): *** found bad undo data at %d, hash=%s\n",

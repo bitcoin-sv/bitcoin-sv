@@ -36,6 +36,11 @@ namespace BlockFileAccess
         const CDiskBlockPos& pos,
         bool calculateDiskBlockMetadata=false);
 
+    bool UndoReadFromDisk(
+        CBlockUndo& blockundo,
+        const CDiskBlockPos& pos,
+        const uint256& hashBlock);
+
     bool WriteBlockToDisk(
         const CBlock& block,
         CDiskBlockPos& pos,
