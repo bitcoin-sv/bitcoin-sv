@@ -73,16 +73,18 @@ namespace
             fileout << FLATDATA(messageStart) << static_cast<uint32_t>(nSize);
         }
     }
-}
 
-FILE* BlockFileAccess::OpenBlockFile(const CDiskBlockPos& pos, bool fReadOnly)
-{
-    return OpenDiskFile(pos, "blk", fReadOnly);
-}
+    /** Open a block file (blk?????.dat). */
+    FILE* OpenBlockFile(const CDiskBlockPos& pos, bool fReadOnly = false)
+    {
+        return OpenDiskFile(pos, "blk", fReadOnly);
+    }
 
-FILE* BlockFileAccess::OpenUndoFile(const CDiskBlockPos& pos, bool fReadOnly)
-{
-    return OpenDiskFile(pos, "rev", fReadOnly);
+    /** Open an undo file (rev?????.dat) */
+    FILE* OpenUndoFile(const CDiskBlockPos& pos, bool fReadOnly = false)
+    {
+        return OpenDiskFile(pos, "rev", fReadOnly);
+    }
 }
 
 UniqueCFile BlockFileAccess::GetBlockFile( int fileNo )

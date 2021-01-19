@@ -28,12 +28,6 @@ static constexpr unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 /** Utility functions for opening block and undo files */
 namespace BlockFileAccess
 {
-    /** Open a block file (blk?????.dat). */
-    FILE* OpenBlockFile(const CDiskBlockPos& pos, bool fReadOnly = false);
-
-    /** Open an undo file (rev?????.dat) */
-    FILE* OpenUndoFile(const CDiskBlockPos& pos, bool fReadOnly = false);
-
     UniqueCFile GetBlockFile( int fileNo );
     UniqueCFile GetBlockFile( const CDiskBlockPos& pos );
     bool RemoveFile( int fileNo );
