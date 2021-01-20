@@ -1717,14 +1717,14 @@ void CWalletTx::GetAmounts(std::list<COutputEntry> &listReceived,
  * before CWallet::nTimeFirstKey). Returns null if there is no such range, or
  * the range doesn't include chainActive.Tip().
  */
-CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
+const CBlockIndex *CWallet::ScanForWalletTransactions(const CBlockIndex *pindexStart,
                                                 bool fUpdate) {
     LOCK2(cs_main, cs_wallet);
 
     int64_t nNow = GetTime();
 
-    CBlockIndex *pindex = pindexStart;
-    CBlockIndex *ret = pindexStart;
+    const CBlockIndex *pindex = pindexStart;
+    const CBlockIndex *ret = pindexStart;
 
     // No need to read and scan block, if block was created before our wallet
     // birthday (as adjusted for block time variability)
@@ -4208,7 +4208,7 @@ CWallet *CWallet::CreateWalletFromFile(const CChainParams &chainParams,
 
     LOCK(cs_main);
 
-    CBlockIndex *pindexRescan = chainActive.Genesis();
+    const CBlockIndex *pindexRescan = chainActive.Genesis();
     if (!gArgs.GetBoolArg("-rescan", false)) {
         CWalletDB walletdb(*walletInstance->dbw);
         CBlockLocator locator;

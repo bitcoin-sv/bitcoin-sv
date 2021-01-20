@@ -1276,12 +1276,12 @@ UniValue importmulti(const Config &config, const JSONRPCRequest &mainRequest) {
     }
 
     if (fRescan && fRunScan && requests.size()) {
-        CBlockIndex *pindex =
+        const CBlockIndex *pindex =
             nLowestTimestamp > minimumTimestamp
                 ? chainActive.FindEarliestAtLeast(
                       std::max<int64_t>(nLowestTimestamp - TIMESTAMP_WINDOW, 0))
                 : chainActive.Genesis();
-        CBlockIndex *scannedRange = nullptr;
+        const CBlockIndex *scannedRange = nullptr;
         if (pindex) {
             scannedRange = pwallet->ScanForWalletTransactions(pindex, true);
             pwallet->ReacceptWalletTransactions();

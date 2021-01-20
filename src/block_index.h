@@ -262,6 +262,12 @@ public:
     };
 
 private:
+
+    /**
+     * TODO: this member is a root of many problems regarding const-correctness and object construction
+     * because object cannot be created without this member being set.
+     * This should be implemented properly in the future.
+    **/
     //! pointer to the hash of the block, if any. Memory is owned by this
     //! CBlockIndex
     const uint256* phashBlock{ nullptr };

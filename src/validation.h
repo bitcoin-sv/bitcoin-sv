@@ -247,7 +247,7 @@ extern arith_uint256 nMinimumChainWork;
 /**
  * Best header we've seen so far (used for getheaders queries' starting points).
  */
-extern CBlockIndex *pindexBestHeader;
+extern const CBlockIndex *pindexBestHeader;
 
 /** Minimum disk space required - used in CheckDiskSpace() */
 static const uint64_t nMinDiskSpace = 52428800;
@@ -557,7 +557,7 @@ Amount GetBlockSubsidy(int32_t nHeight, const Consensus::Params &consensusParams
  * candidates later on - in any case it indicates that we should wait to see if
  * it lands in the best chain or not.
  */
-bool IsBlockABestChainTipCandidate(CBlockIndex& index);
+bool IsBlockABestChainTipCandidate(const CBlockIndex& index);
 
 /**
  * Check whether there are any block index candidates that are older than
@@ -570,7 +570,7 @@ bool AreOlderOrEqualUnvalidatedBlockIndexCandidates(
  * Guess verification progress (as a fraction between 0.0=genesis and
  * 1.0=current tip).
  */
-double GuessVerificationProgress(const ChainTxData &data, CBlockIndex *pindex);
+double GuessVerificationProgress(const ChainTxData &data, const CBlockIndex *pindex);
 
 /**
  * Unlink the specified files and mark associated block indices as pruned
@@ -1028,7 +1028,7 @@ public:
 bool ReplayBlocks(const Config &config, CoinsDB& view);
 
 /** Find the last common block between the parameter chain and a locator. */
-CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
+const CBlockIndex *FindForkInGlobalIndex(const CChain &chain,
                                    const CBlockLocator &locator);
 
 /**
