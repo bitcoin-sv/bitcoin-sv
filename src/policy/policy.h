@@ -135,6 +135,11 @@ static const uint64_t DEFAULT_STACK_MEMORY_USAGE_POLICY_AFTER_GENESIS = 100 * ON
 // Default policy value for script number length after Genesis
 static const uint64_t DEFAULT_SCRIPT_NUM_LENGTH_POLICY_AFTER_GENESIS = 250 * ONE_KILOBYTE;
 
+// Default policy value for coins cache size threshold before coins are no longer
+// loaded into cache but instead returned directly to the caller.
+static const uint64_t MIN_COINS_PROVIDER_CACHE_SIZE = ONE_MEGABYTE;
+static const uint64_t DEFAULT_COINS_PROVIDER_CACHE_SIZE = ONE_GIGABYTE;
+
 /**
  * Standard script verification flags that standard transactions will comply
  * with. However scripts violating these flags may still be present in valid
