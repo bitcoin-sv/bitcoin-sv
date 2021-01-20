@@ -1726,13 +1726,21 @@ static bool ProcessCreateStreamMessage(const CNodePtr& pfrom, const std::string&
     std::vector<uint8_t> associationID {};
     uint8_t streamTypeRaw {0};
     std::string streamPolicyName {};
-    vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-    vRecv >> streamTypeRaw;
-    vRecv >> LIMITED_STRING(streamPolicyName, MAX_STREAM_POLICY_NAME_LENGTH);
 
     // Which association is this for?
     try
     {
+        try
+        {
+            vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+            vRecv >> streamTypeRaw;
+            vRecv >> LIMITED_STRING(streamPolicyName, MAX_STREAM_POLICY_NAME_LENGTH);
+        }
+        catch(std::exception& e)
+        {
+            throw std::runtime_error("Badly formatted message");
+        }
+
         // Parse stream type
         if(streamTypeRaw >= static_cast<uint8_t>(StreamType::MAX_STREAM_TYPE))
         {
@@ -1792,11 +1800,19 @@ static bool ProcessStreamAckMessage(const CNodePtr& pfrom, const std::string& st
 
     std::vector<uint8_t> associationID {};
     uint8_t streamTypeRaw {0};
-    vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
-    vRecv >> streamTypeRaw;
 
     try
     {
+        try
+        {
+            vRecv >> LIMITED_BYTE_VEC(associationID, AssociationID::MAX_ASSOCIATION_ID_LENGTH);
+            vRecv >> streamTypeRaw;
+        }
+        catch(std::exception& e)
+        {
+            throw std::runtime_error("Badly formatted message");
+        }
+
         // Parse stream type
         if(streamTypeRaw >= static_cast<uint8_t>(StreamType::MAX_STREAM_TYPE))
         {
