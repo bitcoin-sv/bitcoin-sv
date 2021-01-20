@@ -6,6 +6,7 @@
 
 #include "crypto/common.h"
 
+#include <cassert>
 #include <cstring>
 
 // Internal implementation code.
@@ -284,6 +285,10 @@ CRIPEMD160::CRIPEMD160() : bytes(0) {
 }
 
 CRIPEMD160 &CRIPEMD160::Write(const uint8_t *data, size_t len) {
+    if (len == 0) {
+        return *this;    
+    }
+    assert(data);
     const uint8_t *end = data + len;
     size_t bufsize = bytes % 64;
     if (bufsize && bufsize + len >= 64) {
