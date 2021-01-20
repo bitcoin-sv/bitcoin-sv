@@ -62,7 +62,6 @@ struct CLogCategoryDesc {
 
 const CLogCategoryDesc LogCategories[] = {
     {BCLog::NONE, "0"},
-    {BCLog::NET, "net"},
     {BCLog::MEMPOOL, "mempool"},
     {BCLog::HTTP, "http"},
     {BCLog::BENCH, "bench"},
@@ -88,6 +87,7 @@ const CLogCategoryDesc LogCategories[] = {
     {BCLog::NETMSG, "netmsg"},
     {BCLog::NETMSGVERB, "netmsgverb"},
     {BCLog::NETMSGALL, "netmsgall"},
+    {BCLog::NET, "net"},
     {BCLog::ALL, "1"},
     {BCLog::ALL, "all"},
 };
