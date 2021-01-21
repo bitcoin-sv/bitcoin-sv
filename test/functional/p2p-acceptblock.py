@@ -230,7 +230,7 @@ class AcceptBlockTest(BitcoinTestFramework):
         with mininode_lock:
             # Clear state so we can check the getdata request
             test_node.last_message.pop("getdata", None)
-            test_node.send_message(msg_inv([CInv(2, blocks_h3[0].sha256)]))
+            test_node.send_message(msg_inv([CInv(CInv.BLOCK, blocks_h3[0].sha256)]))
 
         test_node.sync_with_ping()
         with mininode_lock:

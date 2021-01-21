@@ -351,14 +351,20 @@ class CAddress():
         return "CAddress(nServices=%i ip=%s port=%i time=%d)" % (self.nServices, self.ip, self.port, self.nTime)
 
 class CInv():
+
+    ERROR = 0
+    TX = 1
+    BLOCK = 2
+    COMPACT_BLOCK = 4
+
     typemap = {
-        0: "Error",
-        1: "TX",
-        2: "Block",
-        4: "CompactBlock"
+        ERROR: "Error",
+        TX: "TX",
+        BLOCK: "Block",
+        COMPACT_BLOCK: "CompactBlock"
     }
 
-    def __init__(self, t=0, h=0):
+    def __init__(self, t=ERROR, h=0):
         self.type = t
         self.hash = h
 
@@ -1499,6 +1505,24 @@ class msg_blocktxn():
     def __repr__(self):
         return "msg_blocktxn(block_transactions=%s)" % (repr(self.block_transactions))
 
+class msg_notfound():
+    command = b"notfound"
+
+    def __init__(self, inv=None):
+        if inv is None:
+            self.inv = []
+        else:
+            self.inv = inv
+
+    def deserialize(self, f):
+        self.inv = deser_vector(f, CInv)
+
+    def serialize(self):
+        return ser_vector(self.inv)
+
+    def __repr__(self):
+        return "msg_notfound(inv=%s)" % (repr(self.inv))
+
 
 class NodeConnCB():
     """Callback and helper functions for P2P connection to a bitcoind node.
@@ -1642,6 +1666,8 @@ class NodeConnCB():
             conn.ver_recv = conn.ver_send
         conn.nServices = message.nServices
 
+    def on_notfound(self, conn, message): pass
+
     def send_protoconf(self, conn):
         conn.send_message(msg_protoconf(CProtoconf(2, MAX_PROTOCOL_RECV_PAYLOAD_LENGTH, b"BlockPriority,Default")))
 
@@ -1772,7 +1798,8 @@ class NodeConn(asyncore.dispatcher):
         b"sendcmpct": msg_sendcmpct,
         b"cmpctblock": msg_cmpctblock,
         b"getblocktxn": msg_getblocktxn,
-        b"blocktxn": msg_blocktxn
+        b"blocktxn": msg_blocktxn,
+        b"notfound": msg_notfound
     }
 
     MAGIC_BYTES = {

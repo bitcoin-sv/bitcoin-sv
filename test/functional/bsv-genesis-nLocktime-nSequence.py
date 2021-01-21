@@ -107,10 +107,10 @@ class MyNode(TestNode):
         super().on_inv(conn, message)
 
         for x in message.inv:
-            if x.type == 1:
+            if x.type == CInv.TX:
                 # Remember txn
                 pass
-            elif x.type == 2:
+            elif x.type == CInv.BLOCK:
                 # Request block
                 self.conn.send_message(msg_getdata([CInv(x.type, x.hash)]))
 

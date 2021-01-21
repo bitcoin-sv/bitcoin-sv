@@ -172,10 +172,10 @@ class PBVSubmitBlock(BitcoinTestFramework):
         #     the validation is complete by the nodes that are not using early
         #     announcement functionality.
         wait_until(lambda: receivedAnnouncement)
-        node0.wait_for_inv([CInv(2, block3_easier.sha256)]) # 2 == GetDataMsg::MSG_BLOCK
+        node0.wait_for_inv([CInv(CInv.BLOCK, block3_easier.sha256)])
         # node 1 was the sender but receives inv for block non the less
         # (with early announcement that's not the case - sender does not receive the announcement)
-        node1.wait_for_inv([CInv(2, block3_easier.sha256)]) # 2 == GetDataMsg::MSG_BLOCK
+        node1.wait_for_inv([CInv(CInv.BLOCK, block3_easier.sha256)])
 
         rpc_client.waitforblockheight(102)
         assert_equal(block3_easier.hash, rpc_client.getbestblockhash())
