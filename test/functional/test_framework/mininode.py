@@ -388,13 +388,15 @@ class CProtoconf():
     def deserialize(self, f):
         self.number_of_fields = deser_compact_size(f)
         self.max_recv_payload_length = struct.unpack("<i", f.read(4))[0]
-        self.stream_policies = deser_string(f)
+        if self.number_of_fields > 1:
+            self.stream_policies = deser_string(f)
 
     def serialize(self):
         r = b""
         r += ser_compact_size(self.number_of_fields)
         r += struct.pack("<i", self.max_recv_payload_length) 
-        r += ser_string(self.stream_policies)
+        if self.number_of_fields > 1:
+            r += ser_string(self.stream_policies)
         return r
 
     def __repr__(self):
