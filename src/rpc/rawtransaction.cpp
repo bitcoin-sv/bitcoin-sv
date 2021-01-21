@@ -43,7 +43,7 @@ using namespace mining;
 
 void getrawtransaction(const Config& config,
                        const JSONRPCRequest& request,
-                       HTTPRequest& httpReq,
+                       HTTPRequest* httpReq,
                        bool processedInBatch)
 {
     if (request.fHelp || request.params.size() < 1 ||
@@ -132,12 +132,18 @@ void getrawtransaction(const Config& config,
             HelpExampleRpc("getrawtransaction", "\"mytxid\", true"));
     }
 
-    CHttpTextWriter httpWriter(httpReq);
-    getrawtransaction(config, request, httpWriter, processedInBatch, [&httpReq] {httpReq.WriteHeader("Content-Type", "application/json");  httpReq.StartWritingChunks(HTTP_OK); });
+    if(httpReq == nullptr)
+        return;
+
+    CHttpTextWriter httpWriter(*httpReq);
+    getrawtransaction(config, request, httpWriter, processedInBatch, [httpReq] {
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
+    });
     httpWriter.Flush();
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
@@ -630,7 +636,7 @@ static UniValue createrawtransaction(const Config &config,
 
 void decoderawtransaction(const Config& config,
                           const JSONRPCRequest& request,
-                          HTTPRequest& httpReq,
+                          HTTPRequest* httpReq,
                           bool processedInBatch)
 {
     if (request.fHelp || request.params.size() != 1) 
@@ -691,13 +697,20 @@ void decoderawtransaction(const Config& config,
             HelpExampleCli("decoderawtransaction", "\"hexstring\"") +
             HelpExampleRpc("decoderawtransaction", "\"hexstring\""));
     }
+    
+    if(httpReq == nullptr)
+        return;
 
-    CHttpTextWriter httpWriter(httpReq);
-    decoderawtransaction(config, request, httpWriter, processedInBatch, [&httpReq] {httpReq.WriteHeader("Content-Type", "application/json");  httpReq.StartWritingChunks(HTTP_OK);});
+    CHttpTextWriter httpWriter(*httpReq);
+    decoderawtransaction(
+        config, request, httpWriter, processedInBatch, [httpReq] {
+            httpReq->WriteHeader("Content-Type", "application/json");
+            httpReq->StartWritingChunks(HTTP_OK);
+        });
     httpWriter.Flush();
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
 }
 
@@ -1405,8 +1418,11 @@ static void KnownTxnsToJSON(const std::vector<TxId>& knownTxns, CJSONWriter& wri
     }
 }
 
-void sendrawtransactions(const Config &config, const JSONRPCRequest &request,
-                         HTTPRequest& httpReq, bool processedInBatch) {
+void sendrawtransactions(const Config& config,
+                         const JSONRPCRequest& request,
+                         HTTPRequest* httpReq,
+                         bool processedInBatch)
+{
     if (request.fHelp || request.params.size() < 1 ||
         request.params.size() > 1) {
         throw std::runtime_error(
@@ -1482,6 +1498,9 @@ void sendrawtransactions(const Config &config, const JSONRPCRequest &request,
             HelpExampleRpc("sendrawtransactions",
                            "[{\"hex\":\"hexstring\", \"allowhighfees\":true, \"dontcheckfee\":true}]"));
     }
+
+    if(httpReq == nullptr)
+        return;
 
     RPCTypeCheck(request.params, {UniValue::VARR});
 
@@ -1655,11 +1674,11 @@ void sendrawtransactions(const Config &config, const JSONRPCRequest &request,
     // A result json object.
     if (!processedInBatch)
     {
-        httpReq.WriteHeader("Content-Type", "application/json");
-        httpReq.StartWritingChunks(HTTP_OK);
+        httpReq->WriteHeader("Content-Type", "application/json");
+        httpReq->StartWritingChunks(HTTP_OK);
     }
 
-    CHttpTextWriter httpWriter(httpReq);
+    CHttpTextWriter httpWriter(*httpReq);
     CJSONWriter jWriter(httpWriter, false);
 
     jWriter.writeBeginObject();
@@ -1679,9 +1698,8 @@ void sendrawtransactions(const Config &config, const JSONRPCRequest &request,
 
     if (!processedInBatch)
     {
-        httpReq.StopWritingChunks();
+        httpReq->StopWritingChunks();
     }
-
 }
 
 static UniValue getmerkleproof(const Config& config,
