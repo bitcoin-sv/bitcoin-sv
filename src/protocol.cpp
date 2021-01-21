@@ -86,7 +86,7 @@ uint64_t GetMaxMessageLength(const std::string& command, const Config& config)
     }
 }
 
-}; // namespace NetMsgType
+} // namespace NetMsgType
 
 /**
  * All known message types. Keep this in the same order as the list of messages

@@ -107,7 +107,7 @@ public:
     // For all but the coinbase
     std::vector<CTxUndo> vtxundo;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

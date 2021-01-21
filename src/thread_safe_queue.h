@@ -330,7 +330,7 @@ public:
 
         if(!WaitForDataInQueue(lock, "PopWait"))
         {
-            return {};
+            return std::nullopt;
         }
 
         auto objectSize = sizeCalculator(theQueue.front());
@@ -352,7 +352,7 @@ public:
 
         if (theQueue.empty())
         {
-            return {};
+            return std::nullopt;
         }
 
         auto objectSize = sizeCalculator(theQueue.front());

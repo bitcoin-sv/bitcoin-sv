@@ -51,7 +51,7 @@ public:
     //!< number of used bytes in the undo file
     uint64_t nUndoSize;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) 
@@ -141,7 +141,7 @@ struct CDiskBlockPos {
     int nFile;
     unsigned int nPos;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -301,7 +301,7 @@ public:
         return BlockStatus(status & ~INVALID_MASK);
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -317,7 +317,7 @@ struct CDiskBlockMetaData
     uint256 diskDataHash;
     uint64_t diskDataSize = 0;
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action)
@@ -685,7 +685,7 @@ public:
         hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
     }
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

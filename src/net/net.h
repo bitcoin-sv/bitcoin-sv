@@ -331,7 +331,7 @@ public:
             if(NodeFullyConnected(node))
                 func(node);
         }
-    };
+    }
 
     /** Call the specified function for each node in parallel */
     template <typename Callable>
@@ -349,7 +349,7 @@ public:
         }
 
         return results;
-    };
+    }
 
     /** Call the specified function for parallel validation */
     template <typename Callable>

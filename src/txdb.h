@@ -42,7 +42,7 @@ static const int64_t nMaxCoinsDBCache = 8;
 struct CDiskTxPos : public CDiskBlockPos {
     uint64_t nTxOffset; // after header
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {

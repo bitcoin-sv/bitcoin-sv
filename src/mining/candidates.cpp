@@ -44,7 +44,7 @@ CMiningCandidateRef CMiningCandidateManager::Create(const CBlockRef& block)
     std::lock_guard<std::mutex> lock {mMutex};
     mCandidates[nextId] = candidate;
     return candidate;
-};
+}
 
 /**
  * Lookup and return a reference to the requested MiningCandidate.

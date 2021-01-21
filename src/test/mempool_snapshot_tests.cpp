@@ -64,7 +64,7 @@ namespace
                 tx->vout.resize(1);
                 tx->vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
                 tx->vout[0].nValue = GetAmount();
-            };
+            }
             // Add the second output to Tx4.
             Tx4.vout.resize(2);
             Tx4.vout[1].scriptPubKey = CScript() << OP_11 << OP_EQUAL;

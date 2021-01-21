@@ -1606,7 +1606,7 @@ ServiceFlags nLocalServices = NODE_NETWORK;
 
     // The log was successful, terminate now.
     std::terminate();
-};
+}
 
 bool AppInitBasicSetup() {
 // Step 1: setup

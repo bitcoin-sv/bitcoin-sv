@@ -25,7 +25,7 @@ namespace
     }
 }
 
-BOOST_AUTO_TEST_SUITE(TestEnumCast);
+BOOST_AUTO_TEST_SUITE(TestEnumCast)
 
 // Test normal (correct) operation of enum_cast
 BOOST_AUTO_TEST_CASE(TestCorrectEnumCast)
@@ -51,5 +51,5 @@ BOOST_AUTO_TEST_CASE(TestUnknownEnumCast)
     BOOST_CHECK_EQUAL(myType, MyTypesCorrect::UNKNOWN);
 }
 
-BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE_END()
 

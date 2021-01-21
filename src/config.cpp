@@ -192,7 +192,7 @@ bool GlobalConfig::SetMaxGeneratedBlockSize(uint64_t maxSize, std::string* err) 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize() const {
     CheckSetDefaultCalled();
     return maxGeneratedBlockSizeAfter;
-};
+}
 
 uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
     CheckSetDefaultCalled();
@@ -207,17 +207,17 @@ uint64_t GlobalConfig::GetMaxGeneratedBlockSize(int64_t nMedianTimePast) const {
 }
 bool GlobalConfig::MaxGeneratedBlockSizeOverridden() const {
     return maxGeneratedBlockSizeOverridden;
-};
+}
 
 bool GlobalConfig::SetBlockSizeActivationTime(int64_t activationTime, std::string* err) {
     blockSizeActivationTime = activationTime;
     return true;
-};
+}
 
 int64_t GlobalConfig::GetBlockSizeActivationTime() const {
     CheckSetDefaultCalled();
     return blockSizeActivationTime;
-};
+}
 
 bool GlobalConfig::SetMaxTxSizePolicy(int64_t maxTxSizePolicyIn, std::string* err)
 {

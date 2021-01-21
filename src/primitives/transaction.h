@@ -53,7 +53,7 @@ public:
     COutPoint() : txid(), n(-1) {}
     COutPoint(uint256 txidIn, uint32_t nIn) : txid(TxId(txidIn)), n(nIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -165,7 +165,7 @@ public:
           uint32_t nSequenceIn = SEQUENCE_FINAL)
         : CTxIn(COutPoint(prevTxId, nOut), scriptSigIn, nSequenceIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
@@ -199,7 +199,7 @@ public:
     CTxOut(Amount nValueIn, CScript scriptPubKeyIn)
         : nValue(nValueIn), scriptPubKey(scriptPubKeyIn) {}
 
-    ADD_SERIALIZE_METHODS;
+    ADD_SERIALIZE_METHODS
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream &s, Operation ser_action) {
