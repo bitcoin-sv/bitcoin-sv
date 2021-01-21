@@ -21,9 +21,6 @@ class GetDataTest(BitcoinTestFramework):
 
         self.stop_node(0)
 
-        TX_TYPE = 1
-        BLOCK_TYPE = 2
-
         with self.run_node_with_connections("send GETDATA messages and check responses", 0, [], 1) as p2p_connections:
 
             receivedBlocks = set()
@@ -51,23 +48,23 @@ class GetDataTest(BitcoinTestFramework):
 
             # 1. Check that sending GETDATA of unknown block does no action.
             unknown_hash = 0xdecaf
-            connection.cb.send_message(msg_getdata([CInv(BLOCK_TYPE, unknown_hash)]))
+            connection.cb.send_message(msg_getdata([CInv(CInv.BLOCK, unknown_hash)]))
 
             # 2. Check that sending GETDATA of known block returns BLOCK message.
             known_hash = self.nodes[0].getbestblockhash()
-            connection.cb.send_message(msg_getdata([CInv(BLOCK_TYPE, int(known_hash, 16))]))
+            connection.cb.send_message(msg_getdata([CInv(CInv.BLOCK, int(known_hash, 16))]))
             wait_until(lambda: known_hash in receivedBlocks)
             # previously requested unknown block is not in the received list
             assert_equal(unknown_hash not in receivedBlocks, True)
             assert_equal(len(receivedBlocks), 1)
 
             # 3. Check that sending GETDATA of unknown transaction returns NOTFOUND message.
-            connection.cb.send_message(msg_getdata([CInv(TX_TYPE, unknown_hash)]))
+            connection.cb.send_message(msg_getdata([CInv(CInv.TX, unknown_hash)]))
             wait_until(lambda: unknown_hash in receivedTxsNotFound)
 
             # 4. Check that sending GETDATA of known transaction returns TX message.
             known_hash = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), 1.0)
-            connection.cb.send_message(msg_getdata([CInv(TX_TYPE, int(known_hash, 16))]))
+            connection.cb.send_message(msg_getdata([CInv(CInv.TX, int(known_hash, 16))]))
             wait_until(lambda: known_hash in receivedTxs)
             assert_equal(len(receivedTxs), 1)
 

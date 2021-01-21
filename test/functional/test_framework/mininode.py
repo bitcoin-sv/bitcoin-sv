@@ -351,14 +351,20 @@ class CAddress():
         return "CAddress(nServices=%i ip=%s port=%i time=%d)" % (self.nServices, self.ip, self.port, self.nTime)
 
 class CInv():
+
+    ERROR = 0
+    TX = 1
+    BLOCK = 2
+    COMPACT_BLOCK = 4
+
     typemap = {
-        0: "Error",
-        1: "TX",
-        2: "Block",
-        4: "CompactBlock"
+        ERROR: "Error",
+        TX: "TX",
+        BLOCK: "Block",
+        COMPACT_BLOCK: "CompactBlock"
     }
 
-    def __init__(self, t=0, h=0):
+    def __init__(self, t=ERROR, h=0):
         self.type = t
         self.hash = h
 
