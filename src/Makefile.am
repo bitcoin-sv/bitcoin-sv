@@ -82,6 +82,7 @@ BITCOIN_CORE_H = \
   blockencodings.h \
   blockfileinfostore.h \
   block_file_access.h \
+  block_file_info.h \
   blockstreams.h \
   blockvalidation.h \
   chain.h \
