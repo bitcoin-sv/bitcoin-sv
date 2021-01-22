@@ -2268,7 +2268,7 @@ static bool PopulateBlockIndexBlockDiskMetaData(
 
     SetBlockIndexFileMetaDataIfNotSet(index, CDiskBlockMetaData{hash, size});
 
-    if(fseek(file, index.GetBlockPos().nPos, SEEK_SET) != 0)
+    if(fseek(file, index.GetBlockPos().Pos(), SEEK_SET) != 0)
     {
         // this should never happen but for some odd reason we aren't
         // able to rewind the file pointer back to the beginning
@@ -3556,7 +3556,7 @@ static bool ConnectBlock(
                     pindex->nHeight);
 
         vPos.push_back(std::make_pair(tx.GetId(), pos));
-        pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
+        pos = {pos, pos.TxOffset() + ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION)};
     }
 
     if (parallelBlockValidation)
@@ -3695,7 +3695,7 @@ static bool ConnectBlock(
             }
 
             // update nUndoPos in block index
-            pindex->nUndoPos = _pos.nPos;
+            pindex->nUndoPos = _pos.Pos();
             pindex->nStatus = pindex->nStatus.withUndo();
         }
 
@@ -6776,7 +6776,7 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                 // read block
                 uint64_t nBlockPos = blkdat.GetPos();
                 if (dbp) {
-                    dbp->nPos = nBlockPos;
+                    *dbp = {dbp->File(), static_cast<unsigned int>(nBlockPos)};
                 }
                 blkdat.SetLimit(nBlockPos + nSize);
                 blkdat.SetPos(nBlockPos);

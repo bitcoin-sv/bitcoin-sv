@@ -319,21 +319,17 @@ public:
     }
 
     CDiskBlockPos GetBlockPos() const {
-        CDiskBlockPos ret;
         if (nStatus.hasData()) {
-            ret.nFile = nFile;
-            ret.nPos = nDataPos;
+            return { nFile, nDataPos };
         }
-        return ret;
+        return {};
     }
 
     CDiskBlockPos GetUndoPos() const {
-        CDiskBlockPos ret;
         if (nStatus.hasUndo()) {
-            ret.nFile = nFile;
-            ret.nPos = nUndoPos;
+            return { nFile, nUndoPos };
         }
-        return ret;
+        return {};
     }
 
     CDiskBlockMetaData GetDiskBlockMetaData() const {return mDiskBlockMetaData;}
@@ -353,8 +349,8 @@ public:
     {
         nTx = transactionsCount;
         nChainTx = 0;
-        nFile = pos.nFile;
-        nDataPos = pos.nPos;
+        nFile = pos.File();
+        nDataPos = pos.Pos();
         nUndoPos = 0;
         nStatus = nStatus.withData();
         RaiseValidity(BlockValidity::TRANSACTIONS);

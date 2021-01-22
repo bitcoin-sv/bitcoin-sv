@@ -37,7 +37,7 @@ namespace
      */
     fs::path GetBlockPosFilename(const CDiskBlockPos& pos, const char* prefix)
     {
-        return GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, pos.nFile);
+        return GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, pos.File());
     }
 
     enum class OpenDiskType
@@ -86,9 +86,9 @@ namespace
             LogPrintf("Unable to open file %s\n", path.string());
             return nullptr;
         }
-        if (pos.nPos) {
-            if (fseek(file.get(), pos.nPos, SEEK_SET)) {
-                LogPrintf("Unable to seek to position %u of %s\n", pos.nPos,
+        if (pos.Pos()) {
+            if (fseek(file.get(), pos.Pos(), SEEK_SET)) {
+                LogPrintf("Unable to seek to position %u of %s\n", pos.Pos(),
                           path.string());
                 return nullptr;
             }
@@ -180,7 +180,7 @@ bool BlockFileAccess::WriteBlockToDisk(
         return error("WriteBlockToDisk: ftell failed");
     }
 
-    pos.nPos = (unsigned int)fileOutPos;
+    pos = { pos.File(), (unsigned int)fileOutPos };
 
     std::vector<uint8_t> data;
     CVectorWriter{SER_DISK, CLIENT_VERSION, data, 0, block};
@@ -219,7 +219,7 @@ bool BlockFileAccess::UndoWriteToDisk(
     if (fileOutPos < 0) {
         return error("%s: ftell failed", __func__);
     }
-    pos.nPos = (unsigned int)fileOutPos;
+    pos = { pos.File(), (unsigned int)fileOutPos };
     fileout << blockundo;
 
     // calculate & write checksum
@@ -360,15 +360,15 @@ bool BlockFileAccess::PreAllocateBlock(
     // Also OpenBlockFile OpenDiskType::Write parameter requires a unique lock.
     std::scoped_lock lock{ serializationMutex };
 
-    if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.nPos)) {
+    if (CheckDiskSpace(nNewChunks * BLOCKFILE_CHUNK_SIZE - pos.Pos())) {
         UniqueCFile file = OpenBlockFile(pos, OpenDiskType::Write);
         if (file) {
             LogPrintf(
                 "Pre-allocating up to position 0x%x in blk%05u.dat\n",
-                nNewChunks * BLOCKFILE_CHUNK_SIZE, pos.nFile);
-            AllocateFileRange(file.get(), pos.nPos,
+                nNewChunks * BLOCKFILE_CHUNK_SIZE, pos.File());
+            AllocateFileRange(file.get(), pos.Pos(),
                 nNewChunks * BLOCKFILE_CHUNK_SIZE -
-                pos.nPos);
+                pos.Pos());
 
             return true;
         }
@@ -385,13 +385,13 @@ bool BlockFileAccess::PreAllocateUndoBlock(
     // Also OpenBlockFile OpenDiskType::Write parameter requires a unique lock.
     std::scoped_lock lock{ serializationMutex };
 
-    if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos)) {
+    if (CheckDiskSpace(nNewChunks * UNDOFILE_CHUNK_SIZE - pos.Pos())) {
         UniqueCFile file = OpenUndoFile(pos, OpenDiskType::Write);
         if (file) {
             LogPrintf("Pre-allocating up to position 0x%x in rev%05u.dat\n",
-                nNewChunks * UNDOFILE_CHUNK_SIZE, pos.nFile);
-            AllocateFileRange(file.get(), pos.nPos,
-                nNewChunks * UNDOFILE_CHUNK_SIZE - pos.nPos);
+                nNewChunks * UNDOFILE_CHUNK_SIZE, pos.File());
+            AllocateFileRange(file.get(), pos.Pos(),
+                nNewChunks * UNDOFILE_CHUNK_SIZE - pos.Pos());
 
             return true;
         }
@@ -413,9 +413,9 @@ bool BlockFileAccess::LoadBlockHashAndTx(
     try {
         file >> header;
 #if defined(WIN32)
-        _fseeki64(file.Get(), postx.nTxOffset, SEEK_CUR);
+        _fseeki64(file.Get(), postx.TxOffset(), SEEK_CUR);
 #else
-        fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
+        fseek(file.Get(), postx.TxOffset(), SEEK_CUR);
 #endif
         file >> txOut;
     } catch (const std::exception &e) {

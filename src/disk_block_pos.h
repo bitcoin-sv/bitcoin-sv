@@ -9,8 +9,13 @@
 #include <string>
 
 struct CDiskBlockPos {
+private:
     int nFile{ -1 };
     unsigned int nPos{ 0 };
+
+public:
+    int File() const { return nFile; }
+    unsigned int Pos() const { return nPos; }
 
     ADD_SERIALIZE_METHODS
 

@@ -62,15 +62,14 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
     uint64_t nTime, bool& fCheckForPruning, bool fKnown) {
     LOCK(cs_LastBlockFile);
 
-    unsigned int nFile = fKnown ? pos.nFile : nLastBlockFile;
+    unsigned int nFile = fKnown ? pos.File() : nLastBlockFile;
     if (vinfoBlockFile.size() <= nFile) {
         vinfoBlockFile.resize(nFile + 1);
     }
 
     if (!fKnown) {
         FindNextFileWithEnoughEmptySpace(config, nAddSize, nFile);
-        pos.nFile = nFile;
-        pos.nPos = vinfoBlockFile[nFile].Size();
+        pos = { static_cast<int>(nFile), static_cast<unsigned int>(vinfoBlockFile[nFile].Size()) };
     }
 
     if ((int)nFile != nLastBlockFile) {
@@ -83,7 +82,7 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
     }
 
     if (fKnown) {
-        vinfoBlockFile[nFile].AddKnownBlock( nHeight, nTime, nAddSize, pos.nPos );
+        vinfoBlockFile[nFile].AddKnownBlock( nHeight, nTime, nAddSize, pos.Pos() );
     }
     else {
         vinfoBlockFile[nFile].AddNewBlock( nHeight, nTime, nAddSize );
@@ -91,7 +90,7 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
 
     if (!fKnown) {
         uint64_t nOldChunks =
-            (pos.nPos + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
+            (pos.Pos() + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
         uint64_t nNewChunks =
             (vinfoBlockFile[nFile].Size() + BLOCKFILE_CHUNK_SIZE - 1) /
             BLOCKFILE_CHUNK_SIZE;
@@ -113,17 +112,15 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
 
 bool CBlockFileInfoStore::FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos,
     uint64_t nAddSize, bool& fCheckForPruning) {
-    pos.nFile = nFile;
 
     LOCK(cs_LastBlockFile);
 
-    uint64_t nNewSize;
-    pos.nPos = vinfoBlockFile[nFile].UndoSize();
-    nNewSize = vinfoBlockFile[nFile].AddUndoSize( nAddSize );
+    pos = { nFile, static_cast<unsigned int>(vinfoBlockFile[nFile].UndoSize()) };
+    uint64_t nNewSize = vinfoBlockFile[nFile].AddUndoSize( nAddSize );
     setDirtyFileInfo.insert(nFile);
 
     uint64_t nOldChunks =
-        (pos.nPos + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
+        (pos.Pos() + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
     uint64_t nNewChunks =
         (nNewSize + UNDOFILE_CHUNK_SIZE - 1) / UNDOFILE_CHUNK_SIZE;
     if (nNewChunks > nOldChunks) {
