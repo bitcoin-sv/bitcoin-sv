@@ -9,7 +9,7 @@
 #include <numeric>
 
 struct CDiskTxPos : public CDiskBlockPos {
-    uint64_t nTxOffset; // after header
+    uint64_t nTxOffset{ 0 }; // after header
 
     ADD_SERIALIZE_METHODS
 
@@ -42,10 +42,5 @@ struct CDiskTxPos : public CDiskBlockPos {
     CDiskTxPos(const CDiskBlockPos &blockIn, uint64_t nTxOffsetIn)
         : CDiskBlockPos(blockIn.nFile, blockIn.nPos), nTxOffset(nTxOffsetIn) {}
 
-    CDiskTxPos() { SetNull(); }
-
-    void SetNull() {
-        CDiskBlockPos::SetNull();
-        nTxOffset = 0;
-    }
+    CDiskTxPos() = default;
 };

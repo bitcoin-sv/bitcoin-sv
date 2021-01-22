@@ -9,8 +9,8 @@
 #include <string>
 
 struct CDiskBlockPos {
-    int nFile;
-    unsigned int nPos;
+    int nFile{ -1 };
+    unsigned int nPos{ 0 };
 
     ADD_SERIALIZE_METHODS
 
@@ -20,25 +20,23 @@ struct CDiskBlockPos {
         READWRITE(VARINT(nPos));
     }
 
-    CDiskBlockPos() { SetNull(); }
+    CDiskBlockPos() = default;
 
     CDiskBlockPos(int nFileIn, unsigned int nPosIn) {
         nFile = nFileIn;
         nPos = nPosIn;
     }
 
-    friend bool operator==(const CDiskBlockPos &a, const CDiskBlockPos &b) {
-        return (a.nFile == b.nFile && a.nPos == b.nPos);
+    bool operator==(const CDiskBlockPos& other) const
+    {
+        return (nFile == other.nFile && nPos == other.nPos);
     }
 
-    friend bool operator!=(const CDiskBlockPos &a, const CDiskBlockPos &b) {
-        return !(a == b);
+    bool operator!=(const CDiskBlockPos& other) const
+    {
+        return !(*this == other);
     }
 
-    void SetNull() {
-        nFile = -1;
-        nPos = 0;
-    }
     bool IsNull() const { return (nFile == -1); }
 
     std::string ToString() const {
