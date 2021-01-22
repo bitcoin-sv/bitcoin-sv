@@ -102,6 +102,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  disk_block_pos.h \
   dstencode.h \
   enum_cast.h \
   fs.h \
