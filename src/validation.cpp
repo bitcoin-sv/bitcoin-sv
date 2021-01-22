@@ -6707,7 +6707,7 @@ void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& 
         LogPrintf("Reindexing block file blk%05u.dat...\n",
             (unsigned int)nFile);
         CDiskBlockPos pos{ nFile, 0 };
-        LoadExternalBlockFile(config, file.release(), &pos);
+        LoadExternalBlockFile(config, std::move(file), &pos);
         nFile++;
     }
 
@@ -6719,7 +6719,7 @@ void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& 
     InitBlockIndex(config);
 }
 
-bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
+bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                            CDiskBlockPos *dbp) {
     // Map of disk positions for blocks with unknown parent (only used for
     // reindex)
@@ -6731,8 +6731,10 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
     int nLoaded = 0;
     try {
         // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor.
-        CBufferedFile blkdat(fileIn, 2 * ONE_MEGABYTE, ONE_MEGABYTE + 8, SER_DISK,
-                             CLIENT_VERSION);
+        CBufferedFile blkdat{
+            { std::move(fileIn), SER_DISK, CLIENT_VERSION },
+            2 * ONE_MEGABYTE,
+            ONE_MEGABYTE + 8};
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof()) {
             boost::this_thread::interruption_point();

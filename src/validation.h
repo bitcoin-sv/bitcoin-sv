@@ -465,7 +465,7 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /**
  * Import blocks from an external file.
  */
-bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
+bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                            CDiskBlockPos *dbp = nullptr);
 
 /** used for --reindex */
