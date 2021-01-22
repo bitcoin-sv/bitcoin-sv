@@ -1691,7 +1691,7 @@ void CTxMemPool::prioritiseTransactionNL(
     const Amount nFeeDelta) {
 
     auto& delta = mapDeltas[hash];
-    delta += nFeeDelta;
+    delta = std::min(MAX_MONEY, delta + nFeeDelta); // do not allow bigger delta than MAX_MONEY
     txiter it = mapTx.find(hash);
     if (it != mapTx.end()) {
         mapTx.modify(it, update_fee_delta(delta));
