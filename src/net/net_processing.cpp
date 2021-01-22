@@ -1139,7 +1139,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 inv.type == MSG_CMPCT_BLOCK) {
                 bool send = false;
                 auto index = mapBlockIndex.Get(inv.hash);
-                auto bestHeader = mapBlockIndex.GetBestHeader();
+                const auto& bestHeader = mapBlockIndex.GetBestHeader();
                 if (index)
                 {
                     if (index->GetChainTx() &&
@@ -1173,13 +1173,12 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                         // equivalent proof of work) than the best header chain
                         // we know about.
                         send = index->IsValid(BlockValidity::SCRIPTS) &&
-                               (bestHeader != nullptr) &&
-                               (bestHeader->GetBlockTime() -
+                               (bestHeader.GetBlockTime() -
                                     index->GetBlockTime() <
                                 nOneMonth) &&
                                (GetBlockProofEquivalentTime(
-                                    *bestHeader, *index,
-                                    *bestHeader,
+                                    bestHeader, *index,
+                                    bestHeader,
                                     consensusParams) < nOneMonth);
                         if (!send) {
                             LogPrint(BCLog::NETMSG, "%s: ignoring request from peer=%i for "
@@ -1195,8 +1194,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                 // assume > 1 week = historical
                 static const int nOneWeek = 7 * 24 * 60 * 60;
                 if (send && connman.OutboundTargetReached(true) &&
-                    (((bestHeader != nullptr) &&
-                      (bestHeader->GetBlockTime() -
+                    (((bestHeader.GetBlockTime() -
                            index->GetBlockTime() >
                        nOneWeek)) ||
                      inv.type == MSG_FILTERED_BLOCK) &&
@@ -2071,7 +2069,7 @@ static void ProcessInvMessage(const CNodePtr& pfrom,
                 fAlreadyHave ? "have" : "new", pfrom->id);
             UpdateBlockAvailability(inv.hash, GetState(pfrom->GetId()).get());
             if(!fAlreadyHave && !fImporting && !fReindex && !blockDownloadTracker.IsInFlight(inv.hash)) {
-                const auto& bestHeader = mapBlockIndex.GetBestHeaderRef();
+                const auto& bestHeader = mapBlockIndex.GetBestHeader();
                 // We used to request the full block here, but since
                 // headers-announcements are now the primary method of
                 // announcement on the network, and since, in the case that
@@ -2499,7 +2497,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
         //   nUnconnectingHeaders gets reset back to 0.
         if(mapBlockIndex.Get(headers[0].hashPrevBlock) == nullptr && nCount < MAX_BLOCKS_TO_ANNOUNCE)
         {
-            const auto& bestHeader = mapBlockIndex.GetBestHeaderRef();
+            const auto& bestHeader = mapBlockIndex.GetBestHeader();
             // Try to obtain an access to the node's state data.
             const CNodeStateRef nodestateRef { GetState(pfrom->GetId()) };
             const CNodeStatePtr& nodestate { nodestateRef.get() };
@@ -2790,14 +2788,14 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
         LOCK(cs_main);
 
         if(mapBlockIndex.Get(cmpctblock.header.hashPrevBlock) == nullptr) {
-            auto bestHeader = mapBlockIndex.GetBestHeader();
+            const auto& bestHeader = mapBlockIndex.GetBestHeader();
             // Doesn't connect (or is genesis), instead of DoSing in
             // AcceptBlockHeader, request deeper headers
             if(!IsInitialBlockDownload()) {
                 connman.PushMessage(
                     pfrom,
                     msgMaker.Make(NetMsgType::GETHEADERS,
-                                  chainActive.GetLocator(bestHeader),
+                                  chainActive.GetLocator(&bestHeader),
                                   uint256()));
             }
             return true;
@@ -3875,9 +3873,7 @@ void SendBlockSync(const CNodePtr& pto, CConnman &connman, const CNetMsgMaker& m
     const CNodeStatePtr& state)
 {
     // Start block sync
-    auto tip = chainActive.Tip();
-    assert( tip );
-    const auto& bestHeader = mapBlockIndex.SetBestHeaderIfNotSet( *tip );
+    const auto& bestHeader = mapBlockIndex.GetBestHeader();
     assert(state);
     // Download if this is a nice peer, or we have no nice peers and this one
     // might do.

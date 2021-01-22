@@ -2978,7 +2978,7 @@ static bool ConnectBlock(
         // effectively caching the result of part of the verification.
         if (auto index = mapBlockIndex.Get(hashAssumeValid); index)
         {
-            const auto& bestHeader = mapBlockIndex.GetBestHeaderRef();
+            const auto& bestHeader = mapBlockIndex.GetBestHeader();
             if (index->GetAncestor(pindex->GetHeight()) == pindex &&
                 bestHeader.GetAncestor(pindex->GetHeight()) == pindex &&
                 bestHeader.GetChainWork() >= nMinimumChainWork)
@@ -4183,19 +4183,19 @@ static void NotifyHeaderTip() {
     bool fInitialBlockDownload = false;
     static std::mutex pindexHeaderOldMutex;
     static const CBlockIndex *pindexHeaderOld = nullptr;
-    const CBlockIndex* pindexHeader = mapBlockIndex.GetBestHeader();
+    const CBlockIndex& indexHeader = mapBlockIndex.GetBestHeader();
 
     if (std::lock_guard lock{ pindexHeaderOldMutex };
-        pindexHeader != pindexHeaderOld)
+        &indexHeader != pindexHeaderOld)
     {
         fNotify = true;
         fInitialBlockDownload = IsInitialBlockDownload();
-        pindexHeaderOld = pindexHeader;
+        pindexHeaderOld = &indexHeader;
     }
 
     // Send block tip changed notifications without cs_main
     if (fNotify) {
-        uiInterface.NotifyHeaderTip(fInitialBlockDownload, pindexHeader);
+        uiInterface.NotifyHeaderTip(fInitialBlockDownload, &indexHeader);
     }
 }
 
@@ -6457,6 +6457,7 @@ bool InitBlockIndex(const Config &config) {
         try {
             const CChainParams &chainparams = config.GetChainParams();
             CBlock &block = const_cast<CBlock &>(chainparams.GenesisBlock());
+
             // Start new block file
             uint64_t nBlockSize = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION);
             uint64_t nBlockSizeWithHeader =

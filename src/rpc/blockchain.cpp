@@ -2125,12 +2125,11 @@ UniValue getblockchaininfo(const Config &config,
     }
     
     auto tip = chainActive.Tip();
-    auto bestHeader = mapBlockIndex.GetBestHeader();
 
     UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("chain", config.GetChainParams().NetworkIDString()));
     obj.push_back(Pair("blocks", int(chainActive.Height())));
-    obj.push_back(Pair("headers", bestHeader ? bestHeader->GetHeight() : -1));
+    obj.push_back(Pair("headers", mapBlockIndex.GetBestHeader().GetHeight()));
     obj.push_back(
         Pair("bestblockhash", tip->GetBlockHash().GetHex()));
     obj.push_back(Pair("difficulty", double(GetDifficulty(tip))));

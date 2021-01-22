@@ -53,7 +53,7 @@ public:
                 mStore );
 
         if (mBestHeader == nullptr ||
-            mBestHeader->GetChainWork() < indexNew.GetChainWork())
+            CBlockIndexWorkComparator()(mBestHeader, &indexNew))
         {
             mBestHeader = &indexNew;
         }
@@ -114,33 +114,13 @@ public:
         }
     }
 
-    const CBlockIndex& SetBestHeaderIfNotSet(
-        const CBlockIndex& bestHeaderCandidate)
-    {
-        std::lock_guard lock{ mMutex };
-
-        if (mBestHeader == nullptr)
-        {
-            mBestHeader = &bestHeaderCandidate;
-        }
-
-        return *mBestHeader;
-    }
-
-    const CBlockIndex& GetBestHeaderRef() const
+    const CBlockIndex& GetBestHeader() const
     {
         std::shared_lock lock{ mMutex };
 
         assert(mBestHeader);
 
         return *mBestHeader;
-    }
-
-    const CBlockIndex* GetBestHeader() const
-    {
-        std::shared_lock lock{ mMutex };
-
-        return mBestHeader;
     }
 
 private:
@@ -175,6 +155,9 @@ private:
     /**
      * Best header we've seen so far (used for getheaders queries' starting
      * points).
+     *
+     * NOTE: This is always set to not null after initialization in init.cpp
+     *       is complete and before p2p connections are established.
      */
     const CBlockIndex* mBestHeader{ nullptr };
 
