@@ -22,11 +22,11 @@ void CBlockFileInfoStore::FindNextFileWithEnoughEmptySpace(const Config &config,
     // LoadBlockIndexDB function where block file info is being loaded
     // and we can't be certain that it's the only case without more tests
     // and extensive refactoring
-    while (vinfoBlockFile[nFile].nSize &&
+    while (vinfoBlockFile[nFile].Size() &&
            // >= is here for legacy purposes - could possibly be changed to > as
            // currently max file size is one byte less than preferred block file size
            // but larger code analisys would be required
-           vinfoBlockFile[nFile].nSize + nAddSize >= config.GetPreferredBlockFileSize()) {
+           vinfoBlockFile[nFile].Size() + nAddSize >= config.GetPreferredBlockFileSize()) {
         nFile++;
         if (vinfoBlockFile.size() <= nFile) {
             vinfoBlockFile.resize(nFile + 1);
@@ -70,7 +70,7 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
     if (!fKnown) {
         FindNextFileWithEnoughEmptySpace(config, nAddSize, nFile);
         pos.nFile = nFile;
-        pos.nPos = vinfoBlockFile[nFile].nSize;
+        pos.nPos = vinfoBlockFile[nFile].Size();
     }
 
     if ((int)nFile != nLastBlockFile) {
@@ -82,20 +82,18 @@ bool CBlockFileInfoStore::FindBlockPos(const Config &config, CValidationState &s
         nLastBlockFile = nFile;
     }
 
-    vinfoBlockFile[nFile].AddBlock(nHeight, nTime);
     if (fKnown) {
-        vinfoBlockFile[nFile].nSize =
-            std::max(pos.nPos + nAddSize, vinfoBlockFile[nFile].nSize);
+        vinfoBlockFile[nFile].AddKnownBlock( nHeight, nTime, nAddSize, pos.nPos );
     }
     else {
-        vinfoBlockFile[nFile].nSize += nAddSize;
+        vinfoBlockFile[nFile].AddNewBlock( nHeight, nTime, nAddSize );
     }
 
     if (!fKnown) {
         uint64_t nOldChunks =
             (pos.nPos + BLOCKFILE_CHUNK_SIZE - 1) / BLOCKFILE_CHUNK_SIZE;
         uint64_t nNewChunks =
-            (vinfoBlockFile[nFile].nSize + BLOCKFILE_CHUNK_SIZE - 1) /
+            (vinfoBlockFile[nFile].Size() + BLOCKFILE_CHUNK_SIZE - 1) /
             BLOCKFILE_CHUNK_SIZE;
         if (nNewChunks > nOldChunks) {
             if (fPruneMode) {
@@ -120,8 +118,8 @@ bool CBlockFileInfoStore::FindUndoPos(CValidationState &state, int nFile, CDiskB
     LOCK(cs_LastBlockFile);
 
     uint64_t nNewSize;
-    pos.nPos = vinfoBlockFile[nFile].nUndoSize;
-    nNewSize = vinfoBlockFile[nFile].nUndoSize += nAddSize;
+    pos.nPos = vinfoBlockFile[nFile].UndoSize();
+    nNewSize = vinfoBlockFile[nFile].AddUndoSize( nAddSize );
     setDirtyFileInfo.insert(nFile);
 
     uint64_t nOldChunks =
@@ -149,14 +147,14 @@ uint64_t CBlockFileInfoStore::CalculateCurrentUsage() {
     // TODO: this method currently required cs_LastBlockFile to be held. Consider moving locking code insied this method  
     uint64_t retval = 0;
     for (const CBlockFileInfo &file : vinfoBlockFile) {
-        retval += file.nSize + file.nUndoSize;
+        retval += file.Size() + file.UndoSize();
     }
     return retval;
 }
 
 void CBlockFileInfoStore::ClearFileInfo(int fileNumber)
 {
-    vinfoBlockFile[fileNumber].SetNull();
+    vinfoBlockFile[fileNumber] = {};
     setDirtyFileInfo.insert(fileNumber);
 }
 
@@ -182,8 +180,8 @@ void CBlockFileInfoStore::FindFilesToPruneManual(std::set<int> &setFilesToPrune,
         std::min(nManualPruneHeight, chainActive.Tip()->nHeight - MIN_BLOCKS_TO_KEEP);
     int count = 0;
     for (int fileNumber = 0; fileNumber < nLastBlockFile; fileNumber++) {
-        if (vinfoBlockFile[fileNumber].nSize == 0 ||
-            vinfoBlockFile[fileNumber].nHeightLast > nLastBlockWeCanPrune) {
+        if (vinfoBlockFile[fileNumber].Size() == 0 ||
+            vinfoBlockFile[fileNumber].HeightLast() > nLastBlockWeCanPrune) {
             continue;
         }
         setFilesToPrune.insert(fileNumber);
@@ -237,10 +235,11 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
 
     if (nCurrentUsage + nBuffer >= nPruneTarget) {
         for (int fileNumber = 0; fileNumber < nLastBlockFile; fileNumber++) {
-            nBytesToPrune = vinfoBlockFile[fileNumber].nSize +
-                vinfoBlockFile[fileNumber].nUndoSize;
+            nBytesToPrune = vinfoBlockFile[fileNumber].Size() +
+                vinfoBlockFile[fileNumber].UndoSize();
 
-            if (vinfoBlockFile[fileNumber].nSize == 0) {
+            if (vinfoBlockFile[fileNumber].Size() == 0)
+            {
                 continue;
             }
 
@@ -251,7 +250,7 @@ void CBlockFileInfoStore::FindFilesToPrune(std::set<int> &setFilesToPrune,
 
             // don't prune files that could have a block within
             // MIN_BLOCKS_TO_KEEP of the main chain's tip but keep scanning
-            if (vinfoBlockFile[fileNumber].nHeightLast > nLastBlockWeCanPrune) {
+            if (vinfoBlockFile[fileNumber].HeightLast() > nLastBlockWeCanPrune) {
                 continue;
             }
 

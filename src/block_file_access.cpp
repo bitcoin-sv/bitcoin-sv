@@ -337,7 +337,7 @@ void BlockFileAccess::FlushBlockFile(
     if (fileOld) {
         if (finalize)
         {
-            TruncateFile(fileOld.get(), blockFileInfo.nSize);
+            TruncateFile(fileOld.get(), blockFileInfo.Size());
         }
         FileCommit(fileOld.get());
     }
@@ -346,7 +346,7 @@ void BlockFileAccess::FlushBlockFile(
     if (fileOld) {
         if (finalize)
         {
-            TruncateFile(fileOld.get(), blockFileInfo.nUndoSize);
+            TruncateFile(fileOld.get(), blockFileInfo.UndoSize());
         }
         FileCommit(fileOld.get());
     }

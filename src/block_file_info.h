@@ -6,25 +6,30 @@
 #include <string>
 
 #include "serialize.h"
-#include "tinyformat.h"
-#include "utiltime.h"
 
 class CBlockFileInfo {
-public:
+private:
     //!< number of blocks stored in file
-    unsigned int nBlocks;
+    unsigned int nBlocks{ 0 };
     //!< lowest height of block in file
-    int32_t nHeightFirst;
+    int32_t nHeightFirst{ 0 };
     //!< highest height of block in file
-    int32_t nHeightLast;
+    int32_t nHeightLast{ 0 };
     //!< earliest time of block in file
-    uint64_t nTimeFirst;
+    uint64_t nTimeFirst{ 0 };
     //!< latest time of block in file
-    uint64_t nTimeLast;
+    uint64_t nTimeLast{ 0 };
     //!< number of used bytes of block file
-    uint64_t nSize;
+    uint64_t nSize{ 0 };
     //!< number of used bytes in the undo file
-    uint64_t nUndoSize;
+    uint64_t nUndoSize{ 0 };
+
+public:
+    uint64_t Size() const { return nSize; }
+    uint64_t UndoSize() const { return nUndoSize; }
+    int32_t HeightLast() const { return nHeightLast; }
+
+    uint64_t AddUndoSize( uint64_t add ) { return (nUndoSize += add); }
 
     ADD_SERIALIZE_METHODS
 
@@ -80,42 +85,17 @@ public:
         }
     }
 
-    void SetNull() {
-        nBlocks = 0;
-        nHeightFirst = 0;
-        nHeightLast = 0;
-        nTimeFirst = 0;
-        nTimeLast = 0;
-        nSize = 0;
-        nUndoSize = 0;
-    }
-
-    CBlockFileInfo() { SetNull(); }
-
     std::string ToString() const;
 
-    /** update statistics (does not update nSize) */
-    void AddBlock(int32_t nHeightIn, uint64_t nTimeIn) {
-        if (nBlocks == 0 || nHeightFirst > nHeightIn) {
-            nHeightFirst = nHeightIn;
-        }
-        if (nBlocks == 0 || nTimeFirst > nTimeIn) {
-            nTimeFirst = nTimeIn;
-        }
-        nBlocks++;
-        if (nHeightIn > nHeightLast) {
-            nHeightLast = nHeightIn;
-        }
-        if (nTimeIn > nTimeLast) {
-            nTimeLast = nTimeIn;
-        }
-    }
-};
+    void AddKnownBlock(
+        int32_t nHeightIn,
+        uint64_t nTimeIn,
+        uint64_t addSize,
+        unsigned int startPos);
 
-inline std::string CBlockFileInfo::ToString() const {
-    return strprintf(
-        "CBlockFileInfo(blocks=%u, size=%u, heights=%u...%u, time=%s...%s)",
-        nBlocks, nSize, nHeightFirst, nHeightLast,
-        DateTimeStrFormat("%Y-%m-%d", nTimeFirst),
-        DateTimeStrFormat("%Y-%m-%d", nTimeLast));
-}
+    void AddNewBlock(int32_t nHeightIn, uint64_t nTimeIn, uint64_t addSize);
+
+private:
+    /** update statistics (does not update nSize) */
+    void AddBlock(int32_t nHeightIn, uint64_t nTimeIn);
+};
