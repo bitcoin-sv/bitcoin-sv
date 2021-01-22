@@ -1934,11 +1934,19 @@ bool AppInitParameterInteraction(Config &config) {
 
     // Configure ancestor limit count.
     if(gArgs.IsArgSet("-limitancestorcount")) {
-        config.SetLimitAncestorCount(gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT));
+        int64_t limitancestorcount = gArgs.GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
+        if(std::string err; !config.SetLimitAncestorCount(limitancestorcount, &err))
+        {
+            return InitError(err);
+        }
     }
     
     // Configure ancestor limit count.
     if(gArgs.IsArgSet("-limitcpfpgroupmemberscount")) {
+        int64_t limitcpfpgroupmemberscount = gArgs.GetArgAsBytes("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT);
+        if(std::string err; !config.SetLimitSecondaryMempoolAncestorCount(limitcpfpgroupmemberscount, &err)){
+            return InitError(err);
+        }
         config.SetLimitSecondaryMempoolAncestorCount(gArgs.GetArg("-limitcpfpgroupmemberscount", DEFAULT_SECONDARY_MEMPOOL_ANCESTOR_LIMIT));
     }
 
