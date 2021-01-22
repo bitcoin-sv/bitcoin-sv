@@ -7,6 +7,7 @@
 
 #include "chainparams.h"
 #include "config.h"
+#include "disk_tx_pos.h"
 #include "hash.h"
 #include "init.h"
 #include "pow.h"

@@ -15,6 +15,7 @@
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
+#include "disk_tx_pos.h"
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
