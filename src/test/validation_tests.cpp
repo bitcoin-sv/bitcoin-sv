@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(validation_load_external_block_file) {
         CAutoFile outs(std::move(fp), SER_DISK, CLIENT_VERSION);
         outs << size;
         outs << block;
-        fp.reset( outs.release() );
+        fp = outs.release();
     }
 
     fseek(fp.get(), 0, SEEK_SET);

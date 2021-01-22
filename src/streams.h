@@ -407,7 +407,7 @@ public:
  *
  * Will automatically close the file when it goes out of scope if not null. If
  * you're returning the file pointer, return file.release(). If you need to
- * close the file early, use file.fclose() instead of fclose(file).
+ * close the file early, use file.reset() instead of fclose(file).
  */
 class CAutoFile {
 private:
@@ -436,17 +436,12 @@ public:
     CAutoFile(const CAutoFile &) = delete;
     CAutoFile &operator=(const CAutoFile &) = delete;
 
-    void fclose() {
-        file.reset();
-    }
+    void reset() { file.reset(); }
 
     /**
-     * Get wrapped FILE* with transfer of ownership.
-     * @note This will invalidate the CAutoFile object, and makes it the
-     * responsibility of the caller of this function to clean up the returned
-     * FILE*.
+     * Get wrapped UniqueCFile with transfer of ownership.
      */
-    FILE *release() { return file.release(); }
+    UniqueCFile release() { return std::move(file); }
 
     /**
      * Get wrapped FILE* without transfer of ownership.
@@ -585,7 +580,7 @@ public:
     int GetVersion() const { return src.GetVersion(); }
     int GetType() const { return src.GetType(); }
 
-    void fclose() { src.fclose(); }
+    void reset() { src.reset(); }
 
     // check whether we're at the end of the source file
     bool eof() const { return nReadPos == nSrcPos && feof(src.Get()); }

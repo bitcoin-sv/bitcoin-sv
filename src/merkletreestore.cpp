@@ -492,7 +492,7 @@ bool CMerkleTreeStore::ReindexMerkleTreeStoreNL()
             if (static_cast<uint64_t>(ftell(readFromFile.Get())) == currentFileSize)
             {
                 //End of file, move to the next data file
-                readFromFile.fclose();
+                readFromFile.reset();
             }
         }
     }

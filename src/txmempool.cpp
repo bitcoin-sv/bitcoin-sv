@@ -2671,10 +2671,9 @@ void CTxMemPool::InitMempoolTxDB()
 }
 
 
-FILE* CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
+UniqueCFile CTxMemPool::OpenDumpFile(uint64_t& version_, DumpFileID& instanceId_)
 {
-    FILE* filestr = fsbridge::fopen(GetDataDir() / "mempool.dat", "rb");
-    CAutoFile file{filestr, SER_DISK, CLIENT_VERSION};
+    CAutoFile file{fsbridge::fopen(GetDataDir() / "mempool.dat", "rb"), SER_DISK, CLIENT_VERSION};
     if (file.IsNull())
     {
         throw std::runtime_error("Failed to open mempool file from disk");
@@ -2894,7 +2893,7 @@ void CTxMemPool::DumpMempool(uint64_t version) {
 
         file << mapDeltas;
         FileCommit(file.Get());
-        file.fclose();
+        file.reset();
         RenameOver(GetDataDir() / "mempool.dat.new",
                    GetDataDir() / "mempool.dat");
         int64_t last = GetTimeMicros();
