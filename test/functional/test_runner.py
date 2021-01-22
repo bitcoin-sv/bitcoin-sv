@@ -169,9 +169,6 @@ def main():
     parser.add_argument('--large-block-tests', action='store_true', help="Runs large block file tests.")
     parser.add_argument('--output-type', type=int, default=2, help="Output type: 2 - Automatic detection. 0 - Primitive output suited for CI. 1 - Advanced suited for console.")
 
-    parser.add_argument('--journal-broken-tests', action='store_true',
-                        help="FIXME: (CORE-130): Runs tests broken by journaling block assembler.")
-
     args, unknown_args = parser.parse_known_args()
 
     # Output type. Default is 2: automatic detection
