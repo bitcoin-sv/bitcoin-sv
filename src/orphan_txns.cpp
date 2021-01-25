@@ -39,7 +39,8 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
         // but combined size of those transactions. limitTxnsSize is called after adding.
         unsigned int sz = tx.GetTotalSize();
         if (TxSource::p2p == pTxInputData->GetTxSource()) {
-            if (sz > mMaxStandardTxSize /*mMaxStandardTxSize is always set to after genesis value. If non default value is used for policy tx size then orphan tx before genesis might not get accepted by mempool */) {
+            if (mMaxStandardTxSize &&
+                sz > mMaxStandardTxSize /* mMaxStandardTxSize is always set to after genesis value. If non default value is used for policy tx size then orphan tx before genesis might not get accepted by mempool */) {
                 LogPrint(BCLog::MEMPOOL,
                          "ignoring large orphan tx (size: %u, hash: %s)\n", sz,
                          txid.ToString());
