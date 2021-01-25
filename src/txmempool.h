@@ -1013,12 +1013,12 @@ public:
 
     private:
         const bool mValid {false};
-        const Contents mContents;
-        const CachedTxIdsRef mRelevantTxIds;
+        const Contents mContents{};
+        const CachedTxIdsRef mRelevantTxIds{};
 
         // The transaction lookup index.
         using TxIdIndex = std::unordered_map<uint256, Snapshot::const_iterator>;
-        mutable TxIdIndex mIndex;
+        mutable TxIdIndex mIndex{};
         mutable std::once_flag mCreateIndexOnce{};
         void CreateIndex() const;
     };
