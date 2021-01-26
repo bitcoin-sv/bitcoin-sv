@@ -276,7 +276,7 @@ private:
     CBlockIndex* pprev{ nullptr };
 
     //! pointer to the index of some further predecessor of this block
-    CBlockIndex* pskip{ nullptr };
+    const CBlockIndex* pskip{ nullptr };
 
     //! height of the entry in the chain. The genesis block has height 0
     int32_t nHeight{ 0 };
@@ -435,8 +435,9 @@ public:
 
     bool IsGenesis() const { return pprev == nullptr; }
 
-    CBlockIndex* GetPrev() const { return pprev; }
-    CBlockIndex* GetSkip() const { return pskip; }
+    CBlockIndex* GetPrev() { return pprev; }
+    const CBlockIndex* GetPrev() const { return pprev; }
+    const CBlockIndex* GetSkip() const { return pskip; }
 
     /**
     * TODO: This method should become private.

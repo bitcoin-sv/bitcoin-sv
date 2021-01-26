@@ -3630,7 +3630,7 @@ static bool DisconnectTip(const Config &config, CValidationState &state,
                           DisconnectedBlockTransactions *disconnectpool,
                           const CJournalChangeSetPtr& changeSet)
 {
-    const CBlockIndex *pindexDelete = chainActive.Tip();
+    CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
 
     FinalizeGenesisCrossing(config, pindexDelete->GetHeight(), changeSet);

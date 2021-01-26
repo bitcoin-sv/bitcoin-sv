@@ -87,7 +87,7 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
         lookup = pb->GetHeight();
     }
 
-    CBlockIndex *pb0 = pb;
+    const CBlockIndex* pb0 = pb;
     int64_t minTime = pb0->GetBlockTime();
     int64_t maxTime = minTime;
     for (int i = 0; i < lookup; i++) {

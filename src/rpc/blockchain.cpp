@@ -2165,7 +2165,7 @@ UniValue getblockchaininfo(const Config &config,
     obj.push_back(Pair("softforks", softforks));
 
     if (fPruneMode) {
-        CBlockIndex *block = chainActive.Tip();
+        const CBlockIndex* block = chainActive.Tip();
         while (block && !block->IsGenesis() && block->GetPrev()->getStatus().hasData())
         {
             block = block->GetPrev();
