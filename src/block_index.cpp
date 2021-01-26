@@ -34,6 +34,38 @@ static inline int32_t GetSkipHeight(int32_t height) {
                         : InvertLowestOne(height);
 }
 
+
+/**
+ * To avoid having each instance of CBlockIndex having its own mutex,
+ * we have global array of mutexes that current instances of CBlockIndex share.
+ * We use modificated hash method to achieve uniform distribution across the mutexes and also
+ * to make sure each instance of CBlockIndex always uses the same mutex.
+ **/
+namespace
+{
+    constexpr uint32_t MUTEX_COUNT = 8;
+    std::array<std::mutex, MUTEX_COUNT> blockIndexMutexes;
+    // Helper to calculate a byte hash from given integer value of type T.
+    template<typename T, std::size_t NumBits = sizeof(T)*CHAR_BIT>
+    inline T hash_byte(T v)
+    {
+        static_assert(NumBits % CHAR_BIT == 0, "NumBits must be a multiple of CHAR_BIT!");
+        if constexpr(NumBits>CHAR_BIT)
+        {
+            return hash_byte<T, NumBits/2>(
+                (v >> (NumBits/2))  // top half of bits in value
+                ^
+                (v & (std::size_t(-1)>>(NumBits/2))) // bottom half of bits in value
+            );
+        }
+        else
+        {
+            return v;
+        }
+    }
+}
+std::mutex& CBlockIndex::GetMutex() const { return blockIndexMutexes[ hash_byte(reinterpret_cast<std::size_t>(this)) % blockIndexMutexes.size() ]; }
+
 CBlockIndex *CBlockIndex::GetAncestor(int32_t height) {
 
     return const_cast<CBlockIndex*>(static_cast<const CBlockIndex*>(this)->GetAncestor(height));
@@ -134,7 +166,7 @@ const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
 
 std::optional<CBlockUndo> CBlockIndex::GetBlockUndo() const
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
 
     std::optional<CBlockUndo> blockUndo{ CBlockUndo{} };
     CDiskBlockPos pos = GetUndoPosNL();
@@ -158,7 +190,7 @@ std::optional<CBlockUndo> CBlockIndex::GetBlockUndo() const
 bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blockundo,
                             bool fCheckForPruning, const Config &config)
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
     if (GetUndoPosNL().IsNull() ||
         !IsValidNL(BlockValidity::SCRIPTS)) {
         if (GetUndoPosNL().IsNull()) {
@@ -190,7 +222,7 @@ bool CBlockIndex::writeUndoToDisk(CValidationState &state, const CBlockUndo &blo
 
 bool CBlockIndex::verifyUndoValidity()
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
     CBlockUndo undo;
     CDiskBlockPos pos = GetUndoPosNL();
     if (!pos.IsNull()) {
@@ -208,7 +240,7 @@ bool CBlockIndex::verifyUndoValidity()
 bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
                        const Config &config) const
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
     if (!BlockFileAccess::ReadBlockFromDisk(block, GetBlockPosNL(), config))
     {
         return false;
@@ -245,14 +277,14 @@ void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSet(
     CDiskBlockMetaData&& metadata) const
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
     SetBlockIndexFileMetaDataIfNotSetNL(std::move(metadata));
 }
 
 std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStreamReader(
     bool calculateDiskBlockMetadata) const
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
     return
         BlockFileAccess::GetDiskBlockStreamReader(
                 GetBlockPosNL(),
@@ -262,7 +294,7 @@ std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStream
 std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStreamReader(
     const Config &config, bool calculateDiskBlockMetadata) const
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
     std::unique_ptr<CBlockStreamReader<CFileReader>> blockStreamReader;
     try
     {
@@ -333,7 +365,7 @@ auto CBlockIndex::StreamBlockFromDisk(
     int networkVersion) const
     -> BlockStreamAndMetaData
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
 
     UniqueCFile file{ BlockFileAccess::OpenBlockFile(GetBlockPosNL()) };
 
@@ -366,7 +398,7 @@ auto CBlockIndex::StreamBlockFromDisk(
 
 std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk() const
 {
-    std::lock_guard lock{ blockIndexMutex };
+    std::lock_guard lock { GetMutex() };
     UniqueCFile file{ BlockFileAccess::OpenBlockFile(GetBlockPosNL()) };
 
     if (!file)

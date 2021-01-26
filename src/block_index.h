@@ -370,7 +370,7 @@ public:
 
     void LoadFromPersistentData(const CBlockIndex& other, CBlockIndex* previous)
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock{ GetMutex() };
 
         pprev = previous;
         nHeight = other.nHeight;
@@ -400,7 +400,7 @@ public:
      */
     bool PostLoadIndexConnect()
     {
-        std::lock_guard lock{ blockIndexMutex };
+        std::lock_guard lock { GetMutex() };
 
         BuildSkipNL();
         SetChainWorkNL();
@@ -437,42 +437,42 @@ public:
     */
     CDiskBlockPos GetBlockPos() const
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
 
         return GetBlockPosNL();
     }
 
     CDiskBlockMetaData GetDiskBlockMetaData() const
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
 
         return mDiskBlockMetaData;
     }
 
     void SetSequenceId( int32_t id )
     {
-        std::lock_guard lock{ blockIndexMutex };
+        std::lock_guard lock { GetMutex() };
 
         nSequenceId = id;
     }
 
     int32_t GetSequenceId() const
     {
-        std::lock_guard lock{ blockIndexMutex };
+        std::lock_guard lock { GetMutex() };
 
         return nSequenceId;
     }
 
     unsigned int GetBlockTxCount() const
     {
-        std::lock_guard lock{ blockIndexMutex };
+        std::lock_guard lock { GetMutex() };
 
         return nTx;
     }
 
     void SetChainTxAndSequenceId(unsigned int chainTx, int32_t id)
     {
-        std::lock_guard lock{ blockIndexMutex };
+        std::lock_guard lock { GetMutex() };
 
         nChainTx = chainTx;
         nSequenceId = id;
@@ -483,7 +483,7 @@ public:
         const CDiskBlockPos& pos,
         CDiskBlockMetaData metaData)
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
 
         nTx = transactionsCount;
         nChainTx = 0;
@@ -505,7 +505,7 @@ public:
      */
     bool IsSoftRejected() const
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         return IsSoftRejectedNL();
     }
 
@@ -516,7 +516,7 @@ public:
      */
     bool ShouldBeConsideredSoftRejectedBecauseOfParent() const
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         return ShouldBeConsideredSoftRejectedBecauseOfParentNL();
     }
 
@@ -527,7 +527,7 @@ public:
      */
     std::int32_t GetSoftRejectedFor() const
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         return nSoftRejected;
     }
 
@@ -545,7 +545,7 @@ public:
      */
     void SetSoftRejectedFor(std::int32_t numBlocks)
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         assert(numBlocks>=-1);
         assert(!ShouldBeConsideredSoftRejectedBecauseOfParentNL()); // this block must not be soft rejected because of its parent
 
@@ -566,7 +566,7 @@ public:
      */
     void SetSoftRejectedFromParent()
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         SetSoftRejectedFromParentNL();
     }
 
@@ -580,7 +580,7 @@ public:
     // Returns true if clear is successful, otherwise false
     bool ClearFileInfoIfFileNumberEquals(int fileNumber)
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         if (nFile == fileNumber)
         {
             nStatus =
@@ -659,8 +659,7 @@ public:
 
     unsigned int GetChainTx() const
     {
-        std::lock_guard lock{ blockIndexMutex };
-
+        std::lock_guard lock { GetMutex() };
         return this->nChainTx;
     }
 
@@ -670,22 +669,22 @@ public:
     }
 
     BlockStatus getStatus() const {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         return nStatus;
     }
 
     void ModifyStatusWithFailed() {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         nStatus = nStatus.withFailed();
     }
 
     void ModifyStatusWithClearedFailedFlags() {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         nStatus = nStatus.withClearedFailureFlags();
     }
 
     void ModifyStatusWithFailedParent() {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         nStatus = nStatus.withFailedParent();
     }
 
@@ -696,6 +695,7 @@ public:
      */
     void IgnoreValidationTime()
     {
+        std::lock_guard lock{ GetMutex() };
         mValidationCompletionTime = SteadyClockTimePoint::min();
     }
 
@@ -705,6 +705,7 @@ public:
      */
     auto GetValidationCompletionTime() const
     {
+        std::lock_guard lock{ GetMutex() };
         return mValidationCompletionTime;
     }
 
@@ -715,18 +716,18 @@ public:
     }
 
     bool IsValid(enum BlockValidity nUpTo = BlockValidity::TRANSACTIONS) const {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         return IsValidNL(nUpTo);
     }
 
     bool RaiseValidity(enum BlockValidity nUpTo) {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         return RaiseValidityNL(nUpTo);
     }
 
     std::optional<int> GetFileNumber() const
     {
-        std::lock_guard lock(blockIndexMutex);
+        std::lock_guard lock { GetMutex() };
         if (nStatus.hasData())
         {
             return nFile;
@@ -838,13 +839,6 @@ private:
         RaiseValidityNL( BlockValidity::TREE );
     }
 
-    bool ValidityChangeRequiresValidationTimeSetting(BlockValidity nUpTo) const
-    {
-        return
-            nUpTo == BlockValidity::SCRIPTS
-            && mValidationCompletionTime == SteadyClockTimePoint::max();
-    }
-
     bool PopulateBlockIndexBlockDiskMetaDataNL(FILE* file,
                             int networkVersion) const;
 
@@ -897,7 +891,9 @@ private:
             return false;
         }
 
-        if (ValidityChangeRequiresValidationTimeSetting(nUpTo))
+        // Check if validity change requires setting mValidationCompletionTime
+        if (nUpTo == BlockValidity::SCRIPTS &&
+            mValidationCompletionTime == SteadyClockTimePoint::max() )
         {
             mValidationCompletionTime = std::chrono::steady_clock::now();
         }
@@ -939,7 +935,7 @@ private:
         nStatus = nStatus.withDiskBlockMetaData();
     }
 
-    mutable std::mutex blockIndexMutex;
+    std::mutex& GetMutex() const;
 };
 
 /**
@@ -1042,10 +1038,14 @@ struct CBlockIndexWorkComparator {
         }
 
         // ... then by when block was completely validated, ...
-        if (pa->GetValidationCompletionTime() < pb->GetValidationCompletionTime()) {
+        auto paValidationCompletionTime = pa->GetValidationCompletionTime();
+        auto pbValidationCompletionTime = pb->GetValidationCompletionTime();
+        if (paValidationCompletionTime < pbValidationCompletionTime)
+        {
             return false;
         }
-        if (pa->GetValidationCompletionTime() > pb->GetValidationCompletionTime()) {
+        if (paValidationCompletionTime > pbValidationCompletionTime)
+        {
             return true;
         }
 
