@@ -1824,7 +1824,8 @@ static void HandleOrphanAndRejectedP2PTxns(
         uint64_t nMaxOrphanTxnsSize{
             GlobalConfig::GetConfig().GetMaxOrphanTxSize()
         };
-        unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsSize(nMaxOrphanTxnsSize);
+        uint64_t nMaxOrphanTxnHysteresis { nMaxOrphanTxnsSize / 10 }; // 10% seems to work fine
+        unsigned int nEvicted = handlers.mpOrphanTxns->limitTxnsSize(nMaxOrphanTxnsSize, nMaxOrphanTxnHysteresis);
         if (nEvicted > 0) {
             LogPrint(BCLog::MEMPOOL,
                     "%s: mapOrphan overflow, removed %u tx\n",

@@ -157,17 +157,17 @@ BOOST_AUTO_TEST_CASE(test_orphantxns_limit_txns_size) {
     // Check txns count
     BOOST_CHECK(orphanTxns->getTxnsNumber() == nTxnsNumber);
     // Test limit function: (each generated transaction is 86 bytes long)
-    orphanTxns->limitTxnsSize(86000);
+    orphanTxns->limitTxnsSize(86000, 0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 1000);
-    orphanTxns->limitTxnsSize(860);
+    orphanTxns->limitTxnsSize(860, 0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 10);
-     orphanTxns->limitTxnsSize(859);
+     orphanTxns->limitTxnsSize(859, 0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 9);
-    orphanTxns->limitTxnsSize(86);
+    orphanTxns->limitTxnsSize(86, 0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 1);
-    orphanTxns->limitTxnsSize(85);
+    orphanTxns->limitTxnsSize(85, 0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 0);
-    orphanTxns->limitTxnsSize(0);
+    orphanTxns->limitTxnsSize(0, 0);
     BOOST_CHECK(orphanTxns->getTxnsNumber() == 0);
 }
 

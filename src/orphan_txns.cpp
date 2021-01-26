@@ -48,6 +48,7 @@ void COrphanTxns::addTxn(const TxInputDataSPtr& pTxInputData) {
             }
             addToCompactExtraTxns(ptx);
         }
+        mUntrimmedSize += sz;
         auto ret = mOrphanTxns.emplace(
             txid, COrphanTxnEntry{pTxInputData, GetTime() + ORPHAN_TX_EXPIRE_TIME, sz});
         assert(ret.second);
@@ -149,14 +150,37 @@ CompactExtraTxnsVec COrphanTxns::getCompactExtraTxns() const {
 }
 
 unsigned int COrphanTxns::limitTxnsSize(uint64_t nMaxOrphanTxnsSize,
-                                          bool fSkipRndEviction) {
+                                        uint64_t nMaxOrphanTxnsHysteresis,
+                                        bool fSkipRndEviction) {
     unsigned int nEvicted {0};
     uint64_t nOrphanTxnsSize {0};
     int64_t nNow {0};
     int64_t nMinExpTime {0};
     int nErasedTimeLimit {0};
+    assert(nMaxOrphanTxnsHysteresis <= nMaxOrphanTxnsSize);
+    if ( mUntrimmedSize < nMaxOrphanTxnsHysteresis ) {
+        // exit early while we're below the hysteresis
+        return 0;
+    }
     {
         std::unique_lock lock {mOrphanTxnsMtx};
+        if ( mUntrimmedSize < nMaxOrphanTxnsHysteresis ) {
+            // we lost the race, exit early
+            return 0;
+        } else {
+            // mUntrimmedSize is only read outside the lock, we are not losing any updates
+            mUntrimmedSize = 0;
+        }
+        // this algo is really expensive in terms of number of entries, not the number
+        // of entries removed. Calling it per transaction kills paralelism.
+        // Trim more than requested to make headroom for skipping it in further calls, see above.
+        nMaxOrphanTxnsSize -= nMaxOrphanTxnsHysteresis;
+
+        // TODO: Replace the following loop with two separate dedicated data structures:
+        //       a good timer wheel to track expiry
+        //       move the accounting of size to add and remove so it's always up-to-date
+        // Note: it is too early to do this optimisation now as there are much bigger bottlenecks
+        // in the code so no JIRA is created for this for now.
         nNow = GetTime();
         nMinExpTime = nNow + ORPHAN_TX_EXPIRE_TIME - ORPHAN_TX_EXPIRE_INTERVAL;
         // Sweep out expired orphan pool entries:
