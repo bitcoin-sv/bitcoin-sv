@@ -146,7 +146,7 @@ BOOST_AUTO_TEST_CASE(merkle_test) {
             // If no mutation was done (once for every ntx value), try up to 16
             // branches.
             if (mutate == 0) {
-                for (size_t loop = 0; loop < std::min(ntx, size_t{16}; loop++) {
+                for (size_t loop = 0; loop < std::min(ntx, size_t{16}); loop++) {
                     // If ntx <= 16, try all branches. Otherwise, try 16 random
                     // ones.
                     size_t mtx = loop;
