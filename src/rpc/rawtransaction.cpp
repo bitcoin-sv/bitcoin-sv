@@ -347,8 +347,7 @@ static CBlockIndex* GetBlockIndex(const Config& config,
  */
 static std::unique_ptr<CBlockStreamReader<CFileReader>>  GetBlockStream(CBlockIndex& pblockindex)
 {
-    auto stream =
-        BlockFileAccess::GetDiskBlockStreamReader(pblockindex.GetBlockPos());
+    auto stream = pblockindex.GetDiskBlockStreamReader();
     if (!stream)
     {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");

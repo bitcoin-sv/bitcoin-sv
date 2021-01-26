@@ -12,7 +12,6 @@
 #endif
 
 #include "amount.h"
-#include "blockstreams.h"
 #include "blockvalidation.h"
 #include "chain.h"
 #include "coins.h"
@@ -954,13 +953,6 @@ public:
     const CTransaction* GetTransaction() const { return ptxTo; }
 };
 
-std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata=false);
-std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
-    CBlockIndex& index,
-    int networkVersion);
-std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& index);
-void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata);
 /** Functions for validating blocks and updating the block tree */
 
 /**

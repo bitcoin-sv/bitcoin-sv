@@ -1734,9 +1734,8 @@ CBlockIndex *CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart,
     }
 
     while (pindex) {
-        
-        auto stream =
-            BlockFileAccess::GetDiskBlockStreamReader(pindex->GetBlockPos());
+
+        auto stream = pindex->GetDiskBlockStreamReader();
 
         if (stream)
         {

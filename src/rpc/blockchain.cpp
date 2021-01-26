@@ -1251,7 +1251,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
             throw block_parse_error("Block not available (pruned data)");
         }
 
-        stream = StreamSyncBlockFromDisk(blockIndex);
+        stream = blockIndex.StreamSyncBlockFromDisk();
         if (!stream) 
         {
             // Block not found on disk. This could be because we have the block
@@ -1336,7 +1336,7 @@ void writeBlockChunksAndUpdateMetadata(bool isHexEncoded, HTTPRequest &req,
     if (!hasDiskBlockMetaData)
     {
         hasher.Finalize(reinterpret_cast<uint8_t *>(&metadata.diskDataHash));
-        SetBlockIndexFileMetaDataIfNotSet(blockIndex, metadata);
+        blockIndex.SetBlockIndexFileMetaDataIfNotSet(metadata);
     }
 
     // RPC requests have additional layer around the actual response 
@@ -1373,10 +1373,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
             diskBlockMetaData = blockIndex.GetDiskBlockMetaData();
         }
 
-        reader =
-            BlockFileAccess::GetDiskBlockStreamReader(
-                blockIndex.GetBlockPos(),
-                !hasDiskBlockMetaData);
+        reader = blockIndex.GetDiskBlockStreamReader(!hasDiskBlockMetaData);
     }
 
     if (!reader) 
@@ -1423,7 +1420,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     if (!diskBlockMetaData.has_value() && reader->EndOfStream())
     {
         diskBlockMetaData = reader->getDiskBlockMetadata();
-        SetBlockIndexFileMetaDataIfNotSet(blockIndex, diskBlockMetaData.value());
+        blockIndex.SetBlockIndexFileMetaDataIfNotSet(diskBlockMetaData.value());
     }
     headerBlockToJSON(config, header, &blockIndex, diskBlockMetaData, confirmations, nextBlockHash, jWriter);
 
@@ -3103,7 +3100,7 @@ UniValue getblockstats_impl(const Config &config,
         throw JSONRPCError(RPC_MISC_ERROR, "Block not available (pruned data)");
     }
 
-    auto stream = StreamSyncBlockFromDisk(*pindex);
+    auto stream = pindex->StreamSyncBlockFromDisk();
     if (!stream) {
         // Block not found on disk. This could be because we have the block
         // header in our index but don't have the block (for example if a
@@ -3112,8 +3109,7 @@ UniValue getblockstats_impl(const Config &config,
         throw JSONRPCError(RPC_MISC_ERROR, "Block not found on disk");
     }
 
-    auto reader =
-        BlockFileAccess::GetDiskBlockStreamReader(pindex->GetBlockPos(), false);
+    auto reader = pindex->GetDiskBlockStreamReader(false);
     if (!reader)
     {
         assert(!"cannot load block from disk");

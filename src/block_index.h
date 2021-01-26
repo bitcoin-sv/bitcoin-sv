@@ -19,8 +19,12 @@
 #include <shared_mutex>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 
 struct CBlockIndexWorkComparator;
+
+template<typename Reader>
+class CBlockStreamReader;
 
 /**
  * Maximum amount of time that a block timestamp is allowed to exceed the
@@ -229,10 +233,10 @@ public:
     //! Which # file this block is stored in (blk?????.dat)
     int nFile{ 0 };
 
+private:
     //! Byte offset within blk?????.dat where this block's data is stored
     unsigned int nDataPos{ 0 };
 
-private:
     //! Byte offset within rev?????.dat where this block's undo data is stored
     unsigned int nUndoPos{ 0 };;
 
@@ -307,11 +311,14 @@ public:
         mValidationCompletionTime = other.mValidationCompletionTime;
     }
 
-    CDiskBlockPos GetBlockPos() const {
-        if (nStatus.hasData()) {
-            return { nFile, nDataPos };
-        }
-        return {};
+    /**
+    * TODO: This method should become private.
+    */
+    CDiskBlockPos GetBlockPos() const
+    {
+        std::lock_guard lock(blockIndexMutex);
+
+        return GetBlockPosNL();
     }
 
     CDiskBlockMetaData GetDiskBlockMetaData() const {return mDiskBlockMetaData;}
@@ -580,6 +587,19 @@ public:
     bool ReadBlockFromDisk(CBlock &block,
                             const Config &config) const;
 
+    void SetBlockIndexFileMetaDataIfNotSet(CDiskBlockMetaData metadata);
+
+    std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+                            bool calculateDiskBlockMetadata=false) const;
+
+    // Same as above except that pos is obtained from pindex and some additional checks are performed
+    std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
+                            const Config &config, bool calculateDiskBlockMetadata=false) const;
+
+    std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(int networkVersion);
+
+    std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk();
+
     friend class CDiskBlockIndex;
 protected:
     CDiskBlockMetaData mDiskBlockMetaData;
@@ -619,6 +639,9 @@ private:
             && mValidationCompletionTime == SteadyClockTimePoint::max();
     }
 
+    bool PopulateBlockIndexBlockDiskMetaData(FILE* file,
+                            int networkVersion);
+
     CDiskBlockPos GetUndoPosNL() const
     {
        if (nStatus.hasUndo()) {
@@ -637,6 +660,14 @@ private:
         assert(pprev);
         return pprev->nSoftRejected > 0; // NOTE: Parent block makes this one soft rejected only if it affects one or more blocks after it.
                                          //       If this value is 0 or -1, this block is not soft rejected because of its parent.
+    }
+    
+    CDiskBlockPos GetBlockPosNL() const
+    {
+        if (nStatus.hasData()) {
+            return { nFile, nDataPos };
+        }
+        return {};
     }
 
     mutable std::mutex blockIndexMutex;

@@ -1022,9 +1022,9 @@ static bool SendCompactBlock(
     const CNodePtr& node,
     CConnman& connman,
     const CNetMsgMaker msgMaker,
-    const CDiskBlockPos& pos)
+    const CBlockIndex& index)
 {
-    auto reader = BlockFileAccess::GetDiskBlockStreamReader(pos);
+    auto reader = index.GetDiskBlockStreamReader();
     if (!reader) {
         assert(!"cannot load block from disk");
     }
@@ -1048,7 +1048,7 @@ static void SendBlock(
     CConnman& connman,
     CBlockIndex& index)
 {
-    auto stream = StreamBlockFromDisk(index, pfrom->GetSendVersion());
+    auto stream = index.StreamBlockFromDisk(pfrom->GetSendVersion());
 
     if (!stream)
     {
@@ -1076,14 +1076,14 @@ static void SendUnseenTransactions(
     CConnman& connman,
     const CNodePtr& pfrom,
     const CNetMsgMaker msgMaker,
-    const CDiskBlockPos& pos)
+    const CBlockIndex& index)
 {
     if (vOrderedUnseenTransactions.empty())
     {
         return;
     }
 
-    auto stream = BlockFileAccess::GetDiskBlockStreamReader(pos);
+    auto stream = index.GetDiskBlockStreamReader();
     if (!stream) {
         assert(!"can not load block from disk");
     }
@@ -1224,8 +1224,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             *mi->second);
                     } else if (inv.type == MSG_FILTERED_BLOCK) {
                         auto stream =
-                            BlockFileAccess::GetDiskBlockStreamReader(
-                                mi->second->GetBlockPos());
+                            mi->second->GetDiskBlockStreamReader();
                         if (!stream) {
                             assert(!"can not load block from disk");
                         }
@@ -1260,7 +1259,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                                 connman,
                                 pfrom,
                                 msgMaker,
-                                mi->second->GetBlockPos());
+                                *mi->second);
                         }
                         // else
                         // no response
@@ -1280,7 +1279,7 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                                 pfrom,
                                 connman,
                                 msgMaker,
-                                mi->second->GetBlockPos());
+                                *mi->second);
                             if (!sent)
                             {
                                 break;
@@ -2247,7 +2246,7 @@ static void ProcessGetBlockTxnMessage(const Config& config,
     }
 
     // Create stream reader object that will be used to read block from disk.
-    auto block_stream_reader = GetDiskBlockStreamReader(it->second, config, false); // Disk block meta-data is not needed and does not need to be calculated.
+    auto block_stream_reader = it->second->GetDiskBlockStreamReader(config, false); // Disk block meta-data is not needed and does not need to be calculated.
     assert(block_stream_reader); // It must always be possible to read a valid block from disk if block was found in block index.
 
     // Number of transactions in block
@@ -4014,7 +4013,7 @@ void SendBlockHeaders(const Config &config, const CNodePtr& pto, CConnman &connm
                     pto,
                     connman,
                     msgMaker,
-                    pBestIndex->GetBlockPos());
+                    *pBestIndex);
             }
             state->pindexBestHeaderSent = pBestIndex;
         }

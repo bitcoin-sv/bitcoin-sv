@@ -543,8 +543,8 @@ CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockInd
         /* Merkle Tree of this block was not found or cannot be read from data files on disk.
          * Calculate it from block stream and store it to the disk.
          */
-        auto stream =
-            BlockFileAccess::GetDiskBlockStreamReader(blockIndex.GetBlockPos());
+        auto stream = blockIndex.GetDiskBlockStreamReader();
+
         if (!stream)
         {
             // This should be handled by the caller - block cannot be read from the disk

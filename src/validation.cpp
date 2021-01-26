@@ -2072,7 +2072,7 @@ bool GetTransaction(const Config &config, const TxId &txid,
     }
 
     if (pindexSlow) {
-        if (auto blockStreamReader=GetDiskBlockStreamReader(pindexSlow, config)) {
+        if (auto blockStreamReader=pindexSlow->GetDiskBlockStreamReader(config)) {
             while (!blockStreamReader->EndOfStream()) {
                 const CTransaction* tx = blockStreamReader->ReadTransaction_NoThrow();
                 if(!tx)
@@ -2112,158 +2112,6 @@ unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize)
     {
         return 8; // 4 bytes disk magic + 4 bytes block size 
     }
-}
-
-void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata)
-{
-    LOCK(cs_main);
-    if (!index.nStatus.hasDiskBlockMetaData()) 
-    {
-        if (!index.nStatus.hasData())
-        {
-            LogPrintf("Block index file metadata for block %s will not be set, because disk block data was pruned while processing block.\n", index.GetBlockHash().ToString());
-            return;
-        }
-        LogPrintf("Setting block index file metadata for block %s\n", index.GetBlockHash().ToString());
-        index.SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
-        setDirtyBlockIndex.insert(&index);
-    }
-}
-
-std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata)
-{
-    std::unique_ptr<CBlockStreamReader<CFileReader>> blockStreamReader;
-    try
-    {
-        blockStreamReader =
-            BlockFileAccess::GetDiskBlockStreamReader(
-                pindex->GetBlockPos(),
-                calculateDiskBlockMetadata);
-    }
-    catch(const std::exception& e)
-    {
-        error("GetDiskBlockStreamReader(CBlockIndex*): Deserialize or I/O error - %s at %s",
-            e.what(), pindex->GetBlockPos().ToString());
-        return {};
-    }
-
-    if (!blockStreamReader)
-    {
-        return {};
-    }
-
-    if (!CheckProofOfWork(blockStreamReader->GetBlockHeader().GetHash(), blockStreamReader->GetBlockHeader().nBits, config))
-    {
-        error("GetDiskBlockStreamReader(CBlockIndex*): Errors in block header at %s",
-            pindex->GetBlockPos().ToString());
-        return {};
-    }
-
-    if (blockStreamReader->GetBlockHeader().GetHash() != pindex->GetBlockHash())
-    {
-        error("GetDiskBlockStreamReader(CBlockIndex*): GetHash() doesn't match index for %s at %s",
-            pindex->ToString(), pindex->GetBlockPos().ToString());
-        return {};
-    }
-
-    return blockStreamReader;
-}
-
-static bool PopulateBlockIndexBlockDiskMetaData(
-    FILE* file,
-    CBlockIndex& index,
-    int networkVersion)
-{
-    AssertLockHeld(cs_main);
-
-    CBlockStream stream{
-        CNonOwningFileReader{file},
-        CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
-        CStreamVersionAndType{SER_NETWORK, networkVersion}};
-    CHash256 hasher;
-    uint256 hash;
-    size_t size = 0;
-
-    do
-    {
-        auto chunk = stream.Read(4096);
-        hasher.Write(chunk.Begin(), chunk.Size());
-        size += chunk.Size();
-    } while(!stream.EndOfStream());
-
-    hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
-
-    SetBlockIndexFileMetaDataIfNotSet(index, CDiskBlockMetaData{hash, size});
-
-    if(fseek(file, index.GetBlockPos().Pos(), SEEK_SET) != 0)
-    {
-        // this should never happen but for some odd reason we aren't
-        // able to rewind the file pointer back to the beginning
-        return false;
-    }
-
-    return true;
-}
-
-std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
-    CBlockIndex& index,
-    int networkVersion)
-{
-    AssertLockHeld(cs_main);
-
-    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos()) };
-
-    if (!file)
-    {
-        return {}; // could not open a stream
-    }
-
-    if (!index.nStatus.hasDiskBlockMetaData())
-    {
-        if (!PopulateBlockIndexBlockDiskMetaData(file.get(), index, networkVersion))
-        {
-            return {};
-        }
-    }
-
-    assert(index.GetDiskBlockMetaData().diskDataSize > 0);
-    assert(!index.GetDiskBlockMetaData().diskDataHash.IsNull());
-
-    // We expect that block data on disk is in same format as data sent over the
-    // network. If this would change in the future then CBlockStream would need
-    // to be used to change the resulting fromat.
-    return
-        std::make_unique<CFixedSizeStream<CAsyncFileReader>>(
-            index.GetDiskBlockMetaData().diskDataSize,
-            CAsyncFileReader{std::move(file)});
-}
-
-
-std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& index)
-{
-    AssertLockHeld(cs_main);
-
-    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos()) };
-
-    if (!file)
-    {
-        return {}; // could not open a stream
-    }
-
-    if (index.nStatus.hasDiskBlockMetaData())
-    {
-        return
-            std::make_unique<CSyncFixedSizeStream<CFileReader>>(
-                index.GetDiskBlockMetaData().diskDataSize,
-                CFileReader{std::move(file)});
-    }
-
-    return 
-        std::make_unique<CBlockStream<CFileReader>>(
-            CFileReader{std::move(file)},
-            CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
-            CStreamVersionAndType{SER_NETWORK, PROTOCOL_VERSION});
 }
 
 Amount GetBlockSubsidy(int32_t nHeight, const Consensus::Params &consensusParams) {
@@ -6460,7 +6308,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
 static bool RollforwardBlock(const CBlockIndex *pindex, CoinsDBSpan &inputs,
                              const Config &config) {
     // TODO: merge with ConnectBlock
-    auto blockStreamReader = GetDiskBlockStreamReader(pindex, config);
+    auto blockStreamReader = pindex->GetDiskBlockStreamReader(config);
     if (!blockStreamReader) {
         return error("ReplayBlock(): GetDiskBlockStreamReader(CBlockIndex) failed at %d, hash=%s",
                      pindex->nHeight, pindex->GetBlockHash().ToString());

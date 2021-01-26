@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
 
     // check that blockIndex was updated with disk content size and hash data
     {
-        auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
+        auto stream = index.StreamBlockFromDisk(INIT_PROTO_VERSION);
 
         BOOST_REQUIRE( stream );
 
@@ -144,7 +144,7 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
         index.SetDiskBlockMetaData(randomHash, 1);
 
         auto streamCorruptMetaData =
-            StreamBlockFromDisk(index, INIT_PROTO_VERSION);
+            index.StreamBlockFromDisk(INIT_PROTO_VERSION);
         auto metaData = index.GetDiskBlockMetaData();
         BOOST_REQUIRE_EQUAL(metaData.diskDataSize, 1);
         BOOST_REQUIRE_EQUAL(
@@ -173,7 +173,7 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
     std::vector<uint8_t> expectedSerializedData{Serialize(block)};
 
     LOCK(cs_main);
-    auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
+    auto stream = index.StreamBlockFromDisk(INIT_PROTO_VERSION);
 
     BOOST_REQUIRE( stream );
 

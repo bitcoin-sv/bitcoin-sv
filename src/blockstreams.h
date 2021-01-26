@@ -5,9 +5,10 @@
 #define BITCOIN_BLOCKSTREAMS_H
 
 #include "primitives/block.h"
+#include "block_index.h"
 #include "consensus/consensus.h"
+#include "disk_block_pos.h"
 #include "streams.h"
-#include "chain.h"
 #include "hash.h"
 #include "util.h"
 
