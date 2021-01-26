@@ -33,8 +33,8 @@ static constexpr unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
  */
 namespace BlockFileAccess
 {
-    UniqueCFile GetBlockFile( int fileNo );
-    UniqueCFile GetBlockFile( const CDiskBlockPos& pos );
+    UniqueCFile OpenBlockFile( int fileNo );
+    UniqueCFile OpenBlockFile( const CDiskBlockPos& pos );
     bool RemoveFile( int fileNo );
 
     bool ReadBlockFromDisk(

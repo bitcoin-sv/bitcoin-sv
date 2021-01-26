@@ -2284,7 +2284,7 @@ std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
 {
     AssertLockHeld(cs_main);
 
-    UniqueCFile file{ BlockFileAccess::GetBlockFile(index.GetBlockPos()) };
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos()) };
 
     if (!file)
     {
@@ -2316,7 +2316,7 @@ std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& ind
 {
     AssertLockHeld(cs_main);
 
-    UniqueCFile file{ BlockFileAccess::GetBlockFile(index.GetBlockPos()) };
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos()) };
 
     if (!file)
     {
@@ -6194,7 +6194,7 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
         }
     }
     for (const int i : setBlkDataFiles) {
-        if (auto file = BlockFileAccess::GetBlockFile( i ); file == nullptr)
+        if (auto file = BlockFileAccess::OpenBlockFile( i ); file == nullptr)
         {
             return false;
         }
@@ -6697,7 +6697,7 @@ void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& 
     
     int nFile = 0;
     while (true) {
-        UniqueCFile file = BlockFileAccess::GetBlockFile( nFile );
+        UniqueCFile file = BlockFileAccess::OpenBlockFile( nFile );
         if (file == nullptr)
         {
             // No block files left to reindex or an error occurred.
