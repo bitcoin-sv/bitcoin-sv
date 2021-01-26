@@ -639,8 +639,10 @@ private:
             && mValidationCompletionTime == SteadyClockTimePoint::max();
     }
 
-    bool PopulateBlockIndexBlockDiskMetaData(FILE* file,
+    bool PopulateBlockIndexBlockDiskMetaDataNL(FILE* file,
                             int networkVersion);
+
+    void SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData metadata);
 
     CDiskBlockPos GetUndoPosNL() const
     {

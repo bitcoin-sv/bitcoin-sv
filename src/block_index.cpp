@@ -223,54 +223,51 @@ bool CBlockIndex::ReadBlockFromDisk(CBlock &block,
     return true;
 }
 
-static void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata)
+void CBlockIndex::SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData metadata)
 {
     LOCK(cs_main);
-    if (!index.nStatus.hasDiskBlockMetaData())
+    if (!nStatus.hasDiskBlockMetaData())
     {
-        if (!index.nStatus.hasData())
+        if (!nStatus.hasData())
         {
-            LogPrintf("Block index file metadata for block %s will not be set, because disk block data was pruned while processing block.\n", index.GetBlockHash().ToString());
+            LogPrintf("Block index file metadata for block %s will not be set, because disk block data was pruned while processing block.\n", GetBlockHash().ToString());
             return;
         }
-        LogPrintf("Setting block index file metadata for block %s\n", index.GetBlockHash().ToString());
-        index.SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
-        setDirtyBlockIndex.insert(&index);
+        LogPrintf("Setting block index file metadata for block %s\n", GetBlockHash().ToString());
+        SetDiskBlockMetaData(std::move(metadata.diskDataHash), metadata.diskDataSize);
+        setDirtyBlockIndex.insert(this);
     }
 }
 
 void CBlockIndex::SetBlockIndexFileMetaDataIfNotSet(CDiskBlockMetaData metadata)
 {
-    return ::SetBlockIndexFileMetaDataIfNotSet(*this, metadata);
-}
-
-static std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CBlockIndex& pindex, bool calculateDiskBlockMetadata)
-{
-    return
-        BlockFileAccess::GetDiskBlockStreamReader(
-                pindex.GetBlockPos(),
-                calculateDiskBlockMetadata);
+    std::lock_guard lock{ blockIndexMutex };
+    SetBlockIndexFileMetaDataIfNotSetNL(metadata);
 }
 
 std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStreamReader(
     bool calculateDiskBlockMetadata) const
 {
-    return ::GetDiskBlockStreamReader(*this, calculateDiskBlockMetadata);
+    std::lock_guard lock{ blockIndexMutex };
+    return
+        BlockFileAccess::GetDiskBlockStreamReader(
+                GetBlockPosNL(),
+                calculateDiskBlockMetadata);
 }
 
-static std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CBlockIndex& pindex, const Config &config, bool calculateDiskBlockMetadata)
+std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStreamReader(
+    const Config &config, bool calculateDiskBlockMetadata) const
 {
+    std::lock_guard lock{ blockIndexMutex };
     std::unique_ptr<CBlockStreamReader<CFileReader>> blockStreamReader;
     try
     {
-        blockStreamReader = BlockFileAccess::GetDiskBlockStreamReader(pindex.GetBlockPos(), calculateDiskBlockMetadata);
+        blockStreamReader = BlockFileAccess::GetDiskBlockStreamReader(GetBlockPosNL(), calculateDiskBlockMetadata);
     }
     catch(const std::exception& e)
     {
         error("GetDiskBlockStreamReader(CBlockIndex*): Deserialize or I/O error - %s at %s",
-            e.what(), pindex.GetBlockPos().ToString());
+            e.what(), GetBlockPosNL().ToString());
         return {};
     }
 
@@ -282,29 +279,22 @@ static std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader
     if (!CheckProofOfWork(blockStreamReader->GetBlockHeader().GetHash(), blockStreamReader->GetBlockHeader().nBits, config))
     {
         error("GetDiskBlockStreamReader(CBlockIndex*): Errors in block header at %s",
-            pindex.GetBlockPos().ToString());
+            GetBlockPosNL().ToString());
         return {};
     }
 
-    if (blockStreamReader->GetBlockHeader().GetHash() != pindex.GetBlockHash())
+    if (blockStreamReader->GetBlockHeader().GetHash() != GetBlockHash())
     {
         error("GetDiskBlockStreamReader(CBlockIndex*): GetHash() doesn't match index for %s at %s",
-            pindex.ToString(), pindex.GetBlockPos().ToString());
+            ToString(), GetBlockPosNL().ToString());
         return {};
     }
 
     return blockStreamReader;
 }
 
-std::unique_ptr<CBlockStreamReader<CFileReader>> CBlockIndex::GetDiskBlockStreamReader(
-    const Config &config, bool calculateDiskBlockMetadata) const
-{
-    return ::GetDiskBlockStreamReader(*this, config, calculateDiskBlockMetadata);
-}
-
-static bool PopulateBlockIndexBlockDiskMetaData(
+bool CBlockIndex::PopulateBlockIndexBlockDiskMetaDataNL(
     FILE* file,
-    CBlockIndex& index,
     int networkVersion)
 {
     AssertLockHeld(cs_main);
@@ -326,9 +316,9 @@ static bool PopulateBlockIndexBlockDiskMetaData(
 
     hasher.Finalize(reinterpret_cast<uint8_t*>(&hash));
 
-    SetBlockIndexFileMetaDataIfNotSet(index, CDiskBlockMetaData{hash, size});
+    SetBlockIndexFileMetaDataIfNotSetNL(CDiskBlockMetaData{hash, size});
 
-    if(fseek(file, index.GetBlockPos().Pos(), SEEK_SET) != 0)
+    if(fseek(file, GetBlockPosNL().Pos(), SEEK_SET) != 0)
     {
         // this should never happen but for some odd reason we aren't
         // able to rewind the file pointer back to the beginning
@@ -338,68 +328,54 @@ static bool PopulateBlockIndexBlockDiskMetaData(
     return true;
 }
 
-bool CBlockIndex::PopulateBlockIndexBlockDiskMetaData(
-    FILE* file,
+std::unique_ptr<CForwardAsyncReadonlyStream> CBlockIndex::StreamBlockFromDisk(
     int networkVersion)
 {
-    return ::PopulateBlockIndexBlockDiskMetaData(file, *this, networkVersion);
-}
-
-static std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
-    CBlockIndex& index,
-    int networkVersion)
-{
+    std::lock_guard lock{ blockIndexMutex };
     AssertLockHeld(cs_main);
 
-    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos()) };
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(GetBlockPosNL()) };
 
     if (!file)
     {
         return {}; // could not open a stream
     }
 
-    if (!index.nStatus.hasDiskBlockMetaData())
+    if (!nStatus.hasDiskBlockMetaData())
     {
-        if (!PopulateBlockIndexBlockDiskMetaData(file.get(), index, networkVersion))
+        if (!PopulateBlockIndexBlockDiskMetaDataNL(file.get(), networkVersion))
         {
             return {};
         }
     }
 
-    assert(index.GetDiskBlockMetaData().diskDataSize > 0);
-    assert(!index.GetDiskBlockMetaData().diskDataHash.IsNull());
+    assert(GetDiskBlockMetaData().diskDataSize > 0);
+    assert(!GetDiskBlockMetaData().diskDataHash.IsNull());
 
     // We expect that block data on disk is in same format as data sent over the
     // network. If this would change in the future then CBlockStream would need
     // to be used to change the resulting fromat.
     return
         std::make_unique<CFixedSizeStream<CAsyncFileReader>>(
-            index.GetDiskBlockMetaData().diskDataSize,
+            GetDiskBlockMetaData().diskDataSize,
             CAsyncFileReader{std::move(file)});
 }
 
-std::unique_ptr<CForwardAsyncReadonlyStream> CBlockIndex::StreamBlockFromDisk(
-    int networkVersion)
+std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk()
 {
-    return ::StreamBlockFromDisk(*this, networkVersion);
-}
-
-static std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& index)
-{
-    AssertLockHeld(cs_main);
-
-    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos()) };
+    std::lock_guard lock{ blockIndexMutex };
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(GetBlockPosNL()) };
 
     if (!file)
     {
         return {}; // could not open a stream
     }
 
-    if (index.nStatus.hasDiskBlockMetaData())
+    if (nStatus.hasDiskBlockMetaData())
     {
         return
             std::make_unique<CSyncFixedSizeStream<CFileReader>>(
-                index.GetDiskBlockMetaData().diskDataSize,
+                GetDiskBlockMetaData().diskDataSize,
                 CFileReader{std::move(file)});
     }
 
@@ -408,9 +384,4 @@ static std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockInd
             CFileReader{std::move(file)},
             CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
             CStreamVersionAndType{SER_NETWORK, PROTOCOL_VERSION});
-}
-
-std::unique_ptr<CForwardReadonlyStream> CBlockIndex::StreamSyncBlockFromDisk()
-{
-    return ::StreamSyncBlockFromDisk(*this);
 }
