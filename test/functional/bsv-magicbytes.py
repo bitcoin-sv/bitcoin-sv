@@ -6,7 +6,7 @@ Check the P2P connection with magicbytes parameter.
 """
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import connect_nodes_bi, wait_until
 
 class MagicBytes(BitcoinTestFramework):
 
@@ -32,8 +32,8 @@ class MagicBytes(BitcoinTestFramework):
     def run_test(self):
 
         self.log.info("Testing connections with the same magicbytes")
-        assert(self.nodes[0].getconnectioncount() == 2)
-        assert(self.nodes[1].getconnectioncount() == 2)
+        wait_until(lambda: self.nodes[0].getconnectioncount() == 2)
+        wait_until(lambda: self.nodes[1].getconnectioncount() == 2)
 
         self.log.info("Testing connections with different magicbytes")
         self.extra_args = self._extra_args_diff
