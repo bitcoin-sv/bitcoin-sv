@@ -261,10 +261,12 @@ public:
         CDiskBlockMetaData metaData;
     };
 
+private:
     //! pointer to the hash of the block, if any. Memory is owned by this
     //! CBlockIndex
     const uint256* phashBlock{ nullptr };
 
+public:
     //! pointer to the index of the predecessor of this block
     CBlockIndex* pprev{ nullptr };
 
@@ -305,7 +307,6 @@ private:
     //! Verification status of this block. See enum BlockStatus
     BlockStatus nStatus;
 
-public:
     //! block header
     int32_t nVersion{ 0 };
     uint256 hashMerkleRoot;
@@ -313,13 +314,16 @@ public:
     uint32_t nBits{ 0 };
     uint32_t nNonce{ 0 };
 
+public:
     //! (memory only) Sequential id assigned to distinguish order in which
     //! blocks are received.
     int32_t nSequenceId{ 0 };
 
+private:
     //! (memory only) block header metadata
     uint64_t nTimeReceived{};
 
+public:
     //! (memory only) Maximum nTime in the chain upto and including this block.
     unsigned int nTimeMax{ 0 };
 
@@ -582,7 +586,7 @@ public:
 
     int32_t GetHeight() const { return nHeight; }
 
-    uint256 GetBlockHash() const { return *phashBlock; }
+    const uint256& GetBlockHash() const { return *phashBlock; }
 
     int64_t GetBlockTime() const { return int64_t(nTime); }
 
@@ -611,6 +615,9 @@ public:
                          end(block_times));
         return block_times[n];
     }
+
+    uint32_t GetNonce() const { return nNonce; }
+    const uint256& GetMerkleRoot() const { return hashMerkleRoot; }
 
     uint32_t GetBits() const
     {

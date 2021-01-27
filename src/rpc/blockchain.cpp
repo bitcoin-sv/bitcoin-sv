@@ -65,7 +65,7 @@ double GetDifficulty(const CBlockIndex *blockindex) {
         return 1.0;
     }
 
-    return GetDifficultyFromBits(blockindex->nBits);
+    return GetDifficultyFromBits(blockindex->GetBits());
 }
 
 int ComputeNextBlockAndDepthNL(const CBlockIndex* tip, const CBlockIndex* blockindex, std::optional<uint256>& nextBlockHash)
@@ -93,18 +93,17 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex,
     result.push_back(Pair("hash", blockindex->GetBlockHash().GetHex()));
     result.push_back(Pair("confirmations", confirmations));
     result.push_back(Pair("height", blockindex->nHeight));
-    result.push_back(Pair("version", blockindex->nVersion));
+    result.push_back(Pair("version", blockindex->GetVersion()));
     result.push_back(
-        Pair("versionHex", strprintf("%08x", blockindex->nVersion)));
-    result.push_back(Pair("merkleroot", blockindex->hashMerkleRoot.GetHex()));
+        Pair("versionHex", strprintf("%08x", blockindex->GetVersion())));
+    result.push_back(Pair("merkleroot", blockindex->GetMerkleRoot().GetHex()));
     if (blockindex->nTx > 0) {
         result.push_back(Pair("num_tx", uint64_t(blockindex->nTx)));
     }
-    result.push_back(Pair("time", int64_t(blockindex->nTime)));
-    result.push_back(
-        Pair("mediantime", int64_t(blockindex->GetMedianTimePast())));
-    result.push_back(Pair("nonce", uint64_t(blockindex->nNonce)));
-    result.push_back(Pair("bits", strprintf("%08x", blockindex->nBits)));
+    result.push_back(Pair("time", blockindex->GetBlockTime()));
+    result.push_back(Pair("mediantime", blockindex->GetMedianTimePast()));
+    result.push_back(Pair("nonce", uint64_t(blockindex->GetNonce())));
+    result.push_back(Pair("bits", strprintf("%08x", blockindex->GetBits())));
     result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
     result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
 
@@ -1434,7 +1433,7 @@ void headerBlockToJSON(const Config& config,
     jWriter.pushKV("merkleroot", blockHeader.hashMerkleRoot.GetHex());
     jWriter.pushKV("num_tx", uint64_t(blockindex->nTx));
     jWriter.pushKV("time", blockHeader.GetBlockTime());
-    jWriter.pushKV("mediantime", int64_t(blockindex->GetMedianTimePast()));
+    jWriter.pushKV("mediantime", blockindex->GetMedianTimePast());
     jWriter.pushKV("nonce", uint64_t(blockHeader.nNonce));
     jWriter.pushKV("bits", strprintf("%08x", blockHeader.nBits));
     jWriter.pushKV("difficulty", GetDifficulty(blockindex));
@@ -2140,7 +2139,7 @@ UniValue getblockchaininfo(const Config &config,
         Pair("bestblockhash", chainActive.Tip()->GetBlockHash().GetHex()));
     obj.push_back(Pair("difficulty", double(GetDifficulty(chainActive.Tip()))));
     obj.push_back(
-        Pair("mediantime", int64_t(chainActive.Tip()->GetMedianTimePast())));
+        Pair("mediantime", chainActive.Tip()->GetMedianTimePast()));
     obj.push_back(
         Pair("verificationprogress",
              GuessVerificationProgress(config.GetChainParams().TxData(),
@@ -2262,7 +2261,7 @@ UniValue getchaintips(const Config &config, const JSONRPCRequest &request) {
     for (const CBlockIndex *block : setTips) {
         UniValue obj(UniValue::VOBJ);
         obj.push_back(Pair("height", block->nHeight));
-        obj.push_back(Pair("hash", block->phashBlock->GetHex()));
+        obj.push_back(Pair("hash", block->GetBlockHash().GetHex()));
 
         const int branchLen =
             block->nHeight - chainActive.FindFork(block)->nHeight;
@@ -2805,7 +2804,7 @@ UniValue getchaintxstats(const Config &config, const JSONRPCRequest &request) {
     int nTxDiff = pindex->nChainTx - pindexPast->nChainTx;
 
     UniValue ret(UniValue::VOBJ);
-    ret.push_back(Pair("time", int64_t(pindex->nTime)));
+    ret.push_back(Pair("time", pindex->GetBlockTime()));
     ret.push_back(Pair("txcount", int64_t(pindex->nChainTx)));
     ret.push_back(Pair("window_block_count", blockcount));
     if (blockcount > 0) {

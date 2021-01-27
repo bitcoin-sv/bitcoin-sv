@@ -51,15 +51,15 @@ static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexPrev,
         const CBlockIndex *pindex = pindexPrev;
         while (pindex->pprev &&
                pindex->nHeight % params.DifficultyAdjustmentInterval() != 0 &&
-               pindex->nBits == nProofOfWorkLimit) {
+               pindex->GetBits() == nProofOfWorkLimit) {
             pindex = pindex->pprev;
         }
 
-        return pindex->nBits;
+        return pindex->GetBits();
     }
 
     // We can't go below the minimum, so bail early.
-    uint32_t nBits = pindexPrev->nBits;
+    uint32_t nBits = pindexPrev->GetBits();
     if (nBits == nProofOfWorkLimit) {
         return nProofOfWorkLimit;
     }
@@ -100,7 +100,7 @@ uint32_t GetNextWorkRequired(const CBlockIndex *pindexPrev,
 
     // Special rule for regtest: we never retarget.
     if (params.fPowNoRetargeting) {
-        return pindexPrev->nBits;
+        return pindexPrev->GetBits();
     }
 
     if (IsDAAEnabled(config, pindexPrev->nHeight)) {
@@ -116,7 +116,7 @@ uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexPrev,
     const Consensus::Params &params = config.GetChainParams().GetConsensus();
 
     if (params.fPowNoRetargeting) {
-        return pindexPrev->nBits;
+        return pindexPrev->GetBits();
     }
 
     // Limit adjustment step
@@ -132,7 +132,7 @@ uint32_t CalculateNextWorkRequired(const CBlockIndex *pindexPrev,
     // Retarget
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     arith_uint256 bnNew;
-    bnNew.SetCompact(pindexPrev->nBits);
+    bnNew.SetCompact(pindexPrev->GetBits());
     bnNew *= nActualTimespan;
     bnNew /= params.nPowTargetTimespan;
 
@@ -183,7 +183,7 @@ static arith_uint256 ComputeTarget(const CBlockIndex *pindexFirst,
     // In order to avoid difficulty cliffs, we bound the amplitude of the
     // adjustment we are going to do to a factor in [0.5, 2].
     int64_t nActualTimespan =
-        int64_t(pindexLast->nTime) - int64_t(pindexFirst->nTime);
+        pindexLast->GetBlockTime() - pindexFirst->GetBlockTime();
     if (nActualTimespan > 288 * params.nPowTargetSpacing) {
         nActualTimespan = 288 * params.nPowTargetSpacing;
     } else if (nActualTimespan < 72 * params.nPowTargetSpacing) {
@@ -218,15 +218,18 @@ static const CBlockIndex *GetSuitableBlock(const CBlockIndex *pindex) {
     blocks[0] = blocks[1]->pprev;
 
     // Sorting network.
-    if (blocks[0]->nTime > blocks[2]->nTime) {
+    if (blocks[0]->GetBlockTime() > blocks[2]->GetBlockTime())
+    {
         std::swap(blocks[0], blocks[2]);
     }
 
-    if (blocks[0]->nTime > blocks[1]->nTime) {
+    if (blocks[0]->GetBlockTime() > blocks[1]->GetBlockTime())
+    {
         std::swap(blocks[0], blocks[1]);
     }
 
-    if (blocks[1]->nTime > blocks[2]->nTime) {
+    if (blocks[1]->GetBlockTime() > blocks[2]->GetBlockTime())
+    {
         std::swap(blocks[1], blocks[2]);
     }
 

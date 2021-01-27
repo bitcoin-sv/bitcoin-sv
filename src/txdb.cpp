@@ -480,7 +480,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
             idx,
             insertBlockIndex(diskindex.GetHashPrev()));
 
-        if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits,
+        if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->GetBits(),
                               config)) {
             return error("LoadBlockIndex(): CheckProofOfWork failed: %s",
                          pindexNew->ToString());

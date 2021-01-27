@@ -2343,15 +2343,15 @@ void NotifySafeModeLevelChange(SafeModeLevel safeModeLevel, const CBlockIndex* p
         std::string warning =
             std::string("'Warning: Large-work fork detected, forking after "
                         "block ") +
-                        pindexForkBase->phashBlock->ToString() + std::string("'");
+                        pindexForkBase->GetBlockHash().ToString() + std::string("'");
         AlertNotify(warning);
         LogPrintf("%s: Warning: Large valid fork found\n  forking the "
                   "chain at height %d (%s)\n  lasting to height %d "
                   "(%s).\nChain state database corruption likely.\n",
                   __func__, pindexForkBase->nHeight,
-                  pindexForkBase->phashBlock->ToString(),
+                  pindexForkBase->GetBlockHash().ToString(),
                   pindexForkTip->nHeight,
-                  pindexForkTip->phashBlock->ToString());
+                  pindexForkTip->GetBlockHash().ToString());
         break;
     }
 }
@@ -3013,10 +3013,7 @@ static bool ConnectBlock(
     // applied to all blocks except the two in the chain that violate it. This
     // prevents exploiting the issue against nodes during their initial block
     // download.
-    bool fEnforceBIP30 = (!pindex->phashBlock) || // Enforce on CreateNewBlock
-                                                  // invocations which don't
-                                                  // have a hash.
-                         !((pindex->nHeight == 91842 &&
+    bool fEnforceBIP30 = !((pindex->nHeight == 91842 &&
                             pindex->GetBlockHash() ==
                                 uint256S("0x00000000000a4d0a398161ffc163c503763"
                                          "b1f4360639393e0e4c8e300e0caec")) ||
@@ -3557,8 +3554,8 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
         // upgrade:
         for (int i = 0; i < 100 && pindex != nullptr; i++) {
             int32_t nExpectedVersion = VERSIONBITS_TOP_BITS;
-            if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION &&
-                (pindex->nVersion & ~nExpectedVersion) != 0) {
+            if (pindex->GetVersion() > VERSIONBITS_LAST_OLD_BLOCK_VERSION &&
+                (pindex->GetVersion() & ~nExpectedVersion) != 0) {
                 ++nUpgraded;
             }
             pindex = pindex->pprev;
@@ -3572,7 +3569,7 @@ static void UpdateTip(const Config &config, CBlockIndex *pindexNew) {
     LogPrintf("%s: new best=%s height=%d version=0x%08x log2_work=%.8g tx=%lu "
               "date='%s' progress=%f cache=%.1fMiB(%utxo)",
               __func__, chainActive.Tip()->GetBlockHash().ToString(),
-              chainActive.Height(), chainActive.Tip()->nVersion,
+              chainActive.Height(), chainActive.Tip()->GetVersion(),
               log(chainActive.Tip()->nChainWork.getdouble()) / log(2.0),
               (unsigned long)chainActive.Tip()->nChainTx,
               DateTimeStrFormat("%Y-%m-%d %H:%M:%S",
@@ -4196,7 +4193,7 @@ static CBlockIndex* ConsiderBlockForMostWorkChain(
     const CBlockIndex& currentTip)
 {
     if(block.GetHash() == mostWork.GetBlockHash() ||
-       block.GetBlockHeader().hashPrevBlock != *currentTip.phashBlock)
+       block.GetBlockHeader().hashPrevBlock != currentTip.GetBlockHash())
     {
         return &mostWork;
     }
@@ -4206,7 +4203,7 @@ static CBlockIndex* ConsiderBlockForMostWorkChain(
     // if block is missing from the mapBlockIndex then treat it as code bug
     // since every new block should be added to index before getting here
     assert(it != mapBlockIndex.end());
-    assert(*it->second->pprev->phashBlock == block.GetBlockHeader().hashPrevBlock);
+    assert(it->second->pprev->GetBlockHash() == block.GetBlockHeader().hashPrevBlock);
 
     CBlockIndex* indexOfNewBlock = it->second;
 
@@ -4328,7 +4325,7 @@ bool ActivateBestChain(
                         " tip activation as a different activation is"
                         " already validating it's ancestor and moving"
                         " towards this block.\n",
-                        pindexMostWork->phashBlock->GetHex());
+                        pindexMostWork->GetBlockHash().GetHex());
 
                     break;
                 }
@@ -4353,7 +4350,7 @@ bool ActivateBestChain(
                         " validations are already running on siblings"
                         " - block will be re-considered if this branch is"
                         " built upon by subsequent accepted blocks.\n",
-                        pindexMostWork->phashBlock->GetHex());
+                        pindexMostWork->GetBlockHash().GetHex());
 
                     break;
                 }

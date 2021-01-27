@@ -127,7 +127,7 @@ static CBlockIndex* GetBlockIndex(
     BlockMap& blockIndexStore)
 {
     CBlockHeader header;
-    header.nTime = pindexPrev->nTime + nTimeInterval;
+    header.nTime = pindexPrev->GetBlockTime() + nTimeInterval;
     header.nBits = nBits;
     header.nNonce = blockIndexStore.size();
     header.hashPrevBlock = pindexPrev->GetBlockHash();

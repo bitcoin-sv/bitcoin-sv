@@ -64,6 +64,28 @@ struct CoinsDB::UnitTestAccess<miner_tests_uid>
 };
 using TestAccessCoinsDB = CoinsDB::UnitTestAccess<miner_tests_uid>;
 
+template <>
+struct CBlockIndex::UnitTestAccess<miner_tests_uid>
+{
+    UnitTestAccess() = delete;
+
+    static void SetTime( CBlockIndex& index, int64_t time)
+    {
+        index.nTime = time;
+    }
+
+    static void AddTime( CBlockIndex& index, int64_t time)
+    {
+        index.nTime += time;
+    }
+
+    static void SubTime( CBlockIndex& index, int64_t time)
+    {
+        index.nTime -= time;
+    }
+};
+using TestAccessCBlockIndex = CBlockIndex::UnitTestAccess<miner_tests_uid>;
+
 static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
 
 static struct {
@@ -288,9 +310,10 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
         // Trick the MedianTimePast.
         times[i] = chainActive.Tip()
                        ->GetAncestor(chainActive.Tip()->nHeight - i)
-                       ->nTime;
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime =
-            P2SH_ACTIVATION_TIME;
+                       ->GetBlockTime();
+        TestAccessCBlockIndex::SetTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            P2SH_ACTIVATION_TIME);
     }
 
     tx.vin[0].prevout = COutPoint(txFirst[0]->GetId(), 0);
@@ -320,8 +343,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     mempool.Clear();
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Restore the MedianTimePast.
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime =
-            times[i];
+        TestAccessCBlockIndex::SetTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            times[i]);
     }
 
     // Double spend txn pair in mempool, template creation fails.
@@ -470,8 +494,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime +=
-            512;
+        TestAccessCBlockIndex::AddTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            512);
     }
 
     {
@@ -484,8 +509,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
 
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Undo tricked MTP.
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime -=
-            512;
+        TestAccessCBlockIndex::SubTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            512);
     }
 
     // Absolute height locked.
@@ -596,8 +622,9 @@ void Test_CreateNewBlock_validity(TestingSetup& testingSetup)
     // mined.
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++) {
         // Trick the MedianTimePast.
-        chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime +=
-            512;
+        TestAccessCBlockIndex::AddTime(
+            *chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i),
+            512);
     }
     chainActive.Tip()->nHeight++;
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
