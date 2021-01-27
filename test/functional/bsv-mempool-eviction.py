@@ -61,6 +61,7 @@ class Evictions(BitcoinTestFramework):
         return tx
 
     def run_test(self):
+
         with self.run_node_with_connections("Eviction order test; fill the memppol over its size and see what txs will be evicted.",
                                             0, ["-blockmintxfee=0.00001", # 1 satoshi/byte
                                                 "-minrelaytxfee=0",
@@ -185,6 +186,59 @@ class Evictions(BitcoinTestFramework):
                 txs_in_mempool.add(tx)
                 txs_in_mempool.remove(evicting)
                 check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=0.5)
+
+        with self.run_node_with_connections("Restart the node with using the disk for storing transactions.",
+                                            0, ["-blockmintxfee=0.00001", # 1 satoshi/byte
+                                                "-minrelaytxfee=0",
+                                                "-maxmempool=300MB",
+                                                "-maxmempoolsizedisk=10MB",
+                                                "-genesisactivationheight=1",
+                                                '-maxstdtxvalidationduration=5000',
+                                                '-maxnonstdtxvalidationduration=5001',
+                                                '-maxstackmemoryusageconsensus=5MB',
+                                                '-maxstackmemoryusagepolicy=5MB',
+                                                '-maxscriptsizepolicy=5MB',
+                                                '-checkmempool=0',
+                                                ],
+                                            number_of_connections=1) as (conn,):
+
+            # check that we have all txs in the mempool
+            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1)
+
+            # check that we are not using the tx database
+            assert conn.rpc.getmempoolinfo()['usagedisk'] == 0
+
+            #now we have room for some more txs
+            for _ in range(3):
+                tx = self.create_tx([outpoint_to_spend, ], noutput=1, feerate=1, totalSize=ONE_MEGABYTE)
+                outpoint_to_spend = (tx, 0)
+                conn.send_message(msg_tx(tx))
+                txs_in_mempool.add(tx)
+                check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=0.5)
+
+            # make sure that we are using the tx database now
+            assert conn.rpc.getmempoolinfo()['usagedisk'] != 0
+
+        with self.run_node_with_connections("Restart the node once again to see if transaction were stored in the db.",
+                                            0, ["-blockmintxfee=0.00001", # 1 satoshi/byte
+                                                "-minrelaytxfee=0",
+                                                "-maxmempool=300MB",
+                                                "-maxmempoolsizedisk=10MB",
+                                                "-genesisactivationheight=1",
+                                                '-maxstdtxvalidationduration=5000',
+                                                '-maxnonstdtxvalidationduration=5001',
+                                                '-maxstackmemoryusageconsensus=5MB',
+                                                '-maxstackmemoryusagepolicy=5MB',
+                                                '-maxscriptsizepolicy=5MB',
+                                                '-checkmempool=0',
+                                                ],
+                                            number_of_connections=1) as (conn,):
+
+            # check that we have all txs in the mempool
+            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1)
+
+            # make sure that we are using the tx database
+            assert conn.rpc.getmempoolinfo()['usagedisk'] != 0
 
 
 

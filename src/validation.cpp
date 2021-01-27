@@ -6831,7 +6831,13 @@ void UnloadBlockIndex() {
     chainActive.SetTip(nullptr);
     pindexBestInvalid = nullptr;
     pindexBestHeader = nullptr;
-    mempool.Clear();
+    // FIXME: CORE-1253, CORE-1232
+    // Assumption: This is called only at startup before mempool.dat is restored.
+    // This is a quick fix for CORE-1253 to prevent wiping mempoolTxDB at
+    // startup, a more complete fix will be part of CORE-1232 work.
+    if (mempool.Size() > 0) {
+        mempool.Clear();
+    }
     mapBlocksUnlinked.clear();
     pBlockFileInfoStore->Clear();
     nBlockSequenceId = 1;
