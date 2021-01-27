@@ -98,10 +98,6 @@ static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 336;
 static const unsigned int DEFAULT_NONFINAL_MEMPOOL_EXPIRY = 4 * 7 * 24;
 /** The maximum size of a blk?????.dat file (since 0.8) */
 static const unsigned int DEFAULT_PREFERRED_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
-/** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
-static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
-/** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
-static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
 
 /** Maximum number of script-checking threads allowed */
 static const int MAX_SCRIPTCHECK_THREADS = 64;
@@ -467,14 +463,9 @@ unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize);
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 
 /**
- * Translation to a filesystem path.
- */
-fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
-
-/**
  * Import blocks from an external file.
  */
-bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
+bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                            CDiskBlockPos *dbp = nullptr);
 
 /** used for --reindex */
@@ -967,13 +958,9 @@ public:
 };
 
 /** Functions for disk access for blocks */
-bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
-                       const Config &config);
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config);
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CDiskBlockPos& pos, bool calculateDiskBlockMetadata=false);
-std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader( // Same as above except that pos is obtained from pindex and some additional checks are performed
     const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata=false);
 std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
     CBlockIndex& index,

@@ -454,8 +454,9 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
 
     // Cap last block file size, and mine new block in a new block file.
     CBlockIndex *oldTip = chainActive.Tip();
-    pBlockFileInfoStore->GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize =
-        DEFAULT_PREFERRED_BLOCKFILE_SIZE;
+    pBlockFileInfoStore
+        ->GetBlockFileInfo(oldTip->GetBlockPos().File())
+        ->AddNewBlock(1, 1, DEFAULT_PREFERRED_BLOCKFILE_SIZE);
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     CBlockIndex *newTip = chainActive.Tip();
 
@@ -470,7 +471,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup) {
     }
 
     // Prune the older block file.
-    UnlinkPrunedFiles({oldTip->GetBlockPos().nFile});
+    UnlinkPrunedFiles({oldTip->GetBlockPos().File()});
 
     // Verify ScanForWalletTransactions only picks transactions in the new block
     // file.

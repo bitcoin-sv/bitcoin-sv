@@ -7,6 +7,7 @@
 #include "addrman.h"
 #include "arith_uint256.h"
 #include "blockencodings.h"
+#include "block_file_access.h"
 #include "blockstreams.h"
 #include "chainparams.h"
 #include "clientversion.h"
@@ -1023,7 +1024,7 @@ static bool SendCompactBlock(
     const CNetMsgMaker msgMaker,
     const CDiskBlockPos& pos)
 {
-    auto reader = GetDiskBlockStreamReader(pos);
+    auto reader = BlockFileAccess::GetDiskBlockStreamReader(pos);
     if (!reader) {
         assert(!"cannot load block from disk");
     }
@@ -1082,7 +1083,7 @@ static void SendUnseenTransactions(
         return;
     }
 
-    auto stream = GetDiskBlockStreamReader(pos);
+    auto stream = BlockFileAccess::GetDiskBlockStreamReader(pos);
     if (!stream) {
         assert(!"can not load block from disk");
     }
@@ -1224,7 +1225,8 @@ static void ProcessGetData(const Config &config, const CNodePtr& pfrom,
                             *mi->second);
                     } else if (inv.type == MSG_FILTERED_BLOCK) {
                         auto stream =
-                            GetDiskBlockStreamReader(mi->second->GetBlockPos());
+                            BlockFileAccess::GetDiskBlockStreamReader(
+                                mi->second->GetBlockPos());
                         if (!stream) {
                             assert(!"can not load block from disk");
                         }

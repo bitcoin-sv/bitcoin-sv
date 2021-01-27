@@ -15,6 +15,7 @@
 #include "consensus/consensus.h"
 #include "consensus/merkle.h"
 #include "consensus/validation.h"
+#include "disk_tx_pos.h"
 #include "fs.h"
 #include "hash.h"
 #include "init.h"
@@ -44,6 +45,7 @@
 #include "versionbits.h"
 #include "warnings.h"
 #include "blockfileinfostore.h"
+#include "block_file_access.h"
 #include "invalid_txn_publisher.h"
 
 #include <atomic>
@@ -2098,25 +2100,10 @@ bool GetTransaction(const Config &config, const TxId &txid,
     if (fTxIndex) {
         CDiskTxPos postx;
         if (pblocktree->ReadTxIndex(txid, postx)) {
-            CAutoFile file(CDiskFiles::OpenBlockFile(postx, true), SER_DISK,
-                           CLIENT_VERSION);
-            if (file.IsNull()) {
-                return error("%s: OpenBlockFile failed", __func__);
+            if (!BlockFileAccess::LoadBlockHashAndTx( postx, hashBlock, txOut ))
+            {
+                return false;
             }
-            CBlockHeader header;
-            try {
-                file >> header;
-#if defined(WIN32)
-                _fseeki64(file.Get(), postx.nTxOffset, SEEK_CUR);
-#else
-                fseek(file.Get(), postx.nTxOffset, SEEK_CUR);
-#endif
-                file >> txOut;
-            } catch (const std::exception &e) {
-                return error("%s: Deserialize or I/O error - %s", __func__,
-                             e.what());
-            }
-            hashBlock = header.GetHash();
             if (txOut->GetId() != txid) {
                 return error("%s: txid mismatch", __func__);
             }
@@ -2183,84 +2170,6 @@ unsigned int GetBlockFileBlockHeaderSize(uint64_t nBlockSize)
     }
 }
 
-/** 
- * Write index header. If size larger thant 32 bit max than write 32 bit max and 64 bit size.
- * 32 bit max (0xFFFFFFFF) indicates that there is 64 bit size value following.
- */
-void WriteIndexHeader(CAutoFile& fileout,
-                      const CMessageHeader::MessageMagic& messageStart,
-                      uint64_t nSize)
-{
-    if (nSize >= std::numeric_limits<unsigned int>::max())
-    {
-        fileout << FLATDATA(messageStart) << std::numeric_limits<uint32_t>::max() << nSize;
-    }
-    else
-    {
-        fileout << FLATDATA(messageStart) << static_cast<uint32_t>(nSize);
-    }
-}
-
-static bool WriteBlockToDisk(
-    const CBlock &block,
-    CDiskBlockPos &pos,
-    const CMessageHeader::MessageMagic &messageStart,
-    CDiskBlockMetaData& metaData)
-{
-    // Open history file to append
-    CAutoFile fileout(CDiskFiles::OpenBlockFile(pos), SER_DISK, CLIENT_VERSION);
-    if (fileout.IsNull()) {
-        return error("WriteBlockToDisk: OpenBlockFile failed");
-    }
-
-    // Write index header.
-    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, block));    
-    
-    // Write block
-    long fileOutPos = ftell(fileout.Get());
-    if (fileOutPos < 0) {
-        return error("WriteBlockToDisk: ftell failed");
-    }
-
-    pos.nPos = (unsigned int)fileOutPos;
-
-    std::vector<uint8_t> data;
-    CVectorWriter{SER_DISK, CLIENT_VERSION, data, 0, block};
-    metaData = { Hash(data.begin(), data.end()), data.size() };
-
-    fileout.write(reinterpret_cast<const char*>(data.data()), data.size());
-
-    return true;
-}
-
-bool ReadBlockFromDisk(CBlock &block, const CDiskBlockPos &pos,
-                       const Config &config) {
-    block.SetNull();
-
-    // Open history file to read
-    CAutoFile filein(CDiskFiles::OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION);
-    if (filein.IsNull()) {
-        return error("ReadBlockFromDisk: OpenBlockFile failed for %s",
-                     pos.ToString());
-    }
-
-    // Read block
-    try {
-        filein >> block;
-    } catch (const std::exception &e) {
-        return error("%s: Deserialize or I/O error - %s at %s", __func__,
-                     e.what(), pos.ToString());
-    }
-
-    // Check the header
-    if (!CheckProofOfWork(block.GetHash(), block.nBits, config)) {
-        return error("ReadBlockFromDisk: Errors in block header at %s",
-                     pos.ToString());
-    }
-
-    return true;
-}
-
 void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData metadata)
 {
     LOCK(cs_main);
@@ -2279,7 +2188,8 @@ void SetBlockIndexFileMetaDataIfNotSet(CBlockIndex& index, CDiskBlockMetaData me
 
 bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
                        const Config &config) {
-    if (!ReadBlockFromDisk(block, pindex->GetBlockPos(), config)) {
+    if (!BlockFileAccess::ReadBlockFromDisk(block, pindex->GetBlockPos(), config))
+    {
         return false;
     }
 
@@ -2293,33 +2203,15 @@ bool ReadBlockFromDisk(CBlock &block, const CBlockIndex *pindex,
 }
 
 std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
-    const CDiskBlockPos& pos, bool calculateDiskBlockMetadata)
-{
-    std::unique_ptr<FILE, CCloseFile> file{
-        CDiskFiles::OpenBlockFile(pos, true)};
-
-    if (!file)
-    {
-        error("GetDiskBlockStreamReader(CDiskBlockPos&): OpenBlockFile failed for %s", 
-            pos.ToString());
-        return {}; // could not open a stream
-    }
-
-    return
-        std::make_unique<CBlockStreamReader<CFileReader>>(
-            std::move(file),
-            CStreamVersionAndType{SER_DISK, CLIENT_VERSION},
-            calculateDiskBlockMetadata,
-            pos);
-}
-
-std::unique_ptr<CBlockStreamReader<CFileReader>> GetDiskBlockStreamReader(
     const CBlockIndex* pindex, const Config &config, bool calculateDiskBlockMetadata)
 {
     std::unique_ptr<CBlockStreamReader<CFileReader>> blockStreamReader;
     try
     {
-        blockStreamReader = GetDiskBlockStreamReader(pindex->GetBlockPos(), calculateDiskBlockMetadata);
+        blockStreamReader =
+            BlockFileAccess::GetDiskBlockStreamReader(
+                pindex->GetBlockPos(),
+                calculateDiskBlockMetadata);
     }
     catch(const std::exception& e)
     {
@@ -2376,7 +2268,7 @@ static bool PopulateBlockIndexBlockDiskMetaData(
 
     SetBlockIndexFileMetaDataIfNotSet(index, CDiskBlockMetaData{hash, size});
 
-    if(fseek(file, index.GetBlockPos().nPos, SEEK_SET) != 0)
+    if(fseek(file, index.GetBlockPos().Pos(), SEEK_SET) != 0)
     {
         // this should never happen but for some odd reason we aren't
         // able to rewind the file pointer back to the beginning
@@ -2392,8 +2284,7 @@ std::unique_ptr<CForwardAsyncReadonlyStream> StreamBlockFromDisk(
 {
     AssertLockHeld(cs_main);
 
-    std::unique_ptr<FILE, CCloseFile> file{
-        CDiskFiles::OpenBlockFile(index.GetBlockPos(), true)};
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos()) };
 
     if (!file)
     {
@@ -2425,8 +2316,7 @@ std::unique_ptr<CForwardReadonlyStream> StreamSyncBlockFromDisk(CBlockIndex& ind
 {
     AssertLockHeld(cs_main);
 
-    std::unique_ptr<FILE, CCloseFile> file{
-        CDiskFiles::OpenBlockFile(index.GetBlockPos(), true)};
+    UniqueCFile file{ BlockFileAccess::OpenBlockFile(index.GetBlockPos()) };
 
     if (!file)
     {
@@ -3143,63 +3033,6 @@ std::optional<bool> CheckInputs(
 
 namespace {
 
-bool UndoWriteToDisk(const CBlockUndo &blockundo, CDiskBlockPos &pos,
-                     const uint256 &hashBlock,
-                     const CMessageHeader::MessageMagic &messageStart) {
-    // Open history file to append
-    CAutoFile fileout(CDiskFiles::OpenUndoFile(pos), SER_DISK, CLIENT_VERSION);
-    if (fileout.IsNull()) {
-        return error("%s: OpenUndoFile failed", __func__);
-    }
-
-    // Write index header. 
-    WriteIndexHeader(fileout, messageStart, GetSerializeSize(fileout, blockundo));
-
-    // Write undo data
-    long fileOutPos = ftell(fileout.Get());
-    if (fileOutPos < 0) {
-        return error("%s: ftell failed", __func__);
-    }
-    pos.nPos = (unsigned int)fileOutPos;
-    fileout << blockundo;
-
-    // calculate & write checksum
-    CHashWriter hasher(SER_GETHASH, PROTOCOL_VERSION);
-    hasher << hashBlock;
-    hasher << blockundo;
-    fileout << hasher.GetHash();
-
-    return true;
-}
-
-bool UndoReadFromDisk(CBlockUndo &blockundo, const CDiskBlockPos &pos,
-                      const uint256 &hashBlock) {
-    // Open history file to read
-    CAutoFile filein(CDiskFiles::OpenUndoFile(pos, true), SER_DISK, CLIENT_VERSION);
-    if (filein.IsNull()) {
-        return error("%s: OpenUndoFile failed", __func__);
-    }
-
-    // Read block
-    uint256 hashChecksum;
-    // We need a CHashVerifier as reserializing may lose data
-    CHashVerifier<CAutoFile> verifier(&filein);
-    try {
-        verifier << hashBlock;
-        verifier >> blockundo;
-        filein >> hashChecksum;
-    } catch (const std::exception &e) {
-        return error("%s: Deserialize or I/O error - %s", __func__, e.what());
-    }
-
-    // Verify checksum
-    if (hashChecksum != verifier.GetHash()) {
-        return error("%s: Checksum mismatch", __func__);
-    }
-
-    return true;
-}
-
 /** Abort with a message */
 bool AbortNode(const std::string &strMessage,
                const std::string &userMessage = "") {
@@ -3256,7 +3089,8 @@ static DisconnectResult DisconnectBlock(const CBlock &block,
         return DISCONNECT_FAILED;
     }
 
-    if (!UndoReadFromDisk(blockUndo, pos, pindex->pprev->GetBlockHash())) {
+    if (!BlockFileAccess::UndoReadFromDisk(blockUndo, pos, pindex->pprev->GetBlockHash()))
+    {
         error("DisconnectBlock(): failure reading undo data");
         return DISCONNECT_FAILED;
     }
@@ -3722,7 +3556,7 @@ static bool ConnectBlock(
                     pindex->nHeight);
 
         vPos.push_back(std::make_pair(tx.GetId(), pos));
-        pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
+        pos = {pos, pos.TxOffset() + ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION)};
     }
 
     if (parallelBlockValidation)
@@ -3855,13 +3689,13 @@ static bool ConnectBlock(
                         40, fCheckForPruning)) {
                 return error("ConnectBlock(): FindUndoPos failed");
             }
-            if (!UndoWriteToDisk(blockundo, _pos, pindex->pprev->GetBlockHash(),
+            if (!BlockFileAccess::UndoWriteToDisk(blockundo, _pos, pindex->pprev->GetBlockHash(),
                                  config.GetChainParams().DiskMagic())) {
                 return AbortNode(state, "Failed to write undo data");
             }
 
             // update nUndoPos in block index
-            pindex->nUndoPos = _pos.nPos;
+            pindex->nUndoPos = _pos.Pos();
             pindex->nStatus = pindex->nStatus.withUndo();
         }
 
@@ -5988,7 +5822,8 @@ static bool AcceptBlock(const Config& config,
         }
         CDiskBlockMetaData metaData;
         if (dbp == nullptr) {
-            if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData)) {
+            if (!BlockFileAccess::WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData))
+            {
                 AbortNode(state, "Failed to write block");
             }
         }
@@ -6227,16 +6062,10 @@ void UnlinkPrunedFiles(const std::set<int> &setFilesToPrune)
 {
     for (const int i : setFilesToPrune)
     {
-        CDiskBlockPos pos{i, 0};
-        boost::system::error_code ec;
-        fs::remove(GetBlockPosFilename(pos, "blk"), ec);
-
-        if(!ec) // if there was no error
+        if (BlockFileAccess::RemoveFile( i )) // if there was no error
         {
-            // only delete rev file and remove block index data if blk file
-            // deletion succeeded otherwise keep the data for now as it's most
-            // likely still being used
-            fs::remove(GetBlockPosFilename(pos, "rev"));
+            // remove block index data if file deletion succeeded otherwise keep
+            // the data for now as it's most likely still being used
             PruneOneBlockFile(i);
             LogPrintf("Prune: %s deleted blk/rev (%05u)\n", __func__, i);
         }
@@ -6268,45 +6097,6 @@ bool CheckDiskSpace(uint64_t nAdditionalBytes) {
     }
 
     return true;
-}
-
-FILE *CDiskFiles::OpenDiskFile(const CDiskBlockPos &pos, const char *prefix,
-                          bool fReadOnly) {
-    if (pos.IsNull()) {
-        return nullptr;
-    }
-
-    fs::path path = GetBlockPosFilename(pos, prefix);
-    fs::create_directories(path.parent_path());
-    FILE *file = fsbridge::fopen(path, "rb+");
-    if (!file && !fReadOnly) {
-        file = fsbridge::fopen(path, "wb+");
-    }
-    if (!file) {
-        LogPrintf("Unable to open file %s\n", path.string());
-        return nullptr;
-    }
-    if (pos.nPos) {
-        if (fseek(file, pos.nPos, SEEK_SET)) {
-            LogPrintf("Unable to seek to position %u of %s\n", pos.nPos,
-                      path.string());
-            fclose(file);
-            return nullptr;
-        }
-    }
-    return file;
-}
-
-FILE *CDiskFiles::OpenBlockFile(const CDiskBlockPos &pos, bool fReadOnly) {
-    return OpenDiskFile(pos, "blk", fReadOnly);
-}
-
-FILE *CDiskFiles::OpenUndoFile(const CDiskBlockPos &pos, bool fReadOnly) {
-    return OpenDiskFile(pos, "rev", fReadOnly);
-}
-
-fs::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix) {
-    return GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, pos.nFile);
 }
 
 CBlockIndex *InsertBlockIndex(uint256 hash) {
@@ -6404,9 +6194,8 @@ static bool LoadBlockIndexDB(const CChainParams &chainparams) {
         }
     }
     for (const int i : setBlkDataFiles) {
-        CDiskBlockPos pos(i, 0);
-        if (CAutoFile(CDiskFiles::OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION)
-                .IsNull()) {
+        if (auto file = BlockFileAccess::OpenBlockFile( i ); file == nullptr)
+        {
             return false;
         }
     }
@@ -6552,7 +6341,7 @@ bool CVerifyDB::VerifyDB(const Config &config, CoinsDB& coinsview,
             CBlockUndo undo;
             CDiskBlockPos pos = pindex->GetUndoPos();
             if (!pos.IsNull()) {
-                if (!UndoReadFromDisk(undo, pos,
+                if (!BlockFileAccess::UndoReadFromDisk(undo, pos,
                                       pindex->pprev->GetBlockHash())) {
                     return error(
                         "VerifyDB(): *** found bad undo data at %d, hash=%s\n",
@@ -6884,7 +6673,8 @@ bool InitBlockIndex(const Config &config) {
                 return error("LoadBlockIndex(): FindBlockPos failed");
             }
             CDiskBlockMetaData metaData;
-            if (!WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData)) {
+            if (!BlockFileAccess::WriteBlockToDisk(block, blockPos, chainparams.DiskMagic(), metaData))
+            {
                 return error(
                     "LoadBlockIndex(): writing genesis block to disk failed");
             }
@@ -6907,19 +6697,17 @@ void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& 
     
     int nFile = 0;
     while (true) {
-        CDiskBlockPos pos(nFile, 0);
-        if (!fs::exists(GetBlockPosFilename(pos, "blk"))) {
-            // No block files left to reindex
-            break;
-        }
-        FILE *file = CDiskFiles::OpenBlockFile(pos, true);
-        if (!file) {
-            // This error is logged in OpenBlockFile
+        UniqueCFile file = BlockFileAccess::OpenBlockFile( nFile );
+        if (file == nullptr)
+        {
+            // No block files left to reindex or an error occurred.
+            // Potential errors are logged in GetBlockFile.
             break;
         }
         LogPrintf("Reindexing block file blk%05u.dat...\n",
             (unsigned int)nFile);
-        LoadExternalBlockFile(config, file, &pos);
+        CDiskBlockPos pos{ nFile, 0 };
+        LoadExternalBlockFile(config, std::move(file), &pos);
         nFile++;
     }
 
@@ -6931,7 +6719,7 @@ void ReindexAllBlockFiles(const Config &config, CBlockTreeDB *pblocktree, bool& 
     InitBlockIndex(config);
 }
 
-bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
+bool LoadExternalBlockFile(const Config &config, UniqueCFile fileIn,
                            CDiskBlockPos *dbp) {
     // Map of disk positions for blocks with unknown parent (only used for
     // reindex)
@@ -6943,8 +6731,10 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
     int nLoaded = 0;
     try {
         // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor.
-        CBufferedFile blkdat(fileIn, 2 * ONE_MEGABYTE, ONE_MEGABYTE + 8, SER_DISK,
-                             CLIENT_VERSION);
+        CBufferedFile blkdat{
+            { std::move(fileIn), SER_DISK, CLIENT_VERSION },
+            2 * ONE_MEGABYTE,
+            ONE_MEGABYTE + 8};
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof()) {
             boost::this_thread::interruption_point();
@@ -6988,7 +6778,7 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                 // read block
                 uint64_t nBlockPos = blkdat.GetPos();
                 if (dbp) {
-                    dbp->nPos = nBlockPos;
+                    *dbp = {dbp->File(), static_cast<unsigned int>(nBlockPos)};
                 }
                 blkdat.SetLimit(nBlockPos + nSize);
                 blkdat.SetPos(nBlockPos);
@@ -7064,8 +6854,11 @@ bool LoadExternalBlockFile(const Config &config, FILE *fileIn,
                             range.first;
                         std::shared_ptr<CBlock> pblockrecursive =
                             std::make_shared<CBlock>();
-                        if (ReadBlockFromDisk(*pblockrecursive, it->second,
-                                              config)) {
+                        if (BlockFileAccess::ReadBlockFromDisk(
+                                *pblockrecursive,
+                                it->second,
+                                config))
+                        {
                             LogPrint(
                                 BCLog::REINDEX,
                                 "%s: Processing out of order child %s of %s\n",
@@ -7377,14 +7170,6 @@ static void CheckBlockIndex(const Consensus::Params &consensusParams) {
 
     // Check that we actually traversed the entire map.
     assert(nNodes == forward.size());
-}
-
-std::string CBlockFileInfo::ToString() const {
-    return strprintf(
-        "CBlockFileInfo(blocks=%u, size=%u, heights=%u...%u, time=%s...%s)",
-        nBlocks, nSize, nHeightFirst, nHeightLast,
-        DateTimeStrFormat("%Y-%m-%d", nTimeFirst),
-        DateTimeStrFormat("%Y-%m-%d", nTimeLast));
 }
 
 

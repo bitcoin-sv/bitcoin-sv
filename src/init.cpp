@@ -1389,11 +1389,11 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
         // hardcoded $DATADIR/bootstrap.dat
         fs::path pathBootstrap = GetDataDir() / "bootstrap.dat";
         if (fs::exists(pathBootstrap)) {
-            FILE *file = fsbridge::fopen(pathBootstrap, "rb");
+            UniqueCFile file{ fsbridge::fopen(pathBootstrap, "rb") };
             if (file) {
                 fs::path pathBootstrapOld = GetDataDir() / "bootstrap.dat.old";
                 LogPrintf("Importing bootstrap.dat...\n");
-                LoadExternalBlockFile(config, file);
+                LoadExternalBlockFile(config, std::move(file));
                 RenameOver(pathBootstrap, pathBootstrapOld);
             } else {
                 LogPrintf("Warning: Could not open bootstrap file %s\n",
@@ -1403,10 +1403,10 @@ void ThreadImport(const Config &config, std::vector<fs::path> vImportFiles, cons
 
         // -loadblock=
         for (const fs::path &path : vImportFiles) {
-            FILE *file = fsbridge::fopen(path, "rb");
+            UniqueCFile file{ fsbridge::fopen(path, "rb") };
             if (file) {
                 LogPrintf("Importing blocks file %s...\n", path.string());
-                LoadExternalBlockFile(config, file);
+                LoadExternalBlockFile(config, std::move(file));
             } else {
                 LogPrintf("Warning: Could not open blocks file %s\n",
                           path.string());

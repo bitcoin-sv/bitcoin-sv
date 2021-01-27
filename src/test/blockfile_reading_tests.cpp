@@ -6,6 +6,7 @@
 #include "stream_test_helpers.h"
 #include "protocol.h"
 #include "blockfileinfostore.h"
+#include "block_file_access.h"
 #include "consensus/validation.h"
 #include "config.h"
 #include "chainparams.h"
@@ -48,35 +49,18 @@ namespace
             throw std::runtime_error{"LoadBlockIndex(): FindBlockPos failed"};
         }
 
-        // Open history file to append
-        CAutoFile fileout{
-            CDiskFiles::OpenBlockFile(blockPos),
-            SER_DISK,
-            CLIENT_VERSION};
-        if (fileout.IsNull())
-        {
-            throw std::runtime_error{"WriteBlockToDisk: OpenBlockFile failed"};
-        }
+        CDiskBlockMetaData metaData;
 
-        // Write index header
-        //CMessageHeader::MessageMagic diskMagic{{0xde, 0xad, 0xbe, 0xef}};
-        const CChainParams& chainparams = config.GetChainParams();
-        unsigned int nSize = GetSerializeSize(fileout, block);
-        fileout << FLATDATA(chainparams.DiskMagic()) << nSize;
+        auto res =
+            BlockFileAccess::WriteBlockToDisk(
+                block,
+                blockPos,
+                config.GetChainParams().DiskMagic(),
+                metaData);
 
-        // Write block
-        long fileOutPos = ftell(fileout.Get());
-        if (fileOutPos < 0) {
-            throw std::runtime_error{"WriteBlockToDisk: ftell failed"};
-        }
+        BOOST_REQUIRE( res );
 
-        // set index data
-        index.nFile = blockPos.nFile;
-        index.nDataPos = fileOutPos;
-        index.nUndoPos = 0;
-        index.nStatus = index.nStatus.withData();
-
-        fileout << block;
+        index.SetDiskBlockData(block.vtx.size(), blockPos, metaData);
     }
 
     struct CScopeSetupTeardown
@@ -133,6 +117,9 @@ BOOST_AUTO_TEST_CASE(read_without_meta_info)
     // check that blockIndex was updated with disk content size and hash data
     {
         auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
+
+        BOOST_REQUIRE( stream );
+
         std::vector<uint8_t> serializedData{SerializeAsyncStream(*stream, 5u)};
 
         uint256 expectedHash =
@@ -187,6 +174,9 @@ BOOST_AUTO_TEST_CASE(delete_block_file_while_reading)
 
     LOCK(cs_main);
     auto stream = StreamBlockFromDisk(index, INIT_PROTO_VERSION);
+
+    BOOST_REQUIRE( stream );
+
     std::vector<uint8_t> serializedData;
 
     // start reading and inbetween the read try to delete the file on disk

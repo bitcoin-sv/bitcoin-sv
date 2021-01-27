@@ -7,6 +7,7 @@
 #define BITCOIN_TXMEMPOOL_H
 
 #include "amount.h"
+#include "cfile_util.h"
 #include "coins.h"
 #include "mining/journal_entry.h"
 #include "mining/journal_builder.h"
@@ -1224,7 +1225,7 @@ private:
 
     // Dumping and loading the mempool.
     using DumpFileID = boost::uuids::uuid;
-    FILE* OpenDumpFile(uint64_t& version, DumpFileID& instanceId);
+    UniqueCFile OpenDumpFile(uint64_t& version, DumpFileID& instanceId);
 
     // Mempool dump and load for testing different file formats
     // and custion validation.

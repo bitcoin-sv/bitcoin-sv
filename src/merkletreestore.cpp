@@ -2,6 +2,8 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "merkletreestore.h"
+
+#include "block_file_access.h"
 #include "util.h"
 #include "config.h"
 #include "clientversion.h"
@@ -490,7 +492,7 @@ bool CMerkleTreeStore::ReindexMerkleTreeStoreNL()
             if (static_cast<uint64_t>(ftell(readFromFile.Get())) == currentFileSize)
             {
                 //End of file, move to the next data file
-                readFromFile.fclose();
+                readFromFile.reset();
             }
         }
     }
@@ -541,7 +543,8 @@ CMerkleTreeRef CMerkleTreeFactory::GetMerkleTree(const Config& config, CBlockInd
         /* Merkle Tree of this block was not found or cannot be read from data files on disk.
          * Calculate it from block stream and store it to the disk.
          */
-        auto stream = GetDiskBlockStreamReader(blockIndex.GetBlockPos());
+        auto stream =
+            BlockFileAccess::GetDiskBlockStreamReader(blockIndex.GetBlockPos());
         if (!stream)
         {
             // This should be handled by the caller - block cannot be read from the disk

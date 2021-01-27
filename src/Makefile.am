@@ -81,6 +81,8 @@ BITCOIN_CORE_H = \
   bloom.h \
   blockencodings.h \
   blockfileinfostore.h \
+  block_file_access.h \
+  block_file_info.h \
   blockstreams.h \
   blockvalidation.h \
   chain.h \
@@ -102,6 +104,8 @@ BITCOIN_CORE_H = \
   core_io.h \
   core_memusage.h \
   cuckoocache.h \
+  disk_block_pos.h \
+  disk_tx_pos.h \
   dstencode.h \
   enum_cast.h \
   fs.h \
@@ -250,7 +254,9 @@ libbitcoin_server_a_SOURCES = \
   addrdb.cpp \
   bloom.cpp \
   blockencodings.cpp \
+  block_file_info.cpp \
   blockfileinfostore.cpp \
+  block_file_access.cpp \
   chain.cpp \
   checkpoints.cpp \
   config.cpp \
@@ -377,6 +383,7 @@ libbitcoin_consensus_a_SOURCES = \
   arith_uint256.h \
   big_int.cpp \
   big_int.h \
+  cfile_util.h \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \

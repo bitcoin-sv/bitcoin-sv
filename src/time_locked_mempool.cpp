@@ -233,7 +233,7 @@ void CTimeLockedMempool::dumpMempool() const
         }
 
         FileCommit(file.Get());
-        file.fclose();
+        file.reset();
         RenameOver(GetDataDir() / "non-final-mempool.dat.new", GetDataDir() / "non-final-mempool.dat");
         int64_t last { GetTimeMicros() };
         LogPrintf("Dumped %d txns to non-final mempool: %.6fs to dump\n", numTxns, (last - start) * 0.000001);

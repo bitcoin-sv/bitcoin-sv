@@ -4,6 +4,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include "base58.h"
+#include "block_file_access.h"
 #include "chain.h"
 #include "coins.h"
 #include "config.h"
@@ -339,7 +340,8 @@ static CBlockIndex* GetBlockIndex(const Config& config,
  */
 static std::unique_ptr<CBlockStreamReader<CFileReader>>  GetBlockStream(CBlockIndex& pblockindex)
 {
-    auto stream = GetDiskBlockStreamReader(pblockindex.GetBlockPos());
+    auto stream =
+        BlockFileAccess::GetDiskBlockStreamReader(pblockindex.GetBlockPos());
     if (!stream)
     {
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
