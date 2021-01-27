@@ -210,6 +210,8 @@ void Shutdown() {
     }
 #endif
 
+    pMerkleTreeFactory.reset();
+
 #if ENABLE_ZMQ
     {
         LOCK(cs_zmqNotificationInterface);
@@ -237,6 +239,16 @@ void Shutdown() {
 #endif
     globalVerifyHandle.reset();
     ECC_Stop();
+
+    {
+        // Free block headers
+        LOCK(cs_main);
+        for(const auto& block : mapBlockIndex) {
+            delete block.second;
+        }
+        mapBlockIndex.clear();
+    }
+
     LogPrintf("%s: done\n", __func__);
 }
 

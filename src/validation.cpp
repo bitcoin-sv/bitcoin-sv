@@ -7417,15 +7417,3 @@ double GuessVerificationProgress(const ChainTxData &data, CBlockIndex *pindex) {
     return pindex->nChainTx / fTxTotal;
 }
 
-class CMainCleanup {
-public:
-    CMainCleanup() {}
-    ~CMainCleanup() {
-        // block headers
-        for (const std::pair<const uint256, CBlockIndex *> &it :
-             mapBlockIndex) {
-            delete it.second;
-        }
-        mapBlockIndex.clear();
-    }
-} instance_of_cmaincleanup;
