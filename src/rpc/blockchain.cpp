@@ -105,7 +105,7 @@ UniValue blockheaderToJSON(const CBlockIndex *blockindex,
     result.push_back(Pair("nonce", uint64_t(blockindex->GetNonce())));
     result.push_back(Pair("bits", strprintf("%08x", blockindex->GetBits())));
     result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
-    result.push_back(Pair("chainwork", blockindex->nChainWork.GetHex()));
+    result.push_back(Pair("chainwork", blockindex->GetChainWork().GetHex()));
 
     if (blockindex->pprev) {
         result.push_back(Pair("previousblockhash",
@@ -1437,7 +1437,7 @@ void headerBlockToJSON(const Config& config,
     jWriter.pushKV("nonce", uint64_t(blockHeader.nNonce));
     jWriter.pushKV("bits", strprintf("%08x", blockHeader.nBits));
     jWriter.pushKV("difficulty", GetDifficulty(blockindex));
-    jWriter.pushKV("chainwork", blockindex->nChainWork.GetHex());
+    jWriter.pushKV("chainwork", blockindex->GetChainWork().GetHex());
 
     if (blockindex->pprev)
     {
@@ -2144,7 +2144,7 @@ UniValue getblockchaininfo(const Config &config,
         Pair("verificationprogress",
              GuessVerificationProgress(config.GetChainParams().TxData(),
                                        chainActive.Tip())));
-    obj.push_back(Pair("chainwork", chainActive.Tip()->nChainWork.GetHex()));
+    obj.push_back(Pair("chainwork", chainActive.Tip()->GetChainWork().GetHex()));
     obj.push_back(Pair("pruned", fPruneMode));
 
     const Consensus::Params &consensusParams =

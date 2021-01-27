@@ -177,7 +177,7 @@ static arith_uint256 ComputeTarget(const CBlockIndex *pindexFirst,
      * we can deduce how much work we expect to be produced in the targeted time
      * between blocks.
      */
-    arith_uint256 work = pindexLast->nChainWork - pindexFirst->nChainWork;
+    arith_uint256 work = pindexLast->GetChainWork() - pindexFirst->GetChainWork();
     work *= params.nPowTargetSpacing;
 
     // In order to avoid difficulty cliffs, we bound the amplitude of the

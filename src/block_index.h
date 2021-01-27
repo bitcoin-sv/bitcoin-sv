@@ -286,11 +286,11 @@ private:
     //! Byte offset within rev?????.dat where this block's undo data is stored
     unsigned int nUndoPos{ 0 };;
 
-public:
     //! (memory only) Total amount of work (expected number of hashes) in the
     //! chain up to and including this block
     arith_uint256 nChainWork;
 
+public:
     //! Number of transactions in this block.
     //! Note: in a potential headers-first mode, this number cannot be relied
     //! upon
@@ -407,7 +407,7 @@ public:
         std::lock_guard lock{ blockIndexMutex };
 
         BuildSkip();
-        SetChainWork();
+        SetChainWorkNL();
         nTimeMax = (pprev ? std::max(pprev->nTimeMax, nTime) : nTime);
 
         // We can link the chain of blocks for which we've received transactions
@@ -656,7 +656,7 @@ public:
         return this->nChainTx;
     }
 
-    arith_uint256 GetChainWork() const
+    const arith_uint256& GetChainWork() const
     {
         return this->nChainWork;
     }
@@ -829,7 +829,7 @@ private:
         }
         nTimeReceived = GetTime();
         nTimeMax = pprev ? std::max(pprev->nTimeMax, nTime) : nTime;
-        SetChainWork();
+        SetChainWorkNL();
         RaiseValidityNL( BlockValidity::TREE );
     }
 
@@ -874,22 +874,6 @@ private:
         return {};
     }
 
-    void SetSoftRejectedFromParentNL()
-    {
-        if(ShouldBeConsideredSoftRejectedBecauseOfParentNL())
-        {
-            // If previous block was marked soft rejected, this one is also soft rejected, but for one block less.
-            nSoftRejected = pprev->nSoftRejected - 1;
-            nStatus = nStatus.withDataForSoftRejection(true);
-        }
-        else
-        {
-            // This block is not soft rejected.
-            nSoftRejected = -1;
-            nStatus = nStatus.withDataForSoftRejection(false);
-        }
-    }
-
     // Check whether this block index entry is valid up to the passed validity
     // level.
     bool IsValidNL(enum BlockValidity nUpTo = BlockValidity::TRANSACTIONS) const {
@@ -915,6 +899,29 @@ private:
 
         nStatus = nStatus.withValidity(nUpTo);
         return true;
+    }
+
+    void SetChainWorkNL()
+    {
+        nChainWork =
+            (pprev ? pprev->nChainWork : 0) +
+            GetBlockProof(*this);
+    }
+
+    void SetSoftRejectedFromParentNL()
+    {
+        if(ShouldBeConsideredSoftRejectedBecauseOfParentNL())
+        {
+            // If previous block was marked soft rejected, this one is also soft rejected, but for one block less.
+            nSoftRejected = pprev->nSoftRejected - 1;
+            nStatus = nStatus.withDataForSoftRejection(true);
+        }
+        else
+        {
+            // This block is not soft rejected.
+            nSoftRejected = -1;
+            nStatus = nStatus.withDataForSoftRejection(false);
+        }
     }
 
     void SetDiskBlockMetaData( CDiskBlockMetaData&& meta )
@@ -945,7 +952,8 @@ public:
     {
         //pSkip is not set here intentionally: logic depends on pSkip to be nullptr at this point
         mIndex.phashBlock = &mDummyHash;
-        mIndex.SetChainWork();
+
+        mIndex.SetChainWorkNL(); // no need for lock as we control the dummy
     }
 
     // TODO make parent const in future MRs
@@ -961,7 +969,7 @@ public:
         mIndex.pprev = &parent;
         mIndex.nHeight = parent.nHeight + 1;
 
-        mIndex.SetChainWork();
+        mIndex.SetChainWorkNL(); // no need for lock as we control the dummy
     }
 
     // We want to limit the scope of temporary as much as possible
@@ -1015,10 +1023,14 @@ const CBlockIndex *LastCommonAncestor(const CBlockIndex *pa,
 struct CBlockIndexWorkComparator {
     bool operator()(const CBlockIndex *pa, const CBlockIndex *pb) const {
         // First sort by most total work, ...
-        if (pa->nChainWork > pb->nChainWork) {
+        auto paChainWork = pa->GetChainWork();
+        auto pbChainWork = pb->GetChainWork();
+        if (paChainWork > pbChainWork)
+        {
             return false;
         }
-        if (pa->nChainWork < pb->nChainWork) {
+        if (paChainWork < pbChainWork)
+        {
             return true;
         }
 

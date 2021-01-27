@@ -252,13 +252,17 @@ void ProcessBlockAvailability(const CNodeStatePtr& state) {
     if (!state->hashLastUnknownBlock.IsNull()) {
         BlockMap::iterator itOld =
             mapBlockIndex.find(state->hashLastUnknownBlock);
-        if (itOld != mapBlockIndex.end() && itOld->second->nChainWork > 0) {
-            if (state->pindexBestKnownBlock == nullptr ||
-                itOld->second->nChainWork >=
-                    state->pindexBestKnownBlock->nChainWork) {
-                state->pindexBestKnownBlock = itOld->second;
+        if (itOld != mapBlockIndex.end())
+        {
+            if (auto chainWork = itOld->second->GetChainWork(); chainWork > 0)
+            {
+                if (state->pindexBestKnownBlock == nullptr ||
+                    chainWork >= state->pindexBestKnownBlock->GetChainWork())
+                {
+                    state->pindexBestKnownBlock = itOld->second;
+                }
+                state->hashLastUnknownBlock.SetNull();
             }
-            state->hashLastUnknownBlock.SetNull();
         }
     }
 }
@@ -271,17 +275,24 @@ void UpdateBlockAvailability(const uint256 &hash, const CNodeStatePtr& state) {
 
     ProcessBlockAvailability(state);
     BlockMap::iterator it = mapBlockIndex.find(hash);
-    if (it != mapBlockIndex.end() && it->second->nChainWork > 0) {
-        // An actually better block was announced.
-        if (state->pindexBestKnownBlock == nullptr ||
-            it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork) {
-            state->pindexBestKnownBlock = it->second;
+    if (it != mapBlockIndex.end())
+    {
+        if (auto chainWork = it->second->GetChainWork(); chainWork > 0)
+        {
+            // An actually better block was announced.
+            if (state->pindexBestKnownBlock == nullptr ||
+                chainWork >= state->pindexBestKnownBlock->GetChainWork())
+            {
+                state->pindexBestKnownBlock = it->second;
+            }
+
+            return;
         }
-    } else {
-        // An unknown block was announced; just assume that the latest one is
-        // the best one.
-        state->hashLastUnknownBlock = hash;
     }
+
+    // An unknown block was announced; just assume that the latest one is
+    // the best one.
+    state->hashLastUnknownBlock = hash;
 }
 
 // Requires cs_main
@@ -329,10 +340,15 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count,
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
     ProcessBlockAvailability(state);
 
-    if (state->pindexBestKnownBlock == nullptr ||
-        state->pindexBestKnownBlock->nChainWork <
-            chainActive.Tip()->nChainWork ||
-        state->pindexBestKnownBlock->nChainWork < nMinimumChainWork) {
+    if (state->pindexBestKnownBlock == nullptr)
+    {
+        // This peer has nothing interesting.
+        return;
+    }
+    else if (auto chainWork = state->pindexBestKnownBlock->GetChainWork();
+        chainWork < nMinimumChainWork ||
+        chainWork < chainActive.Tip()->GetChainWork())
+    {
         // This peer has nothing interesting.
         return;
     }
@@ -2579,7 +2595,7 @@ static bool ProcessHeadersMessage(const Config& config, const CNodePtr& pfrom,
         // If this set of headers is valid and ends in a block with at least
         // as much work as our tip, download as much as possible.
         if(fCanDirectFetch && pindexLast->IsValid(BlockValidity::TREE) &&
-            chainActive.Tip()->nChainWork <= pindexLast->nChainWork)
+            chainActive.Tip()->GetChainWork() <= pindexLast->GetChainWork())
         {
             std::vector<const CBlockIndex*> vToFetch;
             const CBlockIndex *pindexWalk = pindexLast;
@@ -2847,8 +2863,8 @@ static bool ProcessCompactBlockMessage(const Config& config, const CNodePtr& pfr
             return true;
         }
 
-        if(pindex->nChainWork <=
-                chainActive.Tip()->nChainWork || // We know something better
+        if(pindex->GetChainWork() <=
+                chainActive.Tip()->GetChainWork() || // We know something better
             pindex->nTx != 0) {
             // We had this block at some point, but pruned it
             if(fAlreadyInFlight) {

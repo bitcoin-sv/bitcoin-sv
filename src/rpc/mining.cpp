@@ -103,7 +103,7 @@ static UniValue GetNetworkHashPS(int lookup, int32_t height) {
         return 0;
     }
 
-    arith_uint256 workDiff = pb->nChainWork - pb0->nChainWork;
+    arith_uint256 workDiff = pb->GetChainWork() - pb0->GetChainWork();
     int64_t timeDiff = maxTime - minTime;
 
     return workDiff.getdouble() / timeDiff;

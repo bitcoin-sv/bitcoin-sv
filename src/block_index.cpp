@@ -92,10 +92,13 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex &to,
                                     const Consensus::Params &params) {
     arith_uint256 r;
     int sign = 1;
-    if (to.nChainWork > from.nChainWork) {
-        r = to.nChainWork - from.nChainWork;
+    auto fromChainWork = from.GetChainWork();
+    auto toChainWork = to.GetChainWork();
+    if (toChainWork > fromChainWork)
+    {
+        r = toChainWork - fromChainWork;
     } else {
-        r = from.nChainWork - to.nChainWork;
+        r = fromChainWork - toChainWork;
         sign = -1;
     }
     r = r * arith_uint256(params.nPowTargetSpacing) / GetBlockProof(tip);
