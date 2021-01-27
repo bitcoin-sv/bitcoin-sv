@@ -1139,9 +1139,20 @@ void CTxMemPool::clearNL(bool skipTransactionDatabase/* = false*/) {
     }
 }
 
-void CTxMemPool::trackPackageRemovedNL(const CFeeRate &rate) {
-    if (rate.GetFeePerK().GetSatoshis() > rollingMinimumFeeRate) {
-        rollingMinimumFeeRate = rate.GetFeePerK().GetSatoshis();
+void CTxMemPool::trackPackageRemovedNL(const CFeeRate &rate, bool haveSecondaryMempoolTxs) 
+{
+    if (rate.GetFeePerK().GetSatoshis() > rollingMinimumFeeRate) 
+    {
+        // if we still have secondary mempool transactions we should not bump the rolling fee
+        // above blockMinTxfee
+        if (haveSecondaryMempoolTxs && rate > blockMinTxfee)
+        {
+            rollingMinimumFeeRate = blockMinTxfee.GetFeePerK().GetSatoshis();
+        }
+        else
+        {
+            rollingMinimumFeeRate = rate.GetFeePerK().GetSatoshis();
+        }
         blockSinceLastRollingFeeBump = false;
     }
 }
@@ -2345,10 +2356,18 @@ std::vector<TxId> CTxMemPool::TrimToSize(
     {
         if(mapTx.size() != 0)
         {
-            maxFeeRateRemoved = std::max(maxFeeRateRemoved, getFeeRate(evictionTracker->GetMostWorthless()));
+            auto nextToBeRemoved = evictionTracker->GetMostWorthless();
+            maxFeeRateRemoved = std::max(maxFeeRateRemoved, getFeeRate(nextToBeRemoved));
+            maxFeeRateRemoved += MEMPOOL_FULL_FEE_INCREMENT;
+            
+            bool haveSecondaryMempoolTransactions = !nextToBeRemoved->IsInPrimaryMempool();
+            
+            trackPackageRemovedNL(maxFeeRateRemoved, haveSecondaryMempoolTransactions);
         }
-        maxFeeRateRemoved += MEMPOOL_FULL_FEE_INCREMENT;
-        trackPackageRemovedNL(maxFeeRateRemoved);
+        else
+        {
+            trackPackageRemovedNL(CFeeRate(), false);
+        }
 
         LogPrint(BCLog::MEMPOOL,
                  "Removed %u txn, rolling minimum fee bumped to %s\n",
