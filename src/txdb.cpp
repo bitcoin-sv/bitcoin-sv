@@ -543,14 +543,23 @@ std::optional<CoinImpl> CoinsDB::GetCoin(const COutPoint &outpoint, uint64_t max
             }
         }
 
-        // sleep for a while to give the other thread a chance to load the coin
-        // before re-attempting to access it
+        // All but the first reader will end up here. Give the initial thread a
+        // chance to load the coin before re-attempting to access it.
         //
-        // the code would get here extremely rarely (e.g. during parallel block
-        // validation and almost simultaneous request of the same coin) so we
-        // don't need to worry about this sleep penalty
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(5ms);
+        // The code would get here extremely rarely during parallel block
+        // validation and almost simultaneous request of the same coin.
+        //
+        // The other, more likely scenario is chain validation when we validate
+        // dependant transactions in parallel. Validation will look for the
+        // transaction outputs of the ancestor transaction, that we will
+        // normally not find, and in parallel in a separate task validation of
+        // the dependant transaction will load inputs that we will _also_ not
+        // find.
+        //
+        // Sleeping as little time as possible speeds up the more common
+        // not-found case.
+        //
+        std::this_thread::yield();
     }
 
     // Only one thread can reach this point for each distinct outpoint – this
