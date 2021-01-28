@@ -242,13 +242,27 @@ public:
 arith_uint256 GetBlockProof(const CBlockIndex &block);
 
 /**
- * The block chain is a tree shaped structure starting with the genesis block at
- * the root, with each block potentially having multiple candidates to be the
- * next block. A blockindex may have multiple pprev pointing to it, but at most
- * one of them can be part of the currently active branch.
+ * CBlockIndex holds information about block header as well as its context in the blockchain.
+ * For holding information about the containing chain, pprev must always be set.
+ * Only genesis block has pprev set to nullptr. With pprev, blocks can be connected into blockchain.
+ * The blockchain is a tree shaped structure starting with the genesis block at the root,
+ * with each block potentially having multiple candidates to be the next block.
+ * A blockindex may have multiple pprev pointing to it, but at most one of them can be part of the currently active branch.
  *
- * Only genesis blocks have pprev and pskip set to nullptr, the rest must
- * always have a previous block.
+ * CBlockIndex also contains information about file location of block.
+ * The majority of CBlockIndex are immutable and therefore do not change once they are set.
+ * Members that can change during the lifetime of CBlockIndex are data about disk location (nFile, nDataPos, nUndoPos), nSequenceId and nStatus.
+ * All CBlockIndex objects (except TemporaryBlockIndex objects) are stored in a global variable mapBlockIndex.
+ *
+ * All public methods are thread-safe.
+ * Mutable data in CBlockIndex is protected by a set of mutexes which are shared between all CBlockIndex instances.
+ * This is a compromise between each CBlockIndex having own mutex and having just a single mutex for all objects.
+ *
+ * Mutex locks are held only within the implementation of CBlockIndex and are never passed to application code.
+ * This eliminates the possibility of a dead-lock.
+ * But it also means that all mutable public methods must be independent of each other and
+ * object state between calling any two must be valid because it can be observed by another thread.
+ * This is why there are also setters that atomically modify several members and methods that atomically do several independent things.
  */
 class CBlockIndex {
 public:
