@@ -1428,7 +1428,7 @@ void writeBlockJsonChunksAndUpdateMetadata(const Config &config, HTTPRequest &re
     {
         jWriter.writeEndObject();
         jWriter.pushKV("error", nullptr);
-        jWriter.pushKV("id", rpcReqId);
+        jWriter.pushKVJSONFormatted("id", rpcReqId);
 
     }
 

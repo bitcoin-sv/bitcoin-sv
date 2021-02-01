@@ -560,7 +560,7 @@ void getblocktemplate(const Config& config,
                 jWriter.writeBeginObject();
                 jWriter.pushKVJSONFormatted("result", result.write());
                 jWriter.pushKV("error", nullptr);
-                jWriter.pushKV("id", request.id.write());
+                jWriter.pushKVJSONFormatted("id", request.id.write());
                 jWriter.writeEndObject();
                 jWriter.flush();
             }
@@ -771,7 +771,7 @@ void getblocktemplate(const Config& config,
         jWriter.writeEndObject();
 
         jWriter.pushKV("error", nullptr);
-        jWriter.pushKV("id", request.id.write());
+        jWriter.pushKVJSONFormatted("id", request.id.write());
         jWriter.writeEndObject();
         jWriter.flush();
     }
