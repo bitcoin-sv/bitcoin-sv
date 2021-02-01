@@ -128,6 +128,12 @@ class Stream
 
   private:
 
+    // Minimum TCP maximum segment size. Used as the default maximum message
+    // size for header/payload combining if we can't read the real MSS.
+    static constexpr size_t MIN_MAX_SEGMENT_SIZE { 536 };
+    // Maximum TCP maximum segment size
+    static constexpr size_t MAX_MAX_SEGMENT_SIZE { 65535 };
+
     // Node we are for
     CNode* mNode {nullptr};
     mutable CCriticalSection cs_mNode {};
@@ -138,6 +144,9 @@ class Stream
     // Our socket
     SOCKET mSocket {0};
     mutable CCriticalSection cs_mSocket {};
+
+    // TCP maximum segment size for our underlying socket
+    size_t mMSS { MIN_MAX_SEGMENT_SIZE };
 
     // Send message queue
     std::deque<std::unique_ptr<CForwardAsyncReadonlyStream>> mSendMsgQueue {};

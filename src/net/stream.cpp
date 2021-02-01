@@ -48,6 +48,23 @@ Stream::Stream(CNode* node, StreamType streamType, SOCKET socket, uint64_t maxRe
 
     // Remember any sending rate limit that's been set
     mSendRateLimit = gArgs.GetArg("-streamsendratelimit", DEFAULT_SEND_RATE_LIMIT);
+
+    // Fetch the MSS for the underlying socket
+    int mss {0};
+    socklen_t mssLen { sizeof(mss) };
+#ifdef WIN32
+    if(getsockopt(mSocket, IPPROTO_TCP, TCP_MAXSEG, reinterpret_cast<char*>(&mss), &mssLen) != SOCKET_ERROR)
+#else
+    if(getsockopt(mSocket, IPPROTO_TCP, TCP_MAXSEG, &mss, &mssLen) != SOCKET_ERROR)
+#endif
+    {
+        // Sanity check read mss before using it
+        size_t sizeMss { static_cast<size_t>(mss) };
+        if(sizeMss > MIN_MAX_SEGMENT_SIZE && sizeMss <= MAX_MAX_SEGMENT_SIZE)
+        {
+            mMSS = sizeMss;
+        }
+    }
 }
 
 Stream::~Stream()
@@ -209,10 +226,30 @@ uint64_t Stream::PushMessage(std::vector<uint8_t>&& serialisedHeader, CSerialize
     // Track send queue length
     mSendMsgQueueSize += nTotalSize;
 
-    mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
-    if(nPayloadLength)
-    {   
-        mSendMsgQueue.push_back(msg.MoveData());
+    // Combine short messages and their header into a single item in the queue.
+    // This helps to reduce the number of TCP segments sent and so reduces wastage.
+    if(nPayloadLength && nTotalSize <= mMSS)
+    {
+        // Extract all payload from the underlying stream and combine it with the header
+        serialisedHeader.reserve(nTotalSize);
+        auto payloadStream { msg.MoveData() };
+        while(!payloadStream->EndOfStream())
+        {
+            const CSpan& data { payloadStream->ReadAsync(msg.Size()) };
+            serialisedHeader.insert(serialisedHeader.end(), data.Begin(), data.Begin() + data.Size());
+        }
+
+        // Queue combined header & data
+        mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
+    }
+    else
+    {
+        // Queue header and payload separately
+        mSendMsgQueue.push_back(std::make_unique<CVectorStream>(std::move(serialisedHeader)));
+        if(nPayloadLength)
+        {   
+            mSendMsgQueue.push_back(msg.MoveData());
+        }
     }
 
     // If write queue empty, attempt "optimistic write"
