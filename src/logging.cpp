@@ -124,29 +124,33 @@ BCLog::Logger::~Logger() {
     }
 }
 
-std::string BCLog::Logger::LogTimestampStr(const std::string &str) {
-    std::string strStamped;
+std::string BCLog::Logger::LogTimestampStr(const std::string& str)
+{
+    if(!fLogTimestamps)
+        return str;
 
-    if (!fLogTimestamps) return str;
+    std::ostringstream ss;
 
-    if (fStartedNewLine) {
-        int64_t nTimeMicros = GetLogTimeMicros();
-        strStamped =
-            DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros / 1000000);
-        if (fLogTimeMicros)
-            strStamped += strprintf(".%06d", nTimeMicros % 1000000);
+    if(fStartedNewLine)
+    {
+        static const DateTimeFormatter dtf{"%Y-%m-%d %H:%M:%S"};
 
-        std::string strThreadName = "["+GetThreadName()+"]";
-        strStamped += ' ' + strThreadName + ' ' + str;
-    } else
-        strStamped = str;
+        const int64_t nTimeMicros{GetLogTimeMicros()};
+        ss = dtf(nTimeMicros / 1000000);
+        if(fLogTimeMicros)
+            ss << strprintf(".%06d", nTimeMicros % 1000000);
 
-    if (!str.empty() && str[str.size() - 1] == '\n')
+        ss << " [" << GetThreadName() << "] " << str;
+    }
+    else
+        ss << str;
+
+    if(!str.empty() && str[str.size() - 1] == '\n')
         fStartedNewLine = true;
     else
         fStartedNewLine = false;
 
-    return strStamped;
+    return ss.str();
 }
 
 int BCLog::Logger::LogPrintStr(const std::string &str) {

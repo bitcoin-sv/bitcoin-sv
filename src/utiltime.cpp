@@ -11,7 +11,6 @@
 
 #include <atomic>
 
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread.hpp>
 
 //!< For unit testing
@@ -63,7 +62,21 @@ void MilliSleep(int64_t n) {
     boost::this_thread::sleep_for(boost::chrono::milliseconds(n));
 }
 
-std::string DateTimeStrFormat(const char *pszFormat, int64_t nTime) {
+DateTimeFormatter::DateTimeFormatter(const char* format)
+    : locale_{std::locale::classic(), new boost::posix_time::time_facet(format)}
+{
+}
+
+std::ostringstream DateTimeFormatter::operator()(const int64_t nTime) const
+{
+    std::ostringstream ss;
+    ss.imbue(locale_);
+    ss << boost::posix_time::from_time_t(nTime);
+    return ss;
+}
+
+std::string DateTimeStrFormat(const char* pszFormat, int64_t nTime)
+{
     static std::locale classic(std::locale::classic());
     // std::locale takes ownership of the pointer
     std::locale loc(classic, new boost::posix_time::time_facet(pszFormat));
