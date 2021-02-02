@@ -1186,7 +1186,7 @@ private:
 
     void clearNL(bool skipTransactionDatabase = false);
 
-    void trackPackageRemovedNL(const CFeeRate &rate);
+    void trackPackageRemovedNL(const CFeeRate &rate, bool haveSecondaryMempoolTxs);
 
     /**
      * Remove a set of transactions from the mempool. If a transaction is in

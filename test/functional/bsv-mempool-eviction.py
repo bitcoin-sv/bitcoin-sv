@@ -185,7 +185,14 @@ class Evictions(BitcoinTestFramework):
                 conn.send_message(msg_tx(tx))
                 txs_in_mempool.add(tx)
                 txs_in_mempool.remove(evicting)
-                check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=0.5)
+                check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=0.5, timeout=60)
+
+                # when there are still some secondary mempool transaction in the mempool
+                if len(txs_in_mempool & set(secondaryMempoolTxs)) != 0:
+                    # the mempoolminfee should not exceed blockmintxfee
+                    assert  conn.rpc.getmempoolinfo()['mempoolminfee'] <= conn.rpc.getsettings()['blockmintxfee']
+
+
 
         with self.run_node_with_connections("Restart the node with using the disk for storing transactions.",
                                             0, ["-blockmintxfee=0.00001", # 1 satoshi/byte
@@ -203,7 +210,7 @@ class Evictions(BitcoinTestFramework):
                                             number_of_connections=1) as (conn,):
 
             # check that we have all txs in the mempool
-            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1)
+            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1, timeout=60)
 
             # check that we are not using the tx database
             assert conn.rpc.getmempoolinfo()['usagedisk'] == 0
@@ -214,7 +221,7 @@ class Evictions(BitcoinTestFramework):
                 outpoint_to_spend = (tx, 0)
                 conn.send_message(msg_tx(tx))
                 txs_in_mempool.add(tx)
-                check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=0.5)
+                check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=0.5, timeout=60)
 
             # make sure that we are using the tx database now
             assert conn.rpc.getmempoolinfo()['usagedisk'] != 0
@@ -235,7 +242,7 @@ class Evictions(BitcoinTestFramework):
                                             number_of_connections=1) as (conn,):
 
             # check that we have all txs in the mempool
-            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1)
+            check_mempool_equals(conn.rpc, txs_in_mempool, check_interval=1, timeout=60)
 
             # make sure that we are using the tx database
             assert conn.rpc.getmempoolinfo()['usagedisk'] != 0
