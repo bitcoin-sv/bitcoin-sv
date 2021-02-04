@@ -111,6 +111,8 @@ TEST_PARAMS = {
     "bsv-block-size-activation-default.py": [["--blocksizeactivationtime={}".format(int(time.time()) + 24 * 60 * 60)]]
 }
 
+TESTS_WITH_DISABLED_STDERROR_CHECK = ["bsv-callback-service.py", "bsv-dsreport.py"]
+
 # Used to limit the number of tests, when list of tests is not provided on command line
 # When --extended is specified, we run all tests, otherwise
 # we only run a test if its execution time in seconds does not exceed EXTENDED_CUTOFF
@@ -492,7 +494,7 @@ class TestHandler:
                         [stdout, stderr] = [l.read().decode('utf-8')
                                             for l in (log_out, log_err)]
                         log_out.close(), log_err.close()
-                        if proc.returncode == TEST_EXIT_PASSED and stderr == "":
+                        if proc.returncode == TEST_EXIT_PASSED and (stderr == "" or name in TESTS_WITH_DISABLED_STDERROR_CHECK):
                             status = "Passed"
                         elif proc.returncode == TEST_EXIT_SKIPPED:
                             status = "Skipped"

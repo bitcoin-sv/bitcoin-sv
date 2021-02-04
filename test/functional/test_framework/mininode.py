@@ -249,6 +249,21 @@ def deser_int_vector(f):
 def ser_int_vector(l):
     return (struct.pack("<i", i) for i in l)
 
+
+def deser_varint_vector(f):
+    nit = deser_compact_size(f)
+    r = []
+    for i in range(nit):
+        t = deser_compact_size(f)
+        r.append(t)
+    return r
+
+
+@generator_based_serializator
+def ser_varint_vector(l):
+    return (ser_compact_size(v) for v in l)
+
+
 # Deserialize from a hex string representation (eg from RPC)
 
 
@@ -871,6 +886,54 @@ class HeaderAndShortIDs():
     def __repr__(self):
         return "HeaderAndShortIDs(header=%s, nonce=%d, shortids=%s, prefilledtxn=%s" % (repr(self.header), self.nonce, repr(self.shortids), repr(self.prefilled_txn))
 
+# callback message for dsnt-enabled transactions
+class CallbackMessage():
+
+    # 127.0.0.1 as network-order bytes
+    LOCAL_HOST_IP = 0x7F000001
+    MAX_INT64 = 0xFFFFFFFFFFFFFFFF
+    IPv6_version = 129
+    IPv4_version = 1
+
+    def __init__(self, version=1, ip_address_count=1, ip_addresses=[LOCAL_HOST_IP], inputs=[0]):
+        self.version = version
+        self.ip_address_count = ip_address_count
+        self.ip_addresses = ip_addresses
+        self.inputs = inputs
+
+    def ser_addrs(self, addrs):
+        rs = b""
+        for addr in addrs:
+            if (self.version == self.IPv6_version):
+                rs += struct.pack('>QQ', (addr >> 64) & self.MAX_INT64, addr & self.MAX_INT64)
+            else:
+                rs += struct.pack("!I", addr)
+        return rs
+
+    def deser_addrs(self, f):
+        addrs = []
+        for i in range(self.ip_address_count):
+            if (self.version == self.IPv6_version):
+                a, b = struct.unpack('>QQ', f.read(16))
+                unpacked = (a << 64) | b
+                addrs.append(unpacked)
+            else:
+                addrs.append(struct.unpack("!I", f.read(4))[0])
+        return addrs
+
+    def deserialize(self, f):
+        self.version = struct.unpack("<B", f.read(1))[0]
+        self.ip_address_count = deser_compact_size(f)
+        self.ip_addresses = self.deser_addrs(f)
+        self.inputs = deser_varint_vector(f)
+
+    def serialize(self):
+        r = b""
+        r += struct.pack("<B", self.version)
+        r += ser_compact_size(self.ip_address_count)
+        r += self.ser_addrs(self.ip_addresses)
+        r += ser_varint_vector(self.inputs)
+        return r
 
 class BlockTransactionsRequest():
 
