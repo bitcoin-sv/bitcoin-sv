@@ -2776,8 +2776,6 @@ UniValue getchaintxstats(const Config &config, const JSONRPCRequest &request) {
                                "Block is not in main chain");
         }
     } else {
-        LOCK(cs_main);
-
         pindex = chainActive.Tip();
     }
 
