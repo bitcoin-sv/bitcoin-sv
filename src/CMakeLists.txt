@@ -386,6 +386,8 @@ add_library(server
 	dbwrapper.cpp
 	dbwrapper.h
 	disk_tx_pos.h
+    double_spend/dsattempt_handler.cpp
+    double_spend/dsattempt_handler.h
     double_spend/dscallback_msg.cpp
     double_spend/dscallback_msg.h
     double_spend/dstxn_serialiser.cpp
