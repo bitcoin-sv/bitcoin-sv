@@ -3,12 +3,14 @@
 
 #pragma once
 
+#include <cfile_util.h>
 #include <event2/http.h>
 #include <rpc/client_config.h>
 #include <univalue.h>
 
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace rpc::client
 {
@@ -25,18 +27,38 @@ class HTTPRequest
 {
   public:
     HTTPRequest() = default;
+    HTTPRequest(const std::string& endpoint, RequestCmdType cmd)
+        : mEndpoint{endpoint}, mCmdType{cmd}
+    {}
+    HTTPRequest(const std::string& endpoint, const std::vector<uint8_t>& contents, RequestCmdType cmd)
+        : mEndpoint{endpoint}, mContents{contents}, mContentsSize{contents.size()}, mCmdType{cmd}
+    {}
     HTTPRequest(const std::string& endpoint, const std::string& contents, RequestCmdType cmd)
-        : mEndpoint{endpoint}, mContents{contents}, mCmdType{cmd}
-     {}
+        : mEndpoint{endpoint}, mContents{contents.begin(), contents.end()}, mContentsSize{contents.size()}, mCmdType{cmd}
+    {}
+    HTTPRequest(const std::string& endpoint, UniqueFileDescriptor&& contentsFD, size_t contentsSize, RequestCmdType cmd)
+        : mEndpoint{endpoint}, mContentsFD{std::move(contentsFD)}, mContentsSize{contentsSize}, mCmdType{cmd}
+    {}
 
     // Get request endpoint
     const std::string& GetEndpoint() const { return mEndpoint; }
 
     // Get request body contents
-    const std::string& GetContents() const { return mContents; }
+    const std::vector<uint8_t>& GetContents() const { return mContents; }
+    const UniqueFileDescriptor& GetContentsFD() const { return mContentsFD; }
+    UniqueFileDescriptor& GetContentsFD() { return mContentsFD; }
+    size_t GetContentsSize() const { return mContentsSize; }
 
     // Get HTTP command type
     RequestCmdType GetCommand() const { return mCmdType; }
+
+    // Get additional header fields
+    using HeaderField = std::pair<std::string, std::string>;
+    using HeaderList = std::vector<HeaderField>;
+    const HeaderList& GetHeaders() const { return mHeaders; }
+
+    // Add a header field
+    void AddHeader(const HeaderField& header) { mHeaders.push_back(header); }
 
 
     // Factory method to make JSON RPC request
@@ -55,7 +77,39 @@ class HTTPRequest
         ((endpoint << "/" << EncodeURI(uriParams)), ...);
 
         // Create request
-        return { endpoint.str(), "", RequestCmdType::GET };
+        return { endpoint.str(), RequestCmdType::GET };
+    }
+
+    // Factory method to make a query request to a double-spend endpoint
+    static HTTPRequest CreateDSEndpointQueryRequest(const RPCClientConfig& config, const std::string& txid);
+
+    // Factory method to make submit request to a double-spend endpoint
+    template<typename... Params>
+    static HTTPRequest CreateDSEndpointSubmitRequest(
+        const RPCClientConfig& config,
+        UniqueFileDescriptor&& contentsFD,
+        size_t contentsSize,
+        Params... uriParamPairs)
+    {
+        // Format endpoint
+        std::stringstream endpoint {};
+        endpoint << config.GetEndpoint() << "submit";
+
+        bool firstParam {true};
+        auto isFirstParam = [&firstParam]() {
+            if(firstParam) {
+                firstParam = false;
+                return true;
+            }
+            return false;
+        };
+
+        ((endpoint << (isFirstParam()? "?" : "&") << EncodeURI(uriParamPairs.first) << "=" << EncodeURI(uriParamPairs.second)), ...);
+
+        // Create request with extra header
+        HTTPRequest request { endpoint.str(), std::move(contentsFD), contentsSize, RequestCmdType::POST };
+        request.AddHeader({"Content-Type", "application/octet-stream"});
+        return request;
     }
 
   private:
@@ -83,8 +137,11 @@ class HTTPRequest
         return encoded;
     }
 
-    std::string mEndpoint   {"/"};
-    std::string mContents   {};
+    std::string mEndpoint {"/"};
+    std::vector<uint8_t> mContents {};
+    UniqueFileDescriptor mContentsFD {};
+    size_t mContentsSize {0};
+    HeaderList mHeaders {};
     RequestCmdType mCmdType {RequestCmdType::POST};
 };
 

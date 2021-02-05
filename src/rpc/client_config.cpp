@@ -2,6 +2,7 @@
 // Distributed under the Open BSV software license, see the accompanying file LICENSE.
 
 #include <chainparamsbase.h>
+#include <config.h>
 #include <rpc/client_config.h>
 #include <rpc/protocol.h>
 #include <util.h>
@@ -138,6 +139,34 @@ RPCClientConfig RPCClientConfig::CreateForDSA(const std::string& url)
     SplitDSAuthorityURL(url, config.mServerIP, config.mServerPort, config.mEndpoint);
 
     return config;
+}
+
+RPCClientConfig RPCClientConfig::CreateForDoubleSpendEndpoint(
+    const Config& config,
+    const std::string& addr,
+    int timeout,
+    unsigned protocolVersion)
+{
+    RPCClientConfig clientConfig {};
+
+    // Get port
+    clientConfig.mServerPort = config.GetDoubleSpendEndpointPort();
+
+    // Set timeout
+    clientConfig.mConnectionTimeout = timeout;
+
+    // Set IP
+    clientConfig.mServerIP = addr;
+
+    // Initial endpoint
+    std::stringstream str {};
+    str << "/dsnt/" << protocolVersion << "/";
+    clientConfig.mEndpoint = str.str();
+
+    // Server sends empty responses
+    clientConfig.mValidEmptyResponse = true;
+
+    return clientConfig;
 }
 
 } // namespace rpc::client

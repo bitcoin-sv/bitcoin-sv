@@ -240,7 +240,8 @@ UniValue CallRPC(const std::string &strMethod, const UniValue &params)
 
     // Call RPC
     rpc::client::RPCClient client { config };
-    client.SubmitRequest(rpc::client::HTTPRequest::CreateJSONRPCRequest(config, strMethod, params), &response);
+    rpc::client::HTTPRequest request { rpc::client::HTTPRequest::CreateJSONRPCRequest(config, strMethod, params) };
+    client.SubmitRequest(request, &response);
 
     // Extract response
     UniValue valReply { UniValue::VSTR };

@@ -7,6 +7,8 @@
 
 #include <string>
 
+class Config;
+
 namespace rpc::client
 {
 
@@ -21,10 +23,18 @@ class RPCClientConfig
     static constexpr int DEFAULT_DS_AUTHORITY_PORT { 80 };
     static constexpr int DEFAULT_DS_AUTHORITY_TIMEOUT { 60 };
 
+    static constexpr int DEFAULT_DS_ENDPOINT_PORT { 80 };
+    static constexpr int DEFAULT_DS_ENDPOINT_FAST_TIMEOUT { 5 };
+    static constexpr int DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT { 60 };
+
     // Factory methods
     static RPCClientConfig CreateForBitcoind();
     static RPCClientConfig CreateForDSA();
     static RPCClientConfig CreateForDSA(const std::string& url);
+    static RPCClientConfig CreateForDoubleSpendEndpoint(const Config& config,
+                                                        const std::string& addr,
+                                                        int timeout,
+                                                        unsigned protocolVersion);
 
     // Accessors
     const std::string& GetServerIP() const { return mServerIP; }
@@ -33,6 +43,7 @@ class RPCClientConfig
     const std::string& GetCredentials() const { return mUsernamePassword; }
     const std::string& GetWallet() const { return mWallet; }
     const std::string& GetEndpoint() const { return mEndpoint; }
+    bool GetValidEmptyResponse() const { return mValidEmptyResponse; }
 
     bool UsesAuth() const { return ! mUsernamePassword.empty(); }
 
@@ -53,6 +64,9 @@ class RPCClientConfig
 
     // The configured endpoint (may be extended elsewhere)
     std::string mEndpoint {};
+
+    // Are empty responses to be expected?
+    bool mValidEmptyResponse {false};
 
 };
 

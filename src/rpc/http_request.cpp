@@ -40,4 +40,15 @@ HTTPRequest HTTPRequest::CreateRESTPostRequest(const RPCClientConfig& config, co
     return { endpoint, contents, RequestCmdType::POST };
 }
 
+// Create a properly formatted query request to a double-spend endpoint
+HTTPRequest HTTPRequest::CreateDSEndpointQueryRequest(const RPCClientConfig& config, const std::string& txid)
+{
+    // Format endpoint
+    std::string endpoint { config.GetEndpoint() + "query/" + txid };
+
+    // Create request
+    return { endpoint, RequestCmdType::GET };
 }
+
+}
+
