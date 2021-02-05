@@ -60,6 +60,7 @@ BITCOIN_TESTS =\
   test/crypto_tests.cpp \
   test/cscript_tests.cpp \
   test/cuckoocache_tests.cpp \
+  test/dsattempt_tests.cpp \
   test/dstxn_serialiser_tests.cpp \
   test/dbwrapper_tests.cpp \
   test/DoS_tests.cpp \
