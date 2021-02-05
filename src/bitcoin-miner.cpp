@@ -197,11 +197,20 @@ void Add_space_for_extra_nonce(vector<unsigned char>& coinbase_bytes, size_t off
     coinbase_bytes[41] += sizeof(extra_nonce_type);
 }
 
+class RandomIntGenerator {
+    const uint32_t distributionMax = std::numeric_limits<uint32_t>::max();
+    std::uniform_int_distribution <uint32_t> dist{0, distributionMax};
+    std::random_device rd{};
+    std::mt19937 mt{rd()};
+public:
+    uint32_t operator ()() { return dist(mt);}
+};
+
 // WARNING: This methods "splits" coinbaseBytes and inserts space for an extra-nonce.
-static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coinbaseBytes, const std::vector<uint256> &merkleproof
-                                        , uniform_int_distribution<uint32_t> & dist, std::mt19937 & mt)
+static bool CpuMineBlockHasher(CBlockHeader *pblock, vector<unsigned char>& coinbaseBytes, const std::vector<uint256> &merkleproof,
+                                        RandomIntGenerator & random_int_func)
 {
-    extra_nonce_type nExtraNonce = dist(mt);
+    extra_nonce_type nExtraNonce = random_int_func();
     uint32_t nNonce = pblock->nNonce;
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
     bool found = false;
@@ -298,8 +307,8 @@ static double GetDifficulty(uint64_t nBits)
     return dDiff;
 }
 
-static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found
-                             , uniform_int_distribution<uint32_t> & dist, std::mt19937 & mt)
+static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params, bool &found,
+                                            RandomIntGenerator & random_int_func)
 {
     UniValue tmp(UniValue::VOBJ);
     UniValue ret(UniValue::VARR);
@@ -332,7 +341,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         header.nVersion = blockversion;
     }
 
-    uint32_t startNonce = header.nNonce = dist(mt);
+    uint32_t startNonce = header.nNonce = random_int_func();
     std::string candidateId = params["id"].get_str();
 
     printf("Mining: id: %s parent: %s bits: %x difficulty: %.8e time: %d\n", candidateId.c_str(),
@@ -348,7 +357,7 @@ static UniValue CpuMineBlock(unsigned int searchDuration, const UniValue &params
         // request a new block).
         // header.nTime = (header.nTime < GetTime()) ? GetTime() : header.nTime;
 
-        found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof, dist, mt);
+        found = CpuMineBlockHasher(&header, coinbaseBytes, merkleproof, random_int_func);
     }
 
     // Leave if not found:
@@ -412,7 +421,7 @@ static UniValue RPCSubmitSolution(const UniValue &solution, int &nblocks)
     return reply;
 }
 
-int CpuMiner(uniform_int_distribution<uint32_t> & dist, std::mt19937 & mt)
+int CpuMiner(RandomIntGenerator & random_int_func)
 {
     int searchDuration = gArgs.GetArg("-duration", 30);
     int nblocks = gArgs.GetArg("-nblocks", -1); //-1 mine forever
@@ -536,7 +545,7 @@ int CpuMiner(uniform_int_distribution<uint32_t> & dist, std::mt19937 & mt)
             else
             {
                 found = false;
-                mineresult = CpuMineBlock(searchDuration, result, found, dist, mt);
+                mineresult = CpuMineBlock(searchDuration, result, found, random_int_func);
                 if (!found)
                 {
                     // printf("Mining did not succeed\n");
@@ -582,13 +591,10 @@ int main(int argc, char *argv[])
     int64_t nThreads {gArgs.GetArg("-cpus", 1)};
 
     auto minerThread = []()  {
-        const uint32_t distributionMax = std::numeric_limits<uint32_t>::max();
-        std::uniform_int_distribution <uint32_t> dist{0, distributionMax};
-        std::random_device rd{};
-        std::mt19937 mt{rd()};
+        RandomIntGenerator generator;
         while (1) {
             try {
-                CpuMiner(dist, mt);
+                CpuMiner(generator);
             }
             catch (const std::exception &e) {
                 PrintExceptionContinue(&e, "CommandLineRPC()");
@@ -606,11 +612,8 @@ int main(int argc, char *argv[])
     int ret = EXIT_FAILURE;
     try
     {
-        const uint32_t distributionMax = std::numeric_limits<uint32_t>::max();
-        std::uniform_int_distribution <uint32_t> dist{0, distributionMax};
-        std::random_device rd{};
-        std::mt19937 mt{rd()};
-        ret = CpuMiner(dist,mt);
+        RandomIntGenerator generator;
+        ret = CpuMiner(generator);
     }
     catch (const std::exception &e)
     {
