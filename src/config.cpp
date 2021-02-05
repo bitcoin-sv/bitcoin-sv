@@ -125,6 +125,20 @@ void GlobalConfig::Reset()
     // P2P parameters
     p2pHandshakeTimeout = DEFAULT_P2P_HANDSHAKE_TIMEOUT_INTERVAL;
     streamSendRateLimit = Stream::DEFAULT_SEND_RATE_LIMIT;
+    banScoreThreshold = DEFAULT_BANSCORE_THRESHOLD;
+
+    // Double-Spend parameters
+    dsNotificationLevel = DSAttemptHandler::DEFAULT_NOTIFY_LEVEL;
+    dsEndpointFastTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_FAST_TIMEOUT;
+    dsEndpointSlowTimeout = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_SLOW_TIMEOUT;
+    dsEndpointSlowRatePerHour = DSAttemptHandler::DEFAULT_DS_ENDPOINT_SLOW_RATE_PER_HOUR;
+    dsEndpointPort = rpc::client::RPCClientConfig::DEFAULT_DS_ENDPOINT_PORT;
+    dsEndpointBlacklistSize = DSAttemptHandler::DEFAULT_DS_ENDPOINT_BLACKLIST_SIZE;
+    dsEndpointSkipList = {};
+    dsAttemptTxnRemember = DSAttemptHandler::DEFAULT_TXN_REMEMBER_COUNT;
+    dsAttemptNumFastThreads = DSAttemptHandler::DEFAULT_NUM_FAST_THREADS;
+    dsAttemptNumSlowThreads = DSAttemptHandler::DEFAULT_NUM_SLOW_THREADS;
+    dsAttemptQueueMaxMemory = DSAttemptHandler::DEFAULT_MAX_SUBMIT_MEMORY;
 
     mDisableBIP30Checks = std::nullopt;
 
@@ -1176,6 +1190,230 @@ bool GlobalConfig::SetStreamSendRateLimit(int64_t limit, std::string* err)
 int64_t GlobalConfig::GetStreamSendRateLimit() const
 {
     return streamSendRateLimit;
+}
+
+bool GlobalConfig::SetBanScoreThreshold(int64_t threshold, std::string* err)
+{
+    auto maxThreshold { std::numeric_limits<decltype(banScoreThreshold)>::max() };
+    if(threshold <= 0 || threshold > maxThreshold)
+    {
+        if(err)
+        {
+            *err = "Ban score threshold must be greater than 0 and less then " + std::to_string(maxThreshold);
+        }
+        return false;
+    }
+
+    banScoreThreshold = static_cast<decltype(banScoreThreshold)>(threshold);
+    return true;
+}
+unsigned int GlobalConfig::GetBanScoreThreshold() const
+{
+    return banScoreThreshold;
+}
+
+// Double-Spend Parameters
+bool GlobalConfig::SetDoubleSpendNotificationLevel(int level, std::string* err)
+{
+    if(level < static_cast<int>(DSAttemptHandler::NotificationLevel::NONE) ||
+       level > static_cast<int>(DSAttemptHandler::NotificationLevel::ALL))
+    {
+        if(err)
+        {
+            *err = "Invalid value for double-spend notification level.";
+        }
+        return false;
+    }
+
+    dsNotificationLevel = static_cast<DSAttemptHandler::NotificationLevel>(level);
+    return true;
+}
+DSAttemptHandler::NotificationLevel GlobalConfig::GetDoubleSpendNotificationLevel() const
+{
+    return dsNotificationLevel;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointFastTimeout(int timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint fast timeout must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsEndpointFastTimeout = timeout;
+    return true;
+}
+int GlobalConfig::GetDoubleSpendEndpointFastTimeout() const
+{
+    return dsEndpointFastTimeout;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointSlowTimeout(int timeout, std::string* err)
+{
+    if(timeout <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint slow timeout must be grater than 0.";
+        }
+        return false;
+    }
+
+    dsEndpointSlowTimeout = timeout;
+    return true;
+}
+int GlobalConfig::GetDoubleSpendEndpointSlowTimeout() const
+{
+    return dsEndpointSlowTimeout;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointSlowRatePerHour(int64_t rate, std::string* err)
+{
+    if(rate <= 0 || rate > 60)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint slow rate per hour must be between 1 and 60.";
+        }
+        return false;
+    }
+
+    dsEndpointSlowRatePerHour = static_cast<uint64_t>(rate);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendEndpointSlowRatePerHour() const
+{
+    return dsEndpointSlowRatePerHour;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointPort(int port, std::string* err)
+{
+    if(port <= 0 || port > 65535)
+    {
+        if(err)
+        {
+            *err = "Double-Spend endpoint port must be between 1 and 65535.";
+        }
+        return false;
+    }
+
+    dsEndpointPort = port;
+    return true;
+}
+int GlobalConfig::GetDoubleSpendEndpointPort() const
+{
+    return dsEndpointPort;
+}
+
+bool GlobalConfig::SetDoubleSpendTxnRemember(int64_t size, std::string* err)
+{
+    if(LessThanZero(size, err, "Double-Spend maximum number of remembered transactions must not be negative."))
+    {
+        return false;
+    }
+
+    dsAttemptTxnRemember = static_cast<uint64_t>(size);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendTxnRemember() const
+{
+    return dsAttemptTxnRemember;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointBlacklistSize(int64_t size, std::string* err)
+{
+    if(LessThanZero(size, err, "Double-Spend maximum size of endpoint blacklist must not be negative."))
+    {
+        return false;
+    }
+
+    dsEndpointBlacklistSize = static_cast<uint64_t>(size);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendEndpointBlacklistSize() const
+{
+    return dsEndpointBlacklistSize;
+}
+
+bool GlobalConfig::SetDoubleSpendEndpointSkipList(const std::string& skip, std::string* err)
+{
+    // Split comma separated list of IPs and trim whitespace
+    std::vector<std::string> ips {};
+    boost::split(ips, skip, boost::is_any_of(","));
+    for(auto& ip : ips)
+    {
+        boost::algorithm::trim(ip);
+        dsEndpointSkipList.insert(ip);
+    }
+
+    return true;
+}
+std::set<std::string> GlobalConfig::GetDoubleSpendEndpointSkipList() const
+{
+    return dsEndpointSkipList;
+}
+
+bool GlobalConfig::SetDoubleSpendNumFastThreads(int64_t num, std::string* err)
+{
+    if(num <= 0 || num > static_cast<int64_t>(DSAttemptHandler::MAX_NUM_THREADS))
+    {
+        if(err)
+        {
+            *err = "Double-Spend maximum number of high priority processing threads must be between 1 and " +
+                std::to_string(DSAttemptHandler::MAX_NUM_THREADS);
+        }
+        return false;
+    }
+
+    dsAttemptNumFastThreads = static_cast<uint64_t>(num);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendNumFastThreads() const
+{
+    return dsAttemptNumFastThreads;
+}
+
+bool GlobalConfig::SetDoubleSpendNumSlowThreads(int64_t num, std::string* err)
+{
+    if(num <= 0 || num > static_cast<int64_t>(DSAttemptHandler::MAX_NUM_THREADS))
+    {
+        if(err)
+        {
+            *err = "Double-Spend maximum number of low priority processing threads must be between 1 and " +
+                std::to_string(DSAttemptHandler::MAX_NUM_THREADS);
+        }
+        return false;
+    }
+
+    dsAttemptNumSlowThreads = static_cast<uint64_t>(num);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendNumSlowThreads() const
+{
+    return dsAttemptNumSlowThreads;
+}
+
+bool GlobalConfig::SetDoubleSpendQueueMaxMemory(int64_t max, std::string* err)
+{
+    if(max <= 0)
+    {
+        if(err)
+        {
+            *err = "Double-Spend maximum queue memory must be greater than 0.";
+        }
+        return false;
+    }
+
+    dsAttemptQueueMaxMemory = static_cast<uint64_t>(max);
+    return true;
+}
+uint64_t GlobalConfig::GetDoubleSpendQueueMaxMemory() const
+{
+    return dsAttemptQueueMaxMemory;
 }
 
 bool GlobalConfig::SetDisableBIP30Checks(bool disable, std::string* err)

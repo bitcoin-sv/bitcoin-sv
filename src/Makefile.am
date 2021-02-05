@@ -274,7 +274,6 @@ libbitcoin_server_a_SOURCES = \
   block_index_store_loader.cpp \
   chain.cpp \
   checkpoints.cpp \
-  config.cpp \
   httprpc.cpp \
   httpserver.cpp \
   init.cpp \
