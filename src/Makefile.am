@@ -115,6 +115,8 @@ BITCOIN_CORE_H = \
   disk_block_index.h \
   disk_block_pos.h \
   disk_tx_pos.h \
+  dsattempt_handler.h \
+  double_spend/dscallback_msg.h \
   dstencode.h \
   enum_cast.h \
   fs.h \
@@ -281,6 +283,8 @@ libbitcoin_server_a_SOURCES = \
   invalid_txn_sinks/file_sink.cpp \
   invalid_txn_sinks/zmq_sink.cpp \
   dbwrapper.cpp \
+  dsattempt_handler.cpp \
+  double_spend/dscallback_msg.cpp \
   mempooltxdb.cpp \
   merkleblock.cpp \
   merkletree.cpp \
