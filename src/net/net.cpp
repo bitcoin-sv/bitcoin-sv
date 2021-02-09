@@ -2380,6 +2380,7 @@ CConnman::CConnman(
     , mValidatorThreadPool{"TxnValidatorPool",
          static_cast<size_t>(gArgs.GetArg("-numstdtxvalidationthreads", GetNumHighPriorityValidationThrs())),
          static_cast<size_t>(gArgs.GetArg("-numnonstdtxvalidationthreads", GetNumLowPriorityValidationThrs()))}
+    , mDSHandler{configIn}
     , mDebugP2PTheadStallsThreshold{debugP2PTheadStallsThreshold}
     , mAsyncTaskPool{configIn}
     , mInvalidTxnPublisher{

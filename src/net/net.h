@@ -13,6 +13,7 @@
 #include "bloom.h"
 #include "chainparams.h"
 #include "compat.h"
+#include "double_spend/dsattempt_handler.h"
 #include "fs.h"
 #include "hash.h"
 #include "invalid_txn_publisher.h"
@@ -323,6 +324,9 @@ public:
 
     /** Get a handle to our transaction propagator */
     const std::shared_ptr<CTxnPropagator>& getTransactionPropagator() const { return mTxnPropagator; }
+
+    /** Get a handle to the double-spend notification processor */
+    DSAttemptHandler& GetDSAttemptHandler() { return mDSHandler; }
 
     /** Call the specified function for each node */
     template <typename Callable> void ForEachNode(Callable&& func) const {
@@ -752,6 +756,9 @@ private:
     /** Transaction validator */
     std::shared_ptr<CTxnValidator> mTxnValidator {};
     CThreadPool<CDualQueueAdaptor> mValidatorThreadPool;
+
+    /** Double-spend attempt processor */
+    DSAttemptHandler mDSHandler;
 
     CThreadInterrupt interruptNet;
 
