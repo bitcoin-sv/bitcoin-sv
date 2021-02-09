@@ -88,6 +88,7 @@ const CLogCategoryDesc LogCategories[] = {
     {BCLog::NETMSGVERB, "netmsgverb"},
     {BCLog::NETMSGALL, "netmsgall"},
     {BCLog::NET, "net"},
+    {BCLog::DOUBLESPEND, "doublespend"},
     {BCLog::ALL, "1"},
     {BCLog::ALL, "all"},
 };
